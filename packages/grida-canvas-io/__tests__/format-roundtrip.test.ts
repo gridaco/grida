@@ -2792,4 +2792,119 @@ describe("format roundtrip", () => {
       );
     });
   });
+
+  describe("stroke_dash_array roundtrip", () => {
+    const dashArray = [10, 5, 3, 5];
+
+    it("roundtrips stroke_dash_array on VectorNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseVector(nodeId),
+          stroke_dash_array: dashArray,
+        },
+      });
+      roundtripTest<grida.program.nodes.VectorNode>(
+        doc,
+        nodeId,
+        "vector",
+        (node) => {
+          expect(node.stroke_dash_array).toEqual(dashArray);
+        }
+      );
+    });
+
+    it("roundtrips stroke_dash_array on LineNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseLine(nodeId),
+          stroke_dash_array: dashArray,
+        },
+      });
+      roundtripTest<grida.program.nodes.LineNode>(
+        doc,
+        nodeId,
+        "line",
+        (node) => {
+          expect(node.stroke_dash_array).toEqual(dashArray);
+        }
+      );
+    });
+
+    it("roundtrips stroke_dash_array on PathNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePath(nodeId),
+          stroke_dash_array: dashArray,
+        },
+      });
+      roundtripTest<grida.program.nodes.PathNode>(
+        doc,
+        nodeId,
+        "path",
+        (node) => {
+          expect(node.stroke_dash_array).toEqual(dashArray);
+        }
+      );
+    });
+
+    it("roundtrips stroke_dash_array on ContainerNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseContainer(nodeId),
+          stroke_dash_array: dashArray,
+        },
+      });
+      roundtripTest<grida.program.nodes.ContainerNode>(
+        doc,
+        nodeId,
+        "container",
+        (node) => {
+          expect(node.stroke_dash_array).toEqual(dashArray);
+        }
+      );
+    });
+
+    it("roundtrips stroke_dash_array on BooleanPathOperationNode", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseBoolean(nodeId),
+          stroke_dash_array: dashArray,
+        },
+      });
+      roundtripTest<grida.program.nodes.BooleanPathOperationNode>(
+        doc,
+        nodeId,
+        "boolean",
+        (node) => {
+          expect(node.stroke_dash_array).toEqual(dashArray);
+        }
+      );
+    });
+
+    it("roundtrips undefined stroke_dash_array (no dash)", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: baseVector(nodeId),
+      });
+      roundtripTest<grida.program.nodes.VectorNode>(
+        doc,
+        nodeId,
+        "vector",
+        (node) => {
+          expect(node.stroke_dash_array).toBeUndefined();
+        }
+      );
+    });
+  });
 });
