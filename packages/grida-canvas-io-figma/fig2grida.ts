@@ -168,6 +168,18 @@ function main(): void {
   const inputPath = resolve(args.input);
   const lower = inputPath.toLowerCase();
 
+  // Reject .fig-only flags for REST-format inputs
+  if (!lower.endsWith(".fig")) {
+    if (args.info) {
+      console.error("--info is only supported for .fig input.");
+      process.exit(1);
+    }
+    if (args.pages) {
+      console.error("--pages is currently only supported for .fig input.");
+      process.exit(1);
+    }
+  }
+
   // --info mode: print file info and exit (.fig only)
   if (args.info) {
     printInfo(inputPath, args.verbose);

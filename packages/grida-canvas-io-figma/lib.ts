@@ -2370,11 +2370,15 @@ export namespace iofigma {
             fontSize: nc.fontSize ?? 12,
             textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
             textAlignVertical: nc.textAlignVertical ?? "TOP",
+            // Produce absolute-pixel letterSpacing to match the REST API
+            // format — the downstream consumer (fromRest*) normalizes by
+            // dividing by fontSize, so we must not pre-normalize here.
             letterSpacing:
               nc.letterSpacing?.units === "PERCENT"
-                ? nc.letterSpacing.value / 100
+                ? (nc.letterSpacing.value / 100) *
+                  (nc.fontSize ?? DEFAULT_FONT_SIZE)
                 : nc.letterSpacing?.units === "PIXELS"
-                  ? nc.letterSpacing.value / (nc.fontSize ?? DEFAULT_FONT_SIZE)
+                  ? nc.letterSpacing.value
                   : (nc.letterSpacing?.value ?? 0),
             lineHeightPx:
               nc.lineHeight?.units === "PIXELS"
