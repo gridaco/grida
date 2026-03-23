@@ -90,7 +90,7 @@ impl Default for RendererOptions {
     }
 }
 
-fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
+pub fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
     fn walk(id: &NodeId, graph: &SceneGraph, set: &mut HashSet<String>) {
         if let Ok(node) = graph.get_node(id) {
             match node {
@@ -1563,6 +1563,9 @@ impl Renderer {
             bounds.y + bounds.height,
         );
         let canvas = recorder.begin_recording(sk_bounds, true);
+        // Skia's built-in mipmaps evaluate LOD at rasterization time based on
+        // the final canvas transform, so Picture playback at different zoom
+        // levels automatically selects the correct mipmap level.
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,

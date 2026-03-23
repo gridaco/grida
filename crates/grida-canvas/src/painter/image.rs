@@ -4,7 +4,7 @@ use crate::{
     sk,
 };
 use math2::transform::AffineTransform;
-use skia_safe::{self, shaders, Color, SamplingOptions, Shader, TileMode};
+use skia_safe::{self, shaders, Color, FilterMode, MipmapMode, SamplingOptions, Shader, TileMode};
 
 fn tile_modes_for_repeat(repeat: ImageRepeat) -> (TileMode, TileMode) {
     match repeat {
@@ -36,7 +36,11 @@ pub fn image_shader(
         (image.width() as f32, image.height() as f32),
         size,
     ));
-    let sampling = SamplingOptions::default();
+    // Use Skia's built-in mipmap support. The image stored in ImageRepository
+    // has a mipmap chain attached via `with_default_mipmaps()`. Skia evaluates
+    // the LOD at rasterization time based on the final canvas transform, so
+    // this works correctly with PictureCache playback at different zoom levels.
+    let sampling = SamplingOptions::new(FilterMode::Linear, MipmapMode::Nearest);
 
     // Extract repeat mode based on the fit variant
     let tile_modes = match &img.fit {
