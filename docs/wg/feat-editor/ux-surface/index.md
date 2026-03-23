@@ -2,7 +2,7 @@
 title: UX Surface (WG)
 tags:
   - internal
-  - working-group
+  - wg
   - editor
 
 ---

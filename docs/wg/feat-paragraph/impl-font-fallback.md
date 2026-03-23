@@ -2,7 +2,7 @@
 title: Font Fallback Strategy (font-fallback)
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - fonts

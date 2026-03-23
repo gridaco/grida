@@ -2,7 +2,7 @@
 title: Platform (WG)
 tags:
   - internal
-  - working-group
+  - wg
   - platform
 
 ---

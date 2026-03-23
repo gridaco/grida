@@ -2,7 +2,7 @@
 title: Image Tools (for AI)
 tags:
   - internal
-  - working-group
+  - wg
   - ai
   - editor
 ---

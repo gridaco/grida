@@ -3,7 +3,7 @@ title: "Figma Import & Translation (io-figma)"
 description: Implementation details behind importing .fig files into Grida.
 tags:
   - internal
-  - working-group
+  - wg
   - figma
   - import
 

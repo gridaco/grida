@@ -2,7 +2,7 @@
 title: Noise Effects (fe-noise)
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - painting
   - rendering

@@ -2,7 +2,7 @@
 title: Image Filters (image-filters)
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - filters
   - rendering

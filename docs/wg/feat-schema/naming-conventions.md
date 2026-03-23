@@ -2,7 +2,7 @@
 title: Grida document schema naming conventions
 tags:
   - internal
-  - working-group
+  - wg
   - format-schema
 
 ---

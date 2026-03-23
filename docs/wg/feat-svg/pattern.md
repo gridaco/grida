@@ -3,7 +3,7 @@ title: SVG Pattern Support
 format: md
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - svg
   - painting

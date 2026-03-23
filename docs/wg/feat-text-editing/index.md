@@ -3,7 +3,7 @@ id: feat-text-editing
 title: "Text Editing: Manifesto"
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - editor

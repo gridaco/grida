@@ -2,7 +2,7 @@
 title: Resource Management (resources)
 tags:
   - internal
-  - working-group
+  - wg
   - resources
   - canvas
   - wasm

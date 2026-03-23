@@ -2,7 +2,7 @@
 title: Kiwi Schema for .fig Format
 tags:
   - internal
-  - working-group
+  - wg
   - figma
   - format-schema
 ---

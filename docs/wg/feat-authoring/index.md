@@ -2,7 +2,7 @@
 title: Authoring (WG)
 tags:
   - internal
-  - working-group
+  - wg
   - editor
   - authoring
 

@@ -2,7 +2,7 @@
 title: Rectangular Stroke Model (stroke-rect)
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - painting
   - rendering

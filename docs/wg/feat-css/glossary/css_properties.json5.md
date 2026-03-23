@@ -3,7 +3,7 @@ title: "css_properties.json5"
 description: "Chromium Blink's single source of truth for CSS property metadata, used as a reference for browser-grade CSS cascade implementation"
 tags:
   - internal
-  - working-group
+  - wg
   - css
 
 ---

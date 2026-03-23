@@ -3,7 +3,7 @@ title: Universal Docs Routing (WG)
 tags:
   - internal
   - user-facing
-  - working-group
+  - wg
   - platform
   - routing
 

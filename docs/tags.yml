@@ -4,7 +4,7 @@
 internal:
   label: Internal
   permalink: /internal
-  description: Engineering and working-group material for Grida builders (not end-user product guides).
+  description: Engineering and WG material for Grida builders (not end-user product guides).
 
 user-facing:
   label: User-facing
@@ -16,10 +16,10 @@ reference:
   permalink: /reference
   description: Stable technical reference tables, glossaries, and specifications.
 
-working-group:
-  label: Working Group
-  permalink: /working-group
-  description: WG design notes, feature specs, and implementation plans.
+wg:
+  label: WG
+  permalink: /wg
+  description: Working group notes, feature specs, and implementation plans.
 
 research:
   label: Research
@@ -29,11 +29,11 @@ research:
 platform:
   label: Platform
   permalink: /platform
-  description: Multi-tenant platform, routing, domains, and infrastructure.
+  description: Multi-tenant platform, routing, domains, and edge operations.
 
-infrastructure:
-  label: Infrastructure
-  permalink: /infrastructure
+infra:
+  label: Infra
+  permalink: /infra
   description: Hosting, DNS, edge configuration, and operational architecture.
 
 routing:
@@ -166,9 +166,9 @@ css:
   permalink: /css
   description: CSS properties, web styling alignment, and design-to-code mapping.
 
-internationalization:
-  label: Internationalization
-  permalink: /internationalization
+icu:
+  label: ICU
+  permalink: /icu
   description: ICU, Unicode, locale-aware text, and cross-script behavior.
 
 chromium:

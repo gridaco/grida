@@ -3,7 +3,7 @@ id: impl-performance
 title: "Text Editing: Performance Model"
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - performance

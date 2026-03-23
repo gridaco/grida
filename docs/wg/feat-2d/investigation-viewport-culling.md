@@ -4,7 +4,7 @@ status: rejected
 date: 2026-03-22
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - performance
   - rendering

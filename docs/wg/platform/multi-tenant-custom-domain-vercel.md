@@ -2,9 +2,9 @@
 title: Multi-tenant Custom Domains on Vercel
 tags:
   - internal
-  - working-group
+  - wg
   - platform
-  - infrastructure
+  - infra
 
 ---
 

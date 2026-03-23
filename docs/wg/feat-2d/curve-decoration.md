@@ -2,7 +2,7 @@
 title: Curve Decorations (2D)
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - vector
   - rendering

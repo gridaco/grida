@@ -2,7 +2,7 @@
 title: Fast Hashing (hash-nch)
 tags:
   - internal
-  - working-group
+  - wg
   - performance
   - resources
 

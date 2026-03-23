@@ -2,7 +2,7 @@
 title: Optical Size Automation (opsz-auto)
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - fonts

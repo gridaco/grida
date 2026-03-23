@@ -2,7 +2,7 @@
 title: Rendering Optimization Strategies
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - performance
   - rendering

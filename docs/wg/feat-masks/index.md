@@ -2,7 +2,7 @@
 title: Masking Model (masks)
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - masks
   - rendering

@@ -2,7 +2,7 @@
 title: Editor Features (WG)
 tags:
   - internal
-  - working-group
+  - wg
   - editor
 
 ---

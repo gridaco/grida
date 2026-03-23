@@ -3,8 +3,8 @@ title: Unicode Coverage Tracker (UCT)
 description: A working group draft describing the Unicode Coverage Tracker (UCT) feature for the core engine.
 tags:
   - internal
-  - working-group
-  - internationalization
+  - wg
+  - icu
   - typography
   - text
 

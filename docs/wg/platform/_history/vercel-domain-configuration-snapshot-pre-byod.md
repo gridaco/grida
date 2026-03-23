@@ -5,7 +5,7 @@ unlisted: true
 tags:
   - internal
   - platform
-  - infrastructure
+  - infra
   - historical
 
 ---

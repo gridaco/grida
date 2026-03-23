@@ -2,7 +2,7 @@
 title: Vector Network Implementation
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - vector
   - editor

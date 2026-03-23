@@ -2,7 +2,7 @@
 title: Paragraph Feature Roadmap
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - fonts

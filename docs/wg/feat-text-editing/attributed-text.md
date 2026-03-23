@@ -3,7 +3,7 @@ id: attributed-text
 title: "Attributed Text: Data Model Specification"
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - editor

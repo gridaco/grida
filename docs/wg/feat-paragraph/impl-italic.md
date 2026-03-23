@@ -2,7 +2,7 @@
 title: Italic and Oblique Strategy (italic)
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - fonts

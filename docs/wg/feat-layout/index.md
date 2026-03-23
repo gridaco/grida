@@ -2,7 +2,7 @@
 title: Layout Model (layout)
 tags:
   - internal
-  - working-group
+  - wg
   - layout
   - canvas
 

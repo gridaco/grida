@@ -2,7 +2,7 @@
 title: Fundamental Tools (for AI)
 tags:
   - internal
-  - working-group
+  - wg
   - ai
   - editor
 ---

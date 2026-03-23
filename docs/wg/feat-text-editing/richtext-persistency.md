@@ -3,7 +3,7 @@ id: richtext-persistency
 title: "Rich Text Persistency: Research & Comparative Reference"
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - editor

@@ -2,7 +2,7 @@
 title: Font Generation (fontgen)
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - fonts
 

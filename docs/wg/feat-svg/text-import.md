@@ -2,7 +2,7 @@
 format: md
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - svg
   - import

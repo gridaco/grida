@@ -2,7 +2,7 @@
 title: Selection
 tags:
   - internal
-  - working-group
+  - wg
   - editor
 ---
 

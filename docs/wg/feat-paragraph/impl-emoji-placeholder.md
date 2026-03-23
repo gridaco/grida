@@ -2,7 +2,7 @@
 title: Emoji Placeholder Rendering (emoji-placeholder)
 tags:
   - internal
-  - working-group
+  - wg
   - typography
   - text
   - fonts

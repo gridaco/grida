@@ -2,7 +2,7 @@
 title: "Stroke-Fill Opacity Compositing"
 tags:
   - internal
-  - working-group
+  - wg
   - canvas
   - rendering
 
