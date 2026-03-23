@@ -268,7 +268,14 @@ describe("iofigma.restful.factory – REST API without geometry=paths", () => {
         absoluteBoundingBox: { x: 20, y: 30, width: 128, height: 16 },
         absoluteRenderBounds: { x: 20, y: 30, width: 120, height: 12 },
         constraints: { vertical: "TOP", horizontal: "LEFT" },
-        fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 }, blendMode: "NORMAL", visible: true }],
+        fills: [
+          {
+            type: "SOLID",
+            color: { r: 0, g: 0, b: 0, a: 1 },
+            blendMode: "NORMAL",
+            visible: true,
+          },
+        ],
         strokes: [],
         strokeWeight: 1,
         strokeAlign: "INSIDE",
@@ -384,7 +391,8 @@ describe("iofigma.restful.factory – REST API without geometry=paths", () => {
       // Root frame must have positive dimensions (not 0x0 which would panic in Rust)
       const rootGrida = Object.values(doc.nodes).find(
         (n): n is grida.program.nodes.ContainerNode =>
-          n.type === "container" && n.name === "ws-intense-next-advertising-agency/"
+          n.type === "container" &&
+          n.name === "ws-intense-next-advertising-agency/"
       );
       expect(rootGrida).toBeDefined();
       expect(rootGrida!.layout_target_width).toBeGreaterThan(0);
@@ -398,6 +406,90 @@ describe("iofigma.restful.factory – REST API without geometry=paths", () => {
       expect(childGrida).toBeDefined();
       expect(childGrida!.layout_target_width).toBeGreaterThan(0);
       expect(childGrida!.layout_target_height).toBeGreaterThan(0);
+    });
+  });
+
+  describe("individualStrokeWeights (per-side stroke widths)", () => {
+    it("FRAME with individualStrokeWeights maps to rectangular_stroke_width_*", () => {
+      const frameNode = makeFrameNodeWithoutGeometry({
+        individualStrokeWeights: { top: 2, right: 0, bottom: 4, left: 0 },
+      } as Partial<figrest.FrameNode>);
+
+      const { document: doc } = iofigma.restful.factory.document(
+        frameNode,
+        {},
+        context
+      );
+
+      const containerGrida = Object.values(doc.nodes).find(
+        (n): n is grida.program.nodes.ContainerNode => n.type === "container"
+      );
+      expect(containerGrida).toBeDefined();
+      expect(containerGrida!.rectangular_stroke_width_top).toBe(2);
+      expect(containerGrida!.rectangular_stroke_width_right).toBe(0);
+      expect(containerGrida!.rectangular_stroke_width_bottom).toBe(4);
+      expect(containerGrida!.rectangular_stroke_width_left).toBe(0);
+    });
+
+    it("RECTANGLE with individualStrokeWeights maps to rectangular_stroke_width_*", () => {
+      const rectNode: figrest.RectangleNode = {
+        id: "1:2",
+        name: "Rect",
+        type: "RECTANGLE",
+        scrollBehavior: "SCROLLS",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        fills: [],
+        strokes: [],
+        strokeWeight: 1,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+        exportSettings: [],
+        interactions: [],
+        individualStrokeWeights: { top: 0, right: 3, bottom: 0, left: 5 },
+      } as figrest.RectangleNode;
+
+      const frameNode = makeFrameNodeWithoutGeometry({
+        children: [rectNode as unknown as figrest.SubcanvasNode],
+      });
+
+      const { document: doc } = iofigma.restful.factory.document(
+        frameNode,
+        {},
+        context
+      );
+
+      const rectGrida = Object.values(doc.nodes).find(
+        (n): n is grida.program.nodes.RectangleNode =>
+          n.type === "rectangle" && n.name === "Rect"
+      );
+      expect(rectGrida).toBeDefined();
+      expect(rectGrida!.rectangular_stroke_width_top).toBe(0);
+      expect(rectGrida!.rectangular_stroke_width_right).toBe(3);
+      expect(rectGrida!.rectangular_stroke_width_bottom).toBe(0);
+      expect(rectGrida!.rectangular_stroke_width_left).toBe(5);
+    });
+
+    it("FRAME without individualStrokeWeights does not set rectangular_stroke_width_*", () => {
+      const frameNode = makeFrameNodeWithoutGeometry();
+
+      const { document: doc } = iofigma.restful.factory.document(
+        frameNode,
+        {},
+        context
+      );
+
+      const containerGrida = Object.values(doc.nodes).find(
+        (n): n is grida.program.nodes.ContainerNode => n.type === "container"
+      );
+      expect(containerGrida).toBeDefined();
+      expect(containerGrida!.rectangular_stroke_width_top).toBeUndefined();
+      expect(containerGrida!.rectangular_stroke_width_right).toBeUndefined();
+      expect(containerGrida!.rectangular_stroke_width_bottom).toBeUndefined();
+      expect(containerGrida!.rectangular_stroke_width_left).toBeUndefined();
     });
   });
 });

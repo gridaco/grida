@@ -740,6 +740,28 @@ export namespace iofigma {
       }
 
       /**
+       * Per-side stroke width properties for rectangular nodes.
+       * Extracts `individualStrokeWeights` from Figma REST API / Kiwi intermediate format.
+       */
+      function rectangular_stroke_width_trait(node: {
+        individualStrokeWeights?: {
+          top: number;
+          right: number;
+          bottom: number;
+          left: number;
+        };
+      }) {
+        if (!node.individualStrokeWeights) return {};
+        const { top, right, bottom, left } = node.individualStrokeWeights;
+        return {
+          rectangular_stroke_width_top: top,
+          rectangular_stroke_width_right: right,
+          rectangular_stroke_width_bottom: bottom,
+          rectangular_stroke_width_left: left,
+        };
+      }
+
+      /**
        * Text stroke properties - ITextStroke (simpler than IStroke)
        */
       function text_stroke_trait(
@@ -1457,6 +1479,7 @@ export namespace iofigma {
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
+              ...rectangular_stroke_width_trait(node),
               ...style_trait({
                 overflow: node.clipsContent ? "clip" : undefined,
               }),
@@ -1588,6 +1611,7 @@ export namespace iofigma {
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
+              ...rectangular_stroke_width_trait(node),
               ...corner_radius_trait(node),
               ...effects_trait(node.effects),
               type: "rectangle",
@@ -2155,6 +2179,17 @@ export namespace iofigma {
           strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
           strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
           strokeMiterAngle: nc.miterLimit,
+          // Per-side stroke weights (Figma Kiwi: borderStrokeWeightsIndependent)
+          ...(nc.borderStrokeWeightsIndependent
+            ? {
+                individualStrokeWeights: {
+                  top: nc.borderTopWeight ?? nc.strokeWeight ?? 0,
+                  right: nc.borderRightWeight ?? nc.strokeWeight ?? 0,
+                  bottom: nc.borderBottomWeight ?? nc.strokeWeight ?? 0,
+                  left: nc.borderLeftWeight ?? nc.strokeWeight ?? 0,
+                },
+              }
+            : {}),
         };
       }
 
