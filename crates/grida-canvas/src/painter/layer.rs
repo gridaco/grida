@@ -601,6 +601,16 @@ impl LayerList {
                         .geometry()
                         .get_render_bounds(id)
                         .unwrap_or(bounds);
+
+                    // The clip_path from compute_clip_path is in the node's LOCAL
+                    // coordinate space. However, draw_render_surface applies it
+                    // directly to the canvas in WORLD space (before any per-node
+                    // transform). Transform the clip path to world space so it
+                    // clips correctly.
+                    let surface_clip_path = clip_path.map(|path| {
+                        path.make_transform(&sk::sk_matrix(transform.matrix))
+                    });
+
                     let surface = PainterRenderSurface {
                         id: id.clone(),
                         bounds: render_bounds,
@@ -608,7 +618,7 @@ impl LayerList {
                         opacity,
                         blend_mode: n.blend_mode,
                         effects: surface_effects,
-                        clip_path,
+                        clip_path: surface_clip_path,
                         own_layer: Some(layer),
                         children: child_commands,
                     };
