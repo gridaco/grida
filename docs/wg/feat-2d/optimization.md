@@ -727,12 +727,12 @@ missing the cheapest possible camera-change path.
 
     **Measured impact (yrr-main.grida, 136K nodes, 100 frames):**
 
-    | Scenario               | Before µs (fps) | After µs (fps) | Speedup |
-    |------------------------|------------------|----------------|---------|
-    | zoom_slow_around_fit   | 57,084 (17.5)    | 1,170 (855)    | **48.8×** |
-    | zoom_fast_around_fit   | 54,455 (18.4)    | 846 (1,182)    | **64.4×** |
-    | zoom_slow_high         | 38,284 (26.1)    | 522 (1,916)    | **73.3×** |
-    | zoom_fast_high         | 39,015 (25.6)    | 518 (1,931)    | **75.3×** |
+    | Scenario             | Before µs (fps) | After µs (fps) | Speedup   |
+    | -------------------- | --------------- | -------------- | --------- |
+    | zoom_slow_around_fit | 57,084 (17.5)   | 1,170 (855)    | **48.8×** |
+    | zoom_fast_around_fit | 54,455 (18.4)   | 846 (1,182)    | **64.4×** |
+    | zoom_slow_high       | 38,284 (26.1)   | 522 (1,916)    | **73.3×** |
+    | zoom_fast_high       | 39,015 (25.6)   | 518 (1,931)    | **75.3×** |
 
     Pan performance unchanged (within noise).
 
@@ -744,8 +744,8 @@ missing the cheapest possible camera-change path.
     The zoom image cache handles both zoom-in and zoom-out uniformly.
     Zoom-out scales down the cached texture (fewer visual artifacts than
     zoom-in since it discards information rather than interpolating).
-    Border strip rasterization (item 17) remains a future refinement for
-    the settle phase.
+    Border strip rasterization remains a future refinement for the settle
+    phase (see items 25–27 on progressive refinement).
 
 23. **Settle & Refine (shared)**
 

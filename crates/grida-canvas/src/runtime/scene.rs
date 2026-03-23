@@ -965,7 +965,7 @@ impl Renderer {
         if !stable
             && self.backend.is_gpu()
             && self.zoom_image_cache.is_some()
-            && camera_change != CameraChangeKind::PanOnly
+            && camera_change.zoom_changed()
         {
             let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &FramePlan {
                 stable,
@@ -1095,13 +1095,13 @@ impl Renderer {
         // The image is rendered at a stale zoom level, so text and fine
         // details are slightly blurry — acceptable during active interaction.
         // The stable frame after interaction ends always does a full redraw.
-        // Don't use zoom cache for pan-only frames — they have their own
-        // faster pan image cache. Use zoom cache for zoom changes, no-change
-        // (quantized repeats during zoom gesture), and pan+zoom.
+        // Don't use zoom cache for pan-only or no-change frames — pan has its
+        // own faster cache, and no-change frames (e.g. scene mutations without
+        // camera movement) must not replay a stale zoom snapshot.
         if !plan.stable
             && self.backend.is_gpu()
             && self.zoom_image_cache.is_some()
-            && plan.camera_change != CameraChangeKind::PanOnly
+            && plan.camera_change.zoom_changed()
         {
             let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &plan);
             if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
@@ -1412,7 +1412,7 @@ impl Renderer {
                 // Pan cache will likely hit
                 (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
                 // Zoom cache will likely hit
-                || (camera_change != CameraChangeKind::PanOnly && self.zoom_image_cache.is_some())
+                || (camera_change.zoom_changed() && self.zoom_image_cache.is_some())
             );
 
         if can_defer {
