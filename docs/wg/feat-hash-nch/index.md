@@ -1,5 +1,11 @@
 ---
 title: Fast Hashing (hash-nch)
+tags:
+  - internal
+  - wg
+  - performance
+  - resources
+
 ---
 
 # Fast Hashing – `hash-nch`

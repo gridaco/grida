@@ -1,5 +1,12 @@
 ---
 title: Image Filters (image-filters)
+tags:
+  - internal
+  - wg
+  - canvas
+  - filters
+  - rendering
+
 ---
 
 # Image Filters - `image-filters`

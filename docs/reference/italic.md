@@ -1,3 +1,13 @@
+---
+title: Italic (and Oblique Model Design)
+format: md
+tags:
+  - reference
+  - user-facing
+  - typography
+  - fonts
+---
+
 # Italic (and Oblique Model Design)
 
 This document provides an in-depth technical analysis of italic and oblique styles in digital typography, focusing on font metadata specifications, rendering engine implementations, platform-specific behaviors, design tool capabilities, multilingual considerations, and user experience design.

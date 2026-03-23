@@ -1,5 +1,12 @@
 ---
 title: "Chromium Compositor Research"
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - compositing
+
 ---
 
 # Chromium Compositor Research

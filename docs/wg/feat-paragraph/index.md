@@ -1,5 +1,12 @@
 ---
 title: Paragraph Feature Roadmap
+tags:
+  - internal
+  - wg
+  - typography
+  - text
+  - fonts
+
 ---
 
 # Paragraph Feature Roadmap
