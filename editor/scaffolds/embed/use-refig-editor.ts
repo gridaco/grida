@@ -158,6 +158,7 @@ export function useRefigEditor() {
           pageNames,
         } = fig2grida(input, {
           placeholder_for_missing_images: false,
+          preserve_figma_ids: true,
         });
         console.log(
           `[@grida/refig] fig2grida: ${pageNames.length} page(s), ${nodeCount} nodes in ${(performance.now() - t0).toFixed(0)}ms`
@@ -227,6 +228,53 @@ export function useRefigEditor() {
     documentKey,
     onFile,
   };
+}
+
+/**
+ * Regex that matches the synthetic suffixes appended by io-figma when
+ * `prefer_path_for_geometry` is true and fill/stroke geometries are
+ * decomposed into child nodes.
+ *
+ * Patterns:
+ * - `{figmaId}_fill_{N}`    — fill geometry child
+ * - `{figmaId}_stroke_{N}`  — stroke geometry child
+ */
+const SYNTHETIC_SUFFIX_RE = /_(fill|stroke)_\d+$/;
+
+/**
+ * Regex for instance-clone IDs: `{prefix}::{counter}::{originalId}`.
+ * The `::` separator is unique to clone IDs (never appears in Figma node IDs).
+ * Captures the trailing original Figma ID after the last `::`.
+ */
+const INSTANCE_CLONE_RE = /^.+::(.+)$/;
+
+/**
+ * Decode a Grida node ID that may contain synthetic suffixes back to the
+ * closest real Figma node ID. This is refig-specific logic and should only
+ * be used in the embed/refig context where `preserve_figma_ids` is true.
+ *
+ * - `"42:17"` → `"42:17"` (real node, unchanged)
+ * - `"42:17_fill_0"` → `"42:17"` (synthetic fill child → parent)
+ * - `"42:17_stroke_1"` → `"42:17"` (synthetic stroke child → parent)
+ * - `"42:17::0::5:3"` → `"5:3"` (instance clone → original)
+ * - `"42:17::0::5:3_fill_0"` → `"5:3"` (instance clone + synthetic → original)
+ * - `"scene-1"` → `"scene-1"` (non-Figma ID, unchanged)
+ */
+export function decodeSyntheticFigmaId(id: string): string {
+  let decoded = id;
+
+  // Strip instance-clone prefix: `{prefix}::{counter}::{originalId}` → `{originalId}`
+  // The `::` delimiter never appears in Figma IDs, so its presence is
+  // unambiguous. We take everything after the last `::`.
+  const cloneMatch = decoded.match(INSTANCE_CLONE_RE);
+  if (cloneMatch) {
+    decoded = cloneMatch[1];
+  }
+
+  // Strip synthetic geometry suffix
+  decoded = decoded.replace(SYNTHETIC_SUFFIX_RE, "");
+
+  return decoded;
 }
 
 export { validateExt };

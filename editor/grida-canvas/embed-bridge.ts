@@ -20,6 +20,16 @@ function scenesFromEditor(ed: Editor): EmbedSceneInfo[] {
 export interface EmbedBridgeOptions {
   /** Handler for `grida:load` command. */
   onFile?: (file: File) => void;
+  /**
+   * Optional transform applied to every node ID before it is emitted to the
+   * host via postMessage. Use this to decode synthetic/internal IDs back to
+   * the original source IDs (e.g. Figma node IDs).
+   *
+   * The transform receives a single Grida node ID and must return the ID
+   * string that should appear in the outgoing event. Return the input
+   * unchanged for IDs that need no mapping.
+   */
+  __dangerously_transform_node_id?: (id: string) => string;
 }
 
 /**
@@ -39,6 +49,7 @@ export interface EmbedBridgeOptions {
 export class EmbedBridge {
   private ed: Editor;
   private onFile?: (file: File) => void;
+  private transformId: ((id: string) => string) | undefined;
   private messageHandler: (e: MessageEvent) => void;
   private unsubscribe: (() => void) | null = null;
   private readySent = false;
@@ -54,6 +65,7 @@ export class EmbedBridge {
   constructor(ed: Editor, options: EmbedBridgeOptions = {}) {
     this.ed = ed;
     this.onFile = options.onFile;
+    this.transformId = options.__dangerously_transform_node_id;
 
     this.prevSelection = ed.state.selection;
     this.prevSceneId = ed.state.scene_id;
@@ -97,6 +109,26 @@ export class EmbedBridge {
   }
 
   // ---------------------------------------------------------------------------
+  // ID mapping helpers
+  // ---------------------------------------------------------------------------
+
+  /** Map a single node ID through the optional transform. */
+  private mapId(id: string): string {
+    return this.transformId ? this.transformId(id) : id;
+  }
+
+  /** Map an array of node IDs through the optional transform. */
+  private mapIds(ids: string[]): string[] {
+    return this.transformId ? ids.map(this.transformId) : ids;
+  }
+
+  /** Map scene info IDs through the optional transform. */
+  private mapScenes(scenes: EmbedSceneInfo[]): EmbedSceneInfo[] {
+    if (!this.transformId) return scenes;
+    return scenes.map((s) => ({ ...s, id: this.transformId!(s.id) }));
+  }
+
+  // ---------------------------------------------------------------------------
   // Action handler — drives all outgoing events
   // ---------------------------------------------------------------------------
 
@@ -116,7 +148,7 @@ export class EmbedBridge {
         this.loading = false;
         this.post({
           type: "grida:document-load",
-          scenes: scenesFromEditor(this.ed),
+          scenes: this.mapScenes(scenesFromEditor(this.ed)),
         });
       });
       return;
@@ -130,7 +162,7 @@ export class EmbedBridge {
       this.prevSelection = state.selection;
       this.post({
         type: "grida:selection-change",
-        selection: state.selection,
+        selection: this.mapIds(state.selection),
       });
     }
 
@@ -140,7 +172,7 @@ export class EmbedBridge {
       if (state.scene_id) {
         this.post({
           type: "grida:scene-change",
-          sceneId: state.scene_id,
+          sceneId: this.mapId(state.scene_id),
         });
       }
     }
@@ -179,9 +211,11 @@ export class EmbedBridge {
         this.post({
           type: "grida:pong",
           ready: this.readySent,
-          scenes: scenesFromEditor(this.ed),
-          sceneId: this.ed.state.scene_id,
-          selection: this.ed.state.selection,
+          scenes: this.mapScenes(scenesFromEditor(this.ed)),
+          sceneId: this.ed.state.scene_id
+            ? this.mapId(this.ed.state.scene_id)
+            : undefined,
+          selection: this.mapIds(this.ed.state.selection),
         });
         break;
       case "grida:images-resolve": {

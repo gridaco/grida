@@ -248,6 +248,113 @@ describe("fig2grida", () => {
     });
   });
 
+  describe("preserve_figma_ids", () => {
+    /**
+     * Figma IDs have several formats:
+     * - Simple: `{sessionID}:{localID}` (e.g. "1:2", "42:17")
+     * - Instance: `I{id};{id}` (e.g. "I1620:1441;291:113")
+     *
+     * Synthetic children append: `_fill_{N}` or `_stroke_{N}`.
+     * Instance clones use: `{prefix}::{counter}::{originalId}`.
+     *
+     * This regex matches any ID that is or derives from a Figma-format ID.
+     */
+    const FIGMA_ID_RE = /^(I?\d+:\d+|I\d+:\d+;[\d:;]+)/;
+
+    test("node IDs are Figma-format when preserve_figma_ids is true (REST JSON)", () => {
+      const { documentJson } = loadFigmaRestArchive(
+        `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
+      );
+      const result = fig2grida(documentJson as object, {
+        preserve_figma_ids: true,
+      });
+
+      const unpacked = io.archive.unpack(result.bytes);
+      const decoded = io.GRID.decode(unpacked.document);
+
+      // Collect all non-scene node IDs
+      const nodeIds = Object.keys(decoded.nodes).filter(
+        (id) => decoded.nodes[id].type !== "scene"
+      );
+
+      expect(nodeIds.length).toBeGreaterThan(0);
+
+      for (const id of nodeIds) {
+        expect(id).toMatch(FIGMA_ID_RE);
+      }
+    }, 120_000);
+
+    test("node IDs are NOT Figma-format by default (REST JSON)", () => {
+      const { documentJson } = loadFigmaRestArchive(
+        `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
+      );
+      const result = fig2grida(documentJson as object);
+
+      const unpacked = io.archive.unpack(result.bytes);
+      const decoded = io.GRID.decode(unpacked.document);
+
+      const nodeIds = Object.keys(decoded.nodes).filter(
+        (id) => decoded.nodes[id].type !== "scene"
+      );
+
+      expect(nodeIds.length).toBeGreaterThan(0);
+
+      // Default IDs should use the "rest-import-N" format, not Figma format
+      for (const id of nodeIds) {
+        expect(id).toMatch(/^rest-import-/);
+      }
+    }, 120_000);
+
+    test("node IDs are Figma-format when preserve_figma_ids is true (.fig)", () => {
+      const input = new Uint8Array(
+        readFileSync(
+          `${FIXTURES_BASE}/community/1510053249065427020-workos-radix-icons.fig`
+        )
+      );
+      const result = fig2grida(input, {
+        preserve_figma_ids: true,
+      });
+
+      const unpacked = io.archive.unpack(result.bytes);
+      const decoded = io.GRID.decode(unpacked.document);
+
+      const nodeIds = Object.keys(decoded.nodes).filter(
+        (id) => decoded.nodes[id].type !== "scene"
+      );
+
+      expect(nodeIds.length).toBeGreaterThan(0);
+
+      for (const id of nodeIds) {
+        expect(id).toMatch(FIGMA_ID_RE);
+      }
+    });
+
+    test("synthetic fill/stroke children extend parent Figma ID", () => {
+      const { documentJson } = loadFigmaRestArchive(
+        `${FIGMA_COMMUNITY_REST}/1510053249065427020-workos-radix-icons.zip`
+      );
+      const result = fig2grida(documentJson as object, {
+        preserve_figma_ids: true,
+      });
+
+      const unpacked = io.archive.unpack(result.bytes);
+      const decoded = io.GRID.decode(unpacked.document);
+
+      // Find synthetic IDs (fill/stroke children)
+      const syntheticIds = Object.keys(decoded.nodes).filter(
+        (id) => id.includes("_fill_") || id.includes("_stroke_")
+      );
+
+      // Synthetic IDs should start with a Figma-format parent ID
+      for (const id of syntheticIds) {
+        const parentPart = id.replace(/_(fill|stroke)_\d+$/, "");
+        expect(parentPart).toMatch(FIGMA_ID_RE);
+        // The parent ID should also exist as a node (or be a known ancestor)
+        // — the parent was converted to a group node
+      }
+    }, 120_000);
+  });
+
   describe("fig2grida unified input", () => {
     test("accepts a JSON object directly", () => {
       const { documentJson } = loadFigmaRestArchive(

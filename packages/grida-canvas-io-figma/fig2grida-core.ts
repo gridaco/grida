@@ -43,6 +43,12 @@ export interface Fig2GridaOptions {
    * so the lazy image loading system can request them at render time.
    */
   placeholder_for_missing_images?: boolean;
+  /**
+   * When true, use original Figma node IDs as Grida node IDs instead of
+   * generating new ones. Required for embed/refig so that emitted events
+   * (selection-change, etc.) carry the original Figma node IDs.
+   */
+  preserve_figma_ids?: boolean;
 }
 
 export interface Fig2GridaResult {
@@ -264,9 +270,16 @@ export function fig2grida(
   const placeholderForMissing =
     options?.placeholder_for_missing_images !== false;
 
+  const preserveFigmaIds = options?.preserve_figma_ids;
+
   // --- Object input: REST JSON directly ---
   if (!(input instanceof Uint8Array)) {
-    return fig2gridaFromRestJson(input, undefined, placeholderForMissing);
+    return fig2gridaFromRestJson(
+      input,
+      undefined,
+      placeholderForMissing,
+      preserveFigmaIds
+    );
   }
 
   // --- Bytes input: detect format ---
@@ -277,14 +290,20 @@ export function fig2grida(
       return fig2gridaFromRestJson(
         restArchive.json,
         restArchive.images,
-        placeholderForMissing
+        placeholderForMissing,
+        preserveFigmaIds
       );
     }
     // Otherwise fall through to .fig parser (handles both ZIP and raw Kiwi)
   } else if (input.length > 0 && input[0] === 0x7b /* '{' */) {
     // JSON text — parse and treat as REST API response
     const json = JSON.parse(new TextDecoder().decode(input));
-    return fig2gridaFromRestJson(json, undefined, placeholderForMissing);
+    return fig2gridaFromRestJson(
+      json,
+      undefined,
+      placeholderForMissing,
+      preserveFigmaIds
+    );
   }
 
   return fig2gridaFromFigBytes(input, options);
@@ -321,6 +340,7 @@ function fig2gridaFromFigBytes(
       gradient_id_generator: makeIdGenerator("grad"),
       prefer_path_for_geometry: true,
       placeholder_for_missing_images: placeholderForMissing,
+      preserve_figma_ids: options?.preserve_figma_ids,
     });
     pageResults.push({ name: page.name, result });
   }
@@ -430,7 +450,8 @@ function extractCanvases(json: unknown): Array<{
 function restJsonToMergedDocument(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
-  placeholderForMissing: boolean
+  placeholderForMissing: boolean,
+  preserveFigmaIds?: boolean
 ): MergedDocument {
   const canvases = extractCanvases(json);
 
@@ -440,7 +461,10 @@ function restJsonToMergedDocument(
     gradient_id_generator: makeIdGenerator("grad"),
     prefer_path_for_geometry: true,
     placeholder_for_missing_images: placeholderForMissing,
-    node_id_generator: makeIdGenerator("rest-import"),
+    preserve_figma_ids: preserveFigmaIds,
+    node_id_generator: preserveFigmaIds
+      ? undefined
+      : makeIdGenerator("rest-import"),
     ...(images &&
       Object.keys(images).length > 0 && {
         resolve_image_src: (ref: string) =>
@@ -464,10 +488,11 @@ function restJsonToMergedDocument(
 function fig2gridaFromRestJson(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
-  placeholderForMissing: boolean
+  placeholderForMissing: boolean,
+  preserveFigmaIds?: boolean
 ): Fig2GridaResult {
   return packMergedDocument(
-    restJsonToMergedDocument(json, images, placeholderForMissing)
+    restJsonToMergedDocument(json, images, placeholderForMissing, preserveFigmaIds)
   );
 }
 
