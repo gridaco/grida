@@ -215,7 +215,12 @@ impl SurfaceUI {
             });
 
             let is_selected = surface.selection.contains(&node_id);
-            let color = if is_selected { ACCENT_COLOR } else { MUTED_COLOR };
+            let is_hovered = surface.hover.hovered() == Some(&node_id);
+            let color = if is_selected || is_hovered {
+                ACCENT_COLOR
+            } else {
+                MUTED_COLOR
+            };
 
             // Build a single-line paragraph with ellipsis truncation
             let mut paragraph_style = textlayout::ParagraphStyle::new();

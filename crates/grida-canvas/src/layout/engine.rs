@@ -1,47 +1,62 @@
-//! Universal Layout Engine
+//! Layout Engine
 //!
-//! This module provides a universal layout computation engine that handles all node types
-//! without switch-case logic. Every node in the scene graph participates in layout computation
-//! with appropriate Taffy styles based on their type and properties.
+//! Computes layout for every node in the scene graph using Taffy (CSS-like
+//! flexbox/block layout). Produces a [`LayoutResult`] consumed by the geometry
+//! phase.
 //!
-//! ## Universal Design
+//! # Node categories
 //!
-//! - **No switch-case logic**: All node types are handled uniformly through `node_to_taffy_style()`
-//! - **Extensible**: Adding layout support to new node types requires only adding a case to the style mapping
-//! - **ICB-less support**: Works with or without InitialContainerBlock, supports any node as root
-//! - **Future-proof**: Clear path to support layout on all node types
+//! Nodes fall into two categories with respect to layout:
 //!
-//! ## Infinite Canvas Support
+//! | Category | Examples | Taffy participation |
+//! |---|---|---|
+//! | **Layout nodes** | Container, Rectangle, TextSpan, … | Yes — get a Taffy style via `node_to_taffy_style()` |
+//! | **Virtual grouping nodes** | Group, BooleanOperation | No — excluded from the Taffy tree |
 //!
-//! Grida is an infinite canvas with layout capabilities. Root nodes can be positioned anywhere
-//! in the viewport (like artboards in design tools), while their children participate in flex layout.
+//! Virtual grouping nodes are organisational: they have no intrinsic size (bounds
+//! derived from children), don't constrain or flow children, and don't clip.
+//! They receive a manual layout result from their schema (position + size).
+//! Their layout-capable children form **independent Taffy subtrees**, each
+//! computed separately.
 //!
-//! ### The Challenge
+//! The predicate [`LayoutEngine::is_layout_node()`] is the single source of
+//! truth for this distinction.
 //!
-//! Taffy (our layout library) cannot position tree roots using `position: absolute` with `inset`
-//! because roots have no containing block. Taffy always computes root nodes at (0, 0).
+//! # Two-phase flow
 //!
-//! ### The Solution
+//! ```text
+//! build_taffy_subtree()          extract_all_layouts()
+//! ─────────────────────          ──────────────────────
+//! Walk scene graph top-down.     Walk scene graph top-down.
+//! ● Layout node → create         ● In Taffy → use computed layout
+//!   Taffy node with style.         (with schema-position fix for
+//! ● Virtual grouping node →          Taffy roots, see below).
+//!   skip, but recurse children   ● Not in Taffy (virtual grouping)
+//!   and collect Taffy-capable      → manual layout from schema.
+//!   subtree roots (extra_roots).
+//! ```
 //!
-//! **Post-processing in `extract_all_layouts()`**:
-//! 1. Taffy computes all layouts (roots at 0,0, children correctly positioned)
-//! 2. `extract_all_layouts()` detects root nodes via `graph.is_root()`
-//! 3. Root positions are overridden with schema positions via `get_schema_position()`
-//! 4. GeometryCache consumes corrected layout results (no special cases needed)
+//! # Schema-position correction
 //!
-//! This keeps **all infinite canvas logic in LayoutEngine**, maintaining clean separation:
-//! - **LayoutEngine**: Owns layout computation AND infinite canvas positioning
-//! - **GeometryCache**: Transforms layout results to geometry (no layout concerns)
+//! Taffy computes every tree root at (0, 0) because roots have no containing
+//! block. Two kinds of nodes are Taffy roots and need their schema position
+//! restored in `extract_all_layouts()`:
 //!
-//! See `test_root_positioning_integration()` for the full pipeline verification.
+//! 1. **Graph roots** — top-level nodes on the infinite canvas.
+//! 2. **Children of virtual grouping nodes** — independent Taffy subtrees
+//!    discovered under Group / BooleanOperation parents.
 //!
-//! ## Pipeline Guarantees
+//! Detection is stateless: check `graph.is_root()` **or** whether the parent
+//! is a virtual grouping node (`!is_layout_node(parent)`). This handles
+//! arbitrary nesting depth (Group → Group → Container) with no extra
+//! bookkeeping.
 //!
-//! This module guarantees:
-//! - Every node gets a layout result (either computed or static)
-//! - Root node positions are corrected to schema positions (infinite canvas)
-//! - Layout results are complete before Geometry phase begins
-//! - Missing layout results indicate a bug in the layout engine
+//! # Pipeline guarantees
+//!
+//! - Every node gets a layout result (computed or manual).
+//! - Root / virtual-group-child positions are corrected to schema positions.
+//! - Results are complete before the geometry phase begins.
+//! - Missing results indicate a bug in the layout engine.
 
 use crate::layout::cache::LayoutResult;
 use crate::layout::tree::{LayoutTree, TextMeasureContext, TextMeasureProvider};
@@ -50,12 +65,12 @@ use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::{Node, NodeId, NodeRectMixin, Size};
 use taffy::prelude::*;
 
-/// Universal Layout Engine
+/// Layout engine for the scene graph.
 ///
-/// Responsible for computing layouts for all node types in the scene graph.
-/// Uses a universal approach where every node participates in layout computation
-/// with appropriate Taffy styles. Owns the LayoutTree (taffy integration) and
-/// caches results between frames.
+/// Owns the Taffy integration ([`LayoutTree`]) and caches results between
+/// frames. Layout nodes get Taffy-computed positions; virtual grouping nodes
+/// (Group, BooleanOperation) get manual schema-based results. See the module
+/// docs for the full design.
 pub struct LayoutEngine {
     tree: LayoutTree,
     result: LayoutResult,
@@ -103,11 +118,11 @@ impl LayoutEngine {
                 );
             }
 
-            // Compute layout for Taffy subtrees discovered under non-Taffy
+            // Compute layout for Taffy subtrees discovered under non-layout
             // parents (e.g. Containers nested under Group/BooleanOperation).
-            for extra_taffy_id in extra_roots {
+            for extra_taffy_id in &extra_roots {
                 let _ = self.tree.compute_layout(
-                    extra_taffy_id,
+                    *extra_taffy_id,
                     taffy::Size {
                         width: AvailableSpace::Definite(viewport_size.width),
                         height: AvailableSpace::Definite(viewport_size.height),
@@ -116,11 +131,11 @@ impl LayoutEngine {
                 );
             }
 
-            // Extract layouts for ALL roots, including those that don't participate
-            // in Taffy (e.g. BooleanOperation, Group). extract_all_layouts() handles
-            // non-Taffy nodes by creating manual layout results from schema data.
-            // Without this, descendants of non-Taffy root nodes would be orphaned
-            // from layout results, causing panics in GeometryCache.
+            // Extract layouts for ALL nodes in the subtree.
+            // Nodes in the Taffy tree get computed layouts; non-Taffy nodes
+            // (Group, BoolOp) get manual layout results from schema data.
+            // Children of non-Taffy parents get schema-position correction
+            // via parent-type check (no extra bookkeeping needed).
             self.extract_all_layouts(root_id, graph);
         }
 
@@ -208,44 +223,21 @@ impl LayoutEngine {
         }
     }
 
-    /// Check if a node should participate in Taffy layout
+    /// Check if a node type participates in Taffy layout.
     ///
-    /// Nodes that should be in Taffy tree:
-    /// - Layout containers (Container, ICB) - need to lay out children
-    /// - Nodes with layout_child field - can participate as flex children
-    ///
-    /// Nodes skipped from Taffy (use manual schema layout):
-    /// - Group, BooleanOperation - no layout_child support (size derived from children)
-    fn should_participate_in_taffy(node: &Node) -> bool {
-        matches!(
-            node,
-            Node::Container(_)
-                | Node::InitialContainer(_)
-                | Node::Rectangle(_)
-                | Node::Ellipse(_)
-                | Node::Image(_)
-                | Node::Line(_)
-                | Node::Polygon(_)
-                | Node::RegularPolygon(_)
-                | Node::RegularStarPolygon(_)
-                | Node::TextSpan(_)
-                | Node::Error(_)
-                | Node::Vector(_)
-                | Node::Path(_)
-        )
+    /// Virtual grouping nodes (Group, BooleanOperation) are excluded — they
+    /// have no intrinsic size, don't constrain children, and their bounds are
+    /// derived from children. Their children form independent Taffy subtrees.
+    fn is_layout_node(node: &Node) -> bool {
+        !matches!(node, Node::Group(_) | Node::BooleanOperation(_))
     }
 
-    /// Recursively build Taffy tree for a node and its descendants
+    /// Recursively build Taffy tree for a node and its descendants.
     ///
-    /// This universal method handles all node types without switch-case logic.
-    /// Each node gets an appropriate Taffy style based on its type and properties.
-    ///
-    /// Nodes without layout_child support (Group, BooleanOperation) are skipped
-    /// from the Taffy tree themselves but their children are still visited so
-    /// that Taffy-capable descendants (e.g. Containers) receive proper flex
-    /// layout instead of only schema fallbacks. Any Taffy subtrees discovered
-    /// under non-Taffy parents are collected in `extra_roots` so the caller
-    /// can compute layout for them.
+    /// Virtual grouping nodes (Group, BooleanOperation) are skipped from the
+    /// Taffy tree, but their children are still visited. Taffy-capable children
+    /// found under non-layout parents are collected in `extra_roots` so the
+    /// caller can compute layout for them as independent subtrees.
     fn build_taffy_subtree(
         &mut self,
         node_id: &NodeId,
@@ -255,27 +247,22 @@ impl LayoutEngine {
     ) -> Option<taffy::NodeId> {
         let node = graph.get_node(node_id).ok()?;
 
-        // Nodes that don't participate in Taffy layout (Group, BooleanOperation)
-        // are skipped themselves, but we still recurse into their children so
-        // Taffy-capable descendants get proper layout computation.
-        if !Self::should_participate_in_taffy(node) {
+        // Virtual grouping nodes don't participate in Taffy — skip them but
+        // recurse into their children to discover Taffy-capable subtrees.
+        if !Self::is_layout_node(node) {
             if let Some(children) = graph.get_children(node_id) {
                 for child_id in children {
                     if let Some(taffy_id) =
                         self.build_taffy_subtree(child_id, graph, viewport_size, extra_roots)
                     {
-                        // This child forms an independent Taffy subtree root
-                        // under a non-Taffy parent; collect it for layout computation.
                         extra_roots.push(taffy_id);
                     }
                 }
             }
-            return None; // This node itself is not in the Taffy tree
+            return None;
         }
 
         // Get style for this node (universal mapping)
-        // Note: Absolutely positioned children are still included in the tree,
-        // Taffy handles them specially (removes them from flex flow but computes their position)
         let mut style = crate::layout::into_taffy::node_to_taffy_style(node, graph, node_id);
 
         // Note: Root nodes are laid out by Taffy at (0,0)
@@ -329,25 +316,33 @@ impl LayoutEngine {
         }
     }
 
-    /// Recursively extract all computed layouts from the Taffy tree
+    /// Recursively extract all computed layouts from the Taffy tree.
     ///
-    /// **Infinite Canvas Support**: Root nodes have their positions corrected here.
+    /// **Infinite Canvas Support**: Taffy computes all tree roots at (0, 0).
+    /// We override root positions with their schema positions so multiple
+    /// artboards/nodes can be positioned anywhere in the viewport.
     ///
-    /// Taffy computes all tree roots at (0, 0) because they have no containing block.
-    /// For infinite canvas support, we override root positions with their schema positions
-    /// so multiple artboards/nodes can be positioned anywhere in the viewport.
-    ///
-    /// **Non-Layout Nodes**: Nodes without layout_child field (Vector, SVGPath, Group, etc.)
-    /// are skipped from Taffy tree. We create manual layout results from their schema here.
-    ///
-    /// Child nodes use Taffy's computed positions unchanged (correct flex/absolute layout).
+    /// **Virtual grouping nodes** (Group, BooleanOperation) are not in the
+    /// Taffy tree — they get manual layout results from their schema.
+    /// Their children become independent Taffy subtree roots (computed at 0,0),
+    /// so we detect this via parent-type check and apply schema positions.
+    /// No extra bookkeeping is needed; this handles arbitrary nesting depth.
     fn extract_all_layouts(&mut self, id: &NodeId, graph: &SceneGraph) {
-        // Extract this node's layout if it exists in the Taffy tree
         if let Some(layout) = self.tree.get_layout(id) {
             let mut computed = ComputedLayout::from(layout);
 
-            // Apply schema position for root nodes (Taffy computes roots at 0,0)
-            if graph.is_root(id) {
+            // Taffy roots are computed at (0,0). Two cases need schema-position
+            // correction:
+            // 1. Graph roots — top-level nodes on the infinite canvas
+            // 2. Children of non-layout parents (Group/BoolOp) — these are
+            //    independent Taffy subtree roots, also computed at (0,0)
+            let needs_schema_position = graph.is_root(id)
+                || graph
+                    .get_parent(id)
+                    .and_then(|pid| graph.get_node(&pid).ok())
+                    .is_some_and(|parent| !Self::is_layout_node(parent));
+
+            if needs_schema_position {
                 if let Ok(node) = graph.get_node(id) {
                     let (schema_x, schema_y) = Self::get_schema_position(node);
                     computed.x = schema_x;
@@ -357,8 +352,7 @@ impl LayoutEngine {
 
             self.result.insert(*id, computed);
         } else {
-            // Node not in Taffy tree (skipped due to no layout_child support)
-            // Create manual layout result from schema
+            // Node not in Taffy tree (virtual grouping node) — use schema
             if let Ok(node) = graph.get_node(id) {
                 let (x, y) = Self::get_schema_position(node);
                 let (width, height) = Self::get_schema_size(node);
@@ -1551,8 +1545,7 @@ mod tests {
         let mut container = nf.create_container_node();
         container.layout_dimensions.layout_target_width = Some(200.0);
         container.layout_dimensions.layout_target_height = Some(100.0);
-        let container_id =
-            graph.append_child(Node::Container(container), Parent::NodeId(bool_id));
+        let container_id = graph.append_child(Node::Container(container), Parent::NodeId(bool_id));
 
         // Grandchild: Rectangle inside the container
         let mut rect = nf.create_rectangle_node();
@@ -1673,8 +1666,7 @@ mod tests {
         let mut container = nf.create_container_node();
         container.layout_dimensions.layout_target_width = Some(150.0);
         container.layout_dimensions.layout_target_height = Some(75.0);
-        let container_id =
-            graph.append_child(Node::Container(container), Parent::NodeId(group_id));
+        let container_id = graph.append_child(Node::Container(container), Parent::NodeId(group_id));
 
         // Grandchild: Rectangle
         let mut rect = nf.create_rectangle_node();
@@ -1717,5 +1709,137 @@ mod tests {
         let container_layout = result.get(&container_id).unwrap();
         assert_eq!(container_layout.width, 150.0);
         assert_eq!(container_layout.height, 75.0);
+    }
+
+    /// Test: Children of a Group retain their schema positions.
+    ///
+    /// Group children become independent Taffy subtree roots (computed at 0,0).
+    /// `extract_all_layouts` detects this via parent-type check and applies
+    /// schema-position correction.
+    #[test]
+    fn test_group_children_retain_schema_positions() {
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Root: Group at (0,0)
+        let group = nf.create_group_node();
+        let group_id = graph.append_child(Node::Group(group), Parent::Root);
+
+        // Child 1: Container at (0, 35)
+        let mut c1 = nf.create_container_node();
+        c1.position = LayoutPositioningBasis::Cartesian(CGPoint::new(0.0, 35.0));
+        c1.layout_dimensions.layout_target_width = Some(87.0);
+        c1.layout_dimensions.layout_target_height = Some(40.0);
+        let c1_id = graph.append_child(Node::Container(c1), Parent::NodeId(group_id));
+
+        // Child 2: Container at (102, 0)
+        let mut c2 = nf.create_container_node();
+        c2.position = LayoutPositioningBasis::Cartesian(CGPoint::new(102.0, 0.0));
+        c2.layout_dimensions.layout_target_width = Some(67.0);
+        c2.layout_dimensions.layout_target_height = Some(20.0);
+        let c2_id = graph.append_child(Node::Container(c2), Parent::NodeId(group_id));
+
+        // Child 3: Container at (189, 0)
+        let mut c3 = nf.create_container_node();
+        c3.position = LayoutPositioningBasis::Cartesian(CGPoint::new(189.0, 0.0));
+        c3.layout_dimensions.layout_target_width = Some(72.0);
+        c3.layout_dimensions.layout_target_height = Some(20.0);
+        let c3_id = graph.append_child(Node::Container(c3), Parent::NodeId(group_id));
+
+        let scene = Scene {
+            name: "Group children positioning".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+            None,
+        );
+
+        // Group at origin
+        let group_layout = result.get(&group_id).unwrap();
+        assert_eq!(group_layout.x, 0.0);
+        assert_eq!(group_layout.y, 0.0);
+
+        // Children must keep their schema positions, not collapse to (0,0)
+        let c1_layout = result.get(&c1_id).unwrap();
+        assert_eq!(c1_layout.x, 0.0, "Child 1 x position");
+        assert_eq!(c1_layout.y, 35.0, "Child 1 y position");
+        assert_eq!(c1_layout.width, 87.0);
+        assert_eq!(c1_layout.height, 40.0);
+
+        let c2_layout = result.get(&c2_id).unwrap();
+        assert_eq!(c2_layout.x, 102.0, "Child 2 x position");
+        assert_eq!(c2_layout.y, 0.0, "Child 2 y position");
+
+        let c3_layout = result.get(&c3_id).unwrap();
+        assert_eq!(c3_layout.x, 189.0, "Child 3 x position");
+        assert_eq!(c3_layout.y, 0.0, "Child 3 y position");
+    }
+
+    /// Test: Nested Groups (Group → Group → Container) position correctly.
+    ///
+    /// Verifies that the parent-type check in `extract_all_layouts` handles
+    /// arbitrary nesting of virtual grouping nodes.
+    #[test]
+    fn test_nested_groups_positioning() {
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        // Root: Outer Group at (10, 20)
+        let mut outer = nf.create_group_node();
+        outer.transform = Some(AffineTransform::new(10.0, 20.0, 0.0));
+        let outer_id = graph.append_child(Node::Group(outer), Parent::Root);
+
+        // Child: Inner Group at (30, 40) relative to outer
+        let mut inner = nf.create_group_node();
+        inner.transform = Some(AffineTransform::new(30.0, 40.0, 0.0));
+        let inner_id = graph.append_child(Node::Group(inner), Parent::NodeId(outer_id));
+
+        // Grandchild: Container at (50, 60) relative to inner
+        let mut container = nf.create_container_node();
+        container.position = LayoutPositioningBasis::Cartesian(CGPoint::new(50.0, 60.0));
+        container.layout_dimensions.layout_target_width = Some(100.0);
+        container.layout_dimensions.layout_target_height = Some(80.0);
+        let container_id = graph.append_child(Node::Container(container), Parent::NodeId(inner_id));
+
+        let scene = Scene {
+            name: "Nested groups".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: 800.0,
+                height: 600.0,
+            },
+            None,
+        );
+
+        // Outer group: schema position applied as root
+        let outer_layout = result.get(&outer_id).unwrap();
+        assert_eq!(outer_layout.x, 10.0, "Outer group x");
+        assert_eq!(outer_layout.y, 20.0, "Outer group y");
+
+        // Inner group: positioned at (30, 40) within outer
+        let inner_layout = result.get(&inner_id).unwrap();
+        assert_eq!(inner_layout.x, 30.0, "Inner group x");
+        assert_eq!(inner_layout.y, 40.0, "Inner group y");
+
+        // Container: positioned at (50, 60) within inner
+        let container_layout = result.get(&container_id).unwrap();
+        assert_eq!(container_layout.x, 50.0, "Container x");
+        assert_eq!(container_layout.y, 60.0, "Container y");
+        assert_eq!(container_layout.width, 100.0);
+        assert_eq!(container_layout.height, 80.0);
     }
 }

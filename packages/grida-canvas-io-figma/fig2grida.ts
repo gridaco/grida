@@ -2,44 +2,53 @@
 /**
  * @fileoverview fig2grida — CLI entrypoint
  *
- * Converts a .fig file to a .grida archive.
+ * Converts Figma files to .grida archives.
+ *
+ * Supported input formats:
+ *   .fig          Figma native binary (Kiwi/ZIP)
+ *   .json         Figma REST API JSON response
+ *   .json.gz      Gzip-compressed REST API JSON
+ *   .zip          REST API archive ZIP (contains document.json + images)
  *
  * Usage:
- *   fig2grida <input.fig> [output.grida]
- *   fig2grida <input.fig> --out <output.grida>
- *   fig2grida <input.fig> --pages 0,2,3
+ *   fig2grida <input> [output.grida]
+ *   fig2grida <input> --out <output.grida>
+ *   fig2grida <input> --pages 0,2,3
  *
  * Options:
  *   --out, -o       Output path (default: input with .grida extension)
  *   --pages, -p     Comma-separated page indices to include (default: all)
- *   --info          Print file info (pages, node counts) without converting
+ *   --info          Print file info (pages, node counts) — .fig only
  *   --verbose       Print progress details
  *   --help          Show help
  */
 import { readFileSync, writeFileSync } from "fs";
+import { gunzipSync } from "zlib";
 import { resolve, basename, dirname, join } from "path";
 import { fig2grida, type Fig2GridaOptions } from "./fig2grida-core";
 import { iofigma } from "./lib";
 
 function printHelp(): void {
   console.log(`
-fig2grida — Convert .fig files to .grida archives
+fig2grida — Convert Figma files to .grida archives
+
+Supported inputs: .fig, .json, .json.gz, .zip
 
 Usage:
-  fig2grida <input.fig> [output.grida]
-  fig2grida <input.fig> --out <output.grida>
-  fig2grida <input.fig> --pages 0,2,3
+  fig2grida <input> [output.grida]
+  fig2grida <input> --out <output.grida>
+  fig2grida <input> --pages 0,2,3
 
 Options:
   --out, -o       Output path (default: input with .grida extension)
   --pages, -p     Comma-separated page indices to include (default: all)
-  --info          Print file info (pages, node counts) without converting
+  --info          Print file info (pages, node counts) — .fig only
   --verbose       Print progress details
   --help          Show help
 
 Examples:
   fig2grida design.fig
-  fig2grida design.fig output.grida
+  fig2grida api-response.json.gz output.grida
   fig2grida design.fig --pages 0,2 --verbose
   fig2grida design.fig --info
 `);
@@ -157,30 +166,69 @@ function main(): void {
   }
 
   const inputPath = resolve(args.input);
+  const lower = inputPath.toLowerCase();
 
-  // --info mode: print file info and exit
+  // Reject .fig-only flags for REST-format inputs
+  if (!lower.endsWith(".fig")) {
+    if (args.info) {
+      console.error("--info is only supported for .fig input.");
+      process.exit(1);
+    }
+    if (args.pages) {
+      console.error("--pages is currently only supported for .fig input.");
+      process.exit(1);
+    }
+  }
+
+  // --info mode: print file info and exit (.fig only)
   if (args.info) {
     printInfo(inputPath, args.verbose);
     return;
   }
 
-  // Determine output path
+  // Strip known extensions to derive the default output name
+  const stripExt = (name: string): string => {
+    for (const ext of [".json.gz", ".json", ".fig", ".zip"]) {
+      if (name.toLowerCase().endsWith(ext)) {
+        return name.slice(0, -ext.length);
+      }
+    }
+    return name;
+  };
+
   const outputPath = args.output
     ? resolve(args.output)
-    : join(dirname(inputPath), basename(inputPath, ".fig") + ".grida");
+    : join(dirname(inputPath), stripExt(basename(inputPath)) + ".grida");
 
   if (args.verbose) {
     console.log(`Input:  ${inputPath}`);
     console.log(`Output: ${outputPath}`);
   }
 
-  // Read input
-  const data = readFileSync(inputPath);
-  const input = new Uint8Array(data);
+  // Read and decompress input
+  let data: Buffer = readFileSync(inputPath);
+  if (lower.endsWith(".gz")) {
+    if (args.verbose) {
+      console.log(
+        `Decompressing gzip (${(data.byteLength / 1024).toFixed(1)} KB)...`
+      );
+    }
+    data = gunzipSync(data);
+  }
+
+  // Detect input type: object (JSON) or bytes (.fig / .zip)
+  let input: Uint8Array | object;
+  if (lower.endsWith(".json.gz") || lower.endsWith(".json")) {
+    input = JSON.parse(data.toString("utf-8"));
+  } else {
+    input = new Uint8Array(data);
+  }
 
   if (args.verbose) {
-    console.log(`File size: ${(input.byteLength / 1024).toFixed(1)} KB`);
-    console.log("Parsing .fig file...");
+    const kind = input instanceof Uint8Array ? "binary" : "JSON";
+    const size =
+      input instanceof Uint8Array ? input.byteLength : data.byteLength;
+    console.log(`Input: ${kind}, ${(size / 1024).toFixed(1)} KB`);
   }
 
   // Build options

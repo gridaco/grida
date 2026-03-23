@@ -35,6 +35,8 @@ import {
 const _GRIDA_SYSTEM_EMBEDDED_CHECKER =
   "system://images/checker-16-strip-L98L92.png";
 
+const DEFAULT_FONT_SIZE = 14;
+
 export namespace iofigma {
   /**
    * custom structs for bridging difference between rest api spec, kiwi spec and plugin sdk spec.
@@ -734,6 +736,28 @@ export namespace iofigma {
             ? (map.strokeAlignMap[node.strokeAlign] ?? "center")
             : undefined,
           stroke_miter_limit: node.strokeMiterAngle,
+        };
+      }
+
+      /**
+       * Per-side stroke width properties for rectangular nodes.
+       * Extracts `individualStrokeWeights` from Figma REST API / Kiwi intermediate format.
+       */
+      function rectangular_stroke_width_trait(node: {
+        individualStrokeWeights?: {
+          top: number;
+          right: number;
+          bottom: number;
+          left: number;
+        };
+      }) {
+        if (!node.individualStrokeWeights) return {};
+        const { top, right, bottom, left } = node.individualStrokeWeights;
+        return {
+          rectangular_stroke_width_top: top,
+          rectangular_stroke_width_right: right,
+          rectangular_stroke_width_bottom: bottom,
+          rectangular_stroke_width_left: left,
         };
       }
 
@@ -1455,6 +1479,7 @@ export namespace iofigma {
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
+              ...rectangular_stroke_width_trait(node),
               ...style_trait({
                 overflow: node.clipsContent ? "clip" : undefined,
               }),
@@ -1565,7 +1590,11 @@ export namespace iofigma {
               line_height: node.style.lineHeightPercentFontSize
                 ? node.style.lineHeightPercentFontSize / 100
                 : 1.2,
-              letter_spacing: node.style.letterSpacing,
+              // letter spacing in rest api is always in px.
+              letter_spacing: node.style.letterSpacing
+                ? node.style.letterSpacing /
+                  (node.style.fontSize || DEFAULT_FONT_SIZE)
+                : 0,
               font_size: node.style.fontSize ?? 0,
               font_family: node.style.fontFamily,
               font_weight:
@@ -1582,6 +1611,7 @@ export namespace iofigma {
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
+              ...rectangular_stroke_width_trait(node),
               ...corner_radius_trait(node),
               ...effects_trait(node.effects),
               type: "rectangle",
@@ -2149,6 +2179,17 @@ export namespace iofigma {
           strokeCap: nc.strokeCap ? map.strokeCap(nc.strokeCap) : "NONE",
           strokeJoin: nc.strokeJoin ? map.strokeJoin(nc.strokeJoin) : "MITER",
           strokeMiterAngle: nc.miterLimit,
+          // Per-side stroke weights (Figma Kiwi: borderStrokeWeightsIndependent)
+          ...(nc.borderStrokeWeightsIndependent
+            ? {
+                individualStrokeWeights: {
+                  top: nc.borderTopWeight ?? nc.strokeWeight ?? 0,
+                  right: nc.borderRightWeight ?? nc.strokeWeight ?? 0,
+                  bottom: nc.borderBottomWeight ?? nc.strokeWeight ?? 0,
+                  left: nc.borderLeftWeight ?? nc.strokeWeight ?? 0,
+                },
+              }
+            : {}),
         };
       }
 
@@ -2329,9 +2370,13 @@ export namespace iofigma {
             fontSize: nc.fontSize ?? 12,
             textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
             textAlignVertical: nc.textAlignVertical ?? "TOP",
+            // Produce absolute-pixel letterSpacing to match the REST API
+            // format — the downstream consumer (fromRest*) normalizes by
+            // dividing by fontSize, so we must not pre-normalize here.
             letterSpacing:
               nc.letterSpacing?.units === "PERCENT"
-                ? nc.letterSpacing.value / 100
+                ? (nc.letterSpacing.value / 100) *
+                  (nc.fontSize ?? DEFAULT_FONT_SIZE)
                 : nc.letterSpacing?.units === "PIXELS"
                   ? nc.letterSpacing.value
                   : (nc.letterSpacing?.value ?? 0),
@@ -3405,11 +3450,25 @@ export namespace iofigma {
         node_id_generator: sharedNodeIdGenerator,
       };
 
+      const canvasBg = page.canvas.backgroundColor;
+      const background_color = canvasBg
+        ? kolor.colorformats.newRGBA32F(
+            canvasBg.r,
+            canvasBg.g,
+            canvasBg.b,
+            canvasBg.a
+          )
+        : undefined;
+
       const individualResults = page.rootNodes.map((rootNode) =>
         iofigma.restful.factory.document(rootNode, {}, sharedContext)
       );
 
-      if (individualResults.length === 1) return individualResults[0];
+      if (individualResults.length === 1) {
+        const result = individualResults[0];
+        result.document.scene.background_color = background_color;
+        return result;
+      }
 
       // Merge multiple roots into single document
       const imageRefsUsed = new Set<string>();
@@ -3427,6 +3486,7 @@ export namespace iofigma {
           guides: [],
           edges: [],
           constraints: { children: "multiple" },
+          background_color,
           // TODO: convert it to our format, number.
           // order: page.sortkey,
         },

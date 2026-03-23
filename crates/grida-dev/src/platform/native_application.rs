@@ -412,7 +412,11 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 if self.settle_countdown > 0 {
                     self.settle_countdown -= 1;
                     if self.settle_countdown == 0 {
-                        self.app.renderer_mut().queue_unstable();
+                        // Use queue_stable() so the settle frame:
+                        // 1. Clears pan/zoom image caches
+                        // 2. Renders at full quality (no reduced effects)
+                        // 3. Fills in any white edges left by cached blits
+                        self.app.renderer_mut().queue_stable();
                         self.window.request_redraw();
                     }
                 }

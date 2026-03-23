@@ -134,6 +134,27 @@ pub struct FramePlan {
     pub display_list_size_estimated: usize,
 }
 
+/// Deferred frame plan: stores just the inputs so the expensive R-tree query
+/// and sort can be skipped when a cache (pan or zoom) will satisfy the frame.
+///
+/// When the cache misses at flush time, the full `FramePlan` is computed from
+/// these stored inputs. This eliminates ~400-500µs of wasted R-tree work on
+/// cache-hit frames for large scenes (136K+ nodes).
+struct DeferredPlan {
+    bounds: rect::Rectangle,
+    zoom: f32,
+    stable: bool,
+    camera_change: CameraChangeKind,
+}
+
+/// Either a fully computed plan or a deferred one awaiting materialization.
+enum PlanState {
+    /// Fully computed — R-tree query and sort already done.
+    Ready(FramePlan),
+    /// Deferred — will be computed in flush() only if cache misses.
+    Deferred(DeferredPlan),
+}
+
 #[derive(Clone)]
 pub struct DrawResult {
     pub painter_duration: Duration,
@@ -224,10 +245,18 @@ impl RendererWindowContext {
 /// Nodes larger than this in either axis are skipped for compositing.
 const COMPOSITOR_SURFACE_SIZE: i32 = 4096;
 
-/// Maximum screen-space offset (in pixels) before the pan image cache is
-/// invalidated and a full re-draw is triggered. Beyond this threshold the
-/// exposed strips are too large for the blit-only fast path to look acceptable.
-const PAN_IMAGE_CACHE_MAX_OFFSET: f32 = 200.0;
+// Note: PAN_IMAGE_CACHE_MAX_OFFSET has been removed. The pan cache now
+// blits at any offset (up to viewport size) and recaptures every frame.
+// No threshold-based invalidation — the settle frame handles full-quality
+// rendering after the gesture ends.
+
+/// Maximum zoom ratio (cached_zoom / current_zoom or inverse) before the
+/// zoom image cache is invalidated. A ratio of 4.0 means we tolerate up to
+/// 4× scale in either direction before the scaled texture becomes too blurry
+/// or aliased. This is aggressive but acceptable during active interaction
+/// (unstable frames) — the stable frame after interaction ends always
+/// produces a full-quality render at the correct zoom level.
+const ZOOM_IMAGE_CACHE_MAX_RATIO: f32 = 4.0;
 
 /// Cached GPU snapshot of the composited frame for pan-only fast path.
 ///
@@ -244,6 +273,25 @@ struct PanImageCache {
     origin_ty: f32,
 }
 
+/// Cached GPU snapshot for zoom fast path (items 21/22/25 in optimization.md).
+///
+/// During active zooming the scene graph is static — only the zoom level
+/// changes. Instead of re-drawing every visible node, we scale the cached
+/// frame texture by the zoom ratio. This replaces O(N) draw commands with
+/// a single scaled texture blit.
+///
+/// The scaled image is slightly blurry at wrong-scale, which is acceptable
+/// during unstable (interaction) frames. The stable frame after interaction
+/// ends always produces a full-quality render.
+struct ZoomImageCache {
+    /// GPU texture snapshot of the composited frame.
+    image: Image,
+    /// Zoom level at capture time.
+    zoom: f32,
+    /// Full view matrix at capture time (includes translation + zoom).
+    view_matrix: math2::transform::AffineTransform,
+}
+
 pub struct Renderer {
     pub backend: Backend,
     pub scene: Option<Scene>,
@@ -256,8 +304,9 @@ pub struct Renderer {
     request_redraw: Option<RequestRedrawCallback>,
     /// frame counter for managing render queue
     fc: FrameCounter,
-    /// the frame plan for the next frame, to be drawn and flushed
-    plan: Option<FramePlan>,
+    /// the frame plan for the next frame, to be drawn and flushed.
+    /// May be deferred (lazy) to skip R-tree query on cache-hit frames.
+    plan: Option<PlanState>,
     /// Runtime configuration for renderer behaviour
     config: RuntimeRendererConfig,
     /// Layout computation engine (owns cache, detects changes)
@@ -281,6 +330,9 @@ pub struct Renderer {
     /// Cached composited frame for pan-only fast path.
     /// See [`PanImageCache`] for details.
     pan_image_cache: Option<PanImageCache>,
+    /// Cached composited frame for zoom fast path.
+    /// See [`ZoomImageCache`] for details.
+    zoom_image_cache: Option<ZoomImageCache>,
 }
 
 impl Renderer {
@@ -505,6 +557,7 @@ impl Renderer {
             downscale_surface: None,
             downscale_dims: (0, 0),
             pan_image_cache: None,
+            zoom_image_cache: None,
         }
     }
 
@@ -696,6 +749,7 @@ impl Renderer {
             self.scene_cache.compositor.invalidate_all();
             self.compositor_atlas.clear();
             self.pan_image_cache = None;
+            self.zoom_image_cache = None;
         }
     }
 
@@ -792,7 +846,7 @@ impl Renderer {
             return FrameFlushResult::NoPending;
         }
 
-        let Some(plan) = self.plan.take() else {
+        let Some(plan_state) = self.plan.take() else {
             return FrameFlushResult::NoFrame;
         };
 
@@ -800,7 +854,7 @@ impl Renderer {
             return FrameFlushResult::NoScene;
         }
 
-        let stats = self.render_frame(plan);
+        let stats = self.render_frame_with_plan_state(plan_state);
 
         self.fc.flush();
         self.plan = None;
@@ -811,6 +865,162 @@ impl Renderer {
     /// Core rendering logic shared by `flush()` and `flush_with_plan()`.
     ///
     /// Assumes `self.scene` is `Some`. Panics otherwise.
+    /// Render a frame, resolving a deferred plan only if cache misses.
+    ///
+    /// When the plan is `Deferred`, the expensive R-tree query and sort are
+    /// skipped if a pan or zoom cache satisfies the frame. This saves
+    /// ~400-500µs per frame on large scenes (136K+ nodes).
+    fn render_frame_with_plan_state(&mut self, plan_state: PlanState) -> FrameFlushStats {
+        let (stable, camera_change) = match &plan_state {
+            PlanState::Ready(p) => (p.stable, p.camera_change),
+            PlanState::Deferred(d) => (d.stable, d.camera_change),
+        };
+
+        let start = Instant::now();
+        let scene_ptr = self.scene.as_ref().unwrap() as *const Scene;
+        let surface = unsafe { &mut *self.backend.get_surface() };
+        let scene = unsafe { &*scene_ptr };
+
+        // --- Pan image cache: blit from ORIGINAL capture ---
+        //
+        // During pan-only frames with a cached composited frame, blit the
+        // ORIGINAL cached texture at the cumulative offset from its capture
+        // position. We do NOT recapture from the blitted result — that would
+        // progressively degrade the image (each blit loses edge pixels to
+        // background, and circular panning would erase all content).
+        //
+        // Instead, we keep the original full-quality capture and always blit
+        // from it. At the same zoom level with all content visible (fit zoom),
+        // this means panning NEVER needs a redraw — just different offsets
+        // into the same cached snapshot.
+        //
+        // When the offset exceeds the viewport (no overlap with cached frame),
+        // we fall through to a full redraw which captures a new snapshot.
+        if camera_change == CameraChangeKind::PanOnly && self.backend.is_gpu() {
+            if let Some(ref cache) = self.pan_image_cache {
+                let width = surface.width() as f32;
+                let height = surface.height() as f32;
+                let vm = self.camera.view_matrix();
+                let dx = vm.matrix[0][2] - cache.origin_tx;
+                let dy = vm.matrix[1][2] - cache.origin_ty;
+
+                // Reject if offset is larger than the viewport (the entire
+                // cached frame has scrolled off-screen — no overlap left).
+                if dx.abs() < width && dy.abs() < height {
+                    let canvas = surface.canvas();
+
+                    // Clear with background + blit the ORIGINAL cached frame.
+                    if let Some(bg) = scene.background_color {
+                        canvas.clear(Color::from(bg));
+                    } else {
+                        canvas.clear(Color::TRANSPARENT);
+                    }
+                    canvas.draw_image(&cache.image, (dx, dy), None);
+
+                    // GPU flush.
+                    let mid_flush_start = Instant::now();
+                    Self::gpu_flush(surface);
+                    let mid_flush_duration = mid_flush_start.elapsed();
+                    let frame_duration = start.elapsed();
+
+                    // Do NOT recapture — keep the original. The settle frame
+                    // will do a fresh full-quality draw and capture.
+
+                    let plan = FramePlan {
+                        stable,
+                        camera_change,
+                        promoted: Vec::new(),
+                        regions: Vec::new(),
+                        compositor_indices: Vec::new(),
+                        display_list_duration: Duration::ZERO,
+                        display_list_size_estimated: 0,
+                    };
+
+                    return FrameFlushStats {
+                        frame: plan,
+                        draw: DrawResult {
+                            painter_duration: Duration::ZERO,
+                            cache_picture_used: 0,
+                            cache_picture_size: self.scene_cache.picture.len(),
+                            cache_geometry_size: self.scene_cache.geometry.len(),
+                            layer_image_cache_size: 0,
+                            layer_image_cache_hits: 0,
+                            layer_image_cache_bytes: 0,
+                            live_draw_count: 0,
+                        },
+                        frame_duration,
+                        flush_duration: Duration::ZERO,
+                        total_duration: frame_duration,
+                        compositor_duration: Duration::ZERO,
+                        mid_flush_duration,
+                    };
+                }
+                // Offset >= viewport — entire frame scrolled off.
+                // Fall through to full redraw (cache stays for potential reuse
+                // if user pans back).
+            }
+        }
+
+        // --- Try zoom image cache fast path (no plan needed) ---
+        if !stable
+            && self.backend.is_gpu()
+            && self.zoom_image_cache.is_some()
+            && camera_change.zoom_changed()
+        {
+            let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &FramePlan {
+                stable,
+                camera_change,
+                promoted: Vec::new(),
+                regions: Vec::new(),
+                compositor_indices: Vec::new(),
+                display_list_duration: Duration::ZERO,
+                display_list_size_estimated: 0,
+            });
+            if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
+                let plan = FramePlan {
+                    stable,
+                    camera_change,
+                    promoted: Vec::new(),
+                    regions: Vec::new(),
+                    compositor_indices: Vec::new(),
+                    display_list_duration: Duration::ZERO,
+                    display_list_size_estimated: 0,
+                };
+                return FrameFlushStats {
+                    frame: plan,
+                    draw: DrawResult {
+                        painter_duration: Duration::ZERO,
+                        cache_picture_used: 0,
+                        cache_picture_size: self.scene_cache.picture.len(),
+                        cache_geometry_size: self.scene_cache.geometry.len(),
+                        layer_image_cache_size: 0,
+                        layer_image_cache_hits: 0,
+                        layer_image_cache_bytes: 0,
+                        live_draw_count: 0,
+                    },
+                    frame_duration,
+                    flush_duration: Duration::ZERO,
+                    total_duration: frame_duration,
+                    compositor_duration: Duration::ZERO,
+                    mid_flush_duration,
+                };
+            }
+        }
+
+        // Cache miss — materialize the full plan (R-tree query + sort).
+        let plan = match plan_state {
+            PlanState::Ready(plan) => plan,
+            PlanState::Deferred(deferred) => self.frame(
+                deferred.bounds,
+                deferred.zoom,
+                deferred.stable,
+                deferred.camera_change,
+            ),
+        };
+
+        self.render_frame(plan)
+    }
+
     fn render_frame(&mut self, plan: FramePlan) -> FrameFlushStats {
         let start = Instant::now();
 
@@ -832,9 +1042,7 @@ impl Renderer {
                 let dx = vm.matrix[0][2] - cache.origin_tx;
                 let dy = vm.matrix[1][2] - cache.origin_ty;
 
-                if dx.abs() <= PAN_IMAGE_CACHE_MAX_OFFSET
-                    && dy.abs() <= PAN_IMAGE_CACHE_MAX_OFFSET
-                {
+                if dx.abs() < width && dy.abs() < height {
                     let canvas = surface.canvas();
                     if let Some(bg) = scene.background_color {
                         canvas.clear(Color::from(bg));
@@ -846,6 +1054,9 @@ impl Renderer {
                     let mid_flush_start = Instant::now();
                     Self::gpu_flush(surface);
                     let mid_flush_duration = mid_flush_start.elapsed();
+
+                    // Do NOT recapture — keep the original capture intact.
+
                     let frame_duration = start.elapsed();
 
                     return FrameFlushStats {
@@ -867,7 +1078,51 @@ impl Renderer {
                         mid_flush_duration,
                     };
                 }
-                // Offset too large — fall through to full re-draw below.
+                // Offset >= viewport — fall through to full re-draw.
+            }
+        }
+
+        // --- Zoom image cache fast path ---
+        // On unstable frames with a valid zoom cache, scale the cached frame
+        // texture instead of re-drawing all nodes. This replaces O(N) draw +
+        // GPU rasterization with a single scaled texture blit.
+        //
+        // Triggers on:
+        // - Zoom-change frames (the primary use case during active zooming)
+        // - No-change frames during zoom gestures (zoom steps may quantize
+        //   to identical values at bounds, but we still have a valid cache)
+        //
+        // The image is rendered at a stale zoom level, so text and fine
+        // details are slightly blurry — acceptable during active interaction.
+        // The stable frame after interaction ends always does a full redraw.
+        // Don't use zoom cache for pan-only or no-change frames — pan has its
+        // own faster cache, and no-change frames (e.g. scene mutations without
+        // camera movement) must not replay a stale zoom snapshot.
+        if !plan.stable
+            && self.backend.is_gpu()
+            && self.zoom_image_cache.is_some()
+            && plan.camera_change.zoom_changed()
+        {
+            let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &plan);
+            if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
+                return FrameFlushStats {
+                    frame: plan,
+                    draw: DrawResult {
+                        painter_duration: Duration::ZERO,
+                        cache_picture_used: 0,
+                        cache_picture_size: self.scene_cache.picture.len(),
+                        cache_geometry_size: self.scene_cache.geometry.len(),
+                        layer_image_cache_size: 0,
+                        layer_image_cache_hits: 0,
+                        layer_image_cache_bytes: 0,
+                        live_draw_count: 0,
+                    },
+                    frame_duration,
+                    flush_duration: Duration::ZERO,
+                    total_duration: frame_duration,
+                    compositor_duration: Duration::ZERO,
+                    mid_flush_duration,
+                };
             }
         }
 
@@ -915,19 +1170,37 @@ impl Renderer {
         Self::gpu_flush(surface);
         let mid_flush_duration = mid_flush_start.elapsed();
 
-        // Capture composited frame for pan image cache.
+        // Capture composited frame for image caches.
         // After mid_flush the surface has the complete rendered scene.
-        // Only capture on non-stable frames that didn't change zoom — zoom
-        // frames invalidate the cache on the next queue(), so capturing
-        // them wastes the snapshot.
-        if self.backend.is_gpu() && !plan.stable && !plan.camera_change.zoom_changed() {
+        // Always capture — even on stable frames — so that the NEXT
+        // unstable frame can use the cache. Without this, stable frames
+        // clear the cache (in queue()) but don't recapture, causing
+        // the next unstable frame to do another expensive full draw.
+        if self.backend.is_gpu() {
             let vm = self.camera.view_matrix();
-            let image = surface.image_snapshot();
-            self.pan_image_cache = Some(PanImageCache {
-                image,
-                origin_tx: vm.matrix[0][2],
-                origin_ty: vm.matrix[1][2],
-            });
+
+            // Pan image cache: only useful when zoom is constant.
+            if !plan.camera_change.zoom_changed() {
+                let image = surface.image_snapshot();
+                self.pan_image_cache = Some(PanImageCache {
+                    image,
+                    origin_tx: vm.matrix[0][2],
+                    origin_ty: vm.matrix[1][2],
+                });
+            }
+
+            // Zoom image cache: capture after every full draw so that
+            // the next zoom frame can use a scaled blit instead of
+            // re-drawing. We snapshot the surface once; the cost is
+            // amortized over all subsequent zoom cache-hit frames.
+            {
+                let image = surface.image_snapshot();
+                self.zoom_image_cache = Some(ZoomImageCache {
+                    image,
+                    zoom: self.camera.get_zoom(),
+                    view_matrix: vm,
+                });
+            }
         }
 
         // Compositor update (GPU-only).
@@ -963,7 +1236,66 @@ impl Renderer {
         }
     }
 
-    /// Submit pending GPU work on the surface's direct context (if any).
+    /// Try to blit the zoom image cache. Returns `Some((mid_flush_duration, frame_duration))`
+    /// on cache hit, `None` on miss (caller should proceed with full draw).
+    fn try_zoom_cache_blit(
+        &mut self,
+        surface: &mut Surface,
+        scene: &Scene,
+        _plan: &FramePlan,
+    ) -> Option<(Duration, Duration)> {
+        let cache = self.zoom_image_cache.as_ref()?;
+        let current_zoom = self.camera.get_zoom();
+        let zoom_ratio = current_zoom / cache.zoom;
+
+        // Only use cache if zoom ratio is within acceptable range.
+        if !((1.0 / ZOOM_IMAGE_CACHE_MAX_RATIO)..=ZOOM_IMAGE_CACHE_MAX_RATIO)
+            .contains(&zoom_ratio)
+        {
+            // Too extreme — invalidate and fall through.
+            self.zoom_image_cache = None;
+            return None;
+        }
+
+        let inv_cached = cache.view_matrix.inverse()?;
+        let cur_vm = self.camera.view_matrix();
+
+        // residual = current_view × inverse(cached_view)
+        let residual = cur_vm.compose(&inv_cached);
+
+        let start = Instant::now();
+        let canvas = surface.canvas();
+        if let Some(bg) = scene.background_color {
+            canvas.clear(Color::from(bg));
+        } else {
+            canvas.clear(Color::TRANSPARENT);
+        }
+
+        canvas.save();
+        canvas.concat(&sk::sk_matrix(residual.matrix));
+
+        let sampling = skia_safe::SamplingOptions::new(
+            skia_safe::FilterMode::Linear,
+            skia_safe::MipmapMode::None,
+        );
+        let mut paint = SkPaint::default();
+        paint.set_anti_alias(false);
+        canvas.draw_image_with_sampling_options(
+            &cache.image,
+            (0.0, 0.0),
+            sampling,
+            Some(&paint),
+        );
+        canvas.restore();
+
+        let mid_flush_start = Instant::now();
+        Self::gpu_flush(surface);
+        let mid_flush_duration = mid_flush_start.elapsed();
+        let frame_duration = start.elapsed();
+
+        Some((mid_flush_duration, frame_duration))
+    }
+
     #[inline]
     fn gpu_flush(surface: &mut Surface) {
         if let Some(mut gr_context) = surface.recording_context() {
@@ -997,6 +1329,7 @@ impl Renderer {
 
         self.scene_cache = cache::scene::SceneCache::new();
         self.pan_image_cache = None;
+        self.zoom_image_cache = None;
         self.images.clear_missing_tracking();
         if let Some(scene) = self.scene.as_ref() {
             let requested = collect_scene_font_families(scene);
@@ -1059,15 +1392,44 @@ impl Renderer {
             self.pan_image_cache = None;
         }
 
-        // Always compute the latest frame plan so that a subsequent flush uses up-to-date state,
-        // even if a previous frame is already pending.
-        let rect = Some(self.camera.rect());
-        self.plan = Some(self.frame(
-            rect.unwrap_or(rect::Rectangle::empty()),
-            self.camera.get_zoom(),
-            stable,
-            camera_change,
-        ));
+        // Invalidate zoom image cache on stable frames (always full-quality).
+        // Keep it alive across all unstable changes — zoom changes use it for
+        // scaled blit, pan-only changes let it persist for when zoom resumes,
+        // and no-change frames can blit it as-is.
+        if stable {
+            self.zoom_image_cache = None;
+        }
+
+        // Build the frame plan. On unstable frames where a cache (pan or zoom)
+        // is likely to satisfy the frame, defer the expensive R-tree query and
+        // sort to flush() — they'll be skipped entirely on cache hits.
+        let bounds = self.camera.rect();
+        let zoom = self.camera.get_zoom();
+
+        let can_defer = !stable
+            && self.backend.is_gpu()
+            && (
+                // Pan cache will likely hit
+                (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
+                // Zoom cache will likely hit
+                || (camera_change.zoom_changed() && self.zoom_image_cache.is_some())
+            );
+
+        if can_defer {
+            self.plan = Some(PlanState::Deferred(DeferredPlan {
+                bounds,
+                zoom,
+                stable,
+                camera_change,
+            }));
+        } else {
+            self.plan = Some(PlanState::Ready(self.frame(
+                bounds,
+                zoom,
+                stable,
+                camera_change,
+            )));
+        }
 
         // Only request a redraw if there isn't already one pending.
         if !self.fc.has_pending() {
@@ -1131,6 +1493,7 @@ impl Renderer {
         self.scene_cache.compositor.invalidate_all();
         self.compositor_atlas.clear();
         self.pan_image_cache = None;
+        self.zoom_image_cache = None;
     }
 
     /// Rebuild scene caches after scene geometry has changed.

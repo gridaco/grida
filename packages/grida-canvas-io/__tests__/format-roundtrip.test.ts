@@ -660,6 +660,31 @@ describe("format roundtrip", () => {
       );
     });
 
+    it.each(["underline", "overline", "line-through", "none"] as const)(
+      "roundtrips TextNode with text_decoration_line: %s",
+      (decoration) => {
+        const sceneId = "0-1";
+        const nodeId = "0-2";
+        const doc = createDocument(sceneId, {
+          [nodeId]: {
+            ...baseTextSpan(nodeId),
+            text: "Decorated text",
+            layout_target_width: 200,
+            layout_target_height: 50,
+            text_decoration_line: decoration,
+          },
+        });
+        roundtripTest<grida.program.nodes.TextSpanNode>(
+          doc,
+          nodeId,
+          "tspan",
+          (node) => {
+            expect(node.text_decoration_line).toBe(decoration);
+          }
+        );
+      }
+    );
+
     it("roundtrips TextNode with letter_spacing, word_spacing, and line_height", () => {
       const sceneId = "0-1";
       const nodeId = "0-2";

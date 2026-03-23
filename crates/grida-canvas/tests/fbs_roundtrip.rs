@@ -741,6 +741,56 @@ fn gen_text_span() {
     assert_roundtrip_scene(&scene, "s1", "text_span");
 }
 
+/// Text with underline decoration — verifies TextDecorationRec survives FBS roundtrip.
+#[test]
+fn gen_text_span_underline() {
+    let text = Node::TextSpan(TextSpanNodeRec {
+        active: true,
+        transform: AffineTransform::new(10.0, 20.0, 0.0),
+        width: Some(200.0),
+        height: Some(40.0),
+        layout_child: None,
+        text: "Underlined text".to_owned(),
+        text_style: {
+            let mut ts = TextStyleRec::from_font("Inter", 16.0);
+            ts.text_decoration = Some(TextDecorationRec {
+                text_decoration_line: TextDecorationLine::Underline,
+                text_decoration_color: Some(CGColor {
+                    r: 255,
+                    g: 0,
+                    b: 0,
+                    a: 255,
+                }),
+                text_decoration_style: Some(TextDecorationStyle::Solid),
+                text_decoration_skip_ink: Some(true),
+                text_decoration_thickness: Some(1.5),
+            });
+            ts
+        },
+        text_align: TextAlign::Left,
+        text_align_vertical: TextAlignVertical::Top,
+        max_lines: None,
+        ellipsis: None,
+        fills: Paints::new(vec![solid(0, 0, 0, 255)]),
+        strokes: Paints::new(vec![]),
+        stroke_width: 0.0,
+        stroke_align: StrokeAlign::Inside,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+        mask: None,
+        effects: LayerEffects::default(),
+    });
+
+    let scene = build_scene(
+        "Underline",
+        None,
+        vec![(1, text)],
+        HashMap::new(),
+        vec![1],
+    );
+    assert_roundtrip_scene(&scene, "s1", "text_span_underline");
+}
+
 // ─── Vector Network ─────────────────────────────────────────────────────────
 
 #[test]
