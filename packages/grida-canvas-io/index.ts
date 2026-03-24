@@ -939,6 +939,14 @@ export namespace io {
        * immediately consumed (e.g. fig2grida → io.load round-trip).
        */
       level?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+      /**
+       * When false, skip generating the `document.grida1` JSON snapshot.
+       * The snapshot is a migration/fallback format; pipelines that only
+       * need the FlatBuffers document (e.g. fig2grida) can disable it
+       * to avoid a costly `JSON.stringify` over the entire node tree.
+       * @default true
+       */
+      snapshot?: boolean;
     }
 
     export function pack(
@@ -963,15 +971,19 @@ export namespace io {
       );
 
       // Generate document.grida1 (JSON snapshot) from document (for migration purposes)
-      const {
-        images: _images,
-        bitmaps: _bitmaps,
-        ...persistedDocument
-      } = document;
-      const snapshotJson = io.snapshot.stringify({
-        version: schemaVersion,
-        document: persistedDocument,
-      });
+      const includeSnapshot = options?.snapshot !== false;
+      let snapshotJson: string | undefined;
+      if (includeSnapshot) {
+        const {
+          images: _images,
+          bitmaps: _bitmaps,
+          ...persistedDocument
+        } = document;
+        snapshotJson = io.snapshot.stringify({
+          version: schemaVersion,
+          document: persistedDocument,
+        });
+      }
 
       const manifest: Manifest = {
         document_file: "document.grida",
@@ -995,7 +1007,9 @@ export namespace io {
       const files: Record<string, Uint8Array> = {
         "manifest.json": strToU8(JSON.stringify(manifest)),
         "document.grida": fbBytes,
-        "document.grida1": strToU8(snapshotJson),
+        ...(snapshotJson && {
+          "document.grida1": strToU8(snapshotJson),
+        }),
         ...(images &&
           Object.keys(images).length > 0 && { "images/": new Uint8Array() }), // Ensure folder exists
       };

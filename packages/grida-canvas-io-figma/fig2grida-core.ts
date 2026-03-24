@@ -229,7 +229,7 @@ function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
     merged.imageRecord,
     undefined,
     undefined,
-    { level: 0 }
+    { level: 0, snapshot: false }
   );
   const nodeCount = Object.keys(merged.document.nodes).filter(
     (id) => merged.document.nodes[id]?.type !== "scene"
