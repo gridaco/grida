@@ -35,9 +35,7 @@ if (!HAS_FIXTURE) {
 
 const FIXTURE_GZ = HAS_FIXTURE ? readFileSync(FIXTURE_PATH) : null;
 
-const decompressedBytes = FIXTURE_GZ
-  ? gunzipSync(FIXTURE_GZ)
-  : null;
+const decompressedBytes = FIXTURE_GZ ? gunzipSync(FIXTURE_GZ) : null;
 const jsonString = decompressedBytes
   ? new TextDecoder().decode(decompressedBytes)
   : null;
@@ -50,7 +48,6 @@ if (FIXTURE_GZ && decompressedBytes && jsonString && preConverted) {
   console.log(
     `[fixture] gz=${(FIXTURE_GZ.byteLength / 1024 / 1024).toFixed(1)}MB, ` +
       `decompressed=${(decompressedBytes.byteLength / 1024 / 1024).toFixed(1)}MB, ` +
-      `jsonString=${(jsonString.length / 1024 / 1024).toFixed(1)}MB, ` +
       `nodes=${nodeCount}`
   );
 }
@@ -60,22 +57,6 @@ if (FIXTURE_GZ && decompressedBytes && jsonString && preConverted) {
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!HAS_FIXTURE)("fig2grida pipeline", () => {
-  bench(
-    "stage: gzip decompress",
-    () => {
-      gunzipSync(FIXTURE_GZ!);
-    },
-    { iterations: 5, warmupIterations: 1 }
-  );
-
-  bench(
-    "stage: JSON.parse",
-    () => {
-      JSON.parse(jsonString!);
-    },
-    { iterations: 5, warmupIterations: 1 }
-  );
-
   bench(
     "stage: restJsonToGridaDocument (convert + merge)",
     () => {
@@ -88,14 +69,6 @@ describe.skipIf(!HAS_FIXTURE)("fig2grida pipeline", () => {
     "stage: fig2grida full (convert + merge + pack)",
     () => {
       fig2grida(parsedJson);
-    },
-    { iterations: 3, warmupIterations: 1 }
-  );
-
-  bench(
-    "stage: io.archive.pack (level 6, default)",
-    () => {
-      io.archive.pack(preConverted!.document, preConverted!.assets);
     },
     { iterations: 3, warmupIterations: 1 }
   );
@@ -116,10 +89,10 @@ describe.skipIf(!HAS_FIXTURE)("fig2grida pipeline", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Benchmarks — io.archive.pack sub-stages
+// Benchmarks — encode sub-stages
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!HAS_FIXTURE)("io.archive.pack sub-stages", () => {
+describe.skipIf(!HAS_FIXTURE)("encode sub-stages", () => {
   const docForFb = {
     ...preConverted!.document,
     images: {},
@@ -127,60 +100,85 @@ describe.skipIf(!HAS_FIXTURE)("io.archive.pack sub-stages", () => {
   };
 
   bench(
-    "sub: toFlatbuffer",
+    "toFlatbuffer (default)",
     () => {
       format.document.encode.toFlatbuffer(docForFb);
     },
     { iterations: 3, warmupIterations: 1 }
   );
 
-  const {
-    images: _images,
-    bitmaps: _bitmaps,
-    ...persistedDocument
-  } = preConverted!.document;
-  const snapshotPayload = {
-    version: "1.0",
-    document: persistedDocument,
-  };
-
   bench(
-    "sub: JSON.stringify (snapshot)",
+    "toFlatbuffer (skipSort)",
     () => {
-      JSON.stringify(snapshotPayload);
+      format.document.encode.toFlatbuffer(docForFb, undefined, {
+        skipSort: true,
+      });
     },
-    { iterations: 5, warmupIterations: 1 }
+    { iterations: 3, warmupIterations: 1 }
   );
 
   const fbBytes = format.document.encode.toFlatbuffer(docForFb);
-  const snapshotJson = JSON.stringify(snapshotPayload);
-
-  const files: Record<string, Uint8Array> = {
-    "manifest.json": strToU8(
-      JSON.stringify({ document_file: "document.grida", version: "1.0" })
-    ),
-    "document.grida": fbBytes,
-    "document.grida1": strToU8(snapshotJson),
-  };
 
   bench(
-    "sub: zipSync (level 6)",
+    "zipSync (level 0)",
     () => {
-      zipSync(files);
+      zipSync(
+        {
+          "manifest.json": strToU8(
+            JSON.stringify({
+              document_file: "document.grida",
+              version: "1.0",
+            })
+          ),
+          "document.grida": fbBytes,
+        },
+        { level: 0 }
+      );
     },
     { iterations: 5, warmupIterations: 1 }
   );
 
   bench(
-    "sub: zipSync (level 0)",
+    "zipSync (level 6)",
     () => {
-      zipSync(files, { level: 0 });
+      zipSync(
+        {
+          "manifest.json": strToU8(
+            JSON.stringify({
+              document_file: "document.grida",
+              version: "1.0",
+            })
+          ),
+          "document.grida": fbBytes,
+        },
+        { level: 6 }
+      );
     },
-    { iterations: 5, warmupIterations: 1 }
+    { iterations: 3, warmupIterations: 1 }
   );
 
   console.log(
-    `[pack sizes] flatbuffer=${(fbBytes.byteLength / 1024 / 1024).toFixed(1)}MB, ` +
-      `snapshot=${(snapshotJson.length / 1024 / 1024).toFixed(1)}MB`
+    `[encode sizes] flatbuffer=${(fbBytes.byteLength / 1024 / 1024).toFixed(1)}MB`
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Benchmarks — decode (round-trip: encode once, then measure decode)
+// ---------------------------------------------------------------------------
+
+describe.skipIf(!HAS_FIXTURE)("decode", () => {
+  const docForFb = {
+    ...preConverted!.document,
+    images: {},
+    bitmaps: {},
+  };
+  const fbBytes = format.document.encode.toFlatbuffer(docForFb);
+
+  bench(
+    "fromFlatbuffer",
+    () => {
+      format.document.decode.fromFlatbuffer(fbBytes);
+    },
+    { iterations: 5, warmupIterations: 1 }
   );
 });
