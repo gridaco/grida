@@ -12,7 +12,7 @@
 use super::packing::{ShelfPacker, Slot, SlotId};
 use crate::node::schema::NodeId;
 use skia_safe::{Canvas, Image, Rect, Surface};
-use std::collections::HashMap;
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 
 /// A single atlas page.
 ///
@@ -26,9 +26,9 @@ pub struct AtlasPage {
     /// Shelf packer managing slot allocation.
     packer: ShelfPacker,
     /// Map from slot ID to the node that occupies it.
-    slot_to_node: HashMap<SlotId, NodeId>,
+    slot_to_node: NodeIdHashMap<SlotId, NodeId>,
     /// Map from node ID to its allocated slot.
-    node_to_slot: HashMap<NodeId, Slot>,
+    node_to_slot: NodeIdHashMap<NodeId, Slot>,
     /// Whether the surface has been modified since the last snapshot.
     dirty: bool,
     /// Page index (for multi-page atlas sets).
@@ -70,8 +70,8 @@ impl AtlasPage {
             surface,
             image: None,
             packer: ShelfPacker::new(w, h),
-            slot_to_node: HashMap::new(),
-            node_to_slot: HashMap::new(),
+            slot_to_node: new_node_id_map(),
+            node_to_slot: new_node_id_map(),
             dirty: false,
             page_index,
         }
