@@ -58,7 +58,7 @@ interface RefigRenderConfig extends Pick<
 }
 
 const REFIG_RENDER_CONFIG: RefigRenderConfig = {
-  cg_skip_layout: true,
+  cg_skip_layout: false,
 };
 
 export function useRefigEditor() {
