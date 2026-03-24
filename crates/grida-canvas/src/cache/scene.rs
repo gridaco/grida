@@ -191,6 +191,17 @@ impl SceneCache {
             .collect()
     }
 
+    /// Return the bounding envelope of all scene content in the R-tree.
+    ///
+    /// O(1) — reads the cached root node envelope. Returns `None` when
+    /// the scene is empty (no layers indexed).
+    pub fn scene_envelope(&self) -> Option<AABB<[f32; 2]>> {
+        if self.layer_index.size() == 0 {
+            return None;
+        }
+        Some(self.layer_index.root().envelope())
+    }
+
     /// Query painter layer indices whose bounds contain the given point.
     pub fn intersects_point(&self, point: Vector2) -> Vec<usize> {
         let env = AABB::from_point([point[0], point[1]]);
