@@ -157,3 +157,105 @@ just --justfile crates/grida-canvas-wasm/justfile build
 3. Native benchmark: should not regress (target: `<800ms`)
 4. WASM-on-Node benchmark: geometry stage should drop from ~4s to `<1s`
 5. Visual: load yrr-main in browser debug embed, verify text renders correctly and pan/zoom/settle work
+
+---
+
+## Results: GeoInput SoA Extraction (Implemented)
+
+### What was implemented
+
+`GeoInput` struct + `GeoNodeKind` enum + `RenderBoundsInfo` enum in
+`cache/geometry.rs`. The geometry cache now runs in two phases:
+
+1. **O(n) extraction pass** — iterates `graph.nodes_iter()`, extracts
+   `GeoInput` (~56 bytes) per node into a `DenseNodeMap<GeoInput>`. Text
+   measurement happens here.
+2. **DFS pass** — operates on `DenseNodeMap<GeoInput>` only. Never touches
+   the full `Node` enum.
+
+All 330 tests pass. No API changes. Single file modified.
+
+### Benchmark Results (yrr-main.grida, 136K nodes)
+
+**Native (release, 3-iteration average):**
+
+| Stage            | Before (ms) | After (ms) | Delta       |
+| ---------------- | ----------- | ---------- | ----------- |
+| geometry total   | 121         | 130        | +7% (noise) |
+| geometry extract | —           | 121        | (new)       |
+| geometry DFS     | ~121        | 7          | **-94%**    |
+| total            | 796         | 706        | -11%        |
+
+**WASM-on-Node (release):**
+
+| Stage            | Before (ms) | After (ms) | Delta        |
+| ---------------- | ----------- | ---------- | ------------ |
+| geometry total   | 4,017       | 4,668      | +16% (noise) |
+| geometry extract | —           | 4,661      | (new)        |
+| geometry DFS     | ~4,017      | **5**      | **-99.9%**   |
+| total            | 10,484      | 12,500     | —            |
+
+### Analysis
+
+The DFS optimization worked exactly as designed — **DFS dropped from
+~4,000ms to 5ms in WASM** (800x improvement, 0.7x native ratio). Once
+data is compact, WASM operates at near-native speed.
+
+However, the total geometry time is unchanged because the **extraction
+pass inherits the same bottleneck**: it iterates `graph.nodes_iter()`
+which yields `&Node` references into `Vec<Option<Node>>` where each slot
+is 500+ bytes. The sequential scan still touches ~65 MB of cold data in
+WASM linear memory.
+
+The cost shifted from DFS to extraction. The root cause is confirmed:
+**any iteration over the full `Node` enum is fundamentally cache-unfriendly
+in WASM**, regardless of whether it's a DFS or a sequential scan.
+
+### Conclusion
+
+SoA extraction within geometry.rs is a dead end for total geometry time.
+The extraction pass itself is the bottleneck, and it must touch the `Node`
+enum. To eliminate this cost, the split must happen **upstream** — at scene
+graph construction time — so that geometry-relevant data is never stored
+inside the monolithic `Node` enum in the first place.
+
+See [docs/wg/research/chromium/node-data-layout.md](../../research/chromium/node-data-layout.md)
+for research on Chromium's property tree architecture, which solves
+exactly this problem by storing properties in separate flat arrays indexed
+by integer IDs.
+
+## Next Steps: Property Split at Scene Graph Level
+
+The GeoInput experiment proved the hypothesis: **compact data = fast WASM**.
+The remaining question is where to split:
+
+### Option A: Split at SceneGraph construction
+
+Populate `DenseNodeMap<NodeTransform>`, `DenseNodeMap<NodeSize>`, etc.
+during FBS decode / JSON parse. The `Node` enum remains for painter and
+export but hot loops (geometry, layers, effects) use the split maps.
+
+- Pro: Incremental migration, no format changes
+- Con: Dual storage during transition
+
+### Option B: Reshape the FBS schema
+
+Store geometry-relevant fields in a separate FBS table. Decode directly
+into split maps without materializing the full `Node`.
+
+- Pro: Minimal memory (no dual storage), aligned end-to-end
+- Con: Format migration, breaks existing .grida files
+
+### Option C: Full ECS
+
+Replace `Node` enum with entity-component storage (e.g., archetype-based).
+
+- Pro: Maximum flexibility for future component shapes
+- Con: Highest complexity, archetype migration overhead for common editing
+  operations, tree traversal requires indirection
+
+**Recommendation: Option A** (split at SceneGraph) as the incremental path,
+with Option B as the long-term goal once the split maps stabilize.
+
+See [docs/wg/research/chromium/node-data-layout.md](../../research/chromium/node-data-layout.md)
+for the full analysis including ECS tradeoffs and mutation considerations.
