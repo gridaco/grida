@@ -85,7 +85,11 @@ impl GeometryCache {
         layout_result: Option<&crate::layout::cache::LayoutResult>,
         viewport_size: crate::node::schema::Size,
     ) -> Self {
-        let mut cache = Self::new();
+        let mut cache = Self {
+            entries: crate::cache::fast_hash::new_node_id_map_with_capacity(
+                scene.graph.node_count(),
+            ),
+        };
         let root_world = AffineTransform::identity();
         let context = GeometryBuildContext { viewport_size };
 
@@ -134,7 +138,7 @@ impl GeometryCache {
     ) -> Rectangle {
         let node = graph
             .get_node(id)
-            .expect(&format!("node not found in geometry cache {id:?}"));
+            .expect("node not found in geometry cache");
 
         match node {
             Node::Group(n) => {
@@ -198,8 +202,9 @@ impl GeometryCache {
                     dirty_bounds: false,
                 };
 
-                cache.entries.insert(id.clone(), entry.clone());
-                entry.absolute_bounding_box
+                let bounds = entry.absolute_bounding_box;
+                cache.entries.insert(*id, entry);
+                bounds
             }
             Node::InitialContainer(_n) => {
                 // ICB fills viewport - size from context
@@ -249,7 +254,7 @@ impl GeometryCache {
                     dirty_bounds: false,
                 };
 
-                cache.entries.insert(id.clone(), entry);
+                cache.entries.insert(*id, entry);
                 union_world_bounds
             }
             Node::BooleanOperation(n) => {
@@ -311,8 +316,9 @@ impl GeometryCache {
                     dirty_bounds: false,
                 };
 
-                cache.entries.insert(id.clone(), entry.clone());
-                entry.absolute_bounding_box
+                let bounds = entry.absolute_bounding_box;
+                cache.entries.insert(*id, entry);
+                bounds
             }
             Node::Container(n) => {
                 // All containers use computed layout (roots have position corrected by LayoutEngine)
@@ -548,8 +554,9 @@ impl GeometryCache {
                     dirty_bounds: false,
                 };
 
-                cache.entries.insert(id.clone(), entry.clone());
-                entry.absolute_bounding_box
+                let bounds = entry.absolute_bounding_box;
+                cache.entries.insert(*id, entry);
+                bounds
             }
         }
     }

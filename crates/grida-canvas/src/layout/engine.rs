@@ -143,7 +143,9 @@ impl LayoutEngine {
             // (Group, BoolOp) get manual layout results from schema data.
             // Children of non-Taffy parents get schema-position correction
             // via parent-type check (no extra bookkeeping needed).
-            self.extract_all_layouts(root_id, graph);
+            // Text nodes not in Taffy are measured on-the-fly if they lack
+            // explicit height in the schema.
+            self.extract_all_layouts(root_id, graph, &mut text_measure);
         }
 
         &self.result
@@ -287,6 +289,25 @@ impl LayoutEngine {
         !matches!(node, Node::Group(_) | Node::BooleanOperation(_))
     }
 
+    /// Check if a Container uses flex layout for its children.
+    ///
+    /// `LayoutMode::Normal` containers don't flow their children — all children
+    /// are positioned via schema coordinates. Their children should be treated
+    /// as independent subtrees (like Group children) rather than Taffy children.
+    ///
+    /// This is the critical optimization for Figma imports where 90%+ of
+    /// containers use `LayoutMode::Normal`. Skipping their children avoids
+    /// building O(n) Taffy nodes and running the flex algorithm unnecessarily.
+    fn is_flex_container(node: &Node) -> bool {
+        match node {
+            Node::Container(n) => {
+                n.layout_container.layout_mode == crate::cg::types::LayoutMode::Flex
+            }
+            Node::InitialContainer(_) => true,
+            _ => false,
+        }
+    }
+
     /// Recursively build Taffy tree for a node and its descendants.
     ///
     /// Virtual grouping nodes (Group, BooleanOperation) are skipped from the
@@ -336,7 +357,20 @@ impl LayoutEngine {
 
         if let Some(children) = children {
             if !children.is_empty() {
-                // Build children recursively, filtering out those that shouldn't participate
+                // For non-flex containers (LayoutMode::Normal), children are
+                // positioned via schema coordinates, not flex layout. Create
+                // this container as a Taffy leaf — it only needs its own size
+                // for its parent's flex computation. Children will be handled
+                // by extract_all_layouts using schema positions directly.
+                //
+                // This is the critical optimization for Figma imports: most
+                // containers use Normal mode, so we skip building Taffy nodes
+                // for their entire subtrees (~90%+ of nodes).
+                if !Self::is_flex_container(node) {
+                    return self.tree.new_leaf(*node_id, style).ok();
+                }
+
+                // Flex containers: build children as Taffy children
                 let taffy_children: Vec<taffy::NodeId> = children
                     .iter()
                     .filter_map(|child_id| {
@@ -377,25 +411,37 @@ impl LayoutEngine {
     /// We override root positions with their schema positions so multiple
     /// artboards/nodes can be positioned anywhere in the viewport.
     ///
-    /// **Virtual grouping nodes** (Group, BooleanOperation) are not in the
-    /// Taffy tree — they get manual layout results from their schema.
-    /// Their children become independent Taffy subtree roots (computed at 0,0),
-    /// so we detect this via parent-type check and apply schema positions.
-    /// No extra bookkeeping is needed; this handles arbitrary nesting depth.
-    fn extract_all_layouts(&mut self, id: &NodeId, graph: &SceneGraph) {
+    /// **Non-layout nodes** (Group, BooleanOperation) are not in the Taffy
+    /// tree — they get manual layout results from their schema.
+    /// **Non-flex containers** (LayoutMode::Normal) ARE in Taffy (as leaves
+    /// for their parent's flex computation) but their children are independent
+    /// subtrees with schema positions.
+    /// In both cases, children become independent Taffy subtree roots
+    /// (computed at 0,0), so we detect this via parent-type check and apply
+    /// schema positions. No extra bookkeeping is needed.
+    fn extract_all_layouts(
+        &mut self,
+        id: &NodeId,
+        graph: &SceneGraph,
+        text_measure: &mut Option<TextMeasureProvider<'_>>,
+    ) {
         if let Some(layout) = self.tree.get_layout(id) {
             let mut computed = ComputedLayout::from(layout);
 
-            // Taffy roots are computed at (0,0). Two cases need schema-position
+            // Taffy roots are computed at (0,0). Three cases need schema-position
             // correction:
             // 1. Graph roots — top-level nodes on the infinite canvas
-            // 2. Children of non-layout parents (Group/BoolOp) — these are
-            //    independent Taffy subtree roots, also computed at (0,0)
+            // 2. Children of non-layout parents (Group/BoolOp) — independent
+            //    Taffy subtree roots, also computed at (0,0)
+            // 3. Children of non-flex containers (LayoutMode::Normal) — these
+            //    are also extra_roots with schema positions
             let needs_schema_position = graph.is_root(id)
                 || graph
                     .get_parent(id)
                     .and_then(|pid| graph.get_node(&pid).ok())
-                    .is_some_and(|parent| !Self::is_layout_node(parent));
+                    .is_some_and(|parent| {
+                        !Self::is_layout_node(parent) || !Self::is_flex_container(parent)
+                    });
 
             if needs_schema_position {
                 if let Ok(node) = graph.get_node(id) {
@@ -407,10 +453,38 @@ impl LayoutEngine {
 
             self.result.insert(*id, computed);
         } else {
-            // Node not in Taffy tree (virtual grouping node) — use schema
+            // Node not in Taffy tree — use schema positions/sizes.
+            // For text nodes with missing dimensions, measure on-the-fly.
             if let Ok(node) = graph.get_node(id) {
                 let (x, y) = Self::get_schema_position(node);
-                let (width, height) = Self::get_schema_size(node);
+                let (mut width, mut height) = Self::get_schema_size(node);
+
+                // Text nodes under non-flex containers need measurement for
+                // missing width/height. The schema typically stores width but
+                // not height for auto-height text.
+                if let Node::TextSpan(n) = node {
+                    if n.width.is_none() || n.height.is_none() {
+                        if let Some(ref mut provider) = text_measure {
+                            let width_constraint = n.width;
+                            let measurements = provider.paragraph_cache.measure(
+                                &n.text,
+                                &n.text_style,
+                                &n.text_align,
+                                &n.max_lines,
+                                &n.ellipsis,
+                                width_constraint,
+                                provider.fonts,
+                                Some(id),
+                            );
+                            if n.width.is_none() {
+                                width = measurements.max_width;
+                            }
+                            if n.height.is_none() {
+                                height = measurements.height;
+                            }
+                        }
+                    }
+                }
 
                 self.result.insert(
                     *id,
@@ -427,7 +501,7 @@ impl LayoutEngine {
         // Recurse for children
         if let Some(children) = graph.get_children(id) {
             for child_id in children {
-                self.extract_all_layouts(child_id, graph);
+                self.extract_all_layouts(child_id, graph, text_measure);
             }
         }
     }

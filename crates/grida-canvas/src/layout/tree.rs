@@ -1,3 +1,4 @@
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::cache::paragraph::ParagraphCache;
 use crate::cg::types::{TextAlign, TextStyleRec};
 use crate::node::schema::NodeId;
@@ -38,7 +39,7 @@ pub(crate) struct LayoutTree {
     /// Taffy tree for layout computation
     taffy: TaffyTree<LayoutNodeContext>,
     /// Map from our SceneGraph NodeId to Taffy's NodeId
-    scene_to_taffy: HashMap<NodeId, taffy::NodeId>,
+    scene_to_taffy: NodeIdHashMap<NodeId, taffy::NodeId>,
     /// Reverse map from Taffy NodeId to SceneGraph NodeId
     taffy_to_scene: HashMap<taffy::NodeId, NodeId>,
 }
@@ -47,7 +48,7 @@ impl LayoutTree {
     pub(crate) fn new() -> Self {
         Self {
             taffy: TaffyTree::new(),
-            scene_to_taffy: HashMap::new(),
+            scene_to_taffy: new_node_id_map(),
             taffy_to_scene: HashMap::new(),
         }
     }

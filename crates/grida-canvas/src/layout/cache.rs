@@ -1,6 +1,6 @@
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::layout::ComputedLayout;
 use crate::node::schema::NodeId;
-use std::collections::HashMap;
 
 /// Immutable layout computation result
 ///
@@ -8,13 +8,13 @@ use std::collections::HashMap;
 /// computation phase. Cached between frames for performance and change detection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LayoutResult {
-    layouts: HashMap<NodeId, ComputedLayout>,
+    layouts: NodeIdHashMap<NodeId, ComputedLayout>,
 }
 
 impl LayoutResult {
     pub fn new() -> Self {
         Self {
-            layouts: HashMap::new(),
+            layouts: new_node_id_map(),
         }
     }
 

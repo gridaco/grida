@@ -39,11 +39,11 @@
 //! }
 //! ```
 
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::cg::types::LayerBlendMode;
 use crate::node::id::NodeId;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::{Node, NodeTrait};
-use std::collections::HashMap;
 
 /// Why a node needs a render surface.
 ///
@@ -110,7 +110,7 @@ impl EffectNode {
 pub struct EffectTree {
     /// Map from NodeId to its EffectNode data.
     /// Only contains nodes that need render surfaces.
-    nodes: HashMap<NodeId, EffectNode>,
+    nodes: NodeIdHashMap<NodeId, EffectNode>,
     /// Total number of render surfaces (== nodes.len()).
     surface_count: usize,
     /// Summary statistics for diagnostics.
@@ -143,7 +143,7 @@ impl EffectTree {
     /// Create an empty effect tree (no render surfaces).
     pub fn empty() -> Self {
         Self {
-            nodes: HashMap::new(),
+            nodes: new_node_id_map(),
             surface_count: 0,
             stats: EffectTreeStats::default(),
         }
@@ -155,7 +155,7 @@ impl EffectTree {
     /// surfaces. This is a full rebuild — no incremental state is carried
     /// over.
     pub fn build(graph: &SceneGraph) -> Self {
-        let mut nodes = HashMap::new();
+        let mut nodes = new_node_id_map();
         let mut stats = EffectTreeStats::default();
 
         for root_id in graph.roots() {
@@ -176,7 +176,7 @@ impl EffectTree {
     fn visit(
         graph: &SceneGraph,
         id: &NodeId,
-        nodes: &mut HashMap<NodeId, EffectNode>,
+        nodes: &mut NodeIdHashMap<NodeId, EffectNode>,
         stats: &mut EffectTreeStats,
     ) {
         stats.nodes_visited += 1;
@@ -191,14 +191,11 @@ impl EffectTree {
             return;
         }
 
-        let all_children: Vec<NodeId> = graph
-            .get_children(id)
-            .cloned()
-            .unwrap_or_default();
+        let all_children = graph.get_children(id);
+        let all_children_slice = all_children.map(|c| c.as_slice()).unwrap_or(&[]);
 
-        // Filter to only active children — inactive nodes should not
-        // trigger render surface reasons (mask, shadow promotion, etc.).
-        let children: Vec<NodeId> = all_children
+        // Count visible children and check for masks without allocating a Vec.
+        let visible_child_count = all_children_slice
             .iter()
             .filter(|cid| {
                 graph
@@ -206,13 +203,10 @@ impl EffectTree {
                     .map(|n| n.active())
                     .unwrap_or(false)
             })
-            .copied()
-            .collect();
-
-        let visible_child_count = children.len();
+            .count();
 
         // Collect render surface reasons for this node.
-        let reasons = Self::classify(node, visible_child_count, &children, graph);
+        let reasons = Self::classify(node, visible_child_count, all_children_slice, graph);
 
         if !reasons.is_empty() {
             // Update per-reason stats.
@@ -227,12 +221,24 @@ impl EffectTree {
                 }
             }
 
+            // Only allocate the children Vec for nodes that actually need a surface.
+            let active_children: Vec<NodeId> = all_children_slice
+                .iter()
+                .filter(|cid| {
+                    graph
+                        .get_node(cid)
+                        .map(|n| n.active())
+                        .unwrap_or(false)
+                })
+                .copied()
+                .collect();
+
             nodes.insert(
                 *id,
                 EffectNode {
                     id: *id,
                     reasons,
-                    children: children.clone(),
+                    children: active_children,
                     visible_child_count,
                 },
             );
@@ -240,7 +246,7 @@ impl EffectTree {
 
         // Recurse into all children (including inactive ones, which will
         // early-return in visit) so the full tree is traversed.
-        for child_id in &all_children {
+        for child_id in all_children_slice {
             Self::visit(graph, child_id, nodes, stats);
         }
     }
@@ -311,12 +317,12 @@ impl EffectTree {
         reasons
     }
 
-    /// Check if any of the given children are mask nodes.
+    /// Check if any of the given children are active mask nodes.
     fn has_mask_children(children: &[NodeId], graph: &SceneGraph) -> bool {
         children.iter().any(|cid| {
             graph
                 .get_node(cid)
-                .map(|n| n.mask().is_some())
+                .map(|n| n.active() && n.mask().is_some())
                 .unwrap_or(false)
         })
     }

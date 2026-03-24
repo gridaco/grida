@@ -1152,7 +1152,7 @@ impl UnknownTargetApplication {
         // to the previous frame. Restore it from the pan image cache and
         // skip the expensive frame-plan build + full draw.  The overlay is
         // still re-drawn below so marquee/selection visuals update correctly.
-        if !content_changed && self.renderer.blit_content_cache() {
+        if !stable && !content_changed && self.renderer.blit_content_cache() {
             // Consume the camera change (no-op here, but keeps the contract).
             self.renderer.camera.consume_change();
 

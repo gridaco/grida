@@ -1532,10 +1532,29 @@ impl Renderer {
             Some(c) => c,
             None => return false,
         };
+        // The pan cache image was captured at (origin_tx, origin_ty).
+        // If the camera has since moved (e.g. pan-only fast-path frames
+        // that don't recapture), we must offset the blit — otherwise the
+        // settle frame "reverts" to the old camera position.
+        let vm = self.camera.view_matrix();
+        let dx = vm.matrix[0][2] - cache.origin_tx;
+        let dy = vm.matrix[1][2] - cache.origin_ty;
+
         let surface = unsafe { &mut *self.backend.get_surface() };
         let canvas = surface.canvas();
-        // Draw the cached content snapshot at the same position (dx=0, dy=0).
-        canvas.draw_image(&cache.image, (0.0, 0.0), None);
+        if dx != 0.0 || dy != 0.0 {
+            // Offset blit — need to clear first (exposed edges).
+            if let Some(scene) = self.scene.as_ref() {
+                if let Some(bg) = scene.background_color {
+                    canvas.clear(skia_safe::Color::from(bg));
+                } else {
+                    canvas.clear(skia_safe::Color::TRANSPARENT);
+                }
+            } else {
+                canvas.clear(skia_safe::Color::TRANSPARENT);
+            }
+        }
+        canvas.draw_image(&cache.image, (dx, dy), None);
         Self::gpu_flush(surface);
         true
     }
