@@ -94,7 +94,7 @@ impl SurfaceState {
             SurfaceEvent::PointerMove {
                 canvas_point,
                 screen_point,
-            } => self.handle_pointer_move(canvas_point, screen_point, hit_tester, hierarchy, ui_hit_regions),
+            } => self.handle_pointer_move(canvas_point, screen_point, hit_tester, ui_hit_regions),
 
             SurfaceEvent::PointerDown {
                 canvas_point,
@@ -156,7 +156,6 @@ impl SurfaceState {
         canvas_point: math2::vector2::Vector2,
         screen_point: math2::vector2::Vector2,
         hit_tester: &HitTester,
-        hierarchy: &impl Hierarchy,
         ui_hit_regions: &HitRegions,
     ) -> SurfaceResponse {
         let mut response = SurfaceResponse::none();
@@ -206,11 +205,12 @@ impl SurfaceState {
                     current_canvas: canvas_point,
                 };
 
-                // Compute tentative selection from marquee rectangle
+                // Compute tentative selection from marquee rectangle.
+                // Use intersects_topmost to get only the shallowest
+                // matching ancestors — avoids the separate O(K*D) prune.
                 let rect = marquee_rect(anchor_canvas, canvas_point);
-                let hits = hit_tester.intersects(&rect);
+                let hits = hit_tester.intersects_topmost(&rect);
                 self.selection.set(hits);
-                self.prune_selection(hierarchy);
 
                 response.selection_changed = true;
                 response.needs_redraw = true;
