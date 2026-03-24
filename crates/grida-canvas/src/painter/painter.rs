@@ -21,8 +21,8 @@ use skia_safe::{
     canvas::SaveLayerRec, textlayout, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
     Shader,
 };
+use crate::cache::fast_hash::NodeIdHashMap;
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Pre-extracted blit data for a single promoted (compositor-cached) node.
@@ -58,7 +58,7 @@ pub struct Painter<'a> {
     /// Pre-extracted blit data for promoted (compositor-cached) nodes.
     /// When present, promoted nodes are blitted inline at their correct
     /// z-position instead of being skipped.
-    promoted_blits: Option<&'a HashMap<NodeId, PromotedBlit>>,
+    promoted_blits: Option<&'a NodeIdHashMap<NodeId, PromotedBlit>>,
 }
 
 impl<'a> Painter<'a> {
@@ -113,7 +113,7 @@ impl<'a> Painter<'a> {
     /// Set the promoted blit map. Nodes in this map will be blitted from
     /// their pre-extracted compositor cache data at the correct z-position
     /// in the render command tree, instead of being re-drawn live.
-    pub fn with_promoted_blits(mut self, blits: &'a HashMap<NodeId, PromotedBlit>) -> Self {
+    pub fn with_promoted_blits(mut self, blits: &'a NodeIdHashMap<NodeId, PromotedBlit>) -> Self {
         self.promoted_blits = Some(blits);
         self
     }

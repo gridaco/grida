@@ -402,10 +402,10 @@ impl Renderer {
         &mut self,
         plan: &FramePlan,
     ) -> (
-        std::collections::HashMap<NodeId, crate::painter::PromotedBlit>,
+        crate::cache::fast_hash::NodeIdHashMap<NodeId, crate::painter::PromotedBlit>,
         usize,
     ) {
-        let mut blits = std::collections::HashMap::new();
+        let mut blits = crate::cache::fast_hash::new_node_id_map();
         let mut cache_hits = 0usize;
 
         for id in &plan.promoted {
@@ -469,7 +469,7 @@ impl Renderer {
         &mut self,
         canvas: &Canvas,
         plan: &FramePlan,
-        promoted_blits: Option<&std::collections::HashMap<NodeId, crate::painter::PromotedBlit>>,
+        promoted_blits: Option<&crate::cache::fast_hash::NodeIdHashMap<NodeId, crate::painter::PromotedBlit>>,
     ) -> usize {
         // Select effect quality based on frame stability.
         // Unstable (interactive) frames use reduced effects for performance.
