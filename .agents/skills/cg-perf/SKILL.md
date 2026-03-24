@@ -495,3 +495,77 @@ absolute-positioned documents.
 thousands of cheap entries, the timing checks themselves can become
 significant. Use `elapsed()` checks at reasonable intervals, not every
 iteration.
+
+### `Instant::now()` is broken on emscripten
+
+Under emscripten, `Instant::now()` is effectively constant, so durations
+collapse to zero. Use `crate::sys::perf_now()` for timing: it maps to
+`emscripten_get_now()` (`performance.now()`) on WASM and `Instant` on native.
+
+### WASM/native ratios are stage-dependent
+
+WASM overhead is not a single multiplier. Roughly: simple compute is ~2-3x,
+HashMap-heavy traversals can be 10-35x, and after Vec-indexing hot paths,
+data-structure-bound stages drop to ~1-2x while compute-heavy stages stay
+~5-15x+. Measure per stage.
+
+### Data structures matter much more in WASM
+
+Large `HashMap`s (100K+ entries) may be fine on native but can be extremely
+slow in WASM due to linear memory and weaker cache behavior. Prefer dense
+Vec-indexed storage (`DenseNodeMap<V>`) for hot paths. See `cache/fast_hash.rs`.
+
+### Native profiles can mis-rank WASM bottlenecks
+
+Native profiling finds stage costs, but not WASM amplification. Example:
+native highlighted layers, while WASM was dominated by geometry because
+per-node `HashMap` costs were amplified. Confirm priorities with WASM data.
+
+---
+
+## WASM Performance
+
+WASM is the primary shipping target. Native benchmarks show the algorithmic
+ceiling; WASM benchmarks show delivered performance.
+
+See `docs/wg/feat-2d/wasm-benchmarking.md` for the full strategy and
+lessons learned. Key points:
+
+### Measurement inside WASM
+
+`load_scene` emits per-stage timing via `eprintln!` + `sys::perf_now()`.
+Read the `[load_scene]` line in browser console (stderr) for
+fonts/layout/geometry/effects/layers. This is the primary `load_scene`
+WASM measurement path today.
+
+### Three-layer benchmarking model
+
+1. **Native** (`load-bench`, Criterion): algorithmic ceiling + profiling
+2. **WASM-on-Node**: real WASM in headless/CI — **implemented**
+3. **Browser**: full pipeline (JS encode + WASM load + GPU render)
+
+WASM-on-Node benchmark:
+
+```sh
+# Build WASM first
+just --justfile crates/grida-canvas-wasm/justfile build
+
+# Run benchmark (requires fixtures/local/perf/local/yrr-main.grida for 136k test)
+cd crates/grida-canvas-wasm && npx vitest run __test__/bench-load-scene.test.ts
+```
+
+WASM-on-Node results closely match browser WASM timings, confirming it as
+a valid benchmarking layer for compute-heavy stages.
+
+### Known WASM-specific issues
+
+- **GPU-only paths** can fail only on WASM (native runs CPU backend).
+  `blit_content_cache` and overlay-only fast path both had WASM-only bugs.
+- **Large enum access** is the dominant WASM bottleneck. The `Node` enum
+  (15 variants, each hundreds of bytes) causes cache-unfriendly memory access
+  that WASM amplifies to 30×+ native cost. Fix: Struct-of-Arrays (SoA) —
+  see `docs/wg/feat-2d/wasm-load-scene-optimization.md`.
+- **Deep recursion** (`build_recursive`, `flatten_node`) is costlier in WASM
+  due to stack-frame overhead in linear memory.
+- **JS↔WASM boundary** is small for bulk calls (`switch_scene`), but JS-side
+  FlatBuffers encoding is still ~10% of pipeline cost.

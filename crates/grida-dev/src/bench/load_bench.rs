@@ -187,7 +187,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
     let mut diffs = Vec::new();
     let eps = threshold;
     for (id, full) in result_full.iter() {
-        if let Some(schema) = result_schema.get(id) {
+        if let Some(schema) = result_schema.get(&id) {
             let dx = (full.x - schema.x).abs();
             let dy = (full.y - schema.y).abs();
             let dw = (full.width - schema.width).abs();
@@ -195,14 +195,14 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
             if dx > eps || dy > eps || dw > eps || dh > eps {
                 let node_type = scene
                     .graph
-                    .get_node(id)
+                    .get_node(&id)
                     .map(|n| format!("{:?}", std::mem::discriminant(n)))
                     .unwrap_or_else(|_| "?".to_string());
 
                 // Get node type name cleanly
                 let type_name = scene
                     .graph
-                    .get_node(id)
+                    .get_node(&id)
                     .map(|n| match n {
                         cg::node::schema::Node::Container(_) => "Container",
                         cg::node::schema::Node::Rectangle(_) => "Rectangle",
@@ -226,7 +226,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
                 // Check if parent is a container (to understand context)
                 let parent_info = scene
                     .graph
-                    .get_parent(id)
+                    .get_parent(&id)
                     .and_then(|pid| {
                         scene.graph.get_node(&pid).ok().map(|p| match p {
                             cg::node::schema::Node::Container(_) => "Container",
@@ -239,7 +239,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
                     .unwrap_or("root");
 
                 diffs.push((
-                    *id,
+                    id,
                     type_name,
                     parent_info,
                     *full,
@@ -258,7 +258,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
 
     // Also check for nodes in schema but not in full
     for (id, _) in result_schema.iter() {
-        if result_full.get(id).is_none() {
+        if result_full.get(&id).is_none() {
             eprintln!(
                 "  WARN: node {:?} in schema result but missing from full result",
                 id

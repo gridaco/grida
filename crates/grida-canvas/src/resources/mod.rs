@@ -148,7 +148,7 @@ fn extract_image_urls(scene: &Scene) -> Vec<String> {
     use crate::node::schema::Node;
     let mut urls = Vec::new();
     for (id, _) in scene.graph.iter() {
-        let Ok(node) = scene.graph.get_node(id) else {
+        let Ok(node) = scene.graph.get_node(&id) else {
             continue;
         };
 

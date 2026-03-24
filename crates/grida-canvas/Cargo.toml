@@ -63,6 +63,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 [features]
 default = []
 web = []
+perf = []
 native-clock-tick = []
 native-gl-context = ["dep:glutin", "dep:raw-window-handle"]
 

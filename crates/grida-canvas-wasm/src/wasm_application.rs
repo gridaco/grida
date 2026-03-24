@@ -181,6 +181,22 @@ pub unsafe extern "C" fn switch_scene(
 }
 
 #[no_mangle]
+/// js::_loaded_scene_ids
+/// Returns a len-prefixed JSON array of scene ID strings, or null if empty.
+pub unsafe extern "C" fn loaded_scene_ids(app: *mut UnknownTargetApplication) -> *const u8 {
+    if let Some(app) = app.as_ref() {
+        let ids = app.loaded_scene_ids();
+        if ids.is_empty() {
+            return std::ptr::null();
+        }
+        if let Ok(json) = serde_json::to_string(&ids) {
+            return alloc_len_prefixed(json.as_bytes());
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
 /// js::_drain_missing_images
 /// Returns a len-prefixed JSON array of missing image ref strings, or null if empty.
 pub unsafe extern "C" fn drain_missing_images(app: *mut UnknownTargetApplication) -> *const u8 {

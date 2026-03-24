@@ -29,6 +29,8 @@ export namespace ffi {
   ): [ptr: number, len: number] {
     const len = bytes.length;
     const ptr = module._allocate(len);
+    // Re-read HEAPU8 after _allocate — if WASM memory grew during
+    // allocation, the old Uint8Array view is detached.
     module.HEAPU8.set(bytes, ptr);
     return [ptr, len];
   }

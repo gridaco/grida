@@ -1338,6 +1338,9 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
+        #[cfg(feature = "perf")]
+        let _t0 = crate::sys::perf_now();
+
         self.scene = Some(scene);
 
         self.scene_cache = cache::scene::SceneCache::new();
@@ -1345,8 +1348,12 @@ impl Renderer {
         self.zoom_image_cache = None;
         self.images.clear_missing_tracking();
         if let Some(scene) = self.scene.as_ref() {
+            #[cfg(feature = "perf")]
+            let _t_fonts_start = crate::sys::perf_now();
             let requested = collect_scene_font_families(scene);
             self.fonts.set_requested_families(requested.into_iter());
+            #[cfg(feature = "perf")]
+            let _t_fonts = crate::sys::perf_now();
 
             let viewport_size = self.window_context.viewport_size;
 
@@ -1367,6 +1374,8 @@ impl Renderer {
                     }),
                 );
             }
+            #[cfg(feature = "perf")]
+            let _t_layout = crate::sys::perf_now();
 
             // 2. Build geometry with layout results
             let layout_result = self.layout_engine.result();
@@ -1376,12 +1385,30 @@ impl Renderer {
                 layout_result,
                 viewport_size,
             );
+            #[cfg(feature = "perf")]
+            let _t_geometry = crate::sys::perf_now();
 
             // 3. Build effect tree (identifies render surface boundaries)
             self.scene_cache.update_effect_tree(scene);
+            #[cfg(feature = "perf")]
+            let _t_effects = crate::sys::perf_now();
 
             // 4. Build layers
             self.scene_cache.update_layers(scene);
+
+            #[cfg(feature = "perf")]
+            {
+                let _t_layers = crate::sys::perf_now();
+                eprintln!(
+                    "[load_scene] fonts={:.0}ms layout={:.0}ms geometry={:.0}ms effects={:.0}ms layers={:.0}ms total={:.0}ms",
+                    _t_fonts - _t_fonts_start,
+                    _t_layout - _t_fonts,
+                    _t_geometry - _t_layout,
+                    _t_effects - _t_geometry,
+                    _t_layers - _t_effects,
+                    _t_layers - _t0,
+                );
+            }
         }
         // Record SCENE_LOAD so apply_changes() knows to clear picture/paragraph/
         // path/compositor caches on the next frame. The scene_cache was already

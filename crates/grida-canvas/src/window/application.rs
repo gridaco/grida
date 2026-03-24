@@ -132,6 +132,9 @@ pub trait ApplicationApi {
     /// Only works after `load_scene_grida` has decoded a multi-scene document.
     fn switch_scene(&mut self, scene_id: &str);
 
+    /// Return the IDs of all scenes decoded by the last `load_scene_grida` call.
+    fn loaded_scene_ids(&self) -> Vec<String>;
+
     /// Apply a batch of scene transactions represented as JSON Patch operations.
     fn apply_document_transactions(
         &mut self,
@@ -626,8 +629,8 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn load_scene_grida(&mut self, bytes: &[u8]) {
-        use crate::io::io_grida_fbs;
-        match io_grida_fbs::decode_with_id_map(bytes) {
+        use crate::io::io_grida_file;
+        match io_grida_file::decode_with_id_map(bytes) {
             Ok(result) => {
                 // Build id mappings from the decode result
                 let mut string_to_internal = std::collections::HashMap::new();
@@ -670,6 +673,10 @@ impl ApplicationApi for UnknownTargetApplication {
                     .collect::<Vec<_>>()
             );
         }
+    }
+
+    fn loaded_scene_ids(&self) -> Vec<String> {
+        self.loaded_scenes.iter().map(|(id, _)| id.clone()).collect()
     }
 
     fn apply_document_transactions(

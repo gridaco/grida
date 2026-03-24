@@ -1,8 +1,9 @@
-use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
+use crate::cache::fast_hash::DenseNodeMap;
 use crate::cache::paragraph::ParagraphCache;
 use crate::cg::types::{TextAlign, TextStyleRec};
 use crate::node::schema::NodeId;
 use crate::runtime::font_repository::FontRepository;
+#[cfg(test)]
 use std::collections::HashMap;
 use taffy::prelude::*;
 
@@ -39,8 +40,9 @@ pub(crate) struct LayoutTree {
     /// Taffy tree for layout computation
     taffy: TaffyTree<LayoutNodeContext>,
     /// Map from our SceneGraph NodeId to Taffy's NodeId
-    scene_to_taffy: NodeIdHashMap<NodeId, taffy::NodeId>,
-    /// Reverse map from Taffy NodeId to SceneGraph NodeId
+    scene_to_taffy: DenseNodeMap<taffy::NodeId>,
+    /// Reverse map from Taffy NodeId to SceneGraph NodeId (test-only)
+    #[cfg(test)]
     taffy_to_scene: HashMap<taffy::NodeId, NodeId>,
 }
 
@@ -48,7 +50,8 @@ impl LayoutTree {
     pub(crate) fn new() -> Self {
         Self {
             taffy: TaffyTree::new(),
-            scene_to_taffy: new_node_id_map(),
+            scene_to_taffy: DenseNodeMap::new(),
+            #[cfg(test)]
             taffy_to_scene: HashMap::new(),
         }
     }
@@ -65,6 +68,7 @@ impl LayoutTree {
         if self.scene_to_taffy.capacity() < capacity {
             self.taffy = TaffyTree::with_capacity(capacity);
             self.scene_to_taffy.reserve(capacity);
+            #[cfg(test)]
             self.taffy_to_scene.reserve(capacity);
         }
     }
@@ -78,17 +82,17 @@ impl LayoutTree {
         style: Style,
     ) -> Result<taffy::NodeId, taffy::TaffyError> {
         let taffy_id = self.taffy.new_leaf(style)?;
-
-        // Clean up any existing mapping for this scene_node_id
-        if let Some(old_taffy_id) = self.scene_to_taffy.insert(scene_node_id, taffy_id) {
+        #[cfg(test)]
+        if let Some(old_taffy_id) = self.scene_to_taffy.get(&scene_node_id).copied() {
             self.taffy_to_scene.remove(&old_taffy_id);
         }
-
-        // Clean up any existing mapping for this taffy_id
-        if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
-            self.scene_to_taffy.remove(&old_scene_id);
+        self.scene_to_taffy.insert(scene_node_id, taffy_id);
+        #[cfg(test)]
+        {
+            if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+                self.scene_to_taffy.remove(&old_scene_id);
+            }
         }
-
         Ok(taffy_id)
     }
 
@@ -102,15 +106,17 @@ impl LayoutTree {
         let taffy_id = self
             .taffy
             .new_leaf_with_context(style, LayoutNodeContext::Text(context))?;
-
-        if let Some(old_taffy_id) = self.scene_to_taffy.insert(scene_node_id, taffy_id) {
+        #[cfg(test)]
+        if let Some(old_taffy_id) = self.scene_to_taffy.get(&scene_node_id).copied() {
             self.taffy_to_scene.remove(&old_taffy_id);
         }
-
-        if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
-            self.scene_to_taffy.remove(&old_scene_id);
+        self.scene_to_taffy.insert(scene_node_id, taffy_id);
+        #[cfg(test)]
+        {
+            if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+                self.scene_to_taffy.remove(&old_scene_id);
+            }
         }
-
         Ok(taffy_id)
     }
 
@@ -124,17 +130,17 @@ impl LayoutTree {
         children: &[taffy::NodeId],
     ) -> Result<taffy::NodeId, taffy::TaffyError> {
         let taffy_id = self.taffy.new_with_children(style, children)?;
-
-        // Clean up any existing mapping for this scene_node_id
-        if let Some(old_taffy_id) = self.scene_to_taffy.insert(scene_node_id, taffy_id) {
+        #[cfg(test)]
+        if let Some(old_taffy_id) = self.scene_to_taffy.get(&scene_node_id).copied() {
             self.taffy_to_scene.remove(&old_taffy_id);
         }
-
-        // Clean up any existing mapping for this taffy_id
-        if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
-            self.scene_to_taffy.remove(&old_scene_id);
+        self.scene_to_taffy.insert(scene_node_id, taffy_id);
+        #[cfg(test)]
+        {
+            if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+                self.scene_to_taffy.remove(&old_scene_id);
+            }
         }
-
         Ok(taffy_id)
     }
 
@@ -214,6 +220,7 @@ impl LayoutTree {
     pub(crate) fn clear(&mut self) {
         self.taffy.clear();
         self.scene_to_taffy.clear();
+        #[cfg(test)]
         self.taffy_to_scene.clear();
     }
 

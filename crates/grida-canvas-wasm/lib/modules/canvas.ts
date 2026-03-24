@@ -196,6 +196,19 @@ export class Scene {
   }
 
   /**
+   * Return the IDs of all scenes decoded by the last `loadSceneGrida` call.
+   */
+  loadedSceneIds(): string[] {
+    this._assertAlive();
+    const outptr = this.module._loaded_scene_ids(this.appptr);
+    if (outptr === 0) {
+      return [];
+    }
+    const str = ffi.readLenPrefixedString(this.module, outptr);
+    return JSON.parse(str) as string[];
+  }
+
+  /**
    * Returns image refs that were needed during the last render but not found.
    * Only returns refs not yet reported in a previous call.
    * Returns an empty array if no new missing images.

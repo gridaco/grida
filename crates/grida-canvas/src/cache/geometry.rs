@@ -18,7 +18,7 @@ use crate::runtime::font_repository::FontRepository;
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
+use crate::cache::fast_hash::DenseNodeMap;
 
 /// Geometry data used for layout, culling, and rendering.
 ///
@@ -46,19 +46,52 @@ pub struct GeometryEntry {
 }
 
 /// Context passed during geometry building
-struct GeometryBuildContext {
+/// Bundles all immutable + mutable state for geometry build, reducing
+/// recursive call parameter count from 9 to 4 (significant for WASM
+/// where each function parameter adds call overhead).
+struct GeometryBuildContext<'a> {
+    graph: &'a SceneGraph,
+    paragraph_cache: &'a mut ParagraphCache,
+    fonts: &'a FontRepository,
+    layout_result: Option<&'a crate::layout::cache::LayoutResult>,
     viewport_size: crate::node::schema::Size,
+    /// Pre-computed: which nodes are layout containers (Container or ICB).
+    is_layout_container: DenseNodeMap<bool>,
+}
+
+impl<'a> GeometryBuildContext<'a> {
+    fn new(
+        graph: &'a SceneGraph,
+        paragraph_cache: &'a mut ParagraphCache,
+        fonts: &'a FontRepository,
+        layout_result: Option<&'a crate::layout::cache::LayoutResult>,
+        viewport_size: crate::node::schema::Size,
+    ) -> Self {
+        let mut is_layout_container = DenseNodeMap::with_capacity(graph.node_count());
+        for (id, node) in graph.nodes_iter() {
+            let is_container = matches!(node, Node::Container(_) | Node::InitialContainer(_));
+            is_layout_container.insert(id, is_container);
+        }
+        Self {
+            graph,
+            paragraph_cache,
+            fonts,
+            layout_result,
+            viewport_size,
+            is_layout_container,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct GeometryCache {
-    entries: NodeIdHashMap<NodeId, GeometryEntry>,
+    entries: DenseNodeMap<GeometryEntry>,
 }
 
 impl GeometryCache {
     pub fn new() -> Self {
         Self {
-            entries: new_node_id_map(),
+            entries: DenseNodeMap::new(),
         }
     }
 
@@ -86,57 +119,31 @@ impl GeometryCache {
         viewport_size: crate::node::schema::Size,
     ) -> Self {
         let mut cache = Self {
-            entries: crate::cache::fast_hash::new_node_id_map_with_capacity(
-                scene.graph.node_count(),
-            ),
+            entries: DenseNodeMap::with_capacity(scene.graph.node_count()),
         };
         let root_world = AffineTransform::identity();
-        let context = GeometryBuildContext { viewport_size };
+        let mut ctx = GeometryBuildContext::new(
+            &scene.graph,
+            paragraph_cache,
+            fonts,
+            layout_result,
+            viewport_size,
+        );
 
         for child in scene.graph.roots() {
-            Self::build_recursive(
-                &child,
-                &scene.graph,
-                &root_world,
-                None,
-                &mut cache,
-                paragraph_cache,
-                fonts,
-                layout_result,
-                &context,
-            );
+            Self::build_recursive(&child, &root_world, None, &mut cache, &mut ctx);
         }
         cache
     }
 
-    /// Check if a node's parent is a layout container (Container or ICB).
-    /// Only layout containers provide meaningful layout results; Group and
-    /// BooleanOperation parents produce synthetic fallbacks.
-    fn is_layout_container_parent(
-        parent_id: &Option<NodeId>,
-        graph: &SceneGraph,
-    ) -> bool {
-        parent_id
-            .as_ref()
-            .and_then(|pid| graph.get_node(pid).ok())
-            .map(|parent_node| {
-                matches!(parent_node, Node::Container(_) | Node::InitialContainer(_))
-            })
-            .unwrap_or(false)
-    }
-
     fn build_recursive(
         id: &NodeId,
-        graph: &SceneGraph,
         parent_world: &AffineTransform,
         parent_id: Option<NodeId>,
         cache: &mut GeometryCache,
-        paragraph_cache: &mut ParagraphCache,
-        fonts: &FontRepository,
-        layout_result: Option<&crate::layout::cache::LayoutResult>,
-        context: &GeometryBuildContext,
+        ctx: &mut GeometryBuildContext,
     ) -> Rectangle {
-        let node = graph
+        let node = ctx.graph
             .get_node(id)
             .expect("node not found in geometry cache");
 
@@ -145,18 +152,10 @@ impl GeometryCache {
                 let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
                 let mut union_bounds: Option<Rectangle> = None;
                 let mut union_render_bounds: Option<Rectangle> = None;
-                if let Some(children) = graph.get_children(id) {
+                if let Some(children) = ctx.graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id,
-                            graph,
-                            &world_transform,
-                            Some(id.clone()),
-                            cache,
-                            paragraph_cache,
-                            fonts,
-                            layout_result,
-                            context,
+                            child_id, &world_transform, Some(*id), cache, ctx,
                         );
                         union_bounds = match union_bounds {
                             Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -172,21 +171,13 @@ impl GeometryCache {
                 }
 
                 let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 0.0,
-                    height: 0.0,
+                    x: 0.0, y: 0.0, width: 0.0, height: 0.0,
                 });
 
                 let local_bounds = if let Some(inv) = world_transform.inverse() {
                     transform_rect(&world_bounds, &inv)
                 } else {
-                    Rectangle {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 0.0,
-                        height: 0.0,
-                    }
+                    Rectangle { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }
                 };
 
                 let render_bounds = union_render_bounds.unwrap_or(world_bounds);
@@ -197,7 +188,7 @@ impl GeometryCache {
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
                     absolute_render_bounds: render_bounds,
-                    parent: parent_id.clone(),
+                    parent: parent_id,
                     dirty_transform: false,
                     dirty_bounds: false,
                 };
@@ -207,48 +198,31 @@ impl GeometryCache {
                 bounds
             }
             Node::InitialContainer(_n) => {
-                // ICB fills viewport - size from context
-                // Layout was already computed by LayoutEngine
-                let size = context.viewport_size;
-
+                let size = ctx.viewport_size;
                 let local_transform = AffineTransform::identity();
                 let world_transform = parent_world.compose(&local_transform);
 
                 let local_bounds = Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: size.width,
-                    height: size.height,
+                    x: 0.0, y: 0.0, width: size.width, height: size.height,
                 };
 
-                // Build children geometries (may use computed layouts from LayoutEngine)
                 let mut union_world_bounds = transform_rect(&local_bounds, &world_transform);
 
-                if let Some(children) = graph.get_children(id) {
+                if let Some(children) = ctx.graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id,
-                            graph,
-                            &world_transform,
-                            Some(id.clone()),
-                            cache,
-                            paragraph_cache,
-                            fonts,
-                            layout_result,
-                            context,
+                            child_id, &world_transform, Some(*id), cache, ctx,
                         );
                         union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
                     }
                 }
-
-                let render_bounds = union_world_bounds; // ICB has no effects
 
                 let entry = GeometryEntry {
                     transform: local_transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: union_world_bounds,
-                    absolute_render_bounds: render_bounds,
+                    absolute_render_bounds: union_world_bounds,
                     parent: parent_id,
                     dirty_transform: false,
                     dirty_bounds: false,
@@ -260,18 +234,10 @@ impl GeometryCache {
             Node::BooleanOperation(n) => {
                 let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
                 let mut union_bounds: Option<Rectangle> = None;
-                if let Some(children) = graph.get_children(id) {
+                if let Some(children) = ctx.graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id,
-                            graph,
-                            &world_transform,
-                            Some(id.clone()),
-                            cache,
-                            paragraph_cache,
-                            fonts,
-                            layout_result,
-                            context,
+                            child_id, &world_transform, Some(*id), cache, ctx,
                         );
                         union_bounds = match union_bounds {
                             Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -281,21 +247,13 @@ impl GeometryCache {
                 }
 
                 let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 0.0,
-                    height: 0.0,
+                    x: 0.0, y: 0.0, width: 0.0, height: 0.0,
                 });
 
                 let local_bounds = if let Some(inv) = world_transform.inverse() {
                     transform_rect(&world_bounds, &inv)
                 } else {
-                    Rectangle {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 0.0,
-                        height: 0.0,
-                    }
+                    Rectangle { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }
                 };
 
                 let render_bounds = compute_render_bounds_from_style(
@@ -311,7 +269,7 @@ impl GeometryCache {
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
                     absolute_render_bounds: render_bounds,
-                    parent: parent_id.clone(),
+                    parent: parent_id,
                     dirty_transform: false,
                     dirty_bounds: false,
                 };
@@ -321,15 +279,12 @@ impl GeometryCache {
                 bounds
             }
             Node::Container(n) => {
-                // All containers use computed layout (roots have position corrected by LayoutEngine)
-                let (x, y, width, height) = if let Some(result) = layout_result {
-                    // Layout engine is active: use computed layout
+                let (x, y, width, height) = if let Some(result) = ctx.layout_result {
                     let computed = result
                         .get(id)
                         .expect("Container must have layout result when layout engine is used");
                     (computed.x, computed.y, computed.width, computed.height)
                 } else {
-                    // No layout engine: use schema directly (backward compatibility)
                     (
                         n.position.x().unwrap_or(0.0),
                         n.position.y().unwrap_or(0.0),
@@ -339,44 +294,26 @@ impl GeometryCache {
                 };
                 let local_transform = AffineTransform::new(x, y, n.rotation);
 
-                let local_bounds = Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width,
-                    height,
-                };
+                let local_bounds = Rectangle { x: 0.0, y: 0.0, width, height };
 
                 let world_transform = parent_world.compose(&local_transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
                 let mut union_world_bounds = world_bounds;
                 let render_bounds = if let Some(rect_stroke) = n.rectangular_stroke_width() {
                     compute_render_bounds_with_rectangular_stroke(
-                        world_bounds,
-                        &rect_stroke,
-                        n.stroke_style.stroke_align,
-                        &n.effects,
+                        world_bounds, &rect_stroke, n.stroke_style.stroke_align, &n.effects,
                     )
                 } else {
                     compute_render_bounds_from_style(
-                        world_bounds,
-                        n.render_bounds_stroke_width(),
-                        n.stroke_style.stroke_align,
-                        &n.effects,
+                        world_bounds, n.render_bounds_stroke_width(),
+                        n.stroke_style.stroke_align, &n.effects,
                     )
                 };
 
-                if let Some(children) = graph.get_children(id) {
+                if let Some(children) = ctx.graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id,
-                            graph,
-                            &world_transform,
-                            Some(id.clone()),
-                            cache,
-                            paragraph_cache,
-                            fonts,
-                            layout_result,
-                            context,
+                            child_id, &world_transform, Some(*id), cache, ctx,
                         );
                         union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
                     }
@@ -388,67 +325,42 @@ impl GeometryCache {
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
                     absolute_render_bounds: render_bounds,
-                    parent: parent_id.clone(),
+                    parent: parent_id,
                     dirty_transform: false,
                     dirty_bounds: false,
                 };
-                cache.entries.insert(id.clone(), entry.clone());
-
+                cache.entries.insert(*id, entry);
                 union_world_bounds
             }
             Node::TextSpan(n) => {
-                // Resolve layout position/size (if available) and measure text consistently with layout width
-                let layout = layout_result.and_then(|r| r.get(id));
-                let width_for_measure = layout.map(|l| l.width).or(n.width);
-
-                let measurements = paragraph_cache.measure(
-                    &n.text,
-                    &n.text_style,
-                    &n.text_align,
-                    &n.max_lines,
-                    &n.ellipsis,
-                    width_for_measure,
-                    fonts,
-                    Some(id),
-                );
+                let layout = ctx.layout_result.and_then(|r| r.get(id));
 
                 const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
 
-                let parent_is_layout_container =
-                    Self::is_layout_container_parent(&parent_id, graph);
+                let parent_is_layout_container = parent_id
+                    .as_ref()
+                    .and_then(|pid| ctx.is_layout_container.get(pid).copied())
+                    .unwrap_or(false);
 
-                let (local_transform, width, height) = if parent_is_layout_container {
-                    let width = layout
-                        .map(|l| l.width)
-                        .unwrap_or_else(|| measurements.max_width)
-                        .max(MIN_SIZE_DIRTY_HACK);
-                    let height = layout
-                        .map(|l| l.height)
-                        .unwrap_or_else(|| n.height.unwrap_or(measurements.height))
-                        .max(MIN_SIZE_DIRTY_HACK);
-                    let (x, y) = if let Some(l) = layout {
-                        (l.x, l.y)
+                let (local_transform, width, height) = if let Some(l) = layout {
+                    let width = l.width.max(MIN_SIZE_DIRTY_HACK);
+                    let height = l.height.max(MIN_SIZE_DIRTY_HACK);
+                    let transform = if parent_is_layout_container {
+                        AffineTransform::new(l.x, l.y, n.transform.rotation())
                     } else {
-                        (n.transform.x(), n.transform.y())
+                        n.transform
                     };
-                    (AffineTransform::new(x, y, n.transform.rotation()), width, height)
+                    (transform, width, height)
                 } else {
-                    let width = layout
-                        .map(|l| l.width)
-                        .unwrap_or_else(|| measurements.max_width)
-                        .max(MIN_SIZE_DIRTY_HACK);
-                    let height = layout
-                        .map(|l| l.height)
-                        .unwrap_or_else(|| n.height.unwrap_or(measurements.height))
-                        .max(MIN_SIZE_DIRTY_HACK);
+                    let measurements = ctx.paragraph_cache.measure(
+                        &n.text, &n.text_style, &n.text_align, &n.max_lines,
+                        &n.ellipsis, n.width, ctx.fonts, Some(id),
+                    );
+                    let width = measurements.max_width.max(MIN_SIZE_DIRTY_HACK);
+                    let height = n.height.unwrap_or(measurements.height).max(MIN_SIZE_DIRTY_HACK);
                     (n.transform, width, height)
                 };
-                let local_bounds = Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width,
-                    height,
-                };
+                let local_bounds = Rectangle { x: 0.0, y: 0.0, width, height };
                 let world_transform = parent_world.compose(&local_transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
                 let render_bounds = compute_render_bounds(node, world_bounds);
@@ -459,16 +371,15 @@ impl GeometryCache {
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
                     absolute_render_bounds: render_bounds,
-                    parent: parent_id.clone(),
+                    parent: parent_id,
                     dirty_transform: false,
                     dirty_bounds: false,
                 };
-                cache.entries.insert(id.clone(), entry.clone());
-
-                local_bounds
+                let bounds = local_bounds;
+                cache.entries.insert(*id, entry);
+                bounds
             }
             _ => {
-                // Leaf nodes - check layout result first, fallback to schema transform
                 let (rec_transform, schema_width, schema_height) = match node {
                     Node::Rectangle(n) => (n.transform, n.size.width, n.size.height),
                     Node::Ellipse(n) => (n.transform, n.size.width, n.size.height),
@@ -489,55 +400,35 @@ impl GeometryCache {
                         (n.transform, rect.width, rect.height)
                     }
                     Node::Error(n) => (n.transform, n.size.width, n.size.height),
-                    // V2/special nodes handled above
                     _ => unreachable!("Has dedicated case above"),
                 };
 
-                // Check if this node's parent is a layout container (Container
-                // or ICB). Only those parents provide meaningful layout results
-                // (computed flex/block positions). Nodes under Group or
-                let parent_is_layout_container =
-                    Self::is_layout_container_parent(&parent_id, graph);
+                let parent_is_layout_container = parent_id
+                    .as_ref()
+                    .and_then(|pid| ctx.is_layout_container.get(pid).copied())
+                    .unwrap_or(false);
 
                 let (local_transform, width, height) = if parent_is_layout_container {
-                    // Parent is a layout container: use layout result for
-                    // position/size (flex/absolute layout), with rotation
-                    // from the schema transform.
                     let (x, y, width, height) =
-                        if let Some(result) = layout_result.and_then(|r| r.get(id)) {
+                        if let Some(result) = ctx.layout_result.and_then(|r| r.get(id)) {
                             (result.x, result.y, result.width, result.height)
                         } else {
-                            (
-                                rec_transform.x(),
-                                rec_transform.y(),
-                                schema_width,
-                                schema_height,
-                            )
+                            (rec_transform.x(), rec_transform.y(), schema_width, schema_height)
                         };
                     (AffineTransform::new(x, y, rec_transform.rotation()), width, height)
                 } else {
-                    // Parent is NOT a layout container (Group,
-                    // BooleanOperation, or root): use the full schema
-                    // transform. This preserves scale, skew, and arbitrary
-                    // matrix entries that don't fit the (x, y, rotation)
-                    // decomposition.
-                    let width = layout_result
+                    let width = ctx.layout_result
                         .and_then(|r| r.get(id))
                         .map(|l| l.width)
                         .unwrap_or(schema_width);
-                    let height = layout_result
+                    let height = ctx.layout_result
                         .and_then(|r| r.get(id))
                         .map(|l| l.height)
                         .unwrap_or(schema_height);
                     (rec_transform, width, height)
                 };
 
-                let local_bounds = Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width,
-                    height,
-                };
+                let local_bounds = Rectangle { x: 0.0, y: 0.0, width, height };
 
                 let world_transform = parent_world.compose(&local_transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
@@ -549,7 +440,7 @@ impl GeometryCache {
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
                     absolute_render_bounds: render_bounds,
-                    parent: parent_id.clone(),
+                    parent: parent_id,
                     dirty_transform: false,
                     dirty_bounds: false,
                 };

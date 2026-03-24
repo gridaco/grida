@@ -9,6 +9,7 @@ description = "Native winit playground for grida-canvas scenes."
 [dependencies]
 cg = { path = "../grida-canvas", features = [
   "web",
+  "perf",
   "native-clock-tick",
   "native-gl-context",
 ] }

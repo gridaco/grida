@@ -1,5 +1,6 @@
 use super::repository::NodeRepository;
 use super::schema::{Node, NodeId};
+use crate::cache::fast_hash::DenseNodeMap;
 use std::collections::HashMap;
 
 /// Parent reference in the scene graph
@@ -59,7 +60,7 @@ pub struct SceneGraph {
     /// Root node IDs - direct children of the scene
     roots: Vec<NodeId>,
     /// Parent to children adjacency list
-    links: HashMap<NodeId, Vec<NodeId>>,
+    links: DenseNodeMap<Vec<NodeId>>,
     /// Node data repository
     nodes: NodeRepository,
     /// Optional display names for nodes (from the source file).
@@ -71,7 +72,7 @@ impl SceneGraph {
     pub fn new() -> Self {
         Self {
             roots: Vec::new(),
-            links: HashMap::new(),
+            links: DenseNodeMap::new(),
             nodes: NodeRepository::new(),
             names: HashMap::new(),
         }
@@ -98,8 +99,12 @@ impl SceneGraph {
             graph.nodes.insert_with_id(id, node);
         }
 
-        // Set up all links
-        graph.links = links;
+        // Convert HashMap links to DenseNodeMap
+        let mut dense_links = DenseNodeMap::new();
+        for (id, children) in links {
+            dense_links.insert(id, children);
+        }
+        graph.links = dense_links;
 
         // Set roots
         graph.roots = roots;
@@ -122,10 +127,11 @@ impl SceneGraph {
                 self.roots.push(id.clone());
             }
             Parent::NodeId(parent_id) => {
-                self.links
-                    .entry(parent_id)
-                    .or_insert_with(Vec::new)
-                    .push(id.clone());
+                if let Some(children) = self.links.get_mut(&parent_id) {
+                    children.push(id.clone());
+                } else {
+                    self.links.insert(parent_id, vec![id.clone()]);
+                }
             }
         }
 
@@ -201,7 +207,7 @@ impl SceneGraph {
     }
 
     /// Iterate over all parent->children pairs
-    pub fn iter(&self) -> impl Iterator<Item = (&NodeId, &Vec<NodeId>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (NodeId, &Vec<NodeId>)> {
         self.links.iter()
     }
 
@@ -220,7 +226,7 @@ impl SceneGraph {
     pub fn get_parent(&self, id: &NodeId) -> Option<NodeId> {
         for (parent_id, children) in &self.links {
             if children.contains(id) {
-                return Some(*parent_id);
+                return Some(parent_id);
             }
         }
         None
@@ -280,7 +286,7 @@ impl SceneGraph {
     ///
     /// The iteration order is not guaranteed; callers should use `roots()` +
     /// `get_children()` if they need tree order.
-    pub fn nodes_iter(&self) -> impl Iterator<Item = (&NodeId, &Node)> {
+    pub fn nodes_iter(&self) -> impl Iterator<Item = (NodeId, &Node)> {
         self.nodes.iter()
     }
 
