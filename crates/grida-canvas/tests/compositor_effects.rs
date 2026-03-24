@@ -20,7 +20,6 @@ use cg::runtime::image_repository::ImageRepository;
 use cg::runtime::render_policy::RenderPolicy;
 use math2::rect::Rectangle;
 use skia_safe::{surfaces, Paint as SkPaint, Rect, Surface};
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 

@@ -119,6 +119,7 @@ pub struct FontMessage {
 }
 
 /// Collect the URL string from a [`ResourceRef`].
+#[allow(dead_code)]
 fn resource_ref_url(r: &ResourceRef) -> &str {
     match r {
         ResourceRef::RID(s) | ResourceRef::HASH(s) => s,
@@ -126,6 +127,7 @@ fn resource_ref_url(r: &ResourceRef) -> &str {
 }
 
 /// Push any image URLs found in a paint slice.
+#[allow(dead_code)]
 fn collect_image_urls_from_paints(paints: &[Paint], out: &mut Vec<String>) {
     for paint in paints {
         if let Paint::Image(img) = paint {
@@ -141,6 +143,7 @@ fn collect_image_urls_from_paints(paints: &[Paint], out: &mut Vec<String>) {
 /// strokes, and dedicated image references.
 // TODO: consider a dedicated paints store or iterator so this doesn't need
 // to match every node variant individually.
+#[allow(dead_code)]
 fn extract_image_urls(scene: &Scene) -> Vec<String> {
     use crate::node::schema::Node;
     let mut urls = Vec::new();
