@@ -1407,10 +1407,13 @@ impl Renderer {
             self.scene_cache.compositor.mark_all_stale();
         }
 
-        // Invalidate pan image cache when zoom changes or on stable frames.
+        // Invalidate pan image cache on zoom changes only.
         // Zoom changes alter the pixel content (different scale/density).
-        // Stable frames should produce a full-quality render, not a cached blit.
-        if camera_change.zoom_changed() || stable {
+        // Stable frames do NOT nuke the pan cache — the cache is valid for
+        // pan-only and no-change scenarios. The render path recaptures it
+        // from the full-quality draw anyway, so the next unstable frame
+        // always has a fresh cache to blit from.
+        if camera_change.zoom_changed() {
             self.pan_image_cache = None;
         }
 
@@ -1619,7 +1622,13 @@ impl Renderer {
 
         // ----- Viewport snapshot caches (pan/zoom image caches) -----
         // These are the ONLY caches that truly depend on viewport dimensions.
-        let invalidate_pan = has_data_changes || camera_change.zoom_changed() || stable;
+        //
+        // Pan cache: invalidate on data changes or zoom changes.  Stable
+        // frames do NOT nuke the pan cache — during slow panning, a stable
+        // frame firing between scroll events would destroy the cache and
+        // force an expensive full redraw on the next unstable frame.  The
+        // stable frame's render path recaptures the pan cache anyway.
+        let invalidate_pan = has_data_changes || camera_change.zoom_changed();
         let invalidate_zoom = has_data_changes || stable;
 
         if invalidate_pan {
