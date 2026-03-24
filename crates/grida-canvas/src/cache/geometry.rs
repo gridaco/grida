@@ -18,7 +18,7 @@ use crate::runtime::font_repository::FontRepository;
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-use std::collections::HashMap;
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 
 /// Geometry data used for layout, culling, and rendering.
 ///
@@ -52,13 +52,13 @@ struct GeometryBuildContext {
 
 #[derive(Debug, Clone)]
 pub struct GeometryCache {
-    entries: HashMap<NodeId, GeometryEntry>,
+    entries: NodeIdHashMap<NodeId, GeometryEntry>,
 }
 
 impl GeometryCache {
     pub fn new() -> Self {
         Self {
-            entries: HashMap::new(),
+            entries: new_node_id_map(),
         }
     }
 

@@ -1,6 +1,6 @@
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::node::schema::NodeId;
 use skia_safe::Picture;
-use std::collections::HashMap;
 
 /// Configuration for how the scene should be cached.
 ///
@@ -22,17 +22,17 @@ impl Default for PictureCacheStrategy {
 pub struct PictureCache {
     strategy: PictureCacheStrategy,
     /// Fast-path store for the default render variant (variant key = 0).
-    default_store: HashMap<NodeId, Picture>,
+    default_store: NodeIdHashMap<NodeId, Picture>,
     /// Store for non-default render variants (variant key != 0).
-    variant_store: HashMap<(NodeId, u64), Picture>,
+    variant_store: NodeIdHashMap<(NodeId, u64), Picture>,
 }
 
 impl PictureCache {
     pub fn new() -> Self {
         Self {
             strategy: PictureCacheStrategy::default(),
-            default_store: HashMap::new(),
-            variant_store: HashMap::new(),
+            default_store: new_node_id_map(),
+            variant_store: new_node_id_map(),
         }
     }
 

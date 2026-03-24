@@ -8,7 +8,7 @@ use crate::cg::prelude::LayerBlendMode;
 use crate::node::schema::NodeId;
 use math2::rect::Rectangle;
 use skia_safe::Image;
-use std::collections::HashMap;
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use std::rc::Rc;
 
 /// Where a promoted node's cached pixels live.
@@ -108,7 +108,7 @@ pub struct LayerImageCacheStats {
 #[derive(Debug, Clone)]
 pub struct LayerImageCache {
     /// Promoted node entries, keyed by node ID.
-    images: HashMap<NodeId, LayerImage>,
+    images: NodeIdHashMap<NodeId, LayerImage>,
     /// Maximum memory budget in bytes (default: 128 MB).
     /// Only individual (non-atlas) images count against this budget.
     memory_budget: usize,
@@ -131,7 +131,7 @@ impl LayerImageCache {
     /// Create a new layer image cache with the given memory budget.
     pub fn new(memory_budget: usize) -> Self {
         Self {
-            images: HashMap::new(),
+            images: new_node_id_map(),
             memory_budget,
             memory_used: 0,
             frame_counter: 0,
