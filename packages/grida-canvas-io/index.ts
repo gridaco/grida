@@ -947,6 +947,12 @@ export namespace io {
        * @default true
        */
       snapshot?: boolean;
+      /**
+       * When true, skip deterministic sorting of node IDs in the FlatBuffer.
+       * Safe for write-once pipelines where node order is irrelevant.
+       * @default false
+       */
+      skip_sort?: boolean;
     }
 
     export function pack(
@@ -967,7 +973,8 @@ export namespace io {
           images: {},
           bitmaps: {},
         },
-        schemaVersion
+        schemaVersion,
+        { skipSort: options?.skip_sort }
       );
 
       // Generate document.grida1 (JSON snapshot) from document (for migration purposes)

@@ -229,7 +229,7 @@ function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
     merged.imageRecord,
     undefined,
     undefined,
-    { level: 0, snapshot: false }
+    { level: 0, snapshot: false, skip_sort: true }
   );
 
   return {

@@ -5,7 +5,7 @@ import * as fbs from "@grida/format";
 import { unionToPaint, unionToNode, unionToFeBlur } from "@grida/format";
 import type { vn } from "@grida/schema";
 import * as flatbuffers from "flatbuffers";
-import { generateNKeysBetween } from "@grida/sequence";
+// generateNKeysBetween removed — replaced by zero-padded integers for position encoding.
 
 type Builder = flatbuffers.Builder;
 
@@ -4516,11 +4516,28 @@ export namespace format {
        * @param document - The TS IR document to encode
        * @returns Uint8Array containing the FlatBuffers binary data
        */
+      export interface ToFlatbufferOptions {
+        /**
+         * When true, skip sorting node IDs for deterministic output.
+         * Safe for write-once pipelines (e.g. fig2grida) where the
+         * consumer does not depend on node order in the FlatBuffer vector.
+         * @default false
+         */
+        skipSort?: boolean;
+      }
+
       export function toFlatbuffer(
         document: grida.program.document.Document,
-        schemaVersion: string = grida.program.document.SCHEMA_VERSION
+        schemaVersion: string = grida.program.document.SCHEMA_VERSION,
+        options?: ToFlatbufferOptions
       ): Uint8Array {
-        const builder = new flatbuffers.Builder(1024);
+        // Pre-size the builder to reduce doubling + copy during growth.
+        // We avoid the full final size (which can be 80MB+ and slow to
+        // allocate in one shot) and instead start at roughly half the
+        // expected output so the builder only needs ~1 resize.
+        const nodeCount = Object.keys(document.nodes || {}).length;
+        const initialSize = Math.max(nodeCount * 256, 256 * 1024);
+        const builder = new flatbuffers.Builder(initialSize);
 
         // Build schema version
         const schemaVersionOffset = builder.createString(schemaVersion);
@@ -4541,27 +4558,31 @@ export namespace format {
           }
         }
 
-        // Generate position strings for each parent's children
+        // Generate position strings for each parent's children.
+        // We use zero-padded integers ("000000", "000001", …) which are
+        // trivially lexicographically sortable and nearly free to generate,
+        // replacing the costly fractional-index algorithm.
         const nodeToParentRef = new Map<
           string,
           { parentId: string; position: string }
         >();
         for (const [parentId, children] of parentToChildrenMap.entries()) {
           if (children.length === 0) continue;
-          // Generate position strings for all children
-          const positions = generateNKeysBetween(null, null, children.length);
+          const pad = Math.max(6, String(children.length - 1).length);
           for (let i = 0; i < children.length; i++) {
             nodeToParentRef.set(children[i]!, {
               parentId,
-              position: positions[i]!,
+              position: String(i).padStart(pad, "0"),
             });
           }
         }
 
         // Encode nodes array (TS nodes map -> flat list)
         const nodeIds = Object.keys(document.nodes || {});
-        // Deterministic ordering: sort by string id
-        nodeIds.sort();
+        // Deterministic ordering: sort by string id (skippable for perf)
+        if (!options?.skipSort) {
+          nodeIds.sort();
+        }
 
         const nodeSlotOffsets: flatbuffers.Offset[] = [];
         for (const nodeId of nodeIds) {
