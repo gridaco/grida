@@ -131,12 +131,23 @@ reports `min/p50/p95/p99/MAX` plus per-stage breakdown and settle cost.
 | `zoom`            | slow/fast × around-fit/high                         | Zoom oscillation at different levels                                                                               |
 | `pan_with_settle` | slow/fast × fit/zoomed                              | Pan with settle frames interleaved every 12 frames                                                                 |
 | `realtime`        | fast/slow × fit/zoomed                              | **Real-time event loop simulation** with sleep, 240Hz tick thread, and settle countdown matching the native viewer |
+| `frameloop`       | 16/50/80/120/200/300/500ms interval                 | **Real FrameLoop path** — the only bench that captures stable-frame jank during panning (see below)                |
 | `resize`          | alternating viewport sizes                          | `--resize` flag. Measures `resize()` + `redraw()` cost per cycle (layout rebuild + cache invalidation + repaint)   |
 
 The `realtime` scenarios use actual `thread::sleep()` between frames
 and simulate the native viewer's 240Hz tick thread + settle countdown.
 These produce frame timings that match what users actually see,
 including settle-induced frame drops at their natural frequency.
+
+The `frameloop` scenarios go through the actual `FrameLoop.poll()` /
+`complete()` path — the same code path as `Application::frame()`. All
+other pan/zoom scenarios bypass `FrameLoop` and call `queue_unstable()`
+directly, which means they never produce stable frames mid-interaction.
+The `frameloop` scenarios sweep scroll intervals from 16ms (fast flick)
+to 500ms (discrete clicks) and reveal how `FrameLoop`'s stable-frame
+decisions affect the frame time distribution at each speed. Use these
+when investigating panning jank, adaptive timing, or pan/zoom image
+cache behavior.
 
 **Choosing scenes:** Use `--list-scenes` to see what's available. Pick
 scenes that stress the subsystem you're optimizing. For effects/caching
@@ -174,6 +185,7 @@ of scenes, configs, and operations. The naming convention is
 | Does a config toggle actually help?           | Both GPU benchmarks + Criterion                  |
 | Does it match what users see in the app?      | `realtime` scenarios (sleep + settle simulation) |
 | Are there frame drops during gestures?        | Check `p99` and `MAX` in scenario stats          |
+| Is slow panning janky (stable frame spikes)?  | `frameloop` scenarios (real FrameLoop path)      |
 | Is resize janky?                              | Single-scene GPU bench with `--resize`           |
 
 ---
@@ -447,9 +459,19 @@ Back-to-back frame benchmarks (no sleep between frames) can produce
 misleadingly fast numbers because they never trigger settle frames.
 The native viewer's 240Hz tick thread fires `queue_stable()` ~50ms
 after the last interaction, clearing image caches. Use the `realtime`
-scenario type to simulate this timing and produce numbers that match
-what users actually see. Always check `p99` and `MAX` — not just
-`p50` — to catch settle-induced spikes.
+or `frameloop` scenario types to produce numbers that match what users
+actually see. Always check `p99` and `MAX` — not just `p50` — to
+catch settle-induced spikes.
+
+### Most benchmarks bypass FrameLoop
+
+All pan/zoom/circle/zigzag scenarios call `queue_unstable()` directly
+— they never go through `FrameLoop.poll()`. This means they never
+produce stable frames mid-interaction and cannot capture the jank
+pattern where a stable frame interrupts slow panning. Only the
+`frameloop` scenarios use the real `FrameLoop` decision path. When
+investigating panning smoothness or adaptive timing, always use the
+`frameloop` scenarios.
 
 ### Stable frames must recapture caches
 
