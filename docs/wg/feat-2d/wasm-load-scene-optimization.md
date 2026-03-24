@@ -1,3 +1,7 @@
+---
+format: md
+---
+
 # WASM `load_scene` Optimization Plan
 
 ## Status: In Progress
@@ -150,6 +154,6 @@ just --justfile crates/grida-canvas-wasm/justfile build
 
 1. `cargo test -p cg` — all 330 tests must pass
 2. `cargo check -p cg -p grida-canvas-wasm -p grida-dev` — all crates compile
-3. Native benchmark: should not regress (target: <800ms)
-4. WASM-on-Node benchmark: geometry stage should drop from ~4s to <1s
+3. Native benchmark: should not regress (target: `<800ms`)
+4. WASM-on-Node benchmark: geometry stage should drop from ~4s to `<1s`
 5. Visual: load yrr-main in browser debug embed, verify text renders correctly and pan/zoom/settle work
