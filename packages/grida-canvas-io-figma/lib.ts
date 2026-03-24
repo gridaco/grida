@@ -473,6 +473,30 @@ export namespace iofigma {
          * @default false
          */
         prefer_fixed_text_sizing?: boolean;
+
+        // -- Shared buffers (performance) --
+        // When provided, factory.document() writes directly into these
+        // pre-allocated collections instead of creating its own, eliminating
+        // the Object.assign merge passes in the caller.
+
+        /**
+         * Shared nodes dictionary. When set, `factory.document()` inserts
+         * converted nodes here instead of allocating a local `nodes` object.
+         */
+        _shared_nodes?: Record<string, grida.program.nodes.Node>;
+        /**
+         * Shared links (parent→children) dictionary.
+         */
+        _shared_links?: Record<string, string[]>;
+        /**
+         * Shared mutable set for collecting image refs used across all roots.
+         */
+        _shared_image_refs_used?: Set<string>;
+        /**
+         * Shared Figma-ID → Grida-ID map. Avoids per-root Map allocations
+         * when converting many root nodes.
+         */
+        _shared_figma_id_map?: Map<string, string>;
       };
 
       function toGradientPaint(paint: figrest.GradientPaint) {
@@ -1022,12 +1046,15 @@ export namespace iofigma {
         images: { [key: string]: string },
         context: FactoryContext
       ): FigmaImportResult {
-        const nodes: Record<string, grida.program.nodes.Node> = {};
-        const graph: Record<string, string[]> = {};
-        const imageRefsUsed = new Set<string>();
+        const nodes: Record<string, grida.program.nodes.Node> =
+          context._shared_nodes ?? {};
+        const graph: Record<string, string[]> = context._shared_links ?? {};
+        const imageRefsUsed: Set<string> =
+          context._shared_image_refs_used ?? new Set<string>();
 
         // Map from Figma ID (ephemeral) to Grida ID (final)
-        const figma_id_to_grida_id = new Map<string, string>();
+        const figma_id_to_grida_id =
+          context._shared_figma_id_map ?? new Map<string, string>();
 
         // ID generator function - use provided generator or fallback
         let counter = 0;
@@ -1465,7 +1492,11 @@ export namespace iofigma {
 
         return {
           document: packed,
-          imageRefsUsed: Array.from(imageRefsUsed),
+          // When shared buffers are in use, the caller reads imageRefsUsed
+          // from the shared Set directly — return empty to avoid copying.
+          imageRefsUsed: context._shared_image_refs_used
+            ? []
+            : Array.from(imageRefsUsed),
         };
       }
 
