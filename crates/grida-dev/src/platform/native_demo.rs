@@ -6,6 +6,7 @@ use cg::window::application::{ApplicationApi, HostEvent, HostEventCallback};
 use futures::channel::mpsc;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[allow(dead_code)]
@@ -74,8 +75,9 @@ async fn run_demo_window_core_multi<F>(
 {
     let width = 1080;
     let height = 1080;
+    let startup_started_at = Instant::now();
 
-    println!("🚀 Starting demo window...");
+    println!("[demo] starting demo window");
     let (tx, rx) = mpsc::unbounded();
     let (font_tx, font_rx) = mpsc::unbounded();
 
@@ -92,15 +94,23 @@ async fn run_demo_window_core_multi<F>(
         file_drop_tx.is_some(),
         scenes_rx,
     );
+    println!(
+        "[demo] native application initialized in {:?}",
+        startup_started_at.elapsed()
+    );
     let proxy = el.create_proxy();
 
     let surface_ptr = app.app.surface_mut_ptr();
     app.app.set_renderer_backend(Backend::GL(surface_ptr));
 
-    println!("📸 Initializing image loader...");
-    println!("🔄 Starting to load scene images in background...");
+    println!(
+        "[demo] initializing image loader at {:?}",
+        startup_started_at.elapsed()
+    );
+    println!("[demo] loading scene images in background");
     let scene_clone = scene.clone();
     let tx_clone = tx.clone();
+    let image_load_started_at = Instant::now();
     let event_cb: HostEventCallback = {
         let proxy_clone = proxy.clone();
         Arc::new(move |event: HostEvent| {
@@ -115,7 +125,10 @@ async fn run_demo_window_core_multi<F>(
         let event_cb = event_cb.clone();
         futures::executor::block_on(async move {
             load_scene_images(&scene_clone, tx_clone, event_cb).await;
-            println!("✅ Scene images loading completed in background");
+            println!(
+                "[demo] scene images loaded in {:?}",
+                image_load_started_at.elapsed()
+            );
         });
     });
 
@@ -140,7 +153,10 @@ async fn run_demo_window_core_multi<F>(
     app.app.devtools_rendering_set_show_ruler(true);
     app.app.devtools_rendering_set_show_tiles(false);
 
-    println!("🎭 Starting event loop...");
+    println!(
+        "[demo] entering event loop after {:?}",
+        startup_started_at.elapsed()
+    );
     if let Err(e) = el.run_app(&mut app) {
         eprintln!("Event loop error: {:?}", e);
     }
