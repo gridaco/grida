@@ -484,13 +484,17 @@ impl LayerList {
         parent_opacity: f32,
         out: &mut Vec<LayerEntry>,
     ) -> FlattenResult {
+        // Fast-path: check active from compact layer_core (~16 bytes)
+        // before touching the full Node enum (~500+ bytes).
+        if let Some(lc) = graph.get_layer_core(id) {
+            if !lc.active {
+                return FlattenResult::default();
+            }
+        }
+
         let Ok(node) = graph.get_node(id) else {
             return FlattenResult::default();
         };
-
-        if !node.active() {
-            return FlattenResult::default();
-        }
 
         let transform = scene_cache
             .geometry()

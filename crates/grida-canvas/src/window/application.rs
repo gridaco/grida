@@ -660,8 +660,9 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn switch_scene(&mut self, scene_id: &str) {
-        if let Some((_, scene)) = self.loaded_scenes.iter().find(|(id, _)| id == scene_id) {
-            self.renderer.load_scene(scene.clone());
+        if let Some(pos) = self.loaded_scenes.iter().position(|(id, _)| id == scene_id) {
+            let (_, scene) = self.loaded_scenes.swap_remove(pos);
+            self.renderer.load_scene(scene);
             self.queue();
         } else {
             eprintln!(
@@ -676,7 +677,10 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn loaded_scene_ids(&self) -> Vec<String> {
-        self.loaded_scenes.iter().map(|(id, _)| id.clone()).collect()
+        self.loaded_scenes
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect()
     }
 
     fn apply_document_transactions(

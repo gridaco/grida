@@ -9,16 +9,44 @@
 //! - Consumes LayoutResult as immutable input from LayoutEngine
 //! - Missing layout for Inset nodes is a PANIC (LayoutEngine bug)
 //! - Missing geometry entry when accessed is a PANIC (GeometryCache bug)
+//!
+//! ## Property Split Optimization
+//!
+//! The `SceneGraph` stores compact `NodeGeoData` (~48 bytes/node) alongside
+//! the full `Node` enum. This module resolves layout into a `GeoInput` struct
+//! by reading only from `NodeGeoData` + `LayoutResult`, then runs the DFS on
+//! that — never touching the full `Node` enum (~500+ bytes/node).
+//! Working set for 136k nodes: ~7.6 MB instead of ~65 MB.
 
+use crate::cache::fast_hash::DenseNodeMap;
 use crate::cache::paragraph::ParagraphCache;
-use crate::cg::prelude::*;
-use crate::node::scene_graph::SceneGraph;
-use crate::node::schema::{LayerEffects, Node, NodeGeometryMixin, NodeId, NodeRectMixin, Scene};
+use crate::node::scene_graph::{GeoNodeKind, NodeGeoData, RenderBoundsInflation, SceneGraph};
+use crate::node::schema::{Node, NodeId, Scene};
 use crate::runtime::font_repository::FontRepository;
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
-use crate::cache::fast_hash::DenseNodeMap;
+
+// ---------------------------------------------------------------------------
+// GeoInput — layout-resolved per-node geometry for the DFS
+// ---------------------------------------------------------------------------
+
+/// Layout-resolved per-node data for the geometry DFS.
+///
+/// Built from `NodeGeoData` (schema-level) + `LayoutResult` (layout-level).
+/// The DFS reads only this — compact and `Copy`, ~48 bytes.
+#[derive(Debug, Clone, Copy)]
+struct GeoInput {
+    transform: AffineTransform,
+    width: f32,
+    height: f32,
+    kind: GeoNodeKind,
+    render_bounds_inflation: RenderBoundsInflation,
+}
+
+// ---------------------------------------------------------------------------
+// GeometryEntry — public output (unchanged)
+// ---------------------------------------------------------------------------
 
 /// Geometry data used for layout, culling, and rendering.
 ///
@@ -45,43 +73,9 @@ pub struct GeometryEntry {
     pub dirty_bounds: bool,
 }
 
-/// Context passed during geometry building
-/// Bundles all immutable + mutable state for geometry build, reducing
-/// recursive call parameter count from 9 to 4 (significant for WASM
-/// where each function parameter adds call overhead).
-struct GeometryBuildContext<'a> {
-    graph: &'a SceneGraph,
-    paragraph_cache: &'a mut ParagraphCache,
-    fonts: &'a FontRepository,
-    layout_result: Option<&'a crate::layout::cache::LayoutResult>,
-    viewport_size: crate::node::schema::Size,
-    /// Pre-computed: which nodes are layout containers (Container or ICB).
-    is_layout_container: DenseNodeMap<bool>,
-}
-
-impl<'a> GeometryBuildContext<'a> {
-    fn new(
-        graph: &'a SceneGraph,
-        paragraph_cache: &'a mut ParagraphCache,
-        fonts: &'a FontRepository,
-        layout_result: Option<&'a crate::layout::cache::LayoutResult>,
-        viewport_size: crate::node::schema::Size,
-    ) -> Self {
-        let mut is_layout_container = DenseNodeMap::with_capacity(graph.node_count());
-        for (id, node) in graph.nodes_iter() {
-            let is_container = matches!(node, Node::Container(_) | Node::InitialContainer(_));
-            is_layout_container.insert(id, is_container);
-        }
-        Self {
-            graph,
-            paragraph_cache,
-            fonts,
-            layout_result,
-            viewport_size,
-            is_layout_container,
-        }
-    }
-}
+// ---------------------------------------------------------------------------
+// GeometryCache — public API (unchanged)
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct GeometryCache {
@@ -118,44 +112,111 @@ impl GeometryCache {
         layout_result: Option<&crate::layout::cache::LayoutResult>,
         viewport_size: crate::node::schema::Size,
     ) -> Self {
+        let graph = &scene.graph;
+        let schema_geo = graph.geo_data();
+
+        #[cfg(feature = "perf")]
+        let _t_resolve_start = crate::sys::perf_now();
+
+        // ── Layout resolution pass ──
+        // Resolve layout-dependent fields (position, size) from the compact
+        // NodeGeoData + LayoutResult. Text measurement for nodes without
+        // layout falls back to accessing the Node enum (rare path).
+        //
+        // This pass iterates over NodeGeoData (~48 bytes/node) instead of
+        // Node (~500+ bytes/node).
+        let mut is_layout_container = DenseNodeMap::with_capacity(graph.node_count());
+        for (id, geo) in schema_geo.iter() {
+            let is_container = matches!(
+                geo.kind,
+                GeoNodeKind::Container | GeoNodeKind::InitialContainer
+            );
+            is_layout_container.insert(id, is_container);
+        }
+
+        // Build parent map from the graph's link structure.
+        let mut parent_map: DenseNodeMap<NodeId> = DenseNodeMap::with_capacity(graph.node_count());
+        for (id, _) in schema_geo.iter() {
+            if let Some(children) = graph.get_children(&id) {
+                for child_id in children {
+                    parent_map.insert(*child_id, id);
+                }
+            }
+        }
+
+        let mut geo_inputs = DenseNodeMap::with_capacity(graph.node_count());
+
+        for (id, geo) in schema_geo.iter() {
+            let parent_id = parent_map.get(&id).copied();
+            let resolved = resolve_layout(
+                &id,
+                geo,
+                parent_id,
+                layout_result,
+                &is_layout_container,
+                graph,
+                paragraph_cache,
+                fonts,
+                viewport_size,
+            );
+            geo_inputs.insert(id, resolved);
+        }
+
+        #[cfg(feature = "perf")]
+        let _t_resolve_end = crate::sys::perf_now();
+
+        // ── DFS pass ──
         let mut cache = Self {
-            entries: DenseNodeMap::with_capacity(scene.graph.node_count()),
+            entries: DenseNodeMap::with_capacity(graph.node_count()),
         };
         let root_world = AffineTransform::identity();
-        let mut ctx = GeometryBuildContext::new(
-            &scene.graph,
-            paragraph_cache,
-            fonts,
-            layout_result,
-            viewport_size,
-        );
 
-        for child in scene.graph.roots() {
-            Self::build_recursive(&child, &root_world, None, &mut cache, &mut ctx);
+        for child in graph.roots() {
+            Self::build_recursive(child, &root_world, None, &mut cache, graph, &geo_inputs);
         }
+
+        #[cfg(feature = "perf")]
+        {
+            let _t_dfs_end = crate::sys::perf_now();
+            eprintln!(
+                "[geometry] resolve={:.0}ms dfs={:.0}ms total={:.0}ms",
+                _t_resolve_end - _t_resolve_start,
+                _t_dfs_end - _t_resolve_end,
+                _t_dfs_end - _t_resolve_start,
+            );
+        }
+
         cache
     }
 
+    /// DFS that operates on layout-resolved `GeoInput` data.
     fn build_recursive(
         id: &NodeId,
         parent_world: &AffineTransform,
         parent_id: Option<NodeId>,
         cache: &mut GeometryCache,
-        ctx: &mut GeometryBuildContext,
+        graph: &SceneGraph,
+        geo_inputs: &DenseNodeMap<GeoInput>,
     ) -> Rectangle {
-        let node = ctx.graph
-            .get_node(id)
-            .expect("node not found in geometry cache");
+        let geo = geo_inputs
+            .get(id)
+            .expect("GeoInput not found — resolve pass missed a node");
 
-        match node {
-            Node::Group(n) => {
-                let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
+        match geo.kind {
+            GeoNodeKind::Group => {
+                let world_transform = parent_world.compose(&geo.transform);
                 let mut union_bounds: Option<Rectangle> = None;
                 let mut union_render_bounds: Option<Rectangle> = None;
-                if let Some(children) = ctx.graph.get_children(id) {
+
+                if let Some(children) = graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id, &world_transform, Some(*id), cache, ctx,
+                            child_id,
+                            &world_transform,
+                            Some(*id),
+                            cache,
+                            graph,
+                            geo_inputs,
                         );
                         union_bounds = match union_bounds {
                             Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -170,20 +231,28 @@ impl GeometryCache {
                     }
                 }
 
-                let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
-                    x: 0.0, y: 0.0, width: 0.0, height: 0.0,
+                let world_bounds = union_bounds.unwrap_or(Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.0,
+                    height: 0.0,
                 });
 
                 let local_bounds = if let Some(inv) = world_transform.inverse() {
                     transform_rect(&world_bounds, &inv)
                 } else {
-                    Rectangle { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }
+                    Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    }
                 };
 
                 let render_bounds = union_render_bounds.unwrap_or(world_bounds);
 
                 let entry = GeometryEntry {
-                    transform: n.transform.unwrap_or_default(),
+                    transform: geo.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
@@ -197,28 +266,33 @@ impl GeometryCache {
                 cache.entries.insert(*id, entry);
                 bounds
             }
-            Node::InitialContainer(_n) => {
-                let size = ctx.viewport_size;
-                let local_transform = AffineTransform::identity();
-                let world_transform = parent_world.compose(&local_transform);
 
+            GeoNodeKind::InitialContainer => {
+                let world_transform = parent_world.compose(&geo.transform);
                 let local_bounds = Rectangle {
-                    x: 0.0, y: 0.0, width: size.width, height: size.height,
+                    x: 0.0,
+                    y: 0.0,
+                    width: geo.width,
+                    height: geo.height,
                 };
-
                 let mut union_world_bounds = transform_rect(&local_bounds, &world_transform);
 
-                if let Some(children) = ctx.graph.get_children(id) {
+                if let Some(children) = graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id, &world_transform, Some(*id), cache, ctx,
+                            child_id,
+                            &world_transform,
+                            Some(*id),
+                            cache,
+                            graph,
+                            geo_inputs,
                         );
                         union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
                     }
                 }
 
                 let entry = GeometryEntry {
-                    transform: local_transform,
+                    transform: geo.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: union_world_bounds,
@@ -231,13 +305,20 @@ impl GeometryCache {
                 cache.entries.insert(*id, entry);
                 union_world_bounds
             }
-            Node::BooleanOperation(n) => {
-                let world_transform = parent_world.compose(&n.transform.unwrap_or_default());
+
+            GeoNodeKind::BooleanOperation => {
+                let world_transform = parent_world.compose(&geo.transform);
                 let mut union_bounds: Option<Rectangle> = None;
-                if let Some(children) = ctx.graph.get_children(id) {
+
+                if let Some(children) = graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id, &world_transform, Some(*id), cache, ctx,
+                            child_id,
+                            &world_transform,
+                            Some(*id),
+                            cache,
+                            graph,
+                            geo_inputs,
                         );
                         union_bounds = match union_bounds {
                             Some(b) => Some(rect::union(&[b, child_bounds])),
@@ -246,25 +327,27 @@ impl GeometryCache {
                     }
                 }
 
-                let world_bounds = union_bounds.unwrap_or_else(|| Rectangle {
-                    x: 0.0, y: 0.0, width: 0.0, height: 0.0,
+                let world_bounds = union_bounds.unwrap_or(Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.0,
+                    height: 0.0,
                 });
 
                 let local_bounds = if let Some(inv) = world_transform.inverse() {
                     transform_rect(&world_bounds, &inv)
                 } else {
-                    Rectangle { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }
+                    Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    }
                 };
-
-                let render_bounds = compute_render_bounds_from_style(
-                    world_bounds,
-                    n.stroke_width.value_or_zero(),
-                    n.stroke_style.stroke_align,
-                    &n.effects,
-                );
+                let render_bounds = inflate_rect_sides(world_bounds, &geo.render_bounds_inflation);
 
                 let entry = GeometryEntry {
-                    transform: n.transform.unwrap_or_default(),
+                    transform: geo.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
@@ -278,49 +361,36 @@ impl GeometryCache {
                 cache.entries.insert(*id, entry);
                 bounds
             }
-            Node::Container(n) => {
-                let (x, y, width, height) = if let Some(result) = ctx.layout_result {
-                    let computed = result
-                        .get(id)
-                        .expect("Container must have layout result when layout engine is used");
-                    (computed.x, computed.y, computed.width, computed.height)
-                } else {
-                    (
-                        n.position.x().unwrap_or(0.0),
-                        n.position.y().unwrap_or(0.0),
-                        n.layout_dimensions.layout_target_width.unwrap_or(0.0),
-                        n.layout_dimensions.layout_target_height.unwrap_or(0.0),
-                    )
+
+            GeoNodeKind::Container => {
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: geo.width,
+                    height: geo.height,
                 };
-                let local_transform = AffineTransform::new(x, y, n.rotation);
 
-                let local_bounds = Rectangle { x: 0.0, y: 0.0, width, height };
-
-                let world_transform = parent_world.compose(&local_transform);
+                let world_transform = parent_world.compose(&geo.transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
                 let mut union_world_bounds = world_bounds;
-                let render_bounds = if let Some(rect_stroke) = n.rectangular_stroke_width() {
-                    compute_render_bounds_with_rectangular_stroke(
-                        world_bounds, &rect_stroke, n.stroke_style.stroke_align, &n.effects,
-                    )
-                } else {
-                    compute_render_bounds_from_style(
-                        world_bounds, n.render_bounds_stroke_width(),
-                        n.stroke_style.stroke_align, &n.effects,
-                    )
-                };
+                let render_bounds = inflate_rect_sides(world_bounds, &geo.render_bounds_inflation);
 
-                if let Some(children) = ctx.graph.get_children(id) {
+                if let Some(children) = graph.get_children(id) {
                     for child_id in children {
                         let child_bounds = Self::build_recursive(
-                            child_id, &world_transform, Some(*id), cache, ctx,
+                            child_id,
+                            &world_transform,
+                            Some(*id),
+                            cache,
+                            graph,
+                            geo_inputs,
                         );
                         union_world_bounds = rect::union(&[union_world_bounds, child_bounds]);
                     }
                 }
 
                 let entry = GeometryEntry {
-                    transform: local_transform,
+                    transform: geo.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
@@ -332,41 +402,20 @@ impl GeometryCache {
                 cache.entries.insert(*id, entry);
                 union_world_bounds
             }
-            Node::TextSpan(n) => {
-                let layout = ctx.layout_result.and_then(|r| r.get(id));
 
-                const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
-
-                let parent_is_layout_container = parent_id
-                    .as_ref()
-                    .and_then(|pid| ctx.is_layout_container.get(pid).copied())
-                    .unwrap_or(false);
-
-                let (local_transform, width, height) = if let Some(l) = layout {
-                    let width = l.width.max(MIN_SIZE_DIRTY_HACK);
-                    let height = l.height.max(MIN_SIZE_DIRTY_HACK);
-                    let transform = if parent_is_layout_container {
-                        AffineTransform::new(l.x, l.y, n.transform.rotation())
-                    } else {
-                        n.transform
-                    };
-                    (transform, width, height)
-                } else {
-                    let measurements = ctx.paragraph_cache.measure(
-                        &n.text, &n.text_style, &n.text_align, &n.max_lines,
-                        &n.ellipsis, n.width, ctx.fonts, Some(id),
-                    );
-                    let width = measurements.max_width.max(MIN_SIZE_DIRTY_HACK);
-                    let height = n.height.unwrap_or(measurements.height).max(MIN_SIZE_DIRTY_HACK);
-                    (n.transform, width, height)
+            GeoNodeKind::TextSpan => {
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: geo.width,
+                    height: geo.height,
                 };
-                let local_bounds = Rectangle { x: 0.0, y: 0.0, width, height };
-                let world_transform = parent_world.compose(&local_transform);
+                let world_transform = parent_world.compose(&geo.transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
-                let render_bounds = compute_render_bounds(node, world_bounds);
+                let render_bounds = inflate_rect_sides(world_bounds, &geo.render_bounds_inflation);
 
                 let entry = GeometryEntry {
-                    transform: local_transform,
+                    transform: geo.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
@@ -379,63 +428,21 @@ impl GeometryCache {
                 cache.entries.insert(*id, entry);
                 bounds
             }
-            _ => {
-                let (rec_transform, schema_width, schema_height) = match node {
-                    Node::Rectangle(n) => (n.transform, n.size.width, n.size.height),
-                    Node::Ellipse(n) => (n.transform, n.size.width, n.size.height),
-                    Node::Image(n) => (n.transform, n.size.width, n.size.height),
-                    Node::RegularPolygon(n) => (n.transform, n.size.width, n.size.height),
-                    Node::RegularStarPolygon(n) => (n.transform, n.size.width, n.size.height),
-                    Node::Line(n) => (n.transform, n.size.width, 0.0),
-                    Node::Polygon(n) => {
-                        let rect = n.rect();
-                        (n.transform, rect.width, rect.height)
-                    }
-                    Node::Path(n) => {
-                        let rect = n.rect();
-                        (n.transform, rect.width, rect.height)
-                    }
-                    Node::Vector(n) => {
-                        let rect = n.network.bounds();
-                        (n.transform, rect.width, rect.height)
-                    }
-                    Node::Error(n) => (n.transform, n.size.width, n.size.height),
-                    _ => unreachable!("Has dedicated case above"),
+
+            GeoNodeKind::Leaf => {
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: geo.width,
+                    height: geo.height,
                 };
 
-                let parent_is_layout_container = parent_id
-                    .as_ref()
-                    .and_then(|pid| ctx.is_layout_container.get(pid).copied())
-                    .unwrap_or(false);
-
-                let (local_transform, width, height) = if parent_is_layout_container {
-                    let (x, y, width, height) =
-                        if let Some(result) = ctx.layout_result.and_then(|r| r.get(id)) {
-                            (result.x, result.y, result.width, result.height)
-                        } else {
-                            (rec_transform.x(), rec_transform.y(), schema_width, schema_height)
-                        };
-                    (AffineTransform::new(x, y, rec_transform.rotation()), width, height)
-                } else {
-                    let width = ctx.layout_result
-                        .and_then(|r| r.get(id))
-                        .map(|l| l.width)
-                        .unwrap_or(schema_width);
-                    let height = ctx.layout_result
-                        .and_then(|r| r.get(id))
-                        .map(|l| l.height)
-                        .unwrap_or(schema_height);
-                    (rec_transform, width, height)
-                };
-
-                let local_bounds = Rectangle { x: 0.0, y: 0.0, width, height };
-
-                let world_transform = parent_world.compose(&local_transform);
+                let world_transform = parent_world.compose(&geo.transform);
                 let world_bounds = transform_rect(&local_bounds, &world_transform);
-                let render_bounds = compute_render_bounds(node, world_bounds);
+                let render_bounds = inflate_rect_sides(world_bounds, &geo.render_bounds_inflation);
 
                 let entry = GeometryEntry {
-                    transform: local_transform,
+                    transform: geo.transform,
                     absolute_transform: world_transform,
                     bounding_box: local_bounds,
                     absolute_bounding_box: world_bounds,
@@ -464,14 +471,12 @@ impl GeometryCache {
         self.entries.get(id).map(|e| e.absolute_bounding_box)
     }
 
-    /// Return expanded render bounds for a node if available.
     pub fn get_render_bounds(&self, id: &NodeId) -> Option<Rectangle> {
         self.entries.get(id).map(|e| e.absolute_render_bounds)
     }
 
-    /// Return the parent NodeId for a given node if available.
     pub fn get_parent(&self, id: &NodeId) -> Option<NodeId> {
-        self.entries.get(id).and_then(|e| e.parent.clone())
+        self.entries.get(id).and_then(|e| e.parent)
     }
 
     pub fn len(&self) -> usize {
@@ -482,258 +487,200 @@ impl GeometryCache {
         self.entries.contains_key(id)
     }
 
-    /// filter by node id and its entry data
     pub fn filter(&self, filter: impl Fn(&NodeId, &GeometryEntry) -> bool) -> Self {
         Self {
             entries: self
                 .entries
                 .iter()
                 .filter(|(id, entry)| filter(id, entry))
-                .map(|(id, entry)| (id.clone(), entry.clone()))
+                .map(|(id, entry)| (id, entry.clone()))
                 .collect(),
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// Layout resolution — NodeGeoData + LayoutResult → GeoInput
+// ---------------------------------------------------------------------------
+
+/// Resolve layout-dependent fields from `NodeGeoData` + `LayoutResult`.
+///
+/// For most nodes this is a lightweight copy from the pre-extracted data
+/// with layout overrides for position/size. Only text spans without layout
+/// results fall back to accessing the full `Node` for text measurement.
+#[allow(clippy::too_many_arguments)]
+fn resolve_layout(
+    id: &NodeId,
+    geo: &NodeGeoData,
+    parent_id: Option<NodeId>,
+    layout_result: Option<&crate::layout::cache::LayoutResult>,
+    is_layout_container: &DenseNodeMap<bool>,
+    graph: &SceneGraph,
+    paragraph_cache: &mut ParagraphCache,
+    fonts: &FontRepository,
+    viewport_size: crate::node::schema::Size,
+) -> GeoInput {
+    match geo.kind {
+        GeoNodeKind::Group | GeoNodeKind::BooleanOperation => GeoInput {
+            transform: geo.schema_transform,
+            width: geo.schema_width,
+            height: geo.schema_height,
+            kind: geo.kind,
+            render_bounds_inflation: geo.render_bounds_inflation,
+        },
+        GeoNodeKind::InitialContainer => GeoInput {
+            transform: geo.schema_transform,
+            width: viewport_size.width,
+            height: viewport_size.height,
+            kind: geo.kind,
+            render_bounds_inflation: geo.render_bounds_inflation,
+        },
+        GeoNodeKind::Container => {
+            let (x, y, width, height) =
+                if let Some(computed) = layout_result.and_then(|r| r.get(id)) {
+                    (computed.x, computed.y, computed.width, computed.height)
+                } else {
+                    // Fallback to schema data when layout result is missing.
+                    // This happens for orphan nodes not reachable from scene roots,
+                    // or when layout is skipped entirely (layout_result == None).
+                    (
+                        geo.schema_transform.x(),
+                        geo.schema_transform.y(),
+                        geo.schema_width,
+                        geo.schema_height,
+                    )
+                };
+            GeoInput {
+                transform: AffineTransform::new(x, y, geo.rotation),
+                width,
+                height,
+                kind: geo.kind,
+                render_bounds_inflation: geo.render_bounds_inflation,
+            }
+        }
+        GeoNodeKind::TextSpan => {
+            let layout = layout_result.and_then(|r| r.get(id));
+            const MIN_SIZE_DIRTY_HACK: f32 = 1.0;
+
+            let parent_is_layout_container = parent_id
+                .as_ref()
+                .and_then(|pid| is_layout_container.get(pid).copied())
+                .unwrap_or(false);
+
+            let (local_transform, width, height) = if let Some(l) = layout {
+                let width = l.width.max(MIN_SIZE_DIRTY_HACK);
+                let height = l.height.max(MIN_SIZE_DIRTY_HACK);
+                let transform = if parent_is_layout_container {
+                    AffineTransform::new(l.x, l.y, geo.schema_transform.rotation())
+                } else {
+                    geo.schema_transform
+                };
+                (transform, width, height)
+            } else {
+                // Fallback: text measurement via paragraph cache.
+                // This requires accessing the Node for text content.
+                // Only happens when layout_result is None (rare path).
+                if let Ok(Node::TextSpan(n)) = graph.get_node(id) {
+                    let measurements = paragraph_cache.measure(
+                        &n.text,
+                        &n.text_style,
+                        &n.text_align,
+                        &n.max_lines,
+                        &n.ellipsis,
+                        n.width,
+                        fonts,
+                        Some(id),
+                    );
+                    let width = measurements.max_width.max(MIN_SIZE_DIRTY_HACK);
+                    let height = n
+                        .height
+                        .unwrap_or(measurements.height)
+                        .max(MIN_SIZE_DIRTY_HACK);
+                    (geo.schema_transform, width, height)
+                } else {
+                    // Shouldn't happen; schema_width/height as fallback
+                    (
+                        geo.schema_transform,
+                        geo.schema_width.max(MIN_SIZE_DIRTY_HACK),
+                        geo.schema_height.max(MIN_SIZE_DIRTY_HACK),
+                    )
+                }
+            };
+
+            GeoInput {
+                transform: local_transform,
+                width,
+                height,
+                kind: geo.kind,
+                render_bounds_inflation: geo.render_bounds_inflation,
+            }
+        }
+        GeoNodeKind::Leaf => {
+            let parent_is_layout_container = parent_id
+                .as_ref()
+                .and_then(|pid| is_layout_container.get(pid).copied())
+                .unwrap_or(false);
+
+            let (local_transform, width, height) = if parent_is_layout_container {
+                let (x, y, width, height) =
+                    if let Some(result) = layout_result.and_then(|r| r.get(id)) {
+                        (result.x, result.y, result.width, result.height)
+                    } else {
+                        (
+                            geo.schema_transform.x(),
+                            geo.schema_transform.y(),
+                            geo.schema_width,
+                            geo.schema_height,
+                        )
+                    };
+                (
+                    AffineTransform::new(x, y, geo.schema_transform.rotation()),
+                    width,
+                    height,
+                )
+            } else {
+                let width = layout_result
+                    .and_then(|r| r.get(id))
+                    .map(|l| l.width)
+                    .unwrap_or(geo.schema_width);
+                let height = layout_result
+                    .and_then(|r| r.get(id))
+                    .map(|l| l.height)
+                    .unwrap_or(geo.schema_height);
+                (geo.schema_transform, width, height)
+            };
+
+            GeoInput {
+                transform: local_transform,
+                width,
+                height,
+                kind: geo.kind,
+                render_bounds_inflation: geo.render_bounds_inflation,
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helper functions
+// ---------------------------------------------------------------------------
+
 fn transform_rect(rect: &Rectangle, t: &AffineTransform) -> Rectangle {
     rect::transform(*rect, t)
 }
 
-fn inflate_rect(rect: Rectangle, delta: f32) -> Rectangle {
-    if delta <= 0.0 {
+/// Inflate a rectangle by pre-computed per-side values.
+fn inflate_rect_sides(rect: Rectangle, inf: &RenderBoundsInflation) -> Rectangle {
+    if inf.is_zero() {
         return rect;
     }
-    Rectangle {
-        x: rect.x - delta,
-        y: rect.y - delta,
-        width: rect.width + 2.0 * delta,
-        height: rect.height + 2.0 * delta,
-    }
-}
-
-fn stroke_outset(align: StrokeAlign, width: f32) -> f32 {
-    match align {
-        StrokeAlign::Inside => 0.0,
-        StrokeAlign::Center => width / 2.0,
-        StrokeAlign::Outside => width,
-    }
-}
-
-fn compute_render_bounds_from_effects(bounds: Rectangle, effects: &LayerEffects) -> Rectangle {
-    let mut bounds = bounds;
-    if let Some(blur) = &effects.blur {
-        bounds = match &blur.blur {
-            FeBlur::Gaussian(gaussian) => {
-                // Use 3x sigma for 99.7% Gaussian coverage
-                inflate_rect(bounds, gaussian.radius * 3.0)
-            }
-            FeBlur::Progressive(progressive) => {
-                // Use the maximum of both radii for bounds calculation
-                // to handle both increasing and decreasing blur gradients
-                // Multiply by 3.0 for proper 3-sigma Gaussian coverage
-                let max_radius = progressive.radius.max(progressive.radius2);
-                inflate_rect(bounds, max_radius * 3.0)
-            }
-        };
-    }
-    for shadow in &effects.shadows {
-        bounds = compute_render_bounds_from_effect(bounds, &shadow.clone().into());
-    }
-    bounds
-}
-
-fn compute_render_bounds_from_effect(bounds: Rectangle, effect: &FilterEffect) -> Rectangle {
-    match effect {
-        FilterEffect::LiquidGlass(glass) => inflate_rect(bounds, glass.blur_radius * 3.0),
-        FilterEffect::LayerBlur(blur) => match &blur.blur {
-            FeBlur::Gaussian(gaussian) => inflate_rect(bounds, gaussian.radius * 3.0),
-            FeBlur::Progressive(progressive) => {
-                let max_radius = progressive.radius.max(progressive.radius2);
-                inflate_rect(bounds, max_radius * 3.0)
-            }
+    rect::inflate(
+        rect,
+        rect::Sides {
+            top: inf.top,
+            right: inf.right,
+            bottom: inf.bottom,
+            left: inf.left,
         },
-        FilterEffect::BackdropBlur(blur) => match &blur.blur {
-            FeBlur::Gaussian(gaussian) => inflate_rect(bounds, gaussian.radius * 3.0),
-            FeBlur::Progressive(progressive) => {
-                let max_radius = progressive.radius.max(progressive.radius2);
-                inflate_rect(bounds, max_radius * 3.0)
-            }
-        },
-        FilterEffect::DropShadow(shadow) => {
-            // Apply spread by inflating the bounds, then offset and blur
-            let mut rect = if shadow.spread != 0.0 {
-                inflate_rect(bounds, shadow.spread)
-            } else {
-                bounds
-            };
-            rect.x += shadow.dx;
-            rect.y += shadow.dy;
-            // Use 3x sigma for proper Gaussian blur coverage
-            inflate_rect(rect, shadow.blur * 3.0)
-        }
-        // no inflation
-        FilterEffect::Noise(_) => bounds,
-        FilterEffect::InnerShadow(_) => bounds,
-    }
-}
-
-fn compute_render_bounds_from_style(
-    world_bounds: Rectangle,
-    stroke_width: f32,
-    stroke_align: StrokeAlign,
-    effects: &LayerEffects,
-) -> Rectangle {
-    let mut bounds = inflate_rect(world_bounds, stroke_outset(stroke_align, stroke_width));
-
-    bounds = compute_render_bounds_from_effects(bounds, effects);
-
-    bounds
-}
-
-/// Computes render bounds for nodes with per-side stroke widths.
-///
-/// Handles all three stroke alignments:
-/// - **Center**: Inflate by half-widths (stroke extends inward and outward)
-/// - **Inside**: No inflation (stroke is entirely inside node bounds)
-/// - **Outside**: Inflate by full-widths (stroke extends entirely outward)
-fn compute_render_bounds_with_rectangular_stroke(
-    world_bounds: Rectangle,
-    rect_stroke: &RectangularStrokeWidth,
-    stroke_align: StrokeAlign,
-    effects: &LayerEffects,
-) -> Rectangle {
-    let mut bounds = world_bounds;
-
-    // Inflate based on stroke alignment
-    match stroke_align {
-        StrokeAlign::Center => {
-            // Center: inflate by half the stroke width on each side
-            bounds = rect::inflate(
-                bounds,
-                rect::Sides {
-                    top: rect_stroke.stroke_top_width / 2.0,
-                    right: rect_stroke.stroke_right_width / 2.0,
-                    bottom: rect_stroke.stroke_bottom_width / 2.0,
-                    left: rect_stroke.stroke_left_width / 2.0,
-                },
-            );
-        }
-        StrokeAlign::Inside => {
-            // Inside: no inflation - stroke is entirely inside the node bounds
-            // bounds remain unchanged
-        }
-        StrokeAlign::Outside => {
-            // Outside: inflate by full stroke width on each side
-            bounds = rect::inflate(
-                bounds,
-                rect::Sides {
-                    top: rect_stroke.stroke_top_width,
-                    right: rect_stroke.stroke_right_width,
-                    bottom: rect_stroke.stroke_bottom_width,
-                    left: rect_stroke.stroke_left_width,
-                },
-            );
-        }
-    }
-
-    bounds = compute_render_bounds_from_effects(bounds, effects);
-
-    bounds
-}
-
-fn compute_render_bounds(node: &Node, world_bounds: Rectangle) -> Rectangle {
-    match node {
-        Node::Rectangle(n) => {
-            // Check if this node has per-side stroke widths
-            if let Some(rect_stroke) = n.rectangular_stroke_width() {
-                compute_render_bounds_with_rectangular_stroke(
-                    world_bounds,
-                    &rect_stroke,
-                    n.stroke_style.stroke_align,
-                    &n.effects,
-                )
-            } else {
-                compute_render_bounds_from_style(
-                    world_bounds,
-                    n.render_bounds_stroke_width(),
-                    n.stroke_style.stroke_align,
-                    &n.effects,
-                )
-            }
-        }
-        Node::Ellipse(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.render_bounds_stroke_width(),
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
-        Node::Polygon(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.render_bounds_stroke_width(),
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
-        Node::RegularPolygon(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.render_bounds_stroke_width(),
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
-        Node::RegularStarPolygon(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.render_bounds_stroke_width(),
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
-        Node::Path(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.stroke_width.value_or_zero(),
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
-        Node::Vector(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.stroke_width,
-            n.get_stroke_align(),
-            &n.effects,
-        ),
-        Node::Image(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.render_bounds_stroke_width(),
-            n.stroke_style.stroke_align,
-            &n.effects,
-        ),
-        Node::Line(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.stroke_width,
-            n.get_stroke_align(),
-            &n.effects,
-        ),
-        Node::TextSpan(n) => compute_render_bounds_from_style(
-            world_bounds,
-            n.stroke_width,
-            n.stroke_align,
-            &LayerEffects::default(),
-        ),
-        Node::Container(n) => {
-            // Check if this node has per-side stroke widths
-            if let Some(rect_stroke) = n.rectangular_stroke_width() {
-                compute_render_bounds_with_rectangular_stroke(
-                    world_bounds,
-                    &rect_stroke,
-                    n.stroke_style.stroke_align,
-                    &n.effects,
-                )
-            } else {
-                compute_render_bounds_from_style(
-                    world_bounds,
-                    n.render_bounds_stroke_width(),
-                    n.stroke_style.stroke_align,
-                    &n.effects,
-                )
-            }
-        }
-        Node::Error(_) => world_bounds,
-        Node::Group(_) | Node::BooleanOperation(_) | Node::InitialContainer(_) => world_bounds,
-    }
+    )
 }

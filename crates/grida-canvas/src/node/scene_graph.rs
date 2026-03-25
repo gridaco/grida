@@ -1,6 +1,8 @@
 use super::repository::NodeRepository;
-use super::schema::{Node, NodeId};
+use super::schema::{extract_layer_core, Node, NodeGeometryMixin, NodeId, NodeLayerCore, NodeRectMixin};
 use crate::cache::fast_hash::DenseNodeMap;
+use crate::cg::prelude::*;
+use math2::transform::AffineTransform;
 use std::collections::HashMap;
 
 /// Parent reference in the scene graph
@@ -46,12 +48,386 @@ impl std::error::Error for SceneGraphError {}
 
 pub type SceneGraphResult<T> = Result<T, SceneGraphError>;
 
+// ---------------------------------------------------------------------------
+// NodeGeoData — compact, schema-level geometry data per node
+// ---------------------------------------------------------------------------
+
+/// Classifies how a node participates in geometry computation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum GeoNodeKind {
+    Group,
+    InitialContainer,
+    Container,
+    BooleanOperation,
+    TextSpan,
+    Leaf,
+}
+
+/// Pre-computed render bounds inflation.
+///
+/// Stores per-side pixel expansion from stroke + effects, computed at
+/// construction time. `Copy`, no heap allocation, 16 bytes total.
+/// The geometry cache inflates world bounds by these values at DFS time.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RenderBoundsInflation {
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
+}
+
+impl RenderBoundsInflation {
+    pub const ZERO: Self = Self {
+        top: 0.0,
+        right: 0.0,
+        bottom: 0.0,
+        left: 0.0,
+    };
+
+    /// Uniform inflation on all sides.
+    pub fn uniform(delta: f32) -> Self {
+        Self {
+            top: delta,
+            right: delta,
+            bottom: delta,
+            left: delta,
+        }
+    }
+
+    /// Expand this inflation to include another inflation (per-side max).
+    pub fn expand(&self, other: &Self) -> Self {
+        Self {
+            top: self.top.max(other.top),
+            right: self.right.max(other.right),
+            bottom: self.bottom.max(other.bottom),
+            left: self.left.max(other.left),
+        }
+    }
+
+    /// Whether this inflation is all zeros.
+    pub fn is_zero(&self) -> bool {
+        self.top == 0.0 && self.right == 0.0 && self.bottom == 0.0 && self.left == 0.0
+    }
+}
+
+/// Compact, schema-level geometry data extracted from a `Node` at construction
+/// time. Stored in a parallel `DenseNodeMap` on the `SceneGraph` so that the
+/// geometry cache never needs to iterate over the full `Node` enum.
+///
+/// Layout-dependent fields (final width/height/position) are resolved by the
+/// geometry cache using this data + `LayoutResult`.
+///
+/// This struct is `Copy` — no heap allocations, ~48 bytes total.
+#[derive(Debug, Clone, Copy)]
+pub struct NodeGeoData {
+    /// The node's transform as stored in the schema.
+    ///
+    /// For Container nodes, this is `AffineTransform::new(fallback_x, fallback_y, rotation)`.
+    /// The geometry cache may override x/y from layout results.
+    pub schema_transform: AffineTransform,
+    /// Schema width (from size, rect(), or network.bounds()).
+    pub schema_width: f32,
+    /// Schema height.
+    pub schema_height: f32,
+    /// What kind of node (determines DFS behavior).
+    pub kind: GeoNodeKind,
+    /// Pre-computed per-side render bounds inflation from stroke + effects.
+    pub render_bounds_inflation: RenderBoundsInflation,
+    /// Container rotation (needed to reconstruct transform from layout x/y).
+    /// Only meaningful for Container nodes; 0.0 for others.
+    pub rotation: f32,
+}
+
+/// Extract schema-level geometry data from a `Node`.
+///
+/// This is a pure function of the Node — no layout results, no font metrics,
+/// no paragraph cache. Called once per node during SceneGraph construction.
+/// All values are `Copy` — zero heap allocations.
+pub fn extract_geo_data(node: &Node) -> NodeGeoData {
+    match node {
+        Node::Group(n) => NodeGeoData {
+            schema_transform: n.transform.unwrap_or_default(),
+            schema_width: 0.0,
+            schema_height: 0.0,
+            kind: GeoNodeKind::Group,
+            render_bounds_inflation: RenderBoundsInflation::ZERO, // union of children
+            rotation: 0.0,
+        },
+        Node::InitialContainer(_) => NodeGeoData {
+            schema_transform: AffineTransform::identity(),
+            schema_width: 0.0,
+            schema_height: 0.0,
+            kind: GeoNodeKind::InitialContainer,
+            render_bounds_inflation: RenderBoundsInflation::ZERO,
+            rotation: 0.0,
+        },
+        Node::BooleanOperation(n) => NodeGeoData {
+            schema_transform: n.transform.unwrap_or_default(),
+            schema_width: 0.0,
+            schema_height: 0.0,
+            kind: GeoNodeKind::BooleanOperation,
+            render_bounds_inflation: compute_inflation_uniform(
+                n.stroke_width.value_or_zero(),
+                n.stroke_style.stroke_align,
+                &n.effects,
+            ),
+            rotation: 0.0,
+        },
+        Node::Container(n) => {
+            let fallback_x = n.position.x().unwrap_or(0.0);
+            let fallback_y = n.position.y().unwrap_or(0.0);
+            let schema_transform = AffineTransform::new(fallback_x, fallback_y, n.rotation);
+
+            let render_bounds_inflation = if let Some(rect_stroke) = n.rectangular_stroke_width() {
+                compute_inflation_rectangular(&rect_stroke, n.stroke_style.stroke_align, &n.effects)
+            } else {
+                compute_inflation_uniform(
+                    n.render_bounds_stroke_width(),
+                    n.stroke_style.stroke_align,
+                    &n.effects,
+                )
+            };
+
+            NodeGeoData {
+                schema_transform,
+                schema_width: n.layout_dimensions.layout_target_width.unwrap_or(0.0),
+                schema_height: n.layout_dimensions.layout_target_height.unwrap_or(0.0),
+                kind: GeoNodeKind::Container,
+                render_bounds_inflation,
+                rotation: n.rotation,
+            }
+        }
+        Node::TextSpan(n) => NodeGeoData {
+            schema_transform: n.transform,
+            schema_width: n.width.unwrap_or(0.0),
+            schema_height: n.height.unwrap_or(0.0),
+            kind: GeoNodeKind::TextSpan,
+            render_bounds_inflation: compute_inflation_uniform(
+                n.stroke_width,
+                n.stroke_align,
+                &super::schema::LayerEffects::default(),
+            ),
+            rotation: 0.0,
+        },
+        _ => {
+            // Leaf nodes: Rectangle, Ellipse, Image, RegularPolygon,
+            // RegularStarPolygon, Line, Polygon, Path, Vector, Error.
+            let (schema_transform, schema_width, schema_height) = match node {
+                Node::Rectangle(n) => (n.transform, n.size.width, n.size.height),
+                Node::Ellipse(n) => (n.transform, n.size.width, n.size.height),
+                Node::Image(n) => (n.transform, n.size.width, n.size.height),
+                Node::RegularPolygon(n) => (n.transform, n.size.width, n.size.height),
+                Node::RegularStarPolygon(n) => (n.transform, n.size.width, n.size.height),
+                Node::Line(n) => (n.transform, n.size.width, 0.0),
+                Node::Polygon(n) => {
+                    let rect = n.rect();
+                    (n.transform, rect.width, rect.height)
+                }
+                Node::Path(n) => {
+                    let rect = n.rect();
+                    (n.transform, rect.width, rect.height)
+                }
+                Node::Vector(n) => {
+                    let rect = n.network.bounds();
+                    (n.transform, rect.width, rect.height)
+                }
+                Node::Error(n) => (n.transform, n.size.width, n.size.height),
+                _ => unreachable!("Non-leaf variants handled above"),
+            };
+
+            let render_bounds_inflation = extract_leaf_inflation(node);
+
+            NodeGeoData {
+                schema_transform,
+                schema_width,
+                schema_height,
+                kind: GeoNodeKind::Leaf,
+                render_bounds_inflation,
+                rotation: 0.0,
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Render bounds inflation computation — pure scalars, no heap allocations
+// ---------------------------------------------------------------------------
+
+/// Stroke outset for a given alignment.
+fn stroke_outset(align: StrokeAlign, width: f32) -> f32 {
+    match align {
+        StrokeAlign::Inside => 0.0,
+        StrokeAlign::Center => width / 2.0,
+        StrokeAlign::Outside => width,
+    }
+}
+
+/// Compute per-side inflation from a uniform stroke + effects.
+fn compute_inflation_uniform(
+    stroke_width: f32,
+    stroke_align: StrokeAlign,
+    effects: &super::schema::LayerEffects,
+) -> RenderBoundsInflation {
+    let stroke_delta = stroke_outset(stroke_align, stroke_width);
+    let base = RenderBoundsInflation::uniform(stroke_delta);
+    expand_inflation_with_effects(base, effects)
+}
+
+/// Compute per-side inflation from a rectangular (per-side) stroke + effects.
+fn compute_inflation_rectangular(
+    rect_stroke: &RectangularStrokeWidth,
+    stroke_align: StrokeAlign,
+    effects: &super::schema::LayerEffects,
+) -> RenderBoundsInflation {
+    let base = match stroke_align {
+        StrokeAlign::Center => RenderBoundsInflation {
+            top: rect_stroke.stroke_top_width / 2.0,
+            right: rect_stroke.stroke_right_width / 2.0,
+            bottom: rect_stroke.stroke_bottom_width / 2.0,
+            left: rect_stroke.stroke_left_width / 2.0,
+        },
+        StrokeAlign::Inside => RenderBoundsInflation::ZERO,
+        StrokeAlign::Outside => RenderBoundsInflation {
+            top: rect_stroke.stroke_top_width,
+            right: rect_stroke.stroke_right_width,
+            bottom: rect_stroke.stroke_bottom_width,
+            left: rect_stroke.stroke_left_width,
+        },
+    };
+    expand_inflation_with_effects(base, effects)
+}
+
+/// Expand a base inflation with the effect-induced expansion.
+///
+/// Effects are additive: blur expands uniformly, drop shadows expand
+/// asymmetrically (offset + blur + spread).
+fn expand_inflation_with_effects(
+    base: RenderBoundsInflation,
+    effects: &super::schema::LayerEffects,
+) -> RenderBoundsInflation {
+    let mut result = base;
+
+    if let Some(blur_effect) = &effects.blur {
+        let radius = match &blur_effect.blur {
+            crate::cg::prelude::FeBlur::Gaussian(g) => g.radius * 3.0,
+            crate::cg::prelude::FeBlur::Progressive(p) => p.radius.max(p.radius2) * 3.0,
+        };
+        result = result.expand(&RenderBoundsInflation::uniform(radius));
+    }
+
+    for shadow in &effects.shadows {
+        let effect: crate::cg::prelude::FilterEffect = shadow.clone().into();
+        let shadow_inflation = compute_effect_inflation(&effect);
+        result = result.expand(&shadow_inflation);
+    }
+
+    result
+}
+
+/// Compute per-side inflation from a single filter effect.
+fn compute_effect_inflation(effect: &crate::cg::prelude::FilterEffect) -> RenderBoundsInflation {
+    use crate::cg::prelude::FilterEffect;
+    match effect {
+        FilterEffect::LiquidGlass(glass) => RenderBoundsInflation::uniform(glass.blur_radius * 3.0),
+        FilterEffect::LayerBlur(blur) => {
+            let r = match &blur.blur {
+                crate::cg::prelude::FeBlur::Gaussian(g) => g.radius * 3.0,
+                crate::cg::prelude::FeBlur::Progressive(p) => p.radius.max(p.radius2) * 3.0,
+            };
+            RenderBoundsInflation::uniform(r)
+        }
+        FilterEffect::BackdropBlur(blur) => {
+            let r = match &blur.blur {
+                crate::cg::prelude::FeBlur::Gaussian(g) => g.radius * 3.0,
+                crate::cg::prelude::FeBlur::Progressive(p) => p.radius.max(p.radius2) * 3.0,
+            };
+            RenderBoundsInflation::uniform(r)
+        }
+        FilterEffect::DropShadow(shadow) => {
+            // Shadow creates a shifted, blurred copy of the shape.
+            // The per-side inflation from the original bounds is:
+            //   side = max(0, blur*3 + spread ± offset)
+            // where the sign of the offset depends on direction.
+            let blur_r = shadow.blur * 3.0;
+            let spread = shadow.spread.max(0.0);
+            let base = blur_r + spread;
+            RenderBoundsInflation {
+                top: (base - shadow.dy).max(0.0),
+                right: (base + shadow.dx).max(0.0),
+                bottom: (base + shadow.dy).max(0.0),
+                left: (base - shadow.dx).max(0.0),
+            }
+        }
+        FilterEffect::Noise(_) | FilterEffect::InnerShadow(_) => RenderBoundsInflation::ZERO,
+    }
+}
+
+/// Extract render bounds inflation for leaf nodes.
+fn extract_leaf_inflation(node: &Node) -> RenderBoundsInflation {
+    match node {
+        Node::Rectangle(n) => {
+            if let Some(rect_stroke) = n.rectangular_stroke_width() {
+                compute_inflation_rectangular(&rect_stroke, n.stroke_style.stroke_align, &n.effects)
+            } else {
+                compute_inflation_uniform(
+                    n.render_bounds_stroke_width(),
+                    n.stroke_style.stroke_align,
+                    &n.effects,
+                )
+            }
+        }
+        Node::Ellipse(n) => compute_inflation_uniform(
+            n.render_bounds_stroke_width(),
+            n.stroke_style.stroke_align,
+            &n.effects,
+        ),
+        Node::Polygon(n) => compute_inflation_uniform(
+            n.render_bounds_stroke_width(),
+            n.stroke_style.stroke_align,
+            &n.effects,
+        ),
+        Node::RegularPolygon(n) => compute_inflation_uniform(
+            n.render_bounds_stroke_width(),
+            n.stroke_style.stroke_align,
+            &n.effects,
+        ),
+        Node::RegularStarPolygon(n) => compute_inflation_uniform(
+            n.render_bounds_stroke_width(),
+            n.stroke_style.stroke_align,
+            &n.effects,
+        ),
+        Node::Path(n) => compute_inflation_uniform(
+            n.stroke_width.value_or_zero(),
+            n.stroke_style.stroke_align,
+            &n.effects,
+        ),
+        Node::Vector(n) => {
+            compute_inflation_uniform(n.stroke_width, n.get_stroke_align(), &n.effects)
+        }
+        Node::Image(n) => compute_inflation_uniform(
+            n.render_bounds_stroke_width(),
+            n.stroke_style.stroke_align,
+            &n.effects,
+        ),
+        Node::Line(n) => {
+            compute_inflation_uniform(n.stroke_width, n.get_stroke_align(), &n.effects)
+        }
+        _ => RenderBoundsInflation::ZERO,
+    }
+}
+
 /// A scene graph that manages both the tree structure and node data.
 ///
 /// The SceneGraph maintains:
 /// - Root node IDs (direct children of the scene)
 /// - An adjacency list (parent->children) for the tree structure
 /// - A node repository for storing actual node data
+/// - A parallel `geo_data` map with compact, schema-level geometry data
+///
+/// The `geo_data` map is populated at construction time from the `Node` data.
+/// It enables the geometry cache to compute transforms and bounds without
+/// iterating over the full `Node` enum (critical for WASM performance).
 ///
 /// This provides a centralized, efficient way to manage scene hierarchy
 /// separate from node attributes.
@@ -65,6 +441,17 @@ pub struct SceneGraph {
     nodes: NodeRepository,
     /// Optional display names for nodes (from the source file).
     names: HashMap<NodeId, String>,
+    /// Compact, schema-level geometry data per node.
+    ///
+    /// Populated at construction time from `Node` data. The geometry cache
+    /// reads this instead of iterating over the full `Node` enum.
+    geo_data: DenseNodeMap<NodeGeoData>,
+    /// Compact, layer-relevant data per node.
+    ///
+    /// Populated at construction time from `Node` data. The effect tree and
+    /// layers DFS read this instead of iterating over the full `Node` enum
+    /// for visibility / opacity / blend mode checks.
+    layer_core: DenseNodeMap<NodeLayerCore>,
 }
 
 impl SceneGraph {
@@ -75,6 +462,8 @@ impl SceneGraph {
             links: DenseNodeMap::new(),
             nodes: NodeRepository::new(),
             names: HashMap::new(),
+            geo_data: DenseNodeMap::new(),
+            layer_core: DenseNodeMap::new(),
         }
     }
 
@@ -94,8 +483,11 @@ impl SceneGraph {
     ) -> Self {
         let mut graph = Self::new();
 
-        // Add all nodes to the repository with their explicit IDs
+        // Add all nodes to the repository with their explicit IDs,
+        // extracting compact geo data and layer core at the same time.
         for (id, node) in node_pairs {
+            graph.geo_data.insert(id, extract_geo_data(&node));
+            graph.layer_core.insert(id, extract_layer_core(&node));
             graph.nodes.insert_with_id(id, node);
         }
 
@@ -120,7 +512,11 @@ impl SceneGraph {
     ///
     /// Returns the node's ID.
     pub fn append_child(&mut self, node: Node, parent: Parent) -> NodeId {
+        let geo = extract_geo_data(&node);
+        let lc = extract_layer_core(&node);
         let id = self.nodes.insert(node);
+        self.geo_data.insert(id, geo);
+        self.layer_core.insert(id, lc);
 
         match parent {
             Parent::Root => {
@@ -262,6 +658,7 @@ impl SceneGraph {
 
     /// Remove a node from the repository and return it
     pub fn remove_node(&mut self, id: &NodeId) -> SceneGraphResult<Node> {
+        self.geo_data.remove(id);
         self.nodes
             .remove(id)
             .ok_or_else(|| SceneGraphError::NodeNotFound(id.clone()))
@@ -288,6 +685,25 @@ impl SceneGraph {
     /// `get_children()` if they need tree order.
     pub fn nodes_iter(&self) -> impl Iterator<Item = (NodeId, &Node)> {
         self.nodes.iter()
+    }
+
+    /// Access the compact, schema-level geometry data map.
+    ///
+    /// This map is populated at construction time and contains only the fields
+    /// needed for geometry computation (~48 bytes/node instead of ~500+).
+    /// The geometry cache reads this instead of iterating over the full Node enum.
+    pub fn geo_data(&self) -> &DenseNodeMap<NodeGeoData> {
+        &self.geo_data
+    }
+
+    /// Access the compact layer-core data map.
+    pub fn layer_core(&self) -> &DenseNodeMap<NodeLayerCore> {
+        &self.layer_core
+    }
+
+    /// Get layer-core data for a single node.
+    pub fn get_layer_core(&self, id: &NodeId) -> Option<&NodeLayerCore> {
+        self.layer_core.get(id)
     }
 
     // -------------------------------------------------------------------------

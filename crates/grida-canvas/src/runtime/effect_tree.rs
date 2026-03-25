@@ -43,7 +43,7 @@ use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::cg::types::LayerBlendMode;
 use crate::node::id::NodeId;
 use crate::node::scene_graph::SceneGraph;
-use crate::node::schema::{Node, NodeTrait};
+use crate::node::schema::NodeLayerCore;
 
 /// Why a node needs a render surface.
 ///
@@ -173,6 +173,10 @@ impl EffectTree {
     }
 
     /// Recursive visitor that checks each node for render surface triggers.
+    ///
+    /// Uses `layer_core` (compact ~16-byte struct) for all visibility, opacity,
+    /// blend mode, and mask checks — never touches the full 500+ byte `Node`
+    /// enum unless the node has effects that need detail inspection.
     fn visit(
         graph: &SceneGraph,
         id: &NodeId,
@@ -181,35 +185,37 @@ impl EffectTree {
     ) {
         stats.nodes_visited += 1;
 
-        let node = match graph.get_node(id) {
-            Ok(n) => n,
-            Err(_) => return,
+        // Read from compact layer_core (~16 bytes) instead of full Node (~500 bytes).
+        let lc = match graph.get_layer_core(id) {
+            Some(lc) => *lc,
+            None => return,
         };
 
         // Skip inactive nodes — they produce no visual output.
-        if !node.active() {
+        if !lc.active {
             return;
         }
 
         let all_children = graph.get_children(id);
         let all_children_slice = all_children.map(|c| c.as_slice()).unwrap_or(&[]);
 
-        // Count visible children and check for masks without allocating a Vec.
+        // Count visible children using layer_core (no full Node touch).
+        let layer_core_map = graph.layer_core();
         let visible_child_count = all_children_slice
             .iter()
             .filter(|cid| {
-                graph
-                    .get_node(cid)
-                    .map(|n| n.active())
+                layer_core_map
+                    .get(cid)
+                    .map(|c| c.active)
                     .unwrap_or(false)
             })
             .count();
 
-        // Collect render surface reasons for this node.
-        let reasons = Self::classify(node, visible_child_count, all_children_slice, graph);
+        // Collect render surface reasons using layer_core for fast checks.
+        // Only access full Node when effects detail is needed.
+        let reasons = Self::classify_from_core(id, &lc, visible_child_count, all_children_slice, graph);
 
         if !reasons.is_empty() {
-            // Update per-reason stats.
             for reason in &reasons {
                 match reason {
                     RenderSurfaceReason::Opacity => stats.by_reason.opacity += 1,
@@ -225,9 +231,9 @@ impl EffectTree {
             let active_children: Vec<NodeId> = all_children_slice
                 .iter()
                 .filter(|cid| {
-                    graph
-                        .get_node(cid)
-                        .map(|n| n.active())
+                    layer_core_map
+                        .get(cid)
+                        .map(|c| c.active)
                         .unwrap_or(false)
                 })
                 .copied()
@@ -251,11 +257,14 @@ impl EffectTree {
         }
     }
 
-    /// Classify a node: determine which render surface reasons apply.
+    /// Classify a node using `NodeLayerCore` for fast-path checks.
     ///
-    /// Returns an empty vec if the node doesn't need a render surface.
-    fn classify(
-        node: &Node,
+    /// Only accesses the full `Node` when the node has effects (blur/shadows)
+    /// that need detail inspection. For the majority of nodes (no effects),
+    /// this never touches the 500+ byte Node enum.
+    fn classify_from_core(
+        id: &NodeId,
+        lc: &NodeLayerCore,
         visible_child_count: usize,
         children: &[NodeId],
         graph: &SceneGraph,
@@ -263,66 +272,51 @@ impl EffectTree {
         let mut reasons = Vec::new();
 
         // --- Opacity isolation ---
-        // Only needed when a container-like node has opacity < 1.0 AND
-        // has 2+ visible children. A single child (or leaf) can have
-        // opacity applied directly without isolation.
-        if node.opacity() < 1.0 && visible_child_count >= 2 {
+        if lc.opacity < 1.0 && visible_child_count >= 2 {
             reasons.push(RenderSurfaceReason::Opacity);
         }
 
         // --- Blend mode isolation ---
-        // Non-PassThrough blend modes require the subtree to be drawn into
-        // an offscreen before blending with the backdrop. Only applies to
-        // container-like nodes with children (leaf blend modes are handled
-        // by the painter directly).
-        if node.blend_mode() != LayerBlendMode::PassThrough && visible_child_count >= 1 {
+        if lc.blend_mode != LayerBlendMode::PassThrough && visible_child_count >= 1 {
             reasons.push(RenderSurfaceReason::BlendMode);
         }
 
         // --- Effects that benefit from render surfaces ---
-        if let Some(effects) = node.effects() {
-            // Layer blur: applies to entire subtree content.
-            // Only creates a surface when there are children — leaf nodes
-            // have their blur applied directly by the painter.
-            if effects.blur.as_ref().is_some_and(|b| b.active) && visible_child_count >= 1 {
-                reasons.push(RenderSurfaceReason::LayerBlur);
+        // Only access full Node when has_effects is true (minority of nodes).
+        if lc.has_effects && visible_child_count >= 1 {
+            if let Ok(node) = graph.get_node(id) {
+                if let Some(effects) = node.effects() {
+                    if effects.blur.as_ref().is_some_and(|b| b.active) {
+                        reasons.push(RenderSurfaceReason::LayerBlur);
+                    }
+                    if !effects.shadows.is_empty() {
+                        reasons.push(RenderSurfaceReason::Shadow);
+                    }
+                }
             }
-
-            // Shadows: a render surface lets us compute the shadow filter
-            // once for the entire subtree instead of per-child.
-            // Only for container-like nodes — leaf shadows are per-node.
-            if !effects.shadows.is_empty() && visible_child_count >= 1 {
-                reasons.push(RenderSurfaceReason::Shadow);
-            }
-
-            // Note: backdrop_blur and liquid_glass are context-dependent
-            // (they read from content behind the node). They are handled
-            // per-node by the painter and do NOT create render surfaces.
         }
 
         // --- Clip ---
-        // Container clip=true requires clipping descendants to the
-        // container's shape. This is a render surface trigger.
-        if node.clips_content() && visible_child_count >= 1 {
+        if lc.clips_content && visible_child_count >= 1 {
             reasons.push(RenderSurfaceReason::Clip);
         }
 
         // --- Mask groups ---
-        // If any child is a mask node, this parent needs a render surface
-        // to implement the mask compositing (DstIn blend).
-        if Self::has_mask_children(children, graph) {
+        // Check children's mask from layer_core (no full Node needed).
+        if Self::has_mask_children_from_core(children, graph) {
             reasons.push(RenderSurfaceReason::Mask);
         }
 
         reasons
     }
 
-    /// Check if any of the given children are active mask nodes.
-    fn has_mask_children(children: &[NodeId], graph: &SceneGraph) -> bool {
+    /// Check if any of the given children are active mask nodes using layer_core.
+    fn has_mask_children_from_core(children: &[NodeId], graph: &SceneGraph) -> bool {
+        let layer_core_map = graph.layer_core();
         children.iter().any(|cid| {
-            graph
-                .get_node(cid)
-                .map(|n| n.active() && n.mask().is_some())
+            layer_core_map
+                .get(cid)
+                .map(|c| c.active && c.mask.is_some())
                 .unwrap_or(false)
         })
     }

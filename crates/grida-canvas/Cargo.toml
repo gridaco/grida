@@ -33,6 +33,10 @@ rstar = "0.12"
 
 # core resource hashing
 seahash = "4.1.0"
+# fast non-cryptographic hasher for hot-path HashMaps
+rustc-hash = "2"
+# inline small collections (avoids heap alloc for common 0-1 element cases)
+smallvec = { version = "1", features = ["serde"] }
 # layout engine
 taffy = "0.9.2"
 # svg parsing

@@ -2,6 +2,7 @@ use super::prelude::*;
 use core::str;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use std::hash::Hash;
 
 use super::alignment::Alignment;
@@ -2007,9 +2008,14 @@ impl From<CGColor> for SolidPaint {
 /// The [`BlendMode`] assigned to each [`Paint`] applies to that specific entry
 /// while it is composited over the accumulated result. It never retroactively
 /// affects paints that were drawn earlier in the stack.
+/// Inline capacity for the [`Paints`] collection. Most nodes have 0 or 1 fill/stroke.
+/// `SmallVec<[Paint; 1]>` stores up to 1 paint inline without heap allocation,
+/// saving ~272K allocs for a 136K-node scene (fills + strokes).
+type PaintsVec = SmallVec<[Paint; 1]>;
+
 #[derive(Debug, Clone, Default)]
 pub struct Paints {
-    paints: Vec<Paint>,
+    paints: PaintsVec,
 }
 
 impl Paints {
@@ -2053,7 +2059,7 @@ impl Paints {
 
     /// Consume the collection and return the underlying vector.
     pub fn into_vec(self) -> Vec<Paint> {
-        self.paints
+        self.paints.into_vec()
     }
 
     /// Append a new paint to the top of the stack.
@@ -2080,39 +2086,40 @@ impl From<Vec<Paint>> for Paints {
 
 impl From<Paints> for Vec<Paint> {
     fn from(value: Paints) -> Self {
-        value.paints
+        value.paints.into_vec()
     }
 }
 
 // Custom trait to support both Vec<Paint> and array literals in Paints::new()
 pub trait IntoPaints {
-    fn into_paints(self) -> Vec<Paint>;
+    fn into_paints(self) -> PaintsVec;
 }
 
 impl IntoPaints for Vec<Paint> {
-    fn into_paints(self) -> Vec<Paint> {
-        self
+    fn into_paints(self) -> PaintsVec {
+        SmallVec::from_vec(self)
     }
 }
 
 impl<const N: usize> IntoPaints for [Paint; N] {
-    fn into_paints(self) -> Vec<Paint> {
-        self.to_vec()
+    fn into_paints(self) -> PaintsVec {
+        self.into_iter().collect()
     }
 }
 
 impl FromIterator<Paint> for Paints {
     fn from_iter<I: IntoIterator<Item = Paint>>(iter: I) -> Self {
-        Paints::new(iter.into_iter().collect::<Vec<_>>())
+        Paints {
+            paints: iter.into_iter().collect(),
+        }
     }
 }
 
 // Support for array literals - much more ergonomic than vec![]
 impl<const N: usize> From<[Paint; N]> for Paints {
     fn from(value: [Paint; N]) -> Self {
-        // Most efficient: direct construction without intermediate allocations
         Paints {
-            paints: value.to_vec(),
+            paints: value.into_iter().collect(),
         }
     }
 }
@@ -2120,16 +2127,16 @@ impl<const N: usize> From<[Paint; N]> for Paints {
 // Support for single Paint conversion
 impl From<Paint> for Paints {
     fn from(value: Paint) -> Self {
-        // More efficient: avoid the intermediate Vec allocation
+        // SmallVec stores 1 paint inline — zero heap allocation
         Paints {
-            paints: vec![value],
+            paints: smallvec::smallvec![value],
         }
     }
 }
 
 impl IntoIterator for Paints {
     type Item = Paint;
-    type IntoIter = std::vec::IntoIter<Paint>;
+    type IntoIter = smallvec::IntoIter<[Paint; 1]>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.paints.into_iter()
