@@ -452,6 +452,12 @@ pub struct SceneGraph {
     /// layers DFS read this instead of iterating over the full `Node` enum
     /// for visibility / opacity / blend mode checks.
     layer_core: DenseNodeMap<NodeLayerCore>,
+    /// Whether the scene contains any flex layout containers.
+    ///
+    /// When `false`, the layout engine can skip Taffy entirely and use
+    /// schema positions/sizes directly — saving ~1,500ms for 136K-node
+    /// Figma imports where all containers use `LayoutMode::Normal`.
+    has_flex: bool,
 }
 
 impl SceneGraph {
@@ -464,6 +470,7 @@ impl SceneGraph {
             names: HashMap::new(),
             geo_data: DenseNodeMap::new(),
             layer_core: DenseNodeMap::new(),
+            has_flex: false,
         }
     }
 
@@ -476,6 +483,18 @@ impl SceneGraph {
     /// * `nodes` - Iterator of nodes to add to the repository
     /// * `links` - HashMap of parent->children relationships
     /// * `roots` - Root node IDs (direct children of the scene)
+    // TODO: Currently `new_from_snapshot` receives ALL nodes from the
+    // document (across all scenes) but only one scene's roots. This means
+    // geo_data, layer_core, and the node repository contain orphan nodes
+    // not reachable from the current scene's roots. Downstream passes
+    // (geometry, layout, layers, effects) already scope their work to
+    // root-reachable nodes, but the extraction loop and storage still pay
+    // O(total_nodes) instead of O(scene_nodes). In a multi-scene document
+    // this is wasted work and memory.
+    //
+    // Future: either filter `node_pairs` to only scene-reachable nodes
+    // before calling this, or accept a reachability set so extraction and
+    // insertion can be bounded to the current scene.
     pub fn new_from_snapshot(
         node_pairs: impl IntoIterator<Item = (NodeId, Node)>,
         links: HashMap<NodeId, Vec<NodeId>>,
@@ -485,11 +504,18 @@ impl SceneGraph {
 
         // Add all nodes to the repository with their explicit IDs,
         // extracting compact geo data and layer core at the same time.
+        // Also detect whether any flex containers exist (for layout skip optimization).
+        let mut has_flex = false;
         for (id, node) in node_pairs {
             graph.geo_data.insert(id, extract_geo_data(&node));
-            graph.layer_core.insert(id, extract_layer_core(&node));
+            let lc = extract_layer_core(&node);
+            if lc.is_flex {
+                has_flex = true;
+            }
+            graph.layer_core.insert(id, lc);
             graph.nodes.insert_with_id(id, node);
         }
+        graph.has_flex = has_flex;
 
         // Convert HashMap links to DenseNodeMap
         let mut dense_links = DenseNodeMap::new();
@@ -514,6 +540,9 @@ impl SceneGraph {
     pub fn append_child(&mut self, node: Node, parent: Parent) -> NodeId {
         let geo = extract_geo_data(&node);
         let lc = extract_layer_core(&node);
+        if lc.is_flex {
+            self.has_flex = true;
+        }
         let id = self.nodes.insert(node);
         self.geo_data.insert(id, geo);
         self.layer_core.insert(id, lc);
@@ -704,6 +733,14 @@ impl SceneGraph {
     /// Get layer-core data for a single node.
     pub fn get_layer_core(&self, id: &NodeId) -> Option<&NodeLayerCore> {
         self.layer_core.get(id)
+    }
+
+    /// Whether the scene contains any flex layout containers.
+    ///
+    /// When `false`, all containers use `LayoutMode::Normal` (absolute
+    /// positioning) and the layout engine can skip Taffy entirely.
+    pub fn has_flex(&self) -> bool {
+        self.has_flex
     }
 
     // -------------------------------------------------------------------------

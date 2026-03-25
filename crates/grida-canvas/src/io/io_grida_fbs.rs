@@ -428,6 +428,12 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
     // The last scene consumes node_pairs/internal_links by move to avoid
     // a deep clone of all Node enums. Earlier scenes (multi-scene files)
     // must clone. Single-scene files (the common case) get zero clones.
+    //
+    // TODO: Each SceneGraph currently receives ALL document nodes, not just
+    // the nodes reachable from that scene's roots. This causes unnecessary
+    // extraction (geo_data, layer_core) and storage for orphan nodes.
+    // Future: compute reachability per scene from `internal_links` + roots,
+    // then pass only reachable nodes to `new_from_snapshot`.
     let mut scenes: Vec<Scene> = Vec::new();
 
     // Helper: resolve scene root NodeIds from the scene string ID.

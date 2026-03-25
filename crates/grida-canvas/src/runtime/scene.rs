@@ -1358,6 +1358,12 @@ impl Renderer {
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Compute layout phase
+            //
+            // NOTE: We cannot auto-skip Taffy based on has_flex() alone because
+            // compute_schema_only() skips text measurement — text nodes with
+            // height=None would get height=0 and become invisible. A future
+            // optimization could use a hybrid path that skips flex computation
+            // but still measures text via the paragraph cache.
             if self.config.skip_layout {
                 // Fast path: derive layout directly from schema positions/sizes.
                 // Skips Taffy tree construction, flexbox computation, and text
