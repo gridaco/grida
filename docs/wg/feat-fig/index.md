@@ -6,7 +6,6 @@ tags:
   - wg
   - figma
   - import
-
 ---
 
 # .fig Format - `io-figma`
@@ -53,7 +52,7 @@ The following capabilities are explicitly **not** in scope:
 
 The `.fig` file format uses the Kiwi binary encoding protocol. A typical `.fig` file consists of:
 
-1. **Header** - File prelude (`"fig-kiwi"` or `"fig-jam."`) and version number
+1. **Header** - An 8-byte ASCII prelude (magic string) identifying the container, then a little-endian version `u32`. Known preludes are all exactly eight bytes: `"fig-kiwi"` (Figma design files), `"fig-jam."` (FigJam — the trailing `.` is part of the format, not punctuation), and `"fig-deck"` (deck files).
 2. **Chunk 1** - Compressed Kiwi schema definition
 3. **Chunk 2+** - Compressed scene data encoded using the schema
 
@@ -80,7 +79,6 @@ This is why we maintain the [fig.kiwi schema file](https://github.com/gridaco/gr
 ### Implementation Strategy
 
 1. **For `.fig` file import:**
-
    - Read schema from chunk 1
    - Use embedded schema to decode remaining chunks
    - More robust to schema changes
@@ -105,6 +103,22 @@ See [Kiwi Schema Glossary](./glossary/fig.kiwi.md) for detailed schema documenta
   - [fig-kiwi@PyPI](https://pypi.org/project/fig-kiwi/)
 - [Figma Inside — .fig file analysis by easylogic](https://easylogic.medium.com/7252bef141da)
 - [fig2json@GitHub / rust](https://github.com/kreako/fig2json)
+
+## Figma Deck (Slides) Import
+
+Figma's REST API does **not** expose Deck/Slides node types. They exist only in the `.fig` Kiwi binary format with the `"fig-deck"` prelude. The Kiwi schema defines `SLIDE`, `SLIDE_GRID`, `SLIDE_ROW`, and `INTERACTIVE_SLIDE_ELEMENT` node types.
+
+Grida handles these through the `iofigma.__ir` intermediate representation:
+
+| Kiwi type                            | IR type        | Grida output |
+| ------------------------------------ | -------------- | ------------ |
+| `SLIDE`, `INTERACTIVE_SLIDE_ELEMENT` | `X_SLIDE`      | container    |
+| `SLIDE_GRID`                         | `X_SLIDE_GRID` | container    |
+| `SLIDE_ROW`                          | `X_SLIDE_ROW`  | container    |
+
+All three IR types are structurally equivalent to `figrest.FrameNode` (children, fills, clips, layout) and convert to Grida containers — the same output as frames. `X_SLIDE` carries an optional `slideMetadata` bag (speaker notes, skip flag, slide numbering) for future use.
+
+Full slide semantics (presenter mode, slide indices in UI, theme maps) are out of scope; this mapping ensures FigDeck files produce a complete, visually usable scene graph without dropping slide subtrees.
 
 ## See Also
 

@@ -178,7 +178,8 @@ function FigFileImportTab({
   const parseRunIdRef = useRef(0);
 
   const validateFile = (file: File) => {
-    return file.name.toLowerCase().endsWith(".fig");
+    const name = file.name.toLowerCase();
+    return name.endsWith(".fig") || name.endsWith(".deck");
   };
 
   const handleParse = useCallback(async (file: File, runId: number) => {
@@ -258,7 +259,7 @@ function FigFileImportTab({
       setParsed(result);
       setStep("confirm");
     } catch (error) {
-      toast.error("Failed to parse .fig file");
+      toast.error("Failed to parse file");
       console.error(error);
       if (!isStale()) {
         // Mark failure to prevent repeated attempts for the same file
@@ -340,7 +341,7 @@ function FigFileImportTab({
             </div>
 
             <FileDropzone
-              accept=".fig"
+              accept=".fig,.deck"
               onFileSelected={setSelectedFile}
               buttonText="Select .fig File or Drag & Drop"
               loadingText="Processing..."

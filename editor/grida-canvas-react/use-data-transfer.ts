@@ -597,8 +597,11 @@ export function useDataTransferEventTarget() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
 
-        // Check for .fig files and show helpful message
-        if (file.name.toLowerCase().endsWith(".fig")) {
+        // Check for .fig/.deck files and show helpful message
+        if (
+          file.name.toLowerCase().endsWith(".fig") ||
+          file.name.toLowerCase().endsWith(".deck")
+        ) {
           toast.info("Use [File] > [Import Figma] to import .fig files");
           continue;
         }

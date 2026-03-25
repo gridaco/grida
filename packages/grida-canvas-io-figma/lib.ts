@@ -195,6 +195,45 @@ export namespace iofigma {
           pointCount: number;
           innerRadius: number;
         };
+
+    /**
+     * Slide node from Figma Deck (.fig with fig-deck prelude).
+     *
+     * - rest-api-spec - Not supported (Figma REST API has no Deck/Slides types)
+     * - kiwi-spec - SLIDE, INTERACTIVE_SLIDE_ELEMENT
+     *
+     * Structurally equivalent to a FrameNode (children, fills, clips, layout).
+     * INTERACTIVE_SLIDE_ELEMENT is also mapped here since it behaves as a
+     * frame-like interactive element within a slide.
+     */
+    export type SlideNodeIR = Omit<figrest.FrameNode, "type"> & {
+      type: "X_SLIDE";
+      slideMetadata?: {
+        speakerNotes?: string;
+        isSkipped?: boolean;
+        slideNumber?: string;
+      };
+    };
+
+    /**
+     * Slide grid container from Figma Deck.
+     *
+     * - rest-api-spec - Not supported
+     * - kiwi-spec - SLIDE_GRID
+     */
+    export type SlideGridNodeIR = Omit<figrest.FrameNode, "type"> & {
+      type: "X_SLIDE_GRID";
+    };
+
+    /**
+     * Slide row container from Figma Deck.
+     *
+     * - rest-api-spec - Not supported
+     * - kiwi-spec - SLIDE_ROW
+     */
+    export type SlideRowNodeIR = Omit<figrest.FrameNode, "type"> & {
+      type: "X_SLIDE_ROW";
+    };
   }
 
   export namespace restful {
@@ -1032,14 +1071,20 @@ export namespace iofigma {
         | figrest.BooleanOperationNode
         | figrest.InstanceNode
         | figrest.FrameNode
-        | figrest.GroupNode;
+        | figrest.GroupNode
+        | __ir.SlideNodeIR
+        | __ir.SlideGridNodeIR
+        | __ir.SlideRowNodeIR;
 
       type InputNode =
         | (figrest.SubcanvasNode & Partial<__ir.HasLayoutTraitIR>)
         | __ir.VectorNodeRestInput
         | __ir.VectorNodeWithVectorNetworkDataPresent
         | __ir.StarNodeWithPointsDataPresent
-        | __ir.RegularPolygonNodeWithPointsDataPresent;
+        | __ir.RegularPolygonNodeWithPointsDataPresent
+        | __ir.SlideNodeIR
+        | __ir.SlideGridNodeIR
+        | __ir.SlideRowNodeIR;
 
       export function document(
         node: InputNode,
@@ -1549,7 +1594,11 @@ export namespace iofigma {
           case "FRAME":
           // Fallback: treat COMPONENT_SET as FRAME for rendering. Grida does not yet
           // support component semantics; proper variant/swap support to be added later.
-          case "COMPONENT_SET": {
+          case "COMPONENT_SET":
+          // Slide IR types (Figma Deck) — structurally identical to frames
+          case "X_SLIDE":
+          case "X_SLIDE_GRID":
+          case "X_SLIDE_ROW": {
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -2633,6 +2682,75 @@ export namespace iofigma {
       }
 
       /**
+       * Convert Kiwi SLIDE / INTERACTIVE_SLIDE_ELEMENT to X_SLIDE IR.
+       * Reuses the same trait pipeline as frame().
+       */
+      function slide(
+        nc: figkiwi.NodeChange
+      ): __ir.SlideNodeIR | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+        return {
+          ...kiwi_is_layer_trait(nc, "FRAME"),
+          ...kiwi_blend_opacity_trait(nc),
+          ...kiwi_layout_trait(nc),
+          ...kiwi_geometry_trait(nc),
+          ...kiwi_corner_trait(nc),
+          ...kiwi_frame_clip_trait(nc),
+          ...kiwi_children_trait(),
+          ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
+          type: "X_SLIDE",
+          slideMetadata: {
+            speakerNotes: nc.slideSpeakerNotes ?? undefined,
+            isSkipped: nc.isSkippedSlide ?? undefined,
+            slideNumber: nc.slideNumber ?? undefined,
+          },
+        } as __ir.SlideNodeIR;
+      }
+
+      /**
+       * Convert Kiwi SLIDE_GRID to X_SLIDE_GRID IR.
+       */
+      function slideGrid(
+        nc: figkiwi.NodeChange
+      ): __ir.SlideGridNodeIR | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+        return {
+          ...kiwi_is_layer_trait(nc, "FRAME"),
+          ...kiwi_blend_opacity_trait(nc),
+          ...kiwi_layout_trait(nc),
+          ...kiwi_geometry_trait(nc),
+          ...kiwi_corner_trait(nc),
+          ...kiwi_frame_clip_trait(nc),
+          ...kiwi_children_trait(),
+          ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
+          type: "X_SLIDE_GRID",
+        } as __ir.SlideGridNodeIR;
+      }
+
+      /**
+       * Convert Kiwi SLIDE_ROW to X_SLIDE_ROW IR.
+       */
+      function slideRow(
+        nc: figkiwi.NodeChange
+      ): __ir.SlideRowNodeIR | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+        return {
+          ...kiwi_is_layer_trait(nc, "FRAME"),
+          ...kiwi_blend_opacity_trait(nc),
+          ...kiwi_layout_trait(nc),
+          ...kiwi_geometry_trait(nc),
+          ...kiwi_corner_trait(nc),
+          ...kiwi_frame_clip_trait(nc),
+          ...kiwi_children_trait(),
+          ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
+          type: "X_SLIDE_ROW",
+        } as __ir.SlideRowNodeIR;
+      }
+
+      /**
        * Convert NodeChange to SECTION node
        */
       function section(
@@ -2995,6 +3113,9 @@ export namespace iofigma {
         | __ir.VectorNodeWithVectorNetworkDataPresent
         | __ir.StarNodeWithPointsDataPresent
         | __ir.RegularPolygonNodeWithPointsDataPresent
+        | __ir.SlideNodeIR
+        | __ir.SlideGridNodeIR
+        | __ir.SlideRowNodeIR
         | undefined {
         if (!nodeChange.type) return undefined;
 
@@ -3026,6 +3147,13 @@ export namespace iofigma {
             return star(nodeChange);
           case "BOOLEAN_OPERATION":
             return booleanOperation(nodeChange);
+          case "SLIDE":
+          case "INTERACTIVE_SLIDE_ELEMENT":
+            return slide(nodeChange);
+          case "SLIDE_GRID":
+            return slideGrid(nodeChange);
+          case "SLIDE_ROW":
+            return slideRow(nodeChange);
           default:
             return undefined;
         }

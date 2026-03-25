@@ -12,6 +12,7 @@ function validateExt(name: string) {
   const l = name.toLowerCase();
   return (
     l.endsWith(".fig") ||
+    l.endsWith(".deck") ||
     l.endsWith(".json") ||
     l.endsWith(".json.gz") ||
     l.endsWith(".zip")
