@@ -1,5 +1,7 @@
 use super::repository::NodeRepository;
-use super::schema::{extract_layer_core, Node, NodeGeometryMixin, NodeId, NodeLayerCore, NodeRectMixin};
+use super::schema::{
+    extract_layer_core, Node, NodeGeometryMixin, NodeId, NodeLayerCore, NodeRectMixin,
+};
 use crate::cache::fast_hash::DenseNodeMap;
 use crate::cg::prelude::*;
 use math2::transform::AffineTransform;
@@ -206,7 +208,7 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             render_bounds_inflation: compute_inflation_uniform(
                 n.stroke_width,
                 n.stroke_align,
-                &super::schema::LayerEffects::default(),
+                &n.effects,
             ),
             rotation: 0.0,
         },

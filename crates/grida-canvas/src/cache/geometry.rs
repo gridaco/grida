@@ -424,7 +424,7 @@ impl GeometryCache {
                     dirty_transform: false,
                     dirty_bounds: false,
                 };
-                let bounds = local_bounds;
+                let bounds = world_bounds;
                 cache.entries.insert(*id, entry);
                 bounds
             }

@@ -203,17 +203,13 @@ impl EffectTree {
         let layer_core_map = graph.layer_core();
         let visible_child_count = all_children_slice
             .iter()
-            .filter(|cid| {
-                layer_core_map
-                    .get(cid)
-                    .map(|c| c.active)
-                    .unwrap_or(false)
-            })
+            .filter(|cid| layer_core_map.get(cid).map(|c| c.active).unwrap_or(false))
             .count();
 
         // Collect render surface reasons using layer_core for fast checks.
         // Only access full Node when effects detail is needed.
-        let reasons = Self::classify_from_core(id, &lc, visible_child_count, all_children_slice, graph);
+        let reasons =
+            Self::classify_from_core(id, &lc, visible_child_count, all_children_slice, graph);
 
         if !reasons.is_empty() {
             for reason in &reasons {
@@ -230,12 +226,7 @@ impl EffectTree {
             // Only allocate the children Vec for nodes that actually need a surface.
             let active_children: Vec<NodeId> = all_children_slice
                 .iter()
-                .filter(|cid| {
-                    layer_core_map
-                        .get(cid)
-                        .map(|c| c.active)
-                        .unwrap_or(false)
-                })
+                .filter(|cid| layer_core_map.get(cid).map(|c| c.active).unwrap_or(false))
                 .copied()
                 .collect();
 
@@ -289,7 +280,7 @@ impl EffectTree {
                     if effects.blur.as_ref().is_some_and(|b| b.active) {
                         reasons.push(RenderSurfaceReason::LayerBlur);
                     }
-                    if !effects.shadows.is_empty() {
+                    if effects.shadows.iter().any(|s| s.active()) {
                         reasons.push(RenderSurfaceReason::Shadow);
                     }
                 }
@@ -494,10 +485,7 @@ mod tests {
             crate::node::scene_graph::Parent::Root,
         );
         for _ in 0..5 {
-            graph.append_child(
-                rect_node(),
-                crate::node::scene_graph::Parent::NodeId(root),
-            );
+            graph.append_child(rect_node(), crate::node::scene_graph::Parent::NodeId(root));
         }
 
         let tree = EffectTree::build(&graph);
@@ -788,20 +776,17 @@ mod tests {
         );
 
         // Two children under each
-        graph.append_child(
-            rect_node(),
-            crate::node::scene_graph::Parent::NodeId(root),
-        );
-        graph.append_child(
-            rect_node(),
-            crate::node::scene_graph::Parent::NodeId(inner),
-        );
+        graph.append_child(rect_node(), crate::node::scene_graph::Parent::NodeId(root));
+        graph.append_child(rect_node(), crate::node::scene_graph::Parent::NodeId(inner));
 
         let tree = EffectTree::build(&graph);
 
         // Root needs surface for opacity (2 visible children: inner + rect).
         assert!(tree.needs_surface(&root));
-        assert!(tree.get(&root).unwrap().has_reason(RenderSurfaceReason::Opacity));
+        assert!(tree
+            .get(&root)
+            .unwrap()
+            .has_reason(RenderSurfaceReason::Opacity));
 
         // Inner needs surface for clip (1 visible child).
         assert!(tree.needs_surface(&inner));

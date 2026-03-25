@@ -661,7 +661,7 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn switch_scene(&mut self, scene_id: &str) {
         if let Some(pos) = self.loaded_scenes.iter().position(|(id, _)| id == scene_id) {
-            let (_, scene) = self.loaded_scenes.swap_remove(pos);
+            let (_, scene) = self.loaded_scenes[pos].clone();
             self.renderer.load_scene(scene);
             self.queue();
         } else {
@@ -1163,7 +1163,7 @@ impl UnknownTargetApplication {
         // to the previous frame. Restore it from the pan image cache and
         // skip the expensive frame-plan build + full draw.  The overlay is
         // still re-drawn below so marquee/selection visuals update correctly.
-        if !stable && !content_changed && self.renderer.blit_content_cache() {
+        if !content_changed && !camera_change.any_changed() && self.renderer.blit_content_cache() {
             // Consume the camera change (no-op here, but keeps the contract).
             self.renderer.camera.consume_change();
 
