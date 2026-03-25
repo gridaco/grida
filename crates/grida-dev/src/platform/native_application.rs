@@ -112,6 +112,10 @@ pub struct NativeApplication {
     pub(crate) modifiers: winit::keyboard::ModifiersState,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     fit_scene_on_load: bool,
+    /// Set to `true` after `CloseRequested` to prevent event processing on
+    /// a partially-torn-down application (the tick thread may still deliver
+    /// events between `event_loop.exit()` and actual termination).
+    exiting: bool,
     /// When >0, the next N ticks should request a redraw to produce a
     /// settle frame (showing "none" after a gesture ends).
     settle_countdown: u8,
@@ -203,6 +207,7 @@ impl NativeApplication {
             modifiers: winit::keyboard::ModifiersState::default(),
             file_drop_tx,
             fit_scene_on_load,
+            exiting: false,
             settle_countdown: 0,
             scenes: Vec::new(),
             scene_index: 0,
@@ -237,8 +242,13 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
         }
 
         if let WindowEvent::CloseRequested = &event {
-            self.app.renderer_mut().free();
+            self.exiting = true;
             event_loop.exit();
+            return;
+        }
+
+        if self.exiting {
+            return;
         }
 
         if let WindowEvent::Resized(size) = &event {
@@ -377,6 +387,9 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
     }
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: HostEvent) {
+        if self.exiting {
+            return;
+        }
         match event {
             HostEvent::Tick => {
                 // Poll for new scenes from the drop task.

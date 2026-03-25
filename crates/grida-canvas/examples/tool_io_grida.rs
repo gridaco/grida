@@ -296,7 +296,7 @@ fn print_scene_stats(scene: &Scene, id_map: &HashMap<NodeId, String>, verbose: b
     // Node type breakdown
     let mut type_counts: BTreeMap<&str, usize> = BTreeMap::new();
     for (node_id, node) in graph.nodes_iter() {
-        if !reachable.contains(node_id) {
+        if !reachable.contains(&node_id) {
             continue;
         }
         let label = classify_node(node);
@@ -371,19 +371,19 @@ fn run_layout_check(scene: &Scene, id_map: &HashMap<NodeId, String>) -> bool {
     let mut missing: Vec<(NodeId, String, Vec<String>)> = Vec::new();
 
     for (node_id, node) in graph.nodes_iter() {
-        if !reachable.contains(node_id) {
+        if !reachable.contains(&node_id) {
             continue;
         }
         if let Node::Container(_) = node {
-            if layout_result.get(node_id).is_none() {
+            if layout_result.get(&node_id).is_none() {
                 let string_id = id_map
-                    .get(node_id)
+                    .get(&node_id)
                     .cloned()
                     .unwrap_or_else(|| format!("{:?}", node_id));
 
-                let mut ancestor_ids: Vec<NodeId> = graph.ancestors(node_id).unwrap_or_default();
+                let mut ancestor_ids: Vec<NodeId> = graph.ancestors(&node_id).unwrap_or_default();
                 ancestor_ids.reverse();
-                ancestor_ids.push(*node_id);
+                ancestor_ids.push(node_id);
                 let path: Vec<String> = ancestor_ids
                     .iter()
                     .map(|id| {
@@ -394,7 +394,7 @@ fn run_layout_check(scene: &Scene, id_map: &HashMap<NodeId, String>) -> bool {
                     })
                     .collect();
 
-                missing.push((*node_id, string_id, path));
+                missing.push((node_id, string_id, path));
             }
         }
     }

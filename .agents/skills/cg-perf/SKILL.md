@@ -131,12 +131,23 @@ reports `min/p50/p95/p99/MAX` plus per-stage breakdown and settle cost.
 | `zoom`            | slow/fast × around-fit/high                         | Zoom oscillation at different levels                                                                               |
 | `pan_with_settle` | slow/fast × fit/zoomed                              | Pan with settle frames interleaved every 12 frames                                                                 |
 | `realtime`        | fast/slow × fit/zoomed                              | **Real-time event loop simulation** with sleep, 240Hz tick thread, and settle countdown matching the native viewer |
+| `frameloop`       | 16/50/80/120/200/300/500ms interval                 | **Real FrameLoop path** — the only bench that captures stable-frame jank during panning (see below)                |
 | `resize`          | alternating viewport sizes                          | `--resize` flag. Measures `resize()` + `redraw()` cost per cycle (layout rebuild + cache invalidation + repaint)   |
 
 The `realtime` scenarios use actual `thread::sleep()` between frames
 and simulate the native viewer's 240Hz tick thread + settle countdown.
 These produce frame timings that match what users actually see,
 including settle-induced frame drops at their natural frequency.
+
+The `frameloop` scenarios go through the actual `FrameLoop.poll()` /
+`complete()` path — the same code path as `Application::frame()`. All
+other pan/zoom scenarios bypass `FrameLoop` and call `queue_unstable()`
+directly, which means they never produce stable frames mid-interaction.
+The `frameloop` scenarios sweep scroll intervals from 16ms (fast flick)
+to 500ms (discrete clicks) and reveal how `FrameLoop`'s stable-frame
+decisions affect the frame time distribution at each speed. Use these
+when investigating panning jank, adaptive timing, or pan/zoom image
+cache behavior.
 
 **Choosing scenes:** Use `--list-scenes` to see what's available. Pick
 scenes that stress the subsystem you're optimizing. For effects/caching
@@ -174,6 +185,7 @@ of scenes, configs, and operations. The naming convention is
 | Does a config toggle actually help?           | Both GPU benchmarks + Criterion                  |
 | Does it match what users see in the app?      | `realtime` scenarios (sleep + settle simulation) |
 | Are there frame drops during gestures?        | Check `p99` and `MAX` in scenario stats          |
+| Is slow panning janky (stable frame spikes)?  | `frameloop` scenarios (real FrameLoop path)      |
 | Is resize janky?                              | Single-scene GPU bench with `--resize`           |
 
 ---
@@ -447,9 +459,19 @@ Back-to-back frame benchmarks (no sleep between frames) can produce
 misleadingly fast numbers because they never trigger settle frames.
 The native viewer's 240Hz tick thread fires `queue_stable()` ~50ms
 after the last interaction, clearing image caches. Use the `realtime`
-scenario type to simulate this timing and produce numbers that match
-what users actually see. Always check `p99` and `MAX` — not just
-`p50` — to catch settle-induced spikes.
+or `frameloop` scenario types to produce numbers that match what users
+actually see. Always check `p99` and `MAX` — not just `p50` — to
+catch settle-induced spikes.
+
+### Most benchmarks bypass FrameLoop
+
+All pan/zoom/circle/zigzag scenarios call `queue_unstable()` directly
+— they never go through `FrameLoop.poll()`. This means they never
+produce stable frames mid-interaction and cannot capture the jank
+pattern where a stable frame interrupts slow panning. Only the
+`frameloop` scenarios use the real `FrameLoop` decision path. When
+investigating panning smoothness or adaptive timing, always use the
+`frameloop` scenarios.
 
 ### Stable frames must recapture caches
 
@@ -473,3 +495,77 @@ absolute-positioned documents.
 thousands of cheap entries, the timing checks themselves can become
 significant. Use `elapsed()` checks at reasonable intervals, not every
 iteration.
+
+### `Instant::now()` is broken on emscripten
+
+Under emscripten, `Instant::now()` is effectively constant, so durations
+collapse to zero. Use `crate::sys::perf_now()` for timing: it maps to
+`emscripten_get_now()` (`performance.now()`) on WASM and `Instant` on native.
+
+### WASM/native ratios are stage-dependent
+
+WASM overhead is not a single multiplier. Roughly: simple compute is ~2-3x,
+HashMap-heavy traversals can be 10-35x, and after Vec-indexing hot paths,
+data-structure-bound stages drop to ~1-2x while compute-heavy stages stay
+~5-15x+. Measure per stage.
+
+### Data structures matter much more in WASM
+
+Large `HashMap`s (100K+ entries) may be fine on native but can be extremely
+slow in WASM due to linear memory and weaker cache behavior. Prefer dense
+Vec-indexed storage (`DenseNodeMap<V>`) for hot paths. See `cache/fast_hash.rs`.
+
+### Native profiles can mis-rank WASM bottlenecks
+
+Native profiling finds stage costs, but not WASM amplification. Example:
+native highlighted layers, while WASM was dominated by geometry because
+per-node `HashMap` costs were amplified. Confirm priorities with WASM data.
+
+---
+
+## WASM Performance
+
+WASM is the primary shipping target. Native benchmarks show the algorithmic
+ceiling; WASM benchmarks show delivered performance.
+
+See `docs/wg/feat-2d/wasm-benchmarking.md` for the full strategy and
+lessons learned. Key points:
+
+### Measurement inside WASM
+
+`load_scene` emits per-stage timing via `eprintln!` + `sys::perf_now()`.
+Read the `[load_scene]` line in browser console (stderr) for
+fonts/layout/geometry/effects/layers. This is the primary `load_scene`
+WASM measurement path today.
+
+### Three-layer benchmarking model
+
+1. **Native** (`load-bench`, Criterion): algorithmic ceiling + profiling
+2. **WASM-on-Node**: real WASM in headless/CI — **implemented**
+3. **Browser**: full pipeline (JS encode + WASM load + GPU render)
+
+WASM-on-Node benchmark:
+
+```sh
+# Build WASM first
+just --justfile crates/grida-canvas-wasm/justfile build
+
+# Run benchmark (requires fixtures/local/perf/local/yrr-main.grida for 136k test)
+cd crates/grida-canvas-wasm && npx vitest run __test__/bench-load-scene.test.ts
+```
+
+WASM-on-Node results closely match browser WASM timings, confirming it as
+a valid benchmarking layer for compute-heavy stages.
+
+### Known WASM-specific issues
+
+- **GPU-only paths** can fail only on WASM (native runs CPU backend).
+  `blit_content_cache` and overlay-only fast path both had WASM-only bugs.
+- **Large enum access** is the dominant WASM bottleneck. The `Node` enum
+  (15 variants, each hundreds of bytes) causes cache-unfriendly memory access
+  that WASM amplifies to 30×+ native cost. Fix: Struct-of-Arrays (SoA) —
+  see `docs/wg/feat-2d/wasm-load-scene-optimization.md`.
+- **Deep recursion** (`build_recursive`, `flatten_node`) is costlier in WASM
+  due to stack-frame overhead in linear memory.
+- **JS↔WASM boundary** is small for bulk calls (`switch_scene`), but JS-side
+  FlatBuffers encoding is still ~10% of pipeline cost.

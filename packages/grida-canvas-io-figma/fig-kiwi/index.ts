@@ -54,9 +54,20 @@ export { compileSchema, prettyPrintSchema } from "kiwi-schema";
 
 export type Header = { prelude: string; version: number };
 
+// First 8 bytes of a Kiwi .fig archive. Each product uses a fixed ASCII magic string;
+// FigJam's is `fig-jam.` including the trailing dot (on-wire / on-disk format).
 const FIG_KIWI_PRELUDE = "fig-kiwi";
 const FIGJAM_KIWI_PRELUDE = "fig-jam.";
+const FIGDECK_KIWI_PRELUDE = "fig-deck";
 const FIG_KIWI_VERSION = 15;
+
+function isKiwiArchivePrelude(prelude: string): boolean {
+  return (
+    prelude === FIG_KIWI_PRELUDE ||
+    prelude === FIGJAM_KIWI_PRELUDE ||
+    prelude === FIGDECK_KIWI_PRELUDE
+  );
+}
 
 const HTML_MARKERS = {
   metaStart: "<!--(figmeta)",
@@ -128,7 +139,7 @@ export class FigmaArchiveParser {
     // @ts-ignore: charCode check
     const prelude = String.fromCharCode.apply(String, preludeData);
 
-    if (prelude !== FIG_KIWI_PRELUDE && prelude !== FIGJAM_KIWI_PRELUDE) {
+    if (!isKiwiArchivePrelude(prelude)) {
       throw new Error(`Unexpected prelude: "${prelude}"`);
     }
 
@@ -273,8 +284,8 @@ export function readFigFile(data: Uint8Array): ParsedFigmaArchive {
         // Check prelude
         // @ts-ignore: charCode check
         const prelude = String.fromCharCode.apply(String, fileData.slice(0, 8));
-        return prelude === FIG_KIWI_PRELUDE || prelude === FIGJAM_KIWI_PRELUDE;
-      }) || keys.find((k) => k.endsWith(".fig"));
+        return isKiwiArchivePrelude(prelude);
+      }) || keys.find((k) => k.endsWith(".fig") || k.endsWith(".deck"));
 
     if (!mainFile) {
       throw new Error(
@@ -360,7 +371,9 @@ export async function readFigFileFromStream(
     }
     const total = buffer.reduce((s, c) => s + c.length, 0);
     if (total < 4) {
-      throw new Error("readFigFileFromStream: stream too short to detect format");
+      throw new Error(
+        "readFigFileFromStream: stream too short to detect format"
+      );
     }
     const merged = new Uint8Array(total);
     let off = 0;
@@ -381,8 +394,8 @@ export async function readFigFileFromStream(
         String,
         Array.from(fileData.slice(0, 8))
       );
-      return prelude === FIG_KIWI_PRELUDE || prelude === FIGJAM_KIWI_PRELUDE;
-    }) || keys.find((k) => k.endsWith(".fig"));
+      return isKiwiArchivePrelude(prelude);
+    }) || keys.find((k) => k.endsWith(".fig") || k.endsWith(".deck"));
 
   if (!mainFile) {
     throw new Error(

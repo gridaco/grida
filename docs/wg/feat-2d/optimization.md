@@ -983,6 +983,87 @@ Chromium uses 64 MB default with soft/hard limits.
 
 ---
 
+## Slow-Pan Smoothness (FrameLoop)
+
+Slow trackpad panning (80-120ms between scroll events) was laggier than
+fast panning — the fixed 50ms stable delay caused stable frames to fire
+between every pair of scroll events, nuking the pan image cache and forcing
+expensive full redraws.
+
+45. **Adaptive Stable Delay** ✅ IMPLEMENTED
+
+    `FrameLoop` tracks input cadence via exponential moving average and
+    extends the effective stable delay to `max(base_delay, cadence × 2.5)`.
+    During 80ms trackpad scrolling, the delay becomes ~200ms. Stable frames
+    only fire when the user truly stops interacting.
+
+    Cadence resets on session breaks (>500ms gap between events). Cadence
+    persists across stable frames (the user may still be scrolling slowly).
+
+    **Measured impact (synthetic 200-node scene, `fl_80ms` scenario):**
+
+    | Metric            | Before   | After  | Improvement |
+    | ----------------- | -------- | ------ | ----------- |
+    | Stable intrusions | 25       | 1      | -96%        |
+    | p50 frame time    | 3,025 µs | 163 µs | 18.6×       |
+
+    Implementation: `FrameLoop` in `runtime/frame_loop.rs`.
+
+46. **Pan Cache Preservation on Stable Frames** ✅ IMPLEMENTED
+
+    Stable frames no longer invalidate `pan_image_cache`. Previously,
+    `apply_changes()` and `queue()` nuked the pan cache when `stable=true`,
+    forcing the next unstable frame to do a full redraw. Since the stable
+    frame's render path recaptures the cache from every full-quality draw
+    anyway, the next unstable frame always has a fresh cache to blit from.
+
+    Implementation: removed `|| stable` from `invalidate_pan` condition in
+    both `apply_changes()` and `queue()` in `runtime/scene.rs`.
+
+47. **Fully-Visible Stable Frame Fast Path** (reverted — correctness issues)
+
+    When the viewport fully contains all scene content (`scene_envelope()`
+    containment check, O(1) via R-tree root node), the stable frame's full
+    draw path is redundant — the pan image cache already has the correct
+    pixels. The idea: blit from pan cache instead of doing an O(N) redraw.
+
+    **Why it was reverted:** Three correctness bugs in succession:
+    1. Blitting at `(0,0)` instead of the correct `(dx, dy)` offset caused
+       content to jump to the wrong position after panning stopped.
+    2. Blitting at `(dx, dy)` clips content at viewport edges — the stable
+       frame never filled in the exposed strips, leaving permanent culling
+       artifacts at max zoom-out.
+    3. Requiring `dx == dy == 0` and skipping the blit entirely (assuming
+       GPU surface persistence) caused stale back-buffer content to
+       accumulate — double-buffered GPU surfaces don't preserve content
+       across swaps.
+
+    **The idea is valid but needs a different approach:**
+    - The `scene_envelope()` utility (O(1) R-tree root AABB) is kept in
+      `cache/scene.rs` for future use.
+    - A correct implementation would need either: (a) always blit the pan
+      cache at `(0,0)` after verifying the cache was captured at the
+      current camera position (not just any position), or (b) use a
+      `last_had_data_changes` flag that is reliably set in BOTH the
+      `frame()` and legacy `redraw()` code paths.
+    - The legacy `redraw()` path does not call `apply_changes()`, so any
+      flag set there is stale. Migrating all hosts to `frame()` would
+      eliminate this dual-path problem.
+    - The `queue()` stable promotion (non-camera events → stable quality)
+      interacts badly with clamped zoom at min/max zoom limits — the zoom
+      doesn't actually change, so `camera_change == None`, causing
+      unintended stable promotion that nukes the zoom cache and forces a
+      ~100ms full redraw.
+
+    **Key files for future implementation:**
+    - `runtime/scene.rs` — `render_frame_with_plan_state()`, between the
+      pan-only cache check and the zoom cache check
+    - `cache/scene.rs` — `scene_envelope()` (already implemented)
+    - `runtime/scene.rs` — `apply_changes()` for `last_had_data_changes`
+    - `window/application.rs` — `frame()` vs `redraw()` dual-path issue
+
+---
+
 This list is designed to evolve the renderer from single-threaded mode to
 scalable, GPU-friendly real-time performance. Items are ordered roughly by
 implementation priority within each section.

@@ -184,8 +184,10 @@ async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             match ext.to_ascii_lowercase().as_str() {
                 "svg" => return scene_from_svg_path(path).map(|s| vec![s]),
-                "png" | "jpg" | "jpeg" | "webp" => {
-                    return scene_from_raster_path(path).map(|s| vec![s])
+                // Raster images should be loaded via load_raster() by the caller
+                // so bytes can be registered with the renderer.
+                ext if is_raster_ext(ext) => {
+                    return load_raster(path).map(|r| vec![r.scene])
                 }
                 _ => {}
             }
@@ -230,8 +232,26 @@ fn build_empty_scene() -> Scene {
 }
 
 async fn run_interactive(file: Option<String>) -> Result<()> {
+    // Load initial scene(s). For raster images we also capture the raw bytes
+    // so we can register them with the renderer once it's ready.
+    let mut initial_image: Option<ImageMessage> = None;
     let initial_scenes = if let Some(ref source) = file {
-        load_scenes_from_source(source).await?
+        let path = Path::new(source);
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|s| s.to_ascii_lowercase())
+            .unwrap_or_default();
+        if !is_url(source) && is_raster_ext(&ext) {
+            let raster = load_raster(path)?;
+            initial_image = Some(ImageMessage {
+                src: raster.rid,
+                data: raster.bytes,
+            });
+            vec![raster.scene]
+        } else {
+            load_scenes_from_source(source).await?
+        }
     } else {
         vec![build_empty_scene()]
     };
@@ -249,6 +269,12 @@ async fn run_interactive(file: Option<String>) -> Result<()> {
     run_demo_window_with_drop(
         first,
         move |_renderer, tx, _font_tx, proxy| {
+            // Register initial raster image bytes if present.
+            if let Some(msg) = initial_image {
+                let _ = tx.unbounded_send(msg.clone());
+                let _ = proxy.send_event(HostEvent::ImageLoaded(msg));
+            }
+
             let mut guard = drop_rx.lock().expect("drop rx mutex poisoned");
             let drop_rx = guard.take().expect("drop receiver already taken");
             start_master_drop_task(drop_rx, tx.clone(), proxy.clone(), scenes_tx);
@@ -278,34 +304,58 @@ fn scene_from_svg_path(path: &Path) -> Result<Scene> {
     })
 }
 
-fn scene_from_raster_path(path: &Path) -> Result<Scene> {
+/// Result of loading a raster image: the scene plus the raw bytes and RID
+/// so the caller can register the image with the renderer directly.
+struct RasterScene {
+    scene: Scene,
+    /// Raw image bytes read from disk.
+    bytes: Vec<u8>,
+    /// The `res://images/{hash}` RID used by the node's fill.
+    rid: String,
+}
+
+fn load_raster(path: &Path) -> Result<RasterScene> {
     use cg::cg::prelude::CGColor;
-    use cg::cg::types::ResourceRef;
+    use cg::cg::types::{Paints, ResourceRef};
     use cg::node::factory::NodeFactory;
     use cg::node::scene_graph::{Parent, SceneGraph};
     use cg::node::schema::{Node, Size};
+    use cg::resources::hash_bytes;
+
+    let bytes = std::fs::read(path)
+        .with_context(|| format!("failed to read image file {}", path.display()))?;
     let (width, height) = image_dimensions(path)
         .with_context(|| format!("failed to read image dimensions {}", path.display()))?;
-    let mut graph = SceneGraph::new();
+
+    let rid = format!("res://images/{:016x}", hash_bytes(&bytes));
+    let ref_ = ResourceRef::RID(rid.clone());
+
     let nf = NodeFactory::new();
+    let mut node = nf.create_image_node();
+    node.size = Size { width: width as f32, height: height as f32 };
+    node.image = ref_.clone();
+    node.fill.image = ref_;
+    node.strokes = Paints::default();
 
-    let mut image_node = nf.create_image_node();
-    image_node.size = Size {
-        width: width as f32,
-        height: height as f32,
-    };
-    image_node.image = ResourceRef::RID(path.to_string_lossy().into_owned());
+    let mut graph = SceneGraph::new();
+    graph.append_child(Node::Image(node), Parent::Root);
 
-    graph.append_child(Node::Image(image_node), Parent::Root);
-
-    Ok(Scene {
-        name: path
-            .file_stem()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "Image".to_string()),
-        graph,
-        background_color: Some(CGColor::from_u32(0xF8F8F8FF)),
+    Ok(RasterScene {
+        scene: Scene {
+            name: path
+                .file_stem()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "Image".to_string()),
+            graph,
+            background_color: Some(CGColor::from_u32(0xF8F8F8FF)),
+        },
+        bytes,
+        rid,
     })
+}
+
+fn is_raster_ext(ext: &str) -> bool {
+    matches!(ext, "png" | "jpg" | "jpeg" | "webp")
 }
 
 async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
@@ -318,7 +368,7 @@ async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
     match ext.as_str() {
         "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
         "svg" => scene_from_svg_path(path).map(|s| vec![s]),
-        "png" | "jpg" | "jpeg" | "webp" => scene_from_raster_path(path).map(|s| vec![s]),
+        // Raster images are handled separately in start_master_drop_task.
         other => Err(anyhow::anyhow!(
             "Unsupported dropped file type ({}): {}",
             other,
@@ -335,6 +385,37 @@ fn start_master_drop_task(
 ) {
     tokio::spawn(async move {
         while let Some(path) = drop_rx.recv().await {
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|s| s.to_ascii_lowercase())
+                .unwrap_or_default();
+
+            // Raster images: read bytes, register image, then send scene.
+            // No need to go through load_scene_images / extract_image_urls.
+            if is_raster_ext(&ext) {
+                match load_raster(&path) {
+                    Ok(raster) => {
+                        // Send image bytes so the renderer registers them.
+                        let msg = ImageMessage {
+                            src: raster.rid,
+                            data: raster.bytes,
+                        };
+                        let _ = image_tx.unbounded_send(msg.clone());
+                        let _ = proxy.send_event(HostEvent::ImageLoaded(msg));
+
+                        if scenes_tx.send(vec![raster.scene]).is_err() {
+                            eprintln!("failed to send scene to window");
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to load dropped image {}: {err}", path.display())
+                    }
+                }
+                continue;
+            }
+
+            // Non-raster files: load scenes, then resolve any embedded image refs.
             match load_master_scenes_from_path(&path).await {
                 Ok(scenes) => {
                     let scenes_for_loader = scenes.clone();

@@ -297,4 +297,84 @@ describe("FigImporter", () => {
       expect(sortedPages.length).toBe(figFile.pages.length);
     });
   });
+
+  describe("FigDeck (.deck) import", () => {
+    const deckFixture =
+      __dirname + "/../../../fixtures/test-fig/deck/light.deck";
+
+    it("should parse deck file and produce 42 slides", () => {
+      const data = readFileSync(deckFixture);
+      const figFile = FigImporter.parseFile(data);
+
+      expect(figFile.pages.length).toBe(1);
+
+      // Count X_SLIDE nodes in the converted tree
+      function countByType(node: any, type: string): number {
+        let count = node.type === type ? 1 : 0;
+        if ("children" in node && Array.isArray(node.children)) {
+          node.children.forEach((child: any) => {
+            count += countByType(child, type);
+          });
+        }
+        return count;
+      }
+
+      const page = figFile.pages[0];
+      let slideCount = 0;
+      page.rootNodes.forEach((root: any) => {
+        slideCount += countByType(root, "X_SLIDE");
+      });
+
+      expect(slideCount).toBe(42);
+    });
+
+    it("should preserve complete slide hierarchy (no dropped subtrees)", () => {
+      const data = readFileSync(deckFixture);
+      const figData = readFigFile(data);
+      const nodeChanges = figData.message.nodeChanges || [];
+
+      const canvas = nodeChanges.find(
+        (nc) => nc.type === "CANVAS" && !nc.internalOnly
+      );
+      if (!canvas?.guid) return;
+
+      const canvasGuidStr = iofigma.kiwi.guid(canvas.guid);
+      const rawCount = countKiwiDescendants(canvasGuidStr, nodeChanges);
+
+      // Count nodes with types that are intentionally unsupported (e.g. SHAPE_WITH_TEXT)
+      const unsupportedTypes = new Set(["SHAPE_WITH_TEXT"]);
+      const unsupportedCount = nodeChanges.filter(
+        (nc) => nc.type && unsupportedTypes.has(nc.type)
+      ).length;
+
+      const figFile = FigImporter.parseFile(data);
+      const page = figFile.pages[0];
+
+      let processedCount = 0;
+      page.rootNodes.forEach((rootNode: any) => {
+        processedCount += countNodes(rootNode);
+      });
+
+      // All supported nodes must be preserved — only unsupported FigJam-crossover types may be absent
+      expect(processedCount).toBe(rawCount - unsupportedCount);
+    });
+
+    it("should convert deck to Grida document without errors", () => {
+      const data = readFileSync(deckFixture);
+      const figFile = FigImporter.parseFile(data);
+      const { document: packedDoc } = FigImporter.convertPageToScene(
+        figFile.pages[0],
+        { gradient_id_generator: () => "test-id" }
+      );
+
+      expect(packedDoc.nodes).toBeDefined();
+      expect(packedDoc.scene).toBeDefined();
+      expect(packedDoc.scene.children_refs.length).toBeGreaterThan(0);
+
+      // All root IDs must exist in nodes
+      packedDoc.scene.children_refs.forEach((rootId: string) => {
+        expect(packedDoc.nodes[rootId]).toBeDefined();
+      });
+    });
+  });
 });

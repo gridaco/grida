@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 
 use math2::{box_fit::BoxFit, transform::AffineTransform};
+use rustc_hash::FxHashMap;
 
 /// Schema version emitted by the Rust FlatBuffers writer.
 ///
@@ -34,19 +35,18 @@ use crate::cg::{
     stroke_dasharray::StrokeDashArray,
     stroke_width::{RectangularStrokeWidth, SingularStrokeWidth, StrokeWidth},
     tilemode::TileMode,
-    varwidth,
     types::{
         Axis, BlendMode, BooleanPathOperation, CGPoint, ContainerClipFlag, CornerSmoothing,
         CrossAxisAlignment, DiamondGradientPaint, EdgeInsets, FontFeature, FontOpticalSizing,
         FontVariation, FontWeight, GradientStop, ImageFilters, ImagePaint, ImagePaintFit,
-        ImageRepeat, ImageTile,
-        LayerBlendMode, LayerMaskType, LayoutGap, LayoutMode, LayoutPositioning, LayoutWrap,
-        LinearGradientPaint, MainAxisAlignment, Paint, Paints, RadialGradientPaint,
-        RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign, StrokeCap, StrokeJoin,
-        StrokeMarkerPreset, StrokeMiterLimit, SweepGradientPaint, TextAlign, TextAlignVertical,
-        TextDecorationLine, TextDecorationRec, TextDecorationStyle, TextLetterSpacing,
-        TextLineHeight, TextStyleRec, TextTransform, TextWordSpacing,
+        ImageRepeat, ImageTile, LayerBlendMode, LayerMaskType, LayoutGap, LayoutMode,
+        LayoutPositioning, LayoutWrap, LinearGradientPaint, MainAxisAlignment, Paint, Paints,
+        RadialGradientPaint, RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign,
+        StrokeCap, StrokeJoin, StrokeMarkerPreset, StrokeMiterLimit, SweepGradientPaint, TextAlign,
+        TextAlignVertical, TextDecorationLine, TextDecorationRec, TextDecorationStyle,
+        TextLetterSpacing, TextLineHeight, TextStyleRec, TextTransform, TextWordSpacing,
     },
+    varwidth,
 };
 use crate::node::{
     id::NodeIdGenerator,
@@ -54,9 +54,9 @@ use crate::node::{
     schema::{
         BooleanPathOperationNodeRec, ContainerNodeRec, EllipseNodeRec, GroupNodeRec,
         InitialContainerNodeRec, LayerEffects, LayoutChildStyle, LayoutContainerStyle,
-        LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node, RectangleNodeRec,
-        RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene, Size, StrokeStyle,
-        PathNodeRec, TextSpanNodeRec, VectorNodeRec,
+        LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node, PathNodeRec,
+        RectangleNodeRec, RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene, Size,
+        StrokeStyle, TextSpanNodeRec, VectorNodeRec,
     },
 };
 use crate::vectornetwork::{
@@ -146,14 +146,16 @@ fn decode_layer_common(sys: &fbs::SystemNodeTrait<'_>, layer: &fbs::LayerTrait<'
 fn decode_shape_layout(layer: &fbs::LayerTrait<'_>, cos_sin: (f32, f32)) -> ShapeLayout {
     let layout = layer.layout();
     let (x, y) = layout.as_ref().map(decode_layout_xy).unwrap_or((0.0, 0.0));
-    let (w, h) = layout.as_ref().map(decode_dimensions).unwrap_or((None, None));
+    let (w, h) = layout
+        .as_ref()
+        .map(decode_dimensions)
+        .unwrap_or((None, None));
     let size = Size {
         width: w.unwrap_or(0.0),
         height: h.unwrap_or(0.0),
     };
     let (cos, sin) = cos_sin;
-    let transform =
-        AffineTransform::from_box_center_raw(x, y, size.width, size.height, cos, sin);
+    let transform = AffineTransform::from_box_center_raw(x, y, size.width, size.height, cos, sin);
     ShapeLayout {
         x,
         y,
@@ -232,10 +234,18 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
     }
 
     // ── 2. Decode all node slots ─────────────────────────────────────────────
+    //
+    // The decode pipeline is structured to minimize heap allocations:
+    //
+    //  Phase 2a: Decode FBS → NodeEntry (one String per ID, no cloning)
+    //  Phase 2b: Assign NodeId in the same loop → build string_to_internal_id
+    //  Phase 3:  Build children_by_parent using NodeId keys (no String cloning)
+    //  Phase 4:  Single-pass consume node_entries → node_pairs + node_names + position_map
 
     struct NodeEntry {
-        id: String,
-        parent: Option<(String, String)>, // (parent_id, fractional-index position)
+        internal_id: crate::node::id::NodeId,
+        parent_internal: Option<crate::node::id::NodeId>,
+        position: Option<String>,
         node: Node,
         name: Option<String>,
     }
@@ -247,24 +257,53 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         background_color: Option<CGColor>,
     }
 
-    let mut node_entries: Vec<NodeEntry> = Vec::new();
-    let mut scene_metas: HashMap<String, SceneMeta> = HashMap::new();
+    // Pre-allocate based on estimated node count.
+    let estimated_count = document.nodes().map(|v| v.len()).unwrap_or(0);
+    let mut string_to_internal_id: FxHashMap<String, crate::node::id::NodeId> =
+        FxHashMap::with_capacity_and_hasher(estimated_count, Default::default());
+    let mut id_generator = NodeIdGenerator::new();
+    let mut node_entries: Vec<NodeEntry> = Vec::with_capacity(estimated_count);
+    let mut scene_metas: FxHashMap<String, SceneMeta> =
+        FxHashMap::default();
 
-    /// Helper macro: every layer-bearing node type follows the same pattern of
-    /// extracting `sys`, `layer`, `id`, `parent` from the slot, then calling a
-    /// decoder.  This macro eliminates that boilerplate and makes it impossible
-    /// to forget any step.
+    // Helper: get or assign an internal NodeId for a string ID.
+    // Uses the shared id_generator and string_to_internal_id map.
+    let mut get_or_assign_id = |s: String| -> crate::node::id::NodeId {
+        *string_to_internal_id
+            .entry(s)
+            .or_insert_with(|| id_generator.next())
+    };
+
+    /// Helper macro: decode a layer-bearing node. Assigns internal IDs
+    /// immediately during the hot loop — no deferred string cloning needed.
     macro_rules! decode_layer_node {
         ($slot:expr, $accessor:ident, $decode_fn:expr) => {
             if let Some(typed) = $slot.$accessor() {
                 let sys = typed.node();
                 let layer = typed.layer();
-                let id = sys.id().id().to_owned();
+                let string_id = sys.id().id().to_owned();
                 let name = sys.name().map(|s| s.to_owned());
-                let parent = decode_parent_ref(&layer);
+                let (parent_internal, position) = {
+                    let parent_ref = layer.parent();
+                    let parent_str = parent_ref.parent_id().id();
+                    if parent_str.is_empty() {
+                        (None, None)
+                    } else {
+                        let parent_nid = get_or_assign_id(parent_str.to_owned());
+                        let pos = parent_ref.position().unwrap_or("").to_owned();
+                        (Some(parent_nid), Some(pos))
+                    }
+                };
+                let internal_id = get_or_assign_id(string_id);
                 let lc = decode_layer_common(&sys, &layer);
                 let node = $decode_fn(&lc, &layer, &typed);
-                node_entries.push(NodeEntry { id, parent, node, name });
+                node_entries.push(NodeEntry {
+                    internal_id,
+                    parent_internal,
+                    position,
+                    node,
+                    name,
+                });
             }
         };
     }
@@ -278,9 +317,8 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                         let sys = sn.node();
                         let id = sys.id().id().to_owned();
                         let name = sys.name().unwrap_or("").to_owned();
-                        let bg = sn
-                            .scene_background_color()
-                            .map(decode_rgba32f_to_cg_color);
+                        let bg = sn.scene_background_color().map(decode_rgba32f_to_cg_color);
+                        get_or_assign_id(id.clone());
                         scene_metas.insert(
                             id.clone(),
                             SceneMeta {
@@ -331,97 +369,126 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         }
     }
 
-    // ── 3. Build ID mapping (string → internal NodeId) ───────────────────────
-    let mut string_to_internal_id: HashMap<String, crate::node::id::NodeId> = HashMap::new();
-    let mut id_generator = NodeIdGenerator::new();
-
+    // ── 3. Build children_by_parent using NodeId keys (no String cloning) ────
+    //
+    // Previously this was HashMap<String, Vec<(String, String)>> which cloned
+    // every node ID and position string. Now uses u64 NodeId keys directly.
+    let mut children_by_parent: FxHashMap<
+        crate::node::id::NodeId,
+        Vec<(crate::node::id::NodeId, &str)>,
+    > = FxHashMap::with_capacity_and_hasher(estimated_count / 4, Default::default());
     for e in &node_entries {
-        string_to_internal_id
-            .entry(e.id.clone())
-            .or_insert_with(|| id_generator.next());
-    }
-    for (sid, _) in &scene_metas {
-        string_to_internal_id
-            .entry(sid.clone())
-            .or_insert_with(|| id_generator.next());
-    }
-
-    let get_id = |s: &String| string_to_internal_id.get(s).copied();
-
-    // ── 4. Build children_by_parent (sorted by fractional index) ─────────────
-    let mut children_by_parent: HashMap<String, Vec<(String, String)>> = HashMap::new();
-    for e in &node_entries {
-        if let Some((parent_id, position)) = &e.parent {
+        if let Some(parent_nid) = e.parent_internal {
+            let pos = e.position.as_deref().unwrap_or("");
             children_by_parent
-                .entry(parent_id.clone())
+                .entry(parent_nid)
                 .or_default()
-                .push((e.id.clone(), position.clone()));
+                .push((e.internal_id, pos));
         }
     }
     for children in children_by_parent.values_mut() {
         children.sort_by(|a, b| a.1.cmp(&b.1));
     }
 
-    let node_pairs: Vec<_> = node_entries
-        .iter()
-        .filter_map(|e| Some((get_id(&e.id)?, e.node.clone())))
-        .collect();
-
-    let node_names: Vec<_> = node_entries
-        .iter()
-        .filter_map(|e| {
-            let id = get_id(&e.id)?;
-            let name = e.name.clone()?;
-            Some((id, name))
-        })
-        .collect();
-
+    // Build internal_links from children_by_parent BEFORE consuming
+    // node_entries, since children_by_parent borrows &str from node_entries.
     let internal_links: HashMap<_, Vec<_>> = children_by_parent
-        .iter()
-        .filter_map(|(parent_str, children)| {
-            let parent_internal = get_id(parent_str)?;
-            let child_internals: Vec<_> = children
-                .iter()
-                .filter_map(|(child_str, _)| get_id(child_str))
+        .into_iter()
+        .map(|(parent_nid, children)| {
+            let child_ids: Vec<_> = children
+                .into_iter()
+                .map(|(child_nid, _)| child_nid)
                 .collect();
-            if child_internals.is_empty() {
-                None
-            } else {
-                Some((parent_internal, child_internals))
-            }
+            (parent_nid, child_ids)
         })
         .collect();
+
+    // ── 4. Single-pass consume: node_pairs + node_names + position_map ───────
+    //
+    // Moves nodes out of node_entries — no cloning of Node enums.
+    let mut node_pairs: Vec<(crate::node::id::NodeId, Node)> =
+        Vec::with_capacity(node_entries.len());
+    let mut node_names: Vec<(crate::node::id::NodeId, String)> = Vec::new();
+    let mut position_map: FxHashMap<crate::node::id::NodeId, String> =
+        FxHashMap::with_capacity_and_hasher(node_entries.len(), Default::default());
+
+    for e in node_entries.into_iter() {
+        if let Some(pos) = e.position {
+            position_map.insert(e.internal_id, pos);
+        }
+        if let Some(name) = e.name {
+            node_names.push((e.internal_id, name));
+        }
+        node_pairs.push((e.internal_id, e.node));
+    }
 
     // ── 5. Produce one Scene per listed scene id ──────────────────────────────
+    //
+    // For each scene we need a SceneGraph built from the full node set.
+    // The last scene consumes node_pairs/internal_links by move to avoid
+    // a deep clone of all Node enums. Earlier scenes (multi-scene files)
+    // must clone. Single-scene files (the common case) get zero clones.
+    //
+    // TODO: Each SceneGraph currently receives ALL document nodes, not just
+    // the nodes reachable from that scene's roots. This causes unnecessary
+    // extraction (geo_data, layer_core) and storage for orphan nodes.
+    // Future: compute reachability per scene from `internal_links` + roots,
+    // then pass only reachable nodes to `new_from_snapshot`.
     let mut scenes: Vec<Scene> = Vec::new();
 
-    let iter: Box<dyn Iterator<Item = &String>> = if !scene_ids_ordered.is_empty() {
-        Box::new(scene_ids_ordered.iter())
-    } else {
-        Box::new(scene_metas.keys())
+    // Helper: resolve scene root NodeIds from the scene string ID.
+    let get_scene_roots = |scene_str: &str| -> Vec<crate::node::id::NodeId> {
+        let scene_nid = string_to_internal_id.get(scene_str).copied();
+        scene_nid
+            .and_then(|nid| internal_links.get(&nid))
+            .cloned()
+            .unwrap_or_default()
     };
 
-    for scene_id_str in iter {
-        let meta = scene_metas.get(scene_id_str);
+    let scene_id_strs: Vec<&String> = if !scene_ids_ordered.is_empty() {
+        scene_ids_ordered.iter().collect()
+    } else {
+        scene_metas.keys().collect()
+    };
+    let scene_count = scene_id_strs.len();
+
+    // Handle all scenes except the last one (if multi-scene) with clones.
+    if scene_count > 1 {
+        for scene_id_str in &scene_id_strs[..scene_count - 1] {
+            let meta = scene_metas.get(*scene_id_str);
+            let name = meta.map(|m| m.name.clone()).unwrap_or_default();
+            let background_color = meta.and_then(|m| m.background_color);
+
+            let roots_internal = get_scene_roots(scene_id_str);
+
+            let mut graph = SceneGraph::new_from_snapshot(
+                node_pairs.clone(),
+                internal_links.clone(),
+                roots_internal,
+            );
+
+            for (id, name) in &node_names {
+                graph.set_name(*id, name.clone());
+            }
+
+            scenes.push(Scene {
+                name,
+                graph,
+                background_color,
+            });
+        }
+    }
+
+    // Handle the last (or only) scene by consuming node_pairs — zero clones.
+    if let Some(scene_id_str) = scene_id_strs.last() {
+        let meta = scene_metas.get(*scene_id_str);
         let name = meta.map(|m| m.name.clone()).unwrap_or_default();
         let background_color = meta.and_then(|m| m.background_color);
 
-        let roots_strings = children_by_parent
-            .get(scene_id_str)
-            .cloned()
-            .unwrap_or_default();
-        let roots_internal: Vec<_> = roots_strings
-            .iter()
-            .filter_map(|(child_str, _)| get_id(child_str))
-            .collect();
+        let roots_internal = get_scene_roots(scene_id_str);
 
-        let mut graph = SceneGraph::new_from_snapshot(
-            node_pairs.clone(),
-            internal_links.clone(),
-            roots_internal,
-        );
+        let mut graph = SceneGraph::new_from_snapshot(node_pairs, internal_links, roots_internal);
 
-        // Preserve node display names
         for (id, name) in &node_names {
             graph.set_name(*id, name.clone());
         }
@@ -439,22 +506,11 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         .map(|(s, &nid)| (nid, s.clone()))
         .collect();
 
-    // Build the position map (internal NodeId → original position string)
-    // so the encoder can preserve child ordering exactly.
-    let mut position_map: HashMap<crate::node::id::NodeId, String> = HashMap::new();
-    for e in &node_entries {
-        if let Some((_parent_id, position)) = &e.parent {
-            if let Some(&nid) = string_to_internal_id.get(&e.id) {
-                position_map.insert(nid, position.clone());
-            }
-        }
-    }
-
     Ok(DecodeResult {
         scenes,
         id_map,
         scene_ids: scene_ids_ordered,
-        position_map,
+        position_map: position_map.into_iter().collect(),
     })
 }
 
@@ -462,15 +518,8 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
 // Hierarchy helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn decode_parent_ref(layer: &fbs::LayerTrait<'_>) -> Option<(String, String)> {
-    let parent_ref = layer.parent();
-    let parent_id = parent_ref.parent_id().id().to_owned();
-    if parent_id.is_empty() {
-        return None;
-    }
-    let position = parent_ref.position().unwrap_or("").to_owned();
-    Some((parent_id, position))
-}
+// decode_parent_ref removed — parent decoding is now inline in the
+// decode_layer_node! macro using get_or_assign_id for zero-clone IDs.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Color helpers
@@ -665,15 +714,18 @@ fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
                 fit,
                 opacity: ip.opacity(),
                 blend_mode: decode_blend_mode(ip.blend_mode()),
-                filters: ip.filters().map(|f| ImageFilters {
-                    exposure: f.exposure(),
-                    contrast: f.contrast(),
-                    saturation: f.saturation(),
-                    temperature: f.temperature(),
-                    tint: f.tint(),
-                    highlights: f.highlights(),
-                    shadows: f.shadows(),
-                }).unwrap_or_default(),
+                filters: ip
+                    .filters()
+                    .map(|f| ImageFilters {
+                        exposure: f.exposure(),
+                        contrast: f.contrast(),
+                        saturation: f.saturation(),
+                        temperature: f.temperature(),
+                        tint: f.tint(),
+                        highlights: f.highlights(),
+                        shadows: f.shadows(),
+                    })
+                    .unwrap_or_default(),
             }))
         }
         _ => None,
@@ -864,26 +916,62 @@ fn decode_fe_shadow(s: &fbs::FeShadow<'_>) -> FeShadow {
         dy: s.dy(),
         blur: s.blur(),
         spread: s.spread(),
-        color: s.color().map(decode_rgba32f_to_cg_color).unwrap_or(CGColor { r: 0, g: 0, b: 0, a: 64 }),
+        color: s
+            .color()
+            .map(decode_rgba32f_to_cg_color)
+            .unwrap_or(CGColor {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 64,
+            }),
         active: s.active(),
     }
 }
 
 fn decode_fe_noise(ne: &fbs::FeNoiseEffect<'_>) -> FeNoiseEffect {
-    const DEFAULT_MONO: CGColor = CGColor { r: 0, g: 0, b: 0, a: 64 };
-    let default_mono = || NoiseEffectColors::Mono { color: DEFAULT_MONO };
+    const DEFAULT_MONO: CGColor = CGColor {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 64,
+    };
+    let default_mono = || NoiseEffectColors::Mono {
+        color: DEFAULT_MONO,
+    };
 
     let coloring = ne
         .coloring()
         .map(|c| match c.kind() {
             fbs::NoiseEffectColorsKind::Mono => NoiseEffectColors::Mono {
-                color: c.mono_color().map(decode_rgba32f_to_cg_color).unwrap_or(DEFAULT_MONO),
+                color: c
+                    .mono_color()
+                    .map(decode_rgba32f_to_cg_color)
+                    .unwrap_or(DEFAULT_MONO),
             },
             fbs::NoiseEffectColorsKind::Duo => NoiseEffectColors::Duo {
-                color1: c.duo_color1().map(decode_rgba32f_to_cg_color).unwrap_or(CGColor { r: 0, g: 0, b: 0, a: 128 }),
-                color2: c.duo_color2().map(decode_rgba32f_to_cg_color).unwrap_or(CGColor { r: 255, g: 255, b: 255, a: 128 }),
+                color1: c
+                    .duo_color1()
+                    .map(decode_rgba32f_to_cg_color)
+                    .unwrap_or(CGColor {
+                        r: 0,
+                        g: 0,
+                        b: 0,
+                        a: 128,
+                    }),
+                color2: c
+                    .duo_color2()
+                    .map(decode_rgba32f_to_cg_color)
+                    .unwrap_or(CGColor {
+                        r: 255,
+                        g: 255,
+                        b: 255,
+                        a: 128,
+                    }),
             },
-            fbs::NoiseEffectColorsKind::Multi => NoiseEffectColors::Multi { opacity: c.multi_opacity() },
+            fbs::NoiseEffectColorsKind::Multi => NoiseEffectColors::Multi {
+                opacity: c.multi_opacity(),
+            },
             _ => default_mono(),
         })
         .unwrap_or_else(default_mono);
@@ -1022,7 +1110,9 @@ fn decode_rectangular_stroke_geometry(
 // Corner radius / smoothing
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn decode_corner_radius(cr: Option<fbs::RectangularCornerRadiusTrait<'_>>) -> RectangularCornerRadius {
+fn decode_corner_radius(
+    cr: Option<fbs::RectangularCornerRadiusTrait<'_>>,
+) -> RectangularCornerRadius {
     use crate::cg::types::Radius;
     match cr.and_then(|t| t.rectangular_corner_radius()) {
         Some(rcr) => RectangularCornerRadius {
@@ -1245,7 +1335,14 @@ fn decode_vector_network(vnd: Option<fbs::VectorNetworkData<'_>>) -> VectorNetwo
 
     let vertices: Vec<(f32, f32)> = vnd
         .vertices()
-        .map(|v| (0..v.len()).map(|i| { let p = v.get(i); (p.x(), p.y()) }).collect())
+        .map(|v| {
+            (0..v.len())
+                .map(|i| {
+                    let p = v.get(i);
+                    (p.x(), p.y())
+                })
+                .collect()
+        })
         .unwrap_or_default();
 
     let segments: Vec<VectorNetworkSegment> = vnd
@@ -1347,9 +1444,18 @@ fn decode_container_node(
     cn: &fbs::ContainerNode<'_>,
 ) -> Node {
     let layout = layer.layout();
-    let position = layout.as_ref().map(decode_layout_position).unwrap_or_default();
-    let layout_container = layout.as_ref().map(decode_layout_container_style).unwrap_or_default();
-    let layout_dimensions = layout.as_ref().map(decode_layout_dimension_style).unwrap_or_default();
+    let position = layout
+        .as_ref()
+        .map(decode_layout_position)
+        .unwrap_or_default();
+    let layout_container = layout
+        .as_ref()
+        .map(decode_layout_container_style)
+        .unwrap_or_default();
+    let layout_dimensions = layout
+        .as_ref()
+        .map(decode_layout_dimension_style)
+        .unwrap_or_default();
     let (stroke_style, stroke_width) = decode_rectangular_stroke_geometry(cn.stroke_geometry());
 
     Node::Container(ContainerNodeRec {
@@ -1379,14 +1485,21 @@ fn decode_initial_container_node(
     _icn: &fbs::InitialContainerNode<'_>,
 ) -> Node {
     let layout = layer.layout();
-    let lcs = layout.as_ref().map(decode_layout_container_style).unwrap_or_default();
+    let lcs = layout
+        .as_ref()
+        .map(decode_layout_container_style)
+        .unwrap_or_default();
     Node::InitialContainer(InitialContainerNodeRec {
         active: lc.active,
         layout_mode: lcs.layout_mode,
         layout_direction: lcs.layout_direction,
         layout_wrap: lcs.layout_wrap.unwrap_or(LayoutWrap::NoWrap),
-        layout_main_axis_alignment: lcs.layout_main_axis_alignment.unwrap_or(MainAxisAlignment::Start),
-        layout_cross_axis_alignment: lcs.layout_cross_axis_alignment.unwrap_or(CrossAxisAlignment::Start),
+        layout_main_axis_alignment: lcs
+            .layout_main_axis_alignment
+            .unwrap_or(MainAxisAlignment::Start),
+        layout_cross_axis_alignment: lcs
+            .layout_cross_axis_alignment
+            .unwrap_or(CrossAxisAlignment::Start),
         padding: lcs.layout_padding.unwrap_or_default(),
         layout_gap: lcs.layout_gap.unwrap_or(LayoutGap {
             main_axis_gap: 0.0,
@@ -1418,7 +1531,12 @@ fn decode_basic_shape_node(
             }
         } else {
             let r = Radius::circular(bsn.corner_radius());
-            RectangularCornerRadius { tl: r, tr: r, bl: r, br: r }
+            RectangularCornerRadius {
+                tl: r,
+                tr: r,
+                bl: r,
+                br: r,
+            }
         }
     };
     let stroke_style = decode_stroke_style_from_fbs(bsn.stroke_style());
@@ -1444,11 +1562,17 @@ fn decode_basic_shape_node(
                     let bottom = rsw.stroke_bottom_width();
                     let left = rsw.stroke_left_width();
                     if top == right && right == bottom && bottom == left {
-                        if top == 0.0 { StrokeWidth::None } else { StrokeWidth::Uniform(top) }
+                        if top == 0.0 {
+                            StrokeWidth::None
+                        } else {
+                            StrokeWidth::Uniform(top)
+                        }
                     } else {
                         StrokeWidth::Rectangular(RectangularStrokeWidth {
-                            stroke_top_width: top, stroke_right_width: right,
-                            stroke_bottom_width: bottom, stroke_left_width: left,
+                            stroke_top_width: top,
+                            stroke_right_width: right,
+                            stroke_bottom_width: bottom,
+                            stroke_left_width: left,
                         })
                     }
                 } else if stroke_width_f32 == 0.0 {
@@ -1493,7 +1617,11 @@ fn decode_basic_shape_node(
                 angle,
                 corner_radius: {
                     let cr = bsn.corner_radius();
-                    if cr == 0.0 { None } else { Some(cr) }
+                    if cr == 0.0 {
+                        None
+                    } else {
+                        Some(cr)
+                    }
                 },
                 effects: lc.effects.clone(),
                 layout_child: lc.layout_child.clone(),
@@ -1585,7 +1713,11 @@ fn decode_vector_node(
         mask: lc.mask,
         transform: sl.transform,
         network: decode_vector_network(vn.vector_network_data()),
-        corner_radius: vn.corner_radius().and_then(|cr| cr.corner_radius()).map(|r| r.rx()).unwrap_or(0.0),
+        corner_radius: vn
+            .corner_radius()
+            .and_then(|cr| cr.corner_radius())
+            .map(|r| r.rx())
+            .unwrap_or(0.0),
         fills: decode_paints_vec(vn.fill_paints()),
         strokes: decode_paints_vec(vn.stroke_paints()),
         stroke_width: stroke_width_f32,
@@ -1602,11 +1734,7 @@ fn decode_vector_node(
     })
 }
 
-fn decode_path_node(
-    lc: &LayerCommon,
-    layer: &fbs::LayerTrait<'_>,
-    pn: &fbs::PathNode<'_>,
-) -> Node {
+fn decode_path_node(lc: &LayerCommon, layer: &fbs::LayerTrait<'_>, pn: &fbs::PathNode<'_>) -> Node {
     let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
     let (stroke_style, stroke_width_f32, _stroke_width_profile) =
         decode_stroke_geometry_trait(pn.stroke_geometry());
@@ -1627,11 +1755,7 @@ fn decode_path_node(
     })
 }
 
-fn decode_line_node(
-    lc: &LayerCommon,
-    layer: &fbs::LayerTrait<'_>,
-    ln: &fbs::LineNode<'_>,
-) -> Node {
+fn decode_line_node(lc: &LayerCommon, layer: &fbs::LayerTrait<'_>, ln: &fbs::LineNode<'_>) -> Node {
     let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
     let sg = ln.stroke_geometry();
     let stroke_width = sg.as_ref().map(|s| s.stroke_width()).unwrap_or(0.0);
@@ -1645,14 +1769,11 @@ fn decode_line_node(
         .and_then(|s| s.stroke_style())
         .map(|ss| StrokeMiterLimit(ss.stroke_miter_limit()))
         .unwrap_or_default();
-    let stroke_dash_array = sg
-        .as_ref()
-        .and_then(|s| s.stroke_style())
-        .and_then(|ss| {
-            ss.stroke_dash_array()
-                .filter(|v| v.len() > 0)
-                .map(|v| StrokeDashArray((0..v.len()).map(|i| v.get(i)).collect()))
-        });
+    let stroke_dash_array = sg.as_ref().and_then(|s| s.stroke_style()).and_then(|ss| {
+        ss.stroke_dash_array()
+            .filter(|v| v.len() > 0)
+            .map(|v| StrokeDashArray((0..v.len()).map(|i| v.get(i)).collect()))
+    });
 
     // Lines use translation + rotation (no center-origin) and height=0.
     // Use raw cos/sin to avoid lossy degree conversion.
@@ -1752,50 +1873,72 @@ fn decode_text_span_node(
                 .unwrap_or(FontOpticalSizing::Auto);
             rec.text_decoration = ts.text_decoration().map(|td| TextDecorationRec {
                 text_decoration_line: decode_text_decoration_line(td.text_decoration_line()),
-                text_decoration_color: td.text_decoration_color().map(|c| decode_rgba32f_to_cg_color(c)),
-                text_decoration_style: Some(decode_text_decoration_style(td.text_decoration_style())),
+                text_decoration_color: td
+                    .text_decoration_color()
+                    .map(|c| decode_rgba32f_to_cg_color(c)),
+                text_decoration_style: Some(decode_text_decoration_style(
+                    td.text_decoration_style(),
+                )),
                 text_decoration_skip_ink: Some(td.text_decoration_skip_ink()),
                 text_decoration_thickness: {
                     let t = td.text_decoration_thickness();
-                    if t == 0.0 { None } else { Some(t) }
+                    if t == 0.0 {
+                        None
+                    } else {
+                        Some(t)
+                    }
                 },
             });
-            rec.letter_spacing = ts.letter_spacing().map(|td| {
-                match td.kind() {
-                    fbs::TextDimensionKind::Factor => TextLetterSpacing::Factor(td.value().unwrap_or(0.0)),
+            rec.letter_spacing = ts
+                .letter_spacing()
+                .map(|td| match td.kind() {
+                    fbs::TextDimensionKind::Factor => {
+                        TextLetterSpacing::Factor(td.value().unwrap_or(0.0))
+                    }
                     _ => TextLetterSpacing::Fixed(td.value().unwrap_or(0.0)),
-                }
-            }).unwrap_or_default();
-            rec.word_spacing = ts.word_spacing().map(|td| {
-                match td.kind() {
-                    fbs::TextDimensionKind::Factor => TextWordSpacing::Factor(td.value().unwrap_or(0.0)),
+                })
+                .unwrap_or_default();
+            rec.word_spacing = ts
+                .word_spacing()
+                .map(|td| match td.kind() {
+                    fbs::TextDimensionKind::Factor => {
+                        TextWordSpacing::Factor(td.value().unwrap_or(0.0))
+                    }
                     _ => TextWordSpacing::Fixed(td.value().unwrap_or(0.0)),
-                }
-            }).unwrap_or_default();
-            rec.line_height = ts.line_height().map(|td| {
-                match td.kind() {
+                })
+                .unwrap_or_default();
+            rec.line_height = ts
+                .line_height()
+                .map(|td| match td.kind() {
                     fbs::TextDimensionKind::Normal => TextLineHeight::Normal,
-                    fbs::TextDimensionKind::Factor => TextLineHeight::Factor(td.value().unwrap_or(1.0)),
+                    fbs::TextDimensionKind::Factor => {
+                        TextLineHeight::Factor(td.value().unwrap_or(1.0))
+                    }
                     _ => TextLineHeight::Fixed(td.value().unwrap_or(0.0)),
-                }
-            }).unwrap_or_default();
+                })
+                .unwrap_or_default();
             rec.font_features = ts.font_features().map(|ff| {
-                (0..ff.len()).filter_map(|i| {
-                    let f = ff.get(i);
-                    f.open_type_feature_tag().map(|tag| FontFeature {
-                        tag: String::from_utf8_lossy(&[tag.a(), tag.b(), tag.c(), tag.d()]).into_owned(),
-                        value: f.open_type_feature_value(),
+                (0..ff.len())
+                    .filter_map(|i| {
+                        let f = ff.get(i);
+                        f.open_type_feature_tag().map(|tag| FontFeature {
+                            tag: String::from_utf8_lossy(&[tag.a(), tag.b(), tag.c(), tag.d()])
+                                .into_owned(),
+                            value: f.open_type_feature_value(),
+                        })
                     })
-                }).collect()
+                    .collect()
             });
             rec.font_variations = ts.font_variations().map(|fv| {
-                (0..fv.len()).map(|i| {
-                    let v = fv.get(i);
-                    FontVariation {
-                        axis: v.variation_axis().to_owned(),
-                        value: v.variation_value(),
-                    }
-                }).collect()
+                (0..fv.len())
+                    .map(|i| {
+                        let v = fv.get(i);
+                        FontVariation {
+                            axis: v.variation_axis().to_owned(),
+                            value: v.variation_value(),
+                        }
+                    })
+                    .collect()
             });
             rec
         })
@@ -1841,8 +1984,17 @@ fn decode_text_span_node(
         text_style,
         text_align,
         text_align_vertical,
-        max_lines: props.as_ref().map(|p| p.max_lines()).and_then(|v| if v == 0 { None } else { Some(v as usize) }),
-        ellipsis: props.as_ref().and_then(|p| p.ellipsis()).map(|s| s.to_owned()),
+        max_lines: props.as_ref().map(|p| p.max_lines()).and_then(|v| {
+            if v == 0 {
+                None
+            } else {
+                Some(v as usize)
+            }
+        }),
+        ellipsis: props
+            .as_ref()
+            .and_then(|p| p.ellipsis())
+            .map(|s| s.to_owned()),
         fills: fill_paints,
         strokes: stroke_paints,
         stroke_width,
@@ -1906,7 +2058,9 @@ pub fn encode(
     let scene_id_str = fbb.create_string(scene_id);
     let scene_nid = fbs::NodeIdentifier::create(
         &mut fbb,
-        &fbs::NodeIdentifierArgs { id: Some(scene_id_str) },
+        &fbs::NodeIdentifierArgs {
+            id: Some(scene_id_str),
+        },
     );
     let scenes_vec = fbb.create_vector(&[scene_nid]);
 
@@ -1924,7 +2078,9 @@ pub fn encode(
     // ── 5. Build GridaFile root ─────────────────────────────────────────────
     let root = fbs::GridaFile::create(
         &mut fbb,
-        &fbs::GridaFileArgs { document: Some(doc) },
+        &fbs::GridaFileArgs {
+            document: Some(doc),
+        },
     );
 
     fbb.finish(root, Some("GRID"));
@@ -1990,7 +2146,9 @@ pub fn encode_multi(
     );
     let root = fbs::GridaFile::create(
         &mut fbb,
-        &fbs::GridaFileArgs { document: Some(doc) },
+        &fbs::GridaFileArgs {
+            document: Some(doc),
+        },
     );
     fbb.finish(root, Some("GRID"));
     fbb.finished_data().to_vec()
@@ -2085,11 +2243,14 @@ fn encode_scene_node<'a, A: flatbuffers::Allocator + 'a>(
 
     let bg = scene.background_color.map(|c| encode_color_to_rgba32f(&c));
 
-    let sn = fbs::SceneNode::create(fbb, &fbs::SceneNodeArgs {
-        node: Some(sys),
-        scene_background_color: bg.as_ref(),
-        ..Default::default()
-    });
+    let sn = fbs::SceneNode::create(
+        fbb,
+        &fbs::SceneNodeArgs {
+            node: Some(sys),
+            scene_background_color: bg.as_ref(),
+            ..Default::default()
+        },
+    );
 
     make_node_slot(fbb, fbs::Node::SceneNode, sn.as_union_value())
 }
@@ -2215,8 +2376,12 @@ fn encode_layer_trait<'a, A: flatbuffers::Allocator + 'a>(
 ) -> flatbuffers::WIPOffset<fbs::LayerTrait<'a>> {
     // Parent reference
     let parent_id_str = fbb.create_string(input.parent_id);
-    let parent_nid =
-        fbs::NodeIdentifier::create(fbb, &fbs::NodeIdentifierArgs { id: Some(parent_id_str) });
+    let parent_nid = fbs::NodeIdentifier::create(
+        fbb,
+        &fbs::NodeIdentifierArgs {
+            id: Some(parent_id_str),
+        },
+    );
     let pos_str = fbb.create_string(input.position);
     let parent_ref = fbs::ParentReference::create(
         fbb,
@@ -2306,7 +2471,10 @@ fn encode_layer_blend_mode(lbm: LayerBlendMode) -> fbs::LayerBlendMode {
 fn encode_mask_type<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     mask: Option<LayerMaskType>,
-) -> (fbs::LayerMaskType, Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>) {
+) -> (
+    fbs::LayerMaskType,
+    Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+) {
     match mask {
         None => (fbs::LayerMaskType::NONE, None),
         Some(LayerMaskType::Image(imt)) => {
@@ -2326,10 +2494,7 @@ fn encode_mask_type<'a, A: flatbuffers::Allocator + 'a>(
             )
         }
         Some(LayerMaskType::Geometry) => {
-            let table = fbs::LayerMaskTypeGeometry::create(
-                fbb,
-                &fbs::LayerMaskTypeGeometryArgs {},
-            );
+            let table = fbs::LayerMaskTypeGeometry::create(fbb, &fbs::LayerMaskTypeGeometryArgs {});
             (
                 fbs::LayerMaskType::LayerMaskTypeGeometry,
                 Some(table.as_union_value()),
@@ -2345,7 +2510,11 @@ fn encode_mask_type<'a, A: flatbuffers::Allocator + 'a>(
 fn encode_paints<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     paints: &Paints,
-) -> Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<fbs::PaintStackItem<'a>>>>> {
+) -> Option<
+    flatbuffers::WIPOffset<
+        flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<fbs::PaintStackItem<'a>>>,
+    >,
+> {
     if paints.is_empty() {
         return None;
     }
@@ -2364,118 +2533,166 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
     match paint {
         Paint::Solid(sp) => {
             let color = encode_color_to_rgba32f(&sp.color);
-            let solid = fbs::SolidPaint::create(fbb, &fbs::SolidPaintArgs {
-                active: sp.active,
-                color: Some(&color),
-                blend_mode: encode_blend_mode(sp.blend_mode),
-            });
-            Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
-                paint_type: fbs::Paint::SolidPaint,
-                paint: Some(solid.as_union_value()),
-            }))
+            let solid = fbs::SolidPaint::create(
+                fbb,
+                &fbs::SolidPaintArgs {
+                    active: sp.active,
+                    color: Some(&color),
+                    blend_mode: encode_blend_mode(sp.blend_mode),
+                },
+            );
+            Some(fbs::PaintStackItem::create(
+                fbb,
+                &fbs::PaintStackItemArgs {
+                    paint_type: fbs::Paint::SolidPaint,
+                    paint: Some(solid.as_union_value()),
+                },
+            ))
         }
         Paint::LinearGradient(lg) => {
             let stops = encode_gradient_stops(fbb, &lg.stops);
             let xy1 = fbs::Alignment::new(lg.xy1.0, lg.xy1.1);
             let xy2 = fbs::Alignment::new(lg.xy2.0, lg.xy2.1);
             let transform = encode_affine_to_cg_transform(&lg.transform);
-            let lgp = fbs::LinearGradientPaint::create(fbb, &fbs::LinearGradientPaintArgs {
-                active: lg.active,
-                xy1: Some(&xy1),
-                xy2: Some(&xy2),
-                stops: Some(stops),
-                opacity: lg.opacity,
-                blend_mode: encode_blend_mode(lg.blend_mode),
-                transform: Some(&transform),
-                tile_mode: encode_tile_mode(lg.tile_mode),
-            });
-            Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
-                paint_type: fbs::Paint::LinearGradientPaint,
-                paint: Some(lgp.as_union_value()),
-            }))
+            let lgp = fbs::LinearGradientPaint::create(
+                fbb,
+                &fbs::LinearGradientPaintArgs {
+                    active: lg.active,
+                    xy1: Some(&xy1),
+                    xy2: Some(&xy2),
+                    stops: Some(stops),
+                    opacity: lg.opacity,
+                    blend_mode: encode_blend_mode(lg.blend_mode),
+                    transform: Some(&transform),
+                    tile_mode: encode_tile_mode(lg.tile_mode),
+                },
+            );
+            Some(fbs::PaintStackItem::create(
+                fbb,
+                &fbs::PaintStackItemArgs {
+                    paint_type: fbs::Paint::LinearGradientPaint,
+                    paint: Some(lgp.as_union_value()),
+                },
+            ))
         }
         Paint::RadialGradient(rg) => {
             let stops = encode_gradient_stops(fbb, &rg.stops);
             let transform = encode_affine_to_cg_transform(&rg.transform);
-            let rgp = fbs::RadialGradientPaint::create(fbb, &fbs::RadialGradientPaintArgs {
-                active: rg.active,
-                stops: Some(stops),
-                opacity: rg.opacity,
-                blend_mode: encode_blend_mode(rg.blend_mode),
-                transform: Some(&transform),
-                tile_mode: encode_tile_mode(rg.tile_mode),
-            });
-            Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
-                paint_type: fbs::Paint::RadialGradientPaint,
-                paint: Some(rgp.as_union_value()),
-            }))
+            let rgp = fbs::RadialGradientPaint::create(
+                fbb,
+                &fbs::RadialGradientPaintArgs {
+                    active: rg.active,
+                    stops: Some(stops),
+                    opacity: rg.opacity,
+                    blend_mode: encode_blend_mode(rg.blend_mode),
+                    transform: Some(&transform),
+                    tile_mode: encode_tile_mode(rg.tile_mode),
+                },
+            );
+            Some(fbs::PaintStackItem::create(
+                fbb,
+                &fbs::PaintStackItemArgs {
+                    paint_type: fbs::Paint::RadialGradientPaint,
+                    paint: Some(rgp.as_union_value()),
+                },
+            ))
         }
         Paint::SweepGradient(sg) => {
             let stops = encode_gradient_stops(fbb, &sg.stops);
             let transform = encode_affine_to_cg_transform(&sg.transform);
-            let sgp = fbs::SweepGradientPaint::create(fbb, &fbs::SweepGradientPaintArgs {
-                active: sg.active,
-                stops: Some(stops),
-                opacity: sg.opacity,
-                blend_mode: encode_blend_mode(sg.blend_mode),
-                transform: Some(&transform),
-            });
-            Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
-                paint_type: fbs::Paint::SweepGradientPaint,
-                paint: Some(sgp.as_union_value()),
-            }))
+            let sgp = fbs::SweepGradientPaint::create(
+                fbb,
+                &fbs::SweepGradientPaintArgs {
+                    active: sg.active,
+                    stops: Some(stops),
+                    opacity: sg.opacity,
+                    blend_mode: encode_blend_mode(sg.blend_mode),
+                    transform: Some(&transform),
+                },
+            );
+            Some(fbs::PaintStackItem::create(
+                fbb,
+                &fbs::PaintStackItemArgs {
+                    paint_type: fbs::Paint::SweepGradientPaint,
+                    paint: Some(sgp.as_union_value()),
+                },
+            ))
         }
         Paint::Image(ip) => {
             let image_ref_offset = match &ip.image {
                 ResourceRef::HASH(h) => {
                     let hash_str = fbb.create_string(h);
-                    let href = fbs::ResourceRefHASH::create(fbb, &fbs::ResourceRefHASHArgs { hash: Some(hash_str) });
+                    let href = fbs::ResourceRefHASH::create(
+                        fbb,
+                        &fbs::ResourceRefHASHArgs {
+                            hash: Some(hash_str),
+                        },
+                    );
                     (fbs::ResourceRef::ResourceRefHASH, href.as_union_value())
                 }
                 ResourceRef::RID(r) => {
                     let rid_str = fbb.create_string(r);
-                    let rref = fbs::ResourceRefRID::create(fbb, &fbs::ResourceRefRIDArgs { rid: Some(rid_str) });
+                    let rref = fbs::ResourceRefRID::create(
+                        fbb,
+                        &fbs::ResourceRefRIDArgs { rid: Some(rid_str) },
+                    );
                     (fbs::ResourceRef::ResourceRefRID, rref.as_union_value())
                 }
             };
             let alignment = fbs::Alignment::new(ip.alignement.0, ip.alignement.1);
             let (fit_type, fit_value) = encode_image_paint_fit(fbb, &ip.fit);
             let fbs_filters = fbs::ImageFilters::new(
-                ip.filters.exposure, ip.filters.contrast, ip.filters.saturation,
-                ip.filters.temperature, ip.filters.tint, ip.filters.highlights,
+                ip.filters.exposure,
+                ip.filters.contrast,
+                ip.filters.saturation,
+                ip.filters.temperature,
+                ip.filters.tint,
+                ip.filters.highlights,
                 ip.filters.shadows,
             );
-            let ip_offset = fbs::ImagePaint::create(fbb, &fbs::ImagePaintArgs {
-                active: ip.active,
-                image_type: image_ref_offset.0,
-                image: Some(image_ref_offset.1),
-                quarter_turns: ip.quarter_turns,
-                alignement: Some(&alignment),
-                fit_type,
-                fit: Some(fit_value),
-                opacity: ip.opacity,
-                blend_mode: encode_blend_mode(ip.blend_mode),
-                filters: Some(&fbs_filters),
-            });
-            Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
-                paint_type: fbs::Paint::ImagePaint,
-                paint: Some(ip_offset.as_union_value()),
-            }))
+            let ip_offset = fbs::ImagePaint::create(
+                fbb,
+                &fbs::ImagePaintArgs {
+                    active: ip.active,
+                    image_type: image_ref_offset.0,
+                    image: Some(image_ref_offset.1),
+                    quarter_turns: ip.quarter_turns,
+                    alignement: Some(&alignment),
+                    fit_type,
+                    fit: Some(fit_value),
+                    opacity: ip.opacity,
+                    blend_mode: encode_blend_mode(ip.blend_mode),
+                    filters: Some(&fbs_filters),
+                },
+            );
+            Some(fbs::PaintStackItem::create(
+                fbb,
+                &fbs::PaintStackItemArgs {
+                    paint_type: fbs::Paint::ImagePaint,
+                    paint: Some(ip_offset.as_union_value()),
+                },
+            ))
         }
         Paint::DiamondGradient(dg) => {
             let stops = encode_gradient_stops(fbb, &dg.stops);
             let transform = encode_affine_to_cg_transform(&dg.transform);
-            let dgp = fbs::DiamondGradientPaint::create(fbb, &fbs::DiamondGradientPaintArgs {
-                active: dg.active,
-                stops: Some(stops),
-                opacity: dg.opacity,
-                blend_mode: encode_blend_mode(dg.blend_mode),
-                transform: Some(&transform),
-            });
-            Some(fbs::PaintStackItem::create(fbb, &fbs::PaintStackItemArgs {
-                paint_type: fbs::Paint::DiamondGradientPaint,
-                paint: Some(dgp.as_union_value()),
-            }))
+            let dgp = fbs::DiamondGradientPaint::create(
+                fbb,
+                &fbs::DiamondGradientPaintArgs {
+                    active: dg.active,
+                    stops: Some(stops),
+                    opacity: dg.opacity,
+                    blend_mode: encode_blend_mode(dg.blend_mode),
+                    transform: Some(&transform),
+                },
+            );
+            Some(fbs::PaintStackItem::create(
+                fbb,
+                &fbs::PaintStackItemArgs {
+                    paint_type: fbs::Paint::DiamondGradientPaint,
+                    paint: Some(dgp.as_union_value()),
+                },
+            ))
         }
     }
 }
@@ -2483,16 +2700,32 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
 fn encode_image_paint_fit<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     fit: &ImagePaintFit,
-) -> (fbs::ImagePaintFit, flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+) -> (
+    fbs::ImagePaintFit,
+    flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+) {
     match fit {
         ImagePaintFit::Fit(box_fit) => {
-            let f = fbs::ImagePaintFitFit::create(fbb, &fbs::ImagePaintFitFitArgs { box_fit: encode_box_fit(*box_fit) });
+            let f = fbs::ImagePaintFitFit::create(
+                fbb,
+                &fbs::ImagePaintFitFitArgs {
+                    box_fit: encode_box_fit(*box_fit),
+                },
+            );
             (fbs::ImagePaintFit::ImagePaintFitFit, f.as_union_value())
         }
         ImagePaintFit::Transform(t) => {
             let ct = encode_affine_to_cg_transform(t);
-            let f = fbs::ImagePaintFitTransform::create(fbb, &fbs::ImagePaintFitTransformArgs { transform: Some(&ct) });
-            (fbs::ImagePaintFit::ImagePaintFitTransform, f.as_union_value())
+            let f = fbs::ImagePaintFitTransform::create(
+                fbb,
+                &fbs::ImagePaintFitTransformArgs {
+                    transform: Some(&ct),
+                },
+            );
+            (
+                fbs::ImagePaintFit::ImagePaintFitTransform,
+                f.as_union_value(),
+            )
         }
         ImagePaintFit::Tile(tile) => {
             let fbs_repeat = match tile.repeat {
@@ -2501,7 +2734,12 @@ fn encode_image_paint_fit<'a, A: flatbuffers::Allocator + 'a>(
                 crate::cg::types::ImageRepeat::Repeat => fbs::ImageRepeat::Repeat,
             };
             let fbs_tile = fbs::ImageTile::new(tile.scale, fbs_repeat);
-            let f = fbs::ImagePaintFitTile::create(fbb, &fbs::ImagePaintFitTileArgs { tile: Some(&fbs_tile) });
+            let f = fbs::ImagePaintFitTile::create(
+                fbb,
+                &fbs::ImagePaintFitTileArgs {
+                    tile: Some(&fbs_tile),
+                },
+            );
             (fbs::ImagePaintFit::ImagePaintFitTile, f.as_union_value())
         }
     }
@@ -2542,15 +2780,20 @@ fn encode_text_dimension_from_letter_spacing<'a, A: flatbuffers::Allocator + 'a>
 ) -> Option<flatbuffers::WIPOffset<fbs::TextDimension<'a>>> {
     let (kind, value) = match ls {
         TextLetterSpacing::Fixed(v) => {
-            if *v == 0.0 { return None; }
+            if *v == 0.0 {
+                return None;
+            }
             (fbs::TextDimensionKind::Fixed, *v)
         }
         TextLetterSpacing::Factor(v) => (fbs::TextDimensionKind::Factor, *v),
     };
-    Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
-        kind,
-        value: Some(value),
-    }))
+    Some(fbs::TextDimension::create(
+        fbb,
+        &fbs::TextDimensionArgs {
+            kind,
+            value: Some(value),
+        },
+    ))
 }
 
 fn encode_text_dimension_from_word_spacing<'a, A: flatbuffers::Allocator + 'a>(
@@ -2559,15 +2802,20 @@ fn encode_text_dimension_from_word_spacing<'a, A: flatbuffers::Allocator + 'a>(
 ) -> Option<flatbuffers::WIPOffset<fbs::TextDimension<'a>>> {
     let (kind, value) = match ws {
         TextWordSpacing::Fixed(v) => {
-            if *v == 0.0 { return None; }
+            if *v == 0.0 {
+                return None;
+            }
             (fbs::TextDimensionKind::Fixed, *v)
         }
         TextWordSpacing::Factor(v) => (fbs::TextDimensionKind::Factor, *v),
     };
-    Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
-        kind,
-        value: Some(value),
-    }))
+    Some(fbs::TextDimension::create(
+        fbb,
+        &fbs::TextDimensionArgs {
+            kind,
+            value: Some(value),
+        },
+    ))
 }
 
 fn encode_text_dimension_from_line_height<'a, A: flatbuffers::Allocator + 'a>(
@@ -2576,14 +2824,20 @@ fn encode_text_dimension_from_line_height<'a, A: flatbuffers::Allocator + 'a>(
 ) -> Option<flatbuffers::WIPOffset<fbs::TextDimension<'a>>> {
     match lh {
         TextLineHeight::Normal => None,
-        TextLineHeight::Fixed(v) => Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
-            kind: fbs::TextDimensionKind::Fixed,
-            value: Some(*v),
-        })),
-        TextLineHeight::Factor(v) => Some(fbs::TextDimension::create(fbb, &fbs::TextDimensionArgs {
-            kind: fbs::TextDimensionKind::Factor,
-            value: Some(*v),
-        })),
+        TextLineHeight::Fixed(v) => Some(fbs::TextDimension::create(
+            fbb,
+            &fbs::TextDimensionArgs {
+                kind: fbs::TextDimensionKind::Fixed,
+                value: Some(*v),
+            },
+        )),
+        TextLineHeight::Factor(v) => Some(fbs::TextDimension::create(
+            fbb,
+            &fbs::TextDimensionArgs {
+                kind: fbs::TextDimensionKind::Factor,
+                value: Some(*v),
+            },
+        )),
     }
 }
 
@@ -2595,7 +2849,10 @@ fn encode_text_dimension_from_line_height<'a, A: flatbuffers::Allocator + 'a>(
 fn encode_fe_blur<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     blur: &FeBlur,
-) -> (fbs::FeBlur, flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+) -> (
+    fbs::FeBlur,
+    flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+) {
     match blur {
         FeBlur::Gaussian(g) => {
             let offset =
@@ -2634,55 +2891,75 @@ fn encode_layer_effects<'a, A: flatbuffers::Allocator + 'a>(
 
     let blur_offset = effects.blur.as_ref().map(|lb| {
         let (blur_type, blur_union) = encode_fe_blur(fbb, &lb.blur);
-        fbs::FeLayerBlur::create(fbb, &fbs::FeLayerBlurArgs {
-            active: lb.active,
-            blur_type,
-            blur: Some(blur_union),
-        })
+        fbs::FeLayerBlur::create(
+            fbb,
+            &fbs::FeLayerBlurArgs {
+                active: lb.active,
+                blur_type,
+                blur: Some(blur_union),
+            },
+        )
     });
 
     let backdrop_blur_offset = effects.backdrop_blur.as_ref().map(|bb| {
         let (blur_type, blur_union) = encode_fe_blur(fbb, &bb.blur);
-        fbs::FeBackdropBlur::create(fbb, &fbs::FeBackdropBlurArgs {
-            active: bb.active,
-            blur_type,
-            blur: Some(blur_union),
-        })
+        fbs::FeBackdropBlur::create(
+            fbb,
+            &fbs::FeBackdropBlurArgs {
+                active: bb.active,
+                blur_type,
+                blur: Some(blur_union),
+            },
+        )
     });
 
     let shadows_offset = if effects.shadows.is_empty() {
         None
     } else {
-        let shadow_items: Vec<_> = effects.shadows.iter().map(|s| encode_filter_shadow_effect(fbb, s)).collect();
+        let shadow_items: Vec<_> = effects
+            .shadows
+            .iter()
+            .map(|s| encode_filter_shadow_effect(fbb, s))
+            .collect();
         Some(fbb.create_vector(&shadow_items))
     };
 
     let glass_offset = effects.glass.as_ref().map(|lg| {
-        fbs::FeLiquidGlass::create(fbb, &fbs::FeLiquidGlassArgs {
-            active: lg.active,
-            light_intensity: lg.light_intensity,
-            light_angle: lg.light_angle,
-            refraction: lg.refraction,
-            depth: lg.depth,
-            dispersion: lg.dispersion,
-            blur_radius: lg.blur_radius,
-        })
+        fbs::FeLiquidGlass::create(
+            fbb,
+            &fbs::FeLiquidGlassArgs {
+                active: lg.active,
+                light_intensity: lg.light_intensity,
+                light_angle: lg.light_angle,
+                refraction: lg.refraction,
+                depth: lg.depth,
+                dispersion: lg.dispersion,
+                blur_radius: lg.blur_radius,
+            },
+        )
     });
 
     let noises_offset = if effects.noises.is_empty() {
         None
     } else {
-        let noise_items: Vec<_> = effects.noises.iter().map(|n| encode_fe_noise_effect(fbb, n)).collect();
+        let noise_items: Vec<_> = effects
+            .noises
+            .iter()
+            .map(|n| encode_fe_noise_effect(fbb, n))
+            .collect();
         Some(fbb.create_vector(&noise_items))
     };
 
-    Some(fbs::LayerEffects::create(fbb, &fbs::LayerEffectsArgs {
-        fe_blur: blur_offset,
-        fe_backdrop_blur: backdrop_blur_offset,
-        fe_shadows: shadows_offset,
-        fe_glass: glass_offset,
-        fe_noises: noises_offset,
-    }))
+    Some(fbs::LayerEffects::create(
+        fbb,
+        &fbs::LayerEffectsArgs {
+            fe_blur: blur_offset,
+            fe_backdrop_blur: backdrop_blur_offset,
+            fe_shadows: shadows_offset,
+            fe_glass: glass_offset,
+            fe_noises: noises_offset,
+        },
+    ))
 }
 
 fn encode_filter_shadow_effect<'a, A: flatbuffers::Allocator + 'a>(
@@ -2694,13 +2971,24 @@ fn encode_filter_shadow_effect<'a, A: flatbuffers::Allocator + 'a>(
         FilterShadowEffect::InnerShadow(s) => (fbs::FilterShadowEffectKind::InnerShadow, s),
     };
     let color = encode_color_to_rgba32f(&shadow.color);
-    let shadow_offset = fbs::FeShadow::create(fbb, &fbs::FeShadowArgs {
-        active: shadow.active, dx: shadow.dx, dy: shadow.dy,
-        blur: shadow.blur, spread: shadow.spread, color: Some(&color),
-    });
-    fbs::FilterShadowEffect::create(fbb, &fbs::FilterShadowEffectArgs {
-        kind, shadow: Some(shadow_offset),
-    })
+    let shadow_offset = fbs::FeShadow::create(
+        fbb,
+        &fbs::FeShadowArgs {
+            active: shadow.active,
+            dx: shadow.dx,
+            dy: shadow.dy,
+            blur: shadow.blur,
+            spread: shadow.spread,
+            color: Some(&color),
+        },
+    );
+    fbs::FilterShadowEffect::create(
+        fbb,
+        &fbs::FilterShadowEffectArgs {
+            kind,
+            shadow: Some(shadow_offset),
+        },
+    )
 }
 
 fn encode_fe_noise_effect<'a, A: flatbuffers::Allocator + 'a>(
@@ -2708,11 +2996,18 @@ fn encode_fe_noise_effect<'a, A: flatbuffers::Allocator + 'a>(
     noise: &FeNoiseEffect,
 ) -> flatbuffers::WIPOffset<fbs::FeNoiseEffect<'a>> {
     let coloring = encode_noise_colors(fbb, &noise.coloring);
-    fbs::FeNoiseEffect::create(fbb, &fbs::FeNoiseEffectArgs {
-        active: noise.active, noise_size: noise.noise_size, density: noise.density,
-        num_octaves: noise.num_octaves, seed: noise.seed, coloring: Some(coloring),
-        blend_mode: encode_blend_mode(noise.blend_mode),
-    })
+    fbs::FeNoiseEffect::create(
+        fbb,
+        &fbs::FeNoiseEffectArgs {
+            active: noise.active,
+            noise_size: noise.noise_size,
+            density: noise.density,
+            num_octaves: noise.num_octaves,
+            seed: noise.seed,
+            coloring: Some(coloring),
+            blend_mode: encode_blend_mode(noise.blend_mode),
+        },
+    )
 }
 
 fn encode_noise_colors<'a, A: flatbuffers::Allocator + 'a>(
@@ -2722,22 +3017,36 @@ fn encode_noise_colors<'a, A: flatbuffers::Allocator + 'a>(
     match colors {
         NoiseEffectColors::Mono { color } => {
             let c = encode_color_to_rgba32f(color);
-            fbs::NoiseEffectColors::create(fbb, &fbs::NoiseEffectColorsArgs {
-                kind: fbs::NoiseEffectColorsKind::Mono, mono_color: Some(&c), ..Default::default()
-            })
+            fbs::NoiseEffectColors::create(
+                fbb,
+                &fbs::NoiseEffectColorsArgs {
+                    kind: fbs::NoiseEffectColorsKind::Mono,
+                    mono_color: Some(&c),
+                    ..Default::default()
+                },
+            )
         }
         NoiseEffectColors::Duo { color1, color2 } => {
             let c1 = encode_color_to_rgba32f(color1);
             let c2 = encode_color_to_rgba32f(color2);
-            fbs::NoiseEffectColors::create(fbb, &fbs::NoiseEffectColorsArgs {
-                kind: fbs::NoiseEffectColorsKind::Duo, duo_color1: Some(&c1), duo_color2: Some(&c2), ..Default::default()
-            })
+            fbs::NoiseEffectColors::create(
+                fbb,
+                &fbs::NoiseEffectColorsArgs {
+                    kind: fbs::NoiseEffectColorsKind::Duo,
+                    duo_color1: Some(&c1),
+                    duo_color2: Some(&c2),
+                    ..Default::default()
+                },
+            )
         }
-        NoiseEffectColors::Multi { opacity } => {
-            fbs::NoiseEffectColors::create(fbb, &fbs::NoiseEffectColorsArgs {
-                kind: fbs::NoiseEffectColorsKind::Multi, multi_opacity: *opacity, ..Default::default()
-            })
-        }
+        NoiseEffectColors::Multi { opacity } => fbs::NoiseEffectColors::create(
+            fbb,
+            &fbs::NoiseEffectColorsArgs {
+                kind: fbs::NoiseEffectColorsKind::Multi,
+                multi_opacity: *opacity,
+                ..Default::default()
+            },
+        ),
     }
 }
 
@@ -2933,9 +3242,10 @@ fn encode_container_layout<'a, A: flatbuffers::Allocator + 'a>(
 
     // Container style — use FBS `::None` sentinels for unset optional enum fields
     // so the decoder can distinguish "not set" from "explicitly set to default".
-    let padding = container_style.layout_padding.as_ref().map(|p| {
-        fbs::EdgeInsets::new(p.top, p.right, p.bottom, p.left)
-    });
+    let padding = container_style
+        .layout_padding
+        .as_ref()
+        .map(|p| fbs::EdgeInsets::new(p.top, p.right, p.bottom, p.left));
     let lc_fbs = Some(fbs::LayoutContainerStyle::create(
         fbb,
         &fbs::LayoutContainerStyleArgs {
@@ -2976,7 +3286,12 @@ fn encode_container_layout<'a, A: flatbuffers::Allocator + 'a>(
         },
     ));
 
-    let dims = encode_dimensions_with_aspect(fbb, dimensions.layout_target_width, dimensions.layout_target_height, dimensions.layout_target_aspect_ratio);
+    let dims = encode_dimensions_with_aspect(
+        fbb,
+        dimensions.layout_target_width,
+        dimensions.layout_target_height,
+        dimensions.layout_target_aspect_ratio,
+    );
     let child = encode_layout_child_style(fbb, layout_child);
     fbs::LayoutStyle::create(
         fbb,
@@ -3021,10 +3336,7 @@ fn encode_stroke_geometry<'a, A: flatbuffers::Allocator + 'a>(
             .stops
             .iter()
             .map(|s| {
-                fbs::VariableWidthStop::create(
-                    fbb,
-                    &fbs::VariableWidthStopArgs { u: s.u, r: s.r },
-                )
+                fbs::VariableWidthStop::create(fbb, &fbs::VariableWidthStopArgs { u: s.u, r: s.r })
             })
             .collect();
         let stops_vec = fbb.create_vector(&stop_offsets);
@@ -3103,12 +3415,18 @@ fn encode_container_node<'a, A: flatbuffers::Allocator + 'a>(
     let fill_offsets = encode_paints(fbb, &r.fills);
     let stroke_offsets = encode_paints(fbb, &r.strokes);
 
-    let cn = fbs::ContainerNode::create(fbb, &fbs::ContainerNodeArgs {
-        node: Some(sys), layer: Some(layer),
-        corner_radius: Some(cr_trait), stroke_geometry: Some(sg),
-        fill_paints: fill_offsets, stroke_paints: stroke_offsets,
-        clips_content: r.clip,
-    });
+    let cn = fbs::ContainerNode::create(
+        fbb,
+        &fbs::ContainerNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            corner_radius: Some(cr_trait),
+            stroke_geometry: Some(sg),
+            fill_paints: fill_offsets,
+            stroke_paints: stroke_offsets,
+            clips_content: r.clip,
+        },
+    );
     make_node_slot(fbb, fbs::Node::ContainerNode, cn.as_union_value())
 }
 
@@ -3153,9 +3471,13 @@ fn encode_initial_container_node<'a, A: flatbuffers::Allocator + 'a>(
         },
     );
 
-    let icn = fbs::InitialContainerNode::create(fbb, &fbs::InitialContainerNodeArgs {
-        node: Some(sys), layer: Some(layer),
-    });
+    let icn = fbs::InitialContainerNode::create(
+        fbb,
+        &fbs::InitialContainerNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+        },
+    );
     make_node_slot(fbb, fbs::Node::InitialContainerNode, icn.as_union_value())
 }
 
@@ -3173,7 +3495,10 @@ fn encode_group_node<'a, A: flatbuffers::Allocator + 'a>(
     // Groups carry the full affine transform (scale, skew, rotation) — not
     // just rotation like shape nodes. Encode the full matrix so SVG-imported
     // transforms (e.g. scale(0.8, 1.2)) survive the roundtrip.
-    let plt = r.transform.as_ref().map(|t| encode_affine_to_cg_transform(t));
+    let plt = r
+        .transform
+        .as_ref()
+        .map(|t| encode_affine_to_cg_transform(t));
 
     let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
     let layout = encode_shape_layout(fbb, x, y, None, None, &None);
@@ -3192,9 +3517,13 @@ fn encode_group_node<'a, A: flatbuffers::Allocator + 'a>(
         },
     );
 
-    let gn = fbs::GroupNode::create(fbb, &fbs::GroupNodeArgs {
-        node: Some(sys), layer: Some(layer),
-    });
+    let gn = fbs::GroupNode::create(
+        fbb,
+        &fbs::GroupNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+        },
+    );
     make_node_slot(fbb, fbs::Node::GroupNode, gn.as_union_value())
 }
 
@@ -3219,20 +3548,52 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
     let (active, opacity, blend_mode, mask, effects, transform, size, fills, strokes, layout_child) =
         match &fields {
             BasicShapeFields::Rectangle(r) => (
-                r.active, r.opacity, r.blend_mode, r.mask, &r.effects, &r.transform, &r.size,
-                &r.fills, &r.strokes, &r.layout_child,
+                r.active,
+                r.opacity,
+                r.blend_mode,
+                r.mask,
+                &r.effects,
+                &r.transform,
+                &r.size,
+                &r.fills,
+                &r.strokes,
+                &r.layout_child,
             ),
             BasicShapeFields::Ellipse(e) => (
-                e.active, e.opacity, e.blend_mode, e.mask, &e.effects, &e.transform, &e.size,
-                &e.fills, &e.strokes, &e.layout_child,
+                e.active,
+                e.opacity,
+                e.blend_mode,
+                e.mask,
+                &e.effects,
+                &e.transform,
+                &e.size,
+                &e.fills,
+                &e.strokes,
+                &e.layout_child,
             ),
             BasicShapeFields::RegularPolygon(p) => (
-                p.active, p.opacity, p.blend_mode, p.mask, &p.effects, &p.transform, &p.size,
-                &p.fills, &p.strokes, &p.layout_child,
+                p.active,
+                p.opacity,
+                p.blend_mode,
+                p.mask,
+                &p.effects,
+                &p.transform,
+                &p.size,
+                &p.fills,
+                &p.strokes,
+                &p.layout_child,
             ),
             BasicShapeFields::RegularStarPolygon(s) => (
-                s.active, s.opacity, s.blend_mode, s.mask, &s.effects, &s.transform, &s.size,
-                &s.fills, &s.strokes, &s.layout_child,
+                s.active,
+                s.opacity,
+                s.blend_mode,
+                s.mask,
+                &s.effects,
+                &s.transform,
+                &s.size,
+                &s.fills,
+                &s.strokes,
+                &s.layout_child,
             ),
         };
 
@@ -3241,14 +3602,7 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
     let plt = affine_to_rotation_transform(transform);
 
     let sys = encode_system_node_trait(fbb, node_id, "", active, false);
-    let layout = encode_shape_layout(
-        fbb,
-        x,
-        y,
-        Some(size.width),
-        Some(size.height),
-        layout_child,
-    );
+    let layout = encode_shape_layout(fbb, x, y, Some(size.width), Some(size.height), layout_child);
     let layer = encode_layer_trait(
         fbb,
         &LayerTraitInput {
@@ -3292,7 +3646,8 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
     // Shape descriptor
     let shape_offset = match &fields {
         BasicShapeFields::Rectangle(_) => {
-            fbs::CanonicalShapeRectangular::create(fbb, &fbs::CanonicalShapeRectangularArgs {}).as_union_value()
+            fbs::CanonicalShapeRectangular::create(fbb, &fbs::CanonicalShapeRectangularArgs {})
+                .as_union_value()
         }
         BasicShapeFields::Ellipse(e) => {
             let inner = e.inner_radius.unwrap_or(0.0);
@@ -3315,17 +3670,21 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
             )
             .as_union_value()
         }
-        BasicShapeFields::RegularPolygon(p) => {
-            fbs::CanonicalShapeRegularPolygon::create(fbb, &fbs::CanonicalShapeRegularPolygonArgs {
+        BasicShapeFields::RegularPolygon(p) => fbs::CanonicalShapeRegularPolygon::create(
+            fbb,
+            &fbs::CanonicalShapeRegularPolygonArgs {
                 point_count: p.point_count as u32,
-            }).as_union_value()
-        }
-        BasicShapeFields::RegularStarPolygon(s) => {
-            fbs::CanonicalShapeRegularStarPolygon::create(fbb, &fbs::CanonicalShapeRegularStarPolygonArgs {
+            },
+        )
+        .as_union_value(),
+        BasicShapeFields::RegularStarPolygon(s) => fbs::CanonicalShapeRegularStarPolygon::create(
+            fbb,
+            &fbs::CanonicalShapeRegularStarPolygonArgs {
                 point_count: s.point_count as u32,
                 inner_radius_ratio: s.inner_radius,
-            }).as_union_value()
-        }
+            },
+        )
+        .as_union_value(),
     };
 
     // Corner smoothing (only meaningful for rectangles)
@@ -3340,17 +3699,25 @@ fn encode_basic_shape_node<'a, A: flatbuffers::Allocator + 'a>(
         _ => None,
     };
 
-    let bsn = fbs::BasicShapeNode::create(fbb, &fbs::BasicShapeNodeArgs {
-        node: Some(sys), layer: Some(layer),
-        type_: node_type, shape_type, shape: Some(shape_offset),
-        corner_radius: scalar_cr, fill_paints: fill_offsets,
-        stroke_style: Some(stroke_style_offset), stroke_width: stroke_width_f32,
-        rectangular_corner_radius: rect_cr.as_ref(),
-        stroke_paints: stroke_offsets,
-        corner_smoothing,
-        rectangular_stroke_width: rect_sw.as_ref(),
-        ..Default::default()
-    });
+    let bsn = fbs::BasicShapeNode::create(
+        fbb,
+        &fbs::BasicShapeNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            type_: node_type,
+            shape_type,
+            shape: Some(shape_offset),
+            corner_radius: scalar_cr,
+            fill_paints: fill_offsets,
+            stroke_style: Some(stroke_style_offset),
+            stroke_width: stroke_width_f32,
+            rectangular_corner_radius: rect_cr.as_ref(),
+            stroke_paints: stroke_offsets,
+            corner_smoothing,
+            rectangular_stroke_width: rect_sw.as_ref(),
+            ..Default::default()
+        },
+    );
 
     make_node_slot(fbb, fbs::Node::BasicShapeNode, bsn.as_union_value())
 }
@@ -3383,22 +3750,32 @@ fn encode_line_node<'a, A: flatbuffers::Allocator + 'a>(
         },
     );
 
-    let sg = encode_stroke_geometry(fbb, &StrokeStyle {
-        stroke_align: r._data_stroke_align,
-        stroke_cap: r.stroke_cap,
-        stroke_join: StrokeJoin::Miter,
-        stroke_miter_limit: r.stroke_miter_limit,
-        stroke_dash_array: r.stroke_dash_array.clone(),
-    }, r.stroke_width, None);
+    let sg = encode_stroke_geometry(
+        fbb,
+        &StrokeStyle {
+            stroke_align: r._data_stroke_align,
+            stroke_cap: r.stroke_cap,
+            stroke_join: StrokeJoin::Miter,
+            stroke_miter_limit: r.stroke_miter_limit,
+            stroke_dash_array: r.stroke_dash_array.clone(),
+        },
+        r.stroke_width,
+        None,
+    );
 
     let stroke_offsets = encode_paints(fbb, &r.strokes);
 
-    let ln = fbs::LineNode::create(fbb, &fbs::LineNodeArgs {
-        node: Some(sys), layer: Some(layer), stroke_geometry: Some(sg),
-        stroke_paints: stroke_offsets,
-        marker_start_shape: encode_stroke_marker(r.marker_start_shape),
-        marker_end_shape: encode_stroke_marker(r.marker_end_shape),
-    });
+    let ln = fbs::LineNode::create(
+        fbb,
+        &fbs::LineNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            stroke_geometry: Some(sg),
+            stroke_paints: stroke_offsets,
+            marker_start_shape: encode_stroke_marker(r.marker_start_shape),
+            marker_end_shape: encode_stroke_marker(r.marker_end_shape),
+        },
+    );
     make_node_slot(fbb, fbs::Node::LineNode, ln.as_union_value())
 }
 
@@ -3432,25 +3809,36 @@ fn encode_vector_node<'a, A: flatbuffers::Allocator + 'a>(
     // Vector network
     let vn = encode_vector_network(fbb, &r.network);
 
-    let sg = encode_stroke_geometry(fbb, &StrokeStyle {
-        stroke_align: r.stroke_align,
-        stroke_cap: r.stroke_cap,
-        stroke_join: r.stroke_join,
-        stroke_miter_limit: r.stroke_miter_limit,
-        stroke_dash_array: r.stroke_dash_array.clone(),
-    }, r.stroke_width, r.stroke_width_profile.as_ref());
+    let sg = encode_stroke_geometry(
+        fbb,
+        &StrokeStyle {
+            stroke_align: r.stroke_align,
+            stroke_cap: r.stroke_cap,
+            stroke_join: r.stroke_join,
+            stroke_miter_limit: r.stroke_miter_limit,
+            stroke_dash_array: r.stroke_dash_array.clone(),
+        },
+        r.stroke_width,
+        r.stroke_width_profile.as_ref(),
+    );
 
     let fill_offsets = encode_paints(fbb, &r.fills);
     let stroke_offsets = encode_paints(fbb, &r.strokes);
 
-    let vn_node = fbs::VectorNode::create(fbb, &fbs::VectorNodeArgs {
-        node: Some(sys), layer: Some(layer), stroke_geometry: Some(sg),
-        stroke_paints: stroke_offsets, fill_paints: fill_offsets,
-        vector_network_data: vn,
-        marker_start_shape: encode_stroke_marker(r.marker_start_shape),
-        marker_end_shape: encode_stroke_marker(r.marker_end_shape),
-        ..Default::default()
-    });
+    let vn_node = fbs::VectorNode::create(
+        fbb,
+        &fbs::VectorNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            stroke_geometry: Some(sg),
+            stroke_paints: stroke_offsets,
+            fill_paints: fill_offsets,
+            vector_network_data: vn,
+            marker_start_shape: encode_stroke_marker(r.marker_start_shape),
+            marker_end_shape: encode_stroke_marker(r.marker_end_shape),
+            ..Default::default()
+        },
+    );
     make_node_slot(fbb, fbs::Node::VectorNode, vn_node.as_union_value())
 }
 
@@ -3467,31 +3855,37 @@ fn encode_path_node<'a, A: flatbuffers::Allocator + 'a>(
 
     let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
     let layout = encode_shape_layout(fbb, x, y, None, None, &r.layout_child);
-    let layer = encode_layer_trait(fbb, &LayerTraitInput {
-        parent_id,
-        position,
-        opacity: r.opacity,
-        blend_mode: r.blend_mode,
-        mask: r.mask,
-        effects: &r.effects,
-        post_layout_transform: plt,
-        layout: Some(layout),
-    });
+    let layer = encode_layer_trait(
+        fbb,
+        &LayerTraitInput {
+            parent_id,
+            position,
+            opacity: r.opacity,
+            blend_mode: r.blend_mode,
+            mask: r.mask,
+            effects: &r.effects,
+            post_layout_transform: plt,
+            layout: Some(layout),
+        },
+    );
 
     let sg = encode_stroke_geometry(fbb, &r.stroke_style, r.stroke_width.value_or_zero(), None);
     let fill_offsets = encode_paints(fbb, &r.fills);
     let stroke_offsets = encode_paints(fbb, &r.strokes);
     let data_offset = fbb.create_string(&r.data);
 
-    let pn = fbs::PathNode::create(fbb, &fbs::PathNodeArgs {
-        node: Some(sys),
-        layer: Some(layer),
-        stroke_geometry: Some(sg),
-        fill_paints: fill_offsets,
-        stroke_paints: stroke_offsets,
-        data: Some(data_offset),
-        fill_rule: fbs::FillRule::NonZero,
-    });
+    let pn = fbs::PathNode::create(
+        fbb,
+        &fbs::PathNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            stroke_geometry: Some(sg),
+            fill_paints: fill_offsets,
+            stroke_paints: stroke_offsets,
+            data: Some(data_offset),
+            fill_rule: fbs::FillRule::NonZero,
+        },
+    );
     make_node_slot(fbb, fbs::Node::PathNode, pn.as_union_value())
 }
 
@@ -3527,92 +3921,136 @@ fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
     let font_family_str = fbb.create_string(&ts.font_family);
     let font_weight = fbs::FontWeight::new(ts.font_weight.0);
     let fbs_font_optical_sizing = match ts.font_optical_sizing {
-        FontOpticalSizing::Auto => fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::Auto, 0.0),
-        FontOpticalSizing::None => fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::None, 0.0),
-        FontOpticalSizing::Fixed(v) => fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::Fixed, v),
+        FontOpticalSizing::Auto => {
+            fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::Auto, 0.0)
+        }
+        FontOpticalSizing::None => {
+            fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::None, 0.0)
+        }
+        FontOpticalSizing::Fixed(v) => {
+            fbs::FontOpticalSizing::new(fbs::FontOpticalSizingKind::Fixed, v)
+        }
     };
     let text_decoration_offset = ts.text_decoration.as_ref().map(|td| {
-        let color = td.text_decoration_color.as_ref().map(|c| encode_color_to_rgba32f(c));
-        fbs::TextDecorationRec::create(fbb, &fbs::TextDecorationRecArgs {
-            text_decoration_line: encode_text_decoration_line(td.text_decoration_line),
-            text_decoration_style: encode_text_decoration_style(td.text_decoration_style.unwrap_or_default()),
-            text_decoration_skip_ink: td.text_decoration_skip_ink.unwrap_or(true),
-            text_decoration_thickness: td.text_decoration_thickness.unwrap_or(0.0),
-            text_decoration_color: color.as_ref(),
-        })
+        let color = td
+            .text_decoration_color
+            .as_ref()
+            .map(|c| encode_color_to_rgba32f(c));
+        fbs::TextDecorationRec::create(
+            fbb,
+            &fbs::TextDecorationRecArgs {
+                text_decoration_line: encode_text_decoration_line(td.text_decoration_line),
+                text_decoration_style: encode_text_decoration_style(
+                    td.text_decoration_style.unwrap_or_default(),
+                ),
+                text_decoration_skip_ink: td.text_decoration_skip_ink.unwrap_or(true),
+                text_decoration_thickness: td.text_decoration_thickness.unwrap_or(0.0),
+                text_decoration_color: color.as_ref(),
+            },
+        )
     });
     let letter_spacing_offset = encode_text_dimension_from_letter_spacing(fbb, &ts.letter_spacing);
     let word_spacing_offset = encode_text_dimension_from_word_spacing(fbb, &ts.word_spacing);
     let line_height_offset = encode_text_dimension_from_line_height(fbb, &ts.line_height);
     let font_features_offset = ts.font_features.as_ref().map(|features| {
-        let items: Vec<_> = features.iter().map(|f| {
-            let bytes = f.tag.as_bytes();
-            let tag = fbs::OpenTypeFeatureTag::new(
-                *bytes.first().unwrap_or(&0),
-                *bytes.get(1).unwrap_or(&0),
-                *bytes.get(2).unwrap_or(&0),
-                *bytes.get(3).unwrap_or(&0),
-            );
-            fbs::FontFeature::create(fbb, &fbs::FontFeatureArgs {
-                open_type_feature_tag: Some(&tag),
-                open_type_feature_value: f.value,
+        let items: Vec<_> = features
+            .iter()
+            .map(|f| {
+                let bytes = f.tag.as_bytes();
+                let tag = fbs::OpenTypeFeatureTag::new(
+                    *bytes.first().unwrap_or(&0),
+                    *bytes.get(1).unwrap_or(&0),
+                    *bytes.get(2).unwrap_or(&0),
+                    *bytes.get(3).unwrap_or(&0),
+                );
+                fbs::FontFeature::create(
+                    fbb,
+                    &fbs::FontFeatureArgs {
+                        open_type_feature_tag: Some(&tag),
+                        open_type_feature_value: f.value,
+                    },
+                )
             })
-        }).collect();
+            .collect();
         fbb.create_vector(&items)
     });
     let font_variations_offset = ts.font_variations.as_ref().map(|variations| {
-        let items: Vec<_> = variations.iter().map(|v| {
-            let axis_str = fbb.create_string(&v.axis);
-            fbs::FontVariation::create(fbb, &fbs::FontVariationArgs {
-                variation_axis: Some(axis_str),
-                variation_value: v.value,
+        let items: Vec<_> = variations
+            .iter()
+            .map(|v| {
+                let axis_str = fbb.create_string(&v.axis);
+                fbs::FontVariation::create(
+                    fbb,
+                    &fbs::FontVariationArgs {
+                        variation_axis: Some(axis_str),
+                        variation_value: v.value,
+                    },
+                )
             })
-        }).collect();
+            .collect();
         fbb.create_vector(&items)
     });
-    let text_style = fbs::TextStyleRec::create(fbb, &fbs::TextStyleRecArgs {
-        font_family: Some(font_family_str),
-        font_size: ts.font_size,
-        font_weight: Some(&font_weight),
-        font_style_italic: ts.font_style_italic,
-        font_kerning: ts.font_kerning,
-        font_width: ts.font_width.unwrap_or(0.0),
-        font_optical_sizing: Some(&fbs_font_optical_sizing),
-        text_transform: encode_text_transform(ts.text_transform),
-        text_decoration: text_decoration_offset,
-        letter_spacing: letter_spacing_offset,
-        word_spacing: word_spacing_offset,
-        line_height: line_height_offset,
-        font_features: font_features_offset,
-        font_variations: font_variations_offset,
-    });
+    let text_style = fbs::TextStyleRec::create(
+        fbb,
+        &fbs::TextStyleRecArgs {
+            font_family: Some(font_family_str),
+            font_size: ts.font_size,
+            font_weight: Some(&font_weight),
+            font_style_italic: ts.font_style_italic,
+            font_kerning: ts.font_kerning,
+            font_width: ts.font_width.unwrap_or(0.0),
+            font_optical_sizing: Some(&fbs_font_optical_sizing),
+            text_transform: encode_text_transform(ts.text_transform),
+            text_decoration: text_decoration_offset,
+            letter_spacing: letter_spacing_offset,
+            word_spacing: word_spacing_offset,
+            line_height: line_height_offset,
+            font_features: font_features_offset,
+            font_variations: font_variations_offset,
+        },
+    );
 
     let text_str = fbb.create_string(&r.text);
     let fill_offsets = encode_paints(fbb, &r.fills);
     let stroke_offsets = encode_paints(fbb, &r.strokes);
 
-    let sg = encode_stroke_geometry(fbb, &StrokeStyle {
-        stroke_align: r.stroke_align,
-        stroke_cap: StrokeCap::Butt,
-        stroke_join: StrokeJoin::Miter,
-        stroke_miter_limit: StrokeMiterLimit::default(),
-        stroke_dash_array: None,
-    }, r.stroke_width, None);
+    let sg = encode_stroke_geometry(
+        fbb,
+        &StrokeStyle {
+            stroke_align: r.stroke_align,
+            stroke_cap: StrokeCap::Butt,
+            stroke_join: StrokeJoin::Miter,
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
+        },
+        r.stroke_width,
+        None,
+    );
 
     let ellipsis_offset = r.ellipsis.as_ref().map(|s| fbb.create_string(s));
-    let props = fbs::TextSpanNodeProperties::create(fbb, &fbs::TextSpanNodePropertiesArgs {
-        text: Some(text_str), text_style: Some(text_style),
-        text_align: encode_text_align(r.text_align),
-        text_align_vertical: encode_text_align_vertical(r.text_align_vertical),
-        fill_paints: fill_offsets, stroke_paints: stroke_offsets,
-        stroke_geometry: Some(sg),
-        max_lines: r.max_lines.map(|v| v as u32).unwrap_or(0),
-        ellipsis: ellipsis_offset,
-    });
+    let props = fbs::TextSpanNodeProperties::create(
+        fbb,
+        &fbs::TextSpanNodePropertiesArgs {
+            text: Some(text_str),
+            text_style: Some(text_style),
+            text_align: encode_text_align(r.text_align),
+            text_align_vertical: encode_text_align_vertical(r.text_align_vertical),
+            fill_paints: fill_offsets,
+            stroke_paints: stroke_offsets,
+            stroke_geometry: Some(sg),
+            max_lines: r.max_lines.map(|v| v as u32).unwrap_or(0),
+            ellipsis: ellipsis_offset,
+        },
+    );
 
-    let tn = fbs::TextSpanNode::create(fbb, &fbs::TextSpanNodeArgs {
-        node: Some(sys), layer: Some(layer), properties: Some(props),
-    });
+    let tn = fbs::TextSpanNode::create(
+        fbb,
+        &fbs::TextSpanNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            properties: Some(props),
+        },
+    );
     make_node_slot(fbb, fbs::Node::TextSpanNode, tn.as_union_value())
 }
 
@@ -3745,10 +4183,7 @@ fn encode_vector_network_region<'a, A: flatbuffers::Allocator + 'a>(
         crate::cg::types::FillRule::NonZero => fbs::FillRule::NonZero,
     };
 
-    let fills_offset = region
-        .fills
-        .as_ref()
-        .and_then(|p| encode_paints(fbb, p));
+    let fills_offset = region.fills.as_ref().and_then(|p| encode_paints(fbb, p));
 
     fbs::VectorNetworkRegion::create(
         fbb,
@@ -3764,9 +4199,7 @@ fn encode_vector_network_region<'a, A: flatbuffers::Allocator + 'a>(
 // Geometry helpers for encoding
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn encode_rectangular_corner_radius(
-    cr: &RectangularCornerRadius,
-) -> fbs::RectangularCornerRadius {
+fn encode_rectangular_corner_radius(cr: &RectangularCornerRadius) -> fbs::RectangularCornerRadius {
     let tl = fbs::CGRadius::new(cr.tl.rx, cr.tl.ry);
     let tr = fbs::CGRadius::new(cr.tr.rx, cr.tr.ry);
     let bl = fbs::CGRadius::new(cr.bl.rx, cr.bl.ry);

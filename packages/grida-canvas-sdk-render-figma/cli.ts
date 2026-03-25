@@ -207,7 +207,9 @@ async function runExportAll(
   fontsDir?: string,
   skipDefaultFonts?: boolean
 ): Promise<void> {
-  const isFig = documentPath.toLowerCase().endsWith(".fig");
+  const isFig =
+    documentPath.toLowerCase().endsWith(".fig") ||
+    documentPath.toLowerCase().endsWith(".deck");
   let document: FigmaDocument;
   let items: ExportItem[];
   let rendererOptions: {
@@ -319,7 +321,9 @@ async function runSingleNode(
       JSON.parse(readFileSync(documentPath, "utf8"))
     );
   } else {
-    const isFig = documentPath.toLowerCase().endsWith(".fig");
+    const isFig =
+      documentPath.toLowerCase().endsWith(".fig") ||
+      documentPath.toLowerCase().endsWith(".deck");
     const useStreaming =
       isFig && statSync(documentPath).size >= LARGE_FILE_THRESHOLD;
     if (useStreaming) {

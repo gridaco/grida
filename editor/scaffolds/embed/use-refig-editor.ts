@@ -6,11 +6,13 @@ import { io } from "@grida/io";
 import { editor } from "@/grida-canvas";
 import { useEditor, useEditorState } from "@/grida-canvas-react";
 import { distro } from "@/grida-canvas-hosted/distro";
+import type iofigma from "@grida/io-figma";
 
 function validateExt(name: string) {
   const l = name.toLowerCase();
   return (
     l.endsWith(".fig") ||
+    l.endsWith(".deck") ||
     l.endsWith(".json") ||
     l.endsWith(".json.gz") ||
     l.endsWith(".zip")
@@ -44,31 +46,20 @@ async function decompressGzip(buf: ArrayBuffer): Promise<ArrayBuffer> {
  * Renderer configuration for the refig embed canvas.
  *
  * These flags are applied to the WASM renderer after mount, before any
- * document is loaded. Values are intentionally narrow literals today —
- * widen to `boolean` once the feature graduates from "always-on".
+ * document is loaded.
  */
-interface RefigRenderConfig {
+interface RefigRenderConfig extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  "prefer_fixed_text_sizing"
+> {
   /**
-   * Skip the Taffy flexbox layout engine during scene loading.
-   *
-   * Figma imports use absolute positioning — running layout on 100k+
-   * nodes is the dominant cold-start cost (~25 s in WASM). Setting
-   * this to `true` derives layout from schema positions instead.
+   * Skip the flexbox layout engine during scene loading.
    */
-  cg_skip_layout: true;
-  /**
-   * Bake Figma's absoluteBoundingBox dimensions into TEXT nodes instead
-   * of relying on layout-time text measurement.
-   *
-   * Paired with `cg_skip_layout` — without this, text nodes get 0×0
-   * sizes because the layout engine (which would measure them) is skipped.
-   */
-  prefer_fixed_text_sizing: true;
+  cg_skip_layout: boolean;
 }
 
 const REFIG_RENDER_CONFIG: RefigRenderConfig = {
-  cg_skip_layout: true,
-  prefer_fixed_text_sizing: true,
+  cg_skip_layout: false,
 };
 
 export function useRefigEditor() {

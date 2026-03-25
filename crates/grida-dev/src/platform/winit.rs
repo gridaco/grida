@@ -11,7 +11,7 @@ use glutin_winit::DisplayBuilder;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::gpu;
-use std::{ffi::CString, num::NonZeroU32};
+use std::{ffi::CString, num::NonZeroU32, time::Instant};
 use winit::{
     dpi::LogicalSize,
     event_loop::EventLoop,
@@ -28,7 +28,8 @@ pub(crate) struct WinitResult {
 }
 
 pub(crate) fn winit_window(width: i32, height: i32) -> WinitResult {
-    println!("🔄 Window process started with PID: {}", std::process::id());
+    let setup_started_at = Instant::now();
+    println!("[winit] process started (pid={})", std::process::id());
 
     let el = EventLoop::<HostEvent>::with_user_event().build().unwrap();
 
@@ -54,7 +55,11 @@ pub(crate) fn winit_window(width: i32, height: i32) -> WinitResult {
             best
         })
         .expect("failed to build window");
-    println!("Picked a config with {} samples", gl_config.num_samples());
+    println!(
+        "[winit] picked GL config: samples={} (elapsed={:?})",
+        gl_config.num_samples(),
+        setup_started_at.elapsed()
+    );
     let window = window.expect("Could not create window with OpenGL context");
     #[allow(deprecated)]
     let raw_window_handle = window
@@ -148,6 +153,10 @@ pub(crate) fn winit_window(width: i32, height: i32) -> WinitResult {
     .expect("Could not create skia surface");
 
     let state = SurfaceState::from_parts(gr_context, fb_info, surface);
+    println!(
+        "[winit] GL/Skia surface initialized in {:?}",
+        setup_started_at.elapsed()
+    );
 
     WinitResult {
         state,

@@ -210,7 +210,7 @@ export default function EmbedDebugPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".fig,.json,.json.gz,.gz,.zip,application/json,application/gzip,application/x-gzip,application/zip"
+              accept=".fig,.deck,.json,.json.gz,.gz,.zip,application/json,application/gzip,application/x-gzip,application/zip"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];

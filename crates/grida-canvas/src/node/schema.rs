@@ -894,6 +894,216 @@ impl Default for LayoutDimensionStyle {
     }
 }
 
+/// Discriminant tag for the [`Node`] enum — lets hot loops dispatch on node
+/// type without touching the full 500+ byte `Node` variant.
+///
+/// Used by [`NodeLayerCore`] and performance-critical DFS paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum NodeTypeTag {
+    InitialContainer,
+    Container,
+    Error,
+    Group,
+    Rectangle,
+    Ellipse,
+    Polygon,
+    RegularPolygon,
+    RegularStarPolygon,
+    Line,
+    TextSpan,
+    Path,
+    Vector,
+    BooleanOperation,
+    Image,
+}
+
+/// Compact, layer-relevant data extracted from a `Node` at construction time.
+///
+/// Stored in a parallel `DenseNodeMap` on `SceneGraph` so that the layers DFS
+/// and effect tree never need to iterate over the full `Node` enum for basic
+/// visibility / dispatch checks.
+///
+/// This struct is `Copy` — no heap allocations, ~16 bytes total.
+#[derive(Debug, Clone, Copy)]
+pub struct NodeLayerCore {
+    /// Whether this node is visible.
+    pub active: bool,
+    /// Node opacity (0.0–1.0).
+    pub opacity: f32,
+    /// Blend mode.
+    pub blend_mode: LayerBlendMode,
+    /// Mask type (if any).
+    pub mask: Option<LayerMaskType>,
+    /// Whether this container clips its descendants.
+    pub clips_content: bool,
+    /// Whether the node has any non-empty effects (quick check).
+    pub has_effects: bool,
+    /// Node type discriminant for dispatch.
+    pub node_type: NodeTypeTag,
+    /// Whether this node is a flex layout container (Container with LayoutMode::Flex
+    /// or InitialContainer). Used by the layout engine to skip Taffy for normal containers.
+    pub is_flex: bool,
+}
+
+/// Extract compact layer-core data from a `Node`.
+///
+/// Called once per node during `SceneGraph` construction. All values are `Copy`.
+pub fn extract_layer_core(node: &Node) -> NodeLayerCore {
+    match node {
+        Node::InitialContainer(n) => NodeLayerCore {
+            active: n.active,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
+            clips_content: false,
+            has_effects: false,
+            node_type: NodeTypeTag::InitialContainer,
+            is_flex: true, // ICB always uses flex layout
+        },
+        Node::Container(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: n.clip,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Container,
+            is_flex: n.layout_container.layout_mode == crate::cg::types::LayoutMode::Flex,
+        },
+        Node::Error(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
+            clips_content: false,
+            has_effects: false,
+            node_type: NodeTypeTag::Error,
+            is_flex: false,
+        },
+        Node::Group(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: false,
+            node_type: NodeTypeTag::Group,
+            is_flex: false,
+        },
+        Node::Rectangle(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Rectangle,
+            is_flex: false,
+        },
+        Node::Ellipse(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Ellipse,
+            is_flex: false,
+        },
+        Node::Polygon(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Polygon,
+            is_flex: false,
+        },
+        Node::RegularPolygon(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::RegularPolygon,
+            is_flex: false,
+        },
+        Node::RegularStarPolygon(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::RegularStarPolygon,
+            is_flex: false,
+        },
+        Node::Line(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Line,
+            is_flex: false,
+        },
+        Node::TextSpan(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::TextSpan,
+            is_flex: false,
+        },
+        Node::Path(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Path,
+            is_flex: false,
+        },
+        Node::Vector(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Vector,
+            is_flex: false,
+        },
+        Node::BooleanOperation(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::BooleanOperation,
+            is_flex: false,
+        },
+        Node::Image(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Image,
+            is_flex: false,
+        },
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Node {
     InitialContainer(InitialContainerNodeRec),

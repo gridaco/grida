@@ -6,6 +6,7 @@
  *
  * Supported input formats:
  *   .fig          Figma native binary (Kiwi/ZIP)
+ *   .deck         Figma Deck/Slides binary (same format as .fig)
  *   .json         Figma REST API JSON response
  *   .json.gz      Gzip-compressed REST API JSON
  *   .zip          REST API archive ZIP (contains document.json + images)
@@ -33,7 +34,7 @@ function printHelp(): void {
   console.log(`
 fig2grida — Convert Figma files to .grida archives
 
-Supported inputs: .fig, .json, .json.gz, .zip
+Supported inputs: .fig, .deck, .json, .json.gz, .zip
 
 Usage:
   fig2grida <input> [output.grida]
@@ -50,6 +51,7 @@ Options:
 
 Examples:
   fig2grida design.fig
+  fig2grida presentation.deck
   fig2grida api-response.json.gz output.grida
   fig2grida design.fig --pages 0,2 --verbose
   fig2grida design.fig --info
@@ -175,14 +177,16 @@ function main(): void {
   const inputPath = resolve(args.input);
   const lower = inputPath.toLowerCase();
 
-  // Reject .fig-only flags for REST-format inputs
-  if (!lower.endsWith(".fig")) {
+  const isFigLike = lower.endsWith(".fig") || lower.endsWith(".deck");
+
+  // Reject .fig/.deck-only flags for REST-format inputs
+  if (!isFigLike) {
     if (args.info) {
-      console.error("--info is only supported for .fig input.");
+      console.error("--info is only supported for .fig/.deck input.");
       process.exit(1);
     }
     if (args.pages) {
-      console.error("--pages is currently only supported for .fig input.");
+      console.error("--pages is currently only supported for .fig/.deck input.");
       process.exit(1);
     }
   }
@@ -195,7 +199,7 @@ function main(): void {
 
   // Strip known extensions to derive the default output name
   const stripExt = (name: string): string => {
-    for (const ext of [".json.gz", ".json", ".fig", ".zip"]) {
+    for (const ext of [".json.gz", ".json", ".fig", ".deck", ".zip"]) {
       if (name.toLowerCase().endsWith(ext)) {
         return name.slice(0, -ext.length);
       }

@@ -132,6 +132,9 @@ pub trait ApplicationApi {
     /// Only works after `load_scene_grida` has decoded a multi-scene document.
     fn switch_scene(&mut self, scene_id: &str);
 
+    /// Return the IDs of all scenes decoded by the last `load_scene_grida` call.
+    fn loaded_scene_ids(&self) -> Vec<String>;
+
     /// Apply a batch of scene transactions represented as JSON Patch operations.
     fn apply_document_transactions(
         &mut self,
@@ -557,11 +560,15 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
         self.renderer.set_pixel_preview_scale(scale);
+        self.renderer
+            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
         self.queue();
     }
 
     fn runtime_renderer_set_pixel_preview_stable(&mut self, stable: bool) {
         self.renderer.set_pixel_preview_strategy_stable(stable);
+        self.renderer
+            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
         self.queue();
     }
 
@@ -571,6 +578,8 @@ impl ApplicationApi for UnknownTargetApplication {
     ) {
         let policy = crate::runtime::render_policy::RenderPolicy::from_flags(flags);
         self.renderer.set_render_policy(policy);
+        self.renderer
+            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
         self.queue();
     }
 
@@ -620,8 +629,8 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn load_scene_grida(&mut self, bytes: &[u8]) {
-        use crate::io::io_grida_fbs;
-        match io_grida_fbs::decode_with_id_map(bytes) {
+        use crate::io::io_grida_file;
+        match io_grida_file::decode_with_id_map(bytes) {
             Ok(result) => {
                 // Build id mappings from the decode result
                 let mut string_to_internal = std::collections::HashMap::new();
@@ -651,8 +660,9 @@ impl ApplicationApi for UnknownTargetApplication {
     }
 
     fn switch_scene(&mut self, scene_id: &str) {
-        if let Some((_, scene)) = self.loaded_scenes.iter().find(|(id, _)| id == scene_id) {
-            self.renderer.load_scene(scene.clone());
+        if let Some(pos) = self.loaded_scenes.iter().position(|(id, _)| id == scene_id) {
+            let (_, scene) = self.loaded_scenes[pos].clone();
+            self.renderer.load_scene(scene);
             self.queue();
         } else {
             eprintln!(
@@ -664,6 +674,13 @@ impl ApplicationApi for UnknownTargetApplication {
                     .collect::<Vec<_>>()
             );
         }
+    }
+
+    fn loaded_scene_ids(&self) -> Vec<String> {
+        self.loaded_scenes
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect()
     }
 
     fn apply_document_transactions(
@@ -1133,11 +1150,31 @@ impl UnknownTargetApplication {
         // (viewport resize, font/image loads, text edits, config changes)
         // and camera state in one place. This replaces the ad-hoc
         // invalidate_compositor_on_zoom() call and all per-site cache nuking.
-        self.renderer.apply_changes(camera_change, stable);
+        let content_changed = self.renderer.apply_changes(camera_change, stable);
 
         // Warm the camera cache once per frame so view_matrix(), rect(), and
         // screen_to_canvas_point() are essentially free for the rest of this frame.
         self.renderer.camera.warm_cache();
+
+        // 5a. Overlay-only fast path
+        //
+        // When neither scene data nor the camera changed (e.g. marquee drag,
+        // hover highlight, selection change), the content layer is identical
+        // to the previous frame. Restore it from the pan image cache and
+        // skip the expensive frame-plan build + full draw.  The overlay is
+        // still re-drawn below so marquee/selection visuals update correctly.
+        if !content_changed && !camera_change.any_changed() && self.renderer.blit_content_cache() {
+            // Consume the camera change (no-op here, but keeps the contract).
+            self.renderer.camera.consume_change();
+
+            // Draw devtools overlays on top of the restored content.
+            let _overlay_time = self.draw_and_flush_devtools_overlay();
+
+            // Complete frame in the loop.
+            self.frame_loop.complete(quality);
+            self.last_frame_time = __frame_start;
+            return true;
+        }
 
         // Build frame plan lazily
         let rect = self.renderer.camera.rect();

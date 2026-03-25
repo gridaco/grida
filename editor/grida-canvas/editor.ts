@@ -3214,10 +3214,17 @@ export class Editor
         sceneId?: string
       ) => {
         const t0 = __DEV__ ? performance.now() : 0;
+        let tLoad = 0;
+        let encodeMs = 0;
+        let loadMs = 0;
 
         try {
           const bytes = io.GRID.encode(document);
+          const tEncode = __DEV__ ? performance.now() : 0;
           surface.loadSceneGrida(bytes);
+          tLoad = __DEV__ ? performance.now() : 0;
+          encodeMs = tEncode - t0;
+          loadMs = tLoad - tEncode;
         } catch {
           // Fallback to JSON if FlatBuffers encoding fails (e.g. unsupported node types)
           const p = JSON.stringify({
@@ -3225,6 +3232,9 @@ export class Editor
             document,
           });
           surface.loadScene(p);
+          tLoad = __DEV__ ? performance.now() : 0;
+          encodeMs = 0;
+          loadMs = tLoad - t0;
         }
 
         // loadSceneGrida only decodes and stores scenes.
@@ -3236,12 +3246,17 @@ export class Editor
           surface.switchScene(targetScene);
         }
 
+        const tSwitch = __DEV__ ? performance.now() : 0;
+
         surface.redraw();
 
         if (__DEV__) {
+          const tRedraw = performance.now();
           console.log(
             `[syncDocument] ${Object.keys(document.nodes).length} nodes, ` +
-              `scene=${targetScene ?? "(none)"} in ${(performance.now() - t0).toFixed(0)}ms`
+              `scene=${targetScene ?? "(none)"} in ${(tRedraw - t0).toFixed(0)}ms` +
+              ` (encode=${encodeMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
+              ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=${(tRedraw - tSwitch).toFixed(0)}ms)`
           );
         }
       };

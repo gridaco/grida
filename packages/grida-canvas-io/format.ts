@@ -5,7 +5,7 @@ import * as fbs from "@grida/format";
 import { unionToPaint, unionToNode, unionToFeBlur } from "@grida/format";
 import type { vn } from "@grida/schema";
 import * as flatbuffers from "flatbuffers";
-import { generateNKeysBetween } from "@grida/sequence";
+// generateNKeysBetween removed — replaced by zero-padded integers for position encoding.
 
 type Builder = flatbuffers.Builder;
 
@@ -439,7 +439,9 @@ export namespace format {
       builder: Builder,
       id: string
     ): flatbuffers.Offset {
-      const idOffset = builder.createString(id);
+      const idOffset = id
+        ? builder.createSharedString(id)
+        : builder.createString(id);
       return fbs.NodeIdentifier.createNodeIdentifier(builder, idOffset);
     }
 
@@ -452,7 +454,7 @@ export namespace format {
       position: string
     ): flatbuffers.Offset {
       const parentIdOffset = structs.nodeIdentifier(builder, parentId);
-      const positionOffset = builder.createString(position);
+      const positionOffset = builder.createSharedString(position);
       fbs.ParentReference.startParentReference(builder);
       fbs.ParentReference.addParentId(builder, parentIdOffset);
       fbs.ParentReference.addPosition(builder, positionOffset);
@@ -935,7 +937,7 @@ export namespace format {
         node: grida.program.nodes.Node
       ): flatbuffers.Offset {
         const idOffset = structs.nodeIdentifier(builder, node.id);
-        const nameOffset = builder.createString(node.name ?? "");
+        const nameOffset = builder.createSharedString(node.name ?? "");
 
         fbs.SystemNodeTrait.startSystemNodeTrait(builder);
         fbs.SystemNodeTrait.addId(builder, idOffset);
@@ -1062,35 +1064,36 @@ export namespace format {
         }
 
         // 7. Post-layout transform (rotation as transform matrix)
-        // Convert rotation (degrees) to a rotation transform matrix
+        // Only compute trig and emit the transform when rotation is non-zero.
         const nodeWithRotation = node as grida.program.nodes.Node &
           Partial<Pick<grida.program.nodes.UnknownNode, "rotation">>;
         const rotationDegrees = nodeWithRotation.rotation ?? 0;
-        const rotationRad = (rotationDegrees * Math.PI) / 180;
-        const cos = Math.cos(rotationRad);
-        const sin = Math.sin(rotationRad);
+        if (rotationDegrees !== 0) {
+          const rotationRad = (rotationDegrees * Math.PI) / 180;
+          const cos = Math.cos(rotationRad);
+          const sin = Math.sin(rotationRad);
 
-        // Pure rotation matrix: [cos, -sin, 0], [sin, cos, 0]
-        const postLayoutTransformOffset = structs.cgTransform2D(
-          builder,
-          cos, // m00
-          -sin, // m01
-          0, // m02
-          sin, // m10
-          cos, // m11
-          0 // m12
-        );
-        fbs.LayerTrait.addPostLayoutTransform(
-          builder,
-          postLayoutTransformOffset
-        );
+          const postLayoutTransformOffset = structs.cgTransform2D(
+            builder,
+            cos,
+            -sin,
+            0,
+            sin,
+            cos,
+            0
+          );
+          fbs.LayerTrait.addPostLayoutTransform(
+            builder,
+            postLayoutTransformOffset
+          );
 
-        // 8. Post-layout transform origin (default to center: 0, 0 in Alignment coordinates)
-        const transformOriginOffset = structs.alignment(builder, 0, 0);
-        fbs.LayerTrait.addPostLayoutTransformOrigin(
-          builder,
-          transformOriginOffset
-        );
+          // 8. Post-layout transform origin (only needed when rotation is set)
+          const transformOriginOffset = structs.alignment(builder, 0, 0);
+          fbs.LayerTrait.addPostLayoutTransformOrigin(
+            builder,
+            transformOriginOffset
+          );
+        }
 
         return fbs.LayerTrait.endLayerTrait(builder);
       }
@@ -1332,10 +1335,6 @@ export namespace format {
             fbs.BasicShapeNodeType.Rectangle;
 
           // Helper to create StrokeStyle
-          const dashArrayOffset = fbs.StrokeStyle.createStrokeDashArrayVector(
-            builder,
-            []
-          );
           fbs.StrokeStyle.startStrokeStyle(builder);
           fbs.StrokeStyle.addStrokeCap(
             builder,
@@ -1347,7 +1346,7 @@ export namespace format {
           );
           fbs.StrokeStyle.addStrokeAlign(builder, fbs.StrokeAlign.Inside);
           fbs.StrokeStyle.addStrokeMiterLimit(builder, 4.0);
-          fbs.StrokeStyle.addStrokeDashArray(builder, dashArrayOffset);
+          // Skip empty dash array vector — decoder reads null as no dashes
           const strokeStyleOffset = fbs.StrokeStyle.endStrokeStyle(builder);
 
           // Encode paints as PaintStackItem arrays
@@ -1364,15 +1363,8 @@ export namespace format {
             fbs.BasicShapeNode.createStrokePaintsVector
           );
 
-          // Create VariableWidthProfile (empty for now - nodes don't have this in TS model)
-          const emptyStopsOffset = fbs.VariableWidthProfile.createStopsVector(
-            builder,
-            []
-          );
-          fbs.VariableWidthProfile.startVariableWidthProfile(builder);
-          fbs.VariableWidthProfile.addStops(builder, emptyStopsOffset);
-          const strokeWidthProfileOffset =
-            fbs.VariableWidthProfile.endVariableWidthProfile(builder);
+          // Skip VariableWidthProfile — nodes don't have this in TS model.
+          // Decoder reads null when the field is absent.
 
           // Encode corner_radius and rectangular properties
           // For rectangle, use rectangular_corner_radius; for others, use corner_radius
@@ -1409,10 +1401,7 @@ export namespace format {
             builder,
             shapeNode.stroke_width ?? 0
           );
-          fbs.BasicShapeNode.addStrokeWidthProfile(
-            builder,
-            strokeWidthProfileOffset
-          );
+          // strokeWidthProfile omitted — not in TS model, decoder reads null.
           // Create structs inline (must be done while table is being built)
           const rectangularCornerRadiusOffsetInline =
             shapeNode.type === "rectangle"
@@ -2182,7 +2171,7 @@ export namespace format {
         ) => flatbuffers.Offset
       ): flatbuffers.Offset {
         if (!paints || paints.length === 0) {
-          return createVector(builder, []);
+          return 0; // No vector — decoder reads null/empty
         }
 
         const stackItemOffsets: flatbuffers.Offset[] = [];
@@ -4516,52 +4505,67 @@ export namespace format {
        * @param document - The TS IR document to encode
        * @returns Uint8Array containing the FlatBuffers binary data
        */
+      export interface ToFlatbufferOptions {
+        /**
+         * When true, skip sorting node IDs for deterministic output.
+         * Safe for write-once pipelines (e.g. fig2grida) where the
+         * consumer does not depend on node order in the FlatBuffer vector.
+         * @default false
+         */
+        skipSort?: boolean;
+      }
+
       export function toFlatbuffer(
         document: grida.program.document.Document,
-        schemaVersion: string = grida.program.document.SCHEMA_VERSION
+        schemaVersion: string = grida.program.document.SCHEMA_VERSION,
+        options?: ToFlatbufferOptions
       ): Uint8Array {
-        const builder = new flatbuffers.Builder(1024);
+        // Collect node IDs once — reused for pre-sizing and iteration.
+        const nodeIds = Object.keys(document.nodes || {});
+        const nodeCount = nodeIds.length;
+
+        // Pre-size the builder to reduce doubling + copy during growth.
+        const initialSize = Math.max(nodeCount * 256, 256 * 1024);
+        const builder = new flatbuffers.Builder(initialSize);
 
         // Build schema version
         const schemaVersionOffset = builder.createString(schemaVersion);
 
-        // Build parent reference map: for each node, find its parent and generate position
-        // First, build a reverse map: childId -> parentId
-        const childToParentMap = new Map<string, string>();
+        // Build parent→children map from links for position generation.
         const parentToChildrenMap = new Map<string, string[]>();
 
         if (document.links) {
           for (const [parentId, children] of Object.entries(document.links)) {
             if (children && children.length > 0) {
               parentToChildrenMap.set(parentId, children);
-              for (const childId of children) {
-                childToParentMap.set(childId, parentId);
-              }
             }
           }
         }
 
-        // Generate position strings for each parent's children
+        // Generate position strings for each parent's children.
+        // We use zero-padded integers ("000000", "000001", …) which are
+        // trivially lexicographically sortable and nearly free to generate,
+        // replacing the costly fractional-index algorithm.
         const nodeToParentRef = new Map<
           string,
           { parentId: string; position: string }
         >();
         for (const [parentId, children] of parentToChildrenMap.entries()) {
           if (children.length === 0) continue;
-          // Generate position strings for all children
-          const positions = generateNKeysBetween(null, null, children.length);
+          const pad = Math.max(6, String(children.length - 1).length);
           for (let i = 0; i < children.length; i++) {
             nodeToParentRef.set(children[i]!, {
               parentId,
-              position: positions[i]!,
+              position: String(i).padStart(pad, "0"),
             });
           }
         }
 
         // Encode nodes array (TS nodes map -> flat list)
-        const nodeIds = Object.keys(document.nodes || {});
-        // Deterministic ordering: sort by string id
-        nodeIds.sort();
+        // Deterministic ordering: sort by string id (skippable for perf)
+        if (!options?.skipSort) {
+          nodeIds.sort();
+        }
 
         const nodeSlotOffsets: flatbuffers.Offset[] = [];
         for (const nodeId of nodeIds) {

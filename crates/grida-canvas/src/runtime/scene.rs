@@ -413,10 +413,10 @@ impl Renderer {
         &mut self,
         plan: &FramePlan,
     ) -> (
-        std::collections::HashMap<NodeId, crate::painter::PromotedBlit>,
+        crate::cache::fast_hash::NodeIdHashMap<NodeId, crate::painter::PromotedBlit>,
         usize,
     ) {
-        let mut blits = std::collections::HashMap::new();
+        let mut blits = crate::cache::fast_hash::new_node_id_map();
         let mut cache_hits = 0usize;
 
         for id in &plan.promoted {
@@ -475,7 +475,9 @@ impl Renderer {
         &mut self,
         canvas: &Canvas,
         plan: &FramePlan,
-        promoted_blits: Option<&std::collections::HashMap<NodeId, crate::painter::PromotedBlit>>,
+        promoted_blits: Option<
+            &crate::cache::fast_hash::NodeIdHashMap<NodeId, crate::painter::PromotedBlit>,
+        >,
     ) -> usize {
         // Select effect quality based on frame stability.
         // Unstable (interactive) frames use reduced effects for performance.
@@ -910,7 +912,7 @@ impl Renderer {
         //
         // When the offset exceeds the viewport (no overlap with cached frame),
         // we fall through to a full redraw which captures a new snapshot.
-        if camera_change == CameraChangeKind::PanOnly && self.backend.is_gpu() {
+        if !stable && !camera_change.zoom_changed() && self.backend.is_gpu() {
             if let Some(ref cache) = self.pan_image_cache {
                 let width = surface.width() as f32;
                 let height = surface.height() as f32;
@@ -1336,6 +1338,9 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
+        #[cfg(feature = "perf")]
+        let _t0 = crate::sys::perf_now();
+
         self.scene = Some(scene);
 
         self.scene_cache = cache::scene::SceneCache::new();
@@ -1343,12 +1348,22 @@ impl Renderer {
         self.zoom_image_cache = None;
         self.images.clear_missing_tracking();
         if let Some(scene) = self.scene.as_ref() {
+            #[cfg(feature = "perf")]
+            let _t_fonts_start = crate::sys::perf_now();
             let requested = collect_scene_font_families(scene);
             self.fonts.set_requested_families(requested.into_iter());
+            #[cfg(feature = "perf")]
+            let _t_fonts = crate::sys::perf_now();
 
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Compute layout phase
+            //
+            // NOTE: We cannot auto-skip Taffy based on has_flex() alone because
+            // compute_schema_only() skips text measurement — text nodes with
+            // height=None would get height=0 and become invisible. A future
+            // optimization could use a hybrid path that skips flex computation
+            // but still measures text via the paragraph cache.
             if self.config.skip_layout {
                 // Fast path: derive layout directly from schema positions/sizes.
                 // Skips Taffy tree construction, flexbox computation, and text
@@ -1365,6 +1380,8 @@ impl Renderer {
                     }),
                 );
             }
+            #[cfg(feature = "perf")]
+            let _t_layout = crate::sys::perf_now();
 
             // 2. Build geometry with layout results
             let layout_result = self.layout_engine.result();
@@ -1374,12 +1391,30 @@ impl Renderer {
                 layout_result,
                 viewport_size,
             );
+            #[cfg(feature = "perf")]
+            let _t_geometry = crate::sys::perf_now();
 
             // 3. Build effect tree (identifies render surface boundaries)
             self.scene_cache.update_effect_tree(scene);
+            #[cfg(feature = "perf")]
+            let _t_effects = crate::sys::perf_now();
 
             // 4. Build layers
             self.scene_cache.update_layers(scene);
+
+            #[cfg(feature = "perf")]
+            {
+                let _t_layers = crate::sys::perf_now();
+                eprintln!(
+                    "[load_scene] fonts={:.0}ms layout={:.0}ms geometry={:.0}ms effects={:.0}ms layers={:.0}ms total={:.0}ms",
+                    _t_fonts - _t_fonts_start,
+                    _t_layout - _t_fonts,
+                    _t_geometry - _t_layout,
+                    _t_effects - _t_geometry,
+                    _t_layers - _t_effects,
+                    _t_layers - _t0,
+                );
+            }
         }
         // Record SCENE_LOAD so apply_changes() knows to clear picture/paragraph/
         // path/compositor caches on the next frame. The scene_cache was already
@@ -1407,10 +1442,13 @@ impl Renderer {
             self.scene_cache.compositor.mark_all_stale();
         }
 
-        // Invalidate pan image cache when zoom changes or on stable frames.
+        // Invalidate pan image cache on zoom changes only.
         // Zoom changes alter the pixel content (different scale/density).
-        // Stable frames should produce a full-quality render, not a cached blit.
-        if camera_change.zoom_changed() || stable {
+        // Stable frames do NOT nuke the pan cache — the cache is valid for
+        // pan-only and no-change scenarios. The render path recaptures it
+        // from the full-quality draw anyway, so the next unstable frame
+        // always has a fresh cache to blit from.
+        if camera_change.zoom_changed() {
             self.pan_image_cache = None;
         }
 
@@ -1431,8 +1469,10 @@ impl Renderer {
         let can_defer = !stable
             && self.backend.is_gpu()
             && (
+                // No content or camera change — overlay-only (marquee, hover)
+                (!camera_change.any_changed() && self.pan_image_cache.is_some())
                 // Pan cache will likely hit
-                (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
+                || (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
                 // Zoom cache will likely hit
                 || (camera_change.zoom_changed() && self.zoom_image_cache.is_some())
             );
@@ -1508,6 +1548,50 @@ impl Renderer {
         Some(self.render_frame(plan))
     }
 
+    /// Restore cached content for overlay-only frames.
+    ///
+    /// Blits the pan image cache at (0,0) onto the backend surface,
+    /// restoring the content layer without the previous overlay pixels.
+    /// Returns `true` if the blit succeeded, `false` if no cache exists.
+    ///
+    /// Used when neither scene data nor the camera changed — the content
+    /// is identical, so we skip the expensive frame-plan + draw and just
+    /// repaint the overlay on top of cached content.
+    pub fn blit_content_cache(&mut self) -> bool {
+        if !self.backend.is_gpu() {
+            return false;
+        }
+        let cache = match self.pan_image_cache.as_ref() {
+            Some(c) => c,
+            None => return false,
+        };
+        // The pan cache image was captured at (origin_tx, origin_ty).
+        // If the camera has since moved (e.g. pan-only fast-path frames
+        // that don't recapture), we must offset the blit — otherwise the
+        // settle frame "reverts" to the old camera position.
+        let vm = self.camera.view_matrix();
+        let dx = vm.matrix[0][2] - cache.origin_tx;
+        let dy = vm.matrix[1][2] - cache.origin_ty;
+
+        let surface = unsafe { &mut *self.backend.get_surface() };
+        let canvas = surface.canvas();
+        if dx != 0.0 || dy != 0.0 {
+            // Offset blit — need to clear first (exposed edges).
+            if let Some(scene) = self.scene.as_ref() {
+                if let Some(bg) = scene.background_color {
+                    canvas.clear(skia_safe::Color::from(bg));
+                } else {
+                    canvas.clear(skia_safe::Color::TRANSPARENT);
+                }
+            } else {
+                canvas.clear(skia_safe::Color::TRANSPARENT);
+            }
+        }
+        canvas.draw_image(&cache.image, (dx, dy), None);
+        Self::gpu_flush(surface);
+        true
+    }
+
     /// Clear the cached scene picture.
     ///
     /// **Prefer [`mark_changed`] + [`apply_changes`]** for new code.
@@ -1552,12 +1636,17 @@ impl Renderer {
     ///
     /// The `camera_change` parameter is folded in so that zoom/pan
     /// invalidation lives in the same dispatch table.
-    pub fn apply_changes(&mut self, camera_change: CameraChangeKind, stable: bool) {
+    /// Returns `true` when content actually needs re-rendering (data or
+    /// camera changed).  Returns `false` for overlay-only frames (e.g.
+    /// marquee drag, hover highlight) where the caller can skip the
+    /// expensive frame-plan + draw and just blit the cached content.
+    pub fn apply_changes(&mut self, camera_change: CameraChangeKind, stable: bool) -> bool {
         let cs = self.changes.take();
         let flags = cs.flags();
 
         // Fast path: nothing changed (pure camera move handled below).
         let has_data_changes = !flags.is_empty();
+        let content_changed = has_data_changes || camera_change.any_changed();
 
         // ----- Layout -----
         // Scene load handles its own layout in load_scene(); skip here.
@@ -1619,8 +1708,19 @@ impl Renderer {
 
         // ----- Viewport snapshot caches (pan/zoom image caches) -----
         // These are the ONLY caches that truly depend on viewport dimensions.
-        let invalidate_pan = has_data_changes || camera_change.zoom_changed() || stable;
-        let invalidate_zoom = has_data_changes || stable;
+        //
+        // Pan cache: invalidate on data changes or zoom changes.  Stable
+        // frames do NOT nuke the pan cache — during slow panning, a stable
+        // frame firing between scroll events would destroy the cache and
+        // force an expensive full redraw on the next unstable frame.  The
+        // stable frame's render path recaptures the pan cache anyway.
+        let invalidate_pan = has_data_changes || camera_change.zoom_changed();
+        // Zoom cache: invalidate when content changed OR when a stable frame
+        // follows a camera change (full-quality recapture needed).  Overlay-
+        // only frames (no data + no camera change) must NOT nuke the zoom
+        // cache — the content is identical, and destroying the cache forces
+        // an expensive full draw on the next real zoom interaction.
+        let invalidate_zoom = has_data_changes || (stable && camera_change.any_changed());
 
         if invalidate_pan {
             self.pan_image_cache = None;
@@ -1628,6 +1728,8 @@ impl Renderer {
         if invalidate_zoom {
             self.zoom_image_cache = None;
         }
+
+        content_changed
     }
 
     /// Check whether the current scene has layout that depends on viewport size.

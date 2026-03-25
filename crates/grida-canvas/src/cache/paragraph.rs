@@ -78,6 +78,7 @@ use crate::text::text_style::textstyle;
 use skia_safe::textlayout;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
+use crate::cache::fast_hash::DenseNodeMap;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -152,8 +153,9 @@ pub struct ParagraphCacheEntry {
     pub font_generation: usize,
     /// The cached Skia paragraph object
     pub paragraph: Rc<RefCell<textlayout::Paragraph>>,
-    // TODO: Add width-based caching in the future
-    // For now, we just store the paragraph and compute measurements on demand
+    /// Cached measurements for the last layout width — avoids re-calling
+    /// Skia `paragraph.layout()` on every access when the width hasn't changed.
+    pub cached_measurements: Option<(Option<f32>, LayoutMeasurements)>,
 }
 
 /// Accumulated statistics from `measure()` calls — for benchmarking only.
@@ -167,8 +169,8 @@ pub struct ParagraphMeasureStats {
 
 #[derive(Default, Debug, Clone)]
 pub struct ParagraphCache {
-    // ID-based cache for text nodes (primary usage)
-    entries_measurement_by_id: HashMap<NodeId, ParagraphCacheEntry>,
+    // ID-based cache for text nodes (primary usage) — Vec-backed for O(1) access
+    entries_measurement_by_id: DenseNodeMap<ParagraphCacheEntry>,
     // Shape-key-based cache for flexible usage (not currently used)
     entries_measurement_by_shapekey_unstable: HashMap<u64, ParagraphCacheEntry>,
     /// Benchmark statistics — zero-cost when not read.
@@ -181,7 +183,7 @@ pub struct ParagraphCache {
 impl ParagraphCache {
     pub fn new() -> Self {
         Self {
-            entries_measurement_by_id: HashMap::new(),
+            entries_measurement_by_id: DenseNodeMap::new(),
             entries_measurement_by_shapekey_unstable: HashMap::new(),
             stats: ParagraphMeasureStats::default(),
             skip_text_measure: false,
@@ -236,23 +238,37 @@ impl ParagraphCache {
         // Check if we have a cached paragraph
         if let Some(node_id) = id {
             // Use ID-based cache
-            if let Some(entry) = self.entries_measurement_by_id.get(node_id) {
+            if let Some(entry) = self.entries_measurement_by_id.get_mut(node_id) {
                 if entry.font_generation == fonts_gen {
                     self.stats.cache_hits += 1;
-                    // Use the cached paragraph and compute measurements
+                    // Fast path: return cached measurements if width matches
+                    if let Some((cached_w, ref measurements)) = entry.cached_measurements {
+                        if cached_w == width {
+                            return measurements.clone();
+                        }
+                    }
+                    // Width changed: re-layout and cache
                     let paragraph_rc = entry.paragraph.clone();
-                    return Self::compute_measurements(paragraph_rc, width);
+                    let m = Self::compute_measurements(paragraph_rc, width);
+                    entry.cached_measurements = Some((width, m.clone()));
+                    return m;
                 }
             }
         } else {
             // Use shape-key-based cache
             let hash = Self::shape_key(text, style, align, max_lines);
-            if let Some(entry) = self.entries_measurement_by_shapekey_unstable.get(&hash) {
+            if let Some(entry) = self.entries_measurement_by_shapekey_unstable.get_mut(&hash) {
                 if entry.font_generation == fonts_gen {
                     self.stats.cache_hits += 1;
-                    // Use the cached paragraph and compute measurements
+                    if let Some((cached_w, ref measurements)) = entry.cached_measurements {
+                        if cached_w == width {
+                            return measurements.clone();
+                        }
+                    }
                     let paragraph_rc = entry.paragraph.clone();
-                    return Self::compute_measurements(paragraph_rc, width);
+                    let m = Self::compute_measurements(paragraph_rc, width);
+                    entry.cached_measurements = Some((width, m.clone()));
+                    return m;
                 }
             }
         }
@@ -292,10 +308,14 @@ impl ParagraphCache {
         // Store the paragraph for future use
         let paragraph_rc = Rc::new(RefCell::new(paragraph));
 
+        // Compute measurements and cache them with the entry
+        let measurements = Self::compute_measurements(paragraph_rc.clone(), width);
+
         let entry = ParagraphCacheEntry {
             hash: Self::shape_key(text, style, align, max_lines),
             font_generation: fonts_gen,
-            paragraph: paragraph_rc.clone(),
+            paragraph: paragraph_rc,
+            cached_measurements: Some((width, measurements.clone())),
         };
 
         // Store in the appropriate cache
@@ -307,8 +327,7 @@ impl ParagraphCache {
                 .insert(entry.hash, entry);
         }
 
-        // Compute and return the measurements
-        Self::compute_measurements(paragraph_rc, width)
+        measurements
     }
 
     /// Helper method to compute measurements for a given paragraph and width

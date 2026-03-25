@@ -118,28 +118,93 @@ pub struct FontMessage {
     pub data: Vec<u8>,
 }
 
-/// Extract all image URLs from a scene.
-pub fn extract_image_urls(scene: &Scene) -> Vec<String> {
-    // FIXME: this should either iterate the fills / strokes (all paints) rather then iterating the nodes. - the below implementation is legacy.
+/// Collect the URL string from a [`ResourceRef`].
+#[allow(dead_code)]
+fn resource_ref_url(r: &ResourceRef) -> &str {
+    match r {
+        ResourceRef::RID(s) | ResourceRef::HASH(s) => s,
+    }
+}
+
+/// Push any image URLs found in a paint slice.
+#[allow(dead_code)]
+fn collect_image_urls_from_paints(paints: &[Paint], out: &mut Vec<String>) {
+    for paint in paints {
+        if let Paint::Image(img) = paint {
+            let url = resource_ref_url(&img.image);
+            if !url.is_empty() {
+                out.push(url.to_owned());
+            }
+        }
+    }
+}
+
+/// Extract all image URLs from a scene by inspecting every node's fills,
+/// strokes, and dedicated image references.
+// TODO: consider a dedicated paints store or iterator so this doesn't need
+// to match every node variant individually.
+#[allow(dead_code)]
+fn extract_image_urls(scene: &Scene) -> Vec<String> {
+    use crate::node::schema::Node;
     let mut urls = Vec::new();
     for (id, _) in scene.graph.iter() {
-        if let Ok(n) = scene.graph.get_node(id) {
-            if let crate::node::schema::Node::Rectangle(rect) = n {
-                for fill in &rect.fills {
-                    if let Paint::Image(img) = fill {
-                        match &img.image {
-                            ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
-                        }
-                    }
-                }
-                for stroke in &rect.strokes {
-                    if let Paint::Image(img) = stroke {
-                        match &img.image {
-                            ResourceRef::RID(r) | ResourceRef::HASH(r) => urls.push(r.clone()),
-                        }
-                    }
+        let Ok(node) = scene.graph.get_node(&id) else {
+            continue;
+        };
+
+        match node {
+            Node::Image(n) => {
+                let url = resource_ref_url(&n.fill.image);
+                if !url.is_empty() {
+                    urls.push(url.to_owned());
                 }
             }
+            Node::Rectangle(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::Ellipse(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::Container(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::Vector(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::Polygon(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::RegularPolygon(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::RegularStarPolygon(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::Path(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::BooleanOperation(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::TextSpan(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            Node::Line(n) => {
+                // LineNodeRec has strokes only, no fills.
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+            }
+            // Group, InitialContainer, and Error nodes have no paint data.
+            Node::Group(_) | Node::InitialContainer(_) | Node::Error(_) => {}
         }
     }
     urls

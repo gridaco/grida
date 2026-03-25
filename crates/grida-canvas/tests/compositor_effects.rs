@@ -20,7 +20,6 @@ use cg::runtime::image_repository::ImageRepository;
 use cg::runtime::render_policy::RenderPolicy;
 use math2::rect::Rectangle;
 use skia_safe::{surfaces, Paint as SkPaint, Rect, Surface};
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -615,7 +614,7 @@ fn z_order_promoted_child_visible_above_container() {
     let offscreen_image = offscreen.image_snapshot();
 
     // Step 2: Build the promoted_blits map
-    let mut promoted_blits: HashMap<NodeId, PromotedBlit> = HashMap::new();
+    let mut promoted_blits: cg::cache::fast_hash::NodeIdHashMap<NodeId, PromotedBlit> = cg::cache::fast_hash::new_node_id_map();
     let src_rect = Rect::new(
         0.0,
         0.0,

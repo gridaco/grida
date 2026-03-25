@@ -296,6 +296,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.switch_scene(scene_id);
     }
 
+    fn loaded_scene_ids(&self) -> Vec<String> {
+        self.base.loaded_scene_ids()
+    }
+
     fn apply_document_transactions(
         &mut self,
         transactions: Vec<Vec<serde_json::Value>>,

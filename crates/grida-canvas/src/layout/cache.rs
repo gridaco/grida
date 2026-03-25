@@ -1,20 +1,20 @@
+use crate::cache::fast_hash::DenseNodeMap;
 use crate::layout::ComputedLayout;
 use crate::node::schema::NodeId;
-use std::collections::HashMap;
 
 /// Immutable layout computation result
 ///
 /// Maps NodeId to computed position/size. Represents the output of a layout
 /// computation phase. Cached between frames for performance and change detection.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct LayoutResult {
-    layouts: HashMap<NodeId, ComputedLayout>,
+    layouts: DenseNodeMap<ComputedLayout>,
 }
 
 impl LayoutResult {
     pub fn new() -> Self {
         Self {
-            layouts: HashMap::new(),
+            layouts: DenseNodeMap::new(),
         }
     }
 
@@ -38,7 +38,7 @@ impl LayoutResult {
         self.layouts.clear();
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&NodeId, &ComputedLayout)> {
+    pub fn iter(&self) -> impl Iterator<Item = (NodeId, &ComputedLayout)> {
         self.layouts.iter()
     }
 

@@ -54,8 +54,12 @@ import {
 
 // --- Constants ---
 
+// Kiwi archive preludes: the first 8 bytes of the file (see FigmaArchiveParser.parseArchive).
+// Each variant uses a different fixed 8-byte ASCII magic string; FigJam's ends with a literal
+// period — it is not a typo and must match bytes on disk.
 const FIG_KIWI_PRELUDE = "fig-kiwi";
 const FIGJAM_KIWI_PRELUDE = "fig-jam.";
+const FIGDECK_KIWI_PRELUDE = "fig-deck";
 const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
 
 // --- Archive Parser (duplicated from main source) ---
@@ -94,7 +98,11 @@ class FigmaArchiveParser {
     const preludeData = parser.read(FIG_KIWI_PRELUDE.length);
     const prelude = String.fromCharCode.apply(String, Array.from(preludeData));
 
-    if (prelude !== FIG_KIWI_PRELUDE && prelude !== FIGJAM_KIWI_PRELUDE) {
+    if (
+      prelude !== FIG_KIWI_PRELUDE &&
+      prelude !== FIGJAM_KIWI_PRELUDE &&
+      prelude !== FIGDECK_KIWI_PRELUDE
+    ) {
       throw new Error(`Unexpected prelude: "${prelude}"`);
     }
 
@@ -138,8 +146,12 @@ function readFigFile(data: Uint8Array) {
           String,
           Array.from(fileData.slice(0, 8))
         );
-        return prelude === FIG_KIWI_PRELUDE || prelude === FIGJAM_KIWI_PRELUDE;
-      }) || keys.find((k) => k.endsWith(".fig"));
+        return (
+          prelude === FIG_KIWI_PRELUDE ||
+          prelude === FIGJAM_KIWI_PRELUDE ||
+          prelude === FIGDECK_KIWI_PRELUDE
+        );
+      }) || keys.find((k) => k.endsWith(".fig") || k.endsWith(".deck"));
 
     if (!mainFile) {
       throw new Error(

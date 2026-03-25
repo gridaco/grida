@@ -2110,7 +2110,6 @@ impl FromIterator<Paint> for Paints {
 // Support for array literals - much more ergonomic than vec![]
 impl<const N: usize> From<[Paint; N]> for Paints {
     fn from(value: [Paint; N]) -> Self {
-        // Most efficient: direct construction without intermediate allocations
         Paints {
             paints: value.to_vec(),
         }
@@ -2120,7 +2119,6 @@ impl<const N: usize> From<[Paint; N]> for Paints {
 // Support for single Paint conversion
 impl From<Paint> for Paints {
     fn from(value: Paint) -> Self {
-        // More efficient: avoid the intermediate Vec allocation
         Paints {
             paints: vec![value],
         }

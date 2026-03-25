@@ -98,13 +98,24 @@ impl SceneCache {
         self.layers
             .layers
             .sort_by_key(|entry| entry.layer.z_index());
-        self.layer_index = RTree::new();
-        for (i, entry) in self.layers.layers.iter().enumerate() {
-            if let Some(rb) = self.geometry.get_render_bounds(&entry.id) {
-                let bounds = AABB::from_corners([rb.x, rb.y], [rb.x + rb.width, rb.y + rb.height]);
-                self.layer_index.insert(IndexedLayer { index: i, bounds });
-            }
-        }
+        let items: Vec<IndexedLayer> = self
+            .layers
+            .layers
+            .iter()
+            .enumerate()
+            .filter_map(|(i, entry)| {
+                self.geometry.get_render_bounds(&entry.id).map(|rb| {
+                    IndexedLayer {
+                        index: i,
+                        bounds: AABB::from_corners(
+                            [rb.x, rb.y],
+                            [rb.x + rb.width, rb.y + rb.height],
+                        ),
+                    }
+                })
+            })
+            .collect();
+        self.layer_index = RTree::bulk_load(items);
     }
 
     /// Access the geometry cache.
@@ -189,6 +200,17 @@ impl SceneCache {
             .locate_in_envelope(&env)
             .map(|il| il.index)
             .collect()
+    }
+
+    /// Return the bounding envelope of all scene content in the R-tree.
+    ///
+    /// O(1) — reads the cached root node envelope. Returns `None` when
+    /// the scene is empty (no layers indexed).
+    pub fn scene_envelope(&self) -> Option<AABB<[f32; 2]>> {
+        if self.layer_index.size() == 0 {
+            return None;
+        }
+        Some(self.layer_index.root().envelope())
     }
 
     /// Query painter layer indices whose bounds contain the given point.

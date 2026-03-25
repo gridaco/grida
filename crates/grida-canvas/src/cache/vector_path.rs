@@ -1,7 +1,7 @@
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::node::schema::NodeId;
 use skia_safe::Path;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -13,13 +13,13 @@ pub struct VectorPathCacheEntry {
 
 #[derive(Default, Clone, Debug)]
 pub struct VectorPathCache {
-    entries: HashMap<NodeId, VectorPathCacheEntry>,
+    entries: NodeIdHashMap<NodeId, VectorPathCacheEntry>,
 }
 
 impl VectorPathCache {
     pub fn new() -> Self {
         Self {
-            entries: HashMap::new(),
+            entries: new_node_id_map(),
         }
     }
 
