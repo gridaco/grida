@@ -517,6 +517,45 @@ impl SceneGraph {
         }
         graph.has_flex = has_flex;
 
+        Self::finish_snapshot(graph, links, roots)
+    }
+
+    /// Like [`new_from_snapshot`] but accepts pre-extracted `geo_data` and
+    /// `layer_core` maps, avoiding a second iteration over all nodes.
+    ///
+    /// Used by the FBS decoder which extracts compact data in its own
+    /// consume loop (Phase 4) while the Node fields are cache-hot.
+    pub fn new_from_snapshot_preextracted(
+        node_pairs: impl IntoIterator<Item = (NodeId, Node)>,
+        geo_data: impl IntoIterator<Item = (NodeId, NodeGeoData)>,
+        layer_core: impl IntoIterator<Item = (NodeId, NodeLayerCore)>,
+        has_flex: bool,
+        links: HashMap<NodeId, Vec<NodeId>>,
+        roots: Vec<NodeId>,
+    ) -> Self {
+        let mut graph = Self::new();
+
+        // Insert nodes without re-extracting — already done by caller.
+        for (id, node) in node_pairs {
+            graph.nodes.insert_with_id(id, node);
+        }
+        for (id, geo) in geo_data {
+            graph.geo_data.insert(id, geo);
+        }
+        for (id, lc) in layer_core {
+            graph.layer_core.insert(id, lc);
+        }
+        graph.has_flex = has_flex;
+
+        Self::finish_snapshot(graph, links, roots)
+    }
+
+    /// Shared tail for snapshot constructors: set links and roots.
+    fn finish_snapshot(
+        mut graph: Self,
+        links: HashMap<NodeId, Vec<NodeId>>,
+        roots: Vec<NodeId>,
+    ) -> Self {
         // Convert HashMap links to DenseNodeMap
         let mut dense_links = DenseNodeMap::new();
         for (id, children) in links {
