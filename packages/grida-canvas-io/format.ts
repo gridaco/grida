@@ -439,7 +439,9 @@ export namespace format {
       builder: Builder,
       id: string
     ): flatbuffers.Offset {
-      const idOffset = builder.createSharedString(id);
+      const idOffset = id
+        ? builder.createSharedString(id)
+        : builder.createString(id);
       return fbs.NodeIdentifier.createNodeIdentifier(builder, idOffset);
     }
 
@@ -1073,8 +1075,12 @@ export namespace format {
 
           const postLayoutTransformOffset = structs.cgTransform2D(
             builder,
-            cos, -sin, 0,
-            sin, cos, 0
+            cos,
+            -sin,
+            0,
+            sin,
+            cos,
+            0
           );
           fbs.LayerTrait.addPostLayoutTransform(
             builder,
