@@ -13,7 +13,7 @@
 //! and left at defaults on deserialize.
 
 use super::{
-    AttributedText, StyledRun, TextDecorationLine, TextFill, TextStyle, RGBA,
+    AttributedText, CGColor, Paint, StyledRun, TextDecorationLine, TextStyle,
 };
 
 // ---------------------------------------------------------------------------
@@ -93,15 +93,16 @@ fn style_to_css(style: &TextStyle, default: &TextStyle) -> String {
             TextDecorationLine::None => parts.push("text-decoration:none".into()),
         }
     }
-    if style.fill != default.fill {
-        let TextFill::Solid(c) = &style.fill;
-        parts.push(format!(
-            "color:rgba({},{},{},{})",
-            (c.r * 255.0).round() as u8,
-            (c.g * 255.0).round() as u8,
-            (c.b * 255.0).round() as u8,
-            c.a,
-        ));
+    if style.fills != default.fills {
+        if let Some(c) = style.fills.iter().find_map(|p| p.solid_color()) {
+            parts.push(format!(
+                "color:rgba({},{},{},{})",
+                c.r,
+                c.g,
+                c.b,
+                c.a as f32 / 255.0,
+            ));
+        }
     }
 
     parts.join(";")
@@ -500,8 +501,8 @@ fn apply_css_to_style(style: &mut TextStyle, css: &str) {
                 }
             }
             "color" => {
-                if let Some(rgba) = parse_css_color(val) {
-                    style.fill = TextFill::Solid(rgba);
+                if let Some(color) = parse_css_color(val) {
+                    style.fills = vec![Paint::from(color)];
                 }
             }
             _ => {} // Ignore unknown properties.
@@ -510,18 +511,18 @@ fn apply_css_to_style(style: &mut TextStyle, css: &str) {
 }
 
 /// Parse a subset of CSS color values: `rgb(r,g,b)`, `rgba(r,g,b,a)`, `#rrggbb`, `#rgb`.
-fn parse_css_color(val: &str) -> Option<RGBA> {
+fn parse_css_color(val: &str) -> Option<CGColor> {
     let val = val.trim();
 
     if val.starts_with("rgba(") && val.ends_with(')') {
         let inner = &val[5..val.len() - 1];
         let parts: Vec<&str> = inner.split(',').collect();
         if parts.len() == 4 {
-            let r = parts[0].trim().parse::<f32>().ok()? / 255.0;
-            let g = parts[1].trim().parse::<f32>().ok()? / 255.0;
-            let b = parts[2].trim().parse::<f32>().ok()? / 255.0;
-            let a = parts[3].trim().parse::<f32>().ok()?;
-            return Some(RGBA { r, g, b, a });
+            let r = parts[0].trim().parse::<f32>().ok()?.round() as u8;
+            let g = parts[1].trim().parse::<f32>().ok()?.round() as u8;
+            let b = parts[2].trim().parse::<f32>().ok()?.round() as u8;
+            let a = (parts[3].trim().parse::<f32>().ok()? * 255.0).round() as u8;
+            return Some(CGColor::from_rgba(r, g, b, a));
         }
     }
 
@@ -529,25 +530,25 @@ fn parse_css_color(val: &str) -> Option<RGBA> {
         let inner = &val[4..val.len() - 1];
         let parts: Vec<&str> = inner.split(',').collect();
         if parts.len() == 3 {
-            let r = parts[0].trim().parse::<f32>().ok()? / 255.0;
-            let g = parts[1].trim().parse::<f32>().ok()? / 255.0;
-            let b = parts[2].trim().parse::<f32>().ok()? / 255.0;
-            return Some(RGBA { r, g, b, a: 1.0 });
+            let r = parts[0].trim().parse::<f32>().ok()?.round() as u8;
+            let g = parts[1].trim().parse::<f32>().ok()?.round() as u8;
+            let b = parts[2].trim().parse::<f32>().ok()?.round() as u8;
+            return Some(CGColor::from_rgba(r, g, b, 255));
         }
     }
 
     if val.starts_with('#') {
         let hex = &val[1..];
         if hex.len() == 6 {
-            let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
-            let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
-            let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
-            return Some(RGBA { r, g, b, a: 1.0 });
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            return Some(CGColor::from_rgba(r, g, b, 255));
         } else if hex.len() == 3 {
-            let r = u8::from_str_radix(&hex[0..1].repeat(2), 16).ok()? as f32 / 255.0;
-            let g = u8::from_str_radix(&hex[1..2].repeat(2), 16).ok()? as f32 / 255.0;
-            let b = u8::from_str_radix(&hex[2..3].repeat(2), 16).ok()? as f32 / 255.0;
-            return Some(RGBA { r, g, b, a: 1.0 });
+            let r = u8::from_str_radix(&hex[0..1].repeat(2), 16).ok()?;
+            let g = u8::from_str_radix(&hex[1..2].repeat(2), 16).ok()?;
+            let b = u8::from_str_radix(&hex[2..3].repeat(2), 16).ok()?;
+            return Some(CGColor::from_rgba(r, g, b, 255));
         }
     }
 
@@ -650,9 +651,9 @@ mod tests {
         assert_eq!(at.text(), "red bold");
         assert_eq!(at.runs()[0].style.font_weight, 700);
         assert_eq!(at.runs()[0].style.font_size, 24.0);
-        let TextFill::Solid(c) = &at.runs()[0].style.fill;
-        assert!((c.r - 1.0).abs() < 0.01);
-        assert!(c.g.abs() < 0.01);
+        let c = at.runs()[0].style.fills.iter().find_map(|p| p.solid_color()).unwrap();
+        assert_eq!(c.r, 255);
+        assert_eq!(c.g, 0);
     }
 
     #[test]

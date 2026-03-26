@@ -2,12 +2,10 @@ pub mod attributed_text;
 pub mod history;
 pub mod layout;
 pub mod simple_layout;
-pub mod text_edit_session;
+pub mod session;
 pub mod time;
 
-#[cfg(feature = "skia")]
 pub mod selection_rects;
-#[cfg(feature = "skia")]
 pub mod skia_layout;
 
 #[cfg(test)]
@@ -18,11 +16,9 @@ mod session_tests;
 pub use history::EditKind;
 pub use layout::{line_index_for_offset, CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine, DEFAULT_CARET_WIDTH};
 pub use simple_layout::SimpleLayoutEngine;
-pub use text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
+pub use session::{ClickTracker, KeyAction, KeyName, TextEditSession};
 
-#[cfg(feature = "skia")]
 pub use selection_rects::{EmptyLineSelectionPolicy, selection_rects_with_policy, skia_line_index_for_u16_offset};
-#[cfg(feature = "skia")]
 pub use skia_layout::SkiaLayoutEngine;
 
 use unicode_segmentation::UnicodeSegmentation;

@@ -100,13 +100,13 @@
 //!
 //! - [ ] Visual-order bidi cursor movement
 
-use crate::time::{Duration, Instant};
+use super::time::{Duration, Instant};
 
-use crate::{
+use super::{
     apply_command_mut,
     attributed_text::{
         html::{html_to_attributed_text, runs_to_html},
-        AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,
+        AttributedText, CGColor, Paint, TextDecorationLine, TextStyle as AttrTextStyle,
     },
     history::{EditKind, GenericEditHistory},
     layout::{line_index_for_offset, CaretRect, ManagedTextLayout},
@@ -874,11 +874,11 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
     }
 
     /// Set a color on the selection or caret style.
-    pub fn set_color(&mut self, color: RGBA) {
+    pub fn set_color(&mut self, color: CGColor) {
         if let Some((lo, hi)) = self.selection_range() {
             self.history.push(&self.snapshot(), EditKind::Style);
             self.content.apply_style(lo, hi, |s| {
-                s.fill = TextFill::Solid(color);
+                s.fills = vec![Paint::from(color)];
             });
             self.layout.invalidate();
         } else {
@@ -886,7 +886,7 @@ impl<L: ManagedTextLayout> TextEditSession<L> {
                 .caret_style_override
                 .clone()
                 .unwrap_or_else(|| self.content.caret_style_at(self.state.cursor as u32).clone());
-            style.fill = TextFill::Solid(color);
+            style.fills = vec![Paint::from(color)];
             self.caret_style_override = Some(style);
         }
     }

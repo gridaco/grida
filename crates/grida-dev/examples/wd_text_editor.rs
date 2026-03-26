@@ -18,7 +18,7 @@ use std::fs;
 use std::num::NonZeroU32;
 use std::time::Duration;
 
-use grida_text_edit::time::Instant;
+use cg::text_edit::time::Instant;
 
 use arboard::Clipboard;
 use gl::types::GLint;
@@ -33,7 +33,9 @@ use glutin_winit::DisplayBuilder;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{
-    gpu::{self, backend_render_targets, gl::FramebufferInfo, surfaces::wrap_backend_render_target},
+    gpu::{
+        self, backend_render_targets, gl::FramebufferInfo, surfaces::wrap_backend_render_target,
+    },
     Color, ColorType, Paint, Point, Rect, Surface,
 };
 use winit::{
@@ -45,14 +47,12 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
-use grida_text_edit::{
-    TextLayoutEngine, SkiaLayoutEngine,
+use cg::cg::color::CGColor;
+use cg::text_edit::{
+    attributed_text::{AttributedText, TextStyle as AttrTextStyle},
     selection_rects::EmptyLineSelectionPolicy,
-    text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession},
-    attributed_text::{
-        AttributedText, TextStyle as AttrTextStyle, RGBA,
-    },
-    EditingCommand,
+    session::{ClickTracker, KeyAction, KeyName, TextEditSession},
+    EditingCommand, SkiaLayoutEngine, TextLayoutEngine,
 };
 
 // ---------------------------------------------------------------------------
@@ -129,19 +129,16 @@ fn draw_session(
         // Build per-block layout with preedit text spliced in and
         // underlined, producing identical metrics to the normal path.
         let (display_text, preedit_range) =
-            session.layout.rebuild_blocks_with_preedit(
-                &session.content,
-                session.state.cursor,
-                p,
-            );
+            session
+                .layout
+                .rebuild_blocks_with_preedit(&session.content, session.state.cursor, p);
 
         // Selection (using the display_text which includes preedit)
         if let Some((lo, hi)) = session.selection_range() {
             if lo < hi {
-                let sel_rects =
-                    session
-                        .layout
-                        .selection_rects_for_range(&display_text, lo, hi);
+                let sel_rects = session
+                    .layout
+                    .selection_rects_for_range(&display_text, lo, hi);
                 let mut sp = Paint::default();
                 sp.set_color(Color::from_argb(80, 66, 133, 244));
                 sp.set_anti_alias(true);
@@ -179,9 +176,7 @@ fn draw_session(
         canvas.draw_rect(cursor_rect, &cp);
     } else {
         // ---- normal mode (rich text, per-block layout) ----
-        session
-            .layout
-            .ensure_layout_attributed(&session.content);
+        session.layout.ensure_layout_attributed(&session.content);
 
         // Selection
         if let Some((lo, hi)) = session.selection_range() {
@@ -272,8 +267,7 @@ impl ApplicationHandler for TextEditorApp {
             .with_inner_size(winit::dpi::LogicalSize::new(WINDOW_W, WINDOW_H));
 
         let template = ConfigTemplateBuilder::new().with_alpha_size(8);
-        let display_builder =
-            DisplayBuilder::new().with_window_attributes(window_attrs.into());
+        let display_builder = DisplayBuilder::new().with_window_attributes(window_attrs.into());
 
         let (window, gl_config) = display_builder
             .build(event_loop, template, |mut cfgs| {
@@ -321,9 +315,7 @@ impl ApplicationHandler for TextEditorApp {
                 .expect("GL surface creation failed")
         };
 
-        let gl_context = not_current
-            .make_current(&gl_surface)
-            .expect("make current");
+        let gl_context = not_current.make_current(&gl_surface).expect("make current");
 
         gl::load_with(|s| {
             let Ok(c) = CString::new(s) else {
@@ -401,18 +393,14 @@ impl ApplicationHandler for TextEditorApp {
         let mut session = TextEditSession::new(layout, default_style.clone());
 
         // Load fonts
-        let inter_upright = include_bytes!(
-            "../../../fixtures/fonts/Inter/Inter-VariableFont_opsz,wght.ttf"
-        );
-        let inter_italic = include_bytes!(
-            "../../../fixtures/fonts/Inter/Inter-Italic-VariableFont_opsz,wght.ttf"
-        );
-        let lora_upright = include_bytes!(
-            "../../../fixtures/fonts/Lora/Lora-VariableFont_wght.ttf"
-        );
-        let lora_italic = include_bytes!(
-            "../../../fixtures/fonts/Lora/Lora-Italic-VariableFont_wght.ttf"
-        );
+        let inter_upright =
+            include_bytes!("../../../fixtures/fonts/Inter/Inter-VariableFont_opsz,wght.ttf");
+        let inter_italic =
+            include_bytes!("../../../fixtures/fonts/Inter/Inter-Italic-VariableFont_opsz,wght.ttf");
+        let lora_upright =
+            include_bytes!("../../../fixtures/fonts/Lora/Lora-VariableFont_wght.ttf");
+        let lora_italic =
+            include_bytes!("../../../fixtures/fonts/Lora/Lora-Italic-VariableFont_wght.ttf");
         let inconsolata = include_bytes!(
             "../../../fixtures/fonts/Inconsolata/Inconsolata-VariableFont_wdth,wght.ttf"
         );
@@ -508,15 +496,9 @@ impl ApplicationHandler for TextEditorApp {
                     NonZeroU32::new(w).unwrap(),
                     NonZeroU32::new(h).unwrap(),
                 );
-                inner
-                    .gl_skia
-                    .recreate_skia_surface(w as i32, h as i32);
-                inner
-                    .session
-                    .set_layout_width((w as f32) - PADDING * 2.0);
-                inner
-                    .session
-                    .set_layout_height((h as f32) - PADDING * 2.0);
+                inner.gl_skia.recreate_skia_surface(w as i32, h as i32);
+                inner.session.set_layout_width((w as f32) - PADDING * 2.0);
+                inner.session.set_layout_height((h as f32) - PADDING * 2.0);
                 inner.window.request_redraw();
             }
 
@@ -540,7 +522,6 @@ impl ApplicationHandler for TextEditorApp {
             // so it is lost. The user must press the key a second time.
             // This is a winit bug — our handler is correct.
             // ---------------------------------------------------------
-
             WindowEvent::Ime(Ime::Preedit(text, _cursor_range)) => {
                 if inner.session.handle_key_action(KeyAction::ImePreedit(text)) {
                     inner.window.request_redraw();
@@ -563,9 +544,7 @@ impl ApplicationHandler for TextEditorApp {
                 inner.window.request_redraw();
             }
 
-            WindowEvent::KeyboardInput { event: ke, .. }
-                if ke.state == ElementState::Pressed =>
-            {
+            WindowEvent::KeyboardInput { event: ke, .. } if ke.state == ElementState::Pressed => {
                 // Drain the empty-preedit sentinel *before* processing
                 // keys so that the session's preedit.is_some() guard
                 // doesn't suppress the next insertion.
@@ -621,12 +600,36 @@ impl ApplicationHandler for TextEditorApp {
                 // Dev-only function key presets (host-specific)
                 if !handled {
                     handled = match &ke.logical_key {
-                        Key::Named(NamedKey::F1) => { inner.session.set_color(RGBA::BLACK); inner.window.request_redraw(); true }
-                        Key::Named(NamedKey::F2) => { inner.session.set_color(RGBA { r: 0.9, g: 0.2, b: 0.2, a: 1.0 }); inner.window.request_redraw(); true }
-                        Key::Named(NamedKey::F3) => { inner.session.set_color(RGBA { r: 0.2, g: 0.4, b: 0.9, a: 1.0 }); inner.window.request_redraw(); true }
-                        Key::Named(NamedKey::F5) => { inner.session.set_font_family("Inter"); inner.window.request_redraw(); true }
-                        Key::Named(NamedKey::F6) => { inner.session.set_font_family("Lora"); inner.window.request_redraw(); true }
-                        Key::Named(NamedKey::F7) => { inner.session.set_font_family("Inconsolata"); inner.window.request_redraw(); true }
+                        Key::Named(NamedKey::F1) => {
+                            inner.session.set_color(CGColor::BLACK);
+                            inner.window.request_redraw();
+                            true
+                        }
+                        Key::Named(NamedKey::F2) => {
+                            inner.session.set_color(CGColor::from_rgb(230, 51, 51));
+                            inner.window.request_redraw();
+                            true
+                        }
+                        Key::Named(NamedKey::F3) => {
+                            inner.session.set_color(CGColor::from_rgb(51, 102, 230));
+                            inner.window.request_redraw();
+                            true
+                        }
+                        Key::Named(NamedKey::F5) => {
+                            inner.session.set_font_family("Inter");
+                            inner.window.request_redraw();
+                            true
+                        }
+                        Key::Named(NamedKey::F6) => {
+                            inner.session.set_font_family("Lora");
+                            inner.window.request_redraw();
+                            true
+                        }
+                        Key::Named(NamedKey::F7) => {
+                            inner.session.set_font_family("Inconsolata");
+                            inner.window.request_redraw();
+                            true
+                        }
                         _ => false,
                     };
                 }
@@ -657,10 +660,9 @@ impl ApplicationHandler for TextEditorApp {
                 let x = position.x as f32;
                 let y = position.y as f32;
                 self.last_mouse_pos = (x, y);
-                inner.session.on_pointer_move(
-                    x - PADDING,
-                    y - PADDING + inner.session.scroll_y(),
-                );
+                inner
+                    .session
+                    .on_pointer_move(x - PADDING, y - PADDING + inner.session.scroll_y());
                 if inner.session.is_mouse_down() {
                     inner.window.request_redraw();
                 }
@@ -677,7 +679,9 @@ impl ApplicationHandler for TextEditorApp {
                     let layout_y = y - PADDING + inner.session.scroll_y();
                     let shift = self.modifiers.shift_key();
                     let click_count = self.clicks.register(x, y);
-                    inner.session.handle_click(local_x, layout_y, click_count, shift);
+                    inner
+                        .session
+                        .handle_click(local_x, layout_y, click_count, shift);
                     inner.window.request_redraw();
                 }
                 ElementState::Released => {
@@ -741,10 +745,7 @@ impl ApplicationHandler for TextEditorApp {
                         }
                     },
                     _ => {
-                        eprintln!(
-                            "unsupported drop: {}",
-                            path.display()
-                        );
+                        eprintln!("unsupported drop: {}", path.display());
                     }
                 }
             }
@@ -773,25 +774,21 @@ impl ApplicationHandler for TextEditorApp {
 ///
 /// Returns `None` for keys the text editor doesn't handle (function keys,
 /// modifier-only presses, etc.).
-fn winit_key_to_key_name(
-    logical: &Key,
-    physical: &PhysicalKey,
-    cmd: bool,
-) -> Option<KeyName> {
+fn winit_key_to_key_name(logical: &Key, physical: &PhysicalKey, cmd: bool) -> Option<KeyName> {
     match logical {
-        Key::Named(NamedKey::ArrowLeft)  => Some(KeyName::ArrowLeft),
+        Key::Named(NamedKey::ArrowLeft) => Some(KeyName::ArrowLeft),
         Key::Named(NamedKey::ArrowRight) => Some(KeyName::ArrowRight),
-        Key::Named(NamedKey::ArrowUp)    => Some(KeyName::ArrowUp),
-        Key::Named(NamedKey::ArrowDown)  => Some(KeyName::ArrowDown),
-        Key::Named(NamedKey::Home)       => Some(KeyName::Home),
-        Key::Named(NamedKey::End)        => Some(KeyName::End),
-        Key::Named(NamedKey::PageUp)     => Some(KeyName::PageUp),
-        Key::Named(NamedKey::PageDown)   => Some(KeyName::PageDown),
-        Key::Named(NamedKey::Backspace)  => Some(KeyName::Backspace),
-        Key::Named(NamedKey::Delete)     => Some(KeyName::Delete),
-        Key::Named(NamedKey::Enter)      => Some(KeyName::Enter),
-        Key::Named(NamedKey::Tab)        => Some(KeyName::Tab),
-        Key::Named(NamedKey::Space)      => Some(KeyName::Space),
+        Key::Named(NamedKey::ArrowUp) => Some(KeyName::ArrowUp),
+        Key::Named(NamedKey::ArrowDown) => Some(KeyName::ArrowDown),
+        Key::Named(NamedKey::Home) => Some(KeyName::Home),
+        Key::Named(NamedKey::End) => Some(KeyName::End),
+        Key::Named(NamedKey::PageUp) => Some(KeyName::PageUp),
+        Key::Named(NamedKey::PageDown) => Some(KeyName::PageDown),
+        Key::Named(NamedKey::Backspace) => Some(KeyName::Backspace),
+        Key::Named(NamedKey::Delete) => Some(KeyName::Delete),
+        Key::Named(NamedKey::Enter) => Some(KeyName::Enter),
+        Key::Named(NamedKey::Tab) => Some(KeyName::Tab),
+        Key::Named(NamedKey::Space) => Some(KeyName::Space),
         // When cmd is held, use physical key for shortcut matching
         _ if cmd => match physical {
             PhysicalKey::Code(KeyCode::KeyA) => Some(KeyName::Letter('a')),

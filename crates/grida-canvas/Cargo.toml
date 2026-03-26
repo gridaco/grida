@@ -25,10 +25,10 @@ json-patch = "4.1.0"
 flatbuffers = "25.12.19"
 
 # text editing
-grida-text-edit = { path = "../grida-text-edit" }
+unicode-segmentation = "1"
 
 # geo
-math2 = { path = "../math2" }
+math2 = { path = "../math2", features = ["serde"] }
 rstar = "0.12"
 
 # core resource hashing

@@ -15,14 +15,14 @@
 //!    must equal `state.text`. Several tests verify this explicitly.
 
 use std::thread;
-use crate::time::Duration;
+use super::time::Duration;
 
-use crate::attributed_text::{
-    AttributedText, TextDecorationLine, TextFill, TextStyle as AttrTextStyle, RGBA,
+use super::attributed_text::{
+    AttributedText, CGColor, Paint, TextDecorationLine, TextStyle as AttrTextStyle,
 };
-use crate::layout::TextLayoutEngine;
-use crate::simple_layout::SimpleLayoutEngine;
-use crate::text_edit_session::{ClickTracker, KeyAction, KeyName, TextEditSession};
+use super::layout::TextLayoutEngine;
+use super::simple_layout::SimpleLayoutEngine;
+use super::session::{ClickTracker, KeyAction, KeyName, TextEditSession};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -934,12 +934,10 @@ fn set_color_on_selection() {
     let mut s = session("Hello");
     s.state.anchor = Some(0);
     s.state.cursor = 5;
-    let red = RGBA { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
-    s.set_color(red);
+    s.set_color(CGColor::RED);
 
-    let TextFill::Solid(c) = &s.content.style_at(0).fill;
-    assert_eq!(c.r, 1.0);
-    assert_eq!(c.g, 0.0);
+    let c = s.content.style_at(0).fills.iter().find_map(|p| p.solid_color()).unwrap();
+    assert_eq!(c, CGColor::RED);
 }
 
 // ===========================================================================

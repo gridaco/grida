@@ -1,7 +1,7 @@
 //! Text editing session for the canvas.
 //!
 //! This module provides the canvas-specific text editing integration by
-//! re-using the generic [`grida_text_edit::TextEditSession<L>`] with
+//! re-using the generic [`crate::text_edit::session::TextEditSession`] with
 //! [`ParagraphCacheLayout`] as the layout backend.
 //!
 //! The generic session already handles all editing concerns:
@@ -20,19 +20,19 @@
 //! - Capturing original text for commit/cancel semantics
 //! - The `ActiveTextEdit` bundle that lives on the Application
 
-use crate::cg::types::TextStyleRec;
+use crate::cg::types::{Paint, TextStyleRec};
 use crate::node::schema::NodeId;
-use crate::text::attributed_text_conv::text_style_rec_to_attr_with_fill;
 use crate::text::paragraph_cache_layout::ParagraphCacheLayout;
+use crate::text_edit::attributed_text::conv::text_style_rec_to_attr_with_fills;
 
-use grida_text_edit::{
-    attributed_text::{AttributedText, ParagraphStyle, TextFill},
-    text_edit_session::TextEditSession,
+use crate::text_edit::{
+    attributed_text::{AttributedText, ParagraphStyle},
+    session::TextEditSession,
 };
 
-// Re-export for WASM layer (so it doesn't depend on grida-text-edit directly)
-pub use grida_text_edit::EditingCommand as EditCommand;
-pub use grida_text_edit::DEFAULT_CARET_WIDTH;
+// Re-export for WASM layer
+pub use crate::text_edit::EditingCommand as EditCommand;
+pub use crate::text_edit::DEFAULT_CARET_WIDTH;
 
 // Re-export the session type for convenience
 pub type CanvasTextEditSession = TextEditSession<ParagraphCacheLayout>;
@@ -72,18 +72,18 @@ impl ActiveTextEdit {
     /// * `node_id` — The internal node ID being edited.
     /// * `text` — The node's current plain text.
     /// * `text_style_rec` — The node's uniform `TextStyleRec`.
-    /// * `fill` — The resolved text fill (from the node's paint stack).
+    /// * `fills` — The resolved text fills (from the node's paint stack).
     /// * `paragraph_style` — Paragraph-level attributes.
     /// * `layout` — The pre-configured `ParagraphCacheLayout`.
     pub fn new(
         node_id: NodeId,
         text: &str,
         text_style_rec: &TextStyleRec,
-        fill: TextFill,
+        fills: Vec<Paint>,
         paragraph_style: ParagraphStyle,
         layout: ParagraphCacheLayout,
     ) -> Self {
-        let attr_style = text_style_rec_to_attr_with_fill(text_style_rec, fill);
+        let attr_style = text_style_rec_to_attr_with_fills(text_style_rec, fills);
         let mut content = AttributedText::new(text, attr_style);
         *content.paragraph_style_mut() = paragraph_style;
 

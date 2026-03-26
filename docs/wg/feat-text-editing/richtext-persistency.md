@@ -7,7 +7,6 @@ tags:
   - typography
   - text
   - editor
-
 ---
 
 ## Purpose
@@ -415,7 +414,7 @@ table TextSpanNodeProperties {
 | `line_height`         | 12  | `TextDimension`                 |
 | `text_transform`      | 13  | `TextTransform`                 |
 
-**Notable gap in current schema**: `TextStyleRec` does not include `fill` (text color). Fills live on `TextSpanNodeProperties.fill_paints` at the node level. The in-memory `grida-text-edit` crate extends this with per-run `fill: TextFill` and `hyperlink: Option<Hyperlink>`, but these extensions are not reflected in the persistent schema.
+**Notable gap in current schema**: `TextStyleRec` does not include `fill` (text color). Fills live on `TextSpanNodeProperties.fill_paints` at the node level. The in-memory `text_edit` module (`cg::text_edit`) extends this with per-run `fill: TextFill` and `hyperlink: Option<Hyperlink>`, but these extensions are not reflected in the persistent schema.
 
 ### 2.2 Attributed text model (in-memory, not persisted)
 

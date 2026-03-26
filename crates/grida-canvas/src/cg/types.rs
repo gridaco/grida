@@ -1316,7 +1316,7 @@ impl Default for CornerSmoothing {
 
 /// Text Transform (Text Case)
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-transform)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextTransform {
     #[serde(rename = "none")]
     None,
@@ -1340,7 +1340,7 @@ impl Default for TextTransform {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-line)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextDecorationLine {
     #[serde(rename = "none")]
     None,
@@ -1358,7 +1358,7 @@ impl Default for TextDecorationLine {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextDecorationStyle {
     #[serde(rename = "solid")]
     Solid,
@@ -1392,7 +1392,7 @@ impl From<&TextStyleRecBuildContext> for DecorationRecBuildContext {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct TextDecorationRec {
     /// Text decoration line (e.g. underline or none).
     pub text_decoration_line: TextDecorationLine,
@@ -1494,7 +1494,7 @@ impl FromWithContext<TextDecorationRec, DecorationRecBuildContext> for TextDecor
 ///
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-align)  
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextAlign.html)
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextAlign {
     #[serde(rename = "left")]
     Left,
@@ -1577,7 +1577,7 @@ impl Default for TextAlign {
 ///
 /// This approach allows for flexible text positioning while maintaining compatibility
 /// with Skia's text layout engine limitations.
-#[derive(Debug, Clone, Copy, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum TextAlignVertical {
     /// Align text to the top of the container.
     ///
@@ -1671,19 +1671,19 @@ impl Default for TextStyleRecBuildContext {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FontFeature {
     pub tag: String,
     pub value: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FontVariation {
     pub axis: String,
     pub value: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FontOpticalSizing {
     /// Auto mode will set the optical size to the font size.
     /// this is the default behavior.
@@ -1698,7 +1698,7 @@ impl Default for FontOpticalSizing {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TextLineHeight {
     /// Normal (unset, no override)
     Normal,
@@ -1714,7 +1714,7 @@ impl Default for TextLineHeight {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum TextLetterSpacing {
     /// Fixed value in px.
     Fixed(f32),
@@ -1729,7 +1729,7 @@ impl Default for TextLetterSpacing {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum TextWordSpacing {
     /// Fixed value in px.
     Fixed(f32),
@@ -2085,7 +2085,7 @@ impl Default for AttributedStringBuilder {
 
 // #region paint
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Paint {
     Solid(SolidPaint),
     LinearGradient(LinearGradientPaint),
@@ -2269,7 +2269,7 @@ impl From<CGColor> for SolidPaint {
 /// The [`BlendMode`] assigned to each [`Paint`] applies to that specific entry
 /// while it is composited over the accumulated result. It never retroactively
 /// affects paints that were drawn earlier in the stack.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Paints {
     paints: Vec<Paint>,
 }
@@ -2453,7 +2453,7 @@ impl GradientPaint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SolidPaint {
     pub active: bool,
     pub color: CGColor,
@@ -2524,7 +2524,7 @@ pub struct GradientStop {
     pub color: CGColor,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinearGradientPaint {
     pub active: bool,
     pub xy1: Alignment,
@@ -2574,7 +2574,7 @@ impl Default for LinearGradientPaint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RadialGradientPaint {
     pub active: bool,
     /// # Radial Gradient Transform Model
@@ -2653,7 +2653,7 @@ impl Default for RadialGradientPaint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiamondGradientPaint {
     pub active: bool,
     /// # Diamond Gradient Transform Model
@@ -2689,7 +2689,7 @@ impl Default for DiamondGradientPaint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SweepGradientPaint {
     pub active: bool,
     /// # Sweep Gradient Transform Model
@@ -2785,7 +2785,7 @@ impl Default for SweepGradientPaint {
 ///
 /// Both variants are treated uniformly in most contexts, allowing the resource management
 /// system to handle different resource types transparently.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ResourceRef {
     /// Reference by content hash, typically used for in-memory resources with `mem://` URLs
     HASH(String),
@@ -2799,7 +2799,7 @@ pub enum ResourceRef {
 /// - `-1.0` = maximum negative adjustment
 /// - `0.0` = no change (neutral)
 /// - `1.0` = maximum positive adjustment
-#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ImageFilters {
     /// Exposure adjustment (-1.0 to 1.0, default: 0.0)
     ///
@@ -2903,7 +2903,7 @@ impl ImageFilters {
 /// 3. **Pragmatic ergonomics**: Tiling is **rare** in design tools compared to single-image fitting;
 ///    surfacing it as an explicit mode keeps common cases simple while still giving power-users a
 ///    precise, predictable tiling pipeline.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ImagePaintFit {
     /// Use standard fitting modes that match CSS `object-fit` and Flutter `BoxFit`
     Fit(BoxFit),
@@ -2958,7 +2958,7 @@ pub enum ImagePaintFit {
 /// - **CSS**: `background-size` + `background-repeat`
 /// - **SVG**: `<image>` inside `<pattern>` with `preserveAspectRatio`
 /// - **Skia**: image shader with local matrix and `SkTileMode`
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ImageTile {
     /// Extra spacing between tiles in pixels (box space). Can be negative to overlap.
     // pub spacing: (f32, f32),
@@ -3023,7 +3023,7 @@ impl Default for ImageRepeat {
 /// - **`blend_mode`**: Determines how the image blends with underlying content
 /// - **`filters`**: Applies visual effects like brightness, contrast, saturation, etc.
 ///
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ImagePaint {
     pub active: bool,
     /// Reference to the image resource to be painted

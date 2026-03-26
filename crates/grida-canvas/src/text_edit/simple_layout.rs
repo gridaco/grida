@@ -10,7 +10,7 @@
 //! and wrong for real rendering — its only purpose is to produce deterministic,
 //! inspectable results for unit tests.
 
-use crate::layout::{CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine};
+use super::layout::{CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine};
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -222,7 +222,7 @@ impl TextLayoutEngine for SimpleLayoutEngine {
 }
 
 impl ManagedTextLayout for SimpleLayoutEngine {
-    fn ensure_layout(&mut self, _content: &crate::attributed_text::AttributedText) {
+    fn ensure_layout(&mut self, _content: &super::attributed_text::AttributedText) {
         // No-op: monospace layout needs no rebuild.
     }
 

@@ -13,7 +13,7 @@
 //!
 //! ```ignore
 //! // In your event loop / requestAnimationFrame callback:
-//! grida_text_edit::time::Instant::advance(frame_dt);
+//! cg::text_edit::time::Instant::advance(frame_dt);
 //! ```
 //!
 //! Where `frame_dt` is a `Duration` obtained from `performance.now()` or

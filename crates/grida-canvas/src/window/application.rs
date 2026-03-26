@@ -1,4 +1,5 @@
-use crate::cg::types::TextAlignVertical;
+use crate::cg::color::CGColor;
+use crate::cg::types::{Paint, TextAlignVertical};
 use crate::devtools::{
     fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay,
 };
@@ -18,8 +19,8 @@ use crate::sys::timer::TimerMgr;
 use crate::text;
 use crate::vectornetwork::VectorNetwork;
 use crate::window::command::ApplicationCommand;
-use grida_text_edit::layout::ManagedTextLayout;
-use grida_text_edit::TextLayoutEngine;
+use crate::text_edit::layout::ManagedTextLayout;
+use crate::text_edit::TextLayoutEngine;
 
 /// A no-op hierarchy for when no scene graph is loaded.
 struct NoHierarchy;
@@ -270,7 +271,7 @@ impl ApplicationApi for UnknownTargetApplication {
         // Instant uses microseconds.  On native builds this is a no-op
         // (native Instant uses std::time::Instant directly).
         #[cfg(target_arch = "wasm32")]
-        grida_text_edit::time::Instant::set_micros((time * 1000.0) as u64);
+        crate::text_edit::time::Instant::set_micros((time * 1000.0) as u64);
     }
 
     /// Update backing resources after a window resize.
@@ -1119,7 +1120,7 @@ impl UnknownTargetApplication {
 
         // Drive the text-edit clock from the host's wall time.
         #[cfg(target_arch = "wasm32")]
-        grida_text_edit::time::Instant::set_micros((time * 1000.0) as u64);
+        crate::text_edit::time::Instant::set_micros((time * 1000.0) as u64);
 
         // 3. Process async resources (native only)
         #[cfg(not(target_arch = "wasm32"))]
@@ -1635,8 +1636,8 @@ impl UnknownTargetApplication {
         let text_align = &tspan.text_align;
         let layout_height = tspan.height.unwrap_or(10000.0);
 
-        let fill = grida_text_edit::attributed_text::TextFill::default();
-        let paragraph_style = grida_text_edit::attributed_text::ParagraphStyle::default();
+        let fills = vec![Paint::from(CGColor::BLACK)];
+        let paragraph_style = crate::text_edit::attributed_text::ParagraphStyle::default();
 
         // Build the layout adapter using the same font collection and style
         // code path as ParagraphCache::measure().
@@ -1648,7 +1649,7 @@ impl UnknownTargetApplication {
             &self.renderer.fonts,
         );
 
-        let te = ActiveTextEdit::new(node_id, text, text_style_rec, fill, paragraph_style, layout);
+        let te = ActiveTextEdit::new(node_id, text, text_style_rec, fills, paragraph_style, layout);
 
         self.text_edit = Some(te);
         self.text_edit_refresh_decorations();
@@ -1685,7 +1686,7 @@ impl UnknownTargetApplication {
     }
 
     /// Dispatch an editing command.
-    pub fn text_edit_command(&mut self, cmd: grida_text_edit::EditingCommand) {
+    pub fn text_edit_command(&mut self, cmd: crate::text_edit::EditingCommand) {
         if let Some(te) = self.text_edit.as_mut() {
             te.session.apply(cmd);
         }
@@ -1746,8 +1747,8 @@ impl UnknownTargetApplication {
     pub fn text_edit_ime_commit(&mut self, text: &str) {
         if let Some(te) = self.text_edit.as_mut() {
             te.session.apply_with_kind(
-                grida_text_edit::EditingCommand::Insert(text.to_owned()),
-                grida_text_edit::EditKind::ImeCommit,
+                crate::text_edit::EditingCommand::Insert(text.to_owned()),
+                crate::text_edit::EditKind::ImeCommit,
             );
             te.session.cancel_preedit();
         }
@@ -1782,8 +1783,8 @@ impl UnknownTargetApplication {
         }
         if let Some(te) = self.text_edit.as_mut() {
             te.session.apply_with_kind(
-                grida_text_edit::EditingCommand::Insert(text.to_owned()),
-                grida_text_edit::EditKind::Paste,
+                crate::text_edit::EditingCommand::Insert(text.to_owned()),
+                crate::text_edit::EditKind::Paste,
             );
         }
         self.text_edit_refresh_decorations();
@@ -1796,7 +1797,7 @@ impl UnknownTargetApplication {
         }
         if let Some(te) = self.text_edit.as_mut() {
             let base_style = te.session.content.default_style().clone();
-            match grida_text_edit::attributed_text::html::html_to_attributed_text(html, base_style)
+            match crate::text_edit::attributed_text::html::html_to_attributed_text(html, base_style)
             {
                 Ok(pasted) if !pasted.is_empty() => {
                     te.session.paste_attributed(&pasted);
@@ -1808,13 +1809,13 @@ impl UnknownTargetApplication {
     }
 
     /// Get caret rect in layout-local coordinates.
-    pub fn text_edit_get_caret_rect(&mut self) -> Option<grida_text_edit::CaretRect> {
+    pub fn text_edit_get_caret_rect(&mut self) -> Option<crate::text_edit::CaretRect> {
         let te = self.text_edit.as_mut()?;
         Some(te.session.caret_rect())
     }
 
     /// Get selection rects in layout-local coordinates.
-    pub fn text_edit_get_selection_rects(&mut self) -> Option<Vec<grida_text_edit::SelectionRect>> {
+    pub fn text_edit_get_selection_rects(&mut self) -> Option<Vec<crate::text_edit::SelectionRect>> {
         let te = self.text_edit.as_mut()?;
         let (lo, hi) = te.session.selection_range()?;
         let rects = te
@@ -1878,9 +1879,14 @@ impl UnknownTargetApplication {
 
     /// Set fill color on selection/caret.
     pub fn text_edit_set_color(&mut self, r: f32, g: f32, b: f32, a: f32) {
-        use grida_text_edit::attributed_text::RGBA;
         if let Some(te) = self.text_edit.as_mut() {
-            te.session.set_color(RGBA { r, g, b, a });
+            let color = CGColor::from_rgba(
+                (r * 255.0) as u8,
+                (g * 255.0) as u8,
+                (b * 255.0) as u8,
+                (a * 255.0) as u8,
+            );
+            te.session.set_color(color);
         }
         self.text_edit_after_style_change();
     }

@@ -1,12 +1,12 @@
 //! `ParagraphCacheLayout` — an adapter that implements
-//! [`grida_text_edit::ManagedTextLayout`] using the same paragraph-building
+//! [`crate::text_edit::ManagedTextLayout`] using the same paragraph-building
 //! code path as the scene's [`ParagraphCache`].
 //!
 //! ## Why this exists
 //!
 //! The text editing session needs geometry queries (caret position, selection
 //! rects, hit testing, word boundaries) that match the **exact** paragraph
-//! the Painter renders. Previously, `SkiaLayoutEngine` (from `grida-text-edit`)
+//! the Painter renders. Previously, `SkiaLayoutEngine` (from `text_edit`)
 //! built its *own* paragraphs with its *own* font configuration — a completely
 //! separate code path from `ParagraphCache`. This caused:
 //!
@@ -47,7 +47,7 @@
 use skia_safe;
 use skia_safe::textlayout;
 
-use grida_text_edit::{
+use crate::text_edit::{
     layout::{CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine},
     prev_grapheme_boundary, snap_grapheme_boundary, utf16_to_utf8_offset, utf8_to_utf16_offset,
 };
@@ -169,7 +169,7 @@ impl ParagraphCacheLayout {
     /// Falls back to uniform styling if no runs overlap the text range.
     fn build_paragraph_attributed(
         &self,
-        content: &grida_text_edit::attributed_text::AttributedText,
+        content: &crate::text_edit::attributed_text::AttributedText,
     ) -> textlayout::Paragraph {
         let text = content.text();
         let runs = content.runs();
@@ -206,15 +206,12 @@ impl ParagraphCacheLayout {
                 });
                 let mut ts = textstyle(&run_rec, &ctx);
                 // Apply the run's fill color (textstyle() doesn't handle fill).
-                match &run.style.fill {
-                    grida_text_edit::attributed_text::TextFill::Solid(rgba) => {
-                        ts.set_color(skia_safe::Color::from_argb(
-                            (rgba.a * 255.0) as u8,
-                            (rgba.r * 255.0) as u8,
-                            (rgba.g * 255.0) as u8,
-                            (rgba.b * 255.0) as u8,
-                        ));
-                    }
+                // For layout/measurement, extract the first solid color.
+                // Full paint stacks are rendered by the cg painter separately.
+                if let Some(color) = run.style.fills.iter().find_map(|p| p.solid_color()) {
+                    ts.set_color(skia_safe::Color::from_argb(
+                        color.a, color.r, color.g, color.b,
+                    ));
                 }
                 builder.push_style(&ts);
                 builder.add_text(&text[run_start..run_end]);
@@ -230,7 +227,7 @@ impl ParagraphCacheLayout {
     /// `ParagraphCache::compute_measurements`).
     fn rebuild_attributed(
         &mut self,
-        content: &grida_text_edit::attributed_text::AttributedText,
+        content: &crate::text_edit::attributed_text::AttributedText,
     ) {
         let text = content.text();
         let mut para = self.build_paragraph_attributed(content);
@@ -515,8 +512,8 @@ impl TextLayoutEngine for ParagraphCacheLayout {
             .collect();
 
         // Empty-line invariant.
-        let first_line = grida_text_edit::line_index_for_offset_utf8(&metrics, start);
-        let last_line = grida_text_edit::line_index_for_offset_utf8(
+        let first_line = crate::text_edit::line_index_for_offset_utf8(&metrics, start);
+        let last_line = crate::text_edit::line_index_for_offset_utf8(
             &metrics,
             end.saturating_sub(1).max(start),
         );
@@ -552,7 +549,7 @@ impl TextLayoutEngine for ParagraphCacheLayout {
 // ---------------------------------------------------------------------------
 
 impl ManagedTextLayout for ParagraphCacheLayout {
-    fn ensure_layout(&mut self, content: &grida_text_edit::attributed_text::AttributedText) {
+    fn ensure_layout(&mut self, content: &crate::text_edit::attributed_text::AttributedText) {
         let gen = content.generation();
         let text = content.text();
         if self.paragraph.is_some()

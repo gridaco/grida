@@ -144,7 +144,7 @@ pub trait ManagedTextLayout: TextLayoutEngine {
     ///
     /// Implementations may cache and skip rebuild if content hasn't changed
     /// (e.g. by checking `AttributedText::generation()`).
-    fn ensure_layout(&mut self, content: &crate::attributed_text::AttributedText);
+    fn ensure_layout(&mut self, content: &super::attributed_text::AttributedText);
 
     /// Invalidate all cached layout. The next `ensure_layout` call will
     /// rebuild from scratch.

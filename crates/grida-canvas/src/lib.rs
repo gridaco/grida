@@ -21,6 +21,7 @@ pub mod query;
 pub mod surface;
 pub mod sys;
 pub mod text;
+pub mod text_edit;
 pub mod text_edit_session;
 pub mod vectornetwork;
 pub mod window;

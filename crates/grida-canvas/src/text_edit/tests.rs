@@ -3,7 +3,7 @@
 //! All tests use `SimpleLayoutEngine` — no Skia, no winit.  The layout is
 //! monospace / no-wrap, so every assertion is exact.
 
-use crate::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, history::EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
+use super::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, history::EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
 
 fn layout() -> SimpleLayoutEngine {
     SimpleLayoutEngine::default_test()
@@ -1028,7 +1028,7 @@ fn different_kinds_do_not_merge() {
 
 #[test]
 fn timeout_breaks_merge() {
-    use crate::time::Duration;
+    use super::time::Duration;
 
     let mut h = EditHistory::with_merge_timeout(Duration::from_secs(2));
     let s0 = TextEditorState::with_cursor("", 0);
@@ -1957,7 +1957,7 @@ fn nav_never_locks_simple() {
 
 // --- SkiaLayoutEngine (real Skia paragraph layout, no GPU needed) ---
 
-use crate::skia_layout::SkiaLayoutEngine;
+use super::skia_layout::SkiaLayoutEngine;
 
 fn skia_layout() -> SkiaLayoutEngine {
     SkiaLayoutEngine::new(752.0, 576.0)

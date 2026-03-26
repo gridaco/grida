@@ -7,7 +7,7 @@ use skia_safe::{
     Color, FontMgr, Point,
 };
 
-use crate::{
+use super::{
     layout::{CaretRect, LineMetrics, SelectionRect, TextLayoutEngine},
     line_index_for_offset_utf8,
     prev_grapheme_boundary, snap_grapheme_boundary,
@@ -21,10 +21,10 @@ const DEFAULT_FONT_SIZE: f32 = 18.0;
 /// Extracted as a free function so it can be reused by both the monolithic
 /// and per-block attributed layout paths.
 fn attr_style_to_skia(
-    style: &crate::attributed_text::TextStyle,
+    style: &super::attributed_text::TextStyle,
     fallback_families: &[&str],
 ) -> TextStyle {
-    use crate::attributed_text as at_mod;
+    use super::attributed_text as at_mod;
 
     let mut ts = TextStyle::new();
     ts.set_font_size(style.font_size);
@@ -97,14 +97,11 @@ fn attr_style_to_skia(
         ts.set_font_arguments(&font_args);
     }
 
-    match &style.fill {
-        at_mod::TextFill::Solid(rgba) => {
-            ts.set_color(Color::from_argb(
-                (rgba.a * 255.0) as u8,
-                (rgba.r * 255.0) as u8,
-                (rgba.g * 255.0) as u8,
-                (rgba.b * 255.0) as u8,
-            ));
+    // For fill, extract the first solid color. The SkiaLayoutEngine is used for
+    // measurement — the host's full paint stack is rendered by the cg painter.
+    {
+        if let Some(c) = style.fills.iter().find_map(|p| p.solid_color()) {
+            ts.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
         }
     }
 
@@ -905,7 +902,7 @@ impl SkiaLayoutEngine {
     /// document into a single Skia `Paragraph`.
     pub fn ensure_layout_attributed(
         &mut self,
-        at: &crate::attributed_text::AttributedText,
+        at: &super::attributed_text::AttributedText,
     ) {
         let gen = at.generation();
         if !self.blocks.is_empty()
@@ -925,7 +922,7 @@ impl SkiaLayoutEngine {
         text: &str,
         block_start: usize,
         block_content_end: usize,
-        runs: &[crate::attributed_text::StyledRun],
+        runs: &[super::attributed_text::StyledRun],
     ) -> Paragraph {
         let mut para_style = ParagraphStyle::new();
         para_style.set_apply_rounding_hack(false);
@@ -984,7 +981,7 @@ impl SkiaLayoutEngine {
     /// Full rebuild of per-block layout from an [`AttributedText`].
     fn rebuild_blocks_attributed(
         &mut self,
-        at: &crate::attributed_text::AttributedText,
+        at: &super::attributed_text::AttributedText,
     ) {
         self.blocks.clear();
         self.cached_line_metrics = None;
@@ -1096,11 +1093,11 @@ impl SkiaLayoutEngine {
     /// position the cursor and draw selection rects using the display text.
     pub fn rebuild_blocks_with_preedit(
         &mut self,
-        content: &crate::attributed_text::AttributedText,
+        content: &super::attributed_text::AttributedText,
         cursor: usize,
         preedit: &str,
     ) -> (String, std::ops::Range<usize>) {
-        use crate::attributed_text::TextDecorationLine;
+        use super::attributed_text::TextDecorationLine;
 
         let mut display_content = content.clone();
         let mut preedit_style = content.caret_style_at(cursor as u32).clone();
@@ -1127,7 +1124,7 @@ impl SkiaLayoutEngine {
     /// range for caret positioning (caret goes at `preedit_byte_range.end`).
     pub fn build_preedit_paragraph(
         &self,
-        content: &crate::attributed_text::AttributedText,
+        content: &super::attributed_text::AttributedText,
         cursor: usize,
         preedit: &str,
     ) -> (String, Paragraph, std::ops::Range<usize>) {
@@ -1428,8 +1425,8 @@ impl TextLayoutEngine for SkiaLayoutEngine {
     }
 }
 
-impl crate::layout::ManagedTextLayout for SkiaLayoutEngine {
-    fn ensure_layout(&mut self, content: &crate::attributed_text::AttributedText) {
+impl super::layout::ManagedTextLayout for SkiaLayoutEngine {
+    fn ensure_layout(&mut self, content: &super::attributed_text::AttributedText) {
         self.ensure_layout_attributed(content);
     }
 

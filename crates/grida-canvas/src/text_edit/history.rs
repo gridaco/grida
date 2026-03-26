@@ -1,4 +1,4 @@
-use crate::time::{Duration, Instant};
+use super::time::{Duration, Instant};
 
 use super::TextEditorState;
 

@@ -26,76 +26,22 @@
 //! 6. **Boundary alignment** — all offsets are valid UTF-8 char boundaries.
 //! 7. **Monotonicity** — `runs[i].start < runs[i+1].start` (implied by 3+4).
 
+pub mod conv;
 pub mod html;
 
 use serde::{Deserialize, Serialize};
 
+// Re-export types from cg::types and cg::color for use within this module
+// and by consumers of the text_edit API.
+pub use crate::cg::color::CGColor;
+pub use crate::cg::types::{
+    FontFeature, FontOpticalSizing, FontVariation, Paint, StrokeAlign, TextAlign,
+    TextAlignVertical, TextDecorationLine, TextDecorationStyle, TextTransform,
+};
+
 // ---------------------------------------------------------------------------
-// Supporting types (self-contained, aligned with cg::types vocabulary)
+// Supporting types (text_edit-specific, not in cg::types)
 // ---------------------------------------------------------------------------
-
-/// Text transform (CSS `text-transform`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TextTransform {
-    None,
-    Uppercase,
-    Lowercase,
-    Capitalize,
-}
-
-impl Default for TextTransform {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-/// Text decoration line (CSS `text-decoration-line`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TextDecorationLine {
-    None,
-    Underline,
-    Overline,
-    LineThrough,
-}
-
-impl Default for TextDecorationLine {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-/// Text decoration style (CSS `text-decoration-style`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TextDecorationStyle {
-    Solid,
-    Double,
-    Dotted,
-    Dashed,
-    Wavy,
-}
-
-impl Default for TextDecorationStyle {
-    fn default() -> Self {
-        Self::Solid
-    }
-}
-
-/// Font optical sizing mode.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum FontOpticalSizing {
-    /// Automatically set `opsz` to the font size.
-    Auto,
-    /// Disable optical sizing.
-    None,
-    /// Use a fixed optical size value.
-    Fixed(f32),
-}
-
-impl Default for FontOpticalSizing {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
 
 /// A dimension that can be `Normal` (unset), a fixed px value, or a factor.
 ///
@@ -116,79 +62,12 @@ impl Default for TextDimension {
     }
 }
 
-/// An OpenType font feature toggle.
-///
-/// Tag is a 4-byte ASCII string (e.g. `"kern"`, `"liga"`, `"ss01"`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct FontFeature {
-    pub tag: String,
-    pub value: bool,
-}
-
-/// A font variation axis value.
-///
-/// Axis is a 4-byte ASCII tag (e.g. `"wght"`, `"wdth"`, `"slnt"`).
+/// Per-run stroke representation for text.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FontVariation {
-    pub axis: String,
-    pub value: f32,
-}
-
-/// RGBA color (f32 components, 0.0..1.0).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct RGBA {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-    pub a: f32,
-}
-
-impl RGBA {
-    pub const BLACK: Self = Self { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
-    pub const WHITE: Self = Self { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
-    pub const TRANSPARENT: Self = Self { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };
-}
-
-/// Text fill (per-run color/paint).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum TextFill {
-    /// Solid color fill.
-    Solid(RGBA),
-}
-
-impl Default for TextFill {
-    fn default() -> Self {
-        Self::Solid(RGBA::BLACK)
-    }
-}
-
-/// Horizontal text alignment (paragraph-level).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TextAlign {
-    Left,
-    Right,
-    Center,
-    Justify,
-}
-
-impl Default for TextAlign {
-    fn default() -> Self {
-        Self::Left
-    }
-}
-
-/// Vertical text alignment (paragraph-level).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TextAlignVertical {
-    Top,
-    Center,
-    Bottom,
-}
-
-impl Default for TextAlignVertical {
-    fn default() -> Self {
-        Self::Top
-    }
+pub struct TextStroke {
+    pub paints: Vec<Paint>,
+    pub width: f32,
+    pub align: StrokeAlign,
 }
 
 /// Paragraph direction.
@@ -219,7 +98,7 @@ pub struct Hyperlink {
 /// The complete set of per-run text attributes.
 ///
 /// Field layout is aligned with `TextStyleRec` in `crates/grida-canvas/src/cg/types.rs`
-/// and `TextStyleRec` in `format/grida.fbs`, extended with a `fill` field.
+/// and `TextStyleRec` in `format/grida.fbs`, extended with fills/stroke fields.
 ///
 /// Two `TextStyle`s are equal iff all fields are structurally equal. This
 /// determines whether adjacent runs can be merged (maximality invariant).
@@ -261,7 +140,7 @@ pub struct TextStyle {
     /// Decoration stroke style. Default: Solid.
     pub text_decoration_style: TextDecorationStyle,
     /// Decoration color override. `None` = inherit from fill.
-    pub text_decoration_color: Option<RGBA>,
+    pub text_decoration_color: Option<CGColor>,
     /// Skip-ink for decorations. Default: true.
     pub text_decoration_skip_ink: bool,
     /// Decoration thickness (percentage). Default: 1.0.
@@ -271,9 +150,13 @@ pub struct TextStyle {
     /// Text transform. Default: None.
     pub text_transform: TextTransform,
 
-    // --- Fill ---
-    /// Text color/fill. Default: solid black.
-    pub fill: TextFill,
+    // --- Fills ---
+    /// Text fill paints. Default: single solid black paint.
+    pub fills: Vec<Paint>,
+
+    // --- Stroke ---
+    /// Per-run stroke. `None` = no stroke / inherit from node.
+    pub stroke: Option<TextStroke>,
 
     // --- Link ---
     /// Hyperlink target. Default: None (no link).
@@ -301,7 +184,8 @@ impl Default for TextStyle {
             text_decoration_skip_ink: true,
             text_decoration_thickness: 1.0,
             text_transform: TextTransform::None,
-            fill: TextFill::default(),
+            fills: vec![Paint::from(CGColor::BLACK)],
+            stroke: None,
             hyperlink: None,
         }
     }
@@ -434,8 +318,8 @@ impl std::error::Error for InvariantError {}
 ///
 /// # Examples
 ///
-/// ```
-/// use grida_text_edit::attributed_text::{AttributedText, TextStyle};
+/// ```ignore
+/// use cg::text_edit::attributed_text::{AttributedText, TextStyle};
 ///
 /// // Create with default style
 /// let mut at = AttributedText::new("Hello, world!", TextStyle::default());
@@ -471,7 +355,7 @@ impl AttributedText {
 
     /// Create an attributed text with a single run covering the entire string.
     pub fn new(text: impl Into<String>, style: TextStyle) -> Self {
-        let text = crate::normalize_newlines(&text.into());
+        let text = crate::text_edit::normalize_newlines(&text.into());
         let len = text.len() as u32;
         let runs = vec![StyledRun { start: 0, end: len, style: style.clone() }];
         let this = Self {
@@ -689,7 +573,7 @@ impl AttributedText {
             self.text.len()
         );
 
-        let normalized = crate::normalize_newlines(s);
+        let normalized = crate::text_edit::normalize_newlines(s);
         let n = normalized.len() as u32;
         let pos32 = pos as u32;
 
@@ -733,7 +617,7 @@ impl AttributedText {
             self.text.len()
         );
 
-        let normalized = crate::normalize_newlines(s);
+        let normalized = crate::text_edit::normalize_newlines(s);
         let n = normalized.len() as u32;
         let pos32 = pos as u32;
 
@@ -903,7 +787,7 @@ impl AttributedText {
         // removed the run that held that style, we need to force it.
         // Since insert inherits the current run at `pos`, and coalesce ran,
         // this is generally correct. We do a defensive set_style.
-        let end = pos + crate::normalize_newlines(s).len();
+        let end = pos + crate::text_edit::normalize_newlines(s).len();
         if *self.style_at(pos as u32) != style_at_lo {
             self.set_style(pos, end, style_at_lo);
         }
@@ -1114,7 +998,7 @@ mod tests {
 
     fn red_style() -> TextStyle {
         TextStyle {
-            fill: TextFill::Solid(RGBA { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }),
+            fills: vec![Paint::from(CGColor::RED)],
             ..default_style()
         }
     }
@@ -1685,14 +1569,8 @@ mod tests {
         let mut at = AttributedText::new("Hello", default_style());
         at.set_style(0, 5, red_style());
         assert_eq!(at.runs().len(), 1);
-        match &at.runs()[0].style.fill {
-            TextFill::Solid(c) => {
-                assert_eq!(c.r, 1.0);
-                assert_eq!(c.g, 0.0);
-                assert_eq!(c.b, 0.0);
-                assert_eq!(c.a, 1.0);
-            }
-        }
+        let c = at.runs()[0].style.fills.iter().find_map(|p| p.solid_color()).unwrap();
+        assert_eq!(c, CGColor::RED);
     }
 
     #[test]

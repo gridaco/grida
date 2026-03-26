@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A 2D point expressed in **Centered Normalized Device Coordinates** (cNDC).
 ///
@@ -46,7 +46,7 @@ use serde::Deserialize;
 /// ## References
 /// - Flutter `Alignment`: https://api.flutter.dev/flutter/painting/Alignment-class.html
 ///
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Alignment(pub f32, pub f32);
 
 impl Alignment {
