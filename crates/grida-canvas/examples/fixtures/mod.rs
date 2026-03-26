@@ -32,6 +32,7 @@ pub mod l0_strokes;
 pub mod l0_strokes_rect;
 pub mod l0_strokes_varwidth;
 pub mod l0_type;
+pub mod l0_type_attributed;
 pub mod l0_type_features;
 pub mod l0_type_fvar;
 pub mod l0_vector;

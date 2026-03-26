@@ -1618,6 +1618,86 @@ impl<'a> Painter<'a> {
                         let effects = &text_layer.effects;
                         let clip_path = &text_layer.base.clip_path;
 
+                        // Attributed text: build per-run paragraph set, then
+                        // feed into the same effect pipeline as uniform text.
+                        if let Some(ref attr) = text_layer.attributed_string {
+                            use crate::text::attributed_paragraph::build_attributed_paragraph_with_images;
+                            let layout_width = text_layer.width.unwrap_or(f32::MAX);
+                            let para_set = build_attributed_paragraph_with_images(
+                                attr,
+                                text_layer.text_align,
+                                text_layer.max_lines,
+                                text_layer.ellipsis.as_deref(),
+                                self.fonts.font_collection(),
+                                layout_width,
+                                &text_layer.fills,
+                                Some(self.images),
+                            );
+                            let layout_height = para_set.height();
+                            let layout_width = para_set.fill.max_width();
+                            let container_height = text_layer.height.unwrap_or(layout_height);
+                            let y_offset = match text_layer.height {
+                                Some(h) => match text_layer.text_align_vertical {
+                                    TextAlignVertical::Top => 0.0,
+                                    TextAlignVertical::Center => (h - layout_height) / 2.0,
+                                    TextAlignVertical::Bottom => h - layout_height,
+                                },
+                                None => 0.0,
+                            };
+
+                            // Wrap fill paragraph for shadow/blur compatibility.
+                            let fill_rc = Rc::new(RefCell::new(para_set.fill));
+
+                            let draw_content = || {
+                                let inner = || {
+                                    self.canvas.save();
+                                    self.canvas.translate((0.0, y_offset));
+                                    // Stroke paragraph (behind fill)
+                                    if let Some(ref stroke) = para_set.stroke {
+                                        stroke.paint(self.canvas, skia_safe::Point::new(0.0, 0.0));
+                                    }
+                                    // Fill paragraph
+                                    fill_rc.borrow().paint(self.canvas, skia_safe::Point::new(0.0, 0.0));
+                                    self.canvas.restore();
+                                };
+                                if text_can_fold {
+                                    inner();
+                                } else {
+                                    let text_bounds = Rect::from_xywh(0.0, y_offset, layout_width, container_height);
+                                    self.with_opacity(text_opacity, Some(&text_bounds), inner);
+                                }
+                            };
+
+                            let apply_effects = || {
+                                if let Some(blur) = &effects.backdrop_blur {
+                                    self.draw_text_backdrop_blur(&fill_rc, &blur.blur, y_offset);
+                                }
+                                for shadow in &effects.shadows {
+                                    if let FilterShadowEffect::DropShadow(ds) = shadow {
+                                        self.draw_text_shadow(&fill_rc, ds, y_offset);
+                                    }
+                                }
+                                draw_content();
+                                for shadow in &effects.shadows {
+                                    if let FilterShadowEffect::InnerShadow(is) = shadow {
+                                        self.draw_text_inner_shadow(&fill_rc, is, y_offset);
+                                    }
+                                }
+                            };
+
+                            let draw_with_effects = || {
+                                if let Some(layer_blur) = &effects.blur {
+                                    let text_bounds = Rect::from_xywh(0.0, y_offset, layout_width, container_height);
+                                    self.with_layer_blur(&layer_blur.blur, text_bounds, apply_effects);
+                                } else {
+                                    apply_effects();
+                                }
+                            };
+
+                            self.with_optional_clip_path(clip_path.as_ref(), draw_with_effects);
+                            return;
+                        }
+
                         let paragraph = self.cached_paragraph(
                             &text_layer.base.id,
                             &text_layer.text,

@@ -44,7 +44,8 @@ use crate::cg::{
         RadialGradientPaint, RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign,
         StrokeCap, StrokeJoin, StrokeMarkerPreset, StrokeMiterLimit, SweepGradientPaint, TextAlign,
         TextAlignVertical, TextDecorationLine, TextDecorationRec, TextDecorationStyle,
-        TextLetterSpacing, TextLineHeight, TextStyleRec, TextTransform, TextWordSpacing,
+        AttributedString, StyledTextRun, TextLetterSpacing, TextLineHeight,
+        TextStyleRec, TextTransform, TextWordSpacing,
     },
     varwidth,
 };
@@ -52,8 +53,8 @@ use crate::node::{
     id::NodeIdGenerator,
     scene_graph::SceneGraph,
     schema::{
-        BooleanPathOperationNodeRec, ContainerNodeRec, EllipseNodeRec, GroupNodeRec,
-        InitialContainerNodeRec, LayerEffects, LayoutChildStyle, LayoutContainerStyle,
+        AttributedTextNodeRec, BooleanPathOperationNodeRec, ContainerNodeRec, EllipseNodeRec,
+        GroupNodeRec, InitialContainerNodeRec, LayerEffects, LayoutChildStyle, LayoutContainerStyle,
         LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node, PathNodeRec,
         RectangleNodeRec, RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene, Size,
         StrokeStyle, TextSpanNodeRec, VectorNodeRec,
@@ -357,6 +358,13 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                 fbs::Node::TextSpanNode => {
                     decode_layer_node!(slot, node_as_text_span_node, decode_text_span_node);
                 }
+                fbs::Node::AttributedTextNode => {
+                    decode_layer_node!(
+                        slot,
+                        node_as_attributed_text_node,
+                        decode_attributed_text_node
+                    );
+                }
                 fbs::Node::BooleanOperationNode => {
                     decode_layer_node!(
                         slot,
@@ -604,6 +612,94 @@ fn extract_rotation_cos_sin(transform: Option<&fbs::CGTransform2D>) -> (f32, f32
         Some(t) => (t.m00(), t.m10()),
         None => (1.0, 0.0),
     }
+}
+
+/// Decode a [`TextStyleRec`] from its FlatBuffers representation.
+///
+/// Shared helper used by both the node-level text style and per-run styled
+/// text runs in attributed strings.
+fn decode_text_style_rec_fbs(ts: fbs::TextStyleRec<'_>) -> TextStyleRec {
+    let mut rec = TextStyleRec::from_font(ts.font_family(), ts.font_size());
+    rec.font_weight = FontWeight(ts.font_weight().value());
+    rec.font_style_italic = ts.font_style_italic();
+    rec.font_kerning = ts.font_kerning();
+    let fw = ts.font_width();
+    rec.font_width = if fw == 0.0 { None } else { Some(fw) };
+    rec.text_transform = decode_text_transform(ts.text_transform());
+    rec.font_optical_sizing = ts
+        .font_optical_sizing()
+        .map(|fos| match fos.kind() {
+            fbs::FontOpticalSizingKind::None => FontOpticalSizing::None,
+            fbs::FontOpticalSizingKind::Fixed => FontOpticalSizing::Fixed(fos.value()),
+            _ => FontOpticalSizing::Auto,
+        })
+        .unwrap_or(FontOpticalSizing::Auto);
+    rec.text_decoration = ts.text_decoration().map(|td| TextDecorationRec {
+        text_decoration_line: decode_text_decoration_line(td.text_decoration_line()),
+        text_decoration_color: td
+            .text_decoration_color()
+            .map(|c| decode_rgba32f_to_cg_color(c)),
+        text_decoration_style: Some(decode_text_decoration_style(
+            td.text_decoration_style(),
+        )),
+        text_decoration_skip_ink: Some(td.text_decoration_skip_ink()),
+        text_decoration_thickness: {
+            let t = td.text_decoration_thickness();
+            if t == 0.0 { None } else { Some(t) }
+        },
+    });
+    rec.letter_spacing = ts
+        .letter_spacing()
+        .map(|td| match td.kind() {
+            fbs::TextDimensionKind::Factor => {
+                TextLetterSpacing::Factor(td.value().unwrap_or(0.0))
+            }
+            _ => TextLetterSpacing::Fixed(td.value().unwrap_or(0.0)),
+        })
+        .unwrap_or_default();
+    rec.word_spacing = ts
+        .word_spacing()
+        .map(|td| match td.kind() {
+            fbs::TextDimensionKind::Factor => {
+                TextWordSpacing::Factor(td.value().unwrap_or(0.0))
+            }
+            _ => TextWordSpacing::Fixed(td.value().unwrap_or(0.0)),
+        })
+        .unwrap_or_default();
+    rec.line_height = ts
+        .line_height()
+        .map(|td| match td.kind() {
+            fbs::TextDimensionKind::Normal => TextLineHeight::Normal,
+            fbs::TextDimensionKind::Factor => {
+                TextLineHeight::Factor(td.value().unwrap_or(1.0))
+            }
+            _ => TextLineHeight::Fixed(td.value().unwrap_or(0.0)),
+        })
+        .unwrap_or_default();
+    rec.font_features = ts.font_features().map(|ff| {
+        (0..ff.len())
+            .filter_map(|i| {
+                let f = ff.get(i);
+                f.open_type_feature_tag().map(|tag| FontFeature {
+                    tag: String::from_utf8_lossy(&[tag.a(), tag.b(), tag.c(), tag.d()])
+                        .into_owned(),
+                    value: f.open_type_feature_value(),
+                })
+            })
+            .collect()
+    });
+    rec.font_variations = ts.font_variations().map(|fv| {
+        (0..fv.len())
+            .map(|i| {
+                let v = fv.get(i);
+                FontVariation {
+                    axis: v.variation_axis().to_owned(),
+                    value: v.variation_value(),
+                }
+            })
+            .collect()
+    });
+    rec
 }
 
 fn decode_paint_item(item: &fbs::PaintStackItem<'_>) -> Option<Paint> {
@@ -1855,93 +1951,7 @@ fn decode_text_span_node(
     let text_style = props
         .as_ref()
         .and_then(|p| p.text_style())
-        .map(|ts| {
-            let mut rec = TextStyleRec::from_font(ts.font_family(), ts.font_size());
-            rec.font_weight = FontWeight(ts.font_weight().value());
-            rec.font_style_italic = ts.font_style_italic();
-            rec.font_kerning = ts.font_kerning();
-            let fw = ts.font_width();
-            rec.font_width = if fw == 0.0 { None } else { Some(fw) };
-            rec.text_transform = decode_text_transform(ts.text_transform());
-            rec.font_optical_sizing = ts
-                .font_optical_sizing()
-                .map(|fos| match fos.kind() {
-                    fbs::FontOpticalSizingKind::None => FontOpticalSizing::None,
-                    fbs::FontOpticalSizingKind::Fixed => FontOpticalSizing::Fixed(fos.value()),
-                    _ => FontOpticalSizing::Auto,
-                })
-                .unwrap_or(FontOpticalSizing::Auto);
-            rec.text_decoration = ts.text_decoration().map(|td| TextDecorationRec {
-                text_decoration_line: decode_text_decoration_line(td.text_decoration_line()),
-                text_decoration_color: td
-                    .text_decoration_color()
-                    .map(|c| decode_rgba32f_to_cg_color(c)),
-                text_decoration_style: Some(decode_text_decoration_style(
-                    td.text_decoration_style(),
-                )),
-                text_decoration_skip_ink: Some(td.text_decoration_skip_ink()),
-                text_decoration_thickness: {
-                    let t = td.text_decoration_thickness();
-                    if t == 0.0 {
-                        None
-                    } else {
-                        Some(t)
-                    }
-                },
-            });
-            rec.letter_spacing = ts
-                .letter_spacing()
-                .map(|td| match td.kind() {
-                    fbs::TextDimensionKind::Factor => {
-                        TextLetterSpacing::Factor(td.value().unwrap_or(0.0))
-                    }
-                    _ => TextLetterSpacing::Fixed(td.value().unwrap_or(0.0)),
-                })
-                .unwrap_or_default();
-            rec.word_spacing = ts
-                .word_spacing()
-                .map(|td| match td.kind() {
-                    fbs::TextDimensionKind::Factor => {
-                        TextWordSpacing::Factor(td.value().unwrap_or(0.0))
-                    }
-                    _ => TextWordSpacing::Fixed(td.value().unwrap_or(0.0)),
-                })
-                .unwrap_or_default();
-            rec.line_height = ts
-                .line_height()
-                .map(|td| match td.kind() {
-                    fbs::TextDimensionKind::Normal => TextLineHeight::Normal,
-                    fbs::TextDimensionKind::Factor => {
-                        TextLineHeight::Factor(td.value().unwrap_or(1.0))
-                    }
-                    _ => TextLineHeight::Fixed(td.value().unwrap_or(0.0)),
-                })
-                .unwrap_or_default();
-            rec.font_features = ts.font_features().map(|ff| {
-                (0..ff.len())
-                    .filter_map(|i| {
-                        let f = ff.get(i);
-                        f.open_type_feature_tag().map(|tag| FontFeature {
-                            tag: String::from_utf8_lossy(&[tag.a(), tag.b(), tag.c(), tag.d()])
-                                .into_owned(),
-                            value: f.open_type_feature_value(),
-                        })
-                    })
-                    .collect()
-            });
-            rec.font_variations = ts.font_variations().map(|fv| {
-                (0..fv.len())
-                    .map(|i| {
-                        let v = fv.get(i);
-                        FontVariation {
-                            axis: v.variation_axis().to_owned(),
-                            value: v.variation_value(),
-                        }
-                    })
-                    .collect()
-            });
-            rec
-        })
+        .map(|ts| decode_text_style_rec_fbs(ts))
         .unwrap_or_else(|| TextStyleRec::from_font("Inter", 14.0));
 
     let text_align = props
@@ -2005,6 +2015,136 @@ fn decode_text_span_node(
         effects: lc.effects.clone(),
     })
 }
+
+fn decode_attributed_text_node(
+    lc: &LayerCommon,
+    layer: &fbs::LayerTrait<'_>,
+    tn: &fbs::AttributedTextNode<'_>,
+) -> Node {
+    let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
+    let (cos, sin) = lc.rotation_cos_sin;
+    let transform = AffineTransform::from_translation_rotation_raw(sl.x, sl.y, cos, sin);
+
+    let props = tn.properties();
+
+    let text = props
+        .as_ref()
+        .and_then(|p| p.text())
+        .unwrap_or("")
+        .to_owned();
+
+    let default_style = props
+        .as_ref()
+        .and_then(|p| p.default_style())
+        .map(|ts| decode_text_style_rec_fbs(ts))
+        .unwrap_or_else(|| TextStyleRec::from_font("Inter", 14.0));
+
+    let text_align = props
+        .as_ref()
+        .map(|p| decode_text_align(p.text_align()))
+        .unwrap_or(TextAlign::Left);
+
+    let text_align_vertical = props
+        .as_ref()
+        .map(|p| decode_text_align_vertical(p.text_align_vertical()))
+        .unwrap_or(TextAlignVertical::Top);
+
+    // Decode styled runs
+    let runs = props
+        .as_ref()
+        .and_then(|p| p.styled_runs())
+        .map(|runs| {
+            (0..runs.len())
+                .map(|i| {
+                    let run = runs.get(i);
+                    let style = run
+                        .text_style()
+                        .map(|ts| decode_text_style_rec_fbs(ts))
+                        .unwrap_or_else(|| default_style.clone());
+                    let fills = run
+                        .fill_paints()
+                        .map(|fp| decode_paints_vec(Some(fp)).to_vec())
+                        .filter(|v| !v.is_empty());
+                    let strokes = {
+                        let p = decode_paints_vec(run.stroke_paints());
+                        if p.is_empty() { None } else { Some(p) }
+                    };
+                    let stroke_width = run.stroke_geometry().map(|sg| sg.stroke_width());
+                    let stroke_align = run
+                        .stroke_geometry()
+                        .and_then(|sg| sg.stroke_style())
+                        .map(|ss| decode_stroke_align(ss.stroke_align()));
+                    StyledTextRun {
+                        start: run.start(),
+                        end: run.end(),
+                        style,
+                        fills,
+                        strokes,
+                        stroke_width,
+                        stroke_align,
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let attributed_string = AttributedString::from_runs(text.clone(), runs);
+
+    let fill_paints = props
+        .as_ref()
+        .map(|p| decode_paints_vec(p.fill_paints()))
+        .unwrap_or_default();
+    let stroke_paints = props
+        .as_ref()
+        .map(|p| decode_paints_vec(p.stroke_paints()))
+        .unwrap_or_default();
+    let stroke_width = props
+        .as_ref()
+        .and_then(|p| p.stroke_geometry())
+        .map(|sg| sg.stroke_width())
+        .unwrap_or(0.0);
+    let stroke_align = props
+        .as_ref()
+        .and_then(|p| p.stroke_geometry())
+        .and_then(|sg| sg.stroke_style())
+        .map(|ss| decode_stroke_align(ss.stroke_align()))
+        .unwrap_or(StrokeAlign::Center);
+
+    Node::AttributedText(AttributedTextNodeRec {
+        active: lc.active,
+        transform,
+        width: sl.width,
+        height: sl.height,
+        layout_child: lc.layout_child.clone(),
+        attributed_string,
+        default_style,
+        text_align,
+        text_align_vertical,
+        max_lines: props.as_ref().map(|p| p.max_lines()).and_then(|v| {
+            if v == 0 {
+                None
+            } else {
+                Some(v as usize)
+            }
+        }),
+        ellipsis: props
+            .as_ref()
+            .and_then(|p| p.ellipsis())
+            .map(|s| s.to_owned()),
+        fills: fill_paints,
+        strokes: stroke_paints,
+        stroke_width,
+        stroke_align,
+        opacity: lc.opacity,
+        blend_mode: lc.blend_mode,
+        mask: lc.mask,
+        effects: lc.effects.clone(),
+    })
+}
+
+// NOTE: `decode_text_stroke_paint` was removed — per-run stroke paints now
+// use the same `Paints` model as node-level strokes. The FBS schema needs
+// regeneration to add `stroke_paints` / `stroke_geometry` to `StyledTextRunItem`.
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Encoder — Scene → FlatBuffers binary (`.grida`)
@@ -2315,6 +2455,9 @@ fn encode_node<'a, A: flatbuffers::Allocator + 'a>(
             encode_boolean_operation_node(fbb, r, node_id, parent_id, position)
         }
         Node::Path(r) => encode_path_node(fbb, r, node_id, parent_id, position),
+        Node::AttributedText(r) => {
+            encode_attributed_text_node(fbb, r, node_id, parent_id, position)
+        }
         // Fallback: encode as UnknownNode
         _ => {
             let sys = encode_system_node_trait(fbb, node_id, "", true, false);
@@ -2526,10 +2669,15 @@ fn encode_paints<'a, A: flatbuffers::Allocator + 'a>(
     Some(fbb.create_vector(&items))
 }
 
-fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
+/// Encode a `Paint` into its raw FlatBuffers union discriminant + value.
+///
+/// This is the single source of truth for paint encoding. Both
+/// `encode_paint_item()` (for `PaintStackItem`) and `encode_styled_runs()`
+/// (for `TextStrokeItem`) delegate here.
+fn encode_paint_raw<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     paint: &Paint,
-) -> Option<flatbuffers::WIPOffset<fbs::PaintStackItem<'a>>> {
+) -> Option<(fbs::Paint, flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>)> {
     match paint {
         Paint::Solid(sp) => {
             let color = encode_color_to_rgba32f(&sp.color);
@@ -2541,13 +2689,7 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                     blend_mode: encode_blend_mode(sp.blend_mode),
                 },
             );
-            Some(fbs::PaintStackItem::create(
-                fbb,
-                &fbs::PaintStackItemArgs {
-                    paint_type: fbs::Paint::SolidPaint,
-                    paint: Some(solid.as_union_value()),
-                },
-            ))
+            Some((fbs::Paint::SolidPaint, solid.as_union_value()))
         }
         Paint::LinearGradient(lg) => {
             let stops = encode_gradient_stops(fbb, &lg.stops);
@@ -2567,13 +2709,7 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                     tile_mode: encode_tile_mode(lg.tile_mode),
                 },
             );
-            Some(fbs::PaintStackItem::create(
-                fbb,
-                &fbs::PaintStackItemArgs {
-                    paint_type: fbs::Paint::LinearGradientPaint,
-                    paint: Some(lgp.as_union_value()),
-                },
-            ))
+            Some((fbs::Paint::LinearGradientPaint, lgp.as_union_value()))
         }
         Paint::RadialGradient(rg) => {
             let stops = encode_gradient_stops(fbb, &rg.stops);
@@ -2589,13 +2725,7 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                     tile_mode: encode_tile_mode(rg.tile_mode),
                 },
             );
-            Some(fbs::PaintStackItem::create(
-                fbb,
-                &fbs::PaintStackItemArgs {
-                    paint_type: fbs::Paint::RadialGradientPaint,
-                    paint: Some(rgp.as_union_value()),
-                },
-            ))
+            Some((fbs::Paint::RadialGradientPaint, rgp.as_union_value()))
         }
         Paint::SweepGradient(sg) => {
             let stops = encode_gradient_stops(fbb, &sg.stops);
@@ -2610,13 +2740,22 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                     transform: Some(&transform),
                 },
             );
-            Some(fbs::PaintStackItem::create(
+            Some((fbs::Paint::SweepGradientPaint, sgp.as_union_value()))
+        }
+        Paint::DiamondGradient(dg) => {
+            let stops = encode_gradient_stops(fbb, &dg.stops);
+            let transform = encode_affine_to_cg_transform(&dg.transform);
+            let dgp = fbs::DiamondGradientPaint::create(
                 fbb,
-                &fbs::PaintStackItemArgs {
-                    paint_type: fbs::Paint::SweepGradientPaint,
-                    paint: Some(sgp.as_union_value()),
+                &fbs::DiamondGradientPaintArgs {
+                    active: dg.active,
+                    stops: Some(stops),
+                    opacity: dg.opacity,
+                    blend_mode: encode_blend_mode(dg.blend_mode),
+                    transform: Some(&transform),
                 },
-            ))
+            );
+            Some((fbs::Paint::DiamondGradientPaint, dgp.as_union_value()))
         }
         Paint::Image(ip) => {
             let image_ref_offset = match &ip.image {
@@ -2665,36 +2804,23 @@ fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
                     filters: Some(&fbs_filters),
                 },
             );
-            Some(fbs::PaintStackItem::create(
-                fbb,
-                &fbs::PaintStackItemArgs {
-                    paint_type: fbs::Paint::ImagePaint,
-                    paint: Some(ip_offset.as_union_value()),
-                },
-            ))
-        }
-        Paint::DiamondGradient(dg) => {
-            let stops = encode_gradient_stops(fbb, &dg.stops);
-            let transform = encode_affine_to_cg_transform(&dg.transform);
-            let dgp = fbs::DiamondGradientPaint::create(
-                fbb,
-                &fbs::DiamondGradientPaintArgs {
-                    active: dg.active,
-                    stops: Some(stops),
-                    opacity: dg.opacity,
-                    blend_mode: encode_blend_mode(dg.blend_mode),
-                    transform: Some(&transform),
-                },
-            );
-            Some(fbs::PaintStackItem::create(
-                fbb,
-                &fbs::PaintStackItemArgs {
-                    paint_type: fbs::Paint::DiamondGradientPaint,
-                    paint: Some(dgp.as_union_value()),
-                },
-            ))
+            Some((fbs::Paint::ImagePaint, ip_offset.as_union_value()))
         }
     }
+}
+
+fn encode_paint_item<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    paint: &Paint,
+) -> Option<flatbuffers::WIPOffset<fbs::PaintStackItem<'a>>> {
+    let (paint_type, paint_val) = encode_paint_raw(fbb, paint)?;
+    Some(fbs::PaintStackItem::create(
+        fbb,
+        &fbs::PaintStackItemArgs {
+            paint_type,
+            paint: Some(paint_val),
+        },
+    ))
 }
 
 fn encode_image_paint_fit<'a, A: flatbuffers::Allocator + 'a>(
@@ -3889,35 +4015,14 @@ fn encode_path_node<'a, A: flatbuffers::Allocator + 'a>(
     make_node_slot(fbb, fbs::Node::PathNode, pn.as_union_value())
 }
 
-fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
+/// Encode a [`TextStyleRec`] into a FlatBuffers offset.
+///
+/// Shared helper used by both the node-level text style and per-run styled
+/// text runs in attributed strings.
+fn encode_text_style_rec<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
-    r: &TextSpanNodeRec,
-    node_id: &str,
-    parent_id: &str,
-    position: &str,
-) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
-    let x = r.transform.x();
-    let y = r.transform.y();
-    let plt = affine_to_rotation_transform(&r.transform);
-
-    let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
-    let layout = encode_shape_layout(fbb, x, y, r.width, r.height, &r.layout_child);
-    let layer = encode_layer_trait(
-        fbb,
-        &LayerTraitInput {
-            parent_id,
-            position,
-            opacity: r.opacity,
-            blend_mode: r.blend_mode,
-            mask: r.mask,
-            effects: &r.effects,
-            post_layout_transform: plt,
-            layout: Some(layout),
-        },
-    );
-
-    // Text style
-    let ts = &r.text_style;
+    ts: &TextStyleRec,
+) -> flatbuffers::WIPOffset<fbs::TextStyleRec<'a>> {
     let font_family_str = fbb.create_string(&ts.font_family);
     let font_weight = fbs::FontWeight::new(ts.font_weight.0);
     let fbs_font_optical_sizing = match ts.font_optical_sizing {
@@ -3990,7 +4095,7 @@ fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
             .collect();
         fbb.create_vector(&items)
     });
-    let text_style = fbs::TextStyleRec::create(
+    fbs::TextStyleRec::create(
         fbb,
         &fbs::TextStyleRecArgs {
             font_family: Some(font_family_str),
@@ -4008,7 +4113,95 @@ fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
             font_features: font_features_offset,
             font_variations: font_variations_offset,
         },
+    )
+}
+
+/// Encode a raw paint union (type + union offset) for embedding in tables
+/// that carry paint as a union field (like `TextStrokeItem`).
+///
+/// Returns `(paint_type, union_offset)`. Returns `None` for unsupported or
+/// empty paint types.
+/// Encode attributed string styled runs into FBS.
+fn encode_styled_runs<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    attr: &AttributedString,
+) -> Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<fbs::StyledTextRunItem<'a>>>>> {
+    if attr.runs.is_empty() {
+        return None;
+    }
+    let items: Vec<_> = attr
+        .runs
+        .iter()
+        .map(|run| {
+            let ts_offset = encode_text_style_rec(fbb, &run.style);
+            let fill_offsets = run.fills.as_ref().and_then(|fills| {
+                let paints = Paints::new(fills.clone());
+                encode_paints(fbb, &paints)
+            });
+            let stroke_offsets = run.strokes.as_ref().and_then(|strokes| {
+                encode_paints(fbb, strokes)
+            });
+            let sg_offset = if run.stroke_width.is_some() || run.stroke_align.is_some() {
+                Some(encode_stroke_geometry(
+                    fbb,
+                    &StrokeStyle {
+                        stroke_align: run.stroke_align.unwrap_or(StrokeAlign::Center),
+                        stroke_cap: StrokeCap::Butt,
+                        stroke_join: StrokeJoin::Miter,
+                        stroke_miter_limit: StrokeMiterLimit::default(),
+                        stroke_dash_array: None,
+                    },
+                    run.stroke_width.unwrap_or(0.0),
+                    None,
+                ))
+            } else {
+                None
+            };
+            fbs::StyledTextRunItem::create(
+                fbb,
+                &fbs::StyledTextRunItemArgs {
+                    start: run.start,
+                    end: run.end,
+                    text_style: Some(ts_offset),
+                    fill_paints: fill_offsets,
+                    stroke_paints: stroke_offsets,
+                    stroke_geometry: sg_offset,
+                },
+            )
+        })
+        .collect();
+    Some(fbb.create_vector(&items))
+}
+
+fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    r: &TextSpanNodeRec,
+    node_id: &str,
+    parent_id: &str,
+    position: &str,
+) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
+    let x = r.transform.x();
+    let y = r.transform.y();
+    let plt = affine_to_rotation_transform(&r.transform);
+
+    let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
+    let layout = encode_shape_layout(fbb, x, y, r.width, r.height, &r.layout_child);
+    let layer = encode_layer_trait(
+        fbb,
+        &LayerTraitInput {
+            parent_id,
+            position,
+            opacity: r.opacity,
+            blend_mode: r.blend_mode,
+            mask: r.mask,
+            effects: &r.effects,
+            post_layout_transform: plt,
+            layout: Some(layout),
+        },
     );
+
+    // Text style (via shared helper)
+    let text_style = encode_text_style_rec(fbb, &r.text_style);
 
     let text_str = fbb.create_string(&r.text);
     let fill_offsets = encode_paints(fbb, &r.fills);
@@ -4052,6 +4245,80 @@ fn encode_text_span_node<'a, A: flatbuffers::Allocator + 'a>(
         },
     );
     make_node_slot(fbb, fbs::Node::TextSpanNode, tn.as_union_value())
+}
+
+fn encode_attributed_text_node<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    r: &AttributedTextNodeRec,
+    node_id: &str,
+    parent_id: &str,
+    position: &str,
+) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
+    let x = r.transform.x();
+    let y = r.transform.y();
+    let plt = affine_to_rotation_transform(&r.transform);
+
+    let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
+    let layout = encode_shape_layout(fbb, x, y, r.width, r.height, &r.layout_child);
+    let layer = encode_layer_trait(
+        fbb,
+        &LayerTraitInput {
+            parent_id,
+            position,
+            opacity: r.opacity,
+            blend_mode: r.blend_mode,
+            mask: r.mask,
+            effects: &r.effects,
+            post_layout_transform: plt,
+            layout: Some(layout),
+        },
+    );
+
+    let default_style = encode_text_style_rec(fbb, &r.default_style);
+    let text_str = fbb.create_string(&r.attributed_string.text);
+    let styled_runs_offset = encode_styled_runs(fbb, &r.attributed_string);
+    let ellipsis_offset = r.ellipsis.as_ref().map(|s| fbb.create_string(s));
+    let fill_offsets = encode_paints(fbb, &r.fills);
+    let stroke_offsets = encode_paints(fbb, &r.strokes);
+
+    let sg = encode_stroke_geometry(
+        fbb,
+        &StrokeStyle {
+            stroke_align: r.stroke_align,
+            stroke_cap: StrokeCap::Butt,
+            stroke_join: StrokeJoin::Miter,
+            stroke_miter_limit: StrokeMiterLimit::default(),
+            stroke_dash_array: None,
+        },
+        r.stroke_width,
+        None,
+    );
+
+    let props = fbs::AttributedTextNodeProperties::create(
+        fbb,
+        &fbs::AttributedTextNodePropertiesArgs {
+            stroke_geometry: Some(sg),
+            fill_paints: fill_offsets,
+            stroke_paints: stroke_offsets,
+            text: Some(text_str),
+            default_style: Some(default_style),
+            text_align: encode_text_align(r.text_align),
+            text_align_vertical: encode_text_align_vertical(r.text_align_vertical),
+            max_lines: r.max_lines.map(|v| v as u32).unwrap_or(0),
+            ellipsis: ellipsis_offset,
+            styled_runs: styled_runs_offset,
+        },
+    );
+
+    let tn = fbs::AttributedTextNode::create(
+        fbb,
+        &fbs::AttributedTextNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            properties: Some(props),
+        },
+    );
+    make_node_slot(fbb, fbs::Node::AttributedTextNode, tn.as_union_value())
 }
 
 fn encode_boolean_operation_node<'a, A: flatbuffers::Allocator + 'a>(

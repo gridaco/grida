@@ -597,6 +597,22 @@ fn resolve_layout(
                         .unwrap_or(measurements.height)
                         .max(MIN_SIZE_DIRTY_HACK);
                     (geo.schema_transform, width, height)
+                } else if let Ok(Node::AttributedText(n)) = graph.get_node(id) {
+                    let measurements = paragraph_cache.measure_attributed(
+                        &n.attributed_string,
+                        &n.text_align,
+                        &n.max_lines,
+                        &n.ellipsis,
+                        n.width,
+                        fonts,
+                        Some(id),
+                    );
+                    let width = measurements.max_width.max(MIN_SIZE_DIRTY_HACK);
+                    let height = n
+                        .height
+                        .unwrap_or(measurements.height)
+                        .max(MIN_SIZE_DIRTY_HACK);
+                    (geo.schema_transform, width, height)
                 } else {
                     // Shouldn't happen; schema_width/height as fallback
                     (

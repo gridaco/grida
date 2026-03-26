@@ -1392,7 +1392,7 @@ impl From<&TextStyleRecBuildContext> for DecorationRecBuildContext {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextDecorationRec {
     /// Text decoration line (e.g. underline or none).
     pub text_decoration_line: TextDecorationLine,
@@ -1671,13 +1671,13 @@ impl Default for TextStyleRecBuildContext {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FontFeature {
     pub tag: String,
     pub value: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FontVariation {
     pub axis: String,
     pub value: f32,
@@ -1698,7 +1698,7 @@ impl Default for FontOpticalSizing {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TextLineHeight {
     /// Normal (unset, no override)
     Normal,
@@ -1714,7 +1714,7 @@ impl Default for TextLineHeight {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TextLetterSpacing {
     /// Fixed value in px.
     Fixed(f32),
@@ -1729,7 +1729,7 @@ impl Default for TextLetterSpacing {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TextWordSpacing {
     /// Fixed value in px.
     Fixed(f32),
@@ -1819,11 +1819,273 @@ impl TextStyleRec {
     }
 }
 
+impl TextStyleRec {
+    /// Returns `true` if two styles produce identical rendering output.
+    ///
+    /// Used by [`AttributedString::merge_adjacent_runs`] to coalesce runs.
+    /// Compares all fields that affect Skia paragraph layout and paint.
+    pub fn is_same_rendering(&self, other: &Self) -> bool {
+        self.font_family == other.font_family
+            && self.font_size == other.font_size
+            && self.font_weight == other.font_weight
+            && self.font_width == other.font_width
+            && self.font_style_italic == other.font_style_italic
+            && self.font_kerning == other.font_kerning
+            && self.letter_spacing == other.letter_spacing
+            && self.word_spacing == other.word_spacing
+            && self.line_height == other.line_height
+            && self.text_transform == other.text_transform
+            && self.text_decoration == other.text_decoration
+            && self.font_optical_sizing == other.font_optical_sizing
+            && self.font_features == other.font_features
+            && self.font_variations == other.font_variations
+    }
+}
+
+// #endregion
+
+// #region attributed_string
+
+/// A contiguous range of text sharing the same typographic style.
+///
+/// Offsets are **UTF-8 byte offsets** into the parent [`AttributedString::text`].
+/// Runs in an attributed string must satisfy the following invariants:
+///
+/// 1. **Coverage** — `runs[0].start == 0` and `runs[last].end == text.len()`.
+/// 2. **Contiguity** — `runs[i].end == runs[i+1].start`.
+/// 3. **Non-degenerate** — `start < end` (no zero-length runs).
+/// 4. **Monotonicity** — `runs[i].start < runs[i+1].start`.
+/// 5. **Boundary alignment** — `start` and `end` fall on valid UTF-8 char boundaries.
+#[derive(Debug, Clone)]
+pub struct StyledTextRun {
+    /// Inclusive start byte offset.
+    pub start: u32,
+    /// Exclusive end byte offset.
+    pub end: u32,
+    /// Typographic style for this run.
+    pub style: TextStyleRec,
+    /// Per-run fill paints override.
+    /// When `None`, the node-level fills are used.
+    /// Uses the same [`Paint`] model as node fills — supports solid, gradient,
+    /// and image paints composited via [`crate::painter::paint::sk_paint_stack_without_images`].
+    pub fills: Option<Vec<Paint>>,
+    /// Per-run stroke paints override.
+    /// When `None`, no per-run stroke is applied.
+    /// Same paint stack model as node-level `strokes`.
+    pub strokes: Option<Paints>,
+    /// Per-run stroke width override.
+    /// When `None`, inherits from node-level stroke width.
+    pub stroke_width: Option<f32>,
+    /// Per-run stroke alignment override.
+    /// When `None`, inherits from node-level stroke align.
+    pub stroke_align: Option<StrokeAlign>,
+}
+
+/// Text content with per-run styling — the attributed string.
+///
+/// This is the cg-native representation of rich text. Each run carries its own
+/// [`TextStyleRec`] and optional fill color, allowing inline style variations
+/// (mixed weights, sizes, colors, decorations) within a single text node.
+///
+/// # Invariants
+///
+/// The `runs` vector must satisfy the invariants documented on [`StyledTextRun`].
+/// Use [`AttributedString::new`] or [`AttributedStringBuilder`] to ensure correctness.
+#[derive(Debug, Clone)]
+pub struct AttributedString {
+    /// The backing UTF-8 text content.
+    pub text: String,
+    /// Ordered, contiguous, non-overlapping runs covering the full text.
+    pub runs: Vec<StyledTextRun>,
+}
+
+impl AttributedString {
+    /// Create an attributed string with a single uniform style.
+    pub fn new(text: impl Into<String>, style: TextStyleRec) -> Self {
+        let text = text.into();
+        let len = text.len() as u32;
+        let runs = if len > 0 {
+            vec![StyledTextRun {
+                start: 0,
+                end: len,
+                style,
+                fills: None,
+                strokes: None,
+                stroke_width: None,
+                stroke_align: None,
+            }]
+        } else {
+            vec![StyledTextRun {
+                start: 0,
+                end: 0,
+                style,
+                fills: None,
+                strokes: None,
+                stroke_width: None,
+                stroke_align: None,
+            }]
+        };
+        Self { text, runs }
+    }
+
+    /// Create from pre-built runs. Panics in debug mode if invariants are violated.
+    pub fn from_runs(text: impl Into<String>, runs: Vec<StyledTextRun>) -> Self {
+        let text = text.into();
+        debug_assert!(!runs.is_empty(), "runs must not be empty");
+        debug_assert_eq!(runs[0].start, 0, "first run must start at 0");
+        debug_assert_eq!(
+            runs.last().unwrap().end as usize,
+            text.len(),
+            "last run must end at text.len()"
+        );
+        for i in 0..runs.len() {
+            debug_assert!(
+                runs[i].start < runs[i].end
+                    || (runs[i].start == 0 && runs[i].end == 0 && text.is_empty()),
+                "run {} is degenerate: start={} end={}",
+                i,
+                runs[i].start,
+                runs[i].end
+            );
+            debug_assert!(
+                text.is_char_boundary(runs[i].start as usize),
+                "run {} start {} is not a char boundary",
+                i,
+                runs[i].start
+            );
+            debug_assert!(
+                text.is_char_boundary(runs[i].end as usize),
+                "run {} end {} is not a char boundary",
+                i,
+                runs[i].end
+            );
+            if i + 1 < runs.len() {
+                debug_assert_eq!(
+                    runs[i].end,
+                    runs[i + 1].start,
+                    "gap between run {} and {}",
+                    i,
+                    i + 1
+                );
+            }
+        }
+        Self { text, runs }
+    }
+
+    /// Returns the text slice for a given run.
+    pub fn run_text(&self, run: &StyledTextRun) -> &str {
+        &self.text[run.start as usize..run.end as usize]
+    }
+
+    /// Merge adjacent runs that have identical styling.
+    ///
+    /// This reduces run count when the import pipeline produces separate runs
+    /// for text segments that share the same style (e.g. inter-tspan whitespace
+    /// in SVG that inherits the default style).
+    pub fn merge_adjacent_runs(&mut self) {
+        if self.runs.len() <= 1 {
+            return;
+        }
+        let mut merged: Vec<StyledTextRun> = Vec::with_capacity(self.runs.len());
+        merged.push(self.runs[0].clone());
+        for run in &self.runs[1..] {
+            let last = merged.last_mut().unwrap();
+            if last.style.is_same_rendering(&run.style)
+                && last.fills == run.fills
+                && last.strokes == run.strokes
+                && last.stroke_width == run.stroke_width
+                && last.stroke_align == run.stroke_align
+            {
+                // Extend the previous run to cover this one.
+                last.end = run.end;
+            } else {
+                merged.push(run.clone());
+            }
+        }
+        self.runs = merged;
+    }
+}
+
+/// Builder for ergonomic construction of [`AttributedString`].
+///
+/// ```ignore
+/// let attr = AttributedStringBuilder::new()
+///     .push("Hello ", &normal_style, None)
+///     .push("World", &bold_style, Some(CGColor::RED))
+///     .build();
+/// ```
+pub struct AttributedStringBuilder {
+    text: String,
+    runs: Vec<StyledTextRun>,
+}
+
+impl AttributedStringBuilder {
+    pub fn new() -> Self {
+        Self {
+            text: String::new(),
+            runs: Vec::new(),
+        }
+    }
+
+    /// Append a styled text segment with a solid fill color.
+    ///
+    /// Convenience wrapper around [`push_painted`] for the common case of
+    /// a single solid color fill with no strokes.
+    pub fn push(self, text: &str, style: &TextStyleRec, fill_color: Option<CGColor>) -> Self {
+        let fills = fill_color.map(|c| vec![Paint::from(c)]);
+        self.push_painted(text, style, fills, None, None, None)
+    }
+
+    /// Append a styled text segment with full paint control.
+    ///
+    /// Accepts per-run fill and stroke paint stacks, matching the node-level
+    /// paint model. Use this for gradient fills, multi-fill stacking, or
+    /// stroked text.
+    pub fn push_painted(
+        mut self,
+        text: &str,
+        style: &TextStyleRec,
+        fills: Option<Vec<Paint>>,
+        strokes: Option<Paints>,
+        stroke_width: Option<f32>,
+        stroke_align: Option<StrokeAlign>,
+    ) -> Self {
+        let start = self.text.len() as u32;
+        self.text.push_str(text);
+        let end = self.text.len() as u32;
+        if start < end {
+            self.runs.push(StyledTextRun {
+                start,
+                end,
+                style: style.clone(),
+                fills,
+                strokes,
+                stroke_width,
+                stroke_align,
+            });
+        }
+        self
+    }
+
+    /// Build the final [`AttributedString`].
+    ///
+    /// Panics if no text was pushed.
+    pub fn build(self) -> AttributedString {
+        AttributedString::from_runs(self.text, self.runs)
+    }
+}
+
+impl Default for AttributedStringBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // #endregion
 
 // #region paint
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Paint {
     Solid(SolidPaint),
     LinearGradient(LinearGradientPaint),
@@ -2007,7 +2269,7 @@ impl From<CGColor> for SolidPaint {
 /// The [`BlendMode`] assigned to each [`Paint`] applies to that specific entry
 /// while it is composited over the accumulated result. It never retroactively
 /// affects paints that were drawn earlier in the stack.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Paints {
     paints: Vec<Paint>,
 }
@@ -2191,7 +2453,7 @@ impl GradientPaint {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SolidPaint {
     pub active: bool,
     pub color: CGColor,
@@ -2255,14 +2517,14 @@ impl From<CGColor> for Paint {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct GradientStop {
     /// 0.0 = start, 1.0 = end
     pub offset: f32,
     pub color: CGColor,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LinearGradientPaint {
     pub active: bool,
     pub xy1: Alignment,
@@ -2312,7 +2574,7 @@ impl Default for LinearGradientPaint {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RadialGradientPaint {
     pub active: bool,
     /// # Radial Gradient Transform Model
@@ -2391,7 +2653,7 @@ impl Default for RadialGradientPaint {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DiamondGradientPaint {
     pub active: bool,
     /// # Diamond Gradient Transform Model
@@ -2427,7 +2689,7 @@ impl Default for DiamondGradientPaint {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SweepGradientPaint {
     pub active: bool,
     /// # Sweep Gradient Transform Model
@@ -2523,7 +2785,7 @@ impl Default for SweepGradientPaint {
 ///
 /// Both variants are treated uniformly in most contexts, allowing the resource management
 /// system to handle different resource types transparently.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ResourceRef {
     /// Reference by content hash, typically used for in-memory resources with `mem://` URLs
     HASH(String),
@@ -2537,7 +2799,7 @@ pub enum ResourceRef {
 /// - `-1.0` = maximum negative adjustment
 /// - `0.0` = no change (neutral)
 /// - `1.0` = maximum positive adjustment
-#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
 pub struct ImageFilters {
     /// Exposure adjustment (-1.0 to 1.0, default: 0.0)
     ///
@@ -2641,7 +2903,7 @@ impl ImageFilters {
 /// 3. **Pragmatic ergonomics**: Tiling is **rare** in design tools compared to single-image fitting;
 ///    surfacing it as an explicit mode keeps common cases simple while still giving power-users a
 ///    precise, predictable tiling pipeline.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ImagePaintFit {
     /// Use standard fitting modes that match CSS `object-fit` and Flutter `BoxFit`
     Fit(BoxFit),
@@ -2696,7 +2958,7 @@ pub enum ImagePaintFit {
 /// - **CSS**: `background-size` + `background-repeat`
 /// - **SVG**: `<image>` inside `<pattern>` with `preserveAspectRatio`
 /// - **Skia**: image shader with local matrix and `SkTileMode`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ImageTile {
     /// Extra spacing between tiles in pixels (box space). Can be negative to overlap.
     // pub spacing: (f32, f32),
@@ -2761,7 +3023,7 @@ impl Default for ImageRepeat {
 /// - **`blend_mode`**: Determines how the image blends with underlying content
 /// - **`filters`**: Applies visual effects like brightness, contrast, saturation, etc.
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ImagePaint {
     pub active: bool,
     /// Reference to the image resource to be painted

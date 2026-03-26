@@ -151,13 +151,13 @@ fn convert_path(path: &usvg::Path, parent_world: &CGTransform2D) -> Result<IRSVG
 
 /// Convert a usvg `Text` into our IR representation.
 ///
-/// Model: `<text>` → Group, each **chunk** → TextSpan child.
+/// Model: `<text>` → Group, each **chunk** → child node.
 /// See `docs/wg/feat-svg/text-import.md` for rationale.
 ///
 /// A chunk is created by usvg at every absolute `x`/`y` reposition.
-/// Each chunk has a resolved position and a single text string.
-/// Inline style variation within a chunk is lost — we take the first
-/// visible span's style.
+/// When a chunk has multiple spans with different styles, we produce
+/// per-span `IRSVGTextStyledRun` entries so the pack step can create
+/// an `AttributedTextNode`.
 fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVGTextNode, String> {
     let abs: CGTransform2D = text.abs_transform().into();
     let relative = extract_relative_transform(parent_world, &abs);
@@ -198,9 +198,9 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
     let mut last_y: f32 = 0.0;
     let mut char_offset: usize = 0;
 
-    let mut spans = Vec::new();
+    let mut chunks = Vec::new();
     for chunk in text.chunks() {
-        let chunk_text = chunk.text().trim();
+        let chunk_text = chunk.text();
 
         // Resolve absolute position, falling back to last cursor position.
         let mut x = chunk.x().unwrap_or(last_x);
@@ -216,15 +216,15 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
         }
 
         // Advance char_offset past this chunk's codepoints.
-        let chunk_chars = chunk.text().chars().count();
+        let chunk_chars = chunk_text.chars().count();
         char_offset += chunk_chars;
 
-        // Update cursor for next chunk (simplified: advance x by 0 since
-        // we don't have glyph advance data; keep y as resolved).
+        // Update cursor for next chunk.
         last_x = x;
         last_y = y;
 
-        if chunk_text.is_empty() {
+        let trimmed = chunk_text.trim();
+        if trimmed.is_empty() {
             continue;
         }
 
@@ -232,21 +232,66 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
         if x != 0.0 || y != 0.0 {
             chunk_affine.translate(x, y);
         }
+        let chunk_transform = CGTransform2D::from(chunk_affine);
 
-        // Style from first visible span in this chunk.
-        let first_visible = chunk.spans().iter().find(|s| s.is_visible());
-        let chunk_fill = first_visible.and_then(|s| s.fill()).map(SVGFillAttributes::from);
-        let chunk_stroke = first_visible.and_then(|s| s.stroke()).map(SVGStrokeAttributes::from);
-        let font_size = first_visible.map(|s| s.font_size().get());
+        let visible_spans: Vec<_> = chunk.spans().iter().filter(|s| s.is_visible()).collect();
+        let has_style_variation = visible_spans.len() > 1;
 
-        spans.push(IRSVGTextSpanNode {
-            transform: CGTransform2D::from(chunk_affine),
-            text: chunk_text.to_string(),
-            fill: chunk_fill,
-            stroke: chunk_stroke,
-            font_size,
-            anchor: chunk.anchor().into(),
-        });
+        if has_style_variation {
+            // Multiple visible spans → attributed text chunk.
+            // Use untrimmed text so byte offsets stay valid.
+            let runs: Vec<IRSVGTextStyledRun> = visible_spans
+                .iter()
+                .filter_map(|span| {
+                    let start = span.start();
+                    let end = span.end();
+                    if start >= end || end > chunk_text.len() {
+                        return None;
+                    }
+                    Some(IRSVGTextStyledRun {
+                        start,
+                        end,
+                        fill: span.fill().map(SVGFillAttributes::from),
+                        stroke: span.stroke().map(SVGStrokeAttributes::from),
+                        font_size: span.font_size().get(),
+                        font_weight: span.font().weight(),
+                        font_style: match span.font().style() {
+                            usvg::FontStyle::Normal => SVGFontStyle::Normal,
+                            usvg::FontStyle::Italic => SVGFontStyle::Italic,
+                            usvg::FontStyle::Oblique => SVGFontStyle::Oblique,
+                        },
+                        font_family: resolve_font_family(span.font()),
+                        letter_spacing: span.letter_spacing(),
+                        word_spacing: span.word_spacing(),
+                    })
+                })
+                .collect();
+
+            chunks.push(IRSVGTextChunk::Attributed(IRSVGAttributedTextChunk {
+                transform: chunk_transform,
+                text: chunk_text.to_string(),
+                anchor: chunk.anchor().into(),
+                runs,
+            }));
+        } else {
+            // Single style → uniform text span.
+            let first_visible = visible_spans.first();
+            let chunk_fill =
+                first_visible.and_then(|s| s.fill()).map(SVGFillAttributes::from);
+            let chunk_stroke = first_visible
+                .and_then(|s| s.stroke())
+                .map(SVGStrokeAttributes::from);
+            let font_size = first_visible.map(|s| s.font_size().get());
+
+            chunks.push(IRSVGTextChunk::Uniform(IRSVGTextSpanNode {
+                transform: chunk_transform,
+                text: trimmed.to_string(),
+                fill: chunk_fill,
+                stroke: chunk_stroke,
+                font_size,
+                anchor: chunk.anchor().into(),
+            }));
+        }
     }
 
     Ok(IRSVGTextNode {
@@ -254,9 +299,22 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
         text_content: combined_text,
         fill,
         stroke,
-        spans,
+        chunks,
         bounds,
     })
+}
+
+/// Resolve a usvg Font to a concrete family name.
+///
+/// Prefers named families; falls back to the embedded default font.
+fn resolve_font_family(font: &usvg::Font) -> String {
+    font.families()
+        .iter()
+        .find_map(|f| match f {
+            usvg::FontFamily::Named(name) => Some(name.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| crate::fonts::embedded::geist::FAMILY.to_string())
 }
 
 fn extract_relative_transform(

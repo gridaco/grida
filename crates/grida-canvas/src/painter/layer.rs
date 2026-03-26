@@ -241,6 +241,9 @@ pub struct PainterPictureTextLayer {
     pub text_align: TextAlign,
     pub text_align_vertical: TextAlignVertical,
     pub id: NodeId,
+    /// When set, the text is rendered using per-run attributed styling
+    /// instead of the uniform `text_style` + node-level `fills`/`strokes`.
+    pub attributed_string: Option<AttributedString>,
 }
 
 #[derive(Debug, Clone)]
@@ -1127,6 +1130,7 @@ impl LayerList {
                     text_align: n.text_align,
                     text_align_vertical: n.text_align_vertical,
                     id: id.clone(),
+                    attributed_string: None,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
@@ -1281,6 +1285,71 @@ impl LayerList {
                     stroke_width: 0.0,
                     stroke_overlaps_fill,
                     non_overlapping_fill_path,
+                });
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::AttributedText(n) => {
+                let text_bounds =
+                    scene_cache
+                        .geometry()
+                        .get_world_bounds(id)
+                        .unwrap_or_else(|| Rectangle {
+                            x: n.x(),
+                            y: n.y(),
+                            width: n.width.unwrap_or(100.0),
+                            height: (n.default_style.font_size
+                                * match n.default_style.line_height {
+                                    TextLineHeight::Fixed(height) => {
+                                        height / n.default_style.font_size
+                                    }
+                                    TextLineHeight::Factor(factor) => factor,
+                                    TextLineHeight::Normal => 1.2,
+                                }
+                                * 2.0)
+                                .max(0.0),
+                        });
+
+                let rect_height = n.height.unwrap_or(text_bounds.height);
+                let shape = PainterShape::from_rect(skia_safe::Rect::from_xywh(
+                    0.0,
+                    0.0,
+                    text_bounds.width,
+                    rect_height,
+                ));
+
+                let layer = PainterPictureLayer::Text(PainterPictureTextLayer {
+                    base: PainterPictureLayerBase {
+                        id: id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
+                    },
+                    width: n.width,
+                    height: n.height,
+                    max_lines: n.max_lines,
+                    ellipsis: n.ellipsis.clone(),
+                    effects: Self::filter_active_effects(&n.effects),
+                    strokes: Self::filter_visible_paints(&n.strokes),
+                    fills: Self::filter_visible_paints(&n.fills),
+                    stroke_width: n.stroke_width,
+                    stroke_align: n.stroke_align,
+                    stroke_path: None,
+                    shape,
+                    text: n.attributed_string.text.clone(),
+                    text_style: n.default_style.clone(),
+                    text_align: n.text_align,
+                    text_align_vertical: n.text_align_vertical,
+                    id: id.clone(),
+                    attributed_string: Some(n.attributed_string.clone()),
                 });
                 out.push(LayerEntry {
                     id: id.clone(),

@@ -46,7 +46,7 @@ use serde::Deserialize;
 /// ## References
 /// - Flutter `Alignment`: https://api.flutter.dev/flutter/painting/Alignment-class.html
 ///
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct Alignment(pub f32, pub f32);
 
 impl Alignment {
