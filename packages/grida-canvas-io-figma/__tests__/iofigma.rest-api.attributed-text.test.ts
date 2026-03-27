@@ -26,7 +26,7 @@ function makeTextNode(
   characterStyleOverrides: number[],
   styleOverrideTable: Record<string, Partial<figrest.TypeStyle>>,
   baseStyle: Partial<figrest.TypeStyle> = {}
-): { doc: grida.program.document.Document } {
+): { doc: grida.program.document.IPackedSceneDocument } {
   const textNode: figrest.TextNode = {
     id: "2:1",
     name: "Text",
@@ -107,7 +107,7 @@ function makeTextNode(
 }
 
 function findAttribNode(
-  doc: grida.program.document.Document
+  doc: grida.program.document.IDocumentDefinition
 ): grida.program.nodes.AttributedTextNode | undefined {
   return Object.values(doc.nodes).find(
     (n): n is grida.program.nodes.AttributedTextNode => n.type === "attrib"

@@ -25,6 +25,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build Packages
         run: pnpm turbo build --filter='./packages/*'
+      - name: Run Typecheck
+        run: pnpm typecheck
       - name: Run Lint
         run: pnpm turbo lint
       - name: Run Tests
