@@ -9,6 +9,65 @@ import * as flatbuffers from "flatbuffers";
 
 type Builder = flatbuffers.Builder;
 
+// ─── char ↔ UTF-8 byte offset conversion ─────────────────────────────────
+// TS strings are UTF-16; Rust strings are UTF-8.  The FBS wire format uses
+// UTF-8 byte offsets (matching the Rust `StyledTextRun` contract), so we
+// must convert when crossing the boundary.
+
+/**
+ * Build a lookup table that maps JS char index → UTF-8 byte offset.
+ * Returns an array of length `text.length + 1` where `map[i]` is the byte
+ * offset of the i-th JS char, and `map[text.length]` is the total byte length.
+ */
+function charToByteOffsets(text: string): Uint32Array {
+  // Walk the JS string (UTF-16 code units) computing UTF-8 byte positions.
+  const map = new Uint32Array(text.length + 1);
+  let byteIdx = 0;
+  for (let i = 0; i < text.length; i++) {
+    map[i] = byteIdx;
+    const code = text.charCodeAt(i);
+    if (code < 0x80) {
+      byteIdx += 1;
+    } else if (code < 0x800) {
+      byteIdx += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      // High surrogate — this char + next form a surrogate pair (4 UTF-8 bytes).
+      byteIdx += 4;
+      i++; // skip low surrogate
+      map[i] = byteIdx; // low surrogate maps to byte *after* the 4-byte seq
+    } else {
+      byteIdx += 3;
+    }
+  }
+  map[text.length] = byteIdx;
+  return map;
+}
+
+/**
+ * Build a lookup table that maps UTF-8 byte offset → JS char index.
+ * Returns a Map (sparse — only entries at valid byte boundaries).
+ */
+function byteToCharOffsets(text: string): Map<number, number> {
+  const map = new Map<number, number>();
+  let byteIdx = 0;
+  for (let i = 0; i < text.length; i++) {
+    map.set(byteIdx, i);
+    const code = text.charCodeAt(i);
+    if (code < 0x80) {
+      byteIdx += 1;
+    } else if (code < 0x800) {
+      byteIdx += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      byteIdx += 4;
+      i++;
+    } else {
+      byteIdx += 3;
+    }
+  }
+  map.set(byteIdx, text.length); // end sentinel
+  return map;
+}
+
 /**
  * Type guard to check if a paint value is a valid cg.Paint (not tokenized).
  * Tokenized paints have string values for properties that should be objects/numbers.
@@ -927,6 +986,288 @@ export namespace format {
             fbs.TextSpanNodeProperties.endTextSpanNodeProperties(builder);
           return { dataOffset };
         }
+
+        /**
+         * Encodes a TextStyleRec table from an ITextStyle-shaped object.
+         * Shared between TextSpanNode and AttributedTextNode encoding.
+         */
+        function encodeTextStyleRec(
+          builder: Builder,
+          style: grida.program.nodes.i.ITextStyle
+        ): flatbuffers.Offset {
+          // TextDecorationRec
+          fbs.TextDecorationRec.startTextDecorationRec(builder);
+          fbs.TextDecorationRec.addTextDecorationLine(
+            builder,
+            styling.encode.textDecorationLine(style.text_decoration_line)
+          );
+          fbs.TextDecorationRec.addTextDecorationColor(
+            builder,
+            fbs.RGBA32F.createRGBA32F(builder, 0.0, 0.0, 0.0, 1.0)
+          );
+          fbs.TextDecorationRec.addTextDecorationStyle(
+            builder,
+            fbs.TextDecorationStyle.Solid
+          );
+          fbs.TextDecorationRec.addTextDecorationSkipInk(builder, true);
+          fbs.TextDecorationRec.addTextDecorationThickness(builder, 1.0);
+          const decorationOffset =
+            fbs.TextDecorationRec.endTextDecorationRec(builder);
+
+          // Font features
+          let fontFeaturesOffset: flatbuffers.Offset | undefined = undefined;
+          if (
+            style.font_features &&
+            Object.keys(style.font_features).length > 0
+          ) {
+            const fontFeatureOffsets: flatbuffers.Offset[] = [];
+            const entries = Object.entries(style.font_features).reverse();
+            for (const [tag, enabled] of entries) {
+              if (enabled !== undefined) {
+                const tagOffset = structs.openTypeFeatureTag(builder, tag);
+                fontFeatureOffsets.push(
+                  fbs.FontFeature.createFontFeature(builder, tagOffset, enabled)
+                );
+              }
+            }
+            if (fontFeatureOffsets.length > 0) {
+              fontFeaturesOffset = fbs.TextStyleRec.createFontFeaturesVector(
+                builder,
+                fontFeatureOffsets
+              );
+            }
+          }
+
+          const fontFamilyOffset = builder.createString(
+            style.font_family ?? ""
+          );
+
+          // TextDimension tables
+          const letterSpacingValue = style.letter_spacing ?? 0;
+          const letterSpacingKind =
+            letterSpacingValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Fixed;
+          const letterSpacingOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            letterSpacingKind,
+            letterSpacingValue
+          );
+
+          const wordSpacingValue = style.word_spacing ?? 0;
+          const wordSpacingKind =
+            wordSpacingValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Fixed;
+          const wordSpacingOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            wordSpacingKind,
+            wordSpacingValue
+          );
+
+          const lineHeightValue = style.line_height ?? 0;
+          const lineHeightKind =
+            lineHeightValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Normal;
+          const lineHeightOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            lineHeightKind,
+            lineHeightValue
+          );
+
+          // Build TextStyleRec
+          fbs.TextStyleRec.startTextStyleRec(builder);
+          fbs.TextStyleRec.addTextDecoration(builder, decorationOffset);
+          fbs.TextStyleRec.addFontFamily(builder, fontFamilyOffset);
+          if (style.font_size !== undefined && style.font_size !== null) {
+            fbs.TextStyleRec.addFontSize(builder, style.font_size);
+          }
+          fbs.TextStyleRec.addFontWeight(
+            builder,
+            fbs.FontWeight.createFontWeight(
+              builder,
+              (style.font_weight as number) ?? 400
+            )
+          );
+          fbs.TextStyleRec.addFontKerning(
+            builder,
+            style.font_kerning ?? true
+          );
+          if (fontFeaturesOffset !== undefined) {
+            fbs.TextStyleRec.addFontFeatures(builder, fontFeaturesOffset);
+          }
+          fbs.TextStyleRec.addLetterSpacing(builder, letterSpacingOffset);
+          fbs.TextStyleRec.addWordSpacing(builder, wordSpacingOffset);
+          fbs.TextStyleRec.addLineHeight(builder, lineHeightOffset);
+          return fbs.TextStyleRec.endTextStyleRec(builder);
+        }
+
+        /**
+         * Encodes AttributedTextNodeProperties.
+         */
+        export function attributedText(
+          builder: Builder,
+          node: grida.program.nodes.AttributedTextNode
+        ): { dataOffset: flatbuffers.Offset } {
+          // Create text string offset BEFORE starting nested tables
+          let textOffset: flatbuffers.Offset | null = null;
+          if (node.text !== null && node.text !== undefined) {
+            textOffset = builder.createString(
+              typeof node.text === "string" ? node.text : String(node.text)
+            );
+          }
+
+          // Encode default_style
+          const defaultStyleOffset = encodeTextStyleRec(
+            builder,
+            node.default_style
+          );
+
+          // Encode styled_runs — convert char indices → UTF-8 byte offsets
+          const c2b =
+            node.text != null ? charToByteOffsets(node.text) : undefined;
+          const runOffsets: flatbuffers.Offset[] = [];
+          for (const run of node.styled_runs) {
+            const runStyleOffset = encodeTextStyleRec(builder, run.style);
+
+            // Per-run fill paints
+            const runFillPaintsFiltered = run.fill_paints?.filter(isPaint);
+            const runFillPaintsOffset =
+              runFillPaintsFiltered && runFillPaintsFiltered.length > 0
+                ? format.paint.encode.fillPaints(
+                    builder,
+                    runFillPaintsFiltered,
+                    fbs.StyledTextRunItem.createFillPaintsVector
+                  )
+                : null;
+
+            // Per-run stroke paints
+            const runStrokePaintsFiltered = run.stroke_paints?.filter(isPaint);
+            const runStrokePaintsOffset =
+              runStrokePaintsFiltered && runStrokePaintsFiltered.length > 0
+                ? format.paint.encode.strokePaints(
+                    builder,
+                    runStrokePaintsFiltered,
+                    fbs.StyledTextRunItem.createStrokePaintsVector
+                  )
+                : null;
+
+            // Per-run stroke geometry
+            let runStrokeGeometryOffset: flatbuffers.Offset | null = null;
+            if (run.stroke_width !== undefined) {
+              runStrokeGeometryOffset =
+                format.shape.encode.strokeGeometryTrait(builder, {
+                  stroke_width: run.stroke_width,
+                });
+            }
+
+            fbs.StyledTextRunItem.startStyledTextRunItem(builder);
+            fbs.StyledTextRunItem.addStart(
+              builder,
+              c2b ? c2b[run.start] : run.start
+            );
+            fbs.StyledTextRunItem.addEnd(
+              builder,
+              c2b ? c2b[run.end] : run.end
+            );
+            fbs.StyledTextRunItem.addTextStyle(builder, runStyleOffset);
+            if (runFillPaintsOffset !== null) {
+              fbs.StyledTextRunItem.addFillPaints(
+                builder,
+                runFillPaintsOffset
+              );
+            }
+            if (runStrokePaintsOffset !== null) {
+              fbs.StyledTextRunItem.addStrokePaints(
+                builder,
+                runStrokePaintsOffset
+              );
+            }
+            if (runStrokeGeometryOffset !== null) {
+              fbs.StyledTextRunItem.addStrokeGeometry(
+                builder,
+                runStrokeGeometryOffset
+              );
+            }
+            runOffsets.push(
+              fbs.StyledTextRunItem.endStyledTextRunItem(builder)
+            );
+          }
+
+          const styledRunsOffset =
+            fbs.AttributedTextNodeProperties.createStyledRunsVector(
+              builder,
+              runOffsets
+            );
+
+          // Node-level stroke geometry
+          const strokeGeometryOffset =
+            format.shape.encode.strokeGeometryTrait(builder, {
+              stroke_width: node.stroke_width ?? 0,
+            });
+
+          // Node-level fill/stroke paints
+          const fillPaintsFiltered = node.fill_paints?.filter(isPaint);
+          const fillPaintsOffset = format.paint.encode.fillPaints(
+            builder,
+            fillPaintsFiltered,
+            fbs.AttributedTextNodeProperties.createFillPaintsVector
+          );
+          const strokePaintsFiltered = node.stroke_paints?.filter(isPaint);
+          const strokePaintsOffset = format.paint.encode.strokePaints(
+            builder,
+            strokePaintsFiltered,
+            fbs.AttributedTextNodeProperties.createStrokePaintsVector
+          );
+
+          // Build AttributedTextNodeProperties
+          fbs.AttributedTextNodeProperties.startAttributedTextNodeProperties(
+            builder
+          );
+          fbs.AttributedTextNodeProperties.addStrokeGeometry(
+            builder,
+            strokeGeometryOffset
+          );
+          fbs.AttributedTextNodeProperties.addFillPaints(
+            builder,
+            fillPaintsOffset
+          );
+          fbs.AttributedTextNodeProperties.addStrokePaints(
+            builder,
+            strokePaintsOffset
+          );
+          if (textOffset !== null) {
+            fbs.AttributedTextNodeProperties.addText(builder, textOffset);
+          }
+          fbs.AttributedTextNodeProperties.addDefaultStyle(
+            builder,
+            defaultStyleOffset
+          );
+          fbs.AttributedTextNodeProperties.addTextAlign(
+            builder,
+            styling.encode.textAlign(node.text_align)
+          );
+          fbs.AttributedTextNodeProperties.addTextAlignVertical(
+            builder,
+            styling.encode.textAlignVertical(node.text_align_vertical)
+          );
+          if (node.max_lines !== undefined && node.max_lines !== null) {
+            fbs.AttributedTextNodeProperties.addMaxLines(
+              builder,
+              node.max_lines
+            );
+          }
+          fbs.AttributedTextNodeProperties.addStyledRuns(
+            builder,
+            styledRunsOffset
+          );
+          const dataOffset =
+            fbs.AttributedTextNodeProperties.endAttributedTextNodeProperties(
+              builder
+            );
+          return { dataOffset };
+        }
       }
 
       /**
@@ -1580,6 +1921,23 @@ export namespace format {
             fbs.TextSpanNode.addProperties(builder, propertiesOffset);
             nodeOffset = fbs.TextSpanNode.endTextSpanNode(builder);
             nodeType = fbs.Node.TextSpanNode;
+            break;
+          }
+          case "attrib": {
+            const attribNode =
+              node as grida.program.nodes.AttributedTextNode;
+            const propertiesOffset =
+              format.node.encode.nodeData.attributedText(
+                builder,
+                attribNode
+              ).dataOffset;
+
+            fbs.AttributedTextNode.startAttributedTextNode(builder);
+            fbs.AttributedTextNode.addNode(builder, systemNodeTraitOffset);
+            fbs.AttributedTextNode.addLayer(builder, layerOffset);
+            fbs.AttributedTextNode.addProperties(builder, propertiesOffset);
+            nodeOffset = fbs.AttributedTextNode.endAttributedTextNode(builder);
+            nodeType = fbs.Node.AttributedTextNode;
             break;
           }
           case "vector": {
@@ -5305,6 +5663,216 @@ export namespace format {
         }
 
         /**
+         * Decodes a TextStyleRec into an ITextStyle object.
+         * Shared helper for TextSpanNode and AttributedTextNode.
+         */
+        function decodeTextStyleRec(
+          textStyle: fbs.TextStyleRec | null
+        ): grida.program.nodes.i.ITextStyle {
+          let textDecorationLine: cg.TextDecorationLine = "none";
+          let fontSize: number = 14;
+          let fontWeight: number = 400;
+          let fontKerning: boolean = true;
+          let fontFamily: string | undefined = undefined;
+          let letterSpacing: number | undefined = undefined;
+          let wordSpacing: number | undefined = undefined;
+          let lineHeight: number | undefined = undefined;
+          let fontFeatures:
+            | Partial<Record<cg.OpenTypeFeature, boolean>>
+            | undefined = undefined;
+
+          if (textStyle) {
+            const decoration = textStyle.textDecoration();
+            if (decoration) {
+              textDecorationLine = format.styling.decode.textDecorationLine(
+                decoration.textDecorationLine()
+              );
+            }
+            const fontFamilyValue = textStyle.fontFamily();
+            if (fontFamilyValue) {
+              fontFamily = fontFamilyValue;
+            }
+            const fontSizeValue = textStyle.fontSize();
+            if (fontSizeValue !== 0) {
+              fontSize = fontSizeValue;
+            }
+            const fontWeightStruct = textStyle.fontWeight();
+            if (fontWeightStruct) {
+              fontWeight = fontWeightStruct.value();
+            }
+            fontKerning = textStyle.fontKerning();
+
+            const letterSpacingStruct = textStyle.letterSpacing();
+            if (letterSpacingStruct) {
+              if (
+                letterSpacingStruct.kind() === fbs.TextDimensionKind.Factor
+              ) {
+                letterSpacing = letterSpacingStruct.value() ?? undefined;
+              }
+            }
+
+            const wordSpacingStruct = textStyle.wordSpacing();
+            if (wordSpacingStruct) {
+              if (wordSpacingStruct.kind() === fbs.TextDimensionKind.Factor) {
+                wordSpacing = wordSpacingStruct.value() ?? undefined;
+              }
+            }
+
+            const lineHeightStruct = textStyle.lineHeight();
+            if (lineHeightStruct) {
+              if (lineHeightStruct.kind() === fbs.TextDimensionKind.Normal) {
+                lineHeight = undefined;
+              } else if (
+                lineHeightStruct.kind() === fbs.TextDimensionKind.Factor
+              ) {
+                lineHeight = lineHeightStruct.value() ?? undefined;
+              }
+            }
+
+            const fontFeaturesLength = textStyle.fontFeaturesLength();
+            if (fontFeaturesLength > 0) {
+              fontFeatures = {};
+              for (let i = 0; i < fontFeaturesLength; i++) {
+                const feature = textStyle.fontFeatures(i);
+                if (feature) {
+                  const tagObj = feature.openTypeFeatureTag();
+                  if (tagObj) {
+                    const tag = structs.openTypeFeatureTagToString(tagObj);
+                    fontFeatures[tag as cg.OpenTypeFeature] =
+                      feature.openTypeFeatureValue();
+                  }
+                }
+              }
+              if (Object.keys(fontFeatures).length === 0) {
+                fontFeatures = undefined;
+              }
+            }
+          }
+
+          return {
+            font_family: fontFamily,
+            font_size: fontSize,
+            font_weight: fontWeight,
+            font_kerning: fontKerning,
+            text_decoration_line: textDecorationLine,
+            ...(letterSpacing !== undefined
+              ? { letter_spacing: letterSpacing }
+              : {}),
+            ...(wordSpacing !== undefined ? { word_spacing: wordSpacing } : {}),
+            ...(lineHeight !== undefined ? { line_height: lineHeight } : {}),
+            ...(fontFeatures ? { font_features: fontFeatures } : {}),
+          };
+        }
+
+        /**
+         * Decodes AttributedTextNode.
+         */
+        export function attributedText(
+          n: fbs.AttributedTextNode,
+          id: string,
+          systemNode: fbs.SystemNodeTrait,
+          layer: fbs.LayerTrait | null,
+          opacity: number,
+          layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
+          effects?: grida.program.nodes.i.IEffects
+        ): grida.program.nodes.AttributedTextNode {
+          const props = n.properties();
+
+          // Decode text alignment
+          const textAlign: cg.TextAlign = props
+            ? format.styling.decode.textAlign(props.textAlign())
+            : "left";
+          const textAlignVertical: cg.TextAlignVertical = props
+            ? format.styling.decode.textAlignVertical(props.textAlignVertical())
+            : "top";
+
+          // Decode default_style
+          const defaultStyle = decodeTextStyleRec(
+            props?.defaultStyle() ?? null
+          );
+
+          // Decode styled_runs — convert UTF-8 byte offsets → char indices
+          const decodedText = props?.text() ?? null;
+          const b2c =
+            decodedText != null ? byteToCharOffsets(decodedText) : undefined;
+          const styledRuns: grida.program.nodes.StyledTextRun[] = [];
+          if (props) {
+            const runsLength = props.styledRunsLength();
+            for (let i = 0; i < runsLength; i++) {
+              const runItem = props.styledRuns(i);
+              if (!runItem) continue;
+
+              const runStyle = decodeTextStyleRec(runItem.textStyle());
+
+              // Per-run fill paints
+              const runFillPaints = format.paint.decode.fillPaints(runItem);
+              // Per-run stroke paints
+              const runStrokePaints = format.paint.decode.strokePaints(runItem);
+              // Per-run stroke geometry
+              const runStrokeGeometry = runItem.strokeGeometry();
+              const runStrokeWidth = runStrokeGeometry
+                ? format.shape.decode.strokeGeometryTrait(runStrokeGeometry)
+                    .stroke_width
+                : undefined;
+
+              const byteStart = runItem.start();
+              const byteEnd = runItem.end();
+              styledRuns.push({
+                start: b2c ? (b2c.get(byteStart) ?? byteStart) : byteStart,
+                end: b2c ? (b2c.get(byteEnd) ?? byteEnd) : byteEnd,
+                style: runStyle,
+                ...(runFillPaints ? { fill_paints: runFillPaints } : {}),
+                ...(runStrokePaints ? { stroke_paints: runStrokePaints } : {}),
+                ...(runStrokeWidth !== undefined
+                  ? { stroke_width: runStrokeWidth }
+                  : {}),
+              });
+            }
+          }
+
+          // Decode StrokeGeometryTrait
+          const strokeGeometry = props?.strokeGeometry();
+          const strokeGeometryProps = format.shape.decode.strokeGeometryTrait(
+            strokeGeometry ?? null
+          );
+
+          // Decode node-level paints
+          const fillPaints = props
+            ? format.paint.decode.fillPaints(props)
+            : undefined;
+          const strokePaints = props
+            ? format.paint.decode.strokePaints(props)
+            : undefined;
+
+          const baseName = systemNode.name() ?? "text";
+          const baseActive = systemNode.active() ?? true;
+          const baseLocked = systemNode.locked() ?? false;
+
+          return {
+            type: "attrib",
+            id,
+            name: baseName,
+            active: baseActive,
+            locked: baseLocked,
+            opacity,
+            z_index: 0,
+            ...layoutFields,
+            text: decodedText,
+            default_style: defaultStyle,
+            styled_runs: styledRuns,
+            text_align: textAlign,
+            text_align_vertical: textAlignVertical,
+            ...(fillPaints ? { fill_paints: fillPaints } : {}),
+            ...(strokePaints ? { stroke_paints: strokePaints } : {}),
+            stroke_width: strokeGeometryProps.stroke_width,
+            ...(props?.maxLines() !== undefined && props.maxLines() > 0
+              ? { max_lines: props.maxLines() }
+              : {}),
+            ...(effects || {}),
+          } satisfies grida.program.nodes.AttributedTextNode;
+        }
+
+        /**
          * Decodes LineNode.
          */
         export function line(
@@ -5739,6 +6307,7 @@ export namespace format {
           type NodeWithLayer =
             | fbs.ContainerNode
             | fbs.TextSpanNode
+            | fbs.AttributedTextNode
             | fbs.LineNode
             | fbs.VectorNode
             | fbs.BooleanOperationNode
@@ -5793,6 +6362,17 @@ export namespace format {
             case fbs.Node.TextSpanNode:
               nodes[id] = nodeTypes.text(
                 typedNode as fbs.TextSpanNode,
+                id,
+                systemNode,
+                layer,
+                opacity,
+                layoutFields,
+                decodedEffects
+              );
+              break;
+            case fbs.Node.AttributedTextNode:
+              nodes[id] = nodeTypes.attributedText(
+                typedNode as fbs.AttributedTextNode,
                 id,
                 systemNode,
                 layer,

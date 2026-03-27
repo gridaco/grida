@@ -971,6 +971,7 @@ fn main() {
             layout_width,
             &[],
             Some(&images),
+            &[],
         );
         para.paint(canvas, Point::new(start_x, y));
         y += para.height() + 20.0;

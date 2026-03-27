@@ -1805,3 +1805,142 @@ fn gen_path_node_complex() {
     );
     assert_roundtrip_scene(&scene, "s1", "path_node_complex");
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AttributedTextNode
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// AttributedText with CJK text — verifies UTF-8 byte offsets survive roundtrip.
+/// Each Hangul/CJK char is 3 UTF-8 bytes, so byte offsets ≠ char indices.
+#[test]
+fn gen_attributed_text_cjk() {
+    // "세계 こんにちは 你好" — mixed Korean + Japanese + Chinese
+    let text = "세계 こんにちは 你好";
+    // Byte offsets:
+    //   "세"=0..3, "계"=3..6, " "=6..7, "こ"=7..10, ..., " "=22..23, "你"=23..26, "好"=26..29
+    let run1_end = "세계 ".len() as u32; // 7
+    let run2_end = text.len() as u32; // 29
+
+    let default_style = TextStyleRec::from_font("sans-serif", 16.0);
+
+    let node = Node::AttributedText(AttributedTextNodeRec {
+        active: true,
+        transform: AffineTransform::new(10.0, 10.0, 0.0),
+        width: Some(300.0),
+        height: Some(50.0),
+        layout_child: None,
+        attributed_string: AttributedString::from_runs(
+            text,
+            vec![
+                StyledTextRun {
+                    start: 0,
+                    end: run1_end,
+                    style: {
+                        let mut s = TextStyleRec::from_font("sans-serif", 16.0);
+                        s.font_weight = FontWeight(700);
+                        s
+                    },
+                    fills: None,
+                    strokes: None,
+                    stroke_width: None,
+                    stroke_align: None,
+                },
+                StyledTextRun {
+                    start: run1_end,
+                    end: run2_end,
+                    style: TextStyleRec::from_font("sans-serif", 16.0),
+                    fills: None,
+                    strokes: None,
+                    stroke_width: None,
+                    stroke_align: None,
+                },
+            ],
+        ),
+        default_style: default_style.clone(),
+        text_align: TextAlign::Left,
+        text_align_vertical: TextAlignVertical::Top,
+        max_lines: None,
+        ellipsis: None,
+        fills: Paints::new(vec![solid(0, 0, 0, 255)]),
+        strokes: Paints::default(),
+        stroke_width: 0.0,
+        stroke_align: StrokeAlign::Center,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+        mask: None,
+        effects: LayerEffects::default(),
+    });
+
+    let scene = build_scene(
+        "AttributedCJK",
+        None,
+        vec![(1, node)],
+        HashMap::new(),
+        vec![1],
+    );
+    assert_roundtrip_scene(&scene, "s1", "attributed_text_cjk");
+}
+
+/// AttributedText basic roundtrip — ASCII text with multiple styled runs.
+#[test]
+fn gen_attributed_text_basic() {
+    let text = "Hello World";
+    let default_style = TextStyleRec::from_font("Inter", 16.0);
+
+    let node = Node::AttributedText(AttributedTextNodeRec {
+        active: true,
+        transform: AffineTransform::new(0.0, 0.0, 0.0),
+        width: Some(200.0),
+        height: Some(40.0),
+        layout_child: None,
+        attributed_string: AttributedString::from_runs(
+            text,
+            vec![
+                StyledTextRun {
+                    start: 0,
+                    end: 5,
+                    style: {
+                        let mut s = TextStyleRec::from_font("Inter", 16.0);
+                        s.font_weight = FontWeight(700);
+                        s
+                    },
+                    fills: Some(vec![solid(255, 0, 0, 255)]),
+                    strokes: None,
+                    stroke_width: None,
+                    stroke_align: None,
+                },
+                StyledTextRun {
+                    start: 5,
+                    end: 11,
+                    style: TextStyleRec::from_font("Inter", 16.0),
+                    fills: None,
+                    strokes: None,
+                    stroke_width: None,
+                    stroke_align: None,
+                },
+            ],
+        ),
+        default_style,
+        text_align: TextAlign::Left,
+        text_align_vertical: TextAlignVertical::Top,
+        max_lines: None,
+        ellipsis: None,
+        fills: Paints::new(vec![solid(0, 0, 0, 255)]),
+        strokes: Paints::default(),
+        stroke_width: 0.0,
+        stroke_align: StrokeAlign::Center,
+        opacity: 1.0,
+        blend_mode: LayerBlendMode::Blend(BlendMode::Normal),
+        mask: None,
+        effects: LayerEffects::default(),
+    });
+
+    let scene = build_scene(
+        "AttributedBasic",
+        None,
+        vec![(1, node)],
+        HashMap::new(),
+        vec![1],
+    );
+    assert_roundtrip_scene(&scene, "s1", "attributed_text_basic");
+}

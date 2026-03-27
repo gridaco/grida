@@ -81,6 +81,7 @@ pub fn build_attributed_paragraph(
         width,
         &[],
         None,
+        &[],
     )
 }
 
@@ -90,6 +91,10 @@ pub fn build_attributed_paragraph(
 /// When a run has `fills: None`, `default_fills` is used instead. This
 /// implements the fill inheritance model where node-level fills serve as the
 /// base paint for runs that don't override.
+///
+/// `user_fallback_fonts` are appended to each run's font family list so that
+/// CJK and other scripts not covered by the primary font can fall back to
+/// the appropriate Noto Sans variant (or similar).
 pub fn build_attributed_paragraph_with_images(
     attr: &AttributedString,
     align: TextAlign,
@@ -99,6 +104,7 @@ pub fn build_attributed_paragraph_with_images(
     width: f32,
     default_fills: &[Paint],
     images: Option<&ImageRepository>,
+    user_fallback_fonts: &[String],
 ) -> AttributedParagraphSet {
     let make_paragraph_style =
         || super::make_paragraph_style(align, max_lines, ellipsis);
@@ -126,9 +132,9 @@ pub fn build_attributed_paragraph_with_images(
                 .as_ref()
                 .and_then(|fills| fills.iter().find_map(|p| p.solid_color()));
 
-            let ctx = first_solid_color.map(|color| TextStyleRecBuildContext {
-                color,
-                user_fallback_fonts: Vec::new(),
+            let ctx = Some(TextStyleRecBuildContext {
+                color: first_solid_color.unwrap_or(CGColor::TRANSPARENT),
+                user_fallback_fonts: user_fallback_fonts.to_vec(),
             });
 
             let mut ts = textstyle(&run.style, &ctx);
@@ -168,7 +174,10 @@ pub fn build_attributed_paragraph_with_images(
                 continue;
             }
 
-            let ctx: Option<TextStyleRecBuildContext> = None;
+            let ctx = Some(TextStyleRecBuildContext {
+                color: CGColor::TRANSPARENT,
+                user_fallback_fonts: user_fallback_fonts.to_vec(),
+            });
             let mut ts = textstyle(&run.style, &ctx);
 
             if let Some(ref strokes) = run.strokes {

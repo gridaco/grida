@@ -1623,6 +1623,20 @@ impl<'a> Painter<'a> {
                         if let Some(ref attr) = text_layer.attributed_string {
                             use crate::text::attributed_paragraph::build_attributed_paragraph_with_images;
                             let layout_width = text_layer.width.unwrap_or(f32::MAX);
+
+                            // Ensure a measurement paragraph is cached so that
+                            // devtools overlays (baseline highlight) can look it up.
+                            if let Some(sc) = self.scene_cache {
+                                sc.paragraph.borrow_mut().measure_attributed(
+                                    attr,
+                                    &text_layer.text_align,
+                                    &text_layer.max_lines,
+                                    &text_layer.ellipsis.clone(),
+                                    text_layer.width,
+                                    self.fonts,
+                                    Some(&text_layer.id),
+                                );
+                            }
                             let para_set = build_attributed_paragraph_with_images(
                                 attr,
                                 text_layer.text_align,
@@ -1632,6 +1646,7 @@ impl<'a> Painter<'a> {
                                 layout_width,
                                 &text_layer.fills,
                                 Some(self.images),
+                                &self.fonts.user_fallback_families(),
                             );
                             let layout_height = para_set.height();
                             let layout_width = para_set.fill.max_width();

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+    <title>CJK Text</title>
+    <desc>L0 test fixture for CJK (Korean, Japanese, Chinese) multi-byte text</desc>
+    <rect x="0" y="0" width="400" height="500" fill="#1e293b"/>
+
+    <!-- Korean -->
+    <g transform="translate(32 48)" fill="#e2e8f0">
+        <text x="0" y="0" font-family="sans-serif" font-size="28" font-weight="700">
+            안녕하세요
+        </text>
+        <text x="0" y="44" font-family="sans-serif" font-size="16">
+            대한민국 서울특별시
+        </text>
+    </g>
+
+    <!-- Japanese -->
+    <g transform="translate(32 160)" fill="#e2e8f0">
+        <text x="0" y="0" font-family="sans-serif" font-size="28" font-weight="700">
+            こんにちは
+        </text>
+        <text x="0" y="44" font-family="sans-serif" font-size="16">
+            東京都渋谷区
+        </text>
+    </g>
+
+    <!-- Chinese -->
+    <g transform="translate(32 272)" fill="#e2e8f0">
+        <text x="0" y="0" font-family="sans-serif" font-size="28" font-weight="700">
+            你好世界
+        </text>
+        <text x="0" y="44" font-family="sans-serif" font-size="16">
+            中华人民共和国
+        </text>
+    </g>
+
+    <!-- Mixed CJK with tspan styling -->
+    <g transform="translate(32 384)" fill="#94a3b8">
+        <text x="0" y="0" font-family="sans-serif" font-size="20">
+            <tspan fill="#38bdf8">세계</tspan>
+            <tspan fill="#f472b6">世界</tspan>
+            <tspan fill="#a78bfa">世界</tspan>
+        </text>
+        <text x="0" y="44" font-family="sans-serif" font-size="16">
+            <tspan font-weight="700">가나다</tspan>
+            <tspan font-weight="400">あいう</tspan>
+            <tspan font-weight="300">你我他</tspan>
+        </text>
+    </g>
+</svg>
