@@ -21,7 +21,11 @@ pub async fn run_demo_window_multi(scenes: Vec<Scene>) {
         .first()
         .cloned()
         .expect("run_demo_window_multi requires at least one scene");
-    run_demo_window_core_multi(first, scenes, |_, _, _, _| {}, None, None).await;
+    let options = cg::runtime::scene::RendererOptions {
+        use_embedded_fonts: true,
+        ..Default::default()
+    };
+    run_demo_window_core_multi(first, scenes, |_, _, _, _| {}, None, None, options).await;
 }
 
 pub async fn run_demo_window_with<F>(scene: Scene, init: F)
@@ -33,7 +37,11 @@ where
         winit::event_loop::EventLoopProxy<HostEvent>,
     ),
 {
-    run_demo_window_core_multi(scene.clone(), vec![scene], init, None, None).await;
+    let options = cg::runtime::scene::RendererOptions {
+        use_embedded_fonts: true,
+        ..Default::default()
+    };
+    run_demo_window_core_multi(scene.clone(), vec![scene], init, None, None, options).await;
 }
 
 pub async fn run_demo_window_with_drop<F>(
@@ -41,6 +49,7 @@ pub async fn run_demo_window_with_drop<F>(
     init: F,
     drop_tx: UnboundedSender<PathBuf>,
     scenes_rx: UnboundedReceiver<Vec<Scene>>,
+    options: cg::runtime::scene::RendererOptions,
 ) where
     F: FnOnce(
         &mut Renderer,
@@ -55,6 +64,7 @@ pub async fn run_demo_window_with_drop<F>(
         init,
         Some(drop_tx),
         Some(scenes_rx),
+        options,
     )
     .await;
 }
@@ -65,6 +75,7 @@ async fn run_demo_window_core_multi<F>(
     init: F,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
+    options: cg::runtime::scene::RendererOptions,
 ) where
     F: FnOnce(
         &mut Renderer,
@@ -86,10 +97,7 @@ async fn run_demo_window_core_multi<F>(
         height,
         rx,
         font_rx,
-        cg::runtime::scene::RendererOptions {
-            use_embedded_fonts: true,
-            ..Default::default()
-        },
+        options,
         file_drop_tx.clone(),
         file_drop_tx.is_some(),
         scenes_rx,

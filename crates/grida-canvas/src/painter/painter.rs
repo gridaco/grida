@@ -1642,11 +1642,10 @@ impl<'a> Painter<'a> {
                                 text_layer.text_align,
                                 text_layer.max_lines,
                                 text_layer.ellipsis.as_deref(),
-                                self.fonts.font_collection(),
+                                self.fonts,
                                 layout_width,
                                 &text_layer.fills,
                                 Some(self.images),
-                                &self.fonts.user_fallback_families(),
                             );
                             let layout_height = para_set.height();
                             let layout_width = para_set.fill.max_width();

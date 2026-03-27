@@ -153,7 +153,7 @@ fn create_paragraph(text: &str, text_color: Color) -> Paragraph {
         text_transform: TextTransform::None,
     };
 
-    let text_style = textstyle(&text_style_rec, &None);
+    let text_style = textstyle(&text_style_rec, &None, None);
     let mut skia_text_style = text_style;
     skia_text_style.set_color(text_color);
 

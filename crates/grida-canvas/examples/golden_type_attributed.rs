@@ -1,7 +1,7 @@
 use cg::cg::prelude::*;
 use cg::resources::ByteStore;
 use cg::runtime::image_repository::ImageRepository;
-use cg::text::attributed_paragraph::{build_attributed_paragraph, build_attributed_paragraph_with_images};
+use cg::text::attributed_paragraph::build_attributed_paragraph;
 use cg::text::text_style::textstyle;
 use skia_safe::textlayout::{
     FontCollection, ParagraphBuilder, ParagraphStyle, TextDirection, TypefaceFontProvider,
@@ -49,7 +49,7 @@ fn main() {
         ps.set_text_align(TextAlign::Left.into());
 
         let mut builder = ParagraphBuilder::new(&ps, &font_collection);
-        let mut ts = textstyle(&style, &None);
+        let mut ts = textstyle(&style, &None, None);
         let mut p = SkPaint::default();
         p.set_anti_alias(true);
         p.set_color(Color::from_argb(255, 100, 100, 100));
@@ -69,7 +69,7 @@ fn main() {
         ps.set_text_align(TextAlign::Left.into());
 
         let mut builder = ParagraphBuilder::new(&ps, &font_collection);
-        let mut ts = textstyle(&style, &None);
+        let mut ts = textstyle(&style, &None, None);
         let mut p = SkPaint::default();
         p.set_anti_alias(true);
         p.set_color(Color::from_argb(255, 150, 150, 150));
@@ -89,7 +89,7 @@ fn main() {
         let mut ps = ParagraphStyle::new();
         ps.set_text_direction(TextDirection::LTR);
         let mut builder = ParagraphBuilder::new(&ps, &font_collection);
-        let mut ts = textstyle(&style, &None);
+        let mut ts = textstyle(&style, &None, None);
         ts.set_foreground_paint(&title_paint);
         builder.push_style(&ts);
         builder.add_text("Attributed Text Golden Test");
@@ -962,16 +962,13 @@ fn main() {
             )
             .build();
 
-        let para = build_attributed_paragraph_with_images(
+        let para = build_attributed_paragraph(
             &attr,
             TextAlign::Left,
             None,
             None,
             &font_collection,
             layout_width,
-            &[],
-            Some(&images),
-            &[],
         );
         para.paint(canvas, Point::new(start_x, y));
         y += para.height() + 20.0;

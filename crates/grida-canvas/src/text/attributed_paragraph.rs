@@ -1,5 +1,6 @@
 use crate::cg::prelude::*;
 use crate::painter::paint as paint_util;
+use crate::runtime::font_repository::FontRepository;
 use crate::runtime::image_repository::ImageRepository;
 use crate::text::text_style::textstyle;
 use crate::text::text_transform;
@@ -64,6 +65,11 @@ fn resolve_fill_paint(
 /// If any run carries strokes, a second paragraph is built with stroke-mode
 /// foreground paints. The caller (or [`AttributedParagraphSet::paint`]) renders
 /// the stroke paragraph behind the fill paragraph.
+/// Convenience wrapper for tests and examples that don't have a [`FontRepository`].
+///
+/// No font fallback injection — uses only the families already in the
+/// `font_collection`. For production rendering, use
+/// [`build_attributed_paragraph_with_images`] with a `FontRepository`.
 pub fn build_attributed_paragraph(
     attr: &AttributedString,
     align: TextAlign,
@@ -72,17 +78,22 @@ pub fn build_attributed_paragraph(
     font_collection: &textlayout::FontCollection,
     width: f32,
 ) -> AttributedParagraphSet {
-    build_attributed_paragraph_with_images(
-        attr,
-        align,
-        max_lines,
-        ellipsis,
-        font_collection,
-        width,
-        &[],
-        None,
-        &[],
-    )
+    build_attributed_paragraph_inner(attr, align, max_lines, ellipsis, font_collection, width, &[], None, None)
+}
+
+/// Production entry point with node-level default fills, image resolution,
+/// and automatic font fallback from [`FontRepository`].
+pub fn build_attributed_paragraph_with_images(
+    attr: &AttributedString,
+    align: TextAlign,
+    max_lines: Option<usize>,
+    ellipsis: Option<&str>,
+    fonts: &FontRepository,
+    width: f32,
+    default_fills: &[Paint],
+    images: Option<&ImageRepository>,
+) -> AttributedParagraphSet {
+    build_attributed_paragraph_inner(attr, align, max_lines, ellipsis, fonts.font_collection(), width, default_fills, images, Some(fonts))
 }
 
 /// Like [`build_attributed_paragraph`] but with node-level default fills and
@@ -92,10 +103,8 @@ pub fn build_attributed_paragraph(
 /// implements the fill inheritance model where node-level fills serve as the
 /// base paint for runs that don't override.
 ///
-/// `user_fallback_fonts` are appended to each run's font family list so that
-/// CJK and other scripts not covered by the primary font can fall back to
-/// the appropriate Noto Sans variant (or similar).
-pub fn build_attributed_paragraph_with_images(
+/// Shared implementation for both public entry points.
+fn build_attributed_paragraph_inner(
     attr: &AttributedString,
     align: TextAlign,
     max_lines: Option<usize>,
@@ -104,7 +113,7 @@ pub fn build_attributed_paragraph_with_images(
     width: f32,
     default_fills: &[Paint],
     images: Option<&ImageRepository>,
-    user_fallback_fonts: &[String],
+    fonts: Option<&FontRepository>,
 ) -> AttributedParagraphSet {
     let make_paragraph_style =
         || super::make_paragraph_style(align, max_lines, ellipsis);
@@ -134,10 +143,9 @@ pub fn build_attributed_paragraph_with_images(
 
             let ctx = Some(TextStyleRecBuildContext {
                 color: first_solid_color.unwrap_or(CGColor::TRANSPARENT),
-                user_fallback_fonts: user_fallback_fonts.to_vec(),
             });
 
-            let mut ts = textstyle(&run.style, &ctx);
+            let mut ts = textstyle(&run.style, &ctx, fonts);
 
             // Apply per-run fill paints, falling back to node-level default fills.
             let effective_fills = run.fills.as_deref().unwrap_or(default_fills);
@@ -176,9 +184,8 @@ pub fn build_attributed_paragraph_with_images(
 
             let ctx = Some(TextStyleRecBuildContext {
                 color: CGColor::TRANSPARENT,
-                user_fallback_fonts: user_fallback_fonts.to_vec(),
             });
-            let mut ts = textstyle(&run.style, &ctx);
+            let mut ts = textstyle(&run.style, &ctx, fonts);
 
             if let Some(ref strokes) = run.strokes {
                 let active_paints: Vec<Paint> =

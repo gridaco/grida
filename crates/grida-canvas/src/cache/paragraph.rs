@@ -237,11 +237,10 @@ impl ParagraphCache {
 
             let ctx = TextStyleRecBuildContext {
                 color: CGColor::TRANSPARENT, // No color for measurement
-                user_fallback_fonts: fonts.user_fallback_families(),
             };
             let mut para_builder =
                 textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
-            let ts = textstyle(style, &Some(ctx));
+            let ts = textstyle(style, &Some(ctx), Some(fonts));
             para_builder.push_style(&ts);
             let transformed_text =
                 crate::text::text_transform::transform_text(text, style.text_transform);
@@ -418,9 +417,8 @@ impl ParagraphCache {
             for run in &attr.runs {
                 let ctx = TextStyleRecBuildContext {
                     color: CGColor::TRANSPARENT,
-                    user_fallback_fonts: fonts.user_fallback_families(),
                 };
-                let ts = textstyle(&run.style, &Some(ctx));
+                let ts = textstyle(&run.style, &Some(ctx), Some(fonts));
                 para_builder.push_style(&ts);
                 let run_text = &attr.text[run.start as usize..run.end as usize];
                 let transformed =
@@ -500,11 +498,10 @@ impl ParagraphCache {
                 .first()
                 .and_then(|f| f.solid_color())
                 .unwrap_or(CGColor::TRANSPARENT),
-            user_fallback_fonts: fonts.user_fallback_families(),
         };
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
-        let mut ts = textstyle(style, &Some(ctx));
+        let mut ts = textstyle(style, &Some(ctx), Some(fonts));
         if let Some(ref paint) = fill_paint {
             ts.set_foreground_paint(paint);
         }

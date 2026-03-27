@@ -83,8 +83,17 @@ pub type RequestRedrawCallback = Arc<dyn Fn()>;
 /// at runtime via individual setters on `Renderer` / `ApplicationApi`.
 #[derive(Clone, Copy)]
 pub struct RendererOptions {
-    /// When true, embedded fonts will be registered.
+    /// When true, embedded fonts (Geist, GeistMono) will be registered.
     pub use_embedded_fonts: bool,
+    /// When true, the platform's system font manager is added as the default
+    /// fallback. This enables Skia's built-in font fallback for scripts not
+    /// covered by explicitly registered fonts (e.g. CJK via system-installed
+    /// Noto Sans).
+    ///
+    /// **Default: `false`** — matches the WASM/web environment where only
+    /// explicitly provided fonts are available. Set to `true` in native-only
+    /// dev tools (grida-dev `--system-fonts`) for convenient local previewing.
+    pub use_system_fonts: bool,
     /// Initial renderer configuration. Applied at construction; individual
     /// fields remain mutable via `Renderer::set_*` / `ApplicationApi` setters.
     pub config: super::config::RuntimeRendererConfig,
@@ -94,6 +103,7 @@ impl Default for RendererOptions {
     fn default() -> Self {
         Self {
             use_embedded_fonts: false,
+            use_system_fonts: false,
             config: Default::default(),
         }
     }
@@ -540,6 +550,9 @@ impl Renderer {
         let mut font_repository = FontRepository::new(store.clone());
         if options.use_embedded_fonts {
             font_repository.register_embedded_fonts();
+        }
+        if options.use_system_fonts {
+            font_repository.enable_system_fallback();
         }
         let mut image_repository = ImageRepository::new(store);
         system_images::register(&mut resources, &mut image_repository);

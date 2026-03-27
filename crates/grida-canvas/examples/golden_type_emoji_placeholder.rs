@@ -110,7 +110,7 @@ fn main() {
         text_decoration_skip_ink: None,
         text_decoration_thickness: None,
     });
-    let mut ts = textstyle(&style, &None);
+    let mut ts = textstyle(&style, &None, None);
     ts.set_foreground_paint(&paint);
     builder.push_style(&ts);
 

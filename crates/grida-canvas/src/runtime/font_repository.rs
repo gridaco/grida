@@ -122,9 +122,37 @@ impl FontRepository {
         self.font_collection.clear_caches();
     }
 
+    /// Enable the platform's system font manager as the default fallback.
+    ///
+    /// When enabled, Skia will search system-installed fonts for glyphs not
+    /// found in the asset/dynamic/test providers.  This is a native-only
+    /// feature — on WASM there is no system font manager.
+    pub fn enable_system_fallback(&mut self) {
+        self.font_collection
+            .set_default_font_manager(FontMgr::new(), None);
+        self.font_collection.enable_font_fallback();
+    }
+
     fn refresh_collection_defaults(&mut self) {
         self.font_collection
             .set_default_font_manager(Some(self.embedded_provider.clone().into()), None);
+    }
+
+    /// Build the full font family list for a text style: the primary family
+    /// followed by all user fallback families (deduped).
+    ///
+    /// This is the canonical way to assemble the font family list for Skia
+    /// `TextStyle::set_font_families()`. Callers should never manually build
+    /// the fallback list — use this method instead.
+    pub fn make_font_families(&self, primary: &str) -> Vec<String> {
+        let mut families = Vec::with_capacity(1 + self.user_fallback_fonts.len());
+        families.push(primary.to_string());
+        for f in &self.user_fallback_fonts {
+            if f != primary {
+                families.push(f.clone());
+            }
+        }
+        families
     }
 
     /// Total number of font families loaded.

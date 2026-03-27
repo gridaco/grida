@@ -73,9 +73,7 @@ pub struct ParagraphCacheLayout {
     node_width: Option<f32>,
 
     // -- Font resources (cloned from FontRepository at session start) --
-    font_collection: textlayout::FontCollection,
-    /// User fallback font families (e.g. CJK coverage fonts).
-    user_fallback_families: Vec<String>,
+    fonts: FontRepository,
 
     // -- Cached paragraph state --
     /// The Skia paragraph built with the same code as the Painter.
@@ -120,8 +118,7 @@ impl ParagraphCacheLayout {
             text_style,
             text_align,
             node_width,
-            font_collection: fonts.font_collection().clone(),
-            user_fallback_families: fonts.user_fallback_families(),
+            fonts: fonts.clone(),
             paragraph: None,
             cached_text: String::new(),
             cached_generation: 0,
@@ -146,11 +143,10 @@ impl ParagraphCacheLayout {
 
         let ctx = TextStyleRecBuildContext {
             color: CGColor::TRANSPARENT,
-            user_fallback_fonts: self.user_fallback_families.clone(),
         };
         let mut builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &self.font_collection);
-        let ts = textstyle(&self.text_style, &Some(ctx));
+            textlayout::ParagraphBuilder::new(&paragraph_style, self.fonts.font_collection());
+        let ts = textstyle(&self.text_style, &Some(ctx), Some(&self.fonts));
         builder.push_style(&ts);
         builder.add_text(text);
         let para = builder.build();
@@ -180,15 +176,14 @@ impl ParagraphCacheLayout {
         paragraph_style.set_apply_rounding_hack(false);
 
         let mut builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &self.font_collection);
+            textlayout::ParagraphBuilder::new(&paragraph_style, self.fonts.font_collection());
 
         if runs.is_empty() || text.is_empty() {
             // No runs — fall back to uniform node style.
             let ctx = Some(TextStyleRecBuildContext {
                 color: CGColor::TRANSPARENT,
-                user_fallback_fonts: self.user_fallback_families.clone(),
             });
-            let ts = textstyle(&self.text_style, &ctx);
+            let ts = textstyle(&self.text_style, &ctx, Some(&self.fonts));
             builder.push_style(&ts);
             builder.add_text(text);
         } else {
@@ -202,9 +197,8 @@ impl ParagraphCacheLayout {
                 let run_rec: TextStyleRec = (&run.style).into();
                 let ctx = Some(TextStyleRecBuildContext {
                     color: CGColor::TRANSPARENT,
-                    user_fallback_fonts: self.user_fallback_families.clone(),
                 });
-                let mut ts = textstyle(&run_rec, &ctx);
+                let mut ts = textstyle(&run_rec, &ctx, Some(&self.fonts));
                 // Apply the run's fill color (textstyle() doesn't handle fill).
                 // For layout/measurement, extract the first solid color.
                 // Full paint stacks are rendered by the cg painter separately.
