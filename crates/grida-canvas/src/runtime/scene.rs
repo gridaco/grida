@@ -1737,7 +1737,8 @@ impl Renderer {
         // Viewport resize needs layout only when the scene has ICB nodes
         // or auto-sized roots (the common infinite-canvas case has neither).
         if has_data_changes && !flags.contains(ChangeFlags::SCENE_LOAD) {
-            let needs_layout = flags.intersects(ChangeFlags::LAYOUT_DIRTY)
+            let needs_layout = flags
+                .intersects(ChangeFlags::LAYOUT_DIRTY | ChangeFlags::FONT_LOADED)
                 || (flags.contains(ChangeFlags::VIEWPORT_SIZE)
                     && self.scene_has_viewport_dependent_layout());
             if needs_layout {

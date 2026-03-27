@@ -1480,6 +1480,7 @@ impl UnknownTargetApplication {
                 &self.renderer.camera,
                 self.renderer.get_cache(),
                 &self.surface_overlay_config,
+                &self.renderer.fonts,
             );
             // Surface UI elements (size meter, frame titles, hit regions)
             crate::surface::ui::SurfaceUI::draw(

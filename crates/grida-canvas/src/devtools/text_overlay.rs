@@ -1,6 +1,7 @@
 use crate::cache::scene::SceneCache;
 use crate::cg::types::TextAlignVertical;
 use crate::painter::layer::PainterPictureTextLayer;
+use crate::runtime::font_repository::FontRepository;
 use skia_safe::{Path, PathBuilder};
 
 pub struct TextOverlay;
@@ -12,12 +13,13 @@ impl TextOverlay {
     pub fn text_layer_baseline(
         cache: &SceneCache,
         layer: &PainterPictureTextLayer,
+        fonts: &FontRepository,
     ) -> Option<Path> {
         // Get baseline information from the paragraph cache using the layer's ID
         if let Some((baseline_info, layout_height)) = cache
             .paragraph
             .borrow()
-            .get_baseline_info_if_cached_by_id(&layer.id, layer.width)
+            .get_baseline_info_if_cached_by_id(&layer.id, layer.width, fonts.generation())
         {
             // Calculate vertical offset based on alignment and container height
             let y_offset = match layer.height {

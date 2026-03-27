@@ -521,15 +521,23 @@ impl ParagraphCache {
         paragraph_rc
     }
 
-    /// Get baseline information for overlay purposes, only if paragraph is already cached by ID
-    /// Returns None if paragraph is not in cache (respects "don't create new" requirement)
+    /// Get baseline information for overlay purposes, only if paragraph is already cached by ID.
+    ///
+    /// Returns `None` if the paragraph is not cached or if the cached entry
+    /// was built with a stale font generation (the caller must re-measure first).
     pub fn get_baseline_info_if_cached_by_id(
         &self,
         id: &NodeId,
         width: Option<f32>,
+        font_generation: usize,
     ) -> Option<(Vec<BaselineInfo>, f32)> {
         // Check if we have a cached paragraph by ID
         if let Some(entry) = self.entries_measurement_by_id.get(id) {
+            // Reject stale entries — prevents reading tofu-width baselines
+            // when fonts have been loaded since this entry was cached.
+            if entry.font_generation != font_generation {
+                return None;
+            }
             let paragraph_rc = &entry.paragraph;
 
             // Apply layout if width is specified

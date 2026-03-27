@@ -60,6 +60,16 @@ impl FontRepository {
         Arc::clone(&self.store)
     }
 
+    /// Increment the generation counter and clear Skia's font caches.
+    ///
+    /// **Every** method that mutates font resolution state (providers,
+    /// collection, fallback list) must call this so downstream caches
+    /// (ParagraphCache, GeometryCache) know to invalidate.
+    fn bump_generation(&mut self) {
+        self.generation += 1;
+        self.font_collection.clear_caches();
+    }
+
     /// Insert a font for the given family referenced by `hash`.
     ///
     /// Multiple typefaces can be registered under the same family. Call this
@@ -77,8 +87,7 @@ impl FontRepository {
         }
         self.missing.remove(&family);
         self.fonts.entry(family).or_insert_with(Vec::new).push(hash);
-        self.generation += 1;
-        self.font_collection.clear_caches();
+        self.bump_generation();
     }
 
     /// Add a font to a family (creates the family if needed).
@@ -99,8 +108,7 @@ impl FontRepository {
             .or_insert_with(Vec::new)
             .push(hash);
         self.missing.remove(family);
-        self.generation += 1;
-        self.font_collection.clear_caches();
+        self.bump_generation();
     }
 
     /// Register the built-in embedded fonts bundled with the renderer.
@@ -119,7 +127,7 @@ impl FontRepository {
         if let Some(tf) = self.loader.new_from_data(bytes, None) {
             self.embedded_provider.register_typeface(tf, Some(family));
         }
-        self.font_collection.clear_caches();
+        self.bump_generation();
     }
 
     /// Enable the platform's system font manager as the default fallback.
@@ -131,6 +139,7 @@ impl FontRepository {
         self.font_collection
             .set_default_font_manager(FontMgr::new(), None);
         self.font_collection.enable_font_fallback();
+        self.bump_generation();
     }
 
     fn refresh_collection_defaults(&mut self) {
@@ -289,6 +298,6 @@ impl FontRepository {
         }
         self.font_collection
             .set_test_font_manager(Some(self.fallback_provider.clone().into()));
-        self.font_collection.clear_caches();
+        self.bump_generation();
     }
 }
