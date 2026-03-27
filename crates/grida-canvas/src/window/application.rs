@@ -1168,7 +1168,21 @@ impl UnknownTargetApplication {
         // to the previous frame. Restore it from the pan image cache and
         // skip the expensive frame-plan build + full draw.  The overlay is
         // still re-drawn below so marquee/selection visuals update correctly.
-        if !content_changed && !camera_change.any_changed() && self.renderer.blit_content_cache() {
+        //
+        // Stable frames MUST skip this fast path.  On the web host the JS
+        // side calls `redraw()` immediately after each camera command, which
+        // consumes the camera change and renders an unstable frame.  When the
+        // FrameLoop debounce expires and `poll()` returns `Stable`, there is
+        // no camera change or data change left — but the pan-image-cache
+        // still contains reduced-quality content from the last unstable
+        // render.  Blitting it would satisfy the FrameLoop without ever
+        // producing a full-quality frame, causing the canvas to never settle
+        // unless the user triggers another explicit interaction (e.g. zoom).
+        if quality != FrameQuality::Stable
+            && !content_changed
+            && !camera_change.any_changed()
+            && self.renderer.blit_content_cache()
+        {
             // Consume the camera change (no-op here, but keeps the contract).
             self.renderer.camera.consume_change();
 
