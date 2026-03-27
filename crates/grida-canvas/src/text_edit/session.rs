@@ -298,6 +298,9 @@ pub enum KeyName {
     Comma,
     /// A printable character or string (from the OS key event).
     Character(String),
+    /// Escape key. Not used for text editing commands, but useful for
+    /// the application layer to detect exit-edit-mode intent.
+    Escape,
 }
 
 // ---------------------------------------------------------------------------
@@ -311,6 +314,7 @@ pub enum KeyName {
 ///
 /// The tracker uses a time window and distance threshold to determine
 /// whether consecutive clicks form a sequence.
+#[derive(Debug, Clone)]
 pub struct ClickTracker {
     count: u32,
     last_time: Option<Instant>,

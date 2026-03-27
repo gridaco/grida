@@ -7,6 +7,7 @@ use crate::surface::hover::{HoverSource, HoverState};
 use crate::surface::response::SurfaceResponse;
 use crate::surface::selection::SelectionState;
 use crate::surface::ui::hit_region::{HitRegions, OverlayAction};
+use crate::text_edit::session::ClickTracker;
 
 /// Canvas surface interaction state.
 ///
@@ -22,6 +23,8 @@ pub struct SurfaceState {
     pub cursor: CursorIcon,
     /// Current modifier key state, updated by `ModifiersChanged` events.
     modifiers: Modifiers,
+    /// Multi-click tracker for double-click detection.
+    pub click_tracker: ClickTracker,
 }
 
 impl Default for SurfaceState {
@@ -32,6 +35,7 @@ impl Default for SurfaceState {
             gesture: SurfaceGesture::default(),
             cursor: CursorIcon::Default,
             modifiers: Modifiers::default(),
+            click_tracker: ClickTracker::new(),
         }
     }
 }
@@ -83,6 +87,9 @@ impl SurfaceState {
     /// - Providing a [`Hierarchy`] for selection pruning (typically the scene graph)
     /// - Providing [`HitRegions`] from the most recent draw pass for overlay UI hit testing
     /// - Queueing a redraw if `response.needs_redraw` is true
+    ///
+    /// Keyboard/text/IME events pass through unchanged (handled at the
+    /// application layer, not the surface layer).
     pub fn dispatch(
         &mut self,
         event: SurfaceEvent,
@@ -126,6 +133,12 @@ impl SurfaceState {
                 self.modifiers = mods;
                 SurfaceResponse::none()
             }
+
+            // Keyboard/text/IME events are not handled by the surface layer.
+            // They are handled by the application's handle_surface_event().
+            SurfaceEvent::KeyDown { .. }
+            | SurfaceEvent::TextInput { .. }
+            | SurfaceEvent::Ime(_) => SurfaceResponse::none(),
         }
     }
 
@@ -236,6 +249,9 @@ impl SurfaceState {
             return response;
         }
 
+        // Track multi-click sequence for double-click detection.
+        let click_count = self.click_tracker.register(canvas_point[0], canvas_point[1]);
+
         let hit = hit_tester.hit_first(canvas_point);
 
         match hit {
@@ -249,6 +265,11 @@ impl SurfaceState {
                 }
                 response.selection_changed = true;
                 response.needs_redraw = true;
+
+                // Report double-click for text editing activation.
+                if click_count >= 2 {
+                    response.double_clicked_node = Some(id);
+                }
             }
             None => {
                 if self.modifiers.shift {

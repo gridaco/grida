@@ -17,10 +17,10 @@ use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::timer::TimerMgr;
 use crate::text;
-use crate::vectornetwork::VectorNetwork;
-use crate::window::command::ApplicationCommand;
 use crate::text_edit::layout::ManagedTextLayout;
 use crate::text_edit::TextLayoutEngine;
+use crate::vectornetwork::VectorNetwork;
+use crate::window::command::ApplicationCommand;
 
 /// A no-op hierarchy for when no scene graph is loaded.
 struct NoHierarchy;
@@ -728,6 +728,10 @@ impl UnknownTargetApplication {
         self.running
     }
 
+    pub fn renderer(&self) -> &Renderer {
+        &self.renderer
+    }
+
     pub fn renderer_mut(&mut self) -> &mut Renderer {
         &mut self.renderer
     }
@@ -1371,6 +1375,15 @@ impl UnknownTargetApplication {
         let now = self.clock.now() + self.last_frame_time.elapsed().as_secs_f64() * 1000.0;
         self.tick(now);
 
+        // Process pending changes (text edits, node mutations) before
+        // flushing so the picture cache is invalidated and the new content
+        // is re-recorded. In the frame() path this happens automatically;
+        // in the redraw() path (native host) we must do it explicitly.
+        {
+            let camera_change = self.renderer.camera.change_kind();
+            self.renderer.apply_changes(camera_change, true);
+        }
+
         let __frame_start = std::time::Instant::now();
 
         let stats = match self.renderer.flush() {
@@ -1607,14 +1620,23 @@ impl UnknownTargetApplication {
     /// `TextStyleRecBuildContext` that `ParagraphCache::measure()` uses,
     /// eliminating font fallback mismatches and layout divergence.
     pub fn text_edit_enter(&mut self, user_node_id: &str) -> bool {
-        use crate::node::schema::Node;
-        use crate::text::paragraph_cache_layout::ParagraphCacheLayout;
-        use crate::text_edit_session::ActiveTextEdit;
-
         let node_id = match self.user_id_to_internal(user_node_id) {
             Some(id) => id,
             None => return false,
         };
+        self.text_edit_enter_by_id(node_id)
+    }
+
+    /// Enter text editing mode for a node by its internal ID.
+    ///
+    /// Supports both `TextSpan` and `AttributedText` node types.
+    /// Reads all text properties directly from the scene node to ensure
+    /// the editing layout engine uses exactly the same configuration as
+    /// the Painter. Returns `true` on success.
+    pub fn text_edit_enter_by_id(&mut self, node_id: NodeId) -> bool {
+        use crate::node::schema::Node;
+        use crate::text::paragraph_cache_layout::ParagraphCacheLayout;
+        use crate::text_edit_session::ActiveTextEdit;
 
         // Look up the text node from the scene to get the authoritative
         // properties — same data the Painter and ParagraphCache use.
@@ -1626,32 +1648,55 @@ impl UnknownTargetApplication {
             Ok(n) => n,
             Err(_) => return false,
         };
-        let tspan = match node {
-            Node::TextSpan(t) => t,
+
+        match node {
+            Node::TextSpan(tspan) => {
+                let text = &tspan.text;
+                let text_style_rec = &tspan.text_style;
+                let text_align = &tspan.text_align;
+                let layout_height = tspan.height.unwrap_or(10000.0);
+
+                let fills = vec![Paint::from(CGColor::BLACK)];
+                let paragraph_style = crate::text_edit::attributed_text::ParagraphStyle::default();
+
+                // Build the layout adapter using the same font collection and style
+                // code path as ParagraphCache::measure().
+                let layout = ParagraphCacheLayout::new(
+                    text_style_rec.clone(),
+                    *text_align,
+                    tspan.width, // None = auto-width (intrinsic sizing)
+                    layout_height,
+                    &self.renderer.fonts,
+                );
+
+                let te = ActiveTextEdit::new(
+                    node_id,
+                    text,
+                    text_style_rec,
+                    fills,
+                    paragraph_style,
+                    layout,
+                );
+                self.text_edit = Some(te);
+            }
+            Node::AttributedText(atext) => {
+                let content: crate::text_edit::attributed_text::AttributedText =
+                    (&atext.attributed_string).into();
+
+                let layout = ParagraphCacheLayout::new(
+                    atext.default_style.clone(),
+                    atext.text_align,
+                    atext.width,
+                    atext.height.unwrap_or(10000.0),
+                    &self.renderer.fonts,
+                );
+
+                let te = ActiveTextEdit::new_attributed(node_id, content, layout);
+                self.text_edit = Some(te);
+            }
             _ => return false,
-        };
+        }
 
-        let text = &tspan.text;
-        let text_style_rec = &tspan.text_style;
-        let text_align = &tspan.text_align;
-        let layout_height = tspan.height.unwrap_or(10000.0);
-
-        let fills = vec![Paint::from(CGColor::BLACK)];
-        let paragraph_style = crate::text_edit::attributed_text::ParagraphStyle::default();
-
-        // Build the layout adapter using the same font collection and style
-        // code path as ParagraphCache::measure().
-        let layout = ParagraphCacheLayout::new(
-            text_style_rec.clone(),
-            *text_align,
-            tspan.width, // None = auto-width (intrinsic sizing)
-            layout_height,
-            &self.renderer.fonts,
-        );
-
-        let te = ActiveTextEdit::new(node_id, text, text_style_rec, fills, paragraph_style, layout);
-
-        self.text_edit = Some(te);
         self.text_edit_refresh_decorations();
         true
     }
@@ -1815,7 +1860,9 @@ impl UnknownTargetApplication {
     }
 
     /// Get selection rects in layout-local coordinates.
-    pub fn text_edit_get_selection_rects(&mut self) -> Option<Vec<crate::text_edit::SelectionRect>> {
+    pub fn text_edit_get_selection_rects(
+        &mut self,
+    ) -> Option<Vec<crate::text_edit::SelectionRect>> {
         let te = self.text_edit.as_mut()?;
         let (lo, hi) = te.session.selection_range()?;
         let rects = te
@@ -1912,6 +1959,331 @@ impl UnknownTargetApplication {
         changed
     }
 
+    // ---- In-scene text editing (native-only) ----
+    //
+    // These methods allow the application to own the full text editing
+    // lifecycle: double-click to enter, keyboard routing, click-outside
+    // to exit. The WASM path continues to use the host-driven text_edit_*
+    // methods above.
+
+    /// Process any surface event, routing keyboard/text/IME to the text
+    /// editor when active and pointer events through the surface state.
+    ///
+    /// Returns a [`SurfaceResponse`] indicating what changed. The host
+    /// should queue a redraw if `needs_redraw` is set and may inspect
+    /// other flags (cursor, selection) for platform-specific actions.
+    pub fn handle_surface_event(
+        &mut self,
+        event: crate::surface::SurfaceEvent,
+    ) -> crate::surface::SurfaceResponse {
+        use crate::surface::SurfaceEvent;
+
+        match &event {
+            // --- Pointer events ---
+            SurfaceEvent::PointerDown { .. } => {
+                if self.text_edit.is_some() {
+                    self.handle_pointer_down_during_edit(event)
+                } else {
+                    let response = self.surface_dispatch(event);
+                    // Double-click on a text node → enter edit mode.
+                    if let Some(node_id) = response.double_clicked_node {
+                        self.try_enter_text_edit(node_id);
+                    }
+                    response
+                }
+            }
+            SurfaceEvent::PointerMove { canvas_point, .. } => {
+                if self.text_edit.is_some() {
+                    let canvas_point = *canvas_point;
+                    self.handle_pointer_move_during_edit(canvas_point)
+                } else {
+                    self.surface_dispatch(event)
+                }
+            }
+            SurfaceEvent::PointerUp { .. } => {
+                if self.text_edit.is_some() {
+                    self.text_edit_pointer_up();
+                    crate::surface::SurfaceResponse::redraw()
+                } else {
+                    self.surface_dispatch(event)
+                }
+            }
+
+            // --- Keyboard events ---
+            SurfaceEvent::KeyDown { key, modifiers } => {
+                let key = key.clone();
+                let modifiers = *modifiers;
+                self.handle_key_down(&key, &modifiers)
+            }
+            SurfaceEvent::TextInput { text } => {
+                let text = text.clone();
+                self.handle_text_input(&text)
+            }
+            SurfaceEvent::Ime(ime) => {
+                let ime = ime.clone();
+                self.handle_ime(&ime)
+            }
+
+            SurfaceEvent::ModifiersChanged(_) => self.surface_dispatch(event),
+        }
+    }
+
+    /// Try to enter text edit mode on the given node.
+    /// Only enters if the node is a text node (TextSpan or AttributedText).
+    fn try_enter_text_edit(&mut self, node_id: NodeId) {
+        let is_text = self
+            .renderer
+            .scene
+            .as_ref()
+            .and_then(|s| s.graph.get_node(&node_id).ok())
+            .map(|n| matches!(n, Node::TextSpan(_) | Node::AttributedText(_)))
+            .unwrap_or(false);
+
+        if is_text {
+            self.text_edit_enter_by_id(node_id);
+        }
+    }
+
+    /// Handle a key-down event, routing to text editor or application commands.
+    fn handle_key_down(
+        &mut self,
+        key: &crate::text_edit::session::KeyName,
+        modifiers: &crate::surface::Modifiers,
+    ) -> crate::surface::SurfaceResponse {
+        use crate::text_edit::session::{KeyAction, KeyName};
+
+        let mut response = crate::surface::SurfaceResponse::none();
+
+        if self.text_edit.is_some() {
+            // Escape → exit edit mode (commit changes).
+            if matches!(key, KeyName::Escape) {
+                self.exit_text_edit(true);
+                response.needs_redraw = true;
+                return response;
+            }
+
+            // Map platform modifiers to the text_edit convention.
+            let cmd = modifiers.ctrl_or_cmd;
+            let word = if cfg!(target_os = "macos") {
+                modifiers.alt
+            } else {
+                modifiers.ctrl_or_cmd
+            };
+            let shift = modifiers.shift;
+
+            if let Some(action) = KeyAction::from_key(cmd, word, shift, key) {
+                // Skip Insert actions — character insertion comes via
+                // the TextInput event to avoid double insertion.
+                if !matches!(action, KeyAction::Insert(_)) {
+                    if let Some(te) = self.text_edit.as_mut() {
+                        te.session.handle_key_action(action);
+                    }
+                    self.text_edit_refresh_decorations();
+                }
+            }
+            response.needs_redraw = true;
+        }
+        // When not editing, we don't consume the key — the host can
+        // fall through to ApplicationCommand handling.
+
+        response
+    }
+
+    /// Handle committed text input (post-IME, post-dead-key).
+    fn handle_text_input(&mut self, text: &str) -> crate::surface::SurfaceResponse {
+        if let Some(te) = self.text_edit.as_mut() {
+            te.session
+                .apply(crate::text_edit::EditingCommand::Insert(text.to_owned()));
+            self.text_edit_refresh_decorations();
+            crate::surface::SurfaceResponse {
+                needs_redraw: true,
+                ..Default::default()
+            }
+        } else {
+            crate::surface::SurfaceResponse::none()
+        }
+    }
+
+    /// Handle an IME composition event.
+    fn handle_ime(&mut self, ime: &crate::surface::ImeEvent) -> crate::surface::SurfaceResponse {
+        match ime {
+            crate::surface::ImeEvent::Preedit(text) => {
+                self.text_edit_ime_set_preedit(text.clone());
+            }
+            crate::surface::ImeEvent::Commit(text) => {
+                self.text_edit_ime_commit(text);
+            }
+            crate::surface::ImeEvent::Cancel => {
+                self.text_edit_ime_cancel();
+            }
+        }
+        crate::surface::SurfaceResponse {
+            needs_redraw: self.text_edit.is_some(),
+            ..Default::default()
+        }
+    }
+
+    /// Handle a pointer-down event while text editing is active.
+    ///
+    /// If the click is inside the text node being edited, forward it as
+    /// a layout-local text edit pointer event. If outside, exit edit mode
+    /// (committing changes) and process the click normally.
+    fn handle_pointer_down_during_edit(
+        &mut self,
+        event: crate::surface::SurfaceEvent,
+    ) -> crate::surface::SurfaceResponse {
+        let (canvas_point, modifiers) = match &event {
+            crate::surface::SurfaceEvent::PointerDown {
+                canvas_point,
+                modifiers,
+                ..
+            } => (*canvas_point, *modifiers),
+            _ => return crate::surface::SurfaceResponse::none(),
+        };
+
+        let node_id = match self.text_edit.as_ref() {
+            Some(te) => te.node_id(),
+            None => return self.surface_dispatch(event),
+        };
+
+        // Try to convert the canvas point to layout-local coordinates.
+        // If the point is inside the text node, forward to the text editor.
+        if let Some(local) = self.canvas_to_text_local(canvas_point, node_id) {
+            let click_count = self.surface.click_tracker.register(local[0], local[1]);
+            self.text_edit_pointer_down(local[0], local[1], modifiers.shift, click_count);
+            crate::surface::SurfaceResponse {
+                needs_redraw: true,
+                ..Default::default()
+            }
+        } else {
+            // Click outside the text node → exit edit mode, then process normally.
+            self.exit_text_edit(true);
+            self.surface_dispatch(event)
+        }
+    }
+
+    /// Handle pointer-move during text editing (drag selection).
+    fn handle_pointer_move_during_edit(
+        &mut self,
+        canvas_point: math2::vector2::Vector2,
+    ) -> crate::surface::SurfaceResponse {
+        let node_id = match self.text_edit.as_ref() {
+            Some(te) => te.node_id(),
+            None => return crate::surface::SurfaceResponse::none(),
+        };
+
+        if let Some(local) = self.canvas_to_text_local(canvas_point, node_id) {
+            if let Some(te) = self.text_edit.as_mut() {
+                te.session.on_pointer_move(local[0], local[1]);
+            }
+            // Only refresh overlay geometry (caret/selection), NOT the layer
+            // text content. This avoids clearing the pan_image_cache on every
+            // mouse move which causes flickering.
+            self.text_edit_refresh_decorations_overlay_only();
+            return crate::surface::SurfaceResponse {
+                needs_redraw: true,
+                ..Default::default()
+            };
+        }
+
+        // Mouse is outside the text node — no text edit update needed.
+        crate::surface::SurfaceResponse::none()
+    }
+
+    /// Convert a canvas-space point to layout-local coordinates for the
+    /// given text node. Returns `None` if the click is outside the node's
+    /// bounding box, the layer is not found, or the transform is
+    /// non-invertible.
+    fn canvas_to_text_local(
+        &self,
+        canvas_point: math2::vector2::Vector2,
+        node_id: NodeId,
+    ) -> Option<math2::vector2::Vector2> {
+        use crate::painter::layer::{Layer, PainterPictureLayer};
+
+        let entry = self
+            .renderer
+            .get_cache()
+            .layers
+            .layers
+            .iter()
+            .find(|e| e.id == node_id)?;
+
+        let node_transform = entry.layer.transform();
+        let inverse = node_transform.inverse()?;
+        let local = math2::vector2::transform(canvas_point, &inverse);
+
+        // Bounds check: is the local point inside the node's bounding rect?
+        let bounds = match &entry.layer {
+            PainterPictureLayer::Text(tl) => tl.shape.rect,
+            _ => entry.layer.shape().rect,
+        };
+        if local[0] < bounds.left()
+            || local[0] > bounds.right()
+            || local[1] < bounds.top()
+            || local[1] > bounds.bottom()
+        {
+            return None;
+        }
+
+        // Apply vertical alignment offset.
+        let paragraph_height = self
+            .text_edit
+            .as_ref()
+            .map(|te| te.session.layout.paragraph_height())
+            .unwrap_or(0.0);
+        let y_offset = Self::compute_text_y_offset(&self.renderer, node_id, paragraph_height);
+
+        Some([local[0], local[1] - y_offset])
+    }
+
+    /// Exit text edit mode, optionally committing changes to the scene graph.
+    ///
+    /// This is the centralized exit point — all text edit session teardown
+    /// flows through here. For the WASM path, [`text_edit_exit`] remains
+    /// available as a simpler host-facing API.
+    pub fn exit_text_edit(&mut self, commit: bool) {
+        let Some(te) = self.text_edit.take() else {
+            return;
+        };
+        self.text_edit_decorations = None;
+
+        if commit {
+            let result = te.commit_full();
+            if result.modified {
+                self.apply_text_edit_commit(result);
+            }
+        }
+
+        self.renderer.queue_unstable();
+    }
+
+    /// Apply a text edit commit to the scene graph.
+    ///
+    /// Single, centralized place for all commit-to-scene logic.
+    fn apply_text_edit_commit(&mut self, commit: crate::text_edit_session::TextEditCommit) {
+        let Some(scene) = self.renderer.scene.as_mut() else {
+            return;
+        };
+        let Ok(node) = scene.graph.get_node_mut(&commit.node_id) else {
+            return;
+        };
+
+        match node {
+            Node::TextSpan(t) => {
+                t.text = commit.text;
+            }
+            Node::AttributedText(t) => {
+                if let Some(ref attr) = commit.attributed {
+                    t.attributed_string = attr.into();
+                } else {
+                    t.attributed_string.text = commit.text;
+                }
+            }
+            _ => {}
+        }
+    }
+
     // -- Internal helpers --
 
     /// Build the display text (committed text + preedit at cursor) and
@@ -1945,30 +2317,25 @@ impl UnknownTargetApplication {
         self.text_edit_refresh_decorations();
     }
 
-    fn text_edit_refresh_decorations(&mut self) {
-        // The generic session's apply() already calls ensure_layout internally,
-        // but we still need to compute decoration data for the overlay.
+    /// Refresh text editing decorations (caret + selection rects).
+    ///
+    /// When `sync_content` is true, also pushes the current text content
+    /// and shape bounds to the layer cache (triggers paragraph rebuild
+    /// and clears the pan image cache). Use `sync_content: false` for
+    /// pointer-move during drag selection where only the caret/selection
+    /// geometry changed — this avoids clearing the pan cache and causing
+    /// flicker.
+    fn text_edit_refresh_decorations_inner(&mut self, sync_content: bool) {
+        use crate::devtools::text_edit_decoration_overlay::{
+            CaretDecoration, TextEditingDecorations,
+        };
 
-        // Split borrows: extract data from `text_edit`, then access `renderer`.
+        // Split borrows: extract all data from `text_edit` first,
+        // then access `renderer`.
         let deco_data = self.text_edit.as_mut().map(|te| {
-            // Ensure layout is up to date.
             te.session.layout.ensure_layout(&te.session.content);
             let node_id = te.node_id();
             let paragraph_height = te.session.layout.paragraph_height();
-            // Use display text (committed + preedit) so intermediate IME
-            // syllables remain visible when decorations are refreshed.
-            let display_text = match te.session.preedit() {
-                Some(preedit) if !preedit.is_empty() => {
-                    let committed = &te.session.state.text;
-                    let cursor = te.session.state.cursor;
-                    let mut buf = String::with_capacity(committed.len() + preedit.len());
-                    buf.push_str(&committed[..cursor]);
-                    buf.push_str(preedit);
-                    buf.push_str(&committed[cursor..]);
-                    buf
-                }
-                _ => te.session.state.text.clone(),
-            };
             let caret = te.session.caret_rect();
             let visible = te.session.should_show_caret();
             let selection_rects = te
@@ -1980,26 +2347,58 @@ impl UnknownTargetApplication {
                         .selection_rects_for_range(&te.session.state.text, lo, hi)
                 })
                 .unwrap_or_default();
+
+            // Content sync data (only extracted when needed).
+            let content_data = if sync_content {
+                let layout_width = te.session.layout.layout_width();
+                // Display text includes preedit for IME composition.
+                let display_text = match te.session.preedit() {
+                    Some(preedit) if !preedit.is_empty() => {
+                        let committed = &te.session.state.text;
+                        let cursor = te.session.state.cursor;
+                        let mut buf = String::with_capacity(committed.len() + preedit.len());
+                        buf.push_str(&committed[..cursor]);
+                        buf.push_str(preedit);
+                        buf.push_str(&committed[cursor..]);
+                        buf
+                    }
+                    _ => te.session.state.text.clone(),
+                };
+                let attributed: Option<crate::cg::types::AttributedString> = if te.is_attributed() {
+                    Some((&te.session.content).into())
+                } else {
+                    None
+                };
+                Some((layout_width, display_text, attributed))
+            } else {
+                None
+            };
+
             (
                 node_id,
                 paragraph_height,
-                display_text,
                 caret,
                 visible,
                 selection_rects,
+                content_data,
             )
         });
 
-        if let Some((node_id, paragraph_height, display_text, caret, visible, selection_rects)) =
+        if let Some((node_id, paragraph_height, caret, visible, selection_rects, content_data)) =
             deco_data
         {
-            self.renderer.update_layer_text(node_id, &display_text);
+            if let Some((layout_width, display_text, attributed)) = content_data {
+                if let Some(attr) = attributed {
+                    self.renderer
+                        .update_layer_attributed_text(node_id, &display_text, attr);
+                } else {
+                    self.renderer.update_layer_text(node_id, &display_text);
+                }
+                self.renderer
+                    .update_layer_text_shape(node_id, layout_width, paragraph_height);
+            }
 
             let y_offset = Self::compute_text_y_offset(&self.renderer, node_id, paragraph_height);
-
-            use crate::devtools::text_edit_decoration_overlay::{
-                CaretDecoration, TextEditingDecorations,
-            };
 
             self.text_edit_decorations = Some(TextEditingDecorations {
                 node_id,
@@ -2012,6 +2411,14 @@ impl UnknownTargetApplication {
             });
         }
         self.renderer.queue_unstable();
+    }
+
+    fn text_edit_refresh_decorations(&mut self) {
+        self.text_edit_refresh_decorations_inner(true);
+    }
+
+    fn text_edit_refresh_decorations_overlay_only(&mut self) {
+        self.text_edit_refresh_decorations_inner(false);
     }
 
     /// Compute the text vertical alignment offset for a text node.
