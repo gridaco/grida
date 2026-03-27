@@ -2673,11 +2673,19 @@ export namespace iofigma {
         ) {
           characterStyleOverrides = charStyleIDs;
           // Build the REST-format styleOverrideTable from the Kiwi array.
-          // Kiwi indexes from 0; ID 0 means "base style" (no override).
-          // Non-zero IDs map to styleOverrideTable[id-1] in the Kiwi array.
+          // Kiwi ID 0 means "base style" (no override). Non-zero IDs are
+          // matched by the `styleID` field inside each override entry — the
+          // array index does NOT necessarily equal `id - 1`.
+          const kiwiOverrideByStyleID = new Map<number, (typeof kiwiOverrideTable)[number]>();
+          for (const entry of kiwiOverrideTable) {
+            if (entry.styleID !== undefined) {
+              kiwiOverrideByStyleID.set(entry.styleID, entry);
+            }
+          }
           const seenIds = new Set(charStyleIDs.filter((id) => id !== 0));
           for (const id of seenIds) {
-            const overrideNc = kiwiOverrideTable[id - 1];
+            const overrideNc =
+              kiwiOverrideByStyleID.get(id) ?? kiwiOverrideTable[id - 1];
             if (!overrideNc) continue;
             // Only include properties that are actually set in the override.
             // Kiwi overrides are sparse — unset fields mean "inherit from base".

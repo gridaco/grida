@@ -237,6 +237,37 @@ describe("REST API TEXT → AttributedTextNode", () => {
     });
   });
 
+  describe("per-run fill color override", () => {
+    it("preserves blue fill_paints on overridden CJK runs", () => {
+      // "你好，世界！" where "世界！" (chars 3..6) is blue + bold
+      const text = "你好，世界！";
+      const { doc } = makeTextNode(text, [0, 0, 0, 1, 1, 1], {
+        "1": {
+          fontWeight: 700,
+          fills: [{ type: "SOLID", color: { r: 0.133, g: 0, b: 1, a: 1 } }],
+        } as any,
+      });
+
+      const attrib = findAttribNode(doc);
+      expect(attrib).toBeDefined();
+
+      const runs = attrib!.styled_runs;
+      expect(runs.length).toBe(2);
+
+      // Base run: no fill_paints override
+      expect(runs[0].fill_paints).toBeUndefined();
+
+      // Blue run: fill_paints with blue
+      expect(runs[1].fill_paints).toBeDefined();
+      expect(runs[1].fill_paints!.length).toBe(1);
+      expect(runs[1].fill_paints![0].type).toBe("solid");
+      if (runs[1].fill_paints![0].type === "solid") {
+        expect(runs[1].fill_paints![0].color.b).toBeCloseTo(1);
+        expect(runs[1].fill_paints![0].color.r).toBeLessThan(0.2);
+      }
+    });
+  });
+
   describe("override preserves base font_family", () => {
     it("does not clobber font_family when override only changes weight", () => {
       const text = "가나다라";
