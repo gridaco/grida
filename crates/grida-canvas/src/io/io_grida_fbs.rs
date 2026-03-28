@@ -3391,6 +3391,31 @@ fn encode_shape_layout<'a, A: flatbuffers::Allocator + 'a>(
     )
 }
 
+/// Build a LayoutStyle for tray nodes (position + dimensions, no layout_container or layout_child).
+fn encode_positional_layout<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    position: &LayoutPositioningBasis,
+    dimensions: &LayoutDimensionStyle,
+) -> flatbuffers::WIPOffset<fbs::LayoutStyle<'a>> {
+    let (pos_type, pos_offset) = encode_layout_position(fbb, position);
+    let dims = encode_dimensions_with_aspect(
+        fbb,
+        dimensions.layout_target_width,
+        dimensions.layout_target_height,
+        dimensions.layout_target_aspect_ratio,
+    );
+    fbs::LayoutStyle::create(
+        fbb,
+        &fbs::LayoutStyleArgs {
+            layout_position_type: pos_type,
+            layout_position: pos_offset,
+            layout_dimensions: Some(dims),
+            layout_container: None,
+            layout_child: None,
+        },
+    )
+}
+
 /// Build a LayoutStyle for container nodes (position, dimensions, container style, child style).
 fn encode_container_layout<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
@@ -3697,13 +3722,7 @@ fn encode_tray_node<'a, A: flatbuffers::Allocator + 'a>(
 ) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
     let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
     // Tray has position + dimensions but no layout_container or layout_child
-    let layout = encode_container_layout(
-        fbb,
-        &r.position,
-        &r.layout_dimensions,
-        &LayoutContainerStyle::default(),
-        &None,
-    );
+    let layout = encode_positional_layout(fbb, &r.position, &r.layout_dimensions);
     let default_effects = LayerEffects::default();
     let layer = encode_layer_trait(
         fbb,

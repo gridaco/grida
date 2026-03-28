@@ -59,4 +59,4 @@ This follows the pattern: **F** = Frame (Container), **Shift + F** = Tray.
 
 ## Figma Compatibility
 
-Trays map directly to Figma **Sections**. When you import a Figma file, Sections become Trays. The round-trip is clean — Trays export back as Sections.
+Trays map directly to Figma **Sections**. When you import a Figma file, Sections become Trays. Export back to Figma Sections is not yet supported.

@@ -44,7 +44,7 @@ The name "Tray" was chosen to reflect the node's passive, infrastructure-like na
 
 ## Node Hierarchy
 
-```
+```text
 Scene
 +-- Tray ("Authentication flows")
 |   +-- Container (Login screen)
@@ -64,7 +64,7 @@ Scene
 
 - **Organizational grouping**: Cluster related Containers under a named, visible boundary when a Scene has many root-level Containers.
 - **Hierarchy participation**: A Tray is a real node in the scene graph. It appears in the layer panel, has children, and can be a parent. It is not metadata or an annotation.
-- **Figma compatibility**: Maps directly to Figma `SECTION` on import/export. Round-trips cleanly.
+- **Figma compatibility**: Maps directly to Figma `SECTION` on import. Export back to Figma `SECTION` is not yet implemented.
 - **Nestability**: Trays can contain other Trays. Nesting is shallow in practice but unrestricted in depth.
 - **Minimal cognitive load**: Users should never need to think about what a Tray "does" -- it doesn't do anything.
 
@@ -73,7 +73,8 @@ Scene
 - **No layout**: No auto-layout, flex, grid, or positioning logic. Children are freely placed. This is permanent, not a v1 limitation.
 - **No rendering in output**: Invisible in exported designs. Canvas-only organizational aid.
 - **No clipping**: Children can visually extend beyond the Tray's bounds.
-- **No styling**: No fills, strokes, effects, blend modes. Label and boundary indicator only.
+- **No effects**: No shadows, blurs, or blend-mode overrides. Canvas-only boundary indicator.
+- **Styling supported**: Fills, strokes, and corner radius are supported and rendered in the canvas editor. They are not visible in exported output.
 - **No nesting under non-Tray parents**: A Tray cannot be a child of Container, Group, or any other non-Tray node. Trays live at Scene level or nested under other Trays. This constraint is permanent.
 - **Does not replace Group**: Groups are temporary, transform-linked wrappers. Trays are persistent, named organizational boundaries. They coexist.
 
@@ -88,15 +89,13 @@ Scene
 | **Layout**    | None. Always `none`. Not configurable.                    |
 | **Rendering** | Canvas-only. Never appears in exported output.            |
 | **Clipping**  | None. Children can overflow.                              |
-| **Styling**   | Label and boundary only. No fills, strokes, or effects.   |
+| **Styling**   | Fills, strokes, and corner radius supported. No effects (shadows, blurs). |
 
 ### Validation Invariants
 
-```
+```text
 Tray.parent    in { Scene, Tray }
 Tray.layout    = none           // invariant, not a default
-Tray.fills     = empty          // not supported
-Tray.strokes   = empty          // not supported
 Tray.effects   = empty          // not supported
 Tray.clip      = false          // invariant
 ```

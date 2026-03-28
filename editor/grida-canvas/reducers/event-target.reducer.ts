@@ -138,7 +138,10 @@ function __self_evt_on_click(
       );
       break;
     case "insert":
-      const parent = __get_insertion_target(draft);
+      const parent =
+        draft.tool.node === "tray"
+          ? __get_tray_insertion_target(draft)
+          : __get_insertion_target(draft);
 
       const nnode = initialNode(
         draft.tool.node,

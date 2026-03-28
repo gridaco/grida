@@ -2,11 +2,11 @@
 id: TC-CANVAS-TRAY-001
 title: Tray Node Hierarchy Constraints and Interaction Behavior
 module: canvas
-area: hierarchy
+area: tray
 tags: [tray, hierarchy, reparent, insert, container, scene, drag, auto-wrap]
 status: untested
 severity: high
-date: 2026-03-29
+date: 2026-03-28
 automatable: partial
 covered_by:
   - editor/grida-canvas/reducers/methods/__tests__/move-tray.test.ts
