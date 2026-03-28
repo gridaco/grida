@@ -1923,7 +1923,7 @@ export namespace format {
             nodeType = fbs.Node.TextSpanNode;
             break;
           }
-          case "attrib": {
+          case "text": {
             const attribNode =
               node as grida.program.nodes.AttributedTextNode;
             const propertiesOffset =
@@ -5849,7 +5849,7 @@ export namespace format {
           const baseLocked = systemNode.locked() ?? false;
 
           return {
-            type: "attrib",
+            type: "text",
             id,
             name: baseName,
             active: baseActive,

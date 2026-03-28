@@ -2912,7 +2912,7 @@ describe("format roundtrip", () => {
     const baseAttrib = (
       id: string
     ): grida.program.nodes.AttributedTextNode => ({
-      type: "attrib",
+      type: "text",
       id,
       name: "RichText",
       active: true,
@@ -2970,7 +2970,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.text).toBe("Hello World");
           expect(node.text_align).toBe("left");
@@ -3003,7 +3003,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.default_style.font_family).toBe("Roboto");
           expect(node.default_style.font_size).toBe(24);
@@ -3030,7 +3030,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.styled_runs[0].fill_paints).toBeDefined();
           expect(node.styled_runs[0].fill_paints).toHaveLength(1);
@@ -3060,7 +3060,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.fill_paints).toBeDefined();
           expect(node.fill_paints).toHaveLength(1);
@@ -3080,7 +3080,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.max_lines).toBe(3);
         }
@@ -3096,7 +3096,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.styled_runs[0].style.font_features).toBeDefined();
           expect(node.styled_runs[0].style.font_features!.liga).toBe(true);
@@ -3139,7 +3139,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.text).toBe(cjkText);
           expect(node.styled_runs).toHaveLength(2);
@@ -3186,7 +3186,7 @@ describe("format roundtrip", () => {
       roundtripTest<grida.program.nodes.AttributedTextNode>(
         doc,
         nodeId,
-        "attrib",
+        "text",
         (node) => {
           expect(node.text).toBe(emojiText);
           expect(node.styled_runs).toHaveLength(2);

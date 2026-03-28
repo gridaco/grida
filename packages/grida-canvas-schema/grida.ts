@@ -2300,7 +2300,7 @@ export namespace grida.program.nodes {
       i.ILayoutChildTrait,
       i.IHotspotTrait,
       i.ITextStroke {
-    readonly type: "attrib";
+    readonly type: "text";
 
     /** The full backing text content. */
     text: string | null;

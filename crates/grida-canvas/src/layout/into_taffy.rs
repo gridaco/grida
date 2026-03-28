@@ -492,8 +492,12 @@ impl From<&crate::node::schema::AttributedTextNodeRec> for Style {
             style.size.width = Dimension::auto();
         }
 
-        // Height is auto for text (will be determined by content)
-        style.size.height = Dimension::auto();
+        // Use explicit height if set, otherwise auto (content-determined)
+        style.size.height = if let Some(height) = node.height {
+            Dimension::length(height)
+        } else {
+            Dimension::auto()
+        };
 
         apply_layout_child(style, &node.layout_child, node.transform)
     }

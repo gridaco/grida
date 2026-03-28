@@ -13,9 +13,7 @@ pub fn into_tree(svg_source: &str) -> Result<usvg::Tree, usvg::Error> {
 
     // Register embedded font so usvg can layout <text> (it silently drops
     // text nodes when no font is available).
-    options
-        .fontdb_mut()
-        .load_font_data(geist::BYTES.to_vec());
+    options.fontdb_mut().load_font_data(geist::BYTES.to_vec());
 
     // Load system fonts first — on Linux, `load_system_fonts()` parses
     // fontconfig and *overwrites* the generic-family mappings with names
@@ -223,8 +221,7 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
         last_x = x;
         last_y = y;
 
-        let trimmed = chunk_text.trim();
-        if trimmed.is_empty() {
+        if chunk_text.is_empty() {
             continue;
         }
 
@@ -276,8 +273,9 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
         } else {
             // Single style → uniform text span.
             let first_visible = visible_spans.first();
-            let chunk_fill =
-                first_visible.and_then(|s| s.fill()).map(SVGFillAttributes::from);
+            let chunk_fill = first_visible
+                .and_then(|s| s.fill())
+                .map(SVGFillAttributes::from);
             let chunk_stroke = first_visible
                 .and_then(|s| s.stroke())
                 .map(SVGStrokeAttributes::from);
@@ -285,7 +283,7 @@ fn convert_text(text: &usvg::Text, parent_world: &CGTransform2D) -> Result<IRSVG
 
             chunks.push(IRSVGTextChunk::Uniform(IRSVGTextSpanNode {
                 transform: chunk_transform,
-                text: trimmed.to_string(),
+                text: chunk_text.to_string(),
                 fill: chunk_fill,
                 stroke: chunk_stroke,
                 font_size,

@@ -1820,7 +1820,7 @@ export namespace iofigma {
                 ...text_stroke_trait(node, context, imageRefsUsed),
                 ...style_trait({}),
                 ...effects_trait(node.effects),
-                type: "attrib",
+                type: "text",
                 text: characters,
                 default_style: defaultStyle,
                 styled_runs: runs,

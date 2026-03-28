@@ -714,12 +714,7 @@ impl Renderer {
     ///
     /// Called during text editing to keep the surface overlay (selection/hover
     /// outline) in sync with the paragraph's laid-out dimensions.
-    pub fn update_layer_text_shape(
-        &mut self,
-        node_id: NodeId,
-        width: f32,
-        height: f32,
-    ) {
+    pub fn update_layer_text_shape(&mut self, node_id: NodeId, width: f32, height: f32) {
         use crate::painter::layer::PainterPictureLayer;
 
         for entry in &mut self.scene_cache.layers.layers {
@@ -1736,6 +1731,12 @@ impl Renderer {
         // Scene load handles its own layout in load_scene(); skip here.
         // Viewport resize needs layout only when the scene has ICB nodes
         // or auto-sized roots (the common infinite-canvas case has neither).
+        // Invalidate paragraph cache before layout so rebuild_scene_caches()
+        // measures text with the new fonts rather than stale fallback paragraphs.
+        if flags.contains(ChangeFlags::FONT_LOADED) {
+            self.scene_cache.paragraph.borrow_mut().invalidate();
+        }
+
         if has_data_changes && !flags.contains(ChangeFlags::SCENE_LOAD) {
             let needs_layout = flags
                 .intersects(ChangeFlags::LAYOUT_DIRTY | ChangeFlags::FONT_LOADED)
@@ -1758,7 +1759,10 @@ impl Renderer {
         }
 
         // ----- Paragraph cache (text layout) -----
-        if flags.intersects(ChangeFlags::SCENE_LOAD | ChangeFlags::FONT_LOADED) {
+        // FONT_LOADED is handled above (before rebuild_scene_caches) so that
+        // layout measurement uses fresh paragraphs. Only SCENE_LOAD needs
+        // invalidation here.
+        if flags.contains(ChangeFlags::SCENE_LOAD) {
             self.scene_cache.paragraph.borrow_mut().invalidate();
         }
         // Per-node paragraph invalidation is handled by update_layer_text

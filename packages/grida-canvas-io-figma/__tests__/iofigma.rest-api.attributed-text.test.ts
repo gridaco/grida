@@ -110,7 +110,7 @@ function findAttribNode(
   doc: grida.program.document.IDocumentDefinition
 ): grida.program.nodes.AttributedTextNode | undefined {
   return Object.values(doc.nodes).find(
-    (n): n is grida.program.nodes.AttributedTextNode => n.type === "attrib"
+    (n): n is grida.program.nodes.AttributedTextNode => n.type === "text"
   );
 }
 

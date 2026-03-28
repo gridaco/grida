@@ -14,15 +14,15 @@
 //! 3. Always assert the _invariant_ — after every edit, `content.text()`
 //!    must equal `state.text`. Several tests verify this explicitly.
 
-use std::thread;
 use super::time::Duration;
+use std::thread;
 
 use super::attributed_text::{
     AttributedText, CGColor, Paint, TextDecorationLine, TextStyle as AttrTextStyle,
 };
 use super::layout::TextLayoutEngine;
-use super::simple_layout::SimpleLayoutEngine;
 use super::session::{ClickTracker, KeyAction, KeyName, TextEditSession};
+use super::simple_layout::SimpleLayoutEngine;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,31 +72,151 @@ fn key_action_arrow_modifier_matrix() {
     // This is exhaustive — any future change to the mapping will break here.
     let cases: Vec<(bool, bool, bool, KeyName, KeyAction)> = vec![
         // plain arrows
-        (false, false, false, KeyName::ArrowLeft,  KeyAction::MoveLeft { extend: false }),
-        (false, false, false, KeyName::ArrowRight, KeyAction::MoveRight { extend: false }),
-        (false, false, false, KeyName::ArrowUp,    KeyAction::MoveUp { extend: false }),
-        (false, false, false, KeyName::ArrowDown,  KeyAction::MoveDown { extend: false }),
+        (
+            false,
+            false,
+            false,
+            KeyName::ArrowLeft,
+            KeyAction::MoveLeft { extend: false },
+        ),
+        (
+            false,
+            false,
+            false,
+            KeyName::ArrowRight,
+            KeyAction::MoveRight { extend: false },
+        ),
+        (
+            false,
+            false,
+            false,
+            KeyName::ArrowUp,
+            KeyAction::MoveUp { extend: false },
+        ),
+        (
+            false,
+            false,
+            false,
+            KeyName::ArrowDown,
+            KeyAction::MoveDown { extend: false },
+        ),
         // shift+arrows (extend selection)
-        (false, false, true,  KeyName::ArrowLeft,  KeyAction::MoveLeft { extend: true }),
-        (false, false, true,  KeyName::ArrowRight, KeyAction::MoveRight { extend: true }),
-        (false, false, true,  KeyName::ArrowUp,    KeyAction::MoveUp { extend: true }),
-        (false, false, true,  KeyName::ArrowDown,  KeyAction::MoveDown { extend: true }),
+        (
+            false,
+            false,
+            true,
+            KeyName::ArrowLeft,
+            KeyAction::MoveLeft { extend: true },
+        ),
+        (
+            false,
+            false,
+            true,
+            KeyName::ArrowRight,
+            KeyAction::MoveRight { extend: true },
+        ),
+        (
+            false,
+            false,
+            true,
+            KeyName::ArrowUp,
+            KeyAction::MoveUp { extend: true },
+        ),
+        (
+            false,
+            false,
+            true,
+            KeyName::ArrowDown,
+            KeyAction::MoveDown { extend: true },
+        ),
         // cmd+arrows (jump to boundaries)
-        (true,  false, false, KeyName::ArrowLeft,  KeyAction::MoveHome { extend: false }),
-        (true,  false, false, KeyName::ArrowRight, KeyAction::MoveEnd { extend: false }),
-        (true,  false, false, KeyName::ArrowUp,    KeyAction::MoveDocStart { extend: false }),
-        (true,  false, false, KeyName::ArrowDown,  KeyAction::MoveDocEnd { extend: false }),
+        (
+            true,
+            false,
+            false,
+            KeyName::ArrowLeft,
+            KeyAction::MoveHome { extend: false },
+        ),
+        (
+            true,
+            false,
+            false,
+            KeyName::ArrowRight,
+            KeyAction::MoveEnd { extend: false },
+        ),
+        (
+            true,
+            false,
+            false,
+            KeyName::ArrowUp,
+            KeyAction::MoveDocStart { extend: false },
+        ),
+        (
+            true,
+            false,
+            false,
+            KeyName::ArrowDown,
+            KeyAction::MoveDocEnd { extend: false },
+        ),
         // cmd+shift+arrows (extend to boundaries)
-        (true,  false, true,  KeyName::ArrowLeft,  KeyAction::MoveHome { extend: true }),
-        (true,  false, true,  KeyName::ArrowRight, KeyAction::MoveEnd { extend: true }),
-        (true,  false, true,  KeyName::ArrowUp,    KeyAction::MoveDocStart { extend: true }),
-        (true,  false, true,  KeyName::ArrowDown,  KeyAction::MoveDocEnd { extend: true }),
+        (
+            true,
+            false,
+            true,
+            KeyName::ArrowLeft,
+            KeyAction::MoveHome { extend: true },
+        ),
+        (
+            true,
+            false,
+            true,
+            KeyName::ArrowRight,
+            KeyAction::MoveEnd { extend: true },
+        ),
+        (
+            true,
+            false,
+            true,
+            KeyName::ArrowUp,
+            KeyAction::MoveDocStart { extend: true },
+        ),
+        (
+            true,
+            false,
+            true,
+            KeyName::ArrowDown,
+            KeyAction::MoveDocEnd { extend: true },
+        ),
         // word+arrows (option/ctrl)
-        (false, true,  false, KeyName::ArrowLeft,  KeyAction::MoveWordLeft { extend: false }),
-        (false, true,  false, KeyName::ArrowRight, KeyAction::MoveWordRight { extend: false }),
+        (
+            false,
+            true,
+            false,
+            KeyName::ArrowLeft,
+            KeyAction::MoveWordLeft { extend: false },
+        ),
+        (
+            false,
+            true,
+            false,
+            KeyName::ArrowRight,
+            KeyAction::MoveWordRight { extend: false },
+        ),
         // word+shift+arrows
-        (false, true,  true,  KeyName::ArrowLeft,  KeyAction::MoveWordLeft { extend: true }),
-        (false, true,  true,  KeyName::ArrowRight, KeyAction::MoveWordRight { extend: true }),
+        (
+            false,
+            true,
+            true,
+            KeyName::ArrowLeft,
+            KeyAction::MoveWordLeft { extend: true },
+        ),
+        (
+            false,
+            true,
+            true,
+            KeyName::ArrowRight,
+            KeyAction::MoveWordRight { extend: true },
+        ),
     ];
     for (cmd, word, shift, key, expected) in cases {
         let actual = KeyAction::from_key(cmd, word, shift, &key);
@@ -112,11 +232,11 @@ fn key_action_arrow_modifier_matrix() {
 fn key_action_deletion_modifier_matrix() {
     let cases: Vec<(bool, bool, KeyName, KeyAction)> = vec![
         (false, false, KeyName::Backspace, KeyAction::Backspace),
-        (false, true,  KeyName::Backspace, KeyAction::BackspaceWord),
-        (true,  false, KeyName::Backspace, KeyAction::BackspaceLine),
-        (false, false, KeyName::Delete,    KeyAction::Delete),
-        (false, true,  KeyName::Delete,    KeyAction::DeleteWord),
-        (true,  false, KeyName::Delete,    KeyAction::DeleteLine),
+        (false, true, KeyName::Backspace, KeyAction::BackspaceWord),
+        (true, false, KeyName::Backspace, KeyAction::BackspaceLine),
+        (false, false, KeyName::Delete, KeyAction::Delete),
+        (false, true, KeyName::Delete, KeyAction::DeleteWord),
+        (true, false, KeyName::Delete, KeyAction::DeleteLine),
     ];
     for (cmd, word, key, expected) in cases {
         let actual = KeyAction::from_key(cmd, word, false, &key);
@@ -134,13 +254,13 @@ fn key_action_cmd_shortcuts_complete() {
     let cases: Vec<(bool, KeyName, KeyAction)> = vec![
         (false, KeyName::Letter('a'), KeyAction::SelectAll),
         (false, KeyName::Letter('z'), KeyAction::Undo),
-        (true,  KeyName::Letter('z'), KeyAction::Redo),
+        (true, KeyName::Letter('z'), KeyAction::Redo),
         (false, KeyName::Letter('b'), KeyAction::ToggleBold),
         (false, KeyName::Letter('i'), KeyAction::ToggleItalic),
         (false, KeyName::Letter('u'), KeyAction::ToggleUnderline),
-        (true,  KeyName::Letter('x'), KeyAction::ToggleStrikethrough),
-        (true,  KeyName::Period,      KeyAction::IncreaseFontSize),
-        (true,  KeyName::Comma,       KeyAction::DecreaseFontSize),
+        (true, KeyName::Letter('x'), KeyAction::ToggleStrikethrough),
+        (true, KeyName::Period, KeyAction::IncreaseFontSize),
+        (true, KeyName::Comma, KeyAction::DecreaseFontSize),
     ];
     for (shift, key, expected) in cases {
         let actual = KeyAction::from_key(true, false, shift, &key);
@@ -315,7 +435,7 @@ fn content_stays_synced_through_load() {
 #[test]
 fn caret_override_lifecycle() {
     let mut s = session("hello");
-    s.state.cursor = 3; // between "hel" and "lo"
+    s.state.cursor = 3; // between "hell" and "o"
 
     // 1. No override initially
     assert!(s.caret_style_override().is_none());
@@ -806,7 +926,10 @@ fn scroll_clamps_to_valid_range() {
 
 #[test]
 fn scroll_set_and_clamp() {
-    let text = (0..50).map(|i| format!("Line {i}")).collect::<Vec<_>>().join("\n");
+    let text = (0..50)
+        .map(|i| format!("Line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut s = session(&text);
     s.set_layout_height(50.0); // tiny viewport
 
@@ -936,7 +1059,13 @@ fn set_color_on_selection() {
     s.state.cursor = 5;
     s.set_color(CGColor::RED);
 
-    let c = s.content.style_at(0).fills.iter().find_map(|p| p.solid_color()).unwrap();
+    let c = s
+        .content
+        .style_at(0)
+        .fills
+        .iter()
+        .find_map(|p| p.solid_color())
+        .unwrap();
     assert_eq!(c, CGColor::RED);
 }
 
@@ -967,7 +1096,10 @@ fn layout_resize_keeps_caret_valid() {
 #[test]
 fn scroll_anchor_pinned_on_width_increase() {
     // Build a long document that wraps heavily at narrow width.
-    let text = (0..100).map(|i| format!("Line {i} with some words")).collect::<Vec<_>>().join("\n");
+    let text = (0..100)
+        .map(|i| format!("Line {i} with some words"))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut s = session(&text);
     s.set_layout_width(100.0); // narrow → heavy wrapping
     s.set_layout_height(50.0); // small viewport
@@ -1007,7 +1139,10 @@ fn scroll_anchor_pinned_on_width_increase() {
 
 #[test]
 fn scroll_anchor_pinned_on_width_decrease() {
-    let text = (0..100).map(|i| format!("Line {i} with some words")).collect::<Vec<_>>().join("\n");
+    let text = (0..100)
+        .map(|i| format!("Line {i} with some words"))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut s = session(&text);
     s.set_layout_width(400.0); // wide
     s.set_layout_height(50.0);
@@ -1041,7 +1176,10 @@ fn scroll_anchor_pinned_on_width_decrease() {
 
 #[test]
 fn scroll_anchor_at_top_stays_at_top() {
-    let text = (0..50).map(|i| format!("Line {i}")).collect::<Vec<_>>().join("\n");
+    let text = (0..50)
+        .map(|i| format!("Line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut s = session(&text);
     s.set_layout_width(100.0);
     s.set_layout_height(50.0);
@@ -1058,7 +1196,10 @@ fn scroll_anchor_at_top_stays_at_top() {
 fn scroll_clamps_after_width_increase_reduces_content() {
     // Regression: widening can reduce wrapped line count enough that the old
     // scroll_y exceeds the new max_scroll_y.
-    let text = (0..50).map(|i| format!("Line {i} with enough words to wrap at narrow widths")).collect::<Vec<_>>().join("\n");
+    let text = (0..50)
+        .map(|i| format!("Line {i} with enough words to wrap at narrow widths"))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut s = session(&text);
     s.set_layout_width(80.0); // narrow → lots of wrapping
     s.set_layout_height(100.0);
