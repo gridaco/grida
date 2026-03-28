@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import kolor from "@grida/color";
-import { Cross2Icon, FrameIcon } from "@radix-ui/react-icons";
+import { Cross2Icon } from "@radix-ui/react-icons";
 import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
@@ -98,15 +98,30 @@ export function PlaygroundToolbar() {
             }}
           />
           <VerticalDivider />
-          <ToolGroupItem
-            value={"container" satisfies ToolbarToolType}
-            label="Container tool"
-            shortcut={keyboardShortcutText(
-              "workbench.surface.cursor.container"
-            )}
-          >
-            <FrameIcon />
-          </ToolGroupItem>
+          <ToolsGroup
+            value={value}
+            open={open === "container"}
+            onOpenChange={(o) => setOpen(o ? "container" : null)}
+            options={[
+              {
+                value: "container",
+                label: "Container",
+                shortcut: keyboardShortcutText(
+                  "workbench.surface.cursor.container"
+                ),
+              },
+              {
+                value: "tray",
+                label: "Tray",
+                shortcut: keyboardShortcutText("workbench.surface.cursor.tray"),
+              },
+            ]}
+            onValueChange={(v) => {
+              editor.surface.surfaceSetTool(
+                toolbar_value_to_cursormode(v as ToolbarToolType)
+              );
+            }}
+          />
           <ToolGroupItem
             value={"text" satisfies ToolbarToolType}
             label="Text tool"
