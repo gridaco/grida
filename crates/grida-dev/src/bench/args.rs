@@ -25,6 +25,10 @@ pub struct BenchArgs {
     /// Run the resize benchmark (alternates between two viewport sizes).
     #[arg(long = "resize", default_value_t = false)]
     pub resize: bool,
+    /// Draw SurfaceUI overlay (frame titles, badges) on each frame.
+    /// Measures the combined cost of content rendering + overlay drawing.
+    #[arg(long = "overlay", default_value_t = false)]
+    pub overlay: bool,
 }
 
 #[derive(Args, Debug)]
@@ -43,4 +47,7 @@ pub struct BenchReportArgs {
     /// Output file path for the JSON report (stdout if omitted).
     #[arg(long = "output")]
     pub output: Option<String>,
+    /// Draw SurfaceUI overlay (frame titles, badges) on each frame.
+    #[arg(long = "overlay", default_value_t = false)]
+    pub overlay: bool,
 }

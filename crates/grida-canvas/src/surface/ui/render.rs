@@ -317,6 +317,17 @@ impl SurfaceUI {
         let view = camera.view_matrix();
         let font_size = FRAME_TITLE_FONT_SIZE * dpr;
 
+        // Screen-space viewport bounds for culling (with generous margin for
+        // title bars that sit above / below the node).
+        let vp_size = camera.get_size();
+        let screen_w = vp_size.width * dpr;
+        let screen_h = vp_size.height * dpr;
+        let margin = title_height + BADGE_GAP_Y * dpr + 50.0 * dpr;
+        let vp_top = -margin;
+        let vp_bottom = screen_h + margin;
+        let vp_left = -margin;
+        let vp_right = screen_w + margin;
+
         // Build font families list: primary + user fallback fonts
         let fallbacks = fonts.user_fallback_families();
         let mut families: Vec<&str> = Vec::with_capacity(1 + fallbacks.len());
@@ -331,7 +342,7 @@ impl SurfaceUI {
         let badge_radius = BADGE_RADIUS * dpr;
         let badge_gap_y = BADGE_GAP_Y * dpr;
 
-        // Base text style — reused for every label (only foreground paint varies)
+        // ── Hoisted style objects (shared across all labels) ────────────
         let wght_coord = skia_safe::font_arguments::variation_position::Coordinate {
             axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
             value: 500.0,
@@ -341,6 +352,48 @@ impl SurfaceUI {
         };
         let font_args =
             skia_safe::FontArguments::new().set_variation_design_position(variation_position);
+
+        let font_style = skia_safe::FontStyle::new(
+            skia_safe::font_style::Weight::MEDIUM,
+            skia_safe::font_style::Width::NORMAL,
+            skia_safe::font_style::Slant::Upright,
+        );
+
+        // Base paragraph style — shared across all labels (immutable fields).
+        let mut base_para_style = textlayout::ParagraphStyle::new();
+        base_para_style.set_max_lines(1);
+        base_para_style.set_ellipsis("\u{2026}");
+        base_para_style.set_apply_rounding_hack(false);
+
+        // Pre-create text-colour paints (only 4 possible colours)
+        let mut paint_black = Paint::default();
+        paint_black.set_color(Color::BLACK);
+        paint_black.set_anti_alias(true);
+
+        let mut paint_white = Paint::default();
+        paint_white.set_color(Color::WHITE);
+        paint_white.set_anti_alias(true);
+
+        let mut paint_muted = Paint::default();
+        paint_muted.set_color(MUTED_COLOR);
+        paint_muted.set_anti_alias(true);
+
+        let mut paint_accent = Paint::default();
+        paint_accent.set_color(ACCENT_COLOR);
+        paint_accent.set_anti_alias(true);
+
+        // Pre-create badge stroke paint (reuse, only change color per label)
+        let mut stroke_paint = Paint::default();
+        stroke_paint.set_style(PaintStyle::Stroke);
+        stroke_paint.set_stroke_width(BADGE_STROKE_WIDTH * dpr);
+        stroke_paint.set_anti_alias(true);
+
+        // Pre-create badge fill paint (reuse, only change color per label)
+        let mut fill_paint = Paint::default();
+        fill_paint.set_style(PaintStyle::Fill);
+        fill_paint.set_anti_alias(true);
+
+        let font_collection = fonts.font_collection();
 
         let labeled_nodes = Self::collect_labeled_nodes(graph);
 
@@ -356,6 +409,7 @@ impl SurfaceUI {
                 None => continue,
             };
 
+            // Transform node's top-left and top-right to screen space
             let screen_tl = math2::vector2::transform([world_bounds.x, world_bounds.y], &view);
             let screen_tr = math2::vector2::transform(
                 [world_bounds.x + world_bounds.width, world_bounds.y],
@@ -367,6 +421,23 @@ impl SurfaceUI {
                 continue;
             }
 
+            // ── Viewport culling ───────────────────────────────────────
+            // The title bar sits above the node (Plain) or above with a gap
+            // (Badge). If the title region is entirely outside the viewport,
+            // skip the expensive paragraph creation.
+            let label_top = screen_tl[1] - title_height - badge_gap_y;
+            let label_bottom = screen_tl[1];
+            let label_left = screen_tl[0];
+            let label_right = screen_tl[0] + screen_width;
+
+            if label_bottom < vp_top
+                || label_top > vp_bottom
+                || label_right < vp_left
+                || label_left > vp_right
+            {
+                continue;
+            }
+
             let label: &str = name.as_deref().unwrap_or_else(|| match variant {
                 LabelVariant::Badge => "Tray",
                 LabelVariant::Plain => "Container",
@@ -375,48 +446,35 @@ impl SurfaceUI {
             let is_selected = surface.selection.contains(node_id);
             let is_hovered = surface.hover.hovered() == Some(node_id);
 
-            // ── Determine text colour ──────────────────────────────
-            //
-            // Badge: black or white, chosen by background luminance.
-            //        Does NOT change on hover / select.
-            // Plain: muted grey normally, accent blue when highlighted.
-            let text_color = match variant {
+            // ── Determine text colour paint ─────────────────────────────
+            let fg_paint = match variant {
                 LabelVariant::Badge => {
                     let bg = badge_bg.unwrap_or(BADGE_BG_FALLBACK);
                     if is_light_color(bg) {
-                        Color::BLACK
+                        &paint_black
                     } else {
-                        Color::WHITE
+                        &paint_white
                     }
                 }
                 LabelVariant::Plain => {
                     if is_selected || is_hovered {
-                        ACCENT_COLOR
+                        &paint_accent
                     } else {
-                        MUTED_COLOR
+                        &paint_muted
                     }
                 }
             };
 
-            // Build a single-line paragraph with ellipsis truncation
-            let mut paragraph_style = textlayout::ParagraphStyle::new();
-            paragraph_style.set_max_lines(1);
-            paragraph_style.set_ellipsis("\u{2026}");
-            paragraph_style.set_apply_rounding_hack(false);
-
+            // Build text style with the chosen foreground paint
             let mut text_style = textlayout::TextStyle::new();
             text_style.set_font_size(font_size);
             text_style.set_font_families(&families);
-            text_style.set_font_style(skia_safe::FontStyle::new(
-                skia_safe::font_style::Weight::MEDIUM,
-                skia_safe::font_style::Width::NORMAL,
-                skia_safe::font_style::Slant::Upright,
-            ));
+            text_style.set_font_style(font_style);
             text_style.set_font_arguments(&font_args);
-            let mut fg_paint = Paint::default();
-            fg_paint.set_color(text_color);
-            fg_paint.set_anti_alias(true);
-            text_style.set_foreground_paint(&fg_paint);
+            text_style.set_foreground_paint(fg_paint);
+
+            // Clone the base paragraph style and apply text style
+            let mut paragraph_style = base_para_style.clone();
             paragraph_style.set_text_style(&text_style);
 
             // For Badge variant, limit paragraph width to leave room for padding
@@ -425,8 +483,7 @@ impl SurfaceUI {
                 LabelVariant::Plain => screen_width,
             };
 
-            let mut builder =
-                textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
+            let mut builder = textlayout::ParagraphBuilder::new(&paragraph_style, font_collection);
             builder.push_style(&text_style);
             builder.add_text(label);
             let mut paragraph = builder.build();
@@ -460,19 +517,11 @@ impl SurfaceUI {
                         base_bg
                     };
 
-                    let mut bg_paint = Paint::default();
-                    bg_paint.set_color(bg_color);
-                    bg_paint.set_style(PaintStyle::Fill);
-                    bg_paint.set_anti_alias(true);
-                    canvas.draw_rrect(rrect, &bg_paint);
+                    fill_paint.set_color(bg_color);
+                    canvas.draw_rrect(rrect, &fill_paint);
 
                     // Adaptive stroke — slightly darker than the fill
-                    let stroke_color = darken(base_bg, BADGE_STROKE_DARKEN);
-                    let mut stroke_paint = Paint::default();
-                    stroke_paint.set_color(stroke_color);
-                    stroke_paint.set_style(PaintStyle::Stroke);
-                    stroke_paint.set_stroke_width(BADGE_STROKE_WIDTH * dpr);
-                    stroke_paint.set_anti_alias(true);
+                    stroke_paint.set_color(darken(base_bg, BADGE_STROKE_DARKEN));
                     canvas.draw_rrect(rrect, &stroke_paint);
 
                     // Draw text inside the pill
