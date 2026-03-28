@@ -1,16 +1,15 @@
 use skia_safe::{
     self as skia_safe,
     textlayout::{
-        FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle,
-        RectHeightStyle, RectWidthStyle, TextDecoration, TextStyle, TypefaceFontProvider,
+        FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, RectHeightStyle,
+        RectWidthStyle, TextDecoration, TextStyle, TypefaceFontProvider,
     },
     Color, FontMgr, Point,
 };
 
 use super::{
     layout::{CaretRect, LineMetrics, SelectionRect, TextLayoutEngine},
-    line_index_for_offset_utf8,
-    prev_grapheme_boundary, snap_grapheme_boundary,
+    line_index_for_offset_utf8, prev_grapheme_boundary, snap_grapheme_boundary,
     utf16_to_utf8_offset, utf8_to_utf16_offset,
 };
 
@@ -58,7 +57,10 @@ fn attr_style_to_skia(
                 *bytes.get(2).unwrap_or(&b' ') as char,
                 *bytes.get(3).unwrap_or(&b' ') as char,
             ));
-            coords.push(Coordinate { axis: tag, value: v.value });
+            coords.push(Coordinate {
+                axis: tag,
+                value: v.value,
+            });
         }
 
         coords.push(Coordinate {
@@ -178,9 +180,9 @@ pub enum TextAlign {
 impl TextAlign {
     fn to_skia(&self) -> skia_safe::textlayout::TextAlign {
         match self {
-            Self::Left    => skia_safe::textlayout::TextAlign::Left,
-            Self::Center  => skia_safe::textlayout::TextAlign::Center,
-            Self::Right   => skia_safe::textlayout::TextAlign::Right,
+            Self::Left => skia_safe::textlayout::TextAlign::Left,
+            Self::Center => skia_safe::textlayout::TextAlign::Center,
+            Self::Right => skia_safe::textlayout::TextAlign::Right,
             Self::Justify => skia_safe::textlayout::TextAlign::Justify,
         }
     }
@@ -227,11 +229,7 @@ pub struct TextConfig {
 impl Default for TextConfig {
     fn default() -> Self {
         Self {
-            font_families: vec![
-                "Menlo".into(),
-                "Courier New".into(),
-                "monospace".into(),
-            ],
+            font_families: vec!["Menlo".into(), "Courier New".into(), "monospace".into()],
             font_size: DEFAULT_FONT_SIZE,
             text_align: TextAlign::Left,
             line_height: None,
@@ -532,13 +530,7 @@ impl SkiaLayoutEngine {
     /// `build_paragraph_for_slice` which applies uniform styling from
     /// `TextConfig`. For attributed (rich text) layout, call `invalidate()`
     /// instead and let `ensure_layout_attributed` do a full rebuild.
-    pub fn notify_edit(
-        &mut self,
-        text: &str,
-        edit_offset: usize,
-        old_len: usize,
-        new_len: usize,
-    ) {
+    pub fn notify_edit(&mut self, text: &str, edit_offset: usize, old_len: usize, new_len: usize) {
         if self.blocks.is_empty() {
             self.rebuild_blocks(text);
             return;
@@ -551,19 +543,27 @@ impl SkiaLayoutEngine {
         // or removed). If so, fall back to a targeted rebuild of the affected
         // region rather than a full rebuild of the entire document.
         let inserted_text = &text[edit_offset..edit_offset + new_len];
-        let newlines_inserted = inserted_text.as_bytes().iter().filter(|&&b| b == b'\n').count();
+        let newlines_inserted = inserted_text
+            .as_bytes()
+            .iter()
+            .filter(|&&b| b == b'\n')
+            .count();
 
         // For the removed region, we need to count newlines that were in the
         // old text. We can infer this from the block boundaries.
         let newlines_removed = if old_len > 0 {
             // Count how many block boundaries (each ends with \n except
             // possibly the last) fall strictly inside the removed range.
-            self.blocks.iter().filter(|b| {
-                // A block boundary at byte_end (which includes the \n) is
-                // "removed" if byte_end falls within (edit_offset, old_edit_end].
-                b.byte_end > edit_offset && b.byte_end <= old_edit_end
-                    && b.byte_end < self.cached_text.len() // not the last block
-            }).count()
+            self.blocks
+                .iter()
+                .filter(|b| {
+                    // A block boundary at byte_end (which includes the \n) is
+                    // "removed" if byte_end falls within (edit_offset, old_edit_end].
+                    b.byte_end > edit_offset
+                        && b.byte_end <= old_edit_end
+                        && b.byte_end < self.cached_text.len() // not the last block
+                })
+                .count()
         } else {
             0
         };
@@ -573,14 +573,16 @@ impl SkiaLayoutEngine {
         if structure_changed {
             // Paragraph structure changed — do a partial rebuild.
             // Find the range of blocks that are affected by the edit.
-            let first_affected = self.blocks
+            let first_affected = self
+                .blocks
                 .iter()
                 .position(|b| b.byte_end > edit_offset)
                 .unwrap_or(self.blocks.len().saturating_sub(1));
 
             // The last affected block is the one that contains old_edit_end
             // (in the old coordinate system).
-            let mut last_affected = self.blocks
+            let mut last_affected = self
+                .blocks
                 .iter()
                 .position(|b| b.byte_end >= old_edit_end)
                 .unwrap_or(self.blocks.len().saturating_sub(1));
@@ -590,7 +592,11 @@ impl SkiaLayoutEngine {
             // the following block needs to be re-parsed together with the
             // preceding one.
             if newlines_removed > 0 {
-                if let Some(next_idx) = self.blocks.iter().position(|b| b.byte_start == old_edit_end) {
+                if let Some(next_idx) = self
+                    .blocks
+                    .iter()
+                    .position(|b| b.byte_start == old_edit_end)
+                {
                     last_affected = last_affected.max(next_idx);
                 }
             }
@@ -600,16 +606,22 @@ impl SkiaLayoutEngine {
 
             // Determine the byte range in the NEW text that we need to
             // re-parse into blocks.
-            let rebuild_start = self.blocks.get(first_affected)
+            let rebuild_start = self
+                .blocks
+                .get(first_affected)
                 .map(|b| b.byte_start)
                 .unwrap_or(0);
-            let old_rebuild_end = self.blocks.get(last_affected)
+            let old_rebuild_end = self
+                .blocks
+                .get(last_affected)
                 .map(|b| b.byte_end)
                 .unwrap_or(self.cached_text.len());
             let rebuild_end = (old_rebuild_end as isize + delta).max(0) as usize;
             let rebuild_end = rebuild_end.min(text.len());
 
-            let y_start = self.blocks.get(first_affected)
+            let y_start = self
+                .blocks
+                .get(first_affected)
                 .map(|b| b.y_offset)
                 .unwrap_or(0.0);
 
@@ -673,7 +685,8 @@ impl SkiaLayoutEngine {
             }
 
             // Replace affected blocks with new blocks.
-            self.blocks.splice(first_affected..first_affected + remove_count, new_blocks);
+            self.blocks
+                .splice(first_affected..first_affected + remove_count, new_blocks);
 
             // Re-add phantom trailing block if needed.
             if text.ends_with('\n') && !text.is_empty() {
@@ -683,23 +696,32 @@ impl SkiaLayoutEngine {
                         self.blocks.pop();
                     }
                 }
-                let final_y = self.blocks.last()
+                let final_y = self
+                    .blocks
+                    .last()
                     .map(|b| b.y_offset + b.height)
                     .unwrap_or(0.0);
                 self.append_phantom_trailing_block(text, final_y);
             } else {
                 // Remove phantom if text no longer ends with \n.
                 if let Some(last) = self.blocks.last() {
-                    if last.byte_start == last.byte_end && last.byte_start == text.len() && !text.is_empty() {
+                    if last.byte_start == last.byte_end
+                        && last.byte_start == text.len()
+                        && !text.is_empty()
+                    {
                         self.blocks.pop();
                     }
                 }
             }
         } else {
             // No paragraph structure change — only one block is affected.
-            let block_idx = self.blocks
+            let block_idx = self
+                .blocks
                 .iter()
-                .position(|b| edit_offset < b.byte_end || (b.byte_start == b.byte_end && edit_offset == b.byte_start))
+                .position(|b| {
+                    edit_offset < b.byte_end
+                        || (b.byte_start == b.byte_end && edit_offset == b.byte_start)
+                })
                 .unwrap_or(self.blocks.len().saturating_sub(1));
 
             // Remove old phantom trailing block before modifying.
@@ -713,7 +735,8 @@ impl SkiaLayoutEngine {
                 let new_end = (self.blocks[block_idx].byte_end as isize + delta) as usize;
                 let y_off = self.blocks[block_idx].y_offset;
 
-                let has_newline = new_end > 0 && new_end <= text.len()
+                let has_newline = new_end > 0
+                    && new_end <= text.len()
                     && text.as_bytes().get(new_end - 1) == Some(&b'\n');
                 let content_end = if has_newline { new_end - 1 } else { new_end };
                 let content_slice = &text[new_start..content_end];
@@ -736,7 +759,9 @@ impl SkiaLayoutEngine {
             }
 
             // Re-add phantom trailing block if needed.
-            let final_y = self.blocks.last()
+            let final_y = self
+                .blocks
+                .last()
                 .map(|b| b.y_offset + b.height)
                 .unwrap_or(0.0);
             self.append_phantom_trailing_block(text, final_y);
@@ -755,7 +780,12 @@ impl SkiaLayoutEngine {
         let mut ts = TextStyle::new();
         ts.set_font_size(self.config.font_size);
         ts.set_color(self.config.text_color.unwrap_or(Color::BLACK));
-        let families: Vec<&str> = self.config.font_families.iter().map(|s| s.as_str()).collect();
+        let families: Vec<&str> = self
+            .config
+            .font_families
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
         ts.set_font_families(&families);
         let slant = if self.config.font_style_italic {
             skia_safe::font_style::Slant::Italic
@@ -763,7 +793,8 @@ impl SkiaLayoutEngine {
             skia_safe::font_style::Slant::Upright
         };
         let weight = skia_safe::font_style::Weight::from(self.config.font_weight as i32);
-        let font_style = skia_safe::FontStyle::new(weight, skia_safe::font_style::Width::NORMAL, slant);
+        let font_style =
+            skia_safe::FontStyle::new(weight, skia_safe::font_style::Width::NORMAL, slant);
         ts.set_font_style(font_style);
 
         // Variable font axis interpolation
@@ -782,8 +813,8 @@ impl SkiaLayoutEngine {
             let variation_position = skia_safe::font_arguments::VariationPosition {
                 coordinates: &coords,
             };
-            let font_args = skia_safe::FontArguments::new()
-                .set_variation_design_position(variation_position);
+            let font_args =
+                skia_safe::FontArguments::new().set_variation_design_position(variation_position);
             ts.set_font_arguments(&font_args);
         }
 
@@ -828,11 +859,20 @@ impl SkiaLayoutEngine {
 
         for lm in &skia {
             let local_start = incremental_u16_to_u8(
-                lm.start_index, slice, &mut run_u16, &mut run_byte, &mut char_iter,
+                lm.start_index,
+                slice,
+                &mut run_u16,
+                &mut run_byte,
+                &mut char_iter,
             );
             let local_end = incremental_u16_to_u8(
-                lm.end_including_newline, slice, &mut run_u16, &mut run_byte, &mut char_iter,
-            ).min(slice.len());
+                lm.end_including_newline,
+                slice,
+                &mut run_u16,
+                &mut run_byte,
+                &mut char_iter,
+            )
+            .min(slice.len());
 
             let local_start = local_start.max(prev_end);
             let local_end = local_end.max(local_start);
@@ -900,10 +940,7 @@ impl SkiaLayoutEngine {
     /// Uses the same per-block architecture as plain text, but pushes
     /// per-run styles within each block. This avoids feeding the entire
     /// document into a single Skia `Paragraph`.
-    pub fn ensure_layout_attributed(
-        &mut self,
-        at: &super::attributed_text::AttributedText,
-    ) {
+    pub fn ensure_layout_attributed(&mut self, at: &super::attributed_text::AttributedText) {
         let gen = at.generation();
         if !self.blocks.is_empty()
             && self.cached_text == at.text()
@@ -936,7 +973,14 @@ impl SkiaLayoutEngine {
             let (strut_size, strut_family) = if let Some(run) = runs.first() {
                 (run.style.font_size, run.style.font_family.as_str())
             } else {
-                (self.config.font_size, self.config.font_families.first().map(|s| s.as_str()).unwrap_or("sans-serif"))
+                (
+                    self.config.font_size,
+                    self.config
+                        .font_families
+                        .first()
+                        .map(|s| s.as_str())
+                        .unwrap_or("sans-serif"),
+                )
             };
             let mut strut = skia_safe::textlayout::StrutStyle::new();
             strut.set_strut_enabled(true);
@@ -947,14 +991,23 @@ impl SkiaLayoutEngine {
         }
 
         let mut builder = ParagraphBuilder::new(&para_style, &self.font_collection);
-        let fallback_families: Vec<&str> =
-            self.config.font_families.iter().map(|s| s.as_str()).collect();
+        let fallback_families: Vec<&str> = self
+            .config
+            .font_families
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
 
         // If no runs overlap, use config defaults.
         if runs.is_empty() || block_start >= block_content_end {
             let mut ts = TextStyle::new();
             ts.set_font_size(self.config.font_size);
-            let families: Vec<&str> = self.config.font_families.iter().map(|s| s.as_str()).collect();
+            let families: Vec<&str> = self
+                .config
+                .font_families
+                .iter()
+                .map(|s| s.as_str())
+                .collect();
             ts.set_font_families(&families);
             builder.push_style(&ts);
             builder.add_text(&text[block_start..block_content_end]);
@@ -979,10 +1032,7 @@ impl SkiaLayoutEngine {
     }
 
     /// Full rebuild of per-block layout from an [`AttributedText`].
-    fn rebuild_blocks_attributed(
-        &mut self,
-        at: &super::attributed_text::AttributedText,
-    ) {
+    fn rebuild_blocks_attributed(&mut self, at: &super::attributed_text::AttributedText) {
         self.blocks.clear();
         self.cached_line_metrics = None;
         self.paragraph = None;
@@ -1148,8 +1198,12 @@ impl SkiaLayoutEngine {
             para_style.set_strut_style(strut);
         }
 
-        let fallback_families: Vec<&str> =
-            self.config.font_families.iter().map(|s| s.as_str()).collect();
+        let fallback_families: Vec<&str> = self
+            .config
+            .font_families
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
 
         let mut builder = ParagraphBuilder::new(&para_style, &self.font_collection);
 
@@ -1219,17 +1273,14 @@ impl SkiaLayoutEngine {
     pub fn paint_paragraph(&mut self, canvas: &skia_safe::Canvas, text: &str) {
         self.ensure_layout(text);
         for block in &self.blocks {
-            block.paragraph.paint(canvas, Point::new(0.0, block.y_offset));
+            block
+                .paragraph
+                .paint(canvas, Point::new(0.0, block.y_offset));
         }
     }
 
     /// Paint the laid-out paragraph at the given origin offset.
-    pub fn paint_paragraph_at(
-        &self,
-        canvas: &skia_safe::Canvas,
-        _text: &str,
-        origin: Point,
-    ) {
+    pub fn paint_paragraph_at(&self, canvas: &skia_safe::Canvas, _text: &str, origin: Point) {
         for block in &self.blocks {
             block
                 .paragraph
@@ -1258,7 +1309,8 @@ impl TextLayoutEngine for SkiaLayoutEngine {
         if self.blocks.is_empty() {
             return 0;
         }
-        let block_idx = self.blocks
+        let block_idx = self
+            .blocks
             .partition_point(|b| b.y_offset + b.height + 0.5 <= y)
             .min(self.blocks.len() - 1);
 
@@ -1280,7 +1332,9 @@ impl TextLayoutEngine for SkiaLayoutEngine {
             }
         }
 
-        let pwa = block.paragraph.get_glyph_position_at_coordinate(Point::new(x, local_y));
+        let pwa = block
+            .paragraph
+            .get_glyph_position_at_coordinate(Point::new(x, local_y));
         let local_raw = utf16_to_utf8_offset(slice, pwa.position.max(0) as usize).min(slice.len());
         let global_raw = block.byte_start + local_raw;
         snap_grapheme_boundary(text, global_raw)
@@ -1290,7 +1344,11 @@ impl TextLayoutEngine for SkiaLayoutEngine {
         let metrics = self.line_metrics(text);
 
         if metrics.is_empty() {
-            return CaretRect { x: 0.0, y: 0.0, height: self.font_size };
+            return CaretRect {
+                x: 0.0,
+                y: 0.0,
+                height: self.font_size,
+            };
         }
 
         let idx = metrics
@@ -1322,7 +1380,10 @@ impl TextLayoutEngine for SkiaLayoutEngine {
                 RectHeightStyle::Max,
                 RectWidthStyle::Tight,
             );
-            rects.iter().map(|tb| tb.rect.right()).fold(0.0_f32, f32::max)
+            rects
+                .iter()
+                .map(|tb| tb.rect.right())
+                .fold(0.0_f32, f32::max)
         };
 
         CaretRect { x, y, height }
@@ -1348,7 +1409,10 @@ impl TextLayoutEngine for SkiaLayoutEngine {
     }
 
     fn selection_rects_for_range(
-        &mut self, text: &str, start: usize, end: usize
+        &mut self,
+        text: &str,
+        start: usize,
+        end: usize,
     ) -> Vec<SelectionRect> {
         if start >= end {
             return Vec::new();
@@ -1402,11 +1466,13 @@ impl TextLayoutEngine for SkiaLayoutEngine {
 
         for idx in first_line..=last_line {
             let lm = &metrics[idx];
-            if !lm.is_empty_line(text) { continue; }
+            if !lm.is_empty_line(text) {
+                continue;
+            }
             let mid_y = lm.baseline - lm.ascent * 0.5;
-            let already = rects.iter().any(|r| {
-                r.y <= mid_y && mid_y <= r.y + r.height
-            });
+            let already = rects
+                .iter()
+                .any(|r| r.y <= mid_y && mid_y <= r.y + r.height);
             if !already {
                 rects.push(SelectionRect {
                     x: lm.left,

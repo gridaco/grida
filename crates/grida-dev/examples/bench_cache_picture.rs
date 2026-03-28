@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},
@@ -10,6 +9,7 @@ use glutin_winit::DisplayBuilder;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::{Canvas, Color, Paint, Picture, PictureRecorder, Rect, Surface};
+use std::collections::VecDeque;
 use std::{ffi::CString, num::NonZeroU32, time::Instant};
 use winit::{
     event::{Event, WindowEvent},
@@ -270,7 +270,9 @@ fn main() {
 
                 // Frame timing
                 let frame_time = now.duration_since(last_frame_time);
-                if fps_samples.len() == 60 { fps_samples.pop_front(); }
+                if fps_samples.len() == 60 {
+                    fps_samples.pop_front();
+                }
                 fps_samples.push_back(frame_time);
                 last_frame_time = now;
 

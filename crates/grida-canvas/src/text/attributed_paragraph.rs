@@ -78,7 +78,17 @@ pub fn build_attributed_paragraph(
     font_collection: &textlayout::FontCollection,
     width: f32,
 ) -> AttributedParagraphSet {
-    build_attributed_paragraph_inner(attr, align, max_lines, ellipsis, font_collection, width, &[], None, None)
+    build_attributed_paragraph_inner(
+        attr,
+        align,
+        max_lines,
+        ellipsis,
+        font_collection,
+        width,
+        &[],
+        None,
+        None,
+    )
 }
 
 /// Production entry point with node-level default fills, image resolution,
@@ -93,7 +103,17 @@ pub fn build_attributed_paragraph_with_images(
     default_fills: &[Paint],
     images: Option<&ImageRepository>,
 ) -> AttributedParagraphSet {
-    build_attributed_paragraph_inner(attr, align, max_lines, ellipsis, fonts.font_collection(), width, default_fills, images, Some(fonts))
+    build_attributed_paragraph_inner(
+        attr,
+        align,
+        max_lines,
+        ellipsis,
+        fonts.font_collection(),
+        width,
+        default_fills,
+        images,
+        Some(fonts),
+    )
 }
 
 /// Like [`build_attributed_paragraph`] but with node-level default fills and
@@ -115,8 +135,7 @@ fn build_attributed_paragraph_inner(
     images: Option<&ImageRepository>,
     fonts: Option<&FontRepository>,
 ) -> AttributedParagraphSet {
-    let make_paragraph_style =
-        || super::make_paragraph_style(align, max_lines, ellipsis);
+    let make_paragraph_style = || super::make_paragraph_style(align, max_lines, ellipsis);
 
     // Track whether any run has strokes so we know if we need a second pass.
     let has_any_strokes = attr
@@ -153,9 +172,7 @@ fn build_attributed_paragraph_inner(
                 effective_fills.iter().filter(|p| p.visible()).collect();
             if !active_fills.is_empty() {
                 let borrowed: Vec<Paint> = active_fills.iter().map(|p| (*p).clone()).collect();
-                if let Some(skia_paint) =
-                    resolve_fill_paint(&borrowed, (width, width), images)
-                {
+                if let Some(skia_paint) = resolve_fill_paint(&borrowed, (width, width), images) {
                     ts.set_foreground_paint(&skia_paint);
                 }
             }

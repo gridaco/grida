@@ -85,7 +85,14 @@ impl SurfaceUI {
         if config.show_frame_titles {
             if let Some(graph) = graph {
                 Self::draw_frame_titles(
-                    canvas, surface, camera, cache, hit_regions, graph, dpr, fonts,
+                    canvas,
+                    surface,
+                    camera,
+                    cache,
+                    hit_regions,
+                    graph,
+                    dpr,
+                    fonts,
                 );
             }
         }
@@ -195,8 +202,7 @@ impl SurfaceUI {
                 None => continue,
             };
 
-            let screen_tl =
-                math2::vector2::transform([world_bounds.x, world_bounds.y], &view);
+            let screen_tl = math2::vector2::transform([world_bounds.x, world_bounds.y], &view);
             let screen_tr = math2::vector2::transform(
                 [world_bounds.x + world_bounds.width, world_bounds.y],
                 &view,
@@ -246,8 +252,8 @@ impl SurfaceUI {
             let variation_position = skia_safe::font_arguments::VariationPosition {
                 coordinates: &[wght_coord],
             };
-            let font_args = skia_safe::FontArguments::new()
-                .set_variation_design_position(variation_position);
+            let font_args =
+                skia_safe::FontArguments::new().set_variation_design_position(variation_position);
             text_style.set_font_arguments(&font_args);
             let mut fg_paint = Paint::default();
             fg_paint.set_color(color);

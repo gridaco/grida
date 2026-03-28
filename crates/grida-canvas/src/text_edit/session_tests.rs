@@ -18,7 +18,7 @@ use super::time::Duration;
 use std::thread;
 
 use super::attributed_text::{
-    AttributedText, CGColor, Paint, TextDecorationLine, TextStyle as AttrTextStyle,
+    AttributedText, CGColor, TextDecorationLine, TextStyle as AttrTextStyle,
 };
 use super::layout::TextLayoutEngine;
 use super::session::{ClickTracker, KeyAction, KeyName, TextEditSession};

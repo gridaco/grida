@@ -12,9 +12,7 @@
 //! variable font axes, optical sizing) are silently dropped on serialize
 //! and left at defaults on deserialize.
 
-use super::{
-    AttributedText, CGColor, Paint, StyledRun, TextDecorationLine, TextStyle,
-};
+use super::{AttributedText, CGColor, Paint, StyledRun, TextDecorationLine, TextStyle};
 
 // ---------------------------------------------------------------------------
 // Serialize (AttributedText → HTML)
@@ -205,10 +203,24 @@ struct HtmlParser {
 fn is_block_tag(tag: &str) -> bool {
     matches!(
         tag,
-        "p" | "div" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
-            | "li" | "ul" | "ol" | "blockquote" | "pre"
-            | "section" | "article" | "header" | "footer"
-            | "tr" | "table"
+        "p" | "div"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "li"
+            | "ul"
+            | "ol"
+            | "blockquote"
+            | "pre"
+            | "section"
+            | "article"
+            | "header"
+            | "footer"
+            | "tr"
+            | "table"
     )
 }
 
@@ -241,7 +253,10 @@ impl HtmlParser {
                 // and consecutive whitespace collapses to a single space.
                 if ch == '\n' || ch == '\r' || ch == '\t' {
                     // Collapse to a single space (skip if previous char was already a space).
-                    if !self.text.ends_with(' ') && !self.text.ends_with('\n') && !self.text.is_empty() {
+                    if !self.text.ends_with(' ')
+                        && !self.text.ends_with('\n')
+                        && !self.text.is_empty()
+                    {
                         self.push_char(' ');
                     }
                 } else {
@@ -308,7 +323,10 @@ impl HtmlParser {
         let mut style_attr = String::new();
         loop {
             self.skip_whitespace();
-            if self.pos >= self.input.len() || self.input[self.pos] == '>' || self.input[self.pos] == '/' {
+            if self.pos >= self.input.len()
+                || self.input[self.pos] == '>'
+                || self.input[self.pos] == '/'
+            {
                 break;
             }
             let attr_name = self.read_ident().to_lowercase();
@@ -639,7 +657,10 @@ mod tests {
     #[test]
     fn deserialize_underline_tag() {
         let at = html_to_attributed_text("<u>under</u>", base()).unwrap();
-        assert_eq!(at.runs()[0].style.text_decoration_line, TextDecorationLine::Underline);
+        assert_eq!(
+            at.runs()[0].style.text_decoration_line,
+            TextDecorationLine::Underline
+        );
     }
 
     #[test]
@@ -647,11 +668,17 @@ mod tests {
         let at = html_to_attributed_text(
             r#"<span style="font-weight:700;font-size:24px;color:#ff0000">red bold</span>"#,
             base(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(at.text(), "red bold");
         assert_eq!(at.runs()[0].style.font_weight, 700);
         assert_eq!(at.runs()[0].style.font_size, 24.0);
-        let c = at.runs()[0].style.fills.iter().find_map(|p| p.solid_color()).unwrap();
+        let c = at.runs()[0]
+            .style
+            .fills
+            .iter()
+            .find_map(|p| p.solid_color())
+            .unwrap();
         assert_eq!(c.r, 255);
         assert_eq!(c.g, 0);
     }

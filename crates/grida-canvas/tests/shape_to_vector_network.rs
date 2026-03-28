@@ -30,8 +30,15 @@ fn rrect_vector_network_has_curved_corners() {
         .iter()
         .filter(|s| s.ta != (0.0, 0.0) || s.tb != (0.0, 0.0))
         .count();
-    assert!(curved >= 4, "expected at least 4 curved segments, got {curved}");
-    assert_eq!(curved % 4, 0, "expected multiple of 4 curved segments, got {curved}");
+    assert!(
+        curved >= 4,
+        "expected at least 4 curved segments, got {curved}"
+    );
+    assert_eq!(
+        curved % 4,
+        0,
+        "expected multiple of 4 curved segments, got {curved}"
+    );
 }
 
 #[test]

@@ -4,11 +4,11 @@
 //! is sourced either from an individual `SkImage` (fallback) or from a
 //! sub-rect of a shared texture atlas (batch-friendly compositing).
 
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::cg::prelude::LayerBlendMode;
 use crate::node::schema::NodeId;
 use math2::rect::Rectangle;
 use skia_safe::Image;
-use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use std::rc::Rc;
 
 /// Where a promoted node's cached pixels live.
@@ -61,7 +61,9 @@ impl LayerImage {
     /// Atlas-backed entries return 0 — the atlas page owns the memory.
     pub fn estimated_bytes(&self) -> usize {
         match &self.source {
-            ImageSource::Individual(_) => (self.pixel_width as usize) * (self.pixel_height as usize) * 4,
+            ImageSource::Individual(_) => {
+                (self.pixel_width as usize) * (self.pixel_height as usize) * 4
+            }
             ImageSource::Atlas => 0,
         }
     }
@@ -416,12 +418,23 @@ mod tests {
         LayerBlendMode::default()
     }
 
-    fn insert_test(cache: &mut LayerImageCache, id: NodeId, img: Image, zoom: f32, bounds: Rectangle) {
+    fn insert_test(
+        cache: &mut LayerImageCache,
+        id: NodeId,
+        img: Image,
+        zoom: f32,
+        bounds: Rectangle,
+    ) {
         cache.insert(id, img, zoom, bounds, 1.0, default_blend());
     }
 
     fn zero_rect() -> Rectangle {
-        Rectangle { x: 0.0, y: 0.0, width: 0.0, height: 0.0 }
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }
     }
 
     #[test]
@@ -429,7 +442,12 @@ mod tests {
         let mut cache = LayerImageCache::new(1024 * 1024);
         let id: NodeId = 42;
         let img = make_test_image(10, 10);
-        let bounds = Rectangle { x: 0.0, y: 0.0, width: 10.0, height: 10.0 };
+        let bounds = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
         insert_test(&mut cache, id, img, 1.0, bounds);
 
         assert_eq!(cache.len(), 1);
@@ -496,7 +514,12 @@ mod tests {
     #[test]
     fn atlas_backed_entry() {
         let mut cache = LayerImageCache::new(1024 * 1024);
-        let bounds = Rectangle { x: 10.0, y: 20.0, width: 100.0, height: 80.0 };
+        let bounds = Rectangle {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 80.0,
+        };
         cache.insert_atlas(42, 100, 80, 1.0, bounds, 0.8, default_blend());
 
         assert_eq!(cache.len(), 1);

@@ -841,15 +841,9 @@ pub struct JSONUnknownNodeProperties {
         alias = "strokeDasharray"
     )]
     pub stroke_dash_array: Option<Vec<f32>>,
-    #[serde(
-        rename = "marker_start_shape",
-        default
-    )]
+    #[serde(rename = "marker_start_shape", default)]
     pub marker_start_shape: Option<StrokeMarkerPreset>,
-    #[serde(
-        rename = "marker_end_shape",
-        default
-    )]
+    #[serde(rename = "marker_end_shape", default)]
     pub marker_end_shape: Option<StrokeMarkerPreset>,
     #[serde(rename = "stroke")]
     pub stroke: Option<JSONPaint>,
@@ -2385,11 +2379,17 @@ mod text_decoration_tests {
         });
 
         let text_node: JSONTextSpanNode = serde_json::from_value(json).unwrap();
-        assert_eq!(text_node.text_decoration_line, TextDecorationLine::Underline);
+        assert_eq!(
+            text_node.text_decoration_line,
+            TextDecorationLine::Underline
+        );
 
         let rec: TextSpanNodeRec = text_node.into();
         assert_eq!(
-            rec.text_style.text_decoration.as_ref().map(|d| d.text_decoration_line),
+            rec.text_style
+                .text_decoration
+                .as_ref()
+                .map(|d| d.text_decoration_line),
             Some(TextDecorationLine::Underline)
         );
     }

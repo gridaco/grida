@@ -26,9 +26,7 @@ fn main() {
 #[cfg(feature = "native-gl-context")]
 fn main() {
     use cg::window::headless::HeadlessGpu;
-    use skia_safe::{
-        canvas::SrcRectConstraint, Color, ImageInfo, Paint, Rect, Surface,
-    };
+    use skia_safe::{canvas::SrcRectConstraint, Color, ImageInfo, Paint, Rect, Surface};
     use std::time::Instant;
 
     let mut gpu = HeadlessGpu::new(2000, 2000).expect("GPU init");
@@ -72,10 +70,7 @@ fn main() {
                 (i * 31 % 256) as u8,
                 (i * 53 % 256) as u8,
             ));
-            c.draw_rect(
-                Rect::from_xywh(0.0, 0.0, size as f32, size as f32),
-                &p,
-            );
+            c.draw_rect(Rect::from_xywh(0.0, 0.0, size as f32, size as f32), &p);
             textures.push(off.image_snapshot());
         }
         flush(surface);
@@ -200,12 +195,7 @@ fn main() {
                 let y = (i / 100) as f32 * (node_size + 2.0);
                 let dst = Rect::from_xywh(x, y, node_size, node_size);
                 let src = &slots[i % slots.len()];
-                canvas.draw_image_rect(
-                    atlas,
-                    Some((src, SrcRectConstraint::Fast)),
-                    dst,
-                    &paint,
-                );
+                canvas.draw_image_rect(atlas, Some((src, SrcRectConstraint::Fast)), dst, &paint);
             }
             flush(surface);
         }
@@ -221,12 +211,7 @@ fn main() {
                 let y = (i / 100) as f32 * (node_size + 2.0);
                 let dst = Rect::from_xywh(x, y, node_size, node_size);
                 let src = &slots[i % slots.len()];
-                canvas.draw_image_rect(
-                    atlas,
-                    Some((src, SrcRectConstraint::Fast)),
-                    dst,
-                    &paint,
-                );
+                canvas.draw_image_rect(atlas, Some((src, SrcRectConstraint::Fast)), dst, &paint);
             }
             flush(surface);
         }
@@ -253,12 +238,7 @@ fn main() {
                 let x = (i % 100) as f32 * (node_size + 2.0);
                 let y = (i / 100) as f32 * (node_size + 2.0);
                 let dst = Rect::from_xywh(x, y, node_size, node_size);
-                canvas.draw_image_rect(
-                    texture,
-                    Some((&src, SrcRectConstraint::Fast)),
-                    dst,
-                    &paint,
-                );
+                canvas.draw_image_rect(texture, Some((&src, SrcRectConstraint::Fast)), dst, &paint);
             }
             flush(surface);
         }
@@ -273,12 +253,7 @@ fn main() {
                 let x = (i % 100) as f32 * (node_size + 2.0);
                 let y = (i / 100) as f32 * (node_size + 2.0);
                 let dst = Rect::from_xywh(x, y, node_size, node_size);
-                canvas.draw_image_rect(
-                    texture,
-                    Some((&src, SrcRectConstraint::Fast)),
-                    dst,
-                    &paint,
-                );
+                canvas.draw_image_rect(texture, Some((&src, SrcRectConstraint::Fast)), dst, &paint);
             }
             flush(surface);
         }
@@ -314,8 +289,7 @@ fn main() {
 
             // Create textures
             let separate = create_separate_textures(surface, count, node_size);
-            let (atlas_img, atlas_slots) =
-                create_atlas(surface, count, node_size, atlas_size);
+            let (atlas_img, atlas_slots) = create_atlas(surface, count, node_size, atlas_size);
 
             // --- A: All separate textures (worst case) ---
             let t_separate =
@@ -651,10 +625,7 @@ fn main() {
 
             let speedup = t_sep.as_micros() as f64 / t_atlas.as_micros().max(1) as f64;
 
-            println!(
-                "  Pan {}x{} x{}:",
-                node_size, node_size, count
-            );
+            println!("  Pan {}x{} x{}:", node_size, node_size, count);
             println!(
                 "    separate  {:>7} us  ({:>5.0} fps)  {:.1} us/blit",
                 t_sep.as_micros(),

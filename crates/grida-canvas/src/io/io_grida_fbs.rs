@@ -36,16 +36,16 @@ use crate::cg::{
     stroke_width::{RectangularStrokeWidth, SingularStrokeWidth, StrokeWidth},
     tilemode::TileMode,
     types::{
-        Axis, BlendMode, BooleanPathOperation, CGPoint, ContainerClipFlag, CornerSmoothing,
-        CrossAxisAlignment, DiamondGradientPaint, EdgeInsets, FontFeature, FontOpticalSizing,
-        FontVariation, FontWeight, GradientStop, ImageFilters, ImagePaint, ImagePaintFit,
-        ImageRepeat, ImageTile, LayerBlendMode, LayerMaskType, LayoutGap, LayoutMode,
-        LayoutPositioning, LayoutWrap, LinearGradientPaint, MainAxisAlignment, Paint, Paints,
-        RadialGradientPaint, RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign,
-        StrokeCap, StrokeJoin, StrokeMarkerPreset, StrokeMiterLimit, SweepGradientPaint, TextAlign,
-        TextAlignVertical, TextDecorationLine, TextDecorationRec, TextDecorationStyle,
-        AttributedString, StyledTextRun, TextLetterSpacing, TextLineHeight,
-        TextStyleRec, TextTransform, TextWordSpacing,
+        AttributedString, Axis, BlendMode, BooleanPathOperation, CGPoint, ContainerClipFlag,
+        CornerSmoothing, CrossAxisAlignment, DiamondGradientPaint, EdgeInsets, FontFeature,
+        FontOpticalSizing, FontVariation, FontWeight, GradientStop, ImageFilters, ImagePaint,
+        ImagePaintFit, ImageRepeat, ImageTile, LayerBlendMode, LayerMaskType, LayoutGap,
+        LayoutMode, LayoutPositioning, LayoutWrap, LinearGradientPaint, MainAxisAlignment, Paint,
+        Paints, RadialGradientPaint, RectangularCornerRadius, ResourceRef, SolidPaint, StrokeAlign,
+        StrokeCap, StrokeJoin, StrokeMarkerPreset, StrokeMiterLimit, StyledTextRun,
+        SweepGradientPaint, TextAlign, TextAlignVertical, TextDecorationLine, TextDecorationRec,
+        TextDecorationStyle, TextLetterSpacing, TextLineHeight, TextStyleRec, TextTransform,
+        TextWordSpacing,
     },
     varwidth,
 };
@@ -54,10 +54,10 @@ use crate::node::{
     scene_graph::SceneGraph,
     schema::{
         AttributedTextNodeRec, BooleanPathOperationNodeRec, ContainerNodeRec, EllipseNodeRec,
-        GroupNodeRec, InitialContainerNodeRec, LayerEffects, LayoutChildStyle, LayoutContainerStyle,
-        LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node, PathNodeRec,
-        RectangleNodeRec, RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene, Size,
-        StrokeStyle, TextSpanNodeRec, VectorNodeRec,
+        GroupNodeRec, InitialContainerNodeRec, LayerEffects, LayoutChildStyle,
+        LayoutContainerStyle, LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node,
+        PathNodeRec, RectangleNodeRec, RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene,
+        Size, StrokeStyle, TextSpanNodeRec, VectorNodeRec,
     },
 };
 use crate::vectornetwork::{
@@ -264,8 +264,7 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         FxHashMap::with_capacity_and_hasher(estimated_count, Default::default());
     let mut id_generator = NodeIdGenerator::new();
     let mut node_entries: Vec<NodeEntry> = Vec::with_capacity(estimated_count);
-    let mut scene_metas: FxHashMap<String, SceneMeta> =
-        FxHashMap::default();
+    let mut scene_metas: FxHashMap<String, SceneMeta> = FxHashMap::default();
 
     // Helper: get or assign an internal NodeId for a string ID.
     // Uses the shared id_generator and string_to_internal_id map.
@@ -639,30 +638,28 @@ fn decode_text_style_rec_fbs(ts: fbs::TextStyleRec<'_>) -> TextStyleRec {
         text_decoration_color: td
             .text_decoration_color()
             .map(|c| decode_rgba32f_to_cg_color(c)),
-        text_decoration_style: Some(decode_text_decoration_style(
-            td.text_decoration_style(),
-        )),
+        text_decoration_style: Some(decode_text_decoration_style(td.text_decoration_style())),
         text_decoration_skip_ink: Some(td.text_decoration_skip_ink()),
         text_decoration_thickness: {
             let t = td.text_decoration_thickness();
-            if t == 0.0 { None } else { Some(t) }
+            if t == 0.0 {
+                None
+            } else {
+                Some(t)
+            }
         },
     });
     rec.letter_spacing = ts
         .letter_spacing()
         .map(|td| match td.kind() {
-            fbs::TextDimensionKind::Factor => {
-                TextLetterSpacing::Factor(td.value().unwrap_or(0.0))
-            }
+            fbs::TextDimensionKind::Factor => TextLetterSpacing::Factor(td.value().unwrap_or(0.0)),
             _ => TextLetterSpacing::Fixed(td.value().unwrap_or(0.0)),
         })
         .unwrap_or_default();
     rec.word_spacing = ts
         .word_spacing()
         .map(|td| match td.kind() {
-            fbs::TextDimensionKind::Factor => {
-                TextWordSpacing::Factor(td.value().unwrap_or(0.0))
-            }
+            fbs::TextDimensionKind::Factor => TextWordSpacing::Factor(td.value().unwrap_or(0.0)),
             _ => TextWordSpacing::Fixed(td.value().unwrap_or(0.0)),
         })
         .unwrap_or_default();
@@ -670,9 +667,7 @@ fn decode_text_style_rec_fbs(ts: fbs::TextStyleRec<'_>) -> TextStyleRec {
         .line_height()
         .map(|td| match td.kind() {
             fbs::TextDimensionKind::Normal => TextLineHeight::Normal,
-            fbs::TextDimensionKind::Factor => {
-                TextLineHeight::Factor(td.value().unwrap_or(1.0))
-            }
+            fbs::TextDimensionKind::Factor => TextLineHeight::Factor(td.value().unwrap_or(1.0)),
             _ => TextLineHeight::Fixed(td.value().unwrap_or(0.0)),
         })
         .unwrap_or_default();
@@ -2067,7 +2062,11 @@ fn decode_attributed_text_node(
                         .filter(|v| !v.is_empty());
                     let strokes = {
                         let p = decode_paints_vec(run.stroke_paints());
-                        if p.is_empty() { None } else { Some(p) }
+                        if p.is_empty() {
+                            None
+                        } else {
+                            Some(p)
+                        }
                     };
                     let stroke_width = run.stroke_geometry().map(|sg| sg.stroke_width());
                     let stroke_align = run
@@ -2677,7 +2676,10 @@ fn encode_paints<'a, A: flatbuffers::Allocator + 'a>(
 fn encode_paint_raw<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     paint: &Paint,
-) -> Option<(fbs::Paint, flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>)> {
+) -> Option<(
+    fbs::Paint,
+    flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+)> {
     match paint {
         Paint::Solid(sp) => {
             let color = encode_color_to_rgba32f(&sp.color);
@@ -4125,7 +4127,11 @@ fn encode_text_style_rec<'a, A: flatbuffers::Allocator + 'a>(
 fn encode_styled_runs<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
     attr: &AttributedString,
-) -> Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<fbs::StyledTextRunItem<'a>>>>> {
+) -> Option<
+    flatbuffers::WIPOffset<
+        flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<fbs::StyledTextRunItem<'a>>>,
+    >,
+> {
     if attr.runs.is_empty() {
         return None;
     }
@@ -4138,9 +4144,10 @@ fn encode_styled_runs<'a, A: flatbuffers::Allocator + 'a>(
                 let paints = Paints::new(fills.clone());
                 encode_paints(fbb, &paints)
             });
-            let stroke_offsets = run.strokes.as_ref().and_then(|strokes| {
-                encode_paints(fbb, strokes)
-            });
+            let stroke_offsets = run
+                .strokes
+                .as_ref()
+                .and_then(|strokes| encode_paints(fbb, strokes));
             let sg_offset = if run.stroke_width.is_some() || run.stroke_align.is_some() {
                 Some(encode_stroke_geometry(
                     fbb,

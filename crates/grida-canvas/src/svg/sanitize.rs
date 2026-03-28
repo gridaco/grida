@@ -67,9 +67,7 @@ pub fn sanitize_svg(svg: &str) -> String {
 /// Find the first occurrence of `needle` in `haystack`, returning the byte
 /// offset of the start of the match.
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|w| w == needle)
+    haystack.windows(needle.len()).position(|w| w == needle)
 }
 
 /// Check whether the bytes immediately after `&` form a valid XML entity
@@ -133,8 +131,7 @@ mod tests {
     #[test]
     fn escapes_bare_ampersand_in_url() {
         let input = "url('https://fonts.googleapis.com/css2?family=Inter&family=Roboto')";
-        let expected =
-            "url('https://fonts.googleapis.com/css2?family=Inter&amp;family=Roboto')";
+        let expected = "url('https://fonts.googleapis.com/css2?family=Inter&amp;family=Roboto')";
         assert_eq!(sanitize_svg(input), expected);
     }
 

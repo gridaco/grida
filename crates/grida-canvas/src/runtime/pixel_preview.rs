@@ -59,7 +59,10 @@ pub struct PixelPreviewPlan {
 
 const ROTATION_EPS: f32 = 1.0e-6;
 
-fn view_matrix_from_camera_transform(camera_transform: AffineTransform, viewport: Size) -> AffineTransform {
+fn view_matrix_from_camera_transform(
+    camera_transform: AffineTransform,
+    viewport: Size,
+) -> AffineTransform {
     // Matches Camera2D::view_matrix():
     // view = translate(vp/2) ∘ inverse(camera_transform)
     let inv = camera_transform
@@ -138,7 +141,10 @@ pub fn compute_pixel_preview_plan(inputs: PixelPreviewInputs) -> PixelPreviewPla
     let inv_zoom = 1.0 / scale_f;
     let (sin, cos) = angle.sin_cos();
     let preview_camera_transform = AffineTransform {
-        matrix: [[cos * inv_zoom, -sin * inv_zoom, cx], [sin * inv_zoom, cos * inv_zoom, cy]],
+        matrix: [
+            [cos * inv_zoom, -sin * inv_zoom, cx],
+            [sin * inv_zoom, cos * inv_zoom, cy],
+        ],
     };
 
     let mut view_matrix = view_matrix_from_camera_transform(
@@ -185,4 +191,3 @@ pub fn compute_pixel_preview_plan(inputs: PixelPreviewInputs) -> PixelPreviewPla
         },
     }
 }
-

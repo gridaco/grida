@@ -71,11 +71,15 @@ pub fn build() -> Scene {
         AttributedStringBuilder::new()
             .push("Small ", &small, Some(CGColor::BLACK))
             .push("Normal ", &base, Some(CGColor::BLACK))
-            .push("Bold Large", &{
-                let mut s = TextStyleRec::from_font("Inter", 28.0);
-                s.font_weight = FontWeight(700);
-                s
-            }, Some(CGColor::BLACK))
+            .push(
+                "Bold Large",
+                &{
+                    let mut s = TextStyleRec::from_font("Inter", 28.0);
+                    s.font_weight = FontWeight(700);
+                    s
+                },
+                Some(CGColor::BLACK),
+            )
             .build(),
         base.clone(),
     );
@@ -86,11 +90,7 @@ pub fn build() -> Scene {
         160.0,
         Some(300.0),
         AttributedStringBuilder::new()
-            .push(
-                "This paragraph demonstrates ",
-                &base,
-                Some(CGColor::BLACK),
-            )
+            .push("This paragraph demonstrates ", &base, Some(CGColor::BLACK))
             .push(
                 "bold runs that wrap across line boundaries",
                 &bold,
@@ -155,8 +155,5 @@ pub fn build() -> Scene {
         base.clone(),
     );
 
-    flat_scene(
-        "L0 Type Attributed",
-        vec![t1, t2, t3, t4, t5, t6],
-    )
+    flat_scene("L0 Type Attributed", vec![t1, t2, t3, t4, t5, t6])
 }

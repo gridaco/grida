@@ -5,9 +5,9 @@
 //! maximum).
 
 use super::atlas::{AtlasAllocation, AtlasPage};
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::node::schema::NodeId;
 use skia_safe::{Image, Surface};
-use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 
 /// Configuration for an atlas set.
 #[derive(Debug, Clone, Copy)]
@@ -130,9 +130,7 @@ impl AtlasSet {
     /// Get the allocation for a node (page index + slot).
     pub fn get_allocation(&self, node_id: &NodeId) -> Option<AtlasAllocation> {
         let page_idx = self.node_page.get(node_id)?;
-        self.pages
-            .get(*page_idx as usize)?
-            .get_allocation(node_id)
+        self.pages.get(*page_idx as usize)?.get_allocation(node_id)
     }
 
     /// Get the atlas page image and source rect for a node.

@@ -41,12 +41,7 @@ fn create_grid_scene(cols: u32, rows: u32) -> Scene {
                 height: size,
             };
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: CGColor::from_rgba(
-                    ((x * 7) % 255) as u8,
-                    ((y * 11) % 255) as u8,
-                    180,
-                    255,
-                ),
+                color: CGColor::from_rgba(((x * 7) % 255) as u8, ((y * 11) % 255) as u8, 180, 255),
                 blend_mode: BlendMode::default(),
                 active: true,
             }));
@@ -105,8 +100,12 @@ fn bench_viewport_culling(c: &mut Criterion) {
         let scene = create_grid_scene(cols_5k, rows_5k);
         let mut renderer = setup_renderer(scene, vp_w, vp_h);
         // Center camera on scene, zoom out so everything fits
-        renderer.camera.set_center(scene_extent_5k / 2.0, scene_extent_5k / 2.0);
-        renderer.camera.set_zoom(vp_w as f32 / scene_extent_5k * 0.9);
+        renderer
+            .camera
+            .set_center(scene_extent_5k / 2.0, scene_extent_5k / 2.0);
+        renderer
+            .camera
+            .set_zoom(vp_w as f32 / scene_extent_5k * 0.9);
         renderer.queue_stable();
         let _ = renderer.flush();
 
@@ -156,7 +155,9 @@ fn bench_viewport_culling(c: &mut Criterion) {
     group.bench_function("zoomed_in_1pct", |b| {
         let scene = create_grid_scene(cols_5k, rows_5k);
         let mut renderer = setup_renderer(scene, vp_w, vp_h);
-        renderer.camera.set_center(scene_extent_5k / 2.0, scene_extent_5k / 2.0);
+        renderer
+            .camera
+            .set_center(scene_extent_5k / 2.0, scene_extent_5k / 2.0);
         renderer.camera.set_zoom(10.0);
         renderer.queue_stable();
         let _ = renderer.flush();
@@ -199,8 +200,12 @@ fn bench_viewport_culling(c: &mut Criterion) {
     group.bench_function("all_visible", |b| {
         let scene = create_grid_scene(cols_50k, rows_50k);
         let mut renderer = setup_renderer(scene, vp_w, vp_h);
-        renderer.camera.set_center(scene_extent_50k / 2.0, scene_extent_50k / 2.0);
-        renderer.camera.set_zoom(vp_w as f32 / scene_extent_50k * 0.9);
+        renderer
+            .camera
+            .set_center(scene_extent_50k / 2.0, scene_extent_50k / 2.0);
+        renderer
+            .camera
+            .set_zoom(vp_w as f32 / scene_extent_50k * 0.9);
         renderer.queue_stable();
         let _ = renderer.flush();
 
@@ -214,7 +219,9 @@ fn bench_viewport_culling(c: &mut Criterion) {
     group.bench_function("zoomed_in_1pct", |b| {
         let scene = create_grid_scene(cols_50k, rows_50k);
         let mut renderer = setup_renderer(scene, vp_w, vp_h);
-        renderer.camera.set_center(scene_extent_50k / 2.0, scene_extent_50k / 2.0);
+        renderer
+            .camera
+            .set_center(scene_extent_50k / 2.0, scene_extent_50k / 2.0);
         renderer.camera.set_zoom(10.0);
         renderer.queue_stable();
         let _ = renderer.flush();

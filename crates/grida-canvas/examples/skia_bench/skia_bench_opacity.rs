@@ -473,9 +473,12 @@ fn main() {
             println!(
                 "  {:>6}  {:>8.0}us {:>3.0}fps {:>8.0}us {:>3.0}fps  {:>8.1}us {:>8.1}us  {:>6.0}x",
                 r.count,
-                r.sl_frame_us, sl_fps,
-                r.pp_frame_us, pp_fps,
-                r.sl_per_node_us, r.pp_per_node_us,
+                r.sl_frame_us,
+                sl_fps,
+                r.pp_frame_us,
+                pp_fps,
+                r.sl_per_node_us,
+                r.pp_per_node_us,
                 speedup,
             );
         }
@@ -489,10 +492,7 @@ fn main() {
     );
     println!("  {}", "-".repeat(88));
     for label in &labels {
-        if let Some(r) = rows
-            .iter()
-            .find(|r| &r.label == label && r.count == 1000)
-        {
+        if let Some(r) = rows.iter().find(|r| &r.label == label && r.count == 1000) {
             let speedup = r.sl_frame_us / r.pp_frame_us;
             println!(
                 "  {:<28} {:>8.0}us {:>8.0} {:>8.0}us {:>8.0} {:>6.0}x",
@@ -515,10 +515,7 @@ fn main() {
     );
     println!("  {}", "-".repeat(68));
     for label in &labels {
-        if let Some(r) = rows
-            .iter()
-            .find(|r| &r.label == label && r.count == 1000)
-        {
+        if let Some(r) = rows.iter().find(|r| &r.label == label && r.count == 1000) {
             let saved = r.sl_frame_us - r.pp_frame_us;
             println!(
                 "  {:<28} {:>10.1}ms {:>10.1}ms {:>10.1}ms",

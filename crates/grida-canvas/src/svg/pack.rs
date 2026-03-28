@@ -91,7 +91,12 @@ impl SceneBuilder {
         });
         node.stroke_style.stroke_align = StrokeAlign::Center;
 
-        let gradient_bounds = Some((path.bounds.x, path.bounds.y, path.bounds.width, path.bounds.height));
+        let gradient_bounds = Some((
+            path.bounds.x,
+            path.bounds.y,
+            path.bounds.width,
+            path.bounds.height,
+        ));
 
         if let Some(fill) = &path.fill {
             node.fills = Paints::new([fill.into_paint_with_opacity(gradient_bounds)]);
@@ -260,11 +265,7 @@ impl SceneBuilder {
         }
 
         // Use the first run's font size for baseline adjustment.
-        let first_font_size = chunk
-            .runs
-            .first()
-            .map(|r| r.font_size)
-            .unwrap_or(16.0);
+        let first_font_size = chunk.runs.first().map(|r| r.font_size).unwrap_or(16.0);
         let mut adjusted_transform = transform;
         // FIXME(svg text): baseline -> top-left conversion needs proper font metrics.
         adjusted_transform.translate(0.0, -first_font_size);
@@ -300,8 +301,8 @@ impl SceneBuilder {
                     .map(|f| vec![f.into_paint_with_opacity(None)]);
 
                 let stroke_ref = run.stroke.as_ref().or(fallback_stroke);
-                let strokes = stroke_ref
-                    .map(|s| Paints::new(vec![s.into_paint_with_opacity(None)]));
+                let strokes =
+                    stroke_ref.map(|s| Paints::new(vec![s.into_paint_with_opacity(None)]));
                 let stroke_width = stroke_ref.map(|s| s.stroke_width);
 
                 StyledTextRun {
@@ -344,8 +345,7 @@ impl SceneBuilder {
             effects: LayerEffects::default(),
         };
 
-        self.graph
-            .append_child(Node::AttributedText(node), parent);
+        self.graph.append_child(Node::AttributedText(node), parent);
         Ok(())
     }
 }

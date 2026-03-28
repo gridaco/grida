@@ -296,7 +296,6 @@ impl LayoutEngine {
         !matches!(tag, NodeTypeTag::Group | NodeTypeTag::BooleanOperation)
     }
 
-
     /// Recursively build Taffy tree for a node and its descendants.
     ///
     /// Virtual grouping nodes (Group, BooleanOperation) are skipped from the
@@ -504,16 +503,15 @@ impl LayoutEngine {
                     } else if let Node::AttributedText(n) = node {
                         if n.width.is_none() || n.height.is_none() {
                             if let Some(ref mut provider) = text_measure {
-                                let measurements =
-                                    provider.paragraph_cache.measure_attributed(
-                                        &n.attributed_string,
-                                        &n.text_align,
-                                        &n.max_lines,
-                                        &n.ellipsis,
-                                        n.width,
-                                        provider.fonts,
-                                        Some(id),
-                                    );
+                                let measurements = provider.paragraph_cache.measure_attributed(
+                                    &n.attributed_string,
+                                    &n.text_align,
+                                    &n.max_lines,
+                                    &n.ellipsis,
+                                    n.width,
+                                    provider.fonts,
+                                    Some(id),
+                                );
                                 if n.width.is_none() {
                                     width = measurements.max_width;
                                 }

@@ -31,9 +31,7 @@ pub struct QueryOptions {
 
 impl Default for QueryOptions {
     fn default() -> Self {
-        Self {
-            prune_nested: true,
-        }
+        Self { prune_nested: true }
     }
 }
 
@@ -221,15 +219,7 @@ mod tests {
     //    9
     //
     fn tree() -> TestTree {
-        TestTree::new(&[
-            (2, 1),
-            (3, 1),
-            (4, 2),
-            (5, 2),
-            (6, 3),
-            (7, 4),
-            (9, 8),
-        ])
+        TestTree::new(&[(2, 1), (3, 1), (4, 2), (5, 2), (6, 3), (7, 4), (9, 8)])
     }
 
     // ---- prune_nested ----

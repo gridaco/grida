@@ -112,7 +112,9 @@ impl SurfaceState {
                 self.modifiers = modifiers;
                 // Check overlay UI hit regions first (they are visually on top)
                 if button == PointerButton::Primary {
-                    if let Some(action) = ui_hit_regions.hit_test([screen_point[0], screen_point[1]]) {
+                    if let Some(action) =
+                        ui_hit_regions.hit_test([screen_point[0], screen_point[1]])
+                    {
                         return self.handle_overlay_action(action, hierarchy);
                     }
                 }
@@ -250,7 +252,9 @@ impl SurfaceState {
         }
 
         // Track multi-click sequence for double-click detection.
-        let click_count = self.click_tracker.register(canvas_point[0], canvas_point[1]);
+        let click_count = self
+            .click_tracker
+            .register(canvas_point[0], canvas_point[1]);
 
         let hit = hit_tester.hit_first(canvas_point);
 
@@ -316,10 +320,7 @@ impl SurfaceState {
 }
 
 /// Compute a normalized rectangle from two corner points.
-fn marquee_rect(
-    a: math2::vector2::Vector2,
-    b: math2::vector2::Vector2,
-) -> math2::rect::Rectangle {
+fn marquee_rect(a: math2::vector2::Vector2, b: math2::vector2::Vector2) -> math2::rect::Rectangle {
     let x = a[0].min(b[0]);
     let y = a[1].min(b[1]);
     let w = (a[0] - b[0]).abs();

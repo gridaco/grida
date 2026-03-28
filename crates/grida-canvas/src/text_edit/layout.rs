@@ -106,7 +106,10 @@ pub trait TextLayoutEngine {
     /// visual line or line fragment). Empty-line invariant: every selected
     /// line produces at least one visible rect even if it has no glyphs.
     fn selection_rects_for_range(
-        &mut self, text: &str, start: usize, end: usize
+        &mut self,
+        text: &str,
+        start: usize,
+        end: usize,
     ) -> Vec<SelectionRect>;
 
     /// Return the x coordinate (layout-local) of the caret at `offset`.

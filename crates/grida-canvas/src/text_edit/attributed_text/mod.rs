@@ -266,13 +266,35 @@ impl StyledRun {
 #[derive(Debug, Clone)]
 pub enum InvariantError {
     EmptyRuns,
-    CoverageStart { expected: u32, actual: u32 },
-    CoverageEnd { expected: u32, actual: u32 },
-    Contiguity { index: usize, prev_end: u32, next_start: u32 },
-    EmptyRun { index: usize, start: u32, end: u32 },
-    NotMaximal { index: usize },
-    BadBoundary { index: usize, field: &'static str, offset: u32 },
-    Monotonicity { index: usize },
+    CoverageStart {
+        expected: u32,
+        actual: u32,
+    },
+    CoverageEnd {
+        expected: u32,
+        actual: u32,
+    },
+    Contiguity {
+        index: usize,
+        prev_end: u32,
+        next_start: u32,
+    },
+    EmptyRun {
+        index: usize,
+        start: u32,
+        end: u32,
+    },
+    NotMaximal {
+        index: usize,
+    },
+    BadBoundary {
+        index: usize,
+        field: &'static str,
+        offset: u32,
+    },
+    Monotonicity {
+        index: usize,
+    },
 }
 
 impl std::fmt::Display for InvariantError {
@@ -285,17 +307,35 @@ impl std::fmt::Display for InvariantError {
             Self::CoverageEnd { expected, actual } => {
                 write!(f, "last run ends at {actual}, expected {expected}")
             }
-            Self::Contiguity { index, prev_end, next_start } => {
-                write!(f, "gap/overlap at index {index}: prev.end={prev_end}, next.start={next_start}")
+            Self::Contiguity {
+                index,
+                prev_end,
+                next_start,
+            } => {
+                write!(
+                    f,
+                    "gap/overlap at index {index}: prev.end={prev_end}, next.start={next_start}"
+                )
             }
             Self::EmptyRun { index, start, end } => {
                 write!(f, "empty run at index {index}: start={start}, end={end}")
             }
             Self::NotMaximal { index } => {
-                write!(f, "adjacent runs {index} and {} have equal styles", index + 1)
+                write!(
+                    f,
+                    "adjacent runs {index} and {} have equal styles",
+                    index + 1
+                )
             }
-            Self::BadBoundary { index, field, offset } => {
-                write!(f, "run {index} {field}={offset} is not a valid char boundary")
+            Self::BadBoundary {
+                index,
+                field,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "run {index} {field}={offset} is not a valid char boundary"
+                )
             }
             Self::Monotonicity { index } => {
                 write!(f, "run {index} start >= run {} start", index + 1)
@@ -357,7 +397,11 @@ impl AttributedText {
     pub fn new(text: impl Into<String>, style: TextStyle) -> Self {
         let text = crate::text_edit::normalize_newlines(&text.into());
         let len = text.len() as u32;
-        let runs = vec![StyledRun { start: 0, end: len, style: style.clone() }];
+        let runs = vec![StyledRun {
+            start: 0,
+            end: len,
+            style: style.clone(),
+        }];
         let this = Self {
             text,
             default_style: style,
@@ -365,13 +409,21 @@ impl AttributedText {
             runs,
             generation: 0,
         };
-        debug_assert!(this.check_invariants().is_ok(), "{:?}", this.check_invariants());
+        debug_assert!(
+            this.check_invariants().is_ok(),
+            "{:?}",
+            this.check_invariants()
+        );
         this
     }
 
     /// Create an empty attributed text preserving the given caret style.
     pub fn empty(style: TextStyle) -> Self {
-        let runs = vec![StyledRun { start: 0, end: 0, style: style.clone() }];
+        let runs = vec![StyledRun {
+            start: 0,
+            end: 0,
+            style: style.clone(),
+        }];
         Self {
             text: String::new(),
             default_style: style,
@@ -391,7 +443,13 @@ impl AttributedText {
         paragraph_style: ParagraphStyle,
         runs: Vec<StyledRun>,
     ) -> Self {
-        let this = Self { text, default_style, paragraph_style, runs, generation: 0 };
+        let this = Self {
+            text,
+            default_style,
+            paragraph_style,
+            runs,
+            generation: 0,
+        };
         if let Err(e) = this.check_invariants() {
             panic!("AttributedText::from_parts: invariant violated: {e}");
         }
@@ -408,7 +466,13 @@ impl AttributedText {
         paragraph_style: ParagraphStyle,
         runs: Vec<StyledRun>,
     ) -> Result<Self, InvariantError> {
-        let this = Self { text, default_style, paragraph_style, runs, generation: 0 };
+        let this = Self {
+            text,
+            default_style,
+            paragraph_style,
+            runs,
+            generation: 0,
+        };
         this.check_invariants()?;
         Ok(this)
     }
@@ -599,7 +663,11 @@ impl AttributedText {
             }
         }
 
-        debug_assert!(self.check_invariants().is_ok(), "{:?}", self.check_invariants());
+        debug_assert!(
+            self.check_invariants().is_ok(),
+            "{:?}",
+            self.check_invariants()
+        );
     }
 
     /// Insert `s` at byte offset `pos` with a specific style.
@@ -628,7 +696,9 @@ impl AttributedText {
         // After split_run_at, pos32 is guaranteed to be at a run boundary
         // (either an existing boundary or a freshly created one), OR at the
         // end of text (past all runs).
-        let idx = self.runs.iter()
+        let idx = self
+            .runs
+            .iter()
             .position(|r| r.start >= pos32)
             .unwrap_or(self.runs.len());
 
@@ -643,14 +713,21 @@ impl AttributedText {
         }
 
         // Insert the new run at the insertion point.
-        self.runs.insert(idx, StyledRun {
-            start: pos32,
-            end: pos32 + n,
-            style,
-        });
+        self.runs.insert(
+            idx,
+            StyledRun {
+                start: pos32,
+                end: pos32 + n,
+                style,
+            },
+        );
 
         self.coalesce();
-        debug_assert!(self.check_invariants().is_ok(), "{:?}", self.check_invariants());
+        debug_assert!(
+            self.check_invariants().is_ok(),
+            "{:?}",
+            self.check_invariants()
+        );
     }
 
     /// Delete the byte range `[lo, hi)` from the text and update runs.
@@ -726,7 +803,11 @@ impl AttributedText {
         }
 
         self.coalesce();
-        debug_assert!(self.check_invariants().is_ok(), "{:?}", self.check_invariants());
+        debug_assert!(
+            self.check_invariants().is_ok(),
+            "{:?}",
+            self.check_invariants()
+        );
     }
 
     /// Apply a style mutation to the byte range `[lo, hi)`.
@@ -762,7 +843,11 @@ impl AttributedText {
         }
 
         self.coalesce();
-        debug_assert!(self.check_invariants().is_ok(), "{:?}", self.check_invariants());
+        debug_assert!(
+            self.check_invariants().is_ok(),
+            "{:?}",
+            self.check_invariants()
+        );
     }
 
     /// Set the style for the byte range `[lo, hi)`, replacing any existing
@@ -985,15 +1070,25 @@ mod tests {
     }
 
     fn bold_style() -> TextStyle {
-        TextStyle { font_weight: 700, ..default_style() }
+        TextStyle {
+            font_weight: 700,
+            ..default_style()
+        }
     }
 
     fn italic_style() -> TextStyle {
-        TextStyle { font_style_italic: true, ..default_style() }
+        TextStyle {
+            font_style_italic: true,
+            ..default_style()
+        }
     }
 
     fn bold_italic_style() -> TextStyle {
-        TextStyle { font_weight: 700, font_style_italic: true, ..default_style() }
+        TextStyle {
+            font_weight: 700,
+            font_style_italic: true,
+            ..default_style()
+        }
     }
 
     fn red_style() -> TextStyle {
@@ -1045,7 +1140,9 @@ mod tests {
     #[test]
     fn style_at_multiple_runs() {
         let mut at = AttributedText::new("Hello World", default_style());
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
         // "Hello" is bold, " World" is normal
         assert_eq!(at.style_at(0).font_weight, 700);
         assert_eq!(at.style_at(4).font_weight, 700);
@@ -1056,7 +1153,9 @@ mod tests {
     #[test]
     fn caret_style_at_boundary() {
         let mut at = AttributedText::new("HelloWorld", default_style());
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
         // At position 5 (boundary between bold "Hello" and normal "World"),
         // caret style should be bold (upstream run).
         assert_eq!(at.caret_style_at(5).font_weight, 700);
@@ -1069,8 +1168,12 @@ mod tests {
     #[test]
     fn runs_in_range_basic() {
         let mut at = AttributedText::new("AABBCC", default_style());
-        at.apply_style(0, 2, |s| { s.font_weight = 700; });
-        at.apply_style(4, 6, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 2, |s| {
+            s.font_weight = 700;
+        });
+        at.apply_style(4, 6, |s| {
+            s.font_style_italic = true;
+        });
         // 3 runs: [0,2) bold, [2,4) normal, [4,6) italic
         assert_eq!(at.runs().len(), 3);
 
@@ -1115,7 +1218,9 @@ mod tests {
     #[test]
     fn insert_preserves_subsequent_runs() {
         let mut at = AttributedText::new("AB", default_style());
-        at.apply_style(1, 2, |s| { s.font_weight = 700; });
+        at.apply_style(1, 2, |s| {
+            s.font_weight = 700;
+        });
         // Runs: [0,1) normal "A", [1,2) bold "B"
         assert_eq!(at.runs().len(), 2);
 
@@ -1173,8 +1278,12 @@ mod tests {
     #[test]
     fn delete_spanning_runs() {
         let mut at = AttributedText::new("AABBCC", default_style());
-        at.apply_style(0, 2, |s| { s.font_weight = 700; });
-        at.apply_style(4, 6, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 2, |s| {
+            s.font_weight = 700;
+        });
+        at.apply_style(4, 6, |s| {
+            s.font_style_italic = true;
+        });
         // Runs: [0,2) bold, [2,4) normal, [4,6) italic
         assert_eq!(at.runs().len(), 3);
 
@@ -1199,7 +1308,9 @@ mod tests {
     #[test]
     fn delete_merges_adjacent_equal_style_runs() {
         let mut at = AttributedText::new("ABCDE", default_style());
-        at.apply_style(2, 3, |s| { s.font_weight = 700; });
+        at.apply_style(2, 3, |s| {
+            s.font_weight = 700;
+        });
         // Runs: [0,2) normal, [2,3) bold, [3,5) normal
         assert_eq!(at.runs().len(), 3);
 
@@ -1212,8 +1323,12 @@ mod tests {
     #[test]
     fn delete_entire_run_in_middle() {
         let mut at = AttributedText::new("AABBCC", default_style());
-        at.apply_style(0, 2, |s| { s.font_weight = 700; });
-        at.apply_style(4, 6, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 2, |s| {
+            s.font_weight = 700;
+        });
+        at.apply_style(4, 6, |s| {
+            s.font_style_italic = true;
+        });
         // Delete the middle "normal" run entirely
         at.delete(2, 4);
         // "AACC": [0,2) bold, [2,4) italic
@@ -1228,7 +1343,9 @@ mod tests {
     #[test]
     fn apply_style_entire_text() {
         let mut at = AttributedText::new("Hello", default_style());
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 1);
         assert_eq!(at.runs()[0].style.font_weight, 700);
     }
@@ -1236,7 +1353,9 @@ mod tests {
     #[test]
     fn apply_style_middle_range() {
         let mut at = AttributedText::new("Hello World", default_style());
-        at.apply_style(6, 11, |s| { s.font_weight = 700; });
+        at.apply_style(6, 11, |s| {
+            s.font_weight = 700;
+        });
         // "Hello " normal, "World" bold
         assert_eq!(at.runs().len(), 2);
         assert_eq!(at.runs()[0].end, 6);
@@ -1247,7 +1366,9 @@ mod tests {
     #[test]
     fn apply_style_creates_three_runs() {
         let mut at = AttributedText::new("Hello World!", default_style());
-        at.apply_style(6, 11, |s| { s.font_weight = 700; });
+        at.apply_style(6, 11, |s| {
+            s.font_weight = 700;
+        });
         // "Hello " normal, "World" bold, "!" normal
         assert_eq!(at.runs().len(), 3);
     }
@@ -1255,11 +1376,15 @@ mod tests {
     #[test]
     fn apply_style_merges_when_same() {
         let mut at = AttributedText::new("Hello World!", default_style());
-        at.apply_style(6, 11, |s| { s.font_weight = 700; });
+        at.apply_style(6, 11, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 3);
 
         // Now make the whole thing bold — should merge back to 1 run.
-        at.apply_style(0, 12, |s| { s.font_weight = 700; });
+        at.apply_style(0, 12, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 1);
         assert_eq!(at.runs()[0].style.font_weight, 700);
     }
@@ -1267,8 +1392,12 @@ mod tests {
     #[test]
     fn apply_style_overlapping_ranges() {
         let mut at = AttributedText::new("ABCDEFGH", default_style());
-        at.apply_style(0, 4, |s| { s.font_weight = 700; });
-        at.apply_style(2, 6, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 4, |s| {
+            s.font_weight = 700;
+        });
+        at.apply_style(2, 6, |s| {
+            s.font_style_italic = true;
+        });
         // Expected: [0,2) bold, [2,4) bold+italic, [4,6) italic, [6,8) normal
         assert_eq!(at.runs().len(), 4);
         assert_eq!(at.runs()[0].style.font_weight, 700);
@@ -1284,11 +1413,15 @@ mod tests {
     #[test]
     fn apply_style_exact_run_boundaries() {
         let mut at = AttributedText::new("AB", default_style());
-        at.apply_style(0, 1, |s| { s.font_weight = 700; });
+        at.apply_style(0, 1, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 2);
 
         // Apply to the exact same range — no extra splits.
-        at.apply_style(0, 1, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 1, |s| {
+            s.font_style_italic = true;
+        });
         assert_eq!(at.runs().len(), 2);
         assert_eq!(at.runs()[0].style.font_weight, 700);
         assert!(at.runs()[0].style.font_style_italic);
@@ -1297,7 +1430,9 @@ mod tests {
     #[test]
     fn apply_style_zero_width_range_noop() {
         let mut at = AttributedText::new("Hello", default_style());
-        at.apply_style(2, 2, |s| { s.font_weight = 700; });
+        at.apply_style(2, 2, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 1);
         assert_eq!(at.runs()[0].style.font_weight, 400);
     }
@@ -1321,7 +1456,9 @@ mod tests {
     #[test]
     fn replace_preserves_style() {
         let mut at = AttributedText::new("AAABBB", default_style());
-        at.apply_style(0, 3, |s| { s.font_weight = 700; });
+        at.apply_style(0, 3, |s| {
+            s.font_weight = 700;
+        });
         // Replace "AAA" with "XX"
         at.replace(0, 3, "XX");
         assert_eq!(at.text(), "XXBBB");
@@ -1353,7 +1490,9 @@ mod tests {
     fn apply_style_multibyte_boundaries() {
         // "A\u{1F600}B" = bytes [0..1) [1..5) [5..6)
         let mut at = AttributedText::new("A\u{1F600}B", default_style());
-        at.apply_style(1, 5, |s| { s.font_weight = 700; });
+        at.apply_style(1, 5, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 3);
         assert_eq!(at.runs()[1].start, 1);
         assert_eq!(at.runs()[1].end, 5);
@@ -1391,7 +1530,11 @@ mod tests {
                 "Hello".into(),
                 default_style(),
                 ParagraphStyle::default(),
-                vec![StyledRun { start: 1, end: 5, style: default_style() }],
+                vec![StyledRun {
+                    start: 1,
+                    end: 5,
+                    style: default_style(),
+                }],
             );
         });
         assert!(result.is_err());
@@ -1405,8 +1548,16 @@ mod tests {
                 default_style(),
                 ParagraphStyle::default(),
                 vec![
-                    StyledRun { start: 0, end: 2, style: default_style() },
-                    StyledRun { start: 3, end: 5, style: bold_style() },
+                    StyledRun {
+                        start: 0,
+                        end: 2,
+                        style: default_style(),
+                    },
+                    StyledRun {
+                        start: 3,
+                        end: 5,
+                        style: bold_style(),
+                    },
                 ],
             );
         });
@@ -1421,8 +1572,16 @@ mod tests {
                 default_style(),
                 ParagraphStyle::default(),
                 vec![
-                    StyledRun { start: 0, end: 3, style: default_style() },
-                    StyledRun { start: 3, end: 5, style: default_style() },
+                    StyledRun {
+                        start: 0,
+                        end: 3,
+                        style: default_style(),
+                    },
+                    StyledRun {
+                        start: 3,
+                        end: 5,
+                        style: default_style(),
+                    },
                 ],
             );
         });
@@ -1438,8 +1597,16 @@ mod tests {
         let mut at = AttributedText::new("Hello", default_style());
         // Manually insert a duplicate run to test coalesce.
         at.runs.clear();
-        at.runs.push(StyledRun { start: 0, end: 3, style: default_style() });
-        at.runs.push(StyledRun { start: 3, end: 5, style: default_style() });
+        at.runs.push(StyledRun {
+            start: 0,
+            end: 3,
+            style: default_style(),
+        });
+        at.runs.push(StyledRun {
+            start: 3,
+            end: 5,
+            style: default_style(),
+        });
         at.coalesce();
         assert_eq!(at.runs().len(), 1);
         assert_eq!(at.runs()[0].start, 0);
@@ -1455,9 +1622,13 @@ mod tests {
         // The classic span-resolution test from the spec.
         let mut at = AttributedText::new("ABCDEFGHIJ", default_style());
         // Bold [0, 5)
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
         // Italic [3, 8)
-        at.apply_style(3, 8, |s| { s.font_style_italic = true; });
+        at.apply_style(3, 8, |s| {
+            s.font_style_italic = true;
+        });
 
         assert_eq!(at.runs().len(), 4);
         // [0,3) bold only
@@ -1489,7 +1660,9 @@ mod tests {
         at.insert(1, "B");
         assert_eq!(at.text(), "ABC");
         // Make "B" bold.
-        at.apply_style(1, 2, |s| { s.font_weight = 700; });
+        at.apply_style(1, 2, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 3);
         // Delete "A".
         at.delete(0, 1);
@@ -1515,10 +1688,14 @@ mod tests {
     fn style_entire_then_unstyle_middle() {
         let mut at = AttributedText::new("ABCDE", default_style());
         // Make everything bold.
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 1);
         // Unbold the middle.
-        at.apply_style(2, 3, |s| { s.font_weight = 400; });
+        at.apply_style(2, 3, |s| {
+            s.font_weight = 400;
+        });
         assert_eq!(at.runs().len(), 3);
         assert_eq!(at.runs()[0].style.font_weight, 700);
         assert_eq!(at.runs()[1].style.font_weight, 400);
@@ -1552,7 +1729,9 @@ mod tests {
     fn apply_bold_italic_overlap() {
         let mut at = AttributedText::new("ABCDEF", italic_style());
         // Apply bold to the second half.
-        at.apply_style(3, 6, |s| { s.font_weight = 700; });
+        at.apply_style(3, 6, |s| {
+            s.font_weight = 700;
+        });
         assert_eq!(at.runs().len(), 2);
         // First run: italic only.
         assert!(at.runs()[0].style.font_style_italic);
@@ -1569,7 +1748,12 @@ mod tests {
         let mut at = AttributedText::new("Hello", default_style());
         at.set_style(0, 5, red_style());
         assert_eq!(at.runs().len(), 1);
-        let c = at.runs()[0].style.fills.iter().find_map(|p| p.solid_color()).unwrap();
+        let c = at.runs()[0]
+            .style
+            .fills
+            .iter()
+            .find_map(|p| p.solid_color())
+            .unwrap();
         assert_eq!(c, CGColor::RED);
     }
 
@@ -1593,8 +1777,12 @@ mod tests {
     fn insert_with_style_at_end_of_text() {
         // Reproduces the panic: typing at the end of a multi-run text.
         let mut at = AttributedText::new("Hello, World!\n", default_style());
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
-        at.apply_style(7, 12, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
+        at.apply_style(7, 12, |s| {
+            s.font_style_italic = true;
+        });
         // Runs: [0,5) bold, [5,7) normal, [7,12) italic, [12,14) normal
 
         // Insert at the very end — this used to panic with a contiguity error.
@@ -1606,7 +1794,9 @@ mod tests {
     #[test]
     fn insert_with_style_at_end_different_style() {
         let mut at = AttributedText::new("AB", default_style());
-        at.apply_style(0, 1, |s| { s.font_weight = 700; });
+        at.apply_style(0, 1, |s| {
+            s.font_weight = 700;
+        });
         // Runs: [0,1) bold, [1,2) normal
 
         // Insert bold text at end.
@@ -1631,12 +1821,17 @@ mod tests {
     fn sequential_insert_with_style_at_end() {
         // Simulate typing character by character at the end.
         let mut at = AttributedText::new("Hello", default_style());
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
 
         for ch in ", World!".chars() {
             let pos = at.len();
             at.insert_with_style(pos, &ch.to_string(), default_style());
-            assert!(at.check_invariants().is_ok(), "failed after inserting '{ch}'");
+            assert!(
+                at.check_invariants().is_ok(),
+                "failed after inserting '{ch}'"
+            );
         }
         assert_eq!(at.text(), "Hello, World!");
         // "Hello" bold + ", World!" normal
@@ -1650,14 +1845,21 @@ mod tests {
     #[test]
     fn clone_preserves_full_state() {
         let mut at = AttributedText::new("Hello World", default_style());
-        at.apply_style(0, 5, |s| { s.font_weight = 700; });
-        at.apply_style(6, 11, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 5, |s| {
+            s.font_weight = 700;
+        });
+        at.apply_style(6, 11, |s| {
+            s.font_style_italic = true;
+        });
 
         // Clone (simulates history snapshot).
         let snapshot = at.clone();
 
         // Mutate the original.
-        at.apply_style(0, 11, |s| { s.font_weight = 400; s.font_style_italic = false; });
+        at.apply_style(0, 11, |s| {
+            s.font_weight = 400;
+            s.font_style_italic = false;
+        });
         assert_eq!(at.runs().len(), 1); // everything uniform now
 
         // Snapshot is untouched: [0,5) bold, [5,6) default, [6,11) italic.
@@ -1669,13 +1871,17 @@ mod tests {
     #[test]
     fn clone_restore_round_trip() {
         let mut at = AttributedText::new("ABCDE", default_style());
-        at.apply_style(2, 4, |s| { s.font_weight = 700; });
+        at.apply_style(2, 4, |s| {
+            s.font_weight = 700;
+        });
 
         // Snapshot before style change.
         let before = at.clone();
 
         // Apply a style change.
-        at.apply_style(0, 5, |s| { s.font_style_italic = true; });
+        at.apply_style(0, 5, |s| {
+            s.font_style_italic = true;
+        });
         assert!(at.runs()[0].style.font_style_italic);
 
         // "Undo" by restoring the snapshot.

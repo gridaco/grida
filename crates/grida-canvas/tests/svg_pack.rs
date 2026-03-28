@@ -81,7 +81,10 @@ fn pack_basic_shapes() {
       <polygon points="150,110 190,190 110,190" fill="orange"/>
     </svg>"##;
     let scene = assert_pack_ok(svg);
-    assert!(count_nodes(&scene) >= 5, "should have 5+ nodes for 5 shapes");
+    assert!(
+        count_nodes(&scene) >= 5,
+        "should have 5+ nodes for 5 shapes"
+    );
 }
 
 #[test]
@@ -351,7 +354,11 @@ fn pack_currentcolor() {
 fn pack_empty_svg() {
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>"##;
     let scene = assert_pack_ok(svg);
-    assert_eq!(count_nodes(&scene), 0, "empty SVG should have no child nodes");
+    assert_eq!(
+        count_nodes(&scene),
+        0,
+        "empty SVG should have no child nodes"
+    );
 }
 
 #[test]
@@ -671,7 +678,10 @@ fn pack_nested_transforms_world_positions() {
     // L1 Group: world = translate(250,250)
     let (ref label, ref t) = transforms[1];
     assert_eq!(label, "Group");
-    assert!(approx(t.x(), 250.0) && approx(t.y(), 250.0), "L1 group at (250,250)");
+    assert!(
+        approx(t.x(), 250.0) && approx(t.y(), 250.0),
+        "L1 group at (250,250)"
+    );
 
     // Path inside L1: world should place rect top-left at (150,150)
     let (ref label, ref t) = transforms[2];
@@ -979,10 +989,26 @@ fn pack_gradient_transform_rotation_preserved() {
     let expected_ty: f32 = 0.5 - 0.5 * cos45 - 0.5 * cos45; // ≈ -0.2071
 
     // Rotation components
-    assert!(approx(m[0][0], cos45), "m00 should be cos(45)≈0.707, got {:.4}", m[0][0]);
-    assert!(approx(m[1][1], cos45), "m11 should be cos(45)≈0.707, got {:.4}", m[1][1]);
-    assert!(approx(m[0][1], -cos45), "m01 should be -sin(45)≈-0.707, got {:.4}", m[0][1]);
-    assert!(approx(m[1][0], cos45), "m10 should be sin(45)≈0.707, got {:.4}", m[1][0]);
+    assert!(
+        approx(m[0][0], cos45),
+        "m00 should be cos(45)≈0.707, got {:.4}",
+        m[0][0]
+    );
+    assert!(
+        approx(m[1][1], cos45),
+        "m11 should be cos(45)≈0.707, got {:.4}",
+        m[1][1]
+    );
+    assert!(
+        approx(m[0][1], -cos45),
+        "m01 should be -sin(45)≈-0.707, got {:.4}",
+        m[0][1]
+    );
+    assert!(
+        approx(m[1][0], cos45),
+        "m10 should be sin(45)≈0.707, got {:.4}",
+        m[1][0]
+    );
 
     // Translation: must NOT include rect's x/y position (50, 30).
     // Should be pure rotate(45, 0.5, 0.5) translation.
@@ -1120,8 +1146,14 @@ fn pack_text_inline_tspans_single_chunk() {
 
     // The text should contain all the words
     let text = &spans[0];
-    assert!(text.contains("Hello"), "text should contain 'Hello': {text}");
-    assert!(text.contains("world"), "text should contain 'world': {text}");
+    assert!(
+        text.contains("Hello"),
+        "text should contain 'Hello': {text}"
+    );
+    assert!(
+        text.contains("world"),
+        "text should contain 'world': {text}"
+    );
     assert!(text.contains("end"), "text should contain 'end': {text}");
 }
 
@@ -1151,9 +1183,9 @@ fn pack_text_multichunk_creates_group_parent() {
         if let Node::Group(_) = node {
             // Check if it has TextSpan children
             if let Some(children) = graph.get_children(id) {
-                let has_text_child = children.iter().any(|cid| {
-                    matches!(graph.get_node(cid), Ok(Node::TextSpan(_)))
-                });
+                let has_text_child = children
+                    .iter()
+                    .any(|cid| matches!(graph.get_node(cid), Ok(Node::TextSpan(_))));
                 if has_text_child {
                     return Some(*id);
                 }
@@ -1239,13 +1271,10 @@ fn svg_to_grida_fbs_group_transform_roundtrip() {
     );
 
     // Check that at least one has non-zero translation
-    let has_translate = group_transforms.iter().any(|t| {
-        t.matrix[0][2].abs() > 0.1 || t.matrix[1][2].abs() > 0.1
-    });
-    assert!(
-        has_translate,
-        "at least one group should have translation"
-    );
+    let has_translate = group_transforms
+        .iter()
+        .any(|t| t.matrix[0][2].abs() > 0.1 || t.matrix[1][2].abs() > 0.1);
+    assert!(has_translate, "at least one group should have translation");
 }
 
 /// Verify that `svg_to_grida_bytes` → `decode` roundtrip preserves
@@ -1325,7 +1354,11 @@ fn svg_to_grida_fbs_roundtrip() {
     let bytes = svg_to_grida_bytes(svg).expect("svg_to_grida_bytes should succeed");
 
     // Must be a valid FBS buffer (starts with valid FlatBuffer, has "GRID" identifier)
-    assert!(bytes.len() > 8, "FBS buffer too small: {} bytes", bytes.len());
+    assert!(
+        bytes.len() > 8,
+        "FBS buffer too small: {} bytes",
+        bytes.len()
+    );
 
     // Decode back into a Scene
     let scene = io_grida_fbs::decode(&bytes).expect("FBS decode should succeed");
@@ -1466,8 +1499,10 @@ fn pack_attributed_text_multi_tspan_diagnostic() {
                         run.fills.as_ref().map(|f| f.len()),
                     );
                 }
-                attributed_texts
-                    .push((n.attributed_string.text.clone(), n.attributed_string.runs.len()));
+                attributed_texts.push((
+                    n.attributed_string.text.clone(),
+                    n.attributed_string.runs.len(),
+                ));
             }
             _ => {}
         }
@@ -1512,8 +1547,7 @@ fn pack_attributed_text_full_pipeline() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../fixtures/test-svg/L0/text-tspan.svg"
     );
-    let svg = std::fs::read_to_string(fixture_path)
-        .expect("text-tspan.svg fixture should exist");
+    let svg = std::fs::read_to_string(fixture_path).expect("text-tspan.svg fixture should exist");
 
     let graph = pack::from_svg_str(&svg).expect("should parse");
     let scene = Scene {
@@ -1566,7 +1600,9 @@ fn pack_attributed_text_full_pipeline() {
             Node::TextSpan(n) => {
                 eprintln!(
                     "{indent}TextSpan {bounds_str} text={:?} font={:.0} fills={}",
-                    n.text, n.text_style.font_size, n.fills.len()
+                    n.text,
+                    n.text_style.font_size,
+                    n.fills.len()
                 );
             }
             Node::AttributedText(n) => {
@@ -1675,7 +1711,10 @@ fn pack_attributed_text_full_pipeline() {
         count_text_nodes(graph, r, &mut attr_count, &mut span_count);
     }
     eprintln!("  attributed_text: {attr_count}, tspan: {span_count}");
-    assert!(attr_count > 0, "expected some AttributedText nodes from multi-tspan SVG");
+    assert!(
+        attr_count > 0,
+        "expected some AttributedText nodes from multi-tspan SVG"
+    );
 
     // Assertions: every text node should have valid (non-degenerate) bounds
     fn check_bounds(

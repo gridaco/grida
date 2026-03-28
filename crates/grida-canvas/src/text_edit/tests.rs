@@ -3,7 +3,13 @@
 //! All tests use `SimpleLayoutEngine` — no Skia, no winit.  The layout is
 //! monospace / no-wrap, so every assertion is exact.
 
-use super::{apply_command, floor_char_boundary, ceil_char_boundary, layout::{CaretRect, TextLayoutEngine}, line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, history::EditHistory, EditKind, EditingCommand, SimpleLayoutEngine, TextEditorState};
+use super::{
+    apply_command, ceil_char_boundary, floor_char_boundary,
+    history::EditHistory,
+    layout::{CaretRect, TextLayoutEngine},
+    line_index_for_offset_utf8, snap_grapheme_boundary, word_segment_at, EditKind, EditingCommand,
+    SimpleLayoutEngine, TextEditorState,
+};
 
 fn layout() -> SimpleLayoutEngine {
     SimpleLayoutEngine::default_test()
@@ -275,9 +281,13 @@ fn snap_stays_at_valid_boundary() {
     // ASCII: every byte offset that is a char start should be returned as-is.
     let t = "Hello\n\nWorld";
     assert_eq!(snap_grapheme_boundary(t, 0), 0);
-    assert_eq!(snap_grapheme_boundary(t, 5), 5,  "start of first \\n");
-    assert_eq!(snap_grapheme_boundary(t, 6), 6,  "start of second \\n");
-    assert_eq!(snap_grapheme_boundary(t, 7), 7,  "start of 'W' — this is what SkiaLayoutEngine returns");
+    assert_eq!(snap_grapheme_boundary(t, 5), 5, "start of first \\n");
+    assert_eq!(snap_grapheme_boundary(t, 6), 6, "start of second \\n");
+    assert_eq!(
+        snap_grapheme_boundary(t, 7),
+        7,
+        "start of 'W' — this is what SkiaLayoutEngine returns"
+    );
     assert_eq!(snap_grapheme_boundary(t, 12), 12, "text.len()");
 }
 
@@ -306,9 +316,10 @@ fn walk_down(text: &str) -> Vec<(usize, usize)> {
 
     for _ in 0..max_steps {
         let metrics = lay.line_metrics(text);
-        let line = metrics.iter().position(|lm| {
-            lm.start_index <= s.cursor && s.cursor < lm.end_index
-        }).unwrap_or(metrics.len() - 1);
+        let line = metrics
+            .iter()
+            .position(|lm| lm.start_index <= s.cursor && s.cursor < lm.end_index)
+            .unwrap_or(metrics.len() - 1);
         path.push((line, s.cursor));
 
         if s.cursor >= text.len() {
@@ -333,11 +344,7 @@ fn move_down_never_locks_simple() {
     // Verify every cursor in the path is strictly increasing (or at text.len()).
     let cursors: Vec<usize> = path.iter().map(|(_, c)| *c).collect();
     for w in cursors.windows(2) {
-        assert!(
-            w[1] >= w[0],
-            "cursor went backwards: {} → {}",
-            w[0], w[1]
-        );
+        assert!(w[1] >= w[0], "cursor went backwards: {} → {}", w[0], w[1]);
     }
     // Must eventually reach the last line.
     let last_cursor = cursors.last().copied().unwrap_or(0);
@@ -384,10 +391,7 @@ fn move_down_reaches_end_of_document() {
         );
     }
 
-    assert_eq!(
-        s.cursor, text.len(),
-        "cursor should reach end of document"
-    );
+    assert_eq!(s.cursor, text.len(), "cursor should reach end of document");
 }
 
 #[test]
@@ -480,8 +484,11 @@ fn move_right_through_emoji_clusters() {
     // 😀 is a single grapheme (4 bytes).
     let text = "A\u{1F600}B"; // "A😀B"  — 1 + 4 + 1 = 6 bytes
     let positions = walk_right(text);
-    assert_eq!(positions, vec![0, 1, 5, 6],
-        "should step over the 4-byte emoji in one move");
+    assert_eq!(
+        positions,
+        vec![0, 1, 5, 6],
+        "should step over the 4-byte emoji in one move"
+    );
 }
 
 #[test]
@@ -496,8 +503,11 @@ fn move_right_through_skin_tone_emoji() {
 fn move_left_through_emoji_clusters() {
     let text = "A\u{1F600}B"; // A😀B, 6 bytes
     let positions = walk_left(text);
-    assert_eq!(positions, vec![6, 5, 1, 0],
-        "should step back over the 4-byte emoji in one move");
+    assert_eq!(
+        positions,
+        vec![6, 5, 1, 0],
+        "should step back over the 4-byte emoji in one move"
+    );
 }
 
 // --- Arabic (RTL) -----------------------------------------------------------
@@ -515,8 +525,12 @@ fn move_right_through_arabic_never_locks() {
     let starts = grapheme_starts(text);
 
     // Every grapheme boundary is visited in ascending order.
-    assert_eq!(&positions[..starts.len()], starts.as_slice(),
-        "move_right should visit all {} Arabic grapheme starts", starts.len());
+    assert_eq!(
+        &positions[..starts.len()],
+        starts.as_slice(),
+        "move_right should visit all {} Arabic grapheme starts",
+        starts.len()
+    );
     assert_eq!(*positions.last().unwrap(), text.len());
 }
 
@@ -604,8 +618,11 @@ fn move_right_korean_and_latin_mix() {
     let positions = walk_right(text);
 
     for (i, &expected) in starts.iter().enumerate() {
-        assert_eq!(positions[i], expected,
-            "step {}: expected byte {}, got {}", i, expected, positions[i]);
+        assert_eq!(
+            positions[i], expected,
+            "step {}: expected byte {}, got {}",
+            i, expected, positions[i]
+        );
     }
     assert_eq!(*positions.last().unwrap(), text.len());
 }
@@ -642,16 +659,22 @@ fn move_right_through_devanagari_namaste() {
     let text = "नमस्ते";
     // Clusters: "न"(0) "म"(3) "स्ते"(6) — end at 18.
     let positions = walk_right(text);
-    assert_eq!(positions, vec![0, 3, 6, 18],
-        "conjunct 'स्ते' must be stepped over as ONE cluster (12 bytes)");
+    assert_eq!(
+        positions,
+        vec![0, 3, 6, 18],
+        "conjunct 'स्ते' must be stepped over as ONE cluster (12 bytes)"
+    );
 }
 
 #[test]
 fn move_left_through_devanagari_namaste() {
     let text = "नमस्ते";
     let positions = walk_left(text);
-    assert_eq!(positions, vec![18, 6, 3, 0],
-        "moving left must not stop inside the conjunct cluster");
+    assert_eq!(
+        positions,
+        vec![18, 6, 3, 0],
+        "moving left must not stop inside the conjunct cluster"
+    );
 }
 
 #[test]
@@ -659,8 +682,11 @@ fn move_right_through_devanagari_conjunct_ksha() {
     // "क्ष" is a single grapheme cluster (9 bytes).
     let text = "क्ष";
     let positions = walk_right(text);
-    assert_eq!(positions, vec![0, 9],
-        "entire conjunct word 'क्ष' is one cluster — one step from 0 to 9");
+    assert_eq!(
+        positions,
+        vec![0, 9],
+        "entire conjunct word 'क्ष' is one cluster — one step from 0 to 9"
+    );
 }
 
 #[test]
@@ -678,8 +704,11 @@ fn move_right_devanagari_never_stops_at_virama() {
     let text = "स्त";
     let positions = walk_right(text);
     // Must go 0 → 9 directly; must NOT visit byte 3 (after 'स') or byte 6 (the virama).
-    assert_eq!(positions, vec![0, 9],
-        "virama at byte 3 and the second consonant at byte 6 must not be cursor stops");
+    assert_eq!(
+        positions,
+        vec![0, 9],
+        "virama at byte 3 and the second consonant at byte 6 must not be cursor stops"
+    );
 }
 
 #[test]
@@ -688,8 +717,11 @@ fn move_right_devanagari_matches_grapheme_starts() {
     let text = "नमस्ते दुनिया";
     let starts = grapheme_starts(text);
     let positions = walk_right(text);
-    assert_eq!(&positions[..starts.len()], starts.as_slice(),
-        "move_right must visit exactly the UAX#29 grapheme cluster starts");
+    assert_eq!(
+        &positions[..starts.len()],
+        starts.as_slice(),
+        "move_right must visit exactly the UAX#29 grapheme cluster starts"
+    );
     assert_eq!(*positions.last().unwrap(), text.len());
 }
 
@@ -721,8 +753,11 @@ fn move_right_through_thai_sawatdi() {
     let text = "สวัสดี";
     // Clusters: ส(0) วั(3) ส(9) ดี(12) — end at 18.
     let positions = walk_right(text);
-    assert_eq!(positions, vec![0, 3, 9, 12, 18],
-        "sara U+0E31 must attach to 'ว' — combined cluster is 6 bytes");
+    assert_eq!(
+        positions,
+        vec![0, 3, 9, 12, 18],
+        "sara U+0E31 must attach to 'ว' — combined cluster is 6 bytes"
+    );
 }
 
 #[test]
@@ -746,8 +781,11 @@ fn move_right_thai_never_stops_inside_sara() {
     // Cursor must NOT stop at byte 3 (the sara alone).
     let text = "วั";
     let positions = walk_right(text);
-    assert_eq!(positions, vec![0, 6],
-        "sara at byte 3 must not be a cursor stop — it bonds with 'ว'");
+    assert_eq!(
+        positions,
+        vec![0, 6],
+        "sara at byte 3 must not be a cursor stop — it bonds with 'ว'"
+    );
 }
 
 #[test]
@@ -756,8 +794,11 @@ fn move_right_thai_full_word_matches_grapheme_starts() {
     let text = "สวัสดีโลก";
     let starts = grapheme_starts(text);
     let positions = walk_right(text);
-    assert_eq!(&positions[..starts.len()], starts.as_slice(),
-        "move_right must visit exactly the UAX#29 grapheme cluster starts");
+    assert_eq!(
+        &positions[..starts.len()],
+        starts.as_slice(),
+        "move_right must visit exactly the UAX#29 grapheme cluster starts"
+    );
     assert_eq!(*positions.last().unwrap(), text.len());
 }
 
@@ -811,9 +852,9 @@ fn devanagari_namaste_right_step_trace() {
     // The 12-byte jump is correct — the whole conjunct+vowel is one cluster.
     let text = "नमस्ते";
     let positions = walk_right(text);
-    assert_eq!(positions[0], 0,  "step 0: start");
-    assert_eq!(positions[1], 3,  "step 1: after 'न' (3 bytes)");
-    assert_eq!(positions[2], 6,  "step 2: after 'म' (3 bytes)");
+    assert_eq!(positions[0], 0, "step 0: start");
+    assert_eq!(positions[1], 3, "step 1: after 'न' (3 bytes)");
+    assert_eq!(positions[2], 6, "step 2: after 'म' (3 bytes)");
     assert_eq!(positions[3], 18, "step 3: after 'स्ते' (12-byte conjunct)");
 }
 
@@ -822,9 +863,12 @@ fn devanagari_namaste_left_step_trace() {
     let text = "नमस्ते";
     let positions = walk_left(text);
     assert_eq!(positions[0], 18, "start at end");
-    assert_eq!(positions[1], 6,  "step 1: jump back 12 bytes over 'स्ते' conjunct");
-    assert_eq!(positions[2], 3,  "step 2: back over 'म' (3 bytes)");
-    assert_eq!(positions[3], 0,  "step 3: back over 'न' (3 bytes)");
+    assert_eq!(
+        positions[1], 6,
+        "step 1: jump back 12 bytes over 'स्ते' conjunct"
+    );
+    assert_eq!(positions[2], 3, "step 2: back over 'म' (3 bytes)");
+    assert_eq!(positions[3], 0, "step 3: back over 'न' (3 bytes)");
 }
 
 #[test]
@@ -843,7 +887,8 @@ fn devanagari_virama_makes_large_jump() {
             assert!(
                 starts.contains(&pos),
                 "cursor landed at byte {} which is not a grapheme start in {:?}",
-                pos, text
+                pos,
+                text
             );
         }
     }
@@ -864,11 +909,17 @@ fn thai_sawatdee_right_step_trace() {
     // the preceding consonant into one grapheme cluster.
     let text = "สวัสดี";
     let positions = walk_right(text);
-    assert_eq!(positions[0], 0,  "step 0: start");
-    assert_eq!(positions[1], 3,  "step 1: after 'ส' (3 bytes)");
-    assert_eq!(positions[2], 9,  "step 2: after 'วั' (6-byte cluster: ว+sara)");
+    assert_eq!(positions[0], 0, "step 0: start");
+    assert_eq!(positions[1], 3, "step 1: after 'ส' (3 bytes)");
+    assert_eq!(
+        positions[2], 9,
+        "step 2: after 'วั' (6-byte cluster: ว+sara)"
+    );
     assert_eq!(positions[3], 12, "step 3: after second 'ส' (3 bytes)");
-    assert_eq!(positions[4], 18, "step 4: after 'ดี' (6-byte cluster: ด+sara)");
+    assert_eq!(
+        positions[4], 18,
+        "step 4: after 'ดี' (6-byte cluster: ด+sara)"
+    );
 }
 
 #[test]
@@ -877,9 +928,9 @@ fn thai_sawatdee_left_step_trace() {
     let positions = walk_left(text);
     assert_eq!(positions[0], 18, "start at end");
     assert_eq!(positions[1], 12, "step 1: back over 'ดี' (6-byte cluster)");
-    assert_eq!(positions[2], 9,  "step 2: back over second 'ส' (3 bytes)");
-    assert_eq!(positions[3], 3,  "step 3: back over 'วั' (6-byte cluster)");
-    assert_eq!(positions[4], 0,  "step 4: back over first 'ส' (3 bytes)");
+    assert_eq!(positions[2], 9, "step 2: back over second 'ส' (3 bytes)");
+    assert_eq!(positions[3], 3, "step 3: back over 'วั' (6-byte cluster)");
+    assert_eq!(positions[4], 0, "step 4: back over first 'ส' (3 bytes)");
 }
 
 #[test]
@@ -893,7 +944,8 @@ fn thai_sara_step_never_stops_mid_cluster() {
             assert!(
                 starts.contains(&pos),
                 "cursor at byte {} is not a grapheme start (mid-cluster stop in {:?})",
-                pos, text
+                pos,
+                text
             );
         }
     }
@@ -912,7 +964,8 @@ fn rtl_arabic_right_always_increases_byte_offset() {
         assert!(
             w[1] > w[0],
             "MoveRight must always increase the byte offset; got {} → {}",
-            w[0], w[1]
+            w[0],
+            w[1]
         );
     }
 }
@@ -926,7 +979,8 @@ fn rtl_hebrew_left_always_decreases_byte_offset() {
         assert!(
             w[1] < w[0],
             "MoveLeft must always decrease the byte offset; got {} → {}",
-            w[0], w[1]
+            w[0],
+            w[1]
         );
     }
 }
@@ -1003,7 +1057,10 @@ fn consecutive_typing_merges_into_one_undo_step() {
     assert_eq!(h.undo_len(), 1, "consecutive typing should merge");
 
     let restored = h.undo(&s3).expect("undo");
-    assert_eq!(restored, s0, "should jump back to state before entire typing run");
+    assert_eq!(
+        restored, s0,
+        "should jump back to state before entire typing run"
+    );
 }
 
 #[test]
@@ -1131,13 +1188,31 @@ fn max_entries_evicts_oldest() {
 
 #[test]
 fn edit_kind_classification() {
-    assert_eq!(EditingCommand::Insert("a".into()).edit_kind(), Some(EditKind::Typing));
-    assert_eq!(EditingCommand::Insert("\n".into()).edit_kind(), Some(EditKind::Newline));
-    assert_eq!(EditingCommand::Insert("hello world".into()).edit_kind(), Some(EditKind::Paste));
-    assert_eq!(EditingCommand::Backspace.edit_kind(), Some(EditKind::Backspace));
-    assert_eq!(EditingCommand::BackspaceWord.edit_kind(), Some(EditKind::Backspace));
+    assert_eq!(
+        EditingCommand::Insert("a".into()).edit_kind(),
+        Some(EditKind::Typing)
+    );
+    assert_eq!(
+        EditingCommand::Insert("\n".into()).edit_kind(),
+        Some(EditKind::Newline)
+    );
+    assert_eq!(
+        EditingCommand::Insert("hello world".into()).edit_kind(),
+        Some(EditKind::Paste)
+    );
+    assert_eq!(
+        EditingCommand::Backspace.edit_kind(),
+        Some(EditKind::Backspace)
+    );
+    assert_eq!(
+        EditingCommand::BackspaceWord.edit_kind(),
+        Some(EditKind::Backspace)
+    );
     assert_eq!(EditingCommand::Delete.edit_kind(), Some(EditKind::Delete));
-    assert_eq!(EditingCommand::DeleteWord.edit_kind(), Some(EditKind::Delete));
+    assert_eq!(
+        EditingCommand::DeleteWord.edit_kind(),
+        Some(EditKind::Delete)
+    );
     assert_eq!(EditingCommand::MoveLeft { extend: false }.edit_kind(), None);
     assert_eq!(EditingCommand::SelectAll.edit_kind(), None);
 }
@@ -1151,13 +1226,13 @@ fn word_segment_at_returns_correct_segments() {
     //                   0123456789...
     let text = "(abc) d efg h?";
     // UAX#29 segments: ( | abc | ) | _ | d | _ | efg | _ | h | ?
-    assert_eq!(word_segment_at(text, 0), (0, 1));   // (
-    assert_eq!(word_segment_at(text, 1), (1, 4));   // abc
-    assert_eq!(word_segment_at(text, 3), (1, 4));   // still inside abc
-    assert_eq!(word_segment_at(text, 4), (4, 5));   // )
-    assert_eq!(word_segment_at(text, 5), (5, 6));   // space
-    assert_eq!(word_segment_at(text, 6), (6, 7));   // d
-    assert_eq!(word_segment_at(text, 8), (8, 11));  // efg
+    assert_eq!(word_segment_at(text, 0), (0, 1)); // (
+    assert_eq!(word_segment_at(text, 1), (1, 4)); // abc
+    assert_eq!(word_segment_at(text, 3), (1, 4)); // still inside abc
+    assert_eq!(word_segment_at(text, 4), (4, 5)); // )
+    assert_eq!(word_segment_at(text, 5), (5, 6)); // space
+    assert_eq!(word_segment_at(text, 6), (6, 7)); // d
+    assert_eq!(word_segment_at(text, 8), (8, 11)); // efg
     assert_eq!(word_segment_at(text, 12), (12, 13)); // h
     assert_eq!(word_segment_at(text, 13), (13, 14)); // ?
 }
@@ -1485,7 +1560,7 @@ fn ceil_char_boundary_mid_multibyte() {
 fn floor_ceil_on_emoji() {
     let t = "\u{1F600}!"; // 😀(4 bytes) + !(1) = 5 bytes
     assert_eq!(floor_char_boundary(t, 2), 0); // mid emoji → 0
-    assert_eq!(ceil_char_boundary(t, 2), 4);  // mid emoji → 4
+    assert_eq!(ceil_char_boundary(t, 2), 4); // mid emoji → 4
 }
 
 // ===========================================================================
@@ -1507,12 +1582,16 @@ fn assert_valid_state(s: &TextEditorState) {
     assert!(
         s.cursor <= s.text.len() && s.text.is_char_boundary(s.cursor),
         "invalid cursor {} in text of len {} ({:?})",
-        s.cursor, s.text.len(), &s.text[..s.text.len().min(40)]
+        s.cursor,
+        s.text.len(),
+        &s.text[..s.text.len().min(40)]
     );
     if let Some(a) = s.anchor {
         assert!(
             a <= s.text.len() && s.text.is_char_boundary(a),
-            "invalid anchor {} in text of len {}", a, s.text.len()
+            "invalid anchor {} in text of len {}",
+            a,
+            s.text.len()
         );
     }
 }
@@ -1650,11 +1729,7 @@ fn insert_at_every_position_produces_valid_offsets() {
         for &pos in &boundaries {
             for &ins in inserts {
                 let s = TextEditorState::with_cursor(text, pos);
-                let result = apply_command(
-                    &s,
-                    EditingCommand::Insert(ins.to_string()),
-                    &mut lay,
-                );
+                let result = apply_command(&s, EditingCommand::Insert(ins.to_string()), &mut lay);
                 assert_valid_state(&result);
             }
         }
@@ -1667,14 +1742,22 @@ fn repeated_word_movement_never_panics() {
     for &text in SAFETY_TEXTS {
         let mut s = TextEditorState::with_cursor(text, 0);
         for _ in 0..100 {
-            if s.cursor >= text.len() { break; }
-            s = apply_command(&s, EditingCommand::MoveWordRight { extend: false }, &mut lay);
+            if s.cursor >= text.len() {
+                break;
+            }
+            s = apply_command(
+                &s,
+                EditingCommand::MoveWordRight { extend: false },
+                &mut lay,
+            );
             assert_valid_state(&s);
         }
 
         s = TextEditorState::new(text);
         for _ in 0..100 {
-            if s.cursor == 0 { break; }
+            if s.cursor == 0 {
+                break;
+            }
             s = apply_command(&s, EditingCommand::MoveWordLeft { extend: false }, &mut lay);
             assert_valid_state(&s);
         }
@@ -1687,19 +1770,31 @@ fn repeated_word_deletion_never_panics() {
     for &text in SAFETY_TEXTS {
         let mut s = TextEditorState::new(text);
         for _ in 0..100 {
-            if s.text.is_empty() { break; }
+            if s.text.is_empty() {
+                break;
+            }
             s = apply_command(&s, EditingCommand::BackspaceWord, &mut lay);
             assert_valid_state(&s);
         }
-        assert!(s.text.is_empty(), "BackspaceWord loop did not empty: {:?}", s.text);
+        assert!(
+            s.text.is_empty(),
+            "BackspaceWord loop did not empty: {:?}",
+            s.text
+        );
 
         let mut s = TextEditorState::with_cursor(text, 0);
         for _ in 0..100 {
-            if s.text.is_empty() { break; }
+            if s.text.is_empty() {
+                break;
+            }
             s = apply_command(&s, EditingCommand::DeleteWord, &mut lay);
             assert_valid_state(&s);
         }
-        assert!(s.text.is_empty(), "DeleteWord loop did not empty: {:?}", s.text);
+        assert!(
+            s.text.is_empty(),
+            "DeleteWord loop did not empty: {:?}",
+            s.text
+        );
     }
 }
 
@@ -1711,19 +1806,27 @@ fn assert_valid_caret_rect(cr: &CaretRect, text: &str, offset: usize) {
     assert!(
         cr.x >= 0.0,
         "caret_rect_at({}).x = {} is negative for {:?}",
-        offset, cr.x, &text[..text.len().min(40)]
+        offset,
+        cr.x,
+        &text[..text.len().min(40)]
     );
     assert!(
         cr.y >= 0.0,
-        "caret_rect_at({}).y = {} is negative", offset, cr.y
+        "caret_rect_at({}).y = {} is negative",
+        offset,
+        cr.y
     );
     assert!(
         cr.height > 0.0,
-        "caret_rect_at({}).height = {} is non-positive", offset, cr.height
+        "caret_rect_at({}).height = {} is non-positive",
+        offset,
+        cr.height
     );
     assert!(
         cr.x.is_finite() && cr.y.is_finite() && cr.height.is_finite(),
-        "caret_rect_at({}) contains non-finite value: {:?}", offset, cr
+        "caret_rect_at({}) contains non-finite value: {:?}",
+        offset,
+        cr
     );
 }
 
@@ -1757,7 +1860,10 @@ fn caret_rect_y_monotonic_with_lines() {
                 assert!(
                     cr.y >= py,
                     "caret y went backwards at offset {}: {} < {} in {:?}",
-                    pos, cr.y, py, text
+                    pos,
+                    cr.y,
+                    py,
+                    text
                 );
             }
             prev_y = Some(cr.y);
@@ -1773,9 +1879,12 @@ fn caret_rect_x_zero_at_line_start() {
         for lm in &metrics {
             let cr = lay.caret_rect_at(text, lm.start_index);
             assert_eq!(
-                cr.x, 0.0,
+                cr.x,
+                0.0,
                 "caret at line start (offset {}) must have x=0, got {} in {:?}",
-                lm.start_index, cr.x, &text[..text.len().min(40)]
+                lm.start_index,
+                cr.x,
+                &text[..text.len().min(40)]
             );
         }
     }
@@ -1809,7 +1918,9 @@ fn line_index_and_caret_rect_agree() {
     let mut lay = layout();
     for &text in SAFETY_TEXTS {
         let metrics = lay.line_metrics(text);
-        if metrics.is_empty() { continue; }
+        if metrics.is_empty() {
+            continue;
+        }
         let boundaries = grapheme_boundaries(text);
         for &pos in &boundaries {
             let idx = line_index_for_offset_utf8(&metrics, pos);
@@ -1818,7 +1929,11 @@ fn line_index_and_caret_rect_agree() {
             assert!(
                 (cr.y - (lm.baseline - lm.ascent)).abs() < 0.01,
                 "line_index says line {} (y={}) but caret_rect_at({}) gives y={} in {:?}",
-                idx, lm.baseline - lm.ascent, pos, cr.y, &text[..text.len().min(40)]
+                idx,
+                lm.baseline - lm.ascent,
+                pos,
+                cr.y,
+                &text[..text.len().min(40)]
             );
         }
     }
@@ -1884,56 +1999,96 @@ fn assert_walk_right(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
     let mut s = TextEditorState::with_cursor(text, start);
     let max = text.len() + 10;
     for step in 0..max {
-        if s.cursor >= text.len() { return; }
+        if s.cursor >= text.len() {
+            return;
+        }
         let before = s.cursor;
         s = apply_command(&s, EditingCommand::MoveRight { extend: false }, lay);
-        assert!(s.cursor > before,
+        assert!(
+            s.cursor > before,
             "MoveRight stuck at offset {} (step {}) in {:?}",
-            before, step, &text[..text.len().min(60)]);
+            before,
+            step,
+            &text[..text.len().min(60)]
+        );
     }
-    panic!("MoveRight did not reach end from offset {} in {:?}", start, &text[..text.len().min(60)]);
+    panic!(
+        "MoveRight did not reach end from offset {} in {:?}",
+        start,
+        &text[..text.len().min(60)]
+    );
 }
 
 fn assert_walk_left(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
     let mut s = TextEditorState::with_cursor(text, start);
     let max = text.len() + 10;
     for step in 0..max {
-        if s.cursor == 0 { return; }
+        if s.cursor == 0 {
+            return;
+        }
         let before = s.cursor;
         s = apply_command(&s, EditingCommand::MoveLeft { extend: false }, lay);
-        assert!(s.cursor < before,
+        assert!(
+            s.cursor < before,
             "MoveLeft stuck at offset {} (step {}) in {:?}",
-            before, step, &text[..text.len().min(60)]);
+            before,
+            step,
+            &text[..text.len().min(60)]
+        );
     }
-    panic!("MoveLeft did not reach 0 from offset {} in {:?}", start, &text[..text.len().min(60)]);
+    panic!(
+        "MoveLeft did not reach 0 from offset {} in {:?}",
+        start,
+        &text[..text.len().min(60)]
+    );
 }
 
 fn assert_walk_down(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
     let mut s = TextEditorState::with_cursor(text, start);
     let max = text.len() + 10;
     for step in 0..max {
-        if s.cursor >= text.len() { return; }
+        if s.cursor >= text.len() {
+            return;
+        }
         let before = s.cursor;
         s = apply_command(&s, EditingCommand::MoveDown { extend: false }, lay);
-        assert!(s.cursor > before || s.cursor == text.len(),
+        assert!(
+            s.cursor > before || s.cursor == text.len(),
             "MoveDown stuck at offset {} (step {}) in {:?}",
-            before, step, &text[..text.len().min(60)]);
+            before,
+            step,
+            &text[..text.len().min(60)]
+        );
     }
-    panic!("MoveDown did not reach end from offset {} in {:?}", start, &text[..text.len().min(60)]);
+    panic!(
+        "MoveDown did not reach end from offset {} in {:?}",
+        start,
+        &text[..text.len().min(60)]
+    );
 }
 
 fn assert_walk_up(text: &str, start: usize, lay: &mut dyn TextLayoutEngine) {
     let mut s = TextEditorState::with_cursor(text, start);
     let max = text.len() + 10;
     for step in 0..max {
-        if s.cursor == 0 { return; }
+        if s.cursor == 0 {
+            return;
+        }
         let before = s.cursor;
         s = apply_command(&s, EditingCommand::MoveUp { extend: false }, lay);
-        assert!(s.cursor < before || s.cursor == 0,
+        assert!(
+            s.cursor < before || s.cursor == 0,
             "MoveUp stuck at offset {} (step {}) in {:?}",
-            before, step, &text[..text.len().min(60)]);
+            before,
+            step,
+            &text[..text.len().min(60)]
+        );
     }
-    panic!("MoveUp did not reach 0 from offset {} in {:?}", start, &text[..text.len().min(60)]);
+    panic!(
+        "MoveUp did not reach 0 from offset {} in {:?}",
+        start,
+        &text[..text.len().min(60)]
+    );
 }
 
 fn run_nav_tests(lay: &mut dyn TextLayoutEngine) {
@@ -1974,32 +2129,48 @@ fn nav_never_locks_skia() {
 
 fn run_hit_test_invariants(lay: &mut dyn TextLayoutEngine, label: &str) {
     for &text in NAV_TEXTS {
-        if text.is_empty() { continue; }
+        if text.is_empty() {
+            continue;
+        }
         let metrics = lay.line_metrics(text);
-        if metrics.is_empty() { continue; }
+        if metrics.is_empty() {
+            continue;
+        }
 
         // For each non-phantom line, clicking at x=0 must return start_index.
         for (line_idx, lm) in metrics.iter().enumerate() {
-            if lm.start_index == lm.end_index { continue; }
+            if lm.start_index == lm.end_index {
+                continue;
+            }
             let mid_y = lm.baseline - lm.ascent * 0.5;
 
             let pos = lay.position_at_point(text, 0.0, mid_y);
             assert!(
                 text.is_char_boundary(pos) && pos <= text.len(),
                 "[{}] position_at_point(0, {}) returned invalid offset {} for {:?}",
-                label, mid_y, pos, &text[..text.len().min(40)]
+                label,
+                mid_y,
+                pos,
+                &text[..text.len().min(40)]
             );
             assert_eq!(
-                pos, lm.start_index,
+                pos,
+                lm.start_index,
                 "[{}] click at x=0 on line {} should give start_index {}, got {} in {:?}",
-                label, line_idx, lm.start_index, pos, &text[..text.len().min(40)]
+                label,
+                line_idx,
+                lm.start_index,
+                pos,
+                &text[..text.len().min(40)]
             );
         }
 
         // Sweep: for every non-phantom line, sample x positions and verify
         // offsets are valid char boundaries and monotonically non-decreasing.
         for (line_idx, lm) in metrics.iter().enumerate() {
-            if lm.start_index == lm.end_index { continue; }
+            if lm.start_index == lm.end_index {
+                continue;
+            }
             let mid_y = lm.baseline - lm.ascent * 0.5;
             let mut prev_pos: Option<usize> = None;
 
@@ -2009,7 +2180,11 @@ fn run_hit_test_invariants(lay: &mut dyn TextLayoutEngine, label: &str) {
                 assert!(
                     text.is_char_boundary(pos) && pos <= text.len(),
                     "[{}] position_at_point({}, {}) invalid offset {} on line {}",
-                    label, x, mid_y, pos, line_idx
+                    label,
+                    x,
+                    mid_y,
+                    pos,
+                    line_idx
                 );
                 if let Some(pp) = prev_pos {
                     assert!(

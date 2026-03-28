@@ -194,9 +194,7 @@ async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
                 "svg" => return scene_from_svg_path(path).map(|s| vec![s]),
                 // Raster images should be loaded via load_raster() by the caller
                 // so bytes can be registered with the renderer.
-                ext if is_raster_ext(ext) => {
-                    return load_raster(path).map(|r| vec![r.scene])
-                }
+                ext if is_raster_ext(ext) => return load_raster(path).map(|r| vec![r.scene]),
                 _ => {}
             }
         }
@@ -347,7 +345,10 @@ fn load_raster(path: &Path) -> Result<RasterScene> {
 
     let nf = NodeFactory::new();
     let mut node = nf.create_image_node();
-    node.size = Size { width: width as f32, height: height as f32 };
+    node.size = Size {
+        width: width as f32,
+        height: height as f32,
+    };
     node.image = ref_.clone();
     node.fill.image = ref_;
     node.strokes = Paints::default();

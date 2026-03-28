@@ -31,7 +31,10 @@ fn build_scene() -> Scene {
     let presets: Vec<(&str, StrokeMarkerPreset)> = vec![
         ("none", StrokeMarkerPreset::None),
         ("right_triangle_open", StrokeMarkerPreset::RightTriangleOpen),
-        ("equilateral_triangle", StrokeMarkerPreset::EquilateralTriangle),
+        (
+            "equilateral_triangle",
+            StrokeMarkerPreset::EquilateralTriangle,
+        ),
         ("circle", StrokeMarkerPreset::Circle),
         ("square", StrokeMarkerPreset::Square),
         ("diamond", StrokeMarkerPreset::Diamond),

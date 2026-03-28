@@ -105,9 +105,7 @@ fn main() {
         Format::Json => inspect_json(&bytes, &cli),
         Format::RawFbs | Format::Zip => inspect_fbs(&bytes, &cli),
         Format::Unknown => {
-            eprintln!(
-                "error: unrecognized format. Expected .grida FlatBuffers, ZIP, or JSON."
-            );
+            eprintln!("error: unrecognized format. Expected .grida FlatBuffers, ZIP, or JSON.");
             std::process::exit(1);
         }
     }
@@ -121,7 +119,9 @@ fn inspect_json(bytes: &[u8], cli: &Cli) {
     // --list-scenes and --scene are FBS/ZIP-only features; reject them for
     // legacy JSON input to avoid silent misuse.
     if cli.list_scenes {
-        eprintln!("error: --list-scenes is not supported for legacy JSON files (single scene only).");
+        eprintln!(
+            "error: --list-scenes is not supported for legacy JSON files (single scene only)."
+        );
         std::process::exit(1);
     }
     if cli.scene_index.is_some() {
@@ -333,13 +333,7 @@ fn print_node_tree(
         .get(id)
         .map(|s| s.as_str())
         .unwrap_or("<no-string-id>");
-    println!(
-        "{}{} {:?} ({})",
-        indent,
-        classify_node(node),
-        id,
-        string_id,
-    );
+    println!("{}{} {:?} ({})", indent, classify_node(node), id, string_id,);
 
     if let Some(children) = graph.get_children(id) {
         for child in children {

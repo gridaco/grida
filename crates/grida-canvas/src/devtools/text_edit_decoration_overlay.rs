@@ -83,11 +83,7 @@ impl TextEditDecorationOverlay {
         cache: &SceneCache,
     ) {
         // Look up the node's world transform from the layer list.
-        let entry = cache
-            .layers
-            .layers
-            .iter()
-            .find(|e| e.id == deco.node_id);
+        let entry = cache.layers.layers.iter().find(|e| e.id == deco.node_id);
         let Some(entry) = entry else {
             return;
         };

@@ -297,8 +297,7 @@ impl<'a> HitTester<'a> {
         indices.sort();
 
         // Set of selected node IDs — used for O(1) ancestor lookups.
-        let mut selected_set =
-            std::collections::HashSet::with_capacity(indices.len().min(256));
+        let mut selected_set = std::collections::HashSet::with_capacity(indices.len().min(256));
         let mut out = Vec::with_capacity(indices.len().min(256));
 
         let center_point = [rect.x + rect.width / 2.0, rect.y + rect.height / 2.0];

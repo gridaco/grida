@@ -90,7 +90,14 @@ mod tests {
     }
 
     fn ins(cache: &mut LayerImageCache, id: u64, w: i32, h: i32) {
-        cache.insert(id, make_test_image(w, h), 1.0, zero_rect(), 1.0, LayerBlendMode::default());
+        cache.insert(
+            id,
+            make_test_image(w, h),
+            1.0,
+            zero_rect(),
+            1.0,
+            LayerBlendMode::default(),
+        );
     }
 
     #[test]

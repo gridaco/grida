@@ -165,7 +165,13 @@ fn scene_wide_container() -> Scene {
 
     let mut links = HashMap::new();
     links.insert(container_id, children_ids);
-    build_scene("bench-wide-container", None, pairs, links, vec![container_id])
+    build_scene(
+        "bench-wide-container",
+        None,
+        pairs,
+        links,
+        vec![container_id],
+    )
 }
 
 /// Deeply nested containers (500 levels deep), each with a leaf rect.
@@ -254,7 +260,14 @@ fn scene_rotated_rects() -> Scene {
         let r = ((i * 17) % 256) as u8;
         let g = ((i * 11) % 256) as u8;
         let b = ((i * 5) % 256) as u8;
-        nodes.push(rect_rotated(x, y, 20.0, 10.0, rotation, solid(r, g, b, 200)));
+        nodes.push(rect_rotated(
+            x,
+            y,
+            20.0,
+            10.0,
+            rotation,
+            solid(r, g, b, 200),
+        ));
     }
     flat_scene("bench-rotated-rects", nodes)
 }
@@ -388,7 +401,14 @@ fn scene_shadow_grid() -> Scene {
                 color: CGColor::from_rgba(0, 0, 0, 80),
                 active: true,
             });
-            nodes.push(rect_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects));
+            nodes.push(rect_with_effects(
+                x,
+                y,
+                cell,
+                cell,
+                solid(r, g, b, 255),
+                effects,
+            ));
         }
     }
     flat_scene("bench-shadow-grid", nodes)
@@ -419,7 +439,14 @@ fn scene_blur_grid() -> Scene {
                 }),
                 ..LayerEffects::default()
             };
-            nodes.push(rect_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects));
+            nodes.push(rect_with_effects(
+                x,
+                y,
+                cell,
+                cell,
+                solid(r, g, b, 255),
+                effects,
+            ));
         }
     }
     flat_scene("bench-blur-grid", nodes)
@@ -473,7 +500,14 @@ fn scene_mixed_effects() -> Scene {
                     ..LayerEffects::default()
                 },
             };
-            nodes.push(rect_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects));
+            nodes.push(rect_with_effects(
+                x,
+                y,
+                cell,
+                cell,
+                solid(r, g, b, 255),
+                effects,
+            ));
         }
     }
     flat_scene("bench-mixed-effects", nodes)
@@ -550,7 +584,13 @@ fn scene_blur_container() -> Scene {
 
     let mut links = HashMap::new();
     links.insert(container_id, children_ids);
-    build_scene("bench-blur-container", None, pairs, links, vec![container_id])
+    build_scene(
+        "bench-blur-container",
+        None,
+        pairs,
+        links,
+        vec![container_id],
+    )
 }
 
 /// 1000 individually-blurred rects inside a plain container (no container effects).
@@ -672,7 +712,14 @@ fn scene_progressive_blur_grid() -> Scene {
                 }),
                 ..LayerEffects::default()
             };
-            nodes.push(rect_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects));
+            nodes.push(rect_with_effects(
+                x,
+                y,
+                cell,
+                cell,
+                solid(r, g, b, 255),
+                effects,
+            ));
         }
     }
     flat_scene("bench-progressive-blur-grid", nodes)
@@ -722,14 +769,7 @@ fn scene_backdrop_blur_grid() -> Scene {
             let effects = LayerEffects::new().backdrop_blur(blur);
             pairs.push((
                 id,
-                rect_with_effects(
-                    x,
-                    y,
-                    cell,
-                    cell,
-                    solid(255, 255, 255, 72),
-                    effects,
-                ),
+                rect_with_effects(x, y, cell, cell, solid(255, 255, 255, 72), effects),
             ));
             roots.push(id);
             id += 1;
@@ -774,7 +814,14 @@ fn scene_noise_grid() -> Scene {
                 }],
                 ..LayerEffects::default()
             };
-            nodes.push(rect_with_effects(x, y, cell, cell, solid(r, g, b, 255), effects));
+            nodes.push(rect_with_effects(
+                x,
+                y,
+                cell,
+                cell,
+                solid(r, g, b, 255),
+                effects,
+            ));
         }
     }
     flat_scene("bench-noise-grid", nodes)
@@ -819,10 +866,7 @@ fn scene_glass_grid() -> Scene {
                     break;
                 }
                 let w = stripe_w.min(cell - left);
-                pairs.push((
-                    id,
-                    rect(x + left, y, w, cell, solid(0, 0, 0, 255)),
-                ));
+                pairs.push((id, rect(x + left, y, w, cell, solid(0, 0, 0, 255))));
                 roots.push(id);
                 id += 1;
             }
@@ -918,7 +962,10 @@ fn scene_opacity_fill_stroke() -> Scene {
             let b = (((col + row) * 5) % 256) as u8;
             let opacity = 0.1 + ((col + row) % 9) as f32 * 0.1;
             nodes.push(rect_opacity_fill_stroke(
-                x, y, cell, cell,
+                x,
+                y,
+                cell,
+                cell,
                 solid(r, g, b, 255),
                 solid(0, 0, 0, 255),
                 2.0,
@@ -1006,7 +1053,10 @@ fn main() {
         ("bench-blur-grid", scene_blur_grid()),
         ("bench-mixed-effects", scene_mixed_effects()),
         ("bench-blur-container", scene_blur_container()),
-        ("bench-blur-children-in-container", scene_blur_children_in_container()),
+        (
+            "bench-blur-children-in-container",
+            scene_blur_children_in_container(),
+        ),
         ("bench-progressive-blur-grid", scene_progressive_blur_grid()),
         ("bench-backdrop-blur-grid", scene_backdrop_blur_grid()),
         ("bench-noise-grid", scene_noise_grid()),
@@ -1015,11 +1065,12 @@ fn main() {
         ("bench-opacity-fill-stroke", scene_opacity_fill_stroke()),
     ];
 
-    let total_nodes: usize = scenes
-        .iter()
-        .map(|(_, s)| s.graph.node_count())
-        .sum();
-    eprintln!("Generating bench.grida with {} scenes, ~{} total nodes", scenes.len(), total_nodes);
+    let total_nodes: usize = scenes.iter().map(|(_, s)| s.graph.node_count()).sum();
+    eprintln!(
+        "Generating bench.grida with {} scenes, ~{} total nodes",
+        scenes.len(),
+        total_nodes
+    );
 
     write_multi_fixture_zip(&scenes, "bench");
 }

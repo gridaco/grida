@@ -127,7 +127,10 @@ pub fn marker_shape(
         BuiltinMarker::RightTriangleOpen => {
             let depth = size;
             let path = shift_path(&build_arrow_lines(size), t * depth);
-            MarkerShape { path, cutback: stroke_width * 0.5 }
+            MarkerShape {
+                path,
+                cutback: stroke_width * 0.5,
+            }
         }
         BuiltinMarker::EquilateralTriangle => {
             let s = size * 0.8;
@@ -135,31 +138,46 @@ pub fn marker_shape(
             let half_h = s * 0.866;
             let path = shift_path(&build_triangle_terminal(size), t * depth);
             let terminal_cutback = solve_cutback_triangle(depth, half_h, half_sw);
-            MarkerShape { path, cutback: lerp_cutback(terminal_cutback, depth, t) }
+            MarkerShape {
+                path,
+                cutback: lerp_cutback(terminal_cutback, depth, t),
+            }
         }
         BuiltinMarker::Circle => {
             let r = size * 0.6;
             let depth = r * 2.0;
             let path = shift_path(&build_circle_terminal(size), t * depth);
             let terminal_cutback = solve_cutback_circle(r, half_sw);
-            MarkerShape { path, cutback: lerp_cutback(terminal_cutback, depth, t) }
+            MarkerShape {
+                path,
+                cutback: lerp_cutback(terminal_cutback, depth, t),
+            }
         }
         BuiltinMarker::Square => {
             let depth = size * 1.2;
             let path = shift_path(&build_square_terminal(size), t * depth);
-            MarkerShape { path, cutback: lerp_cutback(depth, depth, t) }
+            MarkerShape {
+                path,
+                cutback: lerp_cutback(depth, depth, t),
+            }
         }
         BuiltinMarker::Diamond => {
             let s = size * 0.85;
             let depth = s * 2.0;
             let path = shift_path(&build_diamond_terminal(size), t * depth);
             let terminal_cutback = solve_cutback_triangle(s, s, half_sw);
-            MarkerShape { path, cutback: lerp_cutback(terminal_cutback, depth, t) }
+            MarkerShape {
+                path,
+                cutback: lerp_cutback(terminal_cutback, depth, t),
+            }
         }
         BuiltinMarker::VerticalBar => {
             let depth = stroke_width;
             let path = shift_path(&build_vertical_bar(stroke_width), t * depth);
-            MarkerShape { path, cutback: lerp_cutback(depth, depth, t) }
+            MarkerShape {
+                path,
+                cutback: lerp_cutback(depth, depth, t),
+            }
         }
     }
 }

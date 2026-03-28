@@ -37,7 +37,12 @@ fn main() {
                 let x = (i % 100) as f32 * 10.0;
                 let y = (i / 100) as f32 * 10.0;
                 let mut paint = skia_safe::Paint::default();
-                paint.set_color(skia_safe::Color::from_argb(255, (i * 7 % 256) as u8, 100, 200));
+                paint.set_color(skia_safe::Color::from_argb(
+                    255,
+                    (i * 7 % 256) as u8,
+                    100,
+                    200,
+                ));
                 canvas.draw_rect(skia_safe::Rect::from_xywh(x, y, 8.0, 8.0), &paint);
             }
             flush_gpu(surface);
@@ -45,7 +50,10 @@ fn main() {
         let avg = start.elapsed() / n_iter;
         println!(
             "rect_fill x{:<6} | avg {:>7} us  ({:.0} fps)  {:.2} us/rect",
-            count, avg.as_micros(), 1_000_000.0 / avg.as_micros() as f64, avg.as_micros() as f64 / count as f64,
+            count,
+            avg.as_micros(),
+            1_000_000.0 / avg.as_micros() as f64,
+            avg.as_micros() as f64 / count as f64,
         );
     }
 
@@ -55,9 +63,12 @@ fn main() {
     // This is how Skia actually renders shadows — with an image filter on save_layer.
     {
         let shadow_filter_4 = skia_safe::image_filters::drop_shadow_only(
-            (4.0, 4.0), (8.0, 8.0),
+            (4.0, 4.0),
+            (8.0, 8.0),
             skia_safe::Color::from_argb(80, 0, 0, 0),
-            None, None, None,
+            None,
+            None,
+            None,
         );
         // Capture into a GPU texture.
         let info = skia_safe::ImageInfo::new_n32_premul((32, 32), None);
@@ -68,7 +79,9 @@ fn main() {
             let bounds = skia_safe::Rect::from_xywh(0.0, 0.0, 32.0, 32.0);
             let mut lp = skia_safe::Paint::default();
             lp.set_image_filter(shadow_filter_4.clone());
-            let rec = skia_safe::canvas::SaveLayerRec::default().bounds(&bounds).paint(&lp);
+            let rec = skia_safe::canvas::SaveLayerRec::default()
+                .bounds(&bounds)
+                .paint(&lp);
             c.save_layer(&rec);
             let mut p = skia_safe::Paint::default();
             p.set_color(skia_safe::Color::from_argb(255, 180, 180, 180));
@@ -102,7 +115,10 @@ fn main() {
             let avg = start.elapsed() / n_iter;
             println!(
                 "img_blit  x{:<6} | avg {:>7} us  ({:.0} fps)  {:.1} us/node",
-                count, avg.as_micros(), 1_000_000.0 / avg.as_micros() as f64, avg.as_micros() as f64 / count as f64,
+                count,
+                avg.as_micros(),
+                1_000_000.0 / avg.as_micros() as f64,
+                avg.as_micros() as f64 / count as f64,
             );
         }
 
@@ -118,7 +134,12 @@ fn main() {
                 let c = off.canvas();
                 c.clear(skia_safe::Color::TRANSPARENT);
                 let mut p = skia_safe::Paint::default();
-                p.set_color(skia_safe::Color::from_argb(255, (i * 17 % 256) as u8, 100, 200));
+                p.set_color(skia_safe::Color::from_argb(
+                    255,
+                    (i * 17 % 256) as u8,
+                    100,
+                    200,
+                ));
                 c.draw_rect(skia_safe::Rect::from_xywh(0.0, 0.0, 32.0, 32.0), &p);
             }
             textures.push(off.image_snapshot());
@@ -150,7 +171,9 @@ fn main() {
             let avg = start.elapsed() / n_iter;
             println!(
                 "same_tex  x1000   | avg {:>7} us  ({:.0} fps)  {:.1} us/blit",
-                avg.as_micros(), 1_000_000.0 / avg.as_micros() as f64, avg.as_micros() as f64 / 1000.0,
+                avg.as_micros(),
+                1_000_000.0 / avg.as_micros() as f64,
+                avg.as_micros() as f64 / 1000.0,
             );
         }
 
@@ -179,7 +202,9 @@ fn main() {
             let avg = start.elapsed() / n_iter;
             println!(
                 "diff_tex  x1000   | avg {:>7} us  ({:.0} fps)  {:.1} us/blit",
-                avg.as_micros(), 1_000_000.0 / avg.as_micros() as f64, avg.as_micros() as f64 / 1000.0,
+                avg.as_micros(),
+                1_000_000.0 / avg.as_micros() as f64,
+                avg.as_micros() as f64 / 1000.0,
             );
         }
     }
@@ -205,7 +230,9 @@ fn main() {
             let avg = start.elapsed() / n_iter;
             println!(
                 "snapshot  {}x{:<5} | avg {:>7} us",
-                region_size, region_size, avg.as_micros(),
+                region_size,
+                region_size,
+                avg.as_micros(),
             );
         }
     }
@@ -215,15 +242,16 @@ fn main() {
     // ─── Test 6: SkPicture with blur image filter (the expensive part) ──
     // Record a picture that includes a blur filter, measure replay cost.
     {
-        let blur_filter = skia_safe::image_filters::blur(
-            (8.0, 8.0), None, None::<skia_safe::ImageFilter>, None,
-        );
+        let blur_filter =
+            skia_safe::image_filters::blur((8.0, 8.0), None, None::<skia_safe::ImageFilter>, None);
         let mut recorder = skia_safe::PictureRecorder::new();
         let bounds = skia_safe::Rect::from_xywh(0.0, 0.0, 100.0, 100.0);
         let rec_canvas = recorder.begin_recording(bounds, false);
         let mut lp = skia_safe::Paint::default();
         lp.set_image_filter(blur_filter);
-        let rec = skia_safe::canvas::SaveLayerRec::default().bounds(&bounds).paint(&lp);
+        let rec = skia_safe::canvas::SaveLayerRec::default()
+            .bounds(&bounds)
+            .paint(&lp);
         rec_canvas.save_layer(&rec);
         let mut p = skia_safe::Paint::default();
         p.set_color(skia_safe::Color::RED);
@@ -250,7 +278,10 @@ fn main() {
             let avg = start.elapsed() / n_iter;
             println!(
                 "blur_pic  x{:<6} | avg {:>7} us  ({:.0} fps)  {:.1} us/node",
-                count, avg.as_micros(), 1_000_000.0 / avg.as_micros() as f64, avg.as_micros() as f64 / count as f64,
+                count,
+                avg.as_micros(),
+                1_000_000.0 / avg.as_micros() as f64,
+                avg.as_micros() as f64 / count as f64,
             );
         }
     }

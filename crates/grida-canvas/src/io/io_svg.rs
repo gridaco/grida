@@ -1,8 +1,8 @@
 use crate::io::io_grida_fbs;
 use crate::node::schema::*;
+use crate::svg::into_tree;
 use crate::svg::pack;
 use crate::svg::sanitize::sanitize_svg;
-use crate::svg::into_tree;
 use std::collections::HashMap;
 
 type ErrorMessageString = String;
@@ -48,7 +48,13 @@ pub fn svg_to_grida_bytes(svg_source: &str) -> Result<Vec<u8>, ErrorMessageStrin
     }
 
     for root_id in scene.graph.roots() {
-        walk_tree_order(&scene.graph, root_id, &mut id_map, &mut position_map, &mut counter);
+        walk_tree_order(
+            &scene.graph,
+            root_id,
+            &mut id_map,
+            &mut position_map,
+            &mut counter,
+        );
     }
 
     let bytes = io_grida_fbs::encode(&scene, "svg_scene", &id_map, &position_map);
