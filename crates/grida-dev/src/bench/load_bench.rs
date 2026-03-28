@@ -218,6 +218,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
                         cg::node::schema::Node::Group(_) => "Group",
                         cg::node::schema::Node::BooleanOperation(_) => "BoolOp",
                         cg::node::schema::Node::InitialContainer(_) => "ICB",
+                        cg::node::schema::Node::AttributedText(_) => "AttributedText",
                         cg::node::schema::Node::Error(_) => "Error",
                     })
                     .unwrap_or("?");

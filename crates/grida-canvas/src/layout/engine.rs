@@ -59,7 +59,9 @@
 //! - Missing results indicate a bug in the layout engine.
 
 use crate::layout::cache::LayoutResult;
-use crate::layout::tree::{LayoutTree, TextMeasureContext, TextMeasureProvider};
+use crate::layout::tree::{
+    AttributedTextMeasureContext, LayoutTree, TextMeasureContext, TextMeasureProvider,
+};
 use crate::layout::ComputedLayout;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::{Node, NodeId, NodeRectMixin, NodeTypeTag, Size};
@@ -225,6 +227,7 @@ impl LayoutEngine {
             Node::RegularPolygon(n) => (n.size.width, n.size.height),
             Node::RegularStarPolygon(n) => (n.size.width, n.size.height),
             Node::TextSpan(n) => (n.width.unwrap_or(0.0), n.height.unwrap_or(0.0)),
+            Node::AttributedText(n) => (n.width.unwrap_or(0.0), n.height.unwrap_or(0.0)),
             Node::Vector(n) => {
                 let rect = n.network.bounds();
                 (rect.width, rect.height)
@@ -267,6 +270,7 @@ impl LayoutEngine {
             Node::RegularPolygon(n) => (n.transform.x(), n.transform.y()),
             Node::RegularStarPolygon(n) => (n.transform.x(), n.transform.y()),
             Node::TextSpan(n) => (n.transform.x(), n.transform.y()),
+            Node::AttributedText(n) => (n.transform.x(), n.transform.y()),
             Node::Vector(n) => (n.transform.x(), n.transform.y()),
             Node::Path(n) => (n.transform.x(), n.transform.y()),
             Node::Error(n) => (n.transform.x(), n.transform.y()),
@@ -391,6 +395,20 @@ impl LayoutEngine {
                 };
                 self.tree.new_text_leaf(*node_id, style, ctx).ok()
             }
+            Node::AttributedText(n) => {
+                let ctx = AttributedTextMeasureContext {
+                    scene_node_id: *node_id,
+                    attributed_string: n.attributed_string.clone(),
+                    text_align: n.text_align.clone(),
+                    max_lines: n.max_lines.clone(),
+                    ellipsis: n.ellipsis.clone(),
+                    width: n.width,
+                    height: n.height,
+                };
+                self.tree
+                    .new_attributed_text_leaf(*node_id, style, ctx)
+                    .ok()
+            }
             _ => self.tree.new_leaf(*node_id, style).ok(),
         }
     }
@@ -449,10 +467,15 @@ impl LayoutEngine {
             // Node not in Taffy tree — use schema positions/sizes from geo_data.
             // For text nodes with missing dimensions, access full Node for measurement.
             let lc = graph.get_layer_core(id);
-            let is_text = lc.map(|c| c.node_type == NodeTypeTag::TextSpan).unwrap_or(false);
+            let is_text = lc
+                .map(|c| {
+                    c.node_type == NodeTypeTag::TextSpan
+                        || c.node_type == NodeTypeTag::AttributedText
+                })
+                .unwrap_or(false);
 
             if is_text {
-                // TextSpan: may need on-the-fly measurement — access full Node.
+                // Text node: may need on-the-fly measurement — access full Node.
                 if let Ok(node) = graph.get_node(id) {
                     let (x, y) = Self::get_schema_position(node);
                     let (mut width, mut height) = Self::get_schema_size(node);
@@ -460,17 +483,37 @@ impl LayoutEngine {
                     if let Node::TextSpan(n) = node {
                         if n.width.is_none() || n.height.is_none() {
                             if let Some(ref mut provider) = text_measure {
-                                let width_constraint = n.width;
                                 let measurements = provider.paragraph_cache.measure(
                                     &n.text,
                                     &n.text_style,
                                     &n.text_align,
                                     &n.max_lines,
                                     &n.ellipsis,
-                                    width_constraint,
+                                    n.width,
                                     provider.fonts,
                                     Some(id),
                                 );
+                                if n.width.is_none() {
+                                    width = measurements.max_width;
+                                }
+                                if n.height.is_none() {
+                                    height = measurements.height;
+                                }
+                            }
+                        }
+                    } else if let Node::AttributedText(n) = node {
+                        if n.width.is_none() || n.height.is_none() {
+                            if let Some(ref mut provider) = text_measure {
+                                let measurements =
+                                    provider.paragraph_cache.measure_attributed(
+                                        &n.attributed_string,
+                                        &n.text_align,
+                                        &n.max_lines,
+                                        &n.ellipsis,
+                                        n.width,
+                                        provider.fonts,
+                                        Some(id),
+                                    );
                                 if n.width.is_none() {
                                     width = measurements.max_width;
                                 }

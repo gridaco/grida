@@ -486,7 +486,6 @@ dependencies = [
  "futures",
  "gl",
  "glutin",
- "grida-text-edit",
  "imgref",
  "json-patch",
  "math2",
@@ -502,6 +501,7 @@ dependencies = [
  "skia-safe",
  "taffy",
  "tokio",
+ "unicode-segmentation",
  "usvg",
  "zip 2.4.2",
 ]
@@ -1550,22 +1550,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grida-text-edit"
-version = "0.0.0"
-dependencies = [
- "arboard",
- "gl",
- "glutin",
- "glutin-winit",
- "raw-window-handle",
- "serde",
- "serde_json",
- "skia-safe",
- "unicode-segmentation",
- "winit",
-]
-
-[[package]]
 name = "h2"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2295,6 +2279,9 @@ checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 [[package]]
 name = "math2"
 version = "0.0.2"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "maybe-rayon"

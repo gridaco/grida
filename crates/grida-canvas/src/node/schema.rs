@@ -912,6 +912,7 @@ pub enum NodeTypeTag {
     RegularStarPolygon,
     Line,
     TextSpan,
+    AttributedText,
     Path,
     Vector,
     BooleanOperation,
@@ -1061,6 +1062,16 @@ pub fn extract_layer_core(node: &Node) -> NodeLayerCore {
             node_type: NodeTypeTag::TextSpan,
             is_flex: false,
         },
+        Node::AttributedText(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::AttributedText,
+            is_flex: false,
+        },
         Node::Path(n) => NodeLayerCore {
             active: n.active,
             opacity: n.opacity,
@@ -1117,6 +1128,7 @@ pub enum Node {
     RegularStarPolygon(RegularStarPolygonNodeRec),
     Line(LineNodeRec),
     TextSpan(TextSpanNodeRec),
+    AttributedText(AttributedTextNodeRec),
     Path(PathNodeRec),
     Vector(VectorNodeRec),
     BooleanOperation(BooleanPathOperationNodeRec),
@@ -1142,6 +1154,7 @@ impl NodeTrait for Node {
             Node::RegularStarPolygon(n) => n.active,
             Node::Line(n) => n.active,
             Node::TextSpan(n) => n.active,
+            Node::AttributedText(n) => n.active,
             Node::Path(n) => n.active,
             Node::Vector(n) => n.active,
             Node::BooleanOperation(n) => n.active,
@@ -1163,6 +1176,7 @@ impl Node {
             Node::RegularStarPolygon(n) => n.mask,
             Node::Line(n) => n.mask,
             Node::TextSpan(n) => n.mask,
+            Node::AttributedText(n) => n.mask,
             Node::Path(n) => n.mask,
             Node::Vector(n) => n.mask,
             Node::BooleanOperation(n) => n.mask,
@@ -1186,6 +1200,7 @@ impl Node {
             Node::RegularStarPolygon(n) => n.opacity,
             Node::Line(n) => n.opacity,
             Node::TextSpan(n) => n.opacity,
+            Node::AttributedText(n) => n.opacity,
             Node::Path(n) => n.opacity,
             Node::Vector(n) => n.opacity,
             Node::BooleanOperation(n) => n.opacity,
@@ -1207,6 +1222,7 @@ impl Node {
             Node::RegularStarPolygon(_) => "Star",
             Node::Line(_) => "Line",
             Node::TextSpan(_) => "Text",
+            Node::AttributedText(_) => "AttributedText",
             Node::Path(_) => "Path",
             Node::Vector(_) => "Vector",
             Node::BooleanOperation(_) => "Boolean",
@@ -1229,6 +1245,7 @@ impl Node {
             Node::RegularStarPolygon(n) => n.blend_mode,
             Node::Line(n) => n.blend_mode,
             Node::TextSpan(n) => n.blend_mode,
+            Node::AttributedText(n) => n.blend_mode,
             Node::Path(n) => n.blend_mode,
             Node::Vector(n) => n.blend_mode,
             Node::BooleanOperation(n) => n.blend_mode,
@@ -1251,6 +1268,7 @@ impl Node {
             Node::RegularStarPolygon(n) => Some(&n.effects),
             Node::Line(n) => Some(&n.effects),
             Node::TextSpan(n) => Some(&n.effects),
+            Node::AttributedText(n) => Some(&n.effects),
             Node::Path(n) => Some(&n.effects),
             Node::Vector(n) => Some(&n.effects),
             Node::BooleanOperation(n) => Some(&n.effects),
@@ -2590,6 +2608,76 @@ pub struct TextSpanNodeRec {
 }
 
 impl NodeTransformMixin for TextSpanNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
+/// A rich text node with per-run styling (attributed string).
+///
+/// Unlike [`TextSpanNodeRec`] which carries a single uniform style, this node
+/// type stores an [`AttributedString`] with per-run styles, fills, and strokes.
+/// Each run can have its own font weight, size, color, gradient fill, stroke, etc.
+///
+/// The `default_style` field provides the fallback [`TextStyleRec`] used for
+/// runs that don't override a particular property, and for geometry measurement
+/// when the full attributed run data isn't needed.
+#[derive(Debug, Clone)]
+pub struct AttributedTextNodeRec {
+    pub active: bool,
+
+    /// Transform applied to the text container.
+    pub transform: AffineTransform,
+
+    /// Layout bounds width (used for wrapping).
+    pub width: Option<f32>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
+
+    /// Height of the text container box (see [`TextSpanNodeRec::height`] for semantics).
+    pub height: Option<f32>,
+
+    /// The attributed string: text content + per-run styled runs.
+    pub attributed_string: AttributedString,
+
+    /// Default / fallback text style (used for measurement and unstyled segments).
+    pub default_style: TextStyleRec,
+
+    /// Horizontal alignment.
+    pub text_align: TextAlign,
+
+    /// Vertical alignment of text within its container height.
+    pub text_align_vertical: TextAlignVertical,
+
+    /// Maximum number of lines to render.
+    pub max_lines: Option<usize>,
+
+    /// Ellipsis text to be shown when the text is too long.
+    pub ellipsis: Option<String>,
+
+    /// Node-level fill paints (base paint for runs that don't specify their own).
+    pub fills: Paints,
+
+    /// Node-level stroke paints.
+    pub strokes: Paints,
+
+    /// Stroke width.
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+
+    /// Overall node opacity.
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+}
+
+impl NodeTransformMixin for AttributedTextNodeRec {
     fn x(&self) -> f32 {
         self.transform.x()
     }

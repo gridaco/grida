@@ -78,6 +78,7 @@ pub extern "C" fn init_with_backend(
 ) -> Box<UnknownTargetApplication> {
     let options = cg::runtime::scene::RendererOptions {
         use_embedded_fonts,
+        use_system_fonts: false, // WASM has no system font manager
         config: config_from_flags(config_flags),
     };
     match backend_id {

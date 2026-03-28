@@ -227,12 +227,53 @@ impl ParagraphCache {
         fonts: &FontRepository,
         id: Option<&NodeId>,
     ) -> LayoutMeasurements {
+        let shape_key = Some(Self::shape_key(text, style, align, max_lines));
+        self.measure_inner(width, fonts, id, shape_key, |fonts| {
+            let paragraph_style = crate::text::make_paragraph_style(
+                *align,
+                *max_lines,
+                ellipsis.as_deref(),
+            );
+
+            let ctx = TextStyleRecBuildContext {
+                color: CGColor::TRANSPARENT, // No color for measurement
+            };
+            let mut para_builder =
+                textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
+            let ts = textstyle(style, &Some(ctx), Some(fonts));
+            para_builder.push_style(&ts);
+            let transformed_text =
+                crate::text::text_transform::transform_text(text, style.text_transform);
+            para_builder.add_text(&transformed_text);
+            let paragraph = para_builder.build();
+            para_builder.pop();
+            paragraph
+        })
+    }
+
+    /// Shared cache-hit/miss/store logic for both `measure()` and `measure_attributed()`.
+    ///
+    /// Both public measure methods delegate to this, passing different
+    /// paragraph-building closures.
+    ///
+    /// - `shape_key`: when `Some`, enables shape-key-based caching (used when `id` is `None`).
+    ///   When `None`, only ID-based caching is used.
+    fn measure_inner<F>(
+        &mut self,
+        width: Option<f32>,
+        fonts: &FontRepository,
+        id: Option<&NodeId>,
+        shape_key: Option<u64>,
+        build_paragraph: F,
+    ) -> LayoutMeasurements
+    where
+        F: FnOnce(&FontRepository) -> textlayout::Paragraph,
+    {
         if self.skip_text_measure {
             return LayoutMeasurements::default();
         }
 
         let fonts_gen = fonts.generation();
-
         self.stats.calls += 1;
 
         // Check if we have a cached paragraph
@@ -254,9 +295,8 @@ impl ParagraphCache {
                     return m;
                 }
             }
-        } else {
+        } else if let Some(hash) = shape_key {
             // Use shape-key-based cache
-            let hash = Self::shape_key(text, style, align, max_lines);
             if let Some(entry) = self.entries_measurement_by_shapekey_unstable.get_mut(&hash) {
                 if entry.font_generation == fonts_gen {
                     self.stats.cache_hits += 1;
@@ -274,45 +314,15 @@ impl ParagraphCache {
         }
         self.stats.cache_misses += 1;
 
-        // Build the paragraph (expensive operation) - no paint for measurement
-        let mut paragraph_style = textlayout::ParagraphStyle::new();
-        paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
-        paragraph_style.set_text_align(align.clone().into());
-        // Disable Skia's rounding hack to prevent fractional width truncation
-        paragraph_style.set_apply_rounding_hack(false);
-
-        // Set max lines if specified
-        // Note: 0 is treated as "unset" (similar to CSS -webkit-line-clamp where 0 means no limit).
-        // This handles the case where FlatBuffers defaults uint fields to 0, which should be
-        // interpreted as "not set" rather than a valid value. Valid values start from 1.
-        if let Some(max_lines) = max_lines.filter(|&m| m > 0) {
-            paragraph_style.set_max_lines(max_lines);
-            paragraph_style.set_ellipsis(ellipsis.as_ref().unwrap_or(&"...".to_string()));
-        }
-
-        let ctx = TextStyleRecBuildContext {
-            color: CGColor::TRANSPARENT, // No color for measurement
-            user_fallback_fonts: fonts.user_fallback_families(),
-        };
-        let mut para_builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
-        let ts = textstyle(style, &Some(ctx));
-        // No paint for measurement
-        para_builder.push_style(&ts);
-        let transformed_text =
-            crate::text::text_transform::transform_text(text, style.text_transform);
-        para_builder.add_text(&transformed_text);
-        let paragraph: skia_safe::textlayout::Paragraph = para_builder.build();
-        para_builder.pop();
-
-        // Store the paragraph for future use
+        // Build the paragraph (expensive operation) — no paint for measurement.
+        let paragraph = build_paragraph(fonts);
         let paragraph_rc = Rc::new(RefCell::new(paragraph));
 
         // Compute measurements and cache them with the entry
         let measurements = Self::compute_measurements(paragraph_rc.clone(), width);
 
         let entry = ParagraphCacheEntry {
-            hash: Self::shape_key(text, style, align, max_lines),
+            hash: shape_key.unwrap_or(0),
             font_generation: fonts_gen,
             paragraph: paragraph_rc,
             cached_measurements: Some((width, measurements.clone())),
@@ -322,9 +332,9 @@ impl ParagraphCache {
         if let Some(node_id) = id {
             self.entries_measurement_by_id
                 .insert(node_id.clone(), entry);
-        } else {
+        } else if let Some(hash) = shape_key {
             self.entries_measurement_by_shapekey_unstable
-                .insert(entry.hash, entry);
+                .insert(hash, entry);
         }
 
         measurements
@@ -374,6 +384,50 @@ impl ParagraphCache {
             line_number: para_ref.line_number(),
             did_exceed_max_lines: para_ref.did_exceed_max_lines(),
         }
+    }
+
+    /// Measure an attributed string (per-run styled text) for geometry.
+    ///
+    /// Unlike [`measure`], this builds a paragraph with per-run styles so that
+    /// varying font sizes, weights, and families are reflected in the measured
+    /// dimensions. No paint is applied — this is geometry-only.
+    ///
+    /// Results are cached by node ID with the same invalidation strategy as
+    /// [`measure`].
+    pub fn measure_attributed(
+        &mut self,
+        attr: &crate::cg::types::AttributedString,
+        align: &TextAlign,
+        max_lines: &Option<usize>,
+        ellipsis: &Option<String>,
+        width: Option<f32>,
+        fonts: &FontRepository,
+        id: Option<&NodeId>,
+    ) -> LayoutMeasurements {
+        self.measure_inner(width, fonts, id, None, |fonts| {
+            let paragraph_style = crate::text::make_paragraph_style(
+                *align,
+                *max_lines,
+                ellipsis.as_deref(),
+            );
+
+            let mut para_builder =
+                textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
+
+            for run in &attr.runs {
+                let ctx = TextStyleRecBuildContext {
+                    color: CGColor::TRANSPARENT,
+                };
+                let ts = textstyle(&run.style, &Some(ctx), Some(fonts));
+                para_builder.push_style(&ts);
+                let run_text = &attr.text[run.start as usize..run.end as usize];
+                let transformed =
+                    crate::text::text_transform::transform_text(run_text, run.style.text_transform);
+                para_builder.add_text(&transformed);
+            }
+
+            para_builder.build()
+        })
     }
 
     /// Get or create paragraph for rendering with fill paint applied.
@@ -433,30 +487,21 @@ impl ParagraphCache {
             None
         };
 
-        let mut paragraph_style = textlayout::ParagraphStyle::new();
-        paragraph_style.set_text_direction(textlayout::TextDirection::LTR);
-        paragraph_style.set_text_align(align.clone().into());
-        paragraph_style.set_apply_rounding_hack(false);
-
-        // Set max lines if specified
-        // Note: 0 is treated as "unset" (similar to CSS -webkit-line-clamp where 0 means no limit).
-        // This handles the case where FlatBuffers defaults uint fields to 0, which should be
-        // interpreted as "not set" rather than a valid value. Valid values start from 1.
-        if let Some(max_lines) = max_lines.filter(|&m| m > 0) {
-            paragraph_style.set_max_lines(max_lines);
-            paragraph_style.set_ellipsis(ellipsis.as_ref().unwrap_or(&"...".to_string()));
-        }
+        let paragraph_style = crate::text::make_paragraph_style(
+            *align,
+            *max_lines,
+            ellipsis.as_deref(),
+        );
 
         let ctx = TextStyleRecBuildContext {
             color: fills
                 .first()
                 .and_then(|f| f.solid_color())
                 .unwrap_or(CGColor::TRANSPARENT),
-            user_fallback_fonts: fonts.user_fallback_families(),
         };
         let mut para_builder =
             textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
-        let mut ts = textstyle(style, &Some(ctx));
+        let mut ts = textstyle(style, &Some(ctx), Some(fonts));
         if let Some(ref paint) = fill_paint {
             ts.set_foreground_paint(paint);
         }
@@ -476,15 +521,23 @@ impl ParagraphCache {
         paragraph_rc
     }
 
-    /// Get baseline information for overlay purposes, only if paragraph is already cached by ID
-    /// Returns None if paragraph is not in cache (respects "don't create new" requirement)
+    /// Get baseline information for overlay purposes, only if paragraph is already cached by ID.
+    ///
+    /// Returns `None` if the paragraph is not cached or if the cached entry
+    /// was built with a stale font generation (the caller must re-measure first).
     pub fn get_baseline_info_if_cached_by_id(
         &self,
         id: &NodeId,
         width: Option<f32>,
+        font_generation: usize,
     ) -> Option<(Vec<BaselineInfo>, f32)> {
         // Check if we have a cached paragraph by ID
         if let Some(entry) = self.entries_measurement_by_id.get(id) {
+            // Reject stale entries — prevents reading tofu-width baselines
+            // when fonts have been loaded since this entry was cached.
+            if entry.font_generation != font_generation {
+                return None;
+            }
             let paragraph_rc = &entry.paragraph;
 
             // Apply layout if width is specified

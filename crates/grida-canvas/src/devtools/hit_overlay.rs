@@ -74,7 +74,7 @@ impl HitOverlay {
                         match &entry.layer {
                             crate::painter::layer::PainterPictureLayer::Text(t) => {
                                 if let Some(text_path) =
-                                    text_overlay::TextOverlay::text_layer_baseline(cache, t)
+                                    text_overlay::TextOverlay::text_layer_baseline(cache, t, fonts)
                                 {
                                     text_path
                                 } else {

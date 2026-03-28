@@ -1731,7 +1731,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      text,
+      text: text as string | null,
     });
   }
 

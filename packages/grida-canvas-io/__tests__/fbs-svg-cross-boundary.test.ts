@@ -71,7 +71,7 @@ describe.skipIf(!hasGeneratedDir())(
       const doc = loadGolden("paint-linear-gradient-vertical-01");
       const vector = Object.values(doc.nodes).find(
         (n) =>
-          n.type === "vector" &&
+          (n.type === "vector" || n.type === "path") &&
           "fill_paints" in n &&
           Array.isArray((n as any).fill_paints) &&
           (n as any).fill_paints.length > 0
@@ -106,9 +106,7 @@ describe.skipIf(!hasGeneratedDir())(
 
     it("transforms-nested: groups with translate(250,250)", () => {
       const doc = loadGolden("transforms-nested");
-      const groups = Object.values(doc.nodes).filter(
-        (n) => n.type === "group"
-      );
+      const groups = Object.values(doc.nodes).filter((n) => n.type === "group");
       expect(groups.length).toBeGreaterThanOrEqual(3);
       const hasTranslate = groups.some(
         (g: any) =>
@@ -138,7 +136,7 @@ describe.skipIf(!hasGeneratedDir())(
       const doc = loadGolden("stroke-dasharray");
       const hasStroke = Object.values(doc.nodes).some(
         (n) =>
-          n.type === "vector" &&
+          (n.type === "vector" || n.type === "path") &&
           "stroke_paints" in n &&
           Array.isArray((n as any).stroke_paints) &&
           (n as any).stroke_paints.length > 0
@@ -150,7 +148,7 @@ describe.skipIf(!hasGeneratedDir())(
       const doc = loadGolden("stroke-dasharray");
       const vector = Object.values(doc.nodes).find(
         (n) =>
-          n.type === "vector" &&
+          (n.type === "vector" || n.type === "path") &&
           "stroke_paints" in n &&
           (n as any).stroke_paints?.length > 0
       ) as any;

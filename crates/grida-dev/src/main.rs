@@ -29,6 +29,14 @@ struct Cli {
     /// File path or URL to load on startup (optional).
     file: Option<String>,
 
+    /// Enable system font fallback (native only).
+    ///
+    /// When set, the platform's system font manager is used as a fallback for
+    /// glyphs not covered by explicitly loaded fonts. Off by default to match
+    /// the WASM/web environment where only provided fonts are available.
+    #[arg(long)]
+    system_fonts: bool,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -61,7 +69,7 @@ async fn main() -> Result<()> {
         Some(Command::SvgToGrida(args)) => run_svg_to_grida(args),
         Some(Command::BenchReport(args)) => bench::run_bench_report(args, loader).await?,
         Some(Command::LoadBench(args)) => bench::run_load_bench(args, loader).await?,
-        None => run_interactive(cli.file).await?,
+        None => run_interactive(cli.file, cli.system_fonts).await?,
     }
     Ok(())
 }
@@ -231,7 +239,7 @@ fn build_empty_scene() -> Scene {
     }
 }
 
-async fn run_interactive(file: Option<String>) -> Result<()> {
+async fn run_interactive(file: Option<String>, system_fonts: bool) -> Result<()> {
     // Load initial scene(s). For raster images we also capture the raw bytes
     // so we can register them with the renderer once it's ready.
     let mut initial_image: Option<ImageMessage> = None;
@@ -266,6 +274,12 @@ async fn run_interactive(file: Option<String>) -> Result<()> {
         let _ = scenes_tx.send(initial_scenes);
     }
 
+    let options = cg::runtime::scene::RendererOptions {
+        use_embedded_fonts: true,
+        use_system_fonts: system_fonts,
+        ..Default::default()
+    };
+
     run_demo_window_with_drop(
         first,
         move |_renderer, tx, _font_tx, proxy| {
@@ -281,6 +295,7 @@ async fn run_interactive(file: Option<String>) -> Result<()> {
         },
         drop_tx,
         scenes_rx,
+        options,
     )
     .await;
 

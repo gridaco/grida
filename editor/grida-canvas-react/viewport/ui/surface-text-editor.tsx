@@ -6,7 +6,7 @@
  * Two modes based on the rendering backend:
  *
  * **WASM/Canvas backend (primary):**
- * The text editing engine (grida-text-edit) runs entirely in WASM.
+ * The text editing engine (cg::text_edit) runs entirely in WASM.
  * This component provides a thin input relay — a hidden `<textarea>` for
  * keyboard/IME capture and a transparent overlay for pointer events.
  * All rendering (text, caret, selection highlights) is handled by the

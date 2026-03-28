@@ -1227,6 +1227,19 @@ table LayoutStyle {
 // -----------------------------------------------------------------------------
 
 
+/// A styled text run within an attributed string.
+/// Byte offsets into the parent text string.
+/// Mirrors node-level paint/stroke patterns — per-run fills, strokes,
+/// and stroke geometry are optional overrides of the node-level defaults.
+table StyledTextRunItem {
+  start:uint;
+  end:uint;
+  text_style:TextStyleRec;
+  fill_paints:[PaintStackItem];
+  stroke_paints:[PaintStackItem];
+  stroke_geometry:StrokeGeometryTrait;
+}
+
 table TextSpanNodeProperties {
   stroke_geometry:StrokeGeometryTrait;
   fill_paints:[PaintStackItem];
@@ -1238,6 +1251,23 @@ table TextSpanNodeProperties {
   max_lines:uint;
   ellipsis:string;
 }
+
+/// Properties for an attributed text node (rich text with per-run styling).
+table AttributedTextNodeProperties {
+  stroke_geometry:StrokeGeometryTrait;
+  fill_paints:[PaintStackItem];
+  stroke_paints:[PaintStackItem];
+  text:string;
+  /// Default / fallback text style for unstyled segments and measurement.
+  default_style:TextStyleRec;
+  text_align:TextAlign;
+  text_align_vertical:TextAlignVertical;
+  max_lines:uint;
+  ellipsis:string;
+  /// Per-run styled text runs. Required — this is the core of an attributed text node.
+  styled_runs:[StyledTextRunItem];
+}
+
 
 // -----------------------------------------------------------------------------
 // Nodes & hierarchy
@@ -1431,6 +1461,12 @@ table TextSpanNode {
   properties:TextSpanNodeProperties;
 }
 
+/// Attributed text node: rich text with per-run styling.
+table AttributedTextNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  properties:AttributedTextNodeProperties;
+}
 
 // -----------------------------------------------------------------------------
 // Node encoding model: union-per-variant (why this, not an "all-flat" Node table)
@@ -1509,22 +1545,22 @@ table TextSpanNode {
 // at the cost of:
 // - one level of indirection per node (variant table)
 // - care needed for unknown-variant handling across versions
+// 
+// EVOLUTION:
+// - always append new node variants to the end of the union.
 union Node {
   UnknownNode,
   SceneNode,
-  // groups and containers, hierarchial modifiers
   GroupNode,
   InitialContainerNode,
   ContainerNode,
   BooleanOperationNode,
-  // primitive shapes
   BasicShapeNode,
   LineNode,
   VectorNode,
-  // texts
   TextSpanNode,
-  // SVG path data (render-only, no vector network)
-  PathNode,
+  PathNode, // SVG path data (render-only, no vector network)
+  AttributedTextNode,
 }
 
 // -----------------------------------------------------------------------------

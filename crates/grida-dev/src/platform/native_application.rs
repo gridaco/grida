@@ -2,7 +2,9 @@ use super::winit::{winit_window, WinitResult};
 use cg::node::schema::{Scene, Size};
 use cg::resources::{load_scene_images, FontMessage, ImageMessage};
 use cg::runtime::camera::Camera2D;
-use cg::window::application::{ApplicationApi, HostEvent, HostEventCallback, UnknownTargetApplication};
+use cg::window::application::{
+    ApplicationApi, HostEvent, HostEventCallback, UnknownTargetApplication,
+};
 use cg::window::command::ApplicationCommand;
 use cg::window::state::AnySurfaceState;
 use futures::channel::mpsc;
@@ -23,20 +25,67 @@ use winit::{
     window::Window,
 };
 
-fn handle_window_event(
+/// Convert a winit KeyEvent to a SurfaceEvent::KeyDown.
+fn winit_key_to_surface_key_down(
+    event: &KeyEvent,
+    modifiers: &winit::keyboard::ModifiersState,
+) -> Option<cg::surface::SurfaceEvent> {
+    use cg::text_edit::session::KeyName;
+
+    let key = match &event.logical_key {
+        Key::Named(winit::keyboard::NamedKey::ArrowLeft) => KeyName::ArrowLeft,
+        Key::Named(winit::keyboard::NamedKey::ArrowRight) => KeyName::ArrowRight,
+        Key::Named(winit::keyboard::NamedKey::ArrowUp) => KeyName::ArrowUp,
+        Key::Named(winit::keyboard::NamedKey::ArrowDown) => KeyName::ArrowDown,
+        Key::Named(winit::keyboard::NamedKey::Home) => KeyName::Home,
+        Key::Named(winit::keyboard::NamedKey::End) => KeyName::End,
+        Key::Named(winit::keyboard::NamedKey::PageUp) => KeyName::PageUp,
+        Key::Named(winit::keyboard::NamedKey::PageDown) => KeyName::PageDown,
+        Key::Named(winit::keyboard::NamedKey::Backspace) => KeyName::Backspace,
+        Key::Named(winit::keyboard::NamedKey::Delete) => KeyName::Delete,
+        Key::Named(winit::keyboard::NamedKey::Enter) => KeyName::Enter,
+        Key::Named(winit::keyboard::NamedKey::Tab) => KeyName::Tab,
+        Key::Named(winit::keyboard::NamedKey::Space) => KeyName::Space,
+        Key::Named(winit::keyboard::NamedKey::Escape) => KeyName::Escape,
+        Key::Character(c) => {
+            let s = c.as_str();
+            // Map single letters for shortcut detection.
+            if s.len() == 1 {
+                let ch = s.chars().next().unwrap();
+                match ch {
+                    'a'..='z' | 'A'..='Z' => KeyName::Letter(ch.to_ascii_lowercase()),
+                    '.' => KeyName::Period,
+                    ',' => KeyName::Comma,
+                    _ => KeyName::Character(s.to_string()),
+                }
+            } else {
+                KeyName::Character(s.to_string())
+            }
+        }
+        _ => return None,
+    };
+
+    let mods = cg::surface::Modifiers {
+        shift: modifiers.shift_key(),
+        alt: modifiers.alt_key(),
+        ctrl_or_cmd: if cfg!(target_os = "macos") {
+            modifiers.super_key()
+        } else {
+            modifiers.control_key()
+        },
+    };
+
+    Some(cg::surface::SurfaceEvent::KeyDown {
+        key,
+        modifiers: mods,
+    })
+}
+
+fn handle_non_keyboard_window_event(
     event: &WindowEvent,
     modifiers: &winit::keyboard::ModifiersState,
 ) -> ApplicationCommand {
     match event {
-        WindowEvent::KeyboardInput {
-            event:
-                KeyEvent {
-                    logical_key: key,
-                    state: ElementState::Pressed,
-                    ..
-                },
-            ..
-        } => handle_key_pressed(key, modifiers),
         WindowEvent::PinchGesture { delta, .. } => {
             // Deadzone: ignore tiny pinch deltas that macOS trackpads
             // generate incidentally during two-finger scroll. Without this,
@@ -110,6 +159,8 @@ pub struct NativeApplication {
     pub(crate) gl_context: PossiblyCurrentContext,
     pub(crate) window: Window,
     pub(crate) modifiers: winit::keyboard::ModifiersState,
+    /// System clipboard for text editing copy/cut/paste.
+    system_clipboard: Option<arboard::Clipboard>,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     fit_scene_on_load: bool,
     /// Set to `true` after `CloseRequested` to prevent event processing on
@@ -205,6 +256,7 @@ impl NativeApplication {
             gl_context,
             window,
             modifiers: winit::keyboard::ModifiersState::default(),
+            system_clipboard: arboard::Clipboard::new().ok(),
             file_drop_tx,
             fit_scene_on_load,
             exiting: false,
@@ -222,6 +274,68 @@ impl NativeApplication {
         });
 
         (app, el)
+    }
+
+    fn build_modifiers(&self) -> cg::surface::Modifiers {
+        cg::surface::Modifiers {
+            shift: self.modifiers.shift_key(),
+            alt: self.modifiers.alt_key(),
+            ctrl_or_cmd: if cfg!(target_os = "macos") {
+                self.modifiers.super_key()
+            } else {
+                self.modifiers.control_key()
+            },
+        }
+    }
+
+    /// Copy the current text edit selection to the system clipboard (HTML + plain text).
+    fn text_edit_copy_selection(&mut self) {
+        if let Some(html) = self.app.text_edit_get_selected_html() {
+            let plain = self.app.text_edit_get_selected_text().unwrap_or_default();
+            if let Some(ref mut cb) = self.system_clipboard {
+                let _ = cb.set_html(&html, Some(&plain));
+            }
+        }
+    }
+
+    /// Try to handle a clipboard operation (Cmd+C/X/V) during text editing.
+    /// Returns `true` if the key was consumed.
+    fn try_text_edit_clipboard(&mut self, key_event: &KeyEvent) -> bool {
+        use winit::keyboard::{KeyCode, PhysicalKey};
+
+        match key_event.physical_key {
+            PhysicalKey::Code(KeyCode::KeyC) => {
+                self.text_edit_copy_selection();
+                true
+            }
+            PhysicalKey::Code(KeyCode::KeyX) if !self.modifiers.shift_key() => {
+                self.text_edit_copy_selection();
+                self.app
+                    .text_edit_command(cg::text_edit_session::EditCommand::DeleteByCut);
+                self.window.request_redraw();
+                true
+            }
+            PhysicalKey::Code(KeyCode::KeyV) => {
+                let mut pasted = false;
+                if let Some(ref mut cb) = self.system_clipboard {
+                    if let Ok(html) = cb.get().html() {
+                        self.app.text_edit_paste_html(&html);
+                        pasted = true;
+                    }
+                    if !pasted {
+                        if let Ok(text) = cb.get_text() {
+                            self.app.text_edit_paste_text(&text);
+                            pasted = true;
+                        }
+                    }
+                }
+                if pasted {
+                    self.window.request_redraw();
+                }
+                true
+            }
+            _ => false,
+        }
     }
 }
 
@@ -264,8 +378,23 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             self.modifiers = modifiers.state();
         }
 
+        // -- Pointer events: routed through handle_surface_event for
+        //    double-click detection and text edit pointer routing.
         if let WindowEvent::CursorMoved { position, .. } = &event {
-            let response = self.app.surface_pointer_move(position.x as f32, position.y as f32);
+            self.app
+                .set_cursor_position([position.x as f32, position.y as f32]);
+            let canvas_point = self
+                .app
+                .renderer()
+                .camera
+                .screen_to_canvas_point([position.x as f32, position.y as f32]);
+            let screen_point = [position.x as f32, position.y as f32];
+
+            let surface_event = cg::surface::SurfaceEvent::PointerMove {
+                canvas_point,
+                screen_point,
+            };
+            let response = self.app.handle_surface_event(surface_event);
             if response.cursor_changed {
                 let cursor = match self.app.surface_cursor() {
                     cg::surface::CursorIcon::Default => winit::window::CursorIcon::Default,
@@ -277,20 +406,16 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 };
                 self.window.set_cursor(cursor);
             }
+            if response.needs_redraw {
+                self.window.request_redraw();
+            }
             // Keep legacy hit test updated for devtools overlay
             self.app.perform_hit_test_host();
         }
 
         if let WindowEvent::MouseInput { state, button, .. } = &event {
-            let modifiers = cg::surface::Modifiers {
-                shift: self.modifiers.shift_key(),
-                alt: self.modifiers.alt_key(),
-                ctrl_or_cmd: if cfg!(target_os = "macos") {
-                    self.modifiers.super_key()
-                } else {
-                    self.modifiers.control_key()
-                },
-            };
+            let was_editing = self.app.text_edit_is_active();
+            let modifiers = self.build_modifiers();
             let pointer_button = match button {
                 MouseButton::Left => cg::surface::PointerButton::Primary,
                 MouseButton::Right => cg::surface::PointerButton::Secondary,
@@ -298,18 +423,140 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 _ => cg::surface::PointerButton::Primary,
             };
             let [sx, sy] = self.app.input_cursor();
-            match state {
-                ElementState::Pressed => {
-                    self.app.surface_pointer_down(sx, sy, pointer_button, modifiers);
-                }
-                ElementState::Released => {
-                    self.app.surface_pointer_up(sx, sy, pointer_button, modifiers);
-                }
+            let canvas_point = self.app.renderer().camera.screen_to_canvas_point([sx, sy]);
+            let screen_point = [sx, sy];
+
+            let surface_event = match state {
+                ElementState::Pressed => cg::surface::SurfaceEvent::PointerDown {
+                    canvas_point,
+                    screen_point,
+                    button: pointer_button,
+                    modifiers,
+                },
+                ElementState::Released => cg::surface::SurfaceEvent::PointerUp {
+                    canvas_point,
+                    screen_point,
+                    button: pointer_button,
+                    modifiers,
+                },
             };
+            let response = self.app.handle_surface_event(surface_event);
+            if response.needs_redraw {
+                self.window.request_redraw();
+            }
+
+            // Toggle IME on text edit mode transitions.
+            let is_editing = self.app.text_edit_is_active();
+            if is_editing && !was_editing {
+                self.window.set_ime_allowed(true);
+            } else if !is_editing && was_editing {
+                self.window.set_ime_allowed(false);
+            }
 
             // Keep legacy selection for devtools
             if *state == ElementState::Pressed && *button == MouseButton::Left {
                 self.app.capture_hit_test_selection();
+            }
+        }
+
+        // -- IME events (Korean, Japanese, Chinese text composition) --
+        if let WindowEvent::Ime(ref ime) = event {
+            if self.app.text_edit_is_active() {
+                use winit::event::Ime;
+                match ime {
+                    Ime::Preedit(text, _cursor_range) => {
+                        let surface_event = cg::surface::SurfaceEvent::Ime(
+                            cg::surface::ImeEvent::Preedit(text.clone()),
+                        );
+                        let response = self.app.handle_surface_event(surface_event);
+                        if response.needs_redraw {
+                            self.window.request_redraw();
+                        }
+                    }
+                    Ime::Commit(text) => {
+                        let surface_event = cg::surface::SurfaceEvent::Ime(
+                            cg::surface::ImeEvent::Commit(text.clone()),
+                        );
+                        let response = self.app.handle_surface_event(surface_event);
+                        if response.needs_redraw {
+                            self.window.request_redraw();
+                        }
+                    }
+                    Ime::Enabled => {
+                        // No-op. On macOS, Ime::Enabled fires when the first
+                        // preedit begins — cancelling preedit here would race.
+                    }
+                    Ime::Disabled => {
+                        self.app.text_edit_ime_cancel();
+                        self.window.request_redraw();
+                    }
+                }
+                return;
+            }
+        }
+
+        // -- Keyboard events: try text edit first, fall through to app commands.
+        if let WindowEvent::KeyboardInput {
+            event: ref key_event,
+            ..
+        } = event
+        {
+            if key_event.state == ElementState::Pressed {
+                let is_editing = self.app.text_edit_is_active();
+                let cmd_held = self.build_modifiers().ctrl_or_cmd;
+
+                // Clipboard operations (Cmd+C/X/V) require host-specific
+                // system clipboard access — handled here, not in
+                // handle_surface_event.
+                if is_editing && cmd_held && self.try_text_edit_clipboard(key_event) {
+                    return;
+                }
+
+                // Route KeyDown through handle_surface_event for text edit
+                // navigation, deletion, and shortcuts.
+                if let Some(surface_event) =
+                    winit_key_to_surface_key_down(key_event, &self.modifiers)
+                {
+                    let response = self.app.handle_surface_event(surface_event);
+                    if response.needs_redraw {
+                        self.window.request_redraw();
+                    }
+                }
+
+                // Detect text edit exit (e.g. Escape) and disable IME.
+                if is_editing && !self.app.text_edit_is_active() {
+                    self.window.set_ime_allowed(false);
+                }
+
+                // If text editing is active, also route text input for
+                // character insertion (separate from KeyDown to avoid
+                // double insertion). Skip when cmd is held — modifier
+                // shortcuts should not produce text input.
+                if self.app.text_edit_is_active() {
+                    if !cmd_held {
+                        if let Some(ref text) = key_event.text {
+                            let s = text.as_str();
+                            // Filter out control characters (Enter, Tab, etc.
+                            // are already handled as KeyDown actions).
+                            if !s.is_empty() && s.chars().all(|c| !c.is_control()) {
+                                let surface_event = cg::surface::SurfaceEvent::TextInput {
+                                    text: s.to_string(),
+                                };
+                                let response = self.app.handle_surface_event(surface_event);
+                                if response.needs_redraw {
+                                    self.window.request_redraw();
+                                }
+                            }
+                        }
+                    }
+                    return; // Don't fall through to app commands while editing.
+                }
+
+                // If we were editing before KeyDown but exited (e.g. Escape),
+                // don't fall through to app commands for this key.
+                if is_editing {
+                    return;
+                }
             }
         }
 
@@ -319,67 +566,87 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             }
         }
 
-        let cmd = handle_window_event(&event, &self.modifiers);
-        match &cmd {
-            ApplicationCommand::NextScene | ApplicationCommand::PrevScene => {
-                if !self.scenes.is_empty() {
-                    let new_index = match &cmd {
-                        ApplicationCommand::NextScene => {
-                            (self.scene_index + 1) % self.scenes.len()
-                        }
-                        ApplicationCommand::PrevScene => {
-                            (self.scene_index + self.scenes.len() - 1) % self.scenes.len()
-                        }
-                        _ => unreachable!(),
-                    };
-                    if new_index != self.scene_index {
-                        self.scene_index = new_index;
-                        let scene = self.scenes[new_index].clone();
-                        let title = format!(
-                            "[{}/{}] {}",
-                            new_index + 1,
-                            self.scenes.len(),
-                            scene.name,
-                        );
-                        eprintln!("{title}");
+        // -- Non-keyboard app commands (scroll, pinch, etc.)
+        let cmd = handle_non_keyboard_window_event(&event, &self.modifiers);
+        if !matches!(cmd, ApplicationCommand::None) {
+            let ok = self.app.command(cmd);
+            if ok {
+                self.settle_countdown = 12;
+            }
+            return;
+        }
 
-                        // Load scene images in background for the new scene.
-                        if let (Some(image_tx), Some(event_cb)) =
-                            (self.image_tx.clone(), self.event_cb.clone())
-                        {
-                            let scene_for_images = scene.clone();
-                            std::thread::spawn(move || {
-                                futures::executor::block_on(async move {
-                                    load_scene_images(&scene_for_images, image_tx, event_cb).await;
+        // -- Keyboard app commands (only if not consumed by text edit above).
+        if let WindowEvent::KeyboardInput {
+            event:
+                KeyEvent {
+                    logical_key: ref key,
+                    state: ElementState::Pressed,
+                    ..
+                },
+            ..
+        } = event
+        {
+            let cmd = handle_key_pressed(key, &self.modifiers);
+            match &cmd {
+                ApplicationCommand::NextScene | ApplicationCommand::PrevScene => {
+                    if !self.scenes.is_empty() {
+                        let new_index = match &cmd {
+                            ApplicationCommand::NextScene => {
+                                (self.scene_index + 1) % self.scenes.len()
+                            }
+                            ApplicationCommand::PrevScene => {
+                                (self.scene_index + self.scenes.len() - 1) % self.scenes.len()
+                            }
+                            _ => unreachable!(),
+                        };
+                        if new_index != self.scene_index {
+                            self.scene_index = new_index;
+                            let scene = self.scenes[new_index].clone();
+                            let title = format!(
+                                "[{}/{}] {}",
+                                new_index + 1,
+                                self.scenes.len(),
+                                scene.name,
+                            );
+                            eprintln!("{title}");
+
+                            // Load scene images in background for the new scene.
+                            if let (Some(image_tx), Some(event_cb)) =
+                                (self.image_tx.clone(), self.event_cb.clone())
+                            {
+                                let scene_for_images = scene.clone();
+                                std::thread::spawn(move || {
+                                    futures::executor::block_on(async move {
+                                        load_scene_images(&scene_for_images, image_tx, event_cb)
+                                            .await;
+                                    });
                                 });
-                            });
-                        }
+                            }
 
-                        let renderer = self.app.renderer_mut();
-                        renderer.load_scene(scene);
-                        fit_camera_to_scene(renderer);
-                        renderer.queue_unstable();
-                        self.window.request_redraw();
-                        self.window.set_title(&title);
+                            let renderer = self.app.renderer_mut();
+                            renderer.load_scene(scene);
+                            fit_camera_to_scene(renderer);
+                            renderer.queue_unstable();
+                            self.window.request_redraw();
+                            self.window.set_title(&title);
+                        }
                     }
                 }
-            }
-            _ => {
-                let is_copy_png = matches!(cmd, ApplicationCommand::TryCopyAsPNG);
-                let ok = self.app.command(cmd);
-                if ok {
-                    // Schedule a settle redraw ~50ms after the last interaction
-                    // so the overlay shows "none" when the gesture ends.
-                    // The 240Hz tick decrements the countdown (~12 ticks ≈ 50ms).
-                    self.settle_countdown = 12;
-                }
+                _ => {
+                    let is_copy_png = matches!(cmd, ApplicationCommand::TryCopyAsPNG);
+                    let ok = self.app.command(cmd);
+                    if ok {
+                        self.settle_countdown = 12;
+                    }
 
-                if ok && is_copy_png {
-                    use std::io::Write;
-                    let path = "clipboard.png".to_string();
-                    let mut file = std::fs::File::create(path).unwrap();
-                    if let Some(bytes) = self.app.clipboard_bytes() {
-                        file.write_all(bytes).unwrap();
+                    if ok && is_copy_png {
+                        use std::io::Write;
+                        let path = "clipboard.png".to_string();
+                        let mut file = std::fs::File::create(path).unwrap();
+                        if let Some(bytes) = self.app.clipboard_bytes() {
+                            file.write_all(bytes).unwrap();
+                        }
                     }
                 }
             }

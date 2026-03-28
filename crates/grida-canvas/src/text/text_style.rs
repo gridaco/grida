@@ -1,9 +1,11 @@
 use crate::cg::prelude::*;
+use crate::runtime::font_repository::FontRepository;
 use skia_safe;
 
 pub fn textstyle(
     style: &TextStyleRec,
     _ctx: &Option<TextStyleRecBuildContext>,
+    fonts: Option<&FontRepository>,
 ) -> skia_safe::textlayout::TextStyle {
     let mut ts = skia_safe::textlayout::TextStyle::new();
     let default_ctx = TextStyleRecBuildContext::default();
@@ -115,12 +117,13 @@ pub fn textstyle(
         }
     }
     ts.set_decoration(&decoration);
-    let mut families: Vec<&str> = Vec::with_capacity(1 + ctx.user_fallback_fonts.len());
-    families.push(&style.font_family);
-    for f in &ctx.user_fallback_fonts {
-        families.push(f.as_str());
+    if let Some(fonts) = fonts {
+        let families = fonts.make_font_families(&style.font_family);
+        let family_refs: Vec<&str> = families.iter().map(|s| s.as_str()).collect();
+        ts.set_font_families(&family_refs);
+    } else {
+        ts.set_font_families(&[style.font_family.as_str()]);
     }
-    ts.set_font_families(&families);
     ts.set_font_arguments(&font_args);
     ts.set_font_style(font_style);
     if let Some(features) = &style.font_features {

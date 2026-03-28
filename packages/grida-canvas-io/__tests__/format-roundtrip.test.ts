@@ -2907,4 +2907,295 @@ describe("format roundtrip", () => {
       );
     });
   });
+
+  describe("AttributedTextNode", () => {
+    const baseAttrib = (
+      id: string
+    ): grida.program.nodes.AttributedTextNode => ({
+      type: "text",
+      id,
+      name: "RichText",
+      active: true,
+      locked: false,
+      opacity: 1,
+      z_index: 0,
+      layout_positioning: "absolute",
+      layout_inset_left: 0,
+      layout_inset_top: 0,
+      layout_target_width: 200,
+      layout_target_height: 100,
+      rotation: 0,
+      text: "Hello World",
+      default_style: {
+        font_family: "Inter",
+        font_size: 16,
+        font_weight: 400,
+        font_kerning: true,
+        text_decoration_line: "none",
+      },
+      styled_runs: [
+        {
+          start: 0,
+          end: 5,
+          style: {
+            font_family: "Inter",
+            font_size: 16,
+            font_weight: 700,
+            font_kerning: true,
+            text_decoration_line: "none",
+          },
+        },
+        {
+          start: 5,
+          end: 11,
+          style: {
+            font_family: "Inter",
+            font_size: 16,
+            font_weight: 400,
+            font_kerning: true,
+            text_decoration_line: "none",
+          },
+        },
+      ],
+      text_align: "left",
+      text_align_vertical: "top",
+    });
+
+    it("roundtrips basic attributed text node", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: baseAttrib(nodeId),
+      });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.text).toBe("Hello World");
+          expect(node.text_align).toBe("left");
+          expect(node.text_align_vertical).toBe("top");
+          expect(node.styled_runs).toHaveLength(2);
+          expect(node.styled_runs[0].start).toBe(0);
+          expect(node.styled_runs[0].end).toBe(5);
+          expect(node.styled_runs[0].style.font_weight).toBe(700);
+          expect(node.styled_runs[1].start).toBe(5);
+          expect(node.styled_runs[1].end).toBe(11);
+          expect(node.styled_runs[1].style.font_weight).toBe(400);
+        }
+      );
+    });
+
+    it("roundtrips default_style properties", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const attribNode = baseAttrib(nodeId);
+      attribNode.default_style = {
+        font_family: "Roboto",
+        font_size: 24,
+        font_weight: 300,
+        font_kerning: true,
+        text_decoration_line: "underline",
+        letter_spacing: 0.05,
+        line_height: 1.5,
+      };
+      const doc = createDocument(sceneId, { [nodeId]: attribNode });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.default_style.font_family).toBe("Roboto");
+          expect(node.default_style.font_size).toBe(24);
+          expect(node.default_style.font_weight).toBe(300);
+          expect(node.default_style.text_decoration_line).toBe("underline");
+          expect(node.default_style.letter_spacing).toBeCloseTo(0.05);
+          expect(node.default_style.line_height).toBeCloseTo(1.5);
+        }
+      );
+    });
+
+    it("roundtrips per-run fill paints", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const attribNode = baseAttrib(nodeId);
+      attribNode.styled_runs[0].fill_paints = [
+        {
+          type: "solid",
+          color: { r: 1, g: 0, b: 0, a: 1 } as cg.RGBA32F,
+          active: true,
+        },
+      ];
+      const doc = createDocument(sceneId, { [nodeId]: attribNode });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.styled_runs[0].fill_paints).toBeDefined();
+          expect(node.styled_runs[0].fill_paints).toHaveLength(1);
+          const paint = node.styled_runs[0].fill_paints![0] as cg.SolidPaint;
+          expect(paint.type).toBe("solid");
+          expect(paint.color.r).toBeCloseTo(1);
+          expect(paint.color.g).toBeCloseTo(0);
+          expect(paint.color.b).toBeCloseTo(0);
+          // Second run should not have fill paints
+          expect(node.styled_runs[1].fill_paints).toBeUndefined();
+        }
+      );
+    });
+
+    it("roundtrips node-level fill_paints", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const attribNode = baseAttrib(nodeId);
+      attribNode.fill_paints = [
+        {
+          type: "solid",
+          color: { r: 0, g: 0, b: 1, a: 1 } as cg.RGBA32F,
+          active: true,
+        },
+      ];
+      const doc = createDocument(sceneId, { [nodeId]: attribNode });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.fill_paints).toBeDefined();
+          expect(node.fill_paints).toHaveLength(1);
+          const paint = node.fill_paints![0] as cg.SolidPaint;
+          expect(paint.type).toBe("solid");
+          expect(paint.color.b).toBeCloseTo(1);
+        }
+      );
+    });
+
+    it("roundtrips max_lines", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const attribNode = baseAttrib(nodeId);
+      attribNode.max_lines = 3;
+      const doc = createDocument(sceneId, { [nodeId]: attribNode });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.max_lines).toBe(3);
+        }
+      );
+    });
+
+    it("roundtrips per-run font features", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const attribNode = baseAttrib(nodeId);
+      attribNode.styled_runs[0].style.font_features = { liga: true };
+      const doc = createDocument(sceneId, { [nodeId]: attribNode });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.styled_runs[0].style.font_features).toBeDefined();
+          expect(node.styled_runs[0].style.font_features!.liga).toBe(true);
+        }
+      );
+    });
+
+    it("roundtrips multi-byte UTF-8 text (CJK)", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      // KJC mix: Korean + Japanese + Chinese (3 UTF-8 bytes per char)
+      const cjkText = "세계 こんにちは 你好";
+      const attribNode = baseAttrib(nodeId);
+      attribNode.text = cjkText;
+      attribNode.styled_runs = [
+        {
+          start: 0,
+          end: 4,
+          style: {
+            font_family: "Inter",
+            font_size: 16,
+            font_weight: 700,
+            font_kerning: true,
+            text_decoration_line: "none",
+          },
+        },
+        {
+          start: 4,
+          end: cjkText.length,
+          style: {
+            font_family: "Inter",
+            font_size: 16,
+            font_weight: 400,
+            font_kerning: true,
+            text_decoration_line: "none",
+          },
+        },
+      ];
+      const doc = createDocument(sceneId, { [nodeId]: attribNode });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.text).toBe(cjkText);
+          expect(node.styled_runs).toHaveLength(2);
+          expect(node.styled_runs[0].start).toBe(0);
+          expect(node.styled_runs[0].end).toBe(4);
+          expect(node.styled_runs[1].start).toBe(4);
+          expect(node.styled_runs[1].end).toBe(cjkText.length);
+        }
+      );
+    });
+
+    it("roundtrips emoji text (surrogate pairs)", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      // "Hello 👋 World" — 👋 is a surrogate pair (2 JS chars, 4 UTF-8 bytes)
+      const emojiText = "Hello \u{1F44B} World";
+      const attribNode = baseAttrib(nodeId);
+      attribNode.text = emojiText;
+      attribNode.styled_runs = [
+        {
+          start: 0,
+          end: 8, // "Hello 👋" = 6 + 2 JS chars (surrogate pair)
+          style: {
+            font_family: "Inter",
+            font_size: 16,
+            font_weight: 700,
+            font_kerning: true,
+            text_decoration_line: "none",
+          },
+        },
+        {
+          start: 8,
+          end: emojiText.length,
+          style: {
+            font_family: "Inter",
+            font_size: 16,
+            font_weight: 400,
+            font_kerning: true,
+            text_decoration_line: "none",
+          },
+        },
+      ];
+      const doc = createDocument(sceneId, { [nodeId]: attribNode });
+      roundtripTest<grida.program.nodes.AttributedTextNode>(
+        doc,
+        nodeId,
+        "text",
+        (node) => {
+          expect(node.text).toBe(emojiText);
+          expect(node.styled_runs).toHaveLength(2);
+          expect(node.styled_runs[0].start).toBe(0);
+          expect(node.styled_runs[0].end).toBe(8);
+          expect(node.styled_runs[1].start).toBe(8);
+          expect(node.styled_runs[1].end).toBe(emojiText.length);
+        }
+      );
+    });
+  });
 });

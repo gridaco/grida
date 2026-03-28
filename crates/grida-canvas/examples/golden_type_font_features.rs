@@ -36,7 +36,7 @@ fn main() {
 
     // Title
     let title_style = TextStyleRec::from_font("Geist", 36.0);
-    let mut ts_title = textstyle(&title_style, &None);
+    let mut ts_title = textstyle(&title_style, &None, None);
     ts_title.set_foreground_paint(&paint);
     builder.push_style(&ts_title);
     builder.add_text("OpenType Font Features Demonstration with Geist\n\n");
@@ -46,7 +46,7 @@ fn main() {
 
     // With ligatures enabled (default)
     let style_liga = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_liga = textstyle(&style_liga, &None);
+    let mut ts_liga = textstyle(&style_liga, &None, None);
     ts_liga.set_foreground_paint(&paint);
     builder.push_style(&ts_liga);
     builder.add_text("office flag file\n");
@@ -59,7 +59,7 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_no_liga = textstyle(&style_no_liga, &None);
+    let mut ts_no_liga = textstyle(&style_no_liga, &None, None);
     ts_no_liga.set_foreground_paint(&paint);
     builder.push_style(&ts_no_liga);
     builder.add_text("office flag file\n\n");
@@ -75,14 +75,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_dlig = textstyle(&style_dlig, &None);
+    let mut ts_dlig = textstyle(&style_dlig, &None, None);
     ts_dlig.set_foreground_paint(&paint);
     builder.push_style(&ts_dlig);
     builder.add_text("office flag file\n");
 
     // Without discretionary ligatures
     let style_no_dlig = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_dlig = textstyle(&style_no_dlig, &None);
+    let mut ts_no_dlig = textstyle(&style_no_dlig, &None, None);
     ts_no_dlig.set_foreground_paint(&paint);
     builder.push_style(&ts_no_dlig);
     builder.add_text("office flag file\n\n");
@@ -98,7 +98,7 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_calt = textstyle(&style_calt, &None);
+    let mut ts_calt = textstyle(&style_calt, &None, None);
     ts_calt.set_foreground_paint(&paint);
     builder.push_style(&ts_calt);
     builder.add_text("office flag file\n");
@@ -111,7 +111,7 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_no_calt = textstyle(&style_no_calt, &None);
+    let mut ts_no_calt = textstyle(&style_no_calt, &None, None);
     ts_no_calt.set_foreground_paint(&paint);
     builder.push_style(&ts_no_calt);
     builder.add_text("office flag file\n\n");
@@ -127,14 +127,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_smcp = textstyle(&style_smcp, &None);
+    let mut ts_smcp = textstyle(&style_smcp, &None, None);
     ts_smcp.set_foreground_paint(&paint);
     builder.push_style(&ts_smcp);
     builder.add_text("office flag file\n");
 
     // Without small caps
     let style_no_smcp = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_smcp = textstyle(&style_no_smcp, &None);
+    let mut ts_no_smcp = textstyle(&style_no_smcp, &None, None);
     ts_no_smcp.set_foreground_paint(&paint);
     builder.push_style(&ts_no_smcp);
     builder.add_text("office flag file\n\n");
@@ -150,14 +150,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_onum = textstyle(&style_onum, &None);
+    let mut ts_onum = textstyle(&style_onum, &None, None);
     ts_onum.set_foreground_paint(&paint);
     builder.push_style(&ts_onum);
     builder.add_text("1234567890\n");
 
     // Without oldstyle figures
     let style_no_onum = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_onum = textstyle(&style_no_onum, &None);
+    let mut ts_no_onum = textstyle(&style_no_onum, &None, None);
     ts_no_onum.set_foreground_paint(&paint);
     builder.push_style(&ts_no_onum);
     builder.add_text("1234567890\n\n");
@@ -173,14 +173,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_tnum = textstyle(&style_tnum, &None);
+    let mut ts_tnum = textstyle(&style_tnum, &None, None);
     ts_tnum.set_foreground_paint(&paint);
     builder.push_style(&ts_tnum);
     builder.add_text("1234567890\n");
 
     // Without tabular figures
     let style_no_tnum = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_tnum = textstyle(&style_no_tnum, &None);
+    let mut ts_no_tnum = textstyle(&style_no_tnum, &None, None);
     ts_no_tnum.set_foreground_paint(&paint);
     builder.push_style(&ts_no_tnum);
     builder.add_text("1234567890\n\n");
@@ -196,14 +196,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_zero = textstyle(&style_zero, &None);
+    let mut ts_zero = textstyle(&style_zero, &None, None);
     ts_zero.set_foreground_paint(&paint);
     builder.push_style(&ts_zero);
     builder.add_text("0O0O0O\n");
 
     // Without slashed zero
     let style_no_zero = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_zero = textstyle(&style_no_zero, &None);
+    let mut ts_no_zero = textstyle(&style_no_zero, &None, None);
     ts_no_zero.set_foreground_paint(&paint);
     builder.push_style(&ts_no_zero);
     builder.add_text("0O0O0O\n\n");
@@ -219,14 +219,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_ss01 = textstyle(&style_ss01, &None);
+    let mut ts_ss01 = textstyle(&style_ss01, &None, None);
     ts_ss01.set_foreground_paint(&paint);
     builder.push_style(&ts_ss01);
     builder.add_text("office flag file\n");
 
     // Without stylistic set 1
     let style_no_ss01 = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_ss01 = textstyle(&style_no_ss01, &None);
+    let mut ts_no_ss01 = textstyle(&style_no_ss01, &None, None);
     ts_no_ss01.set_foreground_paint(&paint);
     builder.push_style(&ts_no_ss01);
     builder.add_text("office flag file\n\n");
@@ -242,14 +242,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_ss02 = textstyle(&style_ss02, &None);
+    let mut ts_ss02 = textstyle(&style_ss02, &None, None);
     ts_ss02.set_foreground_paint(&paint);
     builder.push_style(&ts_ss02);
     builder.add_text("office flag file\n");
 
     // Without stylistic set 2
     let style_no_ss02 = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_ss02 = textstyle(&style_no_ss02, &None);
+    let mut ts_no_ss02 = textstyle(&style_no_ss02, &None, None);
     ts_no_ss02.set_foreground_paint(&paint);
     builder.push_style(&ts_no_ss02);
     builder.add_text("office flag file\n\n");
@@ -265,14 +265,14 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_ss03 = textstyle(&style_ss03, &None);
+    let mut ts_ss03 = textstyle(&style_ss03, &None, None);
     ts_ss03.set_foreground_paint(&paint);
     builder.push_style(&ts_ss03);
     builder.add_text("office flag file\n");
 
     // Without stylistic set 3
     let style_no_ss03 = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_ss03 = textstyle(&style_no_ss03, &None);
+    let mut ts_no_ss03 = textstyle(&style_no_ss03, &None, None);
     ts_no_ss03.set_foreground_paint(&paint);
     builder.push_style(&ts_no_ss03);
     builder.add_text("office flag file\n\n");
@@ -287,13 +287,13 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_salt = textstyle(&style_salt, &None);
+    let mut ts_salt = textstyle(&style_salt, &None, None);
     ts_salt.set_foreground_paint(&paint);
     builder.push_style(&ts_salt);
     builder.add_text("office flag file\n");
 
     let style_no_salt = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_salt = textstyle(&style_no_salt, &None);
+    let mut ts_no_salt = textstyle(&style_no_salt, &None, None);
     ts_no_salt.set_foreground_paint(&paint);
     builder.push_style(&ts_no_salt);
     builder.add_text("office flag file\n\n");
@@ -327,7 +327,7 @@ fn main() {
         ]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_combined = textstyle(&style_combined, &None);
+    let mut ts_combined = textstyle(&style_combined, &None, None);
     ts_combined.set_foreground_paint(&paint);
     builder.push_style(&ts_combined);
     builder.add_text("office flag file 1234567890\n\n");
@@ -337,7 +337,7 @@ fn main() {
 
     // Standard ligatures with "fi fl ff"
     let style_liga_fi = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_liga_fi = textstyle(&style_liga_fi, &None);
+    let mut ts_liga_fi = textstyle(&style_liga_fi, &None, None);
     ts_liga_fi.set_foreground_paint(&paint);
     builder.push_style(&ts_liga_fi);
     builder.add_text("fi fl ff\n");
@@ -350,7 +350,7 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_no_liga_fi = textstyle(&style_no_liga_fi, &None);
+    let mut ts_no_liga_fi = textstyle(&style_no_liga_fi, &None, None);
     ts_no_liga_fi.set_foreground_paint(&paint);
     builder.push_style(&ts_no_liga_fi);
     builder.add_text("fi fl ff\n\n");
@@ -365,13 +365,13 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_dlig_th = textstyle(&style_dlig_th, &None);
+    let mut ts_dlig_th = textstyle(&style_dlig_th, &None, None);
     ts_dlig_th.set_foreground_paint(&paint);
     builder.push_style(&ts_dlig_th);
     builder.add_text("the thin\n");
 
     let style_no_dlig_th = TextStyleRec::from_font("Geist", 24.0);
-    let mut ts_no_dlig_th = textstyle(&style_no_dlig_th, &None);
+    let mut ts_no_dlig_th = textstyle(&style_no_dlig_th, &None, None);
     ts_no_dlig_th.set_foreground_paint(&paint);
     builder.push_style(&ts_no_dlig_th);
     builder.add_text("the thin\n\n");
@@ -386,7 +386,7 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_calt_st = textstyle(&style_calt_st, &None);
+    let mut ts_calt_st = textstyle(&style_calt_st, &None, None);
     ts_calt_st.set_foreground_paint(&paint);
     builder.push_style(&ts_calt_st);
     builder.add_text("first last\n");
@@ -398,7 +398,7 @@ fn main() {
         }]),
         ..TextStyleRec::from_font("Geist", 24.0)
     };
-    let mut ts_no_calt_st = textstyle(&style_no_calt_st, &None);
+    let mut ts_no_calt_st = textstyle(&style_no_calt_st, &None, None);
     ts_no_calt_st.set_foreground_paint(&paint);
     builder.push_style(&ts_no_calt_st);
     builder.add_text("first last\n\n");
@@ -407,7 +407,7 @@ fn main() {
     builder.add_text("16. Feature Explanations\n");
 
     let explanation_style = TextStyleRec::from_font("Geist", 16.0);
-    let mut ts_explanation = textstyle(&explanation_style, &None);
+    let mut ts_explanation = textstyle(&explanation_style, &None, None);
     ts_explanation.set_foreground_paint(&paint);
     builder.push_style(&ts_explanation);
     builder.add_text("• liga: Standard ligatures (fi, fl, ff, etc.)\n");

@@ -11,6 +11,7 @@ use crate::transform::AffineTransform;
 /// @see https://api.flutter.dev/flutter/painting/BoxFit.html  
 /// @see https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BoxFit {
     Contain,
     Cover,

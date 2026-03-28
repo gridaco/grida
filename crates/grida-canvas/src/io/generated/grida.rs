@@ -3860,10 +3860,10 @@ pub struct LayoutPositioningBasisUnionTableOffset {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_NODE: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_NODE: u8 = 11;
+pub const ENUM_MAX_NODE: u8 = 12;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_NODE: [Node; 12] = [
+pub const ENUM_VALUES_NODE: [Node; 13] = [
   Node::NONE,
   Node::UnknownNode,
   Node::SceneNode,
@@ -3876,6 +3876,7 @@ pub const ENUM_VALUES_NODE: [Node; 12] = [
   Node::VectorNode,
   Node::TextSpanNode,
   Node::PathNode,
+  Node::AttributedTextNode,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -3895,9 +3896,10 @@ impl Node {
   pub const VectorNode: Self = Self(9);
   pub const TextSpanNode: Self = Self(10);
   pub const PathNode: Self = Self(11);
+  pub const AttributedTextNode: Self = Self(12);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 11;
+  pub const ENUM_MAX: u8 = 12;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::UnknownNode,
@@ -3911,6 +3913,7 @@ impl Node {
     Self::VectorNode,
     Self::TextSpanNode,
     Self::PathNode,
+    Self::AttributedTextNode,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
@@ -3927,6 +3930,7 @@ impl Node {
       Self::VectorNode => Some("VectorNode"),
       Self::TextSpanNode => Some("TextSpanNode"),
       Self::PathNode => Some("PathNode"),
+      Self::AttributedTextNode => Some("AttributedTextNode"),
       _ => None,
     }
   }
@@ -15584,6 +15588,191 @@ impl ::core::fmt::Debug for LayoutStyle<'_> {
       ds.finish()
   }
 }
+pub enum StyledTextRunItemOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+/// A styled text run within an attributed string.
+/// Byte offsets into the parent text string.
+/// Mirrors node-level paint/stroke patterns — per-run fills, strokes,
+/// and stroke geometry are optional overrides of the node-level defaults.
+pub struct StyledTextRunItem<'a> {
+  pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for StyledTextRunItem<'a> {
+  type Inner = StyledTextRunItem<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: unsafe { ::flatbuffers::Table::new(buf, loc) } }
+  }
+}
+
+impl<'a> StyledTextRunItem<'a> {
+  pub const VT_START: ::flatbuffers::VOffsetT = 4;
+  pub const VT_END: ::flatbuffers::VOffsetT = 6;
+  pub const VT_TEXT_STYLE: ::flatbuffers::VOffsetT = 8;
+  pub const VT_FILL_PAINTS: ::flatbuffers::VOffsetT = 10;
+  pub const VT_STROKE_PAINTS: ::flatbuffers::VOffsetT = 12;
+  pub const VT_STROKE_GEOMETRY: ::flatbuffers::VOffsetT = 14;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+    StyledTextRunItem { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: ::flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args StyledTextRunItemArgs<'args>
+  ) -> ::flatbuffers::WIPOffset<StyledTextRunItem<'bldr>> {
+    let mut builder = StyledTextRunItemBuilder::new(_fbb);
+    if let Some(x) = args.stroke_geometry { builder.add_stroke_geometry(x); }
+    if let Some(x) = args.stroke_paints { builder.add_stroke_paints(x); }
+    if let Some(x) = args.fill_paints { builder.add_fill_paints(x); }
+    if let Some(x) = args.text_style { builder.add_text_style(x); }
+    builder.add_end(args.end);
+    builder.add_start(args.start);
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn start(&self) -> u32 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<u32>(StyledTextRunItem::VT_START, Some(0)).unwrap()}
+  }
+  #[inline]
+  pub fn end(&self) -> u32 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<u32>(StyledTextRunItem::VT_END, Some(0)).unwrap()}
+  }
+  #[inline]
+  pub fn text_style(&self) -> Option<TextStyleRec<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<TextStyleRec>>(StyledTextRunItem::VT_TEXT_STYLE, None)}
+  }
+  #[inline]
+  pub fn fill_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(StyledTextRunItem::VT_FILL_PAINTS, None)}
+  }
+  #[inline]
+  pub fn stroke_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(StyledTextRunItem::VT_STROKE_PAINTS, None)}
+  }
+  #[inline]
+  pub fn stroke_geometry(&self) -> Option<StrokeGeometryTrait<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<StrokeGeometryTrait>>(StyledTextRunItem::VT_STROKE_GEOMETRY, None)}
+  }
+}
+
+impl ::flatbuffers::Verifiable for StyledTextRunItem<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut ::flatbuffers::Verifier, pos: usize
+  ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+    v.visit_table(pos)?
+     .visit_field::<u32>("start", Self::VT_START, false)?
+     .visit_field::<u32>("end", Self::VT_END, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<TextStyleRec>>("text_style", Self::VT_TEXT_STYLE, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("fill_paints", Self::VT_FILL_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("stroke_paints", Self::VT_STROKE_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<StrokeGeometryTrait>>("stroke_geometry", Self::VT_STROKE_GEOMETRY, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct StyledTextRunItemArgs<'a> {
+    pub start: u32,
+    pub end: u32,
+    pub text_style: Option<::flatbuffers::WIPOffset<TextStyleRec<'a>>>,
+    pub fill_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub stroke_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub stroke_geometry: Option<::flatbuffers::WIPOffset<StrokeGeometryTrait<'a>>>,
+}
+impl<'a> Default for StyledTextRunItemArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    StyledTextRunItemArgs {
+      start: 0,
+      end: 0,
+      text_style: None,
+      fill_paints: None,
+      stroke_paints: None,
+      stroke_geometry: None,
+    }
+  }
+}
+
+pub struct StyledTextRunItemBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> StyledTextRunItemBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_start(&mut self, start: u32) {
+    self.fbb_.push_slot::<u32>(StyledTextRunItem::VT_START, start, 0);
+  }
+  #[inline]
+  pub fn add_end(&mut self, end: u32) {
+    self.fbb_.push_slot::<u32>(StyledTextRunItem::VT_END, end, 0);
+  }
+  #[inline]
+  pub fn add_text_style(&mut self, text_style: ::flatbuffers::WIPOffset<TextStyleRec<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<TextStyleRec>>(StyledTextRunItem::VT_TEXT_STYLE, text_style);
+  }
+  #[inline]
+  pub fn add_fill_paints(&mut self, fill_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(StyledTextRunItem::VT_FILL_PAINTS, fill_paints);
+  }
+  #[inline]
+  pub fn add_stroke_paints(&mut self, stroke_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(StyledTextRunItem::VT_STROKE_PAINTS, stroke_paints);
+  }
+  #[inline]
+  pub fn add_stroke_geometry(&mut self, stroke_geometry: ::flatbuffers::WIPOffset<StrokeGeometryTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<StrokeGeometryTrait>>(StyledTextRunItem::VT_STROKE_GEOMETRY, stroke_geometry);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>) -> StyledTextRunItemBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    StyledTextRunItemBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> ::flatbuffers::WIPOffset<StyledTextRunItem<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    ::flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl ::core::fmt::Debug for StyledTextRunItem<'_> {
+  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+    let mut ds = f.debug_struct("StyledTextRunItem");
+      ds.field("start", &self.start());
+      ds.field("end", &self.end());
+      ds.field("text_style", &self.text_style());
+      ds.field("fill_paints", &self.fill_paints());
+      ds.field("stroke_paints", &self.stroke_paints());
+      ds.field("stroke_geometry", &self.stroke_geometry());
+      ds.finish()
+  }
+}
 pub enum TextSpanNodePropertiesOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -15813,6 +16002,258 @@ impl ::core::fmt::Debug for TextSpanNodeProperties<'_> {
       ds.field("text_align_vertical", &self.text_align_vertical());
       ds.field("max_lines", &self.max_lines());
       ds.field("ellipsis", &self.ellipsis());
+      ds.finish()
+  }
+}
+pub enum AttributedTextNodePropertiesOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+/// Properties for an attributed text node (rich text with per-run styling).
+pub struct AttributedTextNodeProperties<'a> {
+  pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for AttributedTextNodeProperties<'a> {
+  type Inner = AttributedTextNodeProperties<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: unsafe { ::flatbuffers::Table::new(buf, loc) } }
+  }
+}
+
+impl<'a> AttributedTextNodeProperties<'a> {
+  pub const VT_STROKE_GEOMETRY: ::flatbuffers::VOffsetT = 4;
+  pub const VT_FILL_PAINTS: ::flatbuffers::VOffsetT = 6;
+  pub const VT_STROKE_PAINTS: ::flatbuffers::VOffsetT = 8;
+  pub const VT_TEXT: ::flatbuffers::VOffsetT = 10;
+  pub const VT_DEFAULT_STYLE: ::flatbuffers::VOffsetT = 12;
+  pub const VT_TEXT_ALIGN: ::flatbuffers::VOffsetT = 14;
+  pub const VT_TEXT_ALIGN_VERTICAL: ::flatbuffers::VOffsetT = 16;
+  pub const VT_MAX_LINES: ::flatbuffers::VOffsetT = 18;
+  pub const VT_ELLIPSIS: ::flatbuffers::VOffsetT = 20;
+  pub const VT_STYLED_RUNS: ::flatbuffers::VOffsetT = 22;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+    AttributedTextNodeProperties { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: ::flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args AttributedTextNodePropertiesArgs<'args>
+  ) -> ::flatbuffers::WIPOffset<AttributedTextNodeProperties<'bldr>> {
+    let mut builder = AttributedTextNodePropertiesBuilder::new(_fbb);
+    if let Some(x) = args.styled_runs { builder.add_styled_runs(x); }
+    if let Some(x) = args.ellipsis { builder.add_ellipsis(x); }
+    builder.add_max_lines(args.max_lines);
+    if let Some(x) = args.default_style { builder.add_default_style(x); }
+    if let Some(x) = args.text { builder.add_text(x); }
+    if let Some(x) = args.stroke_paints { builder.add_stroke_paints(x); }
+    if let Some(x) = args.fill_paints { builder.add_fill_paints(x); }
+    if let Some(x) = args.stroke_geometry { builder.add_stroke_geometry(x); }
+    builder.add_text_align_vertical(args.text_align_vertical);
+    builder.add_text_align(args.text_align);
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn stroke_geometry(&self) -> Option<StrokeGeometryTrait<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<StrokeGeometryTrait>>(AttributedTextNodeProperties::VT_STROKE_GEOMETRY, None)}
+  }
+  #[inline]
+  pub fn fill_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(AttributedTextNodeProperties::VT_FILL_PAINTS, None)}
+  }
+  #[inline]
+  pub fn stroke_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(AttributedTextNodeProperties::VT_STROKE_PAINTS, None)}
+  }
+  #[inline]
+  pub fn text(&self) -> Option<&'a str> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<&str>>(AttributedTextNodeProperties::VT_TEXT, None)}
+  }
+  /// Default / fallback text style for unstyled segments and measurement.
+  #[inline]
+  pub fn default_style(&self) -> Option<TextStyleRec<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<TextStyleRec>>(AttributedTextNodeProperties::VT_DEFAULT_STYLE, None)}
+  }
+  #[inline]
+  pub fn text_align(&self) -> TextAlign {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<TextAlign>(AttributedTextNodeProperties::VT_TEXT_ALIGN, Some(TextAlign::Left)).unwrap()}
+  }
+  #[inline]
+  pub fn text_align_vertical(&self) -> TextAlignVertical {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<TextAlignVertical>(AttributedTextNodeProperties::VT_TEXT_ALIGN_VERTICAL, Some(TextAlignVertical::Top)).unwrap()}
+  }
+  #[inline]
+  pub fn max_lines(&self) -> u32 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<u32>(AttributedTextNodeProperties::VT_MAX_LINES, Some(0)).unwrap()}
+  }
+  #[inline]
+  pub fn ellipsis(&self) -> Option<&'a str> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<&str>>(AttributedTextNodeProperties::VT_ELLIPSIS, None)}
+  }
+  /// Per-run styled text runs. Required — this is the core of an attributed text node.
+  #[inline]
+  pub fn styled_runs(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<StyledTextRunItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<StyledTextRunItem>>>>(AttributedTextNodeProperties::VT_STYLED_RUNS, None)}
+  }
+}
+
+impl ::flatbuffers::Verifiable for AttributedTextNodeProperties<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut ::flatbuffers::Verifier, pos: usize
+  ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+    v.visit_table(pos)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<StrokeGeometryTrait>>("stroke_geometry", Self::VT_STROKE_GEOMETRY, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("fill_paints", Self::VT_FILL_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("stroke_paints", Self::VT_STROKE_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("text", Self::VT_TEXT, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<TextStyleRec>>("default_style", Self::VT_DEFAULT_STYLE, false)?
+     .visit_field::<TextAlign>("text_align", Self::VT_TEXT_ALIGN, false)?
+     .visit_field::<TextAlignVertical>("text_align_vertical", Self::VT_TEXT_ALIGN_VERTICAL, false)?
+     .visit_field::<u32>("max_lines", Self::VT_MAX_LINES, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("ellipsis", Self::VT_ELLIPSIS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<StyledTextRunItem>>>>("styled_runs", Self::VT_STYLED_RUNS, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct AttributedTextNodePropertiesArgs<'a> {
+    pub stroke_geometry: Option<::flatbuffers::WIPOffset<StrokeGeometryTrait<'a>>>,
+    pub fill_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub stroke_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub text: Option<::flatbuffers::WIPOffset<&'a str>>,
+    pub default_style: Option<::flatbuffers::WIPOffset<TextStyleRec<'a>>>,
+    pub text_align: TextAlign,
+    pub text_align_vertical: TextAlignVertical,
+    pub max_lines: u32,
+    pub ellipsis: Option<::flatbuffers::WIPOffset<&'a str>>,
+    pub styled_runs: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<StyledTextRunItem<'a>>>>>,
+}
+impl<'a> Default for AttributedTextNodePropertiesArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    AttributedTextNodePropertiesArgs {
+      stroke_geometry: None,
+      fill_paints: None,
+      stroke_paints: None,
+      text: None,
+      default_style: None,
+      text_align: TextAlign::Left,
+      text_align_vertical: TextAlignVertical::Top,
+      max_lines: 0,
+      ellipsis: None,
+      styled_runs: None,
+    }
+  }
+}
+
+pub struct AttributedTextNodePropertiesBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> AttributedTextNodePropertiesBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_stroke_geometry(&mut self, stroke_geometry: ::flatbuffers::WIPOffset<StrokeGeometryTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<StrokeGeometryTrait>>(AttributedTextNodeProperties::VT_STROKE_GEOMETRY, stroke_geometry);
+  }
+  #[inline]
+  pub fn add_fill_paints(&mut self, fill_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(AttributedTextNodeProperties::VT_FILL_PAINTS, fill_paints);
+  }
+  #[inline]
+  pub fn add_stroke_paints(&mut self, stroke_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(AttributedTextNodeProperties::VT_STROKE_PAINTS, stroke_paints);
+  }
+  #[inline]
+  pub fn add_text(&mut self, text: ::flatbuffers::WIPOffset<&'b  str>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(AttributedTextNodeProperties::VT_TEXT, text);
+  }
+  #[inline]
+  pub fn add_default_style(&mut self, default_style: ::flatbuffers::WIPOffset<TextStyleRec<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<TextStyleRec>>(AttributedTextNodeProperties::VT_DEFAULT_STYLE, default_style);
+  }
+  #[inline]
+  pub fn add_text_align(&mut self, text_align: TextAlign) {
+    self.fbb_.push_slot::<TextAlign>(AttributedTextNodeProperties::VT_TEXT_ALIGN, text_align, TextAlign::Left);
+  }
+  #[inline]
+  pub fn add_text_align_vertical(&mut self, text_align_vertical: TextAlignVertical) {
+    self.fbb_.push_slot::<TextAlignVertical>(AttributedTextNodeProperties::VT_TEXT_ALIGN_VERTICAL, text_align_vertical, TextAlignVertical::Top);
+  }
+  #[inline]
+  pub fn add_max_lines(&mut self, max_lines: u32) {
+    self.fbb_.push_slot::<u32>(AttributedTextNodeProperties::VT_MAX_LINES, max_lines, 0);
+  }
+  #[inline]
+  pub fn add_ellipsis(&mut self, ellipsis: ::flatbuffers::WIPOffset<&'b  str>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(AttributedTextNodeProperties::VT_ELLIPSIS, ellipsis);
+  }
+  #[inline]
+  pub fn add_styled_runs(&mut self, styled_runs: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<StyledTextRunItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(AttributedTextNodeProperties::VT_STYLED_RUNS, styled_runs);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>) -> AttributedTextNodePropertiesBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    AttributedTextNodePropertiesBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> ::flatbuffers::WIPOffset<AttributedTextNodeProperties<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    ::flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl ::core::fmt::Debug for AttributedTextNodeProperties<'_> {
+  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+    let mut ds = f.debug_struct("AttributedTextNodeProperties");
+      ds.field("stroke_geometry", &self.stroke_geometry());
+      ds.field("fill_paints", &self.fill_paints());
+      ds.field("stroke_paints", &self.stroke_paints());
+      ds.field("text", &self.text());
+      ds.field("default_style", &self.default_style());
+      ds.field("text_align", &self.text_align());
+      ds.field("text_align_vertical", &self.text_align_vertical());
+      ds.field("max_lines", &self.max_lines());
+      ds.field("ellipsis", &self.ellipsis());
+      ds.field("styled_runs", &self.styled_runs());
       ds.finish()
   }
 }
@@ -18429,6 +18870,139 @@ impl ::core::fmt::Debug for TextSpanNode<'_> {
       ds.finish()
   }
 }
+pub enum AttributedTextNodeOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+/// Attributed text node: rich text with per-run styling.
+pub struct AttributedTextNode<'a> {
+  pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for AttributedTextNode<'a> {
+  type Inner = AttributedTextNode<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: unsafe { ::flatbuffers::Table::new(buf, loc) } }
+  }
+}
+
+impl<'a> AttributedTextNode<'a> {
+  pub const VT_NODE: ::flatbuffers::VOffsetT = 4;
+  pub const VT_LAYER: ::flatbuffers::VOffsetT = 6;
+  pub const VT_PROPERTIES: ::flatbuffers::VOffsetT = 8;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+    AttributedTextNode { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: ::flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args AttributedTextNodeArgs<'args>
+  ) -> ::flatbuffers::WIPOffset<AttributedTextNode<'bldr>> {
+    let mut builder = AttributedTextNodeBuilder::new(_fbb);
+    if let Some(x) = args.properties { builder.add_properties(x); }
+    if let Some(x) = args.layer { builder.add_layer(x); }
+    if let Some(x) = args.node { builder.add_node(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn node(&self) -> SystemNodeTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>(AttributedTextNode::VT_NODE, None).unwrap()}
+  }
+  #[inline]
+  pub fn layer(&self) -> LayerTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<LayerTrait>>(AttributedTextNode::VT_LAYER, None).unwrap()}
+  }
+  #[inline]
+  pub fn properties(&self) -> Option<AttributedTextNodeProperties<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<AttributedTextNodeProperties>>(AttributedTextNode::VT_PROPERTIES, None)}
+  }
+}
+
+impl ::flatbuffers::Verifiable for AttributedTextNode<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut ::flatbuffers::Verifier, pos: usize
+  ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+    v.visit_table(pos)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>("node", Self::VT_NODE, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<LayerTrait>>("layer", Self::VT_LAYER, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<AttributedTextNodeProperties>>("properties", Self::VT_PROPERTIES, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct AttributedTextNodeArgs<'a> {
+    pub node: Option<::flatbuffers::WIPOffset<SystemNodeTrait<'a>>>,
+    pub layer: Option<::flatbuffers::WIPOffset<LayerTrait<'a>>>,
+    pub properties: Option<::flatbuffers::WIPOffset<AttributedTextNodeProperties<'a>>>,
+}
+impl<'a> Default for AttributedTextNodeArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    AttributedTextNodeArgs {
+      node: None, // required field
+      layer: None, // required field
+      properties: None,
+    }
+  }
+}
+
+pub struct AttributedTextNodeBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> AttributedTextNodeBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_node(&mut self, node: ::flatbuffers::WIPOffset<SystemNodeTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<SystemNodeTrait>>(AttributedTextNode::VT_NODE, node);
+  }
+  #[inline]
+  pub fn add_layer(&mut self, layer: ::flatbuffers::WIPOffset<LayerTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<LayerTrait>>(AttributedTextNode::VT_LAYER, layer);
+  }
+  #[inline]
+  pub fn add_properties(&mut self, properties: ::flatbuffers::WIPOffset<AttributedTextNodeProperties<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<AttributedTextNodeProperties>>(AttributedTextNode::VT_PROPERTIES, properties);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>) -> AttributedTextNodeBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    AttributedTextNodeBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> ::flatbuffers::WIPOffset<AttributedTextNode<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, AttributedTextNode::VT_NODE,"node");
+    self.fbb_.required(o, AttributedTextNode::VT_LAYER,"layer");
+    ::flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl ::core::fmt::Debug for AttributedTextNode<'_> {
+  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+    let mut ds = f.debug_struct("AttributedTextNode");
+      ds.field("node", &self.node());
+      ds.field("layer", &self.layer());
+      ds.field("properties", &self.properties());
+      ds.finish()
+  }
+}
 pub enum NodeSlotOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -18649,6 +19223,21 @@ impl<'a> NodeSlot<'a> {
     }
   }
 
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn node_as_attributed_text_node(&self) -> Option<AttributedTextNode<'a>> {
+    if self.node_type() == Node::AttributedTextNode {
+      self.node().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { AttributedTextNode::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
 }
 
 impl ::flatbuffers::Verifiable for NodeSlot<'_> {
@@ -18670,6 +19259,7 @@ impl ::flatbuffers::Verifiable for NodeSlot<'_> {
           Node::VectorNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<VectorNode>>("Node::VectorNode", pos),
           Node::TextSpanNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<TextSpanNode>>("Node::TextSpanNode", pos),
           Node::PathNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<PathNode>>("Node::PathNode", pos),
+          Node::AttributedTextNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<AttributedTextNode>>("Node::AttributedTextNode", pos),
           _ => Ok(()),
         }
      })?
@@ -18796,6 +19386,13 @@ impl ::core::fmt::Debug for NodeSlot<'_> {
         },
         Node::PathNode => {
           if let Some(x) = self.node_as_path_node() {
+            ds.field("node", &x)
+          } else {
+            ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        Node::AttributedTextNode => {
+          if let Some(x) = self.node_as_attributed_text_node() {
             ds.field("node", &x)
           } else {
             ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")

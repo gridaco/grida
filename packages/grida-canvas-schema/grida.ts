@@ -1222,6 +1222,7 @@ export namespace grida.program.nodes {
     | BooleanPathOperationNode
     | GroupNode
     | TextSpanNode
+    | AttributedTextNode
     | ImageNode
     | VideoNode
     | ContainerNode
@@ -1288,6 +1289,7 @@ export namespace grida.program.nodes {
     Partial<BooleanPathOperationNode> &
       Partial<GroupNode> &
       Partial<TextSpanNode> &
+      Partial<AttributedTextNode> &
       Partial<BitmapNode> &
       Partial<ImageNode> &
       Partial<VideoNode> &
@@ -2270,6 +2272,55 @@ export namespace grida.program.nodes {
     > {
     readonly type: "tspan";
     max_lines?: number | null;
+  }
+
+  /**
+   * A styled text run with per-run text style.
+   *
+   * Extends the core `cg.StyledTextRun` (offsets + paint overrides)
+   * with a full `ITextStyle` for per-run font/decoration properties.
+   */
+  export interface StyledTextRun extends cg.StyledTextRun {
+    /** Per-run text style (font, size, weight, decoration, etc.). */
+    style: i.ITextStyle;
+  }
+
+  /**
+   * [AttributedTextNode]
+   *
+   * Rich text node with per-run styling (mixed fonts, sizes, colors, decorations
+   * within a single text block).
+   *
+   * Mirrors the Rust `AttributedString` + node wrapper and FBS `AttributedTextNode`.
+   */
+  export interface AttributedTextNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
+      i.ITextStroke {
+    readonly type: "text";
+
+    /** The full backing text content. */
+    text: string | null;
+
+    /** Default / fallback text style for unstyled segments and measurement. */
+    default_style: i.ITextStyle;
+
+    /** Ordered, contiguous, non-overlapping runs covering the full text. */
+    styled_runs: StyledTextRun[];
+
+    /** Node-level fill paints (used as fallback when runs omit fills). */
+    fill_paints?: cg.Paint[];
+
+    /** @default "left" */
+    text_align: cg.TextAlign;
+    /** @default "top" */
+    text_align_vertical: cg.TextAlignVertical;
+
+    max_lines?: number | null;
+    ellipsis?: string | null;
   }
 
   export interface ImageNode

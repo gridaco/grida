@@ -203,6 +203,18 @@ fn extract_image_urls(scene: &Scene) -> Vec<String> {
                 // LineNodeRec has strokes only, no fills.
                 collect_image_urls_from_paints(&n.strokes, &mut urls);
             }
+            Node::AttributedText(n) => {
+                collect_image_urls_from_paints(&n.fills, &mut urls);
+                collect_image_urls_from_paints(&n.strokes, &mut urls);
+                for run in &n.attributed_string.runs {
+                    if let Some(ref fills) = run.fills {
+                        collect_image_urls_from_paints(fills, &mut urls);
+                    }
+                    if let Some(ref strokes) = run.strokes {
+                        collect_image_urls_from_paints(strokes, &mut urls);
+                    }
+                }
+            }
             // Group, InitialContainer, and Error nodes have no paint data.
             Node::Group(_) | Node::InitialContainer(_) | Node::Error(_) => {}
         }

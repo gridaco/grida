@@ -33,6 +33,7 @@ fn main() {
         ("L0-effects-glass",       fixtures::l0_effects_glass::build()),
         ("L0-effects-progressive-blur", fixtures::l0_effects_progressive_blur::build()),
         ("L0-type",                fixtures::l0_type::build()),
+        ("L0-type-attributed",     fixtures::l0_type_attributed::build()),
         ("L0-type-fvar",           fixtures::l0_type_fvar::build()),
         ("L0-type-features",       fixtures::l0_type_features::build()),
         ("L0-masks",               fixtures::l0_masks::build()),

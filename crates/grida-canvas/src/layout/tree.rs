@@ -1,6 +1,6 @@
 use crate::cache::fast_hash::DenseNodeMap;
 use crate::cache::paragraph::ParagraphCache;
-use crate::cg::types::{TextAlign, TextStyleRec};
+use crate::cg::types::{AttributedString, TextAlign, TextStyleRec};
 use crate::node::schema::NodeId;
 use crate::runtime::font_repository::FontRepository;
 #[cfg(test)]
@@ -11,6 +11,7 @@ use taffy::prelude::*;
 #[derive(Clone)]
 pub(crate) enum LayoutNodeContext {
     Text(TextMeasureContext),
+    AttributedText(AttributedTextMeasureContext),
 }
 
 /// Measurement inputs for text nodes.
@@ -19,6 +20,18 @@ pub(crate) struct TextMeasureContext {
     pub scene_node_id: NodeId,
     pub text: String,
     pub text_style: TextStyleRec,
+    pub text_align: TextAlign,
+    pub max_lines: Option<usize>,
+    pub ellipsis: Option<String>,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+}
+
+/// Measurement inputs for attributed text nodes.
+#[derive(Clone)]
+pub(crate) struct AttributedTextMeasureContext {
+    pub scene_node_id: NodeId,
+    pub attributed_string: AttributedString,
     pub text_align: TextAlign,
     pub max_lines: Option<usize>,
     pub ellipsis: Option<String>,
@@ -120,6 +133,29 @@ impl LayoutTree {
         Ok(taffy_id)
     }
 
+    pub(crate) fn new_attributed_text_leaf(
+        &mut self,
+        scene_node_id: NodeId,
+        style: Style,
+        context: AttributedTextMeasureContext,
+    ) -> Result<taffy::NodeId, taffy::TaffyError> {
+        let taffy_id = self
+            .taffy
+            .new_leaf_with_context(style, LayoutNodeContext::AttributedText(context))?;
+        #[cfg(test)]
+        if let Some(old_taffy_id) = self.scene_to_taffy.get(&scene_node_id).copied() {
+            self.taffy_to_scene.remove(&old_taffy_id);
+        }
+        self.scene_to_taffy.insert(scene_node_id, taffy_id);
+        #[cfg(test)]
+        {
+            if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+                self.scene_to_taffy.remove(&old_scene_id);
+            }
+        }
+        Ok(taffy_id)
+    }
+
     /// Create a container node with children
     ///
     /// Maps the scene node ID to a taffy node ID and returns it
@@ -158,15 +194,32 @@ impl LayoutTree {
                 available_space,
                 move |known_dimensions, _available_space, _node_id, node_context, _style| {
                     if let Some(LayoutNodeContext::Text(ctx)) = node_context {
-                        // For text:
-                        // - If Taffy already resolved a definite width for this node, honor it.
-                        // - Else if the node schema has an explicit width, use it.
-                        // - Otherwise keep width unconstrained (measure to intrinsic).
                         let width_constraint = known_dimensions.width.or(ctx.width);
 
                         let measurements = provider.paragraph_cache.measure(
                             &ctx.text,
                             &ctx.text_style,
+                            &ctx.text_align,
+                            &ctx.max_lines,
+                            &ctx.ellipsis,
+                            width_constraint,
+                            provider.fonts,
+                            Some(&ctx.scene_node_id),
+                        );
+
+                        let width = width_constraint.unwrap_or(measurements.max_width);
+                        let measured_height = ctx.height.unwrap_or(measurements.height);
+                        let height = known_dimensions.height.unwrap_or(measured_height);
+
+                        Size {
+                            width: width.max(1.0),
+                            height: height.max(1.0),
+                        }
+                    } else if let Some(LayoutNodeContext::AttributedText(ctx)) = node_context {
+                        let width_constraint = known_dimensions.width.or(ctx.width);
+
+                        let measurements = provider.paragraph_cache.measure_attributed(
+                            &ctx.attributed_string,
                             &ctx.text_align,
                             &ctx.max_lines,
                             &ctx.ellipsis,

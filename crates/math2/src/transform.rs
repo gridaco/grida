@@ -6,6 +6,7 @@
 ///
 /// It supports translation and rotation, and can be composed or inverted.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AffineTransform {
     /// The 2x3 transformation matrix: [ [a, c, tx], [b, d, ty] ]
     pub matrix: [[f32; 3]; 2],

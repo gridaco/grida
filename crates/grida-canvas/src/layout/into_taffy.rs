@@ -284,6 +284,7 @@ pub fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) 
         Node::Rectangle(n) => n.into(),
         Node::Ellipse(n) => n.into(),
         Node::TextSpan(n) => n.into(),
+        Node::AttributedText(n) => n.into(),
         Node::Image(n) => n.into(),
         Node::Line(n) => n.into(),
         Node::Polygon(n) => n.into(),
@@ -474,6 +475,29 @@ impl From<&crate::node::schema::TextSpanNodeRec> for Style {
 
         // Height is auto for text (will be determined by content)
         style.size.height = Dimension::auto();
+
+        apply_layout_child(style, &node.layout_child, node.transform)
+    }
+}
+
+/// Convert AttributedTextNodeRec to Taffy Style
+impl From<&crate::node::schema::AttributedTextNodeRec> for Style {
+    fn from(node: &crate::node::schema::AttributedTextNodeRec) -> Self {
+        let mut style = grida_style_default();
+
+        // Set width if specified, otherwise auto
+        if let Some(width) = node.width {
+            style.size.width = Dimension::length(width);
+        } else {
+            style.size.width = Dimension::auto();
+        }
+
+        // Use explicit height if set, otherwise auto (content-determined)
+        style.size.height = if let Some(height) = node.height {
+            Dimension::length(height)
+        } else {
+            Dimension::auto()
+        };
 
         apply_layout_child(style, &node.layout_child, node.transform)
     }

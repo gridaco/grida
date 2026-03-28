@@ -929,6 +929,67 @@ fn scene_opacity_fill_stroke() -> Scene {
     flat_scene("bench-opacity-fill-stroke", nodes)
 }
 
+/// Attributed text nodes with per-run styling (3 000 nodes, 3–5 runs each).
+fn scene_attributed_text_heavy() -> Scene {
+    let count = 3000;
+    let cols = 10;
+    let row_h = 32.0_f32;
+    let col_w = 400.0_f32;
+
+    let base = TextStyleRec::from_font("Inter", 14.0);
+    let mut bold = TextStyleRec::from_font("Inter", 14.0);
+    bold.font_weight = FontWeight(700);
+
+    let colors = [
+        CGColor::from_rgba(30, 30, 40, 255),
+        CGColor::RED,
+        CGColor::from_rgba(0, 100, 200, 255),
+        CGColor::from_rgba(0, 140, 60, 255),
+        CGColor::from_rgba(128, 0, 128, 255),
+    ];
+
+    let mut nodes = Vec::with_capacity(count);
+    for i in 0..count {
+        let col = i % cols;
+        let row = i / cols;
+        let x = col as f32 * col_w;
+        let y = row as f32 * row_h;
+
+        // Vary run count: 3–5 runs per node
+        let run_count = 3 + (i % 3);
+        let mut builder = AttributedStringBuilder::new();
+        for r in 0..run_count {
+            let style = if r % 2 == 0 { &bold } else { &base };
+            let color = colors[r % colors.len()];
+            builder = builder.push(&format!("run{r} "), style, Some(color));
+        }
+        let attr = builder.build();
+
+        nodes.push(Node::AttributedText(AttributedTextNodeRec {
+            active: true,
+            transform: AffineTransform::new(x, y, 0.0),
+            width: None,
+            height: None,
+            layout_child: None,
+            attributed_string: attr,
+            default_style: base.clone(),
+            text_align: TextAlign::Left,
+            text_align_vertical: TextAlignVertical::Top,
+            max_lines: None,
+            ellipsis: None,
+            fills: Paints::new(vec![solid(0, 0, 0, 255)]),
+            strokes: Paints::default(),
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Center,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
+            effects: LayerEffects::default(),
+        }));
+    }
+    flat_scene("bench-attributed-text-heavy", nodes)
+}
+
 fn main() {
     let scenes: Vec<(&str, _)> = vec![
         ("bench-flat-grid", scene_flat_grid()),
@@ -939,6 +1000,7 @@ fn main() {
         ("bench-rotated-rects", scene_rotated_rects()),
         ("bench-text-heavy", scene_text_heavy()),
         ("bench-text-stroke-heavy", scene_text_stroke_heavy()),
+        ("bench-attributed-text-heavy", scene_attributed_text_heavy()),
         ("bench-stroke-rect-grid", scene_stroke_rect_grid()),
         ("bench-shadow-grid", scene_shadow_grid()),
         ("bench-blur-grid", scene_blur_grid()),

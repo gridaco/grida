@@ -1681,6 +1681,155 @@ export namespace iofigma {
                 figma_constraints_vertical !== "TOP" ? fixedbottom : undefined,
             };
 
+            const textAlignValue: cg.TextAlign = node.style.textAlignHorizontal
+              ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
+              : "left";
+            const textAlignVerticalValue: cg.TextAlignVertical = node.style
+              .textAlignVertical
+              ? map.textAlignVerticalMap[node.style.textAlignVertical]
+              : "top";
+
+            // Shared layout properties for text nodes
+            const textLayoutProps = {
+              layout_positioning: "absolute" as const,
+              layout_inset_left: constraints.left,
+              layout_inset_top: constraints.top,
+              layout_inset_right: constraints.right,
+              layout_inset_bottom: constraints.bottom,
+              layout_target_width:
+                !context.prefer_fixed_text_sizing &&
+                figma_text_resizing_model === "WIDTH_AND_HEIGHT"
+                  ? ("auto" as const)
+                  : fixedwidth,
+              layout_target_height:
+                !context.prefer_fixed_text_sizing &&
+                (figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
+                  figma_text_resizing_model === "HEIGHT")
+                  ? ("auto" as const)
+                  : fixedheight,
+            };
+
+            // Helper to convert a REST-format style object into a Grida ITextStyle
+            const restStyleToGrida = (
+              style: Record<string, unknown>
+            ): grida.program.nodes.i.ITextStyle => ({
+              font_family: (style.fontFamily as string) ?? "Inter",
+              font_size: (style.fontSize as number) ?? DEFAULT_FONT_SIZE,
+              font_weight:
+                ((style.fontWeight as cg.NFontWeight) ?? 400) as cg.NFontWeight,
+              font_kerning: true,
+              text_decoration_line: style.textDecoration
+                ? (map.textDecorationMap[
+                    style.textDecoration as keyof typeof map.textDecorationMap
+                  ] ?? "none")
+                : "none",
+              line_height: (style as { lineHeightPercentFontSize?: number })
+                .lineHeightPercentFontSize
+                ? (style as { lineHeightPercentFontSize: number })
+                    .lineHeightPercentFontSize / 100
+                : undefined,
+              letter_spacing: (style.letterSpacing as number)
+                ? (style.letterSpacing as number) /
+                  ((style.fontSize as number) || DEFAULT_FONT_SIZE)
+                : undefined,
+              font_postscript_name:
+                (style.fontPostScriptName as string) || undefined,
+              font_style_italic: (style.italic as boolean) ?? false,
+            });
+
+            // Check for rich text (per-character style overrides)
+            const charOverrides = (
+              node as { characterStyleOverrides?: number[] }
+            ).characterStyleOverrides;
+            const overrideTable = (
+              node as {
+                styleOverrideTable?: Record<string, Record<string, unknown>>;
+              }
+            ).styleOverrideTable;
+            const hasRichText =
+              charOverrides &&
+              charOverrides.length > 0 &&
+              charOverrides.some((id: number) => id !== 0) &&
+              overrideTable;
+
+            if (hasRichText && node.characters) {
+              // Build styled runs from characterStyleOverrides.
+              //
+              // Figma's `characterStyleOverrides` array may be shorter than
+              // `characters` — positions beyond the array use the base style
+              // (id 0). We treat out-of-bounds indices as id 0 (base style).
+              const characters = node.characters;
+              const runs: grida.program.nodes.StyledTextRun[] = [];
+              let runStart = 0;
+              let currentId = charOverrides[0] ?? 0;
+
+              for (let i = 1; i <= characters.length; i++) {
+                // Characters beyond the charOverrides array use base style (0).
+                const nextId =
+                  i < characters.length
+                    ? (i < charOverrides.length
+                        ? (charOverrides[i] ?? 0)
+                        : 0)
+                    : -1; // sentinel: forces final run to be emitted
+                if (nextId !== currentId) {
+                  // Emit run [runStart, i)
+                  const overrideStyle =
+                    currentId !== 0 && overrideTable[String(currentId)]
+                      ? overrideTable[String(currentId)]
+                      : {};
+
+                  // Merge base style with override
+                  const mergedRestStyle = {
+                    ...node.style,
+                    ...overrideStyle,
+                  };
+                  const gridaStyle = restStyleToGrida(mergedRestStyle);
+
+                  // Per-run fills from override
+                  const overrideFills = (
+                    overrideStyle as { fills?: figrest.Paint[] }
+                  ).fills;
+                  const runFillPaints = overrideFills
+                    ? overrideFills
+                        .map((p) =>
+                          convertPaint(p, context, imageRefsUsed)
+                        )
+                        .filter((p): p is cg.Paint => p !== undefined)
+                    : undefined;
+
+                  runs.push({
+                    start: runStart,
+                    end: i,
+                    style: gridaStyle,
+                    ...(runFillPaints && runFillPaints.length > 0
+                      ? { fill_paints: runFillPaints }
+                      : {}),
+                  });
+
+                  runStart = i;
+                  currentId = nextId;
+                }
+              }
+
+              const defaultStyle = restStyleToGrida(node.style);
+
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...fills_trait(node.fills, context, imageRefsUsed),
+                ...text_stroke_trait(node, context, imageRefsUsed),
+                ...style_trait({}),
+                ...effects_trait(node.effects),
+                type: "text",
+                text: characters,
+                default_style: defaultStyle,
+                styled_runs: runs,
+                ...textLayoutProps,
+                text_align: textAlignValue,
+                text_align_vertical: textAlignVerticalValue,
+              } satisfies grida.program.nodes.AttributedTextNode;
+            }
+
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1690,28 +1839,9 @@ export namespace iofigma {
               ...effects_trait(node.effects),
               type: "tspan",
               text: node.characters,
-              layout_positioning: "absolute",
-              layout_inset_left: constraints.left,
-              layout_inset_top: constraints.top,
-              layout_inset_right: constraints.right,
-              layout_inset_bottom: constraints.bottom,
-              layout_target_width:
-                !context.prefer_fixed_text_sizing &&
-                figma_text_resizing_model === "WIDTH_AND_HEIGHT"
-                  ? "auto"
-                  : fixedwidth,
-              layout_target_height:
-                !context.prefer_fixed_text_sizing &&
-                (figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
-                  figma_text_resizing_model === "HEIGHT")
-                  ? "auto"
-                  : fixedheight,
-              text_align: node.style.textAlignHorizontal
-                ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
-                : "left",
-              text_align_vertical: node.style.textAlignVertical
-                ? map.textAlignVerticalMap[node.style.textAlignVertical]
-                : "top",
+              ...textLayoutProps,
+              text_align: textAlignValue,
+              text_align_vertical: textAlignVerticalValue,
               text_decoration_line: node.style.textDecoration
                 ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
@@ -2473,13 +2603,138 @@ export namespace iofigma {
       /**
        * TypePropertiesTrait - Text-specific properties
        */
+      /**
+       * Build a REST-compatible style object from a Kiwi NodeChange (shared
+       * between the base node style and per-run overrides).
+       */
+      function kiwi_rest_style_from_nc(
+        nc: figkiwi.NodeChange,
+        fontMetaData: figkiwi.FontMetaData[] | undefined
+      ) {
+        const fontMeta = findFontMetaDataEntry(fontMetaData, nc.fontName);
+        const fontWeight = (fontMeta?.fontWeight ?? 400) as cg.NFontWeight;
+        const italic = fontMeta?.fontStyle === "ITALIC";
+        return {
+          fontFamily: nc.fontName?.family ?? "Inter",
+          fontPostScriptName: nc.fontName?.postscript
+            ? nc.fontName.postscript
+            : undefined,
+          fontWeight,
+          italic,
+          fontSize: nc.fontSize ?? 12,
+          textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
+          textAlignVertical: nc.textAlignVertical ?? "TOP",
+          letterSpacing:
+            nc.letterSpacing?.units === "PERCENT"
+              ? (nc.letterSpacing.value / 100) *
+                (nc.fontSize ?? DEFAULT_FONT_SIZE)
+              : nc.letterSpacing?.units === "PIXELS"
+                ? nc.letterSpacing.value
+                : (nc.letterSpacing?.value ?? 0),
+          lineHeightPx:
+            nc.lineHeight?.units === "PIXELS"
+              ? nc.lineHeight.value
+              : undefined,
+          lineHeightPercent:
+            nc.lineHeight?.units === "PERCENT"
+              ? nc.lineHeight.value
+              : undefined,
+          lineHeightPercentFontSize:
+            nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
+          textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
+          textCase:
+            nc.textCase === "ORIGINAL"
+              ? undefined
+              : (nc.textCase ?? undefined),
+          textDecoration: nc.textDecoration ?? "NONE",
+        };
+      }
+
       function kiwi_text_style_trait(nc: figkiwi.NodeChange) {
         const characters = nc.textData?.characters ?? "";
         const fontMetaData =
           nc.derivedTextData?.fontMetaData ?? nc.textData?.fontMetaData;
-        const fontMeta = findFontMetaDataEntry(fontMetaData, nc.fontName);
-        const fontWeight = (fontMeta?.fontWeight ?? 400) as cg.NFontWeight;
-        const italic = fontMeta?.fontStyle === "ITALIC";
+
+        const style = kiwi_rest_style_from_nc(nc, fontMetaData);
+
+        // Parse per-character style overrides from Kiwi textData
+        const charStyleIDs = nc.textData?.characterStyleIDs;
+        const kiwiOverrideTable = nc.textData?.styleOverrideTable;
+        let characterStyleOverrides: number[] = [];
+        const styleOverrideTable: Record<
+          string,
+          Record<string, unknown>
+        > = {};
+
+        if (
+          charStyleIDs?.length &&
+          kiwiOverrideTable?.length &&
+          charStyleIDs.some((id) => id !== 0)
+        ) {
+          characterStyleOverrides = charStyleIDs;
+          // Build the REST-format styleOverrideTable from the Kiwi array.
+          // Kiwi ID 0 means "base style" (no override). Non-zero IDs are
+          // matched by the `styleID` field inside each override entry — the
+          // array index does NOT necessarily equal `id - 1`.
+          const kiwiOverrideByStyleID = new Map<number, (typeof kiwiOverrideTable)[number]>();
+          for (const entry of kiwiOverrideTable) {
+            if (entry.styleID !== undefined) {
+              kiwiOverrideByStyleID.set(entry.styleID, entry);
+            }
+          }
+          const seenIds = new Set(charStyleIDs.filter((id) => id !== 0));
+          for (const id of seenIds) {
+            const overrideNc =
+              kiwiOverrideByStyleID.get(id) ?? kiwiOverrideTable[id - 1];
+            if (!overrideNc) continue;
+            // Only include properties that are actually set in the override.
+            // Kiwi overrides are sparse — unset fields mean "inherit from base".
+            const o: Record<string, unknown> = {};
+            if (overrideNc.fontName?.family) {
+              o.fontFamily = overrideNc.fontName.family;
+              const fm = findFontMetaDataEntry(
+                fontMetaData,
+                overrideNc.fontName
+              );
+              if (fm?.fontWeight !== undefined)
+                o.fontWeight = fm.fontWeight;
+              if (fm?.fontStyle === "ITALIC") o.italic = true;
+            }
+            if (overrideNc.fontName?.postscript)
+              o.fontPostScriptName = overrideNc.fontName.postscript;
+            if (overrideNc.fontSize !== undefined)
+              o.fontSize = overrideNc.fontSize;
+            if (overrideNc.textDecoration !== undefined)
+              o.textDecoration = overrideNc.textDecoration;
+            if (overrideNc.textCase !== undefined && overrideNc.textCase !== "ORIGINAL")
+              o.textCase = overrideNc.textCase;
+            if (overrideNc.letterSpacing !== undefined) {
+              const ls = overrideNc.letterSpacing;
+              const fs = overrideNc.fontSize ?? nc.fontSize ?? DEFAULT_FONT_SIZE;
+              o.letterSpacing =
+                ls.units === "PERCENT"
+                  ? (ls.value / 100) * fs
+                  : ls.units === "PIXELS"
+                    ? ls.value
+                    : (ls.value ?? 0);
+            }
+            if (overrideNc.lineHeight !== undefined) {
+              const lh = overrideNc.lineHeight;
+              if (lh.units === "PIXELS") o.lineHeightPx = lh.value;
+              if (lh.units === "PERCENT") {
+                o.lineHeightPercent = lh.value;
+                o.lineHeightPercentFontSize = lh.value;
+              }
+            }
+            if (overrideNc.fillPaints) o.fills = paints(overrideNc.fillPaints);
+            if (overrideNc.strokePaints)
+              o.strokes = paints(overrideNc.strokePaints);
+            if (overrideNc.strokeWeight !== undefined)
+              o.strokeWeight = overrideNc.strokeWeight;
+            styleOverrideTable[String(id)] = o;
+          }
+        }
+
         return {
           characters,
           fills: nc.fillPaints ? paints(nc.fillPaints) : [],
@@ -2488,45 +2743,9 @@ export namespace iofigma {
           strokeAlign: nc.strokeAlign
             ? map.strokeAlign(nc.strokeAlign)
             : "INSIDE",
-          style: {
-            fontFamily: nc.fontName?.family ?? "Inter",
-            fontPostScriptName: nc.fontName?.postscript
-              ? nc.fontName.postscript
-              : undefined,
-            fontWeight,
-            italic,
-            fontSize: nc.fontSize ?? 12,
-            textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
-            textAlignVertical: nc.textAlignVertical ?? "TOP",
-            // Produce absolute-pixel letterSpacing to match the REST API
-            // format — the downstream consumer (fromRest*) normalizes by
-            // dividing by fontSize, so we must not pre-normalize here.
-            letterSpacing:
-              nc.letterSpacing?.units === "PERCENT"
-                ? (nc.letterSpacing.value / 100) *
-                  (nc.fontSize ?? DEFAULT_FONT_SIZE)
-                : nc.letterSpacing?.units === "PIXELS"
-                  ? nc.letterSpacing.value
-                  : (nc.letterSpacing?.value ?? 0),
-            lineHeightPx:
-              nc.lineHeight?.units === "PIXELS"
-                ? nc.lineHeight.value
-                : undefined,
-            lineHeightPercent:
-              nc.lineHeight?.units === "PERCENT"
-                ? nc.lineHeight.value
-                : undefined,
-            lineHeightPercentFontSize:
-              nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
-            textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
-            textCase:
-              nc.textCase === "ORIGINAL"
-                ? undefined
-                : (nc.textCase ?? undefined),
-            textDecoration: nc.textDecoration ?? "NONE",
-          },
-          characterStyleOverrides: [],
-          styleOverrideTable: {},
+          style,
+          characterStyleOverrides,
+          styleOverrideTable,
           lineTypes: [],
           lineIndentations: [],
         };

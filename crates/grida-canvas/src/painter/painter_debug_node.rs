@@ -633,6 +633,9 @@ impl<'a> NodePainter<'a> {
                 self.draw_boolean_operation_node_recursively(id, n, graph, cache)
             }
             Node::RegularStarPolygon(n) => self.draw_regular_star_polygon_node(n),
+            Node::AttributedText(_) => {
+                // TODO: implement AttributedText debug rendering
+            }
         }
     }
 }

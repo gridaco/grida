@@ -12,7 +12,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typegen": "next typegen"
   },
   "dependencies": {
     "@ai-sdk/openai": "3.0.0",

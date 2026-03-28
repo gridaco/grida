@@ -83,8 +83,17 @@ pub type RequestRedrawCallback = Arc<dyn Fn()>;
 /// at runtime via individual setters on `Renderer` / `ApplicationApi`.
 #[derive(Clone, Copy)]
 pub struct RendererOptions {
-    /// When true, embedded fonts will be registered.
+    /// When true, embedded fonts (Geist, GeistMono) will be registered.
     pub use_embedded_fonts: bool,
+    /// When true, the platform's system font manager is added as the default
+    /// fallback. This enables Skia's built-in font fallback for scripts not
+    /// covered by explicitly registered fonts (e.g. CJK via system-installed
+    /// Noto Sans).
+    ///
+    /// **Default: `false`** — matches the WASM/web environment where only
+    /// explicitly provided fonts are available. Set to `true` in native-only
+    /// dev tools (grida-dev `--system-fonts`) for convenient local previewing.
+    pub use_system_fonts: bool,
     /// Initial renderer configuration. Applied at construction; individual
     /// fields remain mutable via `Renderer::set_*` / `ApplicationApi` setters.
     pub config: super::config::RuntimeRendererConfig,
@@ -94,6 +103,7 @@ impl Default for RendererOptions {
     fn default() -> Self {
         Self {
             use_embedded_fonts: false,
+            use_system_fonts: false,
             config: Default::default(),
         }
     }
@@ -541,6 +551,9 @@ impl Renderer {
         if options.use_embedded_fonts {
             font_repository.register_embedded_fonts();
         }
+        if options.use_system_fonts {
+            font_repository.enable_system_fallback();
+        }
         let mut image_repository = ImageRepository::new(store);
         system_images::register(&mut resources, &mut image_repository);
         let viewport_size = *camera.get_size();
@@ -594,13 +607,47 @@ impl Renderer {
     /// `PainterRenderCommand` variants are added, the inner
     /// `update_commands` function must be updated to traverse them.
     pub fn update_layer_text(&mut self, node_id: NodeId, text: &str) {
+        self.update_layer_text_inner(node_id, text, None);
+    }
+
+    /// Update the text content for an attributed text node, replacing
+    /// both the plain text and the full `AttributedString` (text + runs).
+    ///
+    /// This keeps the run byte offsets in sync with the backing string,
+    /// preventing out-of-bounds panics in the paragraph cache.
+    pub fn update_layer_attributed_text(
+        &mut self,
+        node_id: NodeId,
+        text: &str,
+        attributed: crate::cg::types::AttributedString,
+    ) {
+        self.update_layer_text_inner(node_id, text, Some(attributed));
+    }
+
+    fn update_layer_text_inner(
+        &mut self,
+        node_id: NodeId,
+        text: &str,
+        attributed: Option<crate::cg::types::AttributedString>,
+    ) {
         use crate::painter::layer::{PainterPictureLayer, PainterRenderCommand};
+
+        fn update_text_layer(
+            tl: &mut crate::painter::layer::PainterPictureTextLayer,
+            text: &str,
+            attributed: &Option<crate::cg::types::AttributedString>,
+        ) {
+            tl.text = text.to_owned();
+            if let Some(ref attr) = attributed {
+                tl.attributed_string = Some(attr.clone());
+            }
+        }
 
         // Update text in the flat layer entries.
         for entry in &mut self.scene_cache.layers.layers {
             if let PainterPictureLayer::Text(ref mut tl) = entry.layer {
                 if tl.base.id == node_id {
-                    tl.text = text.to_owned();
+                    update_text_layer(tl, text, &attributed);
                     break;
                 }
             }
@@ -608,34 +655,44 @@ impl Renderer {
 
         // Update text in the render command tree (this is what the Painter
         // actually draws via draw_render_commands).
-        fn update_commands(commands: &mut [PainterRenderCommand], node_id: NodeId, text: &str) {
+        fn update_commands(
+            commands: &mut [PainterRenderCommand],
+            node_id: NodeId,
+            text: &str,
+            attributed: &Option<crate::cg::types::AttributedString>,
+        ) {
             for cmd in commands.iter_mut() {
                 match cmd {
                     PainterRenderCommand::Draw(ref mut layer) => {
                         if let PainterPictureLayer::Text(ref mut tl) = layer {
                             if tl.base.id == node_id {
-                                tl.text = text.to_owned();
+                                update_text_layer(tl, text, attributed);
                             }
                         }
                     }
                     PainterRenderCommand::MaskGroup(ref mut group) => {
-                        update_commands(&mut group.mask_commands, node_id, text);
-                        update_commands(&mut group.content_commands, node_id, text);
+                        update_commands(&mut group.mask_commands, node_id, text, attributed);
+                        update_commands(&mut group.content_commands, node_id, text, attributed);
                     }
                     PainterRenderCommand::RenderSurface(ref mut surface) => {
                         if let Some(ref mut own_layer) = surface.own_layer {
                             if let PainterPictureLayer::Text(ref mut tl) = own_layer {
                                 if tl.base.id == node_id {
-                                    tl.text = text.to_owned();
+                                    update_text_layer(tl, text, attributed);
                                 }
                             }
                         }
-                        update_commands(&mut surface.children, node_id, text);
+                        update_commands(&mut surface.children, node_id, text, attributed);
                     }
                 }
             }
         }
-        update_commands(&mut self.scene_cache.layers.commands, node_id, text);
+        update_commands(
+            &mut self.scene_cache.layers.commands,
+            node_id,
+            text,
+            &attributed,
+        );
 
         // Invalidate the paragraph cache for this node so the Painter
         // rebuilds the paragraph with the new text.
@@ -644,9 +701,31 @@ impl Renderer {
             .borrow_mut()
             .invalidate_by_id(node_id);
 
+        // Invalidate the pan image cache so mouse-move frames don't blit
+        // stale content while text is being edited.
+        self.pan_image_cache = None;
+
         // Record the change. apply_changes() will handle per-node
         // picture/compositor/atlas invalidation and viewport caches.
         self.mark_node_changed(node_id, ChangeFlags::NODE_TEXT);
+    }
+
+    /// Update the shape bounding rect for a text node's layer.
+    ///
+    /// Called during text editing to keep the surface overlay (selection/hover
+    /// outline) in sync with the paragraph's laid-out dimensions.
+    pub fn update_layer_text_shape(&mut self, node_id: NodeId, width: f32, height: f32) {
+        use crate::painter::layer::PainterPictureLayer;
+
+        for entry in &mut self.scene_cache.layers.layers {
+            if entry.id == node_id {
+                if let PainterPictureLayer::Text(ref mut tl) = entry.layer {
+                    let rect = skia_safe::Rect::from_xywh(0.0, 0.0, width, height);
+                    tl.shape = crate::painter::geometry::PainterShape::from_rect(rect);
+                }
+                break;
+            }
+        }
     }
 
     pub fn canvas(&self) -> &Canvas {
@@ -1652,8 +1731,15 @@ impl Renderer {
         // Scene load handles its own layout in load_scene(); skip here.
         // Viewport resize needs layout only when the scene has ICB nodes
         // or auto-sized roots (the common infinite-canvas case has neither).
+        // Invalidate paragraph cache before layout so rebuild_scene_caches()
+        // measures text with the new fonts rather than stale fallback paragraphs.
+        if flags.contains(ChangeFlags::FONT_LOADED) {
+            self.scene_cache.paragraph.borrow_mut().invalidate();
+        }
+
         if has_data_changes && !flags.contains(ChangeFlags::SCENE_LOAD) {
-            let needs_layout = flags.intersects(ChangeFlags::LAYOUT_DIRTY)
+            let needs_layout = flags
+                .intersects(ChangeFlags::LAYOUT_DIRTY | ChangeFlags::FONT_LOADED)
                 || (flags.contains(ChangeFlags::VIEWPORT_SIZE)
                     && self.scene_has_viewport_dependent_layout());
             if needs_layout {
@@ -1673,7 +1759,10 @@ impl Renderer {
         }
 
         // ----- Paragraph cache (text layout) -----
-        if flags.intersects(ChangeFlags::SCENE_LOAD | ChangeFlags::FONT_LOADED) {
+        // FONT_LOADED is handled above (before rebuild_scene_caches) so that
+        // layout measurement uses fresh paragraphs. Only SCENE_LOAD needs
+        // invalidation here.
+        if flags.contains(ChangeFlags::SCENE_LOAD) {
             self.scene_cache.paragraph.borrow_mut().invalidate();
         }
         // Per-node paragraph invalidation is handled by update_layer_text

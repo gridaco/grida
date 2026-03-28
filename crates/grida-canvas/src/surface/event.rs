@@ -16,12 +16,23 @@ pub enum PointerButton {
     Middle,
 }
 
+/// IME composition event.
+#[derive(Debug, Clone)]
+pub enum ImeEvent {
+    /// Active composition string (displayed inline with underline).
+    Preedit(String),
+    /// Composition committed — insert the final text.
+    Commit(String),
+    /// Composition cancelled — discard preedit.
+    Cancel,
+}
+
 /// Platform-agnostic input events for the canvas surface.
 ///
 /// Coordinates are provided in both canvas space (world) and screen space
 /// (viewport pixels). The host is responsible for the camera transform
 /// before constructing these events.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum SurfaceEvent {
     PointerMove {
         canvas_point: Vector2,
@@ -40,4 +51,22 @@ pub enum SurfaceEvent {
         modifiers: Modifiers,
     },
     ModifiersChanged(Modifiers),
+
+    /// A keyboard key was pressed.
+    ///
+    /// Uses [`KeyName`](crate::text_edit::session::KeyName) as the
+    /// platform-agnostic key identifier.
+    KeyDown {
+        key: crate::text_edit::session::KeyName,
+        modifiers: Modifiers,
+    },
+
+    /// Text input from the OS (after IME composition, dead-key resolution, etc.).
+    ///
+    /// This is the *committed* text that should be inserted. It may arrive
+    /// alongside or instead of a `KeyDown` event, depending on the platform.
+    TextInput { text: String },
+
+    /// IME composition event.
+    Ime(ImeEvent),
 }

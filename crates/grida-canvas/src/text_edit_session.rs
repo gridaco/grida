@@ -1,7 +1,7 @@
 //! Text editing session for the canvas.
 //!
 //! This module provides the canvas-specific text editing integration by
-//! re-using the generic [`grida_text_edit::TextEditSession<L>`] with
+//! re-using the generic [`crate::text_edit::session::TextEditSession`] with
 //! [`ParagraphCacheLayout`] as the layout backend.
 //!
 //! The generic session already handles all editing concerns:
@@ -20,22 +20,42 @@
 //! - Capturing original text for commit/cancel semantics
 //! - The `ActiveTextEdit` bundle that lives on the Application
 
-use crate::cg::types::TextStyleRec;
+use crate::cg::types::{Paint, TextStyleRec};
 use crate::node::schema::NodeId;
-use crate::text::attributed_text_conv::text_style_rec_to_attr_with_fill;
 use crate::text::paragraph_cache_layout::ParagraphCacheLayout;
+use crate::text_edit::attributed_text::conv::text_style_rec_to_attr_with_fills;
 
-use grida_text_edit::{
-    attributed_text::{AttributedText, ParagraphStyle, TextFill},
-    text_edit_session::TextEditSession,
+use crate::text_edit::{
+    attributed_text::{AttributedText, ParagraphStyle},
+    session::TextEditSession,
 };
 
-// Re-export for WASM layer (so it doesn't depend on grida-text-edit directly)
-pub use grida_text_edit::EditingCommand as EditCommand;
-pub use grida_text_edit::DEFAULT_CARET_WIDTH;
+// Re-export for WASM layer
+pub use crate::text_edit::EditingCommand as EditCommand;
+pub use crate::text_edit::DEFAULT_CARET_WIDTH;
 
 // Re-export the session type for convenience
 pub type CanvasTextEditSession = TextEditSession<ParagraphCacheLayout>;
+
+// ---------------------------------------------------------------------------
+// TextEditCommit — centralized edit result
+// ---------------------------------------------------------------------------
+
+/// The result of committing a text edit session.
+///
+/// Captures all information needed to apply the edit back to the scene graph
+/// in a single struct, avoiding fragmented commit logic across the codebase.
+pub struct TextEditCommit {
+    /// The node that was being edited.
+    pub node_id: NodeId,
+    /// The final plain text.
+    pub text: String,
+    /// Full attributed content (for writing back to AttributedText nodes).
+    /// `None` for TextSpan nodes (which only need plain text).
+    pub attributed: Option<AttributedText>,
+    /// Whether the content was actually modified from its original state.
+    pub modified: bool,
+}
 
 // ---------------------------------------------------------------------------
 // ActiveTextEdit — session bundle with canvas-specific lifecycle
@@ -62,28 +82,31 @@ pub struct ActiveTextEdit {
 
     /// Original text at session start (for commit comparison).
     original_text: String,
+
+    /// Whether this is an attributed text node (vs. a plain TextSpan).
+    is_attributed: bool,
 }
 
 impl ActiveTextEdit {
-    /// Create a new editing session from a text node's current state.
+    /// Create a new editing session from a TextSpan node's current state.
     ///
     /// # Arguments
     ///
     /// * `node_id` — The internal node ID being edited.
     /// * `text` — The node's current plain text.
     /// * `text_style_rec` — The node's uniform `TextStyleRec`.
-    /// * `fill` — The resolved text fill (from the node's paint stack).
+    /// * `fills` — The resolved text fills (from the node's paint stack).
     /// * `paragraph_style` — Paragraph-level attributes.
     /// * `layout` — The pre-configured `ParagraphCacheLayout`.
     pub fn new(
         node_id: NodeId,
         text: &str,
         text_style_rec: &TextStyleRec,
-        fill: TextFill,
+        fills: Vec<Paint>,
         paragraph_style: ParagraphStyle,
         layout: ParagraphCacheLayout,
     ) -> Self {
-        let attr_style = text_style_rec_to_attr_with_fill(text_style_rec, fill);
+        let attr_style = text_style_rec_to_attr_with_fills(text_style_rec, fills);
         let mut content = AttributedText::new(text, attr_style);
         *content.paragraph_style_mut() = paragraph_style;
 
@@ -97,12 +120,39 @@ impl ActiveTextEdit {
             session,
             node_id,
             original_text: text.to_owned(),
+            is_attributed: false,
+        }
+    }
+
+    /// Create a new editing session from an AttributedText node.
+    ///
+    /// Unlike [`new`](Self::new), this takes pre-built [`AttributedText`]
+    /// content directly (already converted from `CgAttributedString`).
+    pub fn new_attributed(
+        node_id: NodeId,
+        content: AttributedText,
+        layout: ParagraphCacheLayout,
+    ) -> Self {
+        let original_text = content.text().to_owned();
+        let mut session = TextEditSession::with_content(layout, content);
+        session.select_all();
+
+        Self {
+            session,
+            node_id,
+            original_text,
+            is_attributed: true,
         }
     }
 
     /// The canvas node being edited.
     pub fn node_id(&self) -> NodeId {
         self.node_id
+    }
+
+    /// Whether this session is editing an attributed text node.
+    pub fn is_attributed(&self) -> bool {
+        self.is_attributed
     }
 
     /// Whether the text has been modified from its original state.
@@ -119,6 +169,24 @@ impl ActiveTextEdit {
             Some(final_text)
         } else {
             None
+        }
+    }
+
+    /// Commit the session and return a full [`TextEditCommit`] with all
+    /// information needed to apply the edit back to the scene graph.
+    pub fn commit_full(self) -> TextEditCommit {
+        let modified = self.is_modified();
+        let text = self.session.state.text.clone();
+        let attributed = if self.is_attributed {
+            Some(self.session.content.clone())
+        } else {
+            None
+        };
+        TextEditCommit {
+            node_id: self.node_id,
+            text,
+            attributed,
+            modified,
         }
     }
 
