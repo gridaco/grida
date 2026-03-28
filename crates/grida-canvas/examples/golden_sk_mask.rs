@@ -89,13 +89,15 @@ fn draw_alpha_mask(canvas: &skia_safe::Canvas, area: Rect) {
         Color::from_argb(0, 128, 128, 128),   // transparent grey at edge
     ];
     let positions = [0.0_f32, 1.0_f32];
-    let colors4f: Vec<_> = colors.iter().map(|c| skia_safe::Color4f::from(*c)).collect();
+    let colors4f: Vec<_> = colors
+        .iter()
+        .map(|c| skia_safe::Color4f::from(*c))
+        .collect();
     let grad = gradient_shader::Gradient::new(
         gradient_shader::GradientColors::new(&colors4f, Some(&positions), TileMode::Clamp, None),
         gradient_shader::Interpolation::default(),
     );
-    let shader =
-        skia_safe::shaders::radial_gradient((center, radius), &grad, None).unwrap();
+    let shader = skia_safe::shaders::radial_gradient((center, radius), &grad, None).unwrap();
 
     // Apply mask via DstIn blending
     let mut mask_paint = Paint::default();
@@ -122,13 +124,15 @@ fn draw_luminance_mask(canvas: &skia_safe::Canvas, area: Rect) {
         Color::from_argb(255, 40, 40, 40),    // dark grey edge
     ];
     let positions = [0.0_f32, 1.0_f32];
-    let colors4f: Vec<_> = colors.iter().map(|c| skia_safe::Color4f::from(*c)).collect();
+    let colors4f: Vec<_> = colors
+        .iter()
+        .map(|c| skia_safe::Color4f::from(*c))
+        .collect();
     let grad = gradient_shader::Gradient::new(
         gradient_shader::GradientColors::new(&colors4f, Some(&positions), TileMode::Clamp, None),
         gradient_shader::Interpolation::default(),
     );
-    let shader =
-        skia_safe::shaders::radial_gradient((center, radius), &grad, None).unwrap();
+    let shader = skia_safe::shaders::radial_gradient((center, radius), &grad, None).unwrap();
 
     // Built-in luma color filter to convert luminance to alpha
     let cf = luma_color_filter::new();

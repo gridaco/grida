@@ -200,11 +200,19 @@ fn draw_complex(canvas: &Canvas) {
     let radial_positions = [0.0, 1.0];
     let radial_colors4f: Vec<_> = radial_colors.iter().map(|c| Color4f::from(*c)).collect();
     let radial_grad = gradient_shader::Gradient::new(
-        gradient_shader::GradientColors::new(&radial_colors4f, Some(&radial_positions), TileMode::Clamp, None),
+        gradient_shader::GradientColors::new(
+            &radial_colors4f,
+            Some(&radial_positions),
+            TileMode::Clamp,
+            None,
+        ),
         gradient_shader::Interpolation::default(),
     );
     let radial_shader = shaders::radial_gradient(
-        (Point::new(width / 2.0, height / 2.0), width.min(height) / 2.0),
+        (
+            Point::new(width / 2.0, height / 2.0),
+            width.min(height) / 2.0,
+        ),
         &radial_grad,
         None,
     )
