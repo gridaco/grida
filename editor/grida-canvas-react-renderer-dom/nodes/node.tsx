@@ -84,6 +84,7 @@ export function NodeElement<P extends Record<string, any>>({
         return r;
       }
       case "container":
+      case "tray":
       case "image":
       case "video":
       case "tspan":

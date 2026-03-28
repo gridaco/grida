@@ -16,6 +16,7 @@ import {
   GlobeIcon,
   GroupIcon,
   Half2Icon,
+  LayersIcon,
 } from "@radix-ui/react-icons";
 import { SquaresUniteIcon } from "lucide-react";
 
@@ -53,6 +54,7 @@ export function NodeTypeIcon({
       return <Component1Icon className={className} />;
     case "image":
       return <ImageIcon className={className} />;
+    case "text":
     case "tspan":
       return <TextIcon className={className} />;
     case "instance":
@@ -77,6 +79,8 @@ export function NodeTypeIcon({
       return <TransformIcon className={className} />;
     case "bitmap":
       return <TransparencyGridIcon className={className} />;
+    case "tray":
+      return <LayersIcon className={className} />;
     case "group":
       return <GroupIcon className={className} />;
     case "boolean":

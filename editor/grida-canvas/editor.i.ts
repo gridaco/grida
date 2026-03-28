@@ -785,6 +785,7 @@ export namespace editor.state {
           | "text"
           | "image"
           | "container"
+          | "tray"
           | "rectangle"
           | "ellipse"
           | "polygon"

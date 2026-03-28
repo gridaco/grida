@@ -1581,8 +1581,8 @@ export namespace iofigma {
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills ?? [], context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
-              ...rectangular_stroke_width_trait(node),
-              ...corner_radius_trait(node),
+              ...rectangular_stroke_width_trait(node as any),
+              ...corner_radius_trait(node as any),
               type: "tray",
             } satisfies grida.program.nodes.TrayNode;
           }

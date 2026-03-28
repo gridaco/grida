@@ -41,6 +41,7 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 | Line tool       | `L`            | `L`            | Draw line                                  |
 | Arrow tool      | `⇧ + L`        | `⇧ + L`        | Draw arrow (line with arrowhead)           |
 | Container tool  | `A` or `F`     | `A` or `F`     | Insert container                           |
+| Tray tool       | `⇧ + F`        | `⇧ + F`        | Insert tray (organizational section)       |
 | Path tool       | `P`            | `P`            | Draw path (Pen tool)                       |
 | Pencil tool     | `⇧ + P`        | `⇧ + P`        | Draw with pencil                           |
 | Brush tool      | `B`            | `B`            | Brush tool                                 |
@@ -158,18 +159,18 @@ Last updated: Based on keybindings_sheet array and useHotkeys calls in hotkeys.t
 
 ## View & Zoom
 
-| Action               | macOS                  | Windows/Linux                | Description                                        |
-| -------------------- | ---------------------- | ---------------------------- | -------------------------------------------------- |
-| Zoom to fit          | `⇧ + 1` or `⇧ + 9`     | `⇧ + 1` or `⇧ + 9`           | Zoom to fit all content                            |
-| Zoom to selection    | `⇧ + 2`                | `⇧ + 2`                      | Zoom to the current selection                      |
-| Zoom to 100%         | `⇧ + 0`                | `⇧ + 0`                      | Zoom to 100%                                       |
-| Zoom in              | `⌘ + =` or `⌘ + Plus`  | `Ctrl + =` or `Ctrl + Plus`  | Zoom in                                            |
-| Zoom out             | `⌘ + -` or `⌘ + Minus` | `Ctrl + -` or `Ctrl + Minus` | Zoom out                                           |
-| Toggle ruler         | `⇧ + R`                | `⇧ + R`                      | Toggle ruler visibility                            |
-| Toggle pixel grid    | `⇧ + '`                | `⇧ + '`                      | Toggle pixel grid visibility                       |
+| Action               | macOS                  | Windows/Linux                | Description                                       |
+| -------------------- | ---------------------- | ---------------------------- | ------------------------------------------------- |
+| Zoom to fit          | `⇧ + 1` or `⇧ + 9`     | `⇧ + 1` or `⇧ + 9`           | Zoom to fit all content                           |
+| Zoom to selection    | `⇧ + 2`                | `⇧ + 2`                      | Zoom to the current selection                     |
+| Zoom to 100%         | `⇧ + 0`                | `⇧ + 0`                      | Zoom to 100%                                      |
+| Zoom in              | `⌘ + =` or `⌘ + Plus`  | `Ctrl + =` or `Ctrl + Plus`  | Zoom in                                           |
+| Zoom out             | `⌘ + -` or `⌘ + Minus` | `Ctrl + -` or `Ctrl + Minus` | Zoom out                                          |
+| Toggle ruler         | `⇧ + R`                | `⇧ + R`                      | Toggle ruler visibility                           |
+| Toggle pixel grid    | `⇧ + '`                | `⇧ + '`                      | Toggle pixel grid visibility                      |
 | Toggle pixel preview | `⌘ + ⇧ + ⌥ + P`        | `Ctrl + ⇧ + Alt + P`         | Toggle pixel preview (Disabled ↔ last used 1x/2x) |
-| Toggle outline mode  | `⌘ + ⇧ + O` or `⌘ + Y` | `Ctrl + ⇧ + O` or `Ctrl + Y` | Toggle outline mode (wireframe)                    |
-| Preview              | `⇧ + Space`            | `⇧ + Space`                  | Preview current selection                          |
+| Toggle outline mode  | `⌘ + ⇧ + O` or `⌘ + Y` | `Ctrl + ⇧ + O` or `Ctrl + Y` | Toggle outline mode (wireframe)                   |
+| Preview              | `⇧ + Space`            | `⇧ + Space`                  | Preview current selection                         |
 
 ## Brush Tools
 

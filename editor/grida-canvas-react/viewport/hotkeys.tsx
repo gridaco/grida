@@ -807,6 +807,10 @@ export function useEditorHotKeys() {
     editor.surface.surfaceSetTool({ type: "insert", node: "container" });
   });
 
+  useHotkeys("shift+f", () => {
+    editor.surface.surfaceSetTool({ type: "insert", node: "tray" });
+  });
+
   useHotkeys("r", () => {
     editor.surface.surfaceSetTool({ type: "insert", node: "rectangle" });
   });

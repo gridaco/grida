@@ -24,7 +24,7 @@ export function resolveInsertTargetParent(
 
   if (!node) return null;
 
-  if (node.type === "container") {
+  if (node.type === "container" || node.type === "tray") {
     return node_id;
   }
 
@@ -51,20 +51,22 @@ export function resolvePasteTargetParents(
         .map((node_id) => {
           const node = dq.__getNodeById(state, node_id);
 
-          // If node is a container, use it as target parent (paste as child)
-          if (node.type === "container") {
+          // If node is a container or tray, use it as target parent (paste as child)
+          if (node.type === "container" || node.type === "tray") {
             return node_id;
           }
 
           // Otherwise, use its parent as target parent (paste as sibling)
           const parent_id = dq.getParentId(state.document_ctx, node_id);
 
-          // Parent can be null (scene) or a container
+          // Parent can be null (scene) or a container/tray
           if (!parent_id) return null;
 
           const parent = dq.__getNodeById(state, parent_id);
-          // Only return valid container parents
-          return parent?.type === "container" ? parent_id : null;
+          // Only return valid container/tray parents
+          return parent?.type === "container" || parent?.type === "tray"
+            ? parent_id
+            : null;
         })
         .filter((target_id) => {
           // Ensure target parent is not one of the originals

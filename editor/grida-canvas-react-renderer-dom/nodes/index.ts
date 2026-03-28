@@ -1,4 +1,5 @@
 import { ContainerWidget } from "./container";
+import { TrayWidget } from "./tray";
 import { TextSpanWidget } from "./tspan";
 import { ImageWidget } from "./image";
 import { VideoWidget } from "./video";
@@ -15,6 +16,7 @@ import { RegularStarPolygonWidget } from "./star";
 
 export namespace ReactNodeRenderers {
   export const container = ContainerWidget;
+  export const tray = TrayWidget;
   export const component = ContainerWidget; // TODO:
   export const iframe = IFrameWidget;
   export const vector = VectorWidget;

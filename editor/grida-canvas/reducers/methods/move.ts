@@ -32,6 +32,15 @@ export function self_moveNode<S extends editor.state.IEditorState>(
     return false;
   }
 
+  // Tray can only be a child of Scene or another Tray
+  const source_node = dq.__getNodeById(draft, source_id);
+  if (source_node.type === "tray" && target_id !== draft.scene_id) {
+    const target_node = dq.__getNodeById(draft, target_id);
+    if (target_node.type !== "tray") {
+      return false;
+    }
+  }
+
   // Use Graph.mv() - mutates draft.document directly (scene is now a node!)
   const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
   graph.mv(source_id, target_id, order);
