@@ -3,6 +3,7 @@
 This package is the Next.js app that powers **`grida.co`** and tenant domains (e.g. `xyz.grida.site`, custom domains).
 
 - This doc is a curated “where to change what” map. It’s intentionally **not** exhaustive.
+- When fixing UX bugs or changing interaction behavior in `grida-canvas*`, check [`../test/`](../test/) for related manual test cases and add new ones when appropriate.
 
 ## Key rules (things that bite later)
 

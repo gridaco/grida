@@ -313,8 +313,7 @@ function WasmTextEditorRelay({ node_id }: { node_id: string }) {
       // Undo/redo: try the WASM session first (word-grouped, IME-aware).
       // When the session has nothing left, fall through to document-level
       // undo/redo so the user can undo their way out of content edit mode
-      // (see ASSERTIONS.md: "Editor History System Takes Precedence in
-      // Content Edit Mode").
+      // (see test/canvas-input-history-undo-cem.md).
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         e.stopPropagation();

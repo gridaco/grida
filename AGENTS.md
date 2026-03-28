@@ -26,6 +26,7 @@ Currently, we have below features / modules.
 | [apps](./apps)         | -                                            | -                                            | micro sites for Grida                         |
 | [library](./library)   | [`library/README.md`](./library/README.md)   | -                                            | hosted library workers                        |
 | [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                                   |
+| [test](./test)         | [`test/README.md`](./test/README.md)         | [`test/AGENTS.md`](./test/AGENTS.md)         | manual test cases & UX behavior specs         |
 | [.legacy](./.legacy)   | -                                            | -                                            | will be removed (fully ignore this directory) |
 
 ## Languages, Frameworks, Tools, Infrastructures
@@ -170,6 +171,8 @@ For each individual package, refer to the README of its own.
 ## Testing & Development
 
 We use turborepo (except few isolated packages).
+
+**Manual test cases** for UX behaviors that are impractical to automate live in [`test/`](./test). When fixing a UX bug or implementing interaction-heavy features, check for relevant TCs there and add new ones when appropriate (see [`test/AGENTS.md`](./test/AGENTS.md)).
 
 To run test, build, and dev, use below commands.
 
