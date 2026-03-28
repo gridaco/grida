@@ -31,6 +31,7 @@ pub mod l0_shapes;
 pub mod l0_strokes;
 pub mod l0_strokes_rect;
 pub mod l0_strokes_varwidth;
+pub mod l0_tray;
 pub mod l0_type;
 pub mod l0_type_attributed;
 pub mod l0_type_features;

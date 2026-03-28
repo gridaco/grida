@@ -1221,6 +1221,7 @@ export namespace grida.program.nodes {
   export type LayerNode =
     | BooleanPathOperationNode
     | GroupNode
+    | TrayNode
     | TextSpanNode
     | AttributedTextNode
     | ImageNode
@@ -1288,6 +1289,7 @@ export namespace grida.program.nodes {
   export type UnknownNode = Omit<
     Partial<BooleanPathOperationNode> &
       Partial<GroupNode> &
+      Partial<TrayNode> &
       Partial<TextSpanNode> &
       Partial<AttributedTextNode> &
       Partial<BitmapNode> &
@@ -1327,6 +1329,10 @@ export namespace grida.program.nodes {
 
   export type GroupNodePrototype = __TPrototypeNode<
     Omit<Partial<GroupNode>, __base_scene_node_properties | "children"> &
+      __IPrototypeNodeChildren
+  >;
+  export type TrayNodePrototype = __TPrototypeNode<
+    Omit<Partial<TrayNode>, __base_scene_node_properties | "children"> &
       __IPrototypeNodeChildren
   >;
   export type TextNodePrototype = __TPrototypeNode<
@@ -1372,6 +1378,7 @@ export namespace grida.program.nodes {
   export type NodePrototype =
     | BooleanPathOperationNodePrototype
     | GroupNodePrototype
+    | TrayNodePrototype
     | TextNodePrototype
     | ImageNodePrototype
     | VideoNodePrototype
@@ -2228,6 +2235,25 @@ export namespace grida.program.nodes {
   }
 
   /**
+   * Tray Node — canvas-level organizational primitive (Figma SECTION).
+   *
+   * Has explicit dimensions, fills, strokes, corner radius.
+   * No effects, no layout, no clipping.
+   * Children are freely placed and treated as root-level containers.
+   */
+  export interface TrayNode
+    extends i.IBaseNode,
+      i.ISceneNode,
+      i.IBlend,
+      i.IPositioning,
+      i.ICornerRadius,
+      i.IStroke,
+      i.IFill<cg.Paint> {
+    type: "tray";
+    //
+  }
+
+  /**
    * Boolean Path Operation Node
    *
    * [BooleanPathOperationNode] is not supported in the html/svg backend.
@@ -2806,6 +2832,7 @@ export namespace grida.program.nodes {
         // TODO:
         case "boolean":
         case "group":
+        case "tray":
         case "component":
         case "instance":
         case "template_instance": {

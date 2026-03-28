@@ -1,6 +1,8 @@
 use crate::cache::scene::SceneCache;
+use crate::cg::types::Paint as CGPaint;
 use crate::devtools::surface_overlay::SurfaceOverlayConfig;
 use crate::node::scene_graph::SceneGraph;
+use crate::node::schema::{Node, NodeId};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::font_repository::FontRepository;
 use crate::surface::state::SurfaceState;
@@ -33,6 +35,22 @@ const TITLE_BAR_HEIGHT: f32 = 24.0;
 /// Minimum screen-space node width (logical px) to show a title bar.
 const MIN_TITLE_WIDTH: f32 = 20.0;
 
+/// Padding inside the tray badge pill (logical px).
+const BADGE_PAD_X: f32 = 8.0;
+const BADGE_PAD_Y: f32 = 4.0;
+/// Corner radius of the tray badge pill.
+const BADGE_RADIUS: f32 = 4.0;
+/// Extra gap (logical px) between the badge pill bottom and the tray content top.
+const BADGE_GAP_Y: f32 = 6.0;
+/// Fallback badge background color when the tray has no solid fill.
+const BADGE_BG_FALLBACK: Color = Color::from_argb(30, 120, 120, 120);
+/// Alpha multiplier applied to the badge background on hover to darken it.
+const BADGE_HOVER_DARKEN: f32 = 0.9;
+/// Darken factor for the adaptive badge stroke (slightly darker than the fill).
+const BADGE_STROKE_DARKEN: f32 = 0.8;
+/// Badge stroke width (logical px).
+const BADGE_STROKE_WIDTH: f32 = 1.0;
+
 thread_local! {
     static FONT_SIZE_METER: Font = Font::new(
         crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES),
@@ -60,6 +78,57 @@ fn scaled_font(base: &Font, dpr: f32) -> Font {
     let mut f = base.clone();
     f.set_size(base.size() * dpr);
     f
+}
+
+/// Visual style variant for a node label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LabelVariant {
+    /// Plain text label (frame title style) — used for root containers.
+    Plain,
+    /// Badge with a background pill — used for Tray nodes.
+    Badge,
+}
+
+/// A collected node label to render.
+struct NodeLabel {
+    node_id: NodeId,
+    name: Option<String>,
+    variant: LabelVariant,
+    /// For Badge variant: the tray's own background color (first solid fill),
+    /// used as the pill fill for good aesthetics.
+    badge_bg: Option<Color>,
+}
+
+/// Extract the first active solid fill color from a `Paints` collection,
+/// converted to a Skia `Color`.
+fn first_solid_fill(paints: &crate::cg::types::Paints) -> Option<Color> {
+    for p in paints.iter() {
+        if let CGPaint::Solid(s) = p {
+            if s.active {
+                return Some(s.color.into());
+            }
+        }
+    }
+    None
+}
+
+/// Perceived brightness using BT.601 luma coefficients.
+/// Returns `true` when the colour is light (→ use black text).
+#[inline]
+fn is_light_color(c: Color) -> bool {
+    let luma = 0.299 * c.r() as f32 + 0.587 * c.g() as f32 + 0.114 * c.b() as f32;
+    luma > 128.0
+}
+
+/// Darken a colour by multiplying each RGB channel by `factor` (0..1).
+#[inline]
+fn darken(c: Color, factor: f32) -> Color {
+    Color::from_argb(
+        c.a(),
+        (c.r() as f32 * factor) as u8,
+        (c.g() as f32 * factor) as u8,
+        (c.b() as f32 * factor) as u8,
+    )
 }
 
 pub struct SurfaceUI;
@@ -167,6 +236,67 @@ impl SurfaceUI {
         });
     }
 
+    /// Collect nodes that should display a title label.
+    ///
+    /// Labels are shown for:
+    /// - Root nodes (containers and trays at the scene root)
+    /// - "Root-like" containers: containers that are direct children of a Tray
+    ///   (since Tray children are treated as root-level frames)
+    fn collect_labeled_nodes(graph: &SceneGraph) -> Vec<NodeLabel> {
+        let mut labels = Vec::new();
+
+        for &root_id in graph.roots() {
+            let Ok(node) = graph.get_node(&root_id) else {
+                continue;
+            };
+
+            match node {
+                Node::Tray(tray) => {
+                    let bg = first_solid_fill(&tray.fills);
+
+                    // Tray itself gets a badge label
+                    labels.push(NodeLabel {
+                        node_id: root_id,
+                        name: graph.get_name(&root_id).map(str::to_owned),
+                        variant: LabelVariant::Badge,
+                        badge_bg: bg,
+                    });
+
+                    // Tray's direct children that are containers get plain labels
+                    // (they are "root-like" — treated as top-level frames)
+                    if let Some(children) = graph.get_children(&root_id) {
+                        for &child_id in children {
+                            if let Ok(child_node) = graph.get_node(&child_id) {
+                                if matches!(child_node, Node::Container(_)) {
+                                    labels.push(NodeLabel {
+                                        node_id: child_id,
+                                        name: graph.get_name(&child_id).map(str::to_owned),
+                                        variant: LabelVariant::Plain,
+                                        badge_bg: None,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                Node::Container(_) => {
+                    // Root containers get plain labels (frame title bars)
+                    labels.push(NodeLabel {
+                        node_id: root_id,
+                        name: graph.get_name(&root_id).map(str::to_owned),
+                        variant: LabelVariant::Plain,
+                        badge_bg: None,
+                    });
+                }
+                _ => {
+                    // Other root nodes (groups, shapes, etc.) — no label
+                }
+            }
+        }
+
+        labels
+    }
+
     /// Draw title labels above nodes and register hit regions for them.
     ///
     /// Uses the Paragraph API with `FontCollection` from the shared
@@ -195,9 +325,33 @@ impl SurfaceUI {
             families.push(f.as_str());
         }
 
-        // Iterate root nodes directly — no HashSet needed.
-        for &node_id in graph.roots() {
-            let world_bounds = match cache.geometry.get_world_bounds(&node_id) {
+        // Pre-scaled badge metrics (constant across labels)
+        let badge_pad_x = BADGE_PAD_X * dpr;
+        let badge_pad_y = BADGE_PAD_Y * dpr;
+        let badge_radius = BADGE_RADIUS * dpr;
+        let badge_gap_y = BADGE_GAP_Y * dpr;
+
+        // Base text style — reused for every label (only foreground paint varies)
+        let wght_coord = skia_safe::font_arguments::variation_position::Coordinate {
+            axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
+            value: 500.0,
+        };
+        let variation_position = skia_safe::font_arguments::VariationPosition {
+            coordinates: &[wght_coord],
+        };
+        let font_args =
+            skia_safe::FontArguments::new().set_variation_design_position(variation_position);
+
+        let labeled_nodes = Self::collect_labeled_nodes(graph);
+
+        for NodeLabel {
+            node_id,
+            name,
+            variant,
+            badge_bg,
+        } in &labeled_nodes
+        {
+            let world_bounds = match cache.geometry.get_world_bounds(node_id) {
                 Some(b) => b,
                 None => continue,
             };
@@ -213,19 +367,35 @@ impl SurfaceUI {
                 continue;
             }
 
-            let label: &str = graph.get_name(&node_id).unwrap_or_else(|| {
-                graph
-                    .get_node(&node_id)
-                    .map(|n| n.type_label())
-                    .unwrap_or("?")
+            let label: &str = name.as_deref().unwrap_or_else(|| match variant {
+                LabelVariant::Badge => "Tray",
+                LabelVariant::Plain => "Container",
             });
 
-            let is_selected = surface.selection.contains(&node_id);
-            let is_hovered = surface.hover.hovered() == Some(&node_id);
-            let color = if is_selected || is_hovered {
-                ACCENT_COLOR
-            } else {
-                MUTED_COLOR
+            let is_selected = surface.selection.contains(node_id);
+            let is_hovered = surface.hover.hovered() == Some(node_id);
+
+            // ── Determine text colour ──────────────────────────────
+            //
+            // Badge: black or white, chosen by background luminance.
+            //        Does NOT change on hover / select.
+            // Plain: muted grey normally, accent blue when highlighted.
+            let text_color = match variant {
+                LabelVariant::Badge => {
+                    let bg = badge_bg.unwrap_or(BADGE_BG_FALLBACK);
+                    if is_light_color(bg) {
+                        Color::BLACK
+                    } else {
+                        Color::WHITE
+                    }
+                }
+                LabelVariant::Plain => {
+                    if is_selected || is_hovered {
+                        ACCENT_COLOR
+                    } else {
+                        MUTED_COLOR
+                    }
+                }
             };
 
             // Build a single-line paragraph with ellipsis truncation
@@ -242,48 +412,92 @@ impl SurfaceUI {
                 skia_safe::font_style::Width::NORMAL,
                 skia_safe::font_style::Slant::Upright,
             ));
-            // Set explicit wght variation so variable fallback fonts
-            // (e.g. Noto Sans KR) render at Medium (500) weight,
-            // matching the primary Geist font.
-            let wght_coord = skia_safe::font_arguments::variation_position::Coordinate {
-                axis: skia_safe::FourByteTag::from(('w', 'g', 'h', 't')),
-                value: 500.0,
-            };
-            let variation_position = skia_safe::font_arguments::VariationPosition {
-                coordinates: &[wght_coord],
-            };
-            let font_args =
-                skia_safe::FontArguments::new().set_variation_design_position(variation_position);
             text_style.set_font_arguments(&font_args);
             let mut fg_paint = Paint::default();
-            fg_paint.set_color(color);
+            fg_paint.set_color(text_color);
             fg_paint.set_anti_alias(true);
             text_style.set_foreground_paint(&fg_paint);
             paragraph_style.set_text_style(&text_style);
+
+            // For Badge variant, limit paragraph width to leave room for padding
+            let para_max_width = match variant {
+                LabelVariant::Badge => (screen_width - badge_pad_x * 2.0).max(0.0),
+                LabelVariant::Plain => screen_width,
+            };
 
             let mut builder =
                 textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
             builder.push_style(&text_style);
             builder.add_text(label);
             let mut paragraph = builder.build();
-            paragraph.layout(screen_width);
+            paragraph.layout(para_max_width);
 
-            let text_width = paragraph.max_intrinsic_width().min(screen_width);
+            let text_width = paragraph.max_intrinsic_width().min(para_max_width);
             let para_height = paragraph.height();
 
             let title_x = screen_tl[0];
             let title_y = screen_tl[1] - title_height;
 
-            // Vertically center the paragraph within the title bar
-            let text_y = title_y + (title_height - para_height) * 0.5;
+            match variant {
+                LabelVariant::Badge => {
+                    // Draw a background pill behind the label, with extra gap below
+                    let pill_w = text_width + badge_pad_x * 2.0;
+                    let pill_h = para_height + badge_pad_y * 2.0;
+                    let pill_x = title_x;
+                    // Position pill so its bottom edge sits `badge_gap_y` above the tray top
+                    let pill_y = screen_tl[1] - pill_h - badge_gap_y;
 
-            paragraph.paint(canvas, Point::new(title_x, text_y));
+                    let pill_rect = Rect::from_xywh(pill_x, pill_y, pill_w, pill_h);
+                    let rrect = RRect::new_rect_xy(pill_rect, badge_radius, badge_radius);
 
-            let hit_rect = Rect::from_xywh(title_x, title_y, text_width, title_height);
-            hit_regions.push(HitRegion {
-                screen_rect: hit_rect,
-                action: OverlayAction::SelectNode(node_id),
-            });
+                    // Badge background: tray fill colour.
+                    //  - hover  → darken the background
+                    //  - select → no change (original)
+                    let base_bg = badge_bg.unwrap_or(BADGE_BG_FALLBACK);
+                    let bg_color = if is_hovered && !is_selected {
+                        darken(base_bg, BADGE_HOVER_DARKEN)
+                    } else {
+                        base_bg
+                    };
+
+                    let mut bg_paint = Paint::default();
+                    bg_paint.set_color(bg_color);
+                    bg_paint.set_style(PaintStyle::Fill);
+                    bg_paint.set_anti_alias(true);
+                    canvas.draw_rrect(rrect, &bg_paint);
+
+                    // Adaptive stroke — slightly darker than the fill
+                    let stroke_color = darken(base_bg, BADGE_STROKE_DARKEN);
+                    let mut stroke_paint = Paint::default();
+                    stroke_paint.set_color(stroke_color);
+                    stroke_paint.set_style(PaintStyle::Stroke);
+                    stroke_paint.set_stroke_width(BADGE_STROKE_WIDTH * dpr);
+                    stroke_paint.set_anti_alias(true);
+                    canvas.draw_rrect(rrect, &stroke_paint);
+
+                    // Draw text inside the pill
+                    let text_x = pill_x + badge_pad_x;
+                    let text_y = pill_y + badge_pad_y;
+                    paragraph.paint(canvas, Point::new(text_x, text_y));
+
+                    // Hit region covers the pill
+                    hit_regions.push(HitRegion {
+                        screen_rect: pill_rect,
+                        action: OverlayAction::SelectNode(*node_id),
+                    });
+                }
+                LabelVariant::Plain => {
+                    // Plain text label (original frame title style)
+                    let text_y = title_y + (title_height - para_height) * 0.5;
+                    paragraph.paint(canvas, Point::new(title_x, text_y));
+
+                    let hit_rect = Rect::from_xywh(title_x, title_y, text_width, title_height);
+                    hit_regions.push(HitRegion {
+                        screen_rect: hit_rect,
+                        action: OverlayAction::SelectNode(*node_id),
+                    });
+                }
+            }
         }
     }
 }

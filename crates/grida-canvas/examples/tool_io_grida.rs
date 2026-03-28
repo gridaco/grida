@@ -197,6 +197,7 @@ fn inspect_json(bytes: &[u8], cli: &Cli) {
 fn classify_json_node(node: &io_grida::JSONNode) -> &'static str {
     match node {
         io_grida::JSONNode::Group(_) => "group",
+        io_grida::JSONNode::Tray(_) => "tray",
         io_grida::JSONNode::Container(_) => "container",
         io_grida::JSONNode::Vector(_) => "vector",
         io_grida::JSONNode::Path(_) => "path",
@@ -450,6 +451,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::InitialContainer(_) => "initial_container",
         Node::Container(_) => "container",
         Node::Group(_) => "group",
+        Node::Tray(_) => "tray",
         Node::Vector(_) => "vector",
         Node::Path(_) => "path",
         Node::BooleanOperation(_) => "boolean",

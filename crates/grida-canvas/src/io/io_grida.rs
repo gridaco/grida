@@ -870,6 +870,8 @@ pub struct JSONUnknownNodeProperties {
 pub enum JSONNode {
     #[serde(rename = "group")]
     Group(JSONGroupNode),
+    #[serde(rename = "tray")]
+    Tray(JSONGroupNode),
     #[serde(rename = "container", alias = "component")]
     Container(JSONContainerNode),
     #[serde(rename = "vector")]
@@ -902,6 +904,7 @@ impl JSONNode {
     pub fn name(&self) -> Option<&str> {
         match self {
             JSONNode::Group(n) => n.base.name.as_deref(),
+            JSONNode::Tray(n) => n.base.name.as_deref(),
             JSONNode::Container(n) => n.base.name.as_deref(),
             JSONNode::Vector(n) => n.base.name.as_deref(),
             JSONNode::Path(n) => n.base.name.as_deref(),
@@ -1309,6 +1312,28 @@ impl From<JSONGroupNode> for GroupNodeRec {
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
             mask: node.base.mask.map(|m| m.into()),
+        }
+    }
+}
+
+impl From<JSONGroupNode> for TrayNodeRec {
+    fn from(node: JSONGroupNode) -> Self {
+        // TODO: JSONNode::Tray reuses JSONGroupNode shape; visual fields default
+        // until a dedicated JSONTrayNode is introduced.
+        TrayNodeRec {
+            active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
+            rotation: 0.0,
+            position: Default::default(),
+            layout_dimensions: Default::default(),
+            corner_radius: Default::default(),
+            corner_smoothing: Default::default(),
+            fills: Paints::default(),
+            strokes: Paints::default(),
+            stroke_style: StrokeStyle::default(),
+            stroke_width: StrokeWidth::default(),
         }
     }
 }
@@ -2052,6 +2077,7 @@ impl From<JSONNode> for Node {
     fn from(node: JSONNode) -> Self {
         match node {
             JSONNode::Group(group) => Node::Group(group.into()),
+            JSONNode::Tray(tray) => Node::Tray(tray.into()),
             JSONNode::Container(container) => Node::Container(container.into()),
             JSONNode::TextSpan(text) => Node::TextSpan(text.into()),
             JSONNode::Vector(vector) => vector.into(),

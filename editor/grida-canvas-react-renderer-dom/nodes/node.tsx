@@ -210,6 +210,7 @@ const fillings = {
   scene: "background",
   boolean: "none",
   group: "none",
+  tray: "background",
   tspan: "color",
   text: "color",
   container: "background",

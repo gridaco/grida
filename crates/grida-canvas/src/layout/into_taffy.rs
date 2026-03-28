@@ -300,6 +300,7 @@ pub fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) 
             ..grida_style_default()
         },
         Node::Group(_) => grida_style_default(),
+        Node::Tray(_) => grida_style_default(),
         Node::BooleanOperation(_) => grida_style_default(),
     }
 }

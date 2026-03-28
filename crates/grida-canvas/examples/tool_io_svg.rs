@@ -238,6 +238,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::Image(_) => "image",
         Node::TextSpan(_) => "tspan",
         Node::AttributedText(_) => "attributed_text",
+        Node::Tray(_) => "tray",
         Node::Error(_) => "error",
     }
 }

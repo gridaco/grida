@@ -10,13 +10,14 @@ pub mod grida {
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_NODE_TYPE: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_NODE_TYPE: u8 = 14;
+pub const ENUM_MAX_NODE_TYPE: u8 = 15;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_NODE_TYPE: [NodeType; 15] = [
+pub const ENUM_VALUES_NODE_TYPE: [NodeType; 16] = [
   NodeType::Exception,
   NodeType::Scene,
   NodeType::Group,
+  NodeType::Tray,
   NodeType::InitialContainer,
   NodeType::Container,
   NodeType::BooleanOperation,
@@ -40,25 +41,27 @@ impl NodeType {
   pub const Exception: Self = Self(0);
   pub const Scene: Self = Self(1);
   pub const Group: Self = Self(2);
-  pub const InitialContainer: Self = Self(3);
-  pub const Container: Self = Self(4);
-  pub const BooleanOperation: Self = Self(5);
-  pub const Rectangle: Self = Self(6);
-  pub const Ellipse: Self = Self(7);
-  pub const Polygon: Self = Self(8);
-  pub const RegularPolygon: Self = Self(9);
-  pub const RegularStarPolygon: Self = Self(10);
-  pub const Path: Self = Self(11);
-  pub const Line: Self = Self(12);
-  pub const Vector: Self = Self(13);
-  pub const TextSpan: Self = Self(14);
+  pub const Tray: Self = Self(3);
+  pub const InitialContainer: Self = Self(4);
+  pub const Container: Self = Self(5);
+  pub const BooleanOperation: Self = Self(6);
+  pub const Rectangle: Self = Self(7);
+  pub const Ellipse: Self = Self(8);
+  pub const Polygon: Self = Self(9);
+  pub const RegularPolygon: Self = Self(10);
+  pub const RegularStarPolygon: Self = Self(11);
+  pub const Path: Self = Self(12);
+  pub const Line: Self = Self(13);
+  pub const Vector: Self = Self(14);
+  pub const TextSpan: Self = Self(15);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 14;
+  pub const ENUM_MAX: u8 = 15;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::Exception,
     Self::Scene,
     Self::Group,
+    Self::Tray,
     Self::InitialContainer,
     Self::Container,
     Self::BooleanOperation,
@@ -78,6 +81,7 @@ impl NodeType {
       Self::Exception => Some("Exception"),
       Self::Scene => Some("Scene"),
       Self::Group => Some("Group"),
+      Self::Tray => Some("Tray"),
       Self::InitialContainer => Some("InitialContainer"),
       Self::Container => Some("Container"),
       Self::BooleanOperation => Some("BooleanOperation"),
@@ -3860,10 +3864,10 @@ pub struct LayoutPositioningBasisUnionTableOffset {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_NODE: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_NODE: u8 = 12;
+pub const ENUM_MAX_NODE: u8 = 13;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_NODE: [Node; 13] = [
+pub const ENUM_VALUES_NODE: [Node; 14] = [
   Node::NONE,
   Node::UnknownNode,
   Node::SceneNode,
@@ -3877,6 +3881,7 @@ pub const ENUM_VALUES_NODE: [Node; 13] = [
   Node::TextSpanNode,
   Node::PathNode,
   Node::AttributedTextNode,
+  Node::TrayNode,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -3897,9 +3902,10 @@ impl Node {
   pub const TextSpanNode: Self = Self(10);
   pub const PathNode: Self = Self(11);
   pub const AttributedTextNode: Self = Self(12);
+  pub const TrayNode: Self = Self(13);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 12;
+  pub const ENUM_MAX: u8 = 13;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::UnknownNode,
@@ -3914,6 +3920,7 @@ impl Node {
     Self::TextSpanNode,
     Self::PathNode,
     Self::AttributedTextNode,
+    Self::TrayNode,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
@@ -3931,6 +3938,7 @@ impl Node {
       Self::TextSpanNode => Some("TextSpanNode"),
       Self::PathNode => Some("PathNode"),
       Self::AttributedTextNode => Some("AttributedTextNode"),
+      Self::TrayNode => Some("TrayNode"),
       _ => None,
     }
   }
@@ -17445,6 +17453,195 @@ impl ::core::fmt::Debug for GroupNode<'_> {
       ds.finish()
   }
 }
+pub enum TrayNodeOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+/// Node variant: Tray.
+///
+/// A canvas-level organizational primitive (maps to Figma SECTION).
+/// Has explicit dimensions, fills, strokes, corner radius.
+/// No effects, no layout, no clipping.
+/// Children are freely placed and treated as root-level containers.
+pub struct TrayNode<'a> {
+  pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for TrayNode<'a> {
+  type Inner = TrayNode<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: unsafe { ::flatbuffers::Table::new(buf, loc) } }
+  }
+}
+
+impl<'a> TrayNode<'a> {
+  pub const VT_NODE: ::flatbuffers::VOffsetT = 4;
+  pub const VT_LAYER: ::flatbuffers::VOffsetT = 6;
+  pub const VT_STROKE_GEOMETRY: ::flatbuffers::VOffsetT = 8;
+  pub const VT_CORNER_RADIUS: ::flatbuffers::VOffsetT = 10;
+  pub const VT_FILL_PAINTS: ::flatbuffers::VOffsetT = 12;
+  pub const VT_STROKE_PAINTS: ::flatbuffers::VOffsetT = 14;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+    TrayNode { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: ::flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args TrayNodeArgs<'args>
+  ) -> ::flatbuffers::WIPOffset<TrayNode<'bldr>> {
+    let mut builder = TrayNodeBuilder::new(_fbb);
+    if let Some(x) = args.stroke_paints { builder.add_stroke_paints(x); }
+    if let Some(x) = args.fill_paints { builder.add_fill_paints(x); }
+    if let Some(x) = args.corner_radius { builder.add_corner_radius(x); }
+    if let Some(x) = args.stroke_geometry { builder.add_stroke_geometry(x); }
+    if let Some(x) = args.layer { builder.add_layer(x); }
+    if let Some(x) = args.node { builder.add_node(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn node(&self) -> SystemNodeTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>(TrayNode::VT_NODE, None).unwrap()}
+  }
+  #[inline]
+  pub fn layer(&self) -> LayerTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<LayerTrait>>(TrayNode::VT_LAYER, None).unwrap()}
+  }
+  #[inline]
+  pub fn stroke_geometry(&self) -> Option<RectangularStrokeGeometryTrait<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<RectangularStrokeGeometryTrait>>(TrayNode::VT_STROKE_GEOMETRY, None)}
+  }
+  #[inline]
+  pub fn corner_radius(&self) -> Option<RectangularCornerRadiusTrait<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<RectangularCornerRadiusTrait>>(TrayNode::VT_CORNER_RADIUS, None)}
+  }
+  #[inline]
+  pub fn fill_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(TrayNode::VT_FILL_PAINTS, None)}
+  }
+  #[inline]
+  pub fn stroke_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(TrayNode::VT_STROKE_PAINTS, None)}
+  }
+}
+
+impl ::flatbuffers::Verifiable for TrayNode<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut ::flatbuffers::Verifier, pos: usize
+  ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+    v.visit_table(pos)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>("node", Self::VT_NODE, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<LayerTrait>>("layer", Self::VT_LAYER, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<RectangularStrokeGeometryTrait>>("stroke_geometry", Self::VT_STROKE_GEOMETRY, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<RectangularCornerRadiusTrait>>("corner_radius", Self::VT_CORNER_RADIUS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("fill_paints", Self::VT_FILL_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("stroke_paints", Self::VT_STROKE_PAINTS, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct TrayNodeArgs<'a> {
+    pub node: Option<::flatbuffers::WIPOffset<SystemNodeTrait<'a>>>,
+    pub layer: Option<::flatbuffers::WIPOffset<LayerTrait<'a>>>,
+    pub stroke_geometry: Option<::flatbuffers::WIPOffset<RectangularStrokeGeometryTrait<'a>>>,
+    pub corner_radius: Option<::flatbuffers::WIPOffset<RectangularCornerRadiusTrait<'a>>>,
+    pub fill_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub stroke_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+}
+impl<'a> Default for TrayNodeArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    TrayNodeArgs {
+      node: None, // required field
+      layer: None, // required field
+      stroke_geometry: None,
+      corner_radius: None,
+      fill_paints: None,
+      stroke_paints: None,
+    }
+  }
+}
+
+pub struct TrayNodeBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> TrayNodeBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_node(&mut self, node: ::flatbuffers::WIPOffset<SystemNodeTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<SystemNodeTrait>>(TrayNode::VT_NODE, node);
+  }
+  #[inline]
+  pub fn add_layer(&mut self, layer: ::flatbuffers::WIPOffset<LayerTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<LayerTrait>>(TrayNode::VT_LAYER, layer);
+  }
+  #[inline]
+  pub fn add_stroke_geometry(&mut self, stroke_geometry: ::flatbuffers::WIPOffset<RectangularStrokeGeometryTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<RectangularStrokeGeometryTrait>>(TrayNode::VT_STROKE_GEOMETRY, stroke_geometry);
+  }
+  #[inline]
+  pub fn add_corner_radius(&mut self, corner_radius: ::flatbuffers::WIPOffset<RectangularCornerRadiusTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<RectangularCornerRadiusTrait>>(TrayNode::VT_CORNER_RADIUS, corner_radius);
+  }
+  #[inline]
+  pub fn add_fill_paints(&mut self, fill_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(TrayNode::VT_FILL_PAINTS, fill_paints);
+  }
+  #[inline]
+  pub fn add_stroke_paints(&mut self, stroke_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(TrayNode::VT_STROKE_PAINTS, stroke_paints);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>) -> TrayNodeBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    TrayNodeBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> ::flatbuffers::WIPOffset<TrayNode<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, TrayNode::VT_NODE,"node");
+    self.fbb_.required(o, TrayNode::VT_LAYER,"layer");
+    ::flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl ::core::fmt::Debug for TrayNode<'_> {
+  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+    let mut ds = f.debug_struct("TrayNode");
+      ds.field("node", &self.node());
+      ds.field("layer", &self.layer());
+      ds.field("stroke_geometry", &self.stroke_geometry());
+      ds.field("corner_radius", &self.corner_radius());
+      ds.field("fill_paints", &self.fill_paints());
+      ds.field("stroke_paints", &self.stroke_paints());
+      ds.finish()
+  }
+}
 pub enum BooleanOperationNodeOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -19238,6 +19435,21 @@ impl<'a> NodeSlot<'a> {
     }
   }
 
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn node_as_tray_node(&self) -> Option<TrayNode<'a>> {
+    if self.node_type() == Node::TrayNode {
+      self.node().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { TrayNode::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
 }
 
 impl ::flatbuffers::Verifiable for NodeSlot<'_> {
@@ -19260,6 +19472,7 @@ impl ::flatbuffers::Verifiable for NodeSlot<'_> {
           Node::TextSpanNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<TextSpanNode>>("Node::TextSpanNode", pos),
           Node::PathNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<PathNode>>("Node::PathNode", pos),
           Node::AttributedTextNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<AttributedTextNode>>("Node::AttributedTextNode", pos),
+          Node::TrayNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<TrayNode>>("Node::TrayNode", pos),
           _ => Ok(()),
         }
      })?
@@ -19393,6 +19606,13 @@ impl ::core::fmt::Debug for NodeSlot<'_> {
         },
         Node::AttributedTextNode => {
           if let Some(x) = self.node_as_attributed_text_node() {
+            ds.field("node", &x)
+          } else {
+            ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        Node::TrayNode => {
+          if let Some(x) = self.node_as_tray_node() {
             ds.field("node", &x)
           } else {
             ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")

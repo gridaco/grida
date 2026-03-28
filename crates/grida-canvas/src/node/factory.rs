@@ -164,6 +164,35 @@ impl NodeFactory {
         }
     }
 
+    /// Creates a new tray node with default values (Figma SECTION equivalent)
+    pub fn create_tray_node(&self) -> TrayNodeRec {
+        TrayNodeRec {
+            active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            mask: None,
+            rotation: 0.0,
+            position: Default::default(),
+            layout_dimensions: LayoutDimensionStyle {
+                layout_target_width: Some(Self::DEFAULT_SIZE.width),
+                layout_target_height: Some(Self::DEFAULT_SIZE.height),
+                ..Default::default()
+            },
+            corner_radius: Default::default(),
+            corner_smoothing: Default::default(),
+            fills: Paints::default(),
+            strokes: Default::default(),
+            stroke_style: StrokeStyle {
+                stroke_align: Self::DEFAULT_STROKE_ALIGN,
+                stroke_cap: StrokeCap::default(),
+                stroke_join: StrokeJoin::default(),
+                stroke_miter_limit: StrokeMiterLimit::default(),
+                stroke_dash_array: None,
+            },
+            stroke_width: StrokeWidth::Uniform(Self::DEFAULT_STROKE_WIDTH),
+        }
+    }
+
     /// Creates a new container node with default values
     pub fn create_container_node(&self) -> ContainerNodeRec {
         ContainerNodeRec {

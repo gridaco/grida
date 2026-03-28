@@ -242,6 +242,13 @@ impl LayoutEngine {
                 // Size derived from children bounds (dynamic)
                 (0.0, 0.0)
             }
+            Node::Tray(n) => {
+                // Tray has explicit dimensions
+                (
+                    n.layout_dimensions.layout_target_width.unwrap_or(0.0),
+                    n.layout_dimensions.layout_target_height.unwrap_or(0.0),
+                )
+            }
             Node::Error(n) => (n.size.width, n.size.height),
             Node::InitialContainer(_) => (0.0, 0.0), // Size set by viewport
         }
@@ -280,6 +287,7 @@ impl LayoutEngine {
                 let t = n.transform.unwrap_or_default();
                 (t.x(), t.y())
             }
+            Node::Tray(n) => (n.position.x().unwrap_or(0.0), n.position.y().unwrap_or(0.0)),
             Node::BooleanOperation(n) => {
                 let t = n.transform.unwrap_or_default();
                 (t.x(), t.y())
@@ -289,11 +297,15 @@ impl LayoutEngine {
 
     /// Check if a node type participates in Taffy layout (using NodeTypeTag).
     ///
-    /// Virtual grouping nodes (Group, BooleanOperation) are excluded — they
-    /// have no intrinsic size, don't constrain children, and their bounds are
-    /// derived from children. Their children form independent Taffy subtrees.
+    /// Group and BooleanOperation are excluded because their bounds are derived
+    /// from children. Tray is excluded because its children are independently
+    /// positioned and do not form a Taffy subtree. All three form independent
+    /// Taffy subtrees rooted at each of their children.
     fn is_layout_node_tag(tag: NodeTypeTag) -> bool {
-        !matches!(tag, NodeTypeTag::Group | NodeTypeTag::BooleanOperation)
+        !matches!(
+            tag,
+            NodeTypeTag::Group | NodeTypeTag::Tray | NodeTypeTag::BooleanOperation
+        )
     }
 
     /// Recursively build Taffy tree for a node and its descendants.

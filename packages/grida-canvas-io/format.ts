@@ -383,6 +383,7 @@ export namespace format {
       ["rectangle", fbs.NodeType.Rectangle],
       ["tspan", fbs.NodeType.TextSpan],
       ["group", fbs.NodeType.Group],
+      ["tray", fbs.NodeType.Tray],
       ["ellipse", fbs.NodeType.Ellipse],
       ["line", fbs.NodeType.Line],
       ["vector", fbs.NodeType.Vector],
@@ -400,6 +401,7 @@ export namespace format {
       [fbs.NodeType.Rectangle, "rectangle"],
       [fbs.NodeType.TextSpan, "tspan"],
       [fbs.NodeType.Group, "group"],
+      [fbs.NodeType.Tray, "tray"],
       [fbs.NodeType.Ellipse, "ellipse"],
       [fbs.NodeType.Line, "line"],
       [fbs.NodeType.Vector, "vector"],
@@ -2124,6 +2126,61 @@ export namespace format {
             fbs.GroupNode.addLayer(builder, layerOffset);
             nodeOffset = fbs.GroupNode.endGroupNode(builder);
             nodeType = fbs.Node.GroupNode;
+            break;
+          }
+          case "tray": {
+            const trayNode = node as grida.program.nodes.TrayNode;
+
+            // Encode traits and paints
+            const strokeGeometryOffset =
+              format.shape.encode.rectangularStrokeGeometryTrait(builder, {
+                stroke_cap: trayNode.stroke_cap,
+                stroke_join: trayNode.stroke_join,
+                stroke_width: trayNode.stroke_width,
+                stroke_dash_array: trayNode.stroke_dash_array,
+                rectangular_stroke_width_top:
+                  trayNode.rectangular_stroke_width_top,
+                rectangular_stroke_width_right:
+                  trayNode.rectangular_stroke_width_right,
+                rectangular_stroke_width_bottom:
+                  trayNode.rectangular_stroke_width_bottom,
+                rectangular_stroke_width_left:
+                  trayNode.rectangular_stroke_width_left,
+              });
+            const cornerRadiusOffset =
+              format.shape.encode.rectangularCornerRadiusTrait(builder, {
+                rectangular_corner_radius_top_left:
+                  trayNode.rectangular_corner_radius_top_left,
+                rectangular_corner_radius_top_right:
+                  trayNode.rectangular_corner_radius_top_right,
+                rectangular_corner_radius_bottom_left:
+                  trayNode.rectangular_corner_radius_bottom_left,
+                rectangular_corner_radius_bottom_right:
+                  trayNode.rectangular_corner_radius_bottom_right,
+                corner_smoothing: trayNode.corner_smoothing,
+              });
+            const fillPaintsFiltered = paints(trayNode, "fill");
+            const fillPaintsOffset = format.paint.encode.fillPaints(
+              builder,
+              fillPaintsFiltered,
+              fbs.TrayNode.createFillPaintsVector
+            );
+            const strokePaintsFiltered = paints(trayNode, "stroke");
+            const strokePaintsOffset = format.paint.encode.strokePaints(
+              builder,
+              strokePaintsFiltered,
+              fbs.TrayNode.createStrokePaintsVector
+            );
+
+            fbs.TrayNode.startTrayNode(builder);
+            fbs.TrayNode.addNode(builder, systemNodeTraitOffset);
+            fbs.TrayNode.addLayer(builder, layerOffset);
+            fbs.TrayNode.addStrokeGeometry(builder, strokeGeometryOffset);
+            fbs.TrayNode.addCornerRadius(builder, cornerRadiusOffset);
+            fbs.TrayNode.addFillPaints(builder, fillPaintsOffset);
+            fbs.TrayNode.addStrokePaints(builder, strokePaintsOffset);
+            nodeOffset = fbs.TrayNode.endTrayNode(builder);
+            nodeType = fbs.Node.TrayNode;
             break;
           }
           default: {
@@ -6171,6 +6228,69 @@ export namespace format {
             ...(effects || {}),
           } satisfies grida.program.nodes.GroupNode;
         }
+
+        /**
+         * Decodes TrayNode — has fills, strokes, corner radius, explicit dimensions.
+         */
+        export function tray(
+          n: fbs.TrayNode,
+          id: string,
+          systemNode: fbs.SystemNodeTrait,
+          layer: fbs.LayerTrait | null,
+          opacity: number,
+          layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
+          effects?: grida.program.nodes.i.IEffects
+        ): grida.program.nodes.TrayNode {
+          const strokeGeometry = n.strokeGeometry();
+          const cornerRadius = n.cornerRadius();
+          const fillPaints = format.paint.decode.fillPaints(n);
+          const strokePaints = format.paint.decode.strokePaints(n);
+
+          const strokeGeometryProps =
+            format.shape.decode.rectangularStrokeGeometryTrait(strokeGeometry);
+          const cornerRadiusProps =
+            format.shape.decode.rectangularCornerRadiusTrait(cornerRadius);
+
+          const baseName = systemNode.name() ?? "node";
+
+          return {
+            type: "tray",
+            id,
+            name: baseName,
+            active: systemNode.active(),
+            locked: systemNode.locked(),
+            opacity,
+            ...(fillPaints ? { fill_paints: fillPaints } : {}),
+            ...(strokePaints ? { stroke_paints: strokePaints } : {}),
+            stroke_width:
+              format.shape.decode.deriveStrokeWidth(strokeGeometryProps),
+            stroke_cap: strokeGeometryProps.stroke_cap,
+            stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
+            rectangular_corner_radius_top_left:
+              cornerRadiusProps.rectangular_corner_radius_top_left,
+            rectangular_corner_radius_top_right:
+              cornerRadiusProps.rectangular_corner_radius_top_right,
+            rectangular_corner_radius_bottom_left:
+              cornerRadiusProps.rectangular_corner_radius_bottom_left,
+            rectangular_corner_radius_bottom_right:
+              cornerRadiusProps.rectangular_corner_radius_bottom_right,
+            corner_smoothing: cornerRadiusProps.corner_smoothing,
+            rectangular_stroke_width_top:
+              strokeGeometryProps.rectangular_stroke_width_top,
+            rectangular_stroke_width_right:
+              strokeGeometryProps.rectangular_stroke_width_right,
+            rectangular_stroke_width_bottom:
+              strokeGeometryProps.rectangular_stroke_width_bottom,
+            rectangular_stroke_width_left:
+              strokeGeometryProps.rectangular_stroke_width_left,
+            ...layoutFields,
+            layout_positioning: layoutFields.layout_positioning ?? "relative",
+            ...(effects || {}),
+          } satisfies grida.program.nodes.TrayNode;
+        }
       }
 
       /**
@@ -6428,6 +6548,17 @@ export namespace format {
             case fbs.Node.GroupNode:
               nodes[id] = nodeTypes.group(
                 typedNode as fbs.GroupNode,
+                id,
+                systemNode,
+                layer,
+                opacity,
+                layoutFields,
+                decodedEffects
+              );
+              break;
+            case fbs.Node.TrayNode:
+              nodes[id] = nodeTypes.tray(
+                typedNode as fbs.TrayNode,
                 id,
                 systemNode,
                 layer,
