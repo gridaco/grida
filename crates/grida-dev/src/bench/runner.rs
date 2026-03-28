@@ -109,7 +109,6 @@ fn measure_frame(
     }
     let queue_us = t0.elapsed().as_micros() as u64;
 
-    let t1 = Instant::now();
     match renderer.flush() {
         FrameFlushResult::OK(stats) => {
             // Draw the SurfaceUI overlay if enabled (after content flush,

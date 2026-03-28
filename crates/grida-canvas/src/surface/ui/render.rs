@@ -33,7 +33,7 @@ const SIZE_METER_RADIUS: f32 = 4.0;
 /// Height of the frame title bar (logical px)
 const TITLE_BAR_HEIGHT: f32 = 24.0;
 /// Minimum screen-space node width (logical px) to show a title bar.
-const MIN_TITLE_WIDTH: f32 = 20.0;
+const MIN_TITLE_WIDTH: f32 = 40.0;
 
 /// Padding inside the tray badge pill (logical px).
 const BADGE_PAD_X: f32 = 8.0;
