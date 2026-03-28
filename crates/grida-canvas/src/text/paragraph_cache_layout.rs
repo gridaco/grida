@@ -219,10 +219,7 @@ impl ParagraphCacheLayout {
     /// Build and layout the paragraph with **per-run** attributed styling,
     /// handling intrinsic width for auto-width nodes (same logic as
     /// `ParagraphCache::compute_measurements`).
-    fn rebuild_attributed(
-        &mut self,
-        content: &crate::text_edit::attributed_text::AttributedText,
-    ) {
+    fn rebuild_attributed(&mut self, content: &crate::text_edit::attributed_text::AttributedText) {
         let text = content.text();
         let mut para = self.build_paragraph_attributed(content);
 
@@ -231,7 +228,11 @@ impl ParagraphCacheLayout {
         } else {
             para.layout(f32::INFINITY);
             let intrinsic = para.max_intrinsic_width();
-            if intrinsic < 1.0 { 1.0 } else { intrinsic }
+            if intrinsic < 1.0 {
+                1.0
+            } else {
+                intrinsic
+            }
         };
 
         para.layout(layout_width);
@@ -254,7 +255,11 @@ impl ParagraphCacheLayout {
         } else {
             para.layout(f32::INFINITY);
             let intrinsic = para.max_intrinsic_width();
-            if intrinsic < 1.0 { 1.0 } else { intrinsic }
+            if intrinsic < 1.0 {
+                1.0
+            } else {
+                intrinsic
+            }
         };
 
         para.layout(layout_width);
@@ -399,8 +404,7 @@ impl TextLayoutEngine for ParagraphCacheLayout {
             Some(p) => p,
             None => return 0,
         };
-        let pwa =
-            para.get_glyph_position_at_coordinate(skia_safe::Point::new(x, y));
+        let pwa = para.get_glyph_position_at_coordinate(skia_safe::Point::new(x, y));
         let raw_u16 = pwa.position.max(0) as usize;
         let raw_u8 = utf16_to_utf8_offset(text, raw_u16).min(text.len());
         snap_grapheme_boundary(text, raw_u8)
@@ -430,7 +434,13 @@ impl TextLayoutEngine for ParagraphCacheLayout {
         } else {
             let para = match &self.paragraph {
                 Some(p) => p,
-                None => return CaretRect { x: lm.left, y, height },
+                None => {
+                    return CaretRect {
+                        x: lm.left,
+                        y,
+                        height,
+                    }
+                }
             };
 
             let u16_end = utf8_to_utf16_offset(text, offset);
@@ -546,10 +556,7 @@ impl ManagedTextLayout for ParagraphCacheLayout {
     fn ensure_layout(&mut self, content: &crate::text_edit::attributed_text::AttributedText) {
         let gen = content.generation();
         let text = content.text();
-        if self.paragraph.is_some()
-            && self.cached_text == text
-            && self.cached_generation == gen
-        {
+        if self.paragraph.is_some() && self.cached_text == text && self.cached_generation == gen {
             return;
         }
         self.cached_generation = gen;

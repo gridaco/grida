@@ -104,15 +104,15 @@ impl SceneCache {
             .iter()
             .enumerate()
             .filter_map(|(i, entry)| {
-                self.geometry.get_render_bounds(&entry.id).map(|rb| {
-                    IndexedLayer {
+                self.geometry
+                    .get_render_bounds(&entry.id)
+                    .map(|rb| IndexedLayer {
                         index: i,
                         bounds: AABB::from_corners(
                             [rb.x, rb.y],
                             [rb.x + rb.width, rb.y + rb.height],
                         ),
-                    }
-                })
+                    })
             })
             .collect();
         self.layer_index = RTree::bulk_load(items);

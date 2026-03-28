@@ -84,11 +84,8 @@ pub fn selection_rects_with_policy(
     font_size: f32,
     policy: EmptyLineSelectionPolicy,
 ) -> Vec<Rect> {
-    let raw = paragraph.get_rects_for_range(
-        u16_lo..u16_hi,
-        RectHeightStyle::Max,
-        RectWidthStyle::Tight,
-    );
+    let raw =
+        paragraph.get_rects_for_range(u16_lo..u16_hi, RectHeightStyle::Max, RectWidthStyle::Tight);
 
     if policy == EmptyLineSelectionPolicy::None {
         return raw.iter().map(|tb| tb.rect).collect();

@@ -7,6 +7,7 @@ use super::layer::{
 use super::paint;
 use super::shadow;
 use super::text_stroke;
+use crate::cache::fast_hash::NodeIdHashMap;
 use crate::cache::{scene::SceneCache, vector_path::VectorPathCache};
 use crate::cg::prelude::*;
 use crate::node::schema::*;
@@ -21,7 +22,6 @@ use skia_safe::{
     canvas::SaveLayerRec, textlayout, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
     Shader,
 };
-use crate::cache::fast_hash::NodeIdHashMap;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -130,8 +130,7 @@ impl<'a> Painter<'a> {
     /// Returns true if using reduced effect quality (interactive frames).
     #[inline]
     fn is_reduced_quality(&self) -> bool {
-        self.policy.effect_quality
-            == crate::runtime::render_policy::EffectQuality::Reduced
+        self.policy.effect_quality == crate::runtime::render_policy::EffectQuality::Reduced
     }
 
     /// Reduce effects for interactive (unstable) frames.
@@ -862,13 +861,7 @@ impl<'a> Painter<'a> {
     /// coordinates and draws directly. Reduces the SkPicture from 4 commands
     /// (save + concat + draw + restore) to 1 command (draw) per node.
     #[inline]
-    fn draw_fills_translated(
-        &self,
-        shape: &PainterShape,
-        fills: &[Paint],
-        tx: f32,
-        ty: f32,
-    ) {
+    fn draw_fills_translated(&self, shape: &PainterShape, fills: &[Paint], tx: f32, ty: f32) {
         if fills.is_empty() {
             return;
         }
@@ -915,13 +908,7 @@ impl<'a> Painter<'a> {
     /// global origin while only the shape rect is offset — causing image fills
     /// to appear "stuck" in world space when a node is translated.
     #[inline]
-    fn draw_shape_at_offset(
-        &self,
-        shape: &PainterShape,
-        paint: &SkPaint,
-        tx: f32,
-        ty: f32,
-    ) {
+    fn draw_shape_at_offset(&self, shape: &PainterShape, paint: &SkPaint, tx: f32, ty: f32) {
         if tx == 0.0 && ty == 0.0 {
             shape.draw_on_canvas(self.canvas, paint);
             return;
@@ -945,8 +932,7 @@ impl<'a> Painter<'a> {
         if let Some(rect) = shape.rect_shape {
             self.canvas.draw_rect(rect.with_offset((tx, ty)), paint);
         } else if let Some(rrect) = &shape.rrect {
-            self.canvas
-                .draw_rrect(rrect.with_offset((tx, ty)), paint);
+            self.canvas.draw_rrect(rrect.with_offset((tx, ty)), paint);
         } else if let Some(oval) = &shape.oval {
             self.canvas.draw_oval(oval.with_offset((tx, ty)), paint);
         } else {
@@ -1540,11 +1526,7 @@ impl<'a> Painter<'a> {
                                 // 3. Strokes
                                 if self.policy.render_strokes() {
                                     if let Some(path) = &shape_layer.stroke_path {
-                                        self.draw_stroke_path(
-                                            shape,
-                                            path,
-                                            &shape_layer.strokes,
-                                        );
+                                        self.draw_stroke_path(shape, path, &shape_layer.strokes);
                                     }
 
                                     // 4. Stroke decorations (markers at endpoints)
@@ -1572,11 +1554,7 @@ impl<'a> Painter<'a> {
                                         local_bounds.bottom().max(sb.bottom()),
                                     );
                                 }
-                                self.with_opacity(
-                                    opacity,
-                                    Some(&local_bounds),
-                                    inner_draw,
-                                );
+                                self.with_opacity(opacity, Some(&local_bounds), inner_draw);
                             }
                         };
                         self.with_optional_clip_path(clip_path.as_ref(), || {
@@ -1862,143 +1840,133 @@ impl<'a> Painter<'a> {
                         let clip_path = &vector_layer.base.clip_path;
                         let draw_content = || {
                             let inner_vec_draw = || {
-                                    // Use VNPainter for vector network rendering
-                                    let vn_painter =
+                                // Use VNPainter for vector network rendering
+                                let vn_painter =
                                     crate::vectornetwork::vn_painter::VNPainter::new_with_images(
                                         self.canvas,
                                         self.images,
                                     );
 
-                                    if self.policy.render_fills() {
-                                        // 1. Render fills only (pass None for strokes)
-                                        vn_painter.draw(
-                                            &vector_layer.vector,
-                                            &vector_layer.fills,
-                                            None,
-                                            vector_layer.corner_radius,
-                                        );
+                                if self.policy.render_fills() {
+                                    // 1. Render fills only (pass None for strokes)
+                                    vn_painter.draw(
+                                        &vector_layer.vector,
+                                        &vector_layer.fills,
+                                        None,
+                                        vector_layer.corner_radius,
+                                    );
 
-                                        // 2. Apply noise effects (only if fills are visible)
-                                        if !vector_layer.fills.is_empty()
-                                            && !effect_ref.noises.is_empty()
-                                        {
-                                            self.draw_noise_effects(shape, &effect_ref.noises);
+                                    // 2. Apply noise effects (only if fills are visible)
+                                    if !vector_layer.fills.is_empty()
+                                        && !effect_ref.noises.is_empty()
+                                    {
+                                        self.draw_noise_effects(shape, &effect_ref.noises);
+                                    }
+                                }
+
+                                if self.policy.render_strokes() {
+                                    let has_cutback = vector_layer.marker_start_shape.has_marker()
+                                        || vector_layer.marker_end_shape.has_marker();
+
+                                    let start_cutback = crate::shape::marker::cutback_depth(
+                                        vector_layer.marker_start_shape,
+                                        vector_layer.stroke_width,
+                                    );
+                                    let end_cutback = crate::shape::marker::cutback_depth(
+                                        vector_layer.marker_end_shape,
+                                        vector_layer.stroke_width,
+                                    );
+                                    let needs_trim = start_cutback > 0.0 || end_cutback > 0.0;
+
+                                    // Force Butt cap when decorations are present so the
+                                    // native cap doesn't leak out from under the marker.
+                                    let effective_cap = if has_cutback {
+                                        StrokeCap::Butt
+                                    } else {
+                                        vector_layer.stroke_cap
+                                    };
+
+                                    // 3. Render strokes (trimmed when cutback applies)
+                                    if !vector_layer.strokes.is_empty() {
+                                        if needs_trim {
+                                            // When cutback is needed, get the VN path, trim it,
+                                            // and stroke via stroke_geometry instead of VNPainter.
+                                            let paths = vector_layer.vector.to_paths();
+                                            if let Some(vn_path) = paths.first() {
+                                                let trimmed = crate::shape::marker::trim_path(
+                                                    vn_path,
+                                                    start_cutback,
+                                                    end_cutback,
+                                                );
+                                                let stroke_path =
+                                                    crate::shape::stroke::stroke_geometry(
+                                                        &trimmed,
+                                                        vector_layer.stroke_width,
+                                                        vector_layer.stroke_align,
+                                                        effective_cap,
+                                                        vector_layer.stroke_join,
+                                                        vector_layer.stroke_miter_limit,
+                                                        vector_layer.stroke_dash_array.as_ref(),
+                                                    );
+                                                self.draw_stroke_path(
+                                                    shape,
+                                                    &stroke_path,
+                                                    &vector_layer.strokes,
+                                                );
+                                            }
+                                        } else {
+                                            // No cutback: use VNPainter for full-fidelity rendering
+                                            let stroke_options = StrokeOptions {
+                                                stroke_width: vector_layer.stroke_width,
+                                                stroke_align: vector_layer.stroke_align,
+                                                stroke_cap: effective_cap,
+                                                stroke_join: vector_layer.stroke_join,
+                                                stroke_miter_limit: vector_layer.stroke_miter_limit,
+                                                paints: vector_layer.strokes.clone(),
+                                                width_profile: vector_layer
+                                                    .stroke_width_profile
+                                                    .clone(),
+                                                stroke_dash_array: vector_layer
+                                                    .stroke_dash_array
+                                                    .clone(),
+                                            };
+                                            self.draw_vector_strokes(
+                                                &vn_painter,
+                                                &vector_layer.vector,
+                                                &stroke_options,
+                                                vector_layer.corner_radius,
+                                            );
                                         }
                                     }
 
-                                    if self.policy.render_strokes() {
-                                        let has_cutback =
-                                            vector_layer.marker_start_shape.has_marker()
-                                                || vector_layer.marker_end_shape.has_marker();
-
-                                        let start_cutback = crate::shape::marker::cutback_depth(
-                                            vector_layer.marker_start_shape,
-                                            vector_layer.stroke_width,
-                                        );
-                                        let end_cutback = crate::shape::marker::cutback_depth(
-                                            vector_layer.marker_end_shape,
-                                            vector_layer.stroke_width,
-                                        );
-                                        let needs_trim =
-                                            start_cutback > 0.0 || end_cutback > 0.0;
-
-                                        // Force Butt cap when decorations are present so the
-                                        // native cap doesn't leak out from under the marker.
-                                        let effective_cap = if has_cutback {
-                                            StrokeCap::Butt
-                                        } else {
-                                            vector_layer.stroke_cap
-                                        };
-
-                                        // 3. Render strokes (trimmed when cutback applies)
-                                        if !vector_layer.strokes.is_empty() {
-                                            if needs_trim {
-                                                // When cutback is needed, get the VN path, trim it,
-                                                // and stroke via stroke_geometry instead of VNPainter.
-                                                let paths = vector_layer.vector.to_paths();
-                                                if let Some(vn_path) = paths.first() {
-                                                    let trimmed =
-                                                        crate::shape::marker::trim_path(
-                                                            vn_path,
-                                                            start_cutback,
-                                                            end_cutback,
-                                                        );
-                                                    let stroke_path =
-                                                        crate::shape::stroke::stroke_geometry(
-                                                            &trimmed,
-                                                            vector_layer.stroke_width,
-                                                            vector_layer.stroke_align,
-                                                            effective_cap,
-                                                            vector_layer.stroke_join,
-                                                            vector_layer.stroke_miter_limit,
-                                                            vector_layer
-                                                                .stroke_dash_array
-                                                                .as_ref(),
-                                                        );
-                                                    self.draw_stroke_path(
-                                                        shape,
-                                                        &stroke_path,
-                                                        &vector_layer.strokes,
-                                                    );
-                                                }
-                                            } else {
-                                                // No cutback: use VNPainter for full-fidelity rendering
-                                                let stroke_options = StrokeOptions {
-                                                    stroke_width: vector_layer.stroke_width,
-                                                    stroke_align: vector_layer.stroke_align,
-                                                    stroke_cap: effective_cap,
-                                                    stroke_join: vector_layer.stroke_join,
-                                                    stroke_miter_limit: vector_layer
-                                                        .stroke_miter_limit,
-                                                    paints: vector_layer.strokes.clone(),
-                                                    width_profile: vector_layer
-                                                        .stroke_width_profile
-                                                        .clone(),
-                                                    stroke_dash_array: vector_layer
-                                                        .stroke_dash_array
-                                                        .clone(),
-                                                };
-                                                self.draw_vector_strokes(
-                                                    &vn_painter,
-                                                    &vector_layer.vector,
-                                                    &stroke_options,
-                                                    vector_layer.corner_radius,
+                                    // 4. Stroke decorations (markers at endpoints)
+                                    // Place markers on the UNTRIMMED path so tips align
+                                    // with the logical endpoint.
+                                    if has_cutback {
+                                        let paths = vector_layer.vector.to_paths();
+                                        if let Some(vn_path) = paths.first() {
+                                            if let Some(sk_paint) = paint::sk_paint_stack(
+                                                &vector_layer.strokes,
+                                                (shape.rect.width(), shape.rect.height()),
+                                                self.images,
+                                            ) {
+                                                crate::shape::marker::draw_endpoint_decorations(
+                                                    self.canvas,
+                                                    vn_path,
+                                                    vector_layer.marker_start_shape,
+                                                    vector_layer.marker_end_shape,
+                                                    vector_layer.stroke_width,
+                                                    &sk_paint,
                                                 );
                                             }
                                         }
-
-                                        // 4. Stroke decorations (markers at endpoints)
-                                        // Place markers on the UNTRIMMED path so tips align
-                                        // with the logical endpoint.
-                                        if has_cutback {
-                                            let paths = vector_layer.vector.to_paths();
-                                            if let Some(vn_path) = paths.first() {
-                                                if let Some(sk_paint) = paint::sk_paint_stack(
-                                                    &vector_layer.strokes,
-                                                    (shape.rect.width(), shape.rect.height()),
-                                                    self.images,
-                                                ) {
-                                                    crate::shape::marker::draw_endpoint_decorations(
-                                                        self.canvas,
-                                                        vn_path,
-                                                        vector_layer.marker_start_shape,
-                                                        vector_layer.marker_end_shape,
-                                                        vector_layer.stroke_width,
-                                                        &sk_paint,
-                                                    );
-                                                }
-                                            }
-                                        }
+                                    }
                                 }
                             };
                             if vec_can_fold {
                                 inner_vec_draw();
                             } else {
-                                self.with_opacity(
-                                    vec_opacity,
-                                    Some(&shape.rect),
-                                    inner_vec_draw,
-                                );
+                                self.with_opacity(vec_opacity, Some(&shape.rect), inner_vec_draw);
                             }
                         };
                         self.with_optional_clip_path(clip_path.as_ref(), || {
@@ -2171,10 +2139,7 @@ impl<'a> Painter<'a> {
                             paint.set_blend_mode(blit.blend_mode);
                             self.canvas.draw_image_rect(
                                 &*blit.image,
-                                Some((
-                                    &blit.src_rect,
-                                    skia_safe::canvas::SrcRectConstraint::Fast,
-                                )),
+                                Some((&blit.src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
                                 blit.dst_rect,
                                 &paint,
                             );
@@ -2196,9 +2161,7 @@ impl<'a> Painter<'a> {
                 PainterRenderCommand::MaskGroup(group) => {
                     self.draw_mask_group_or_passthrough(group)
                 }
-                PainterRenderCommand::RenderSurface(surface) => {
-                    self.draw_render_surface(surface)
-                }
+                PainterRenderCommand::RenderSurface(surface) => self.draw_render_surface(surface),
             }
         }
     }
@@ -2258,17 +2221,15 @@ impl<'a> Painter<'a> {
         );
 
         // Blend mode isolation wraps everything.
-        let apply_blendmode = |f: &dyn Fn()| {
-            match surface.blend_mode {
-                LayerBlendMode::PassThrough => f(),
-                LayerBlendMode::Blend(blend_mode) => {
-                    let mut paint = SkPaint::default();
-                    paint.set_blend_mode(blend_mode.into());
-                    let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
-                    canvas.save_layer(&layer_rec);
-                    f();
-                    canvas.restore();
-                }
+        let apply_blendmode = |f: &dyn Fn()| match surface.blend_mode {
+            LayerBlendMode::PassThrough => f(),
+            LayerBlendMode::Blend(blend_mode) => {
+                let mut paint = SkPaint::default();
+                paint.set_blend_mode(blend_mode.into());
+                let layer_rec = SaveLayerRec::default().bounds(&bounds).paint(&paint);
+                canvas.save_layer(&layer_rec);
+                f();
+                canvas.restore();
             }
         };
 
@@ -2296,12 +2257,14 @@ impl<'a> Painter<'a> {
                 };
 
                 apply_blur(&|| {
-                    let has_drop_shadows = effects.shadows.iter().any(|s| {
-                        matches!(s, FilterShadowEffect::DropShadow(_))
-                    });
-                    let has_inner_shadows = effects.shadows.iter().any(|s| {
-                        matches!(s, FilterShadowEffect::InnerShadow(_))
-                    });
+                    let has_drop_shadows = effects
+                        .shadows
+                        .iter()
+                        .any(|s| matches!(s, FilterShadowEffect::DropShadow(_)));
+                    let has_inner_shadows = effects
+                        .shadows
+                        .iter()
+                        .any(|s| matches!(s, FilterShadowEffect::InnerShadow(_)));
 
                     if has_drop_shadows {
                         // For drop shadows on a render surface, we use Skia's
@@ -2328,15 +2291,11 @@ impl<'a> Painter<'a> {
                             if let Some(filter) = filter {
                                 let mut paint = SkPaint::default();
                                 paint.set_image_filter(filter);
-                                let expansion = ds.blur * 3.0
-                                    + ds.spread.abs()
-                                    + ds.dx.abs()
-                                    + ds.dy.abs();
+                                let expansion =
+                                    ds.blur * 3.0 + ds.spread.abs() + ds.dx.abs() + ds.dy.abs();
                                 let expanded = bounds.with_outset((expansion, expansion));
                                 canvas.save_layer(
-                                    &SaveLayerRec::default()
-                                        .bounds(&expanded)
-                                        .paint(&paint),
+                                    &SaveLayerRec::default().bounds(&expanded).paint(&paint),
                                 );
                                 save_count += 1;
                             }
@@ -2388,51 +2347,27 @@ impl<'a> Painter<'a> {
         if shadow.spread != 0.0 {
             // With spread: dilate/erode -> blur -> offset, then merge with source
             let morph = if shadow.spread > 0.0 {
-                skia_safe::image_filters::dilate(
-                    (shadow.spread, shadow.spread),
-                    None,
-                    None,
-                )
+                skia_safe::image_filters::dilate((shadow.spread, shadow.spread), None, None)
             } else {
-                skia_safe::image_filters::erode(
-                    (-shadow.spread, -shadow.spread),
-                    None,
-                    None,
-                )
+                skia_safe::image_filters::erode((-shadow.spread, -shadow.spread), None, None)
             };
 
             let blurred = if shadow.blur > 0.0 {
-                skia_safe::image_filters::blur(
-                    (shadow.blur, shadow.blur),
-                    None,
-                    morph,
-                    None,
-                )
+                skia_safe::image_filters::blur((shadow.blur, shadow.blur), None, morph, None)
             } else {
                 morph
             };
 
-            let offset = skia_safe::image_filters::offset(
-                (shadow.dx, shadow.dy),
-                blurred,
-                None,
-            );
+            let offset = skia_safe::image_filters::offset((shadow.dx, shadow.dy), blurred, None);
 
             // Colorize: use color_filter to tint the shadow
-            let color_matrix = skia_safe::color_filters::blend(
-                color,
-                skia_safe::BlendMode::SrcIn,
-            );
-            let colorized = color_matrix.and_then(|cf| {
-                skia_safe::image_filters::color_filter(cf, offset, None)
-            });
+            let color_matrix = skia_safe::color_filters::blend(color, skia_safe::BlendMode::SrcIn);
+            let colorized = color_matrix
+                .and_then(|cf| skia_safe::image_filters::color_filter(cf, offset, None));
 
             // Merge shadow + source (None = passthrough source)
             colorized.and_then(|shadow_layer| {
-                skia_safe::image_filters::merge(
-                    [Some(shadow_layer), None].into_iter(),
-                    None,
-                )
+                skia_safe::image_filters::merge([Some(shadow_layer), None].into_iter(), None)
             })
         } else {
             // Fast path: use Skia's built-in drop_shadow (draws shadow + source)

@@ -97,7 +97,9 @@ impl<S: Clone> GenericEditHistory<S> {
                 // without Instant::advance).  Refuse to merge so undo
                 // granularity is preserved even when the host never drives
                 // the clock.
-                return elapsed > Duration::ZERO && elapsed < self.merge_timeout && top.kind == kind;
+                return elapsed > Duration::ZERO
+                    && elapsed < self.merge_timeout
+                    && top.kind == kind;
             }
         }
         false
@@ -108,7 +110,10 @@ impl<S: Clone> GenericEditHistory<S> {
     /// Call this when `would_merge(kind)` returned `true` to update the
     /// merge timestamp and clear the redo stack without allocating.
     pub fn push_merge(&mut self, kind: EditKind) {
-        debug_assert!(self.would_merge(kind), "push_merge called when would_merge is false");
+        debug_assert!(
+            self.would_merge(kind),
+            "push_merge called when would_merge is false"
+        );
         if let Some(top) = self.undo_stack.last_mut() {
             top.timestamp = Instant::now();
         }

@@ -64,7 +64,13 @@ impl SurfaceOverlay {
             if !surface.selection.contains(hovered_id) {
                 // Hover: text nodes show baseline only (no bounding rect)
                 Self::draw_node_outline(
-                    canvas, hovered_id, &view_sk, cache, HOVER_COLOR, 1.5, use_text_baseline,
+                    canvas,
+                    hovered_id,
+                    &view_sk,
+                    cache,
+                    HOVER_COLOR,
+                    1.5,
+                    use_text_baseline,
                     fonts,
                 );
             }
@@ -76,7 +82,14 @@ impl SurfaceOverlay {
             for id in surface.selection.iter() {
                 // Selection: always draw bounding rect
                 Self::draw_node_outline(
-                    canvas, id, &view_sk, cache, SELECTION_COLOR, 1.5, false, fonts,
+                    canvas,
+                    id,
+                    &view_sk,
+                    cache,
+                    SELECTION_COLOR,
+                    1.5,
+                    false,
+                    fonts,
                 );
                 // Selection: additionally draw text baseline decoration
                 if use_text_baseline {

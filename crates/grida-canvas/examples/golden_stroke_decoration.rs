@@ -52,8 +52,22 @@ fn main() {
     // ===================================================================
     // Section 1: Terminal vs Node anchor — side by side
     // ===================================================================
-    draw_section(canvas, &small_font, &sp, LEFT, y, "── Terminal (edge-aligned) ──");
-    draw_section(canvas, &small_font, &sp, COL2, y, "── Centroid (center-aligned) ──");
+    draw_section(
+        canvas,
+        &small_font,
+        &sp,
+        LEFT,
+        y,
+        "── Terminal (edge-aligned) ──",
+    );
+    draw_section(
+        canvas,
+        &small_font,
+        &sp,
+        COL2,
+        y,
+        "── Centroid (center-aligned) ──",
+    );
     y += 22.0;
 
     let shapes: Vec<(&str, BuiltinMarker)> = vec![
@@ -114,10 +128,30 @@ fn main() {
 
     // Place different shapes at u=0, 0.33, 0.66, 1.0
     let placements: Vec<(f32, BuiltinMarker, Color, bool)> = vec![
-        (0.0, BuiltinMarker::EquilateralTriangle, Color::from_rgb(220, 60, 60), true),
-        (0.33, BuiltinMarker::Circle, Color::from_rgb(60, 180, 60), false),
-        (0.66, BuiltinMarker::Diamond, Color::from_rgb(140, 80, 200), false),
-        (1.0, BuiltinMarker::EquilateralTriangle, Color::from_rgb(60, 60, 220), false),
+        (
+            0.0,
+            BuiltinMarker::EquilateralTriangle,
+            Color::from_rgb(220, 60, 60),
+            true,
+        ),
+        (
+            0.33,
+            BuiltinMarker::Circle,
+            Color::from_rgb(60, 180, 60),
+            false,
+        ),
+        (
+            0.66,
+            BuiltinMarker::Diamond,
+            Color::from_rgb(140, 80, 200),
+            false,
+        ),
+        (
+            1.0,
+            BuiltinMarker::EquilateralTriangle,
+            Color::from_rgb(60, 60, 220),
+            false,
+        ),
     ];
 
     let mut measure = PathMeasure::new(&curve, false, None);
@@ -159,14 +193,24 @@ fn main() {
     draw_guides(canvas, &gp, LEFT, y);
     draw_stroke(canvas, LEFT, y);
     draw_marker_at_end_with(canvas, LEFT, y, &star, Color::from_rgb(220, 140, 20));
-    canvas.draw_str("custom: 5-point star", Point::new(LEFT, y + 42.0), &font, &lp);
+    canvas.draw_str(
+        "custom: 5-point star",
+        Point::new(LEFT, y + 42.0),
+        &font,
+        &lp,
+    );
 
     // Custom: cross / plus
     let cross = build_cross(size * 0.4);
     draw_guides(canvas, &gp, COL2, y);
     draw_stroke(canvas, COL2, y);
     draw_marker_at_end_with(canvas, COL2, y, &cross, Color::from_rgb(220, 60, 60));
-    canvas.draw_str("custom: cross / plus", Point::new(COL2, y + 42.0), &font, &lp);
+    canvas.draw_str(
+        "custom: cross / plus",
+        Point::new(COL2, y + 42.0),
+        &font,
+        &lp,
+    );
     y += ROW_H;
 
     // ===================================================================
@@ -215,7 +259,12 @@ fn main() {
         }
 
         // Marker on untrimmed path
-        let ms = marker::marker_shape(BuiltinMarker::EquilateralTriangle, MarkerAnchor::Terminal, sz, sw);
+        let ms = marker::marker_shape(
+            BuiltinMarker::EquilateralTriangle,
+            MarkerAnchor::Terminal,
+            sz,
+            sw,
+        );
         let fp = fill_paint();
         let mut measure = PathMeasure::new(&path, false, None);
         let length = measure.length();
@@ -282,7 +331,12 @@ fn main() {
             &fp,
         );
 
-        canvas.draw_str(label, Point::new(LEFT + LINE_LEN + 30.0, y + 5.0), &font, &lp);
+        canvas.draw_str(
+            label,
+            Point::new(LEFT + LINE_LEN + 30.0, y + 5.0),
+            &font,
+            &lp,
+        );
         y += ROW_H;
     }
 
@@ -291,10 +345,7 @@ fn main() {
     let data = image
         .encode(None, EncodedImageFormat::PNG, None)
         .expect("encode");
-    let out = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/goldens/stroke_decoration.png"
-    );
+    let out = concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/stroke_decoration.png");
     std::fs::write(out, data.as_bytes()).unwrap();
     println!("Saved {}", out);
 }
@@ -344,7 +395,14 @@ fn draw_guides(canvas: &Canvas, paint: &Paint, x: f32, y: f32) {
     );
 }
 
-fn draw_section(canvas: &Canvas, font: &skia_safe::Font, paint: &Paint, x: f32, y: f32, text: &str) {
+fn draw_section(
+    canvas: &Canvas,
+    font: &skia_safe::Font,
+    paint: &Paint,
+    x: f32,
+    y: f32,
+    text: &str,
+) {
     canvas.draw_str(text, Point::new(x, y), font, paint);
 }
 

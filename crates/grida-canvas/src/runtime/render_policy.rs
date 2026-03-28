@@ -185,8 +185,13 @@ impl RenderPolicy {
     /// interactive frames still benefit from layer compositing.
     #[inline]
     pub fn allows_layer_compositing(&self) -> bool {
-        matches!(self.content, ContentPolicy::Standard { render_fills: true, render_strokes: true })
-            && self.effects == EffectsPolicy::Enabled
+        matches!(
+            self.content,
+            ContentPolicy::Standard {
+                render_fills: true,
+                render_strokes: true
+            }
+        ) && self.effects == EffectsPolicy::Enabled
             && self.compositing == CompositingPolicy::Enabled
             && !self.ignore_clips_content
     }

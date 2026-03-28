@@ -25,7 +25,11 @@ pub struct SimpleLayoutEngine {
 
 impl SimpleLayoutEngine {
     pub fn new(viewport_height: f32, line_height: f32, char_width: f32) -> Self {
-        Self { viewport_height, line_height, char_width }
+        Self {
+            viewport_height,
+            line_height,
+            char_width,
+        }
     }
 
     /// Compute line metrics from text by splitting at `\n`.
@@ -115,7 +119,11 @@ impl TextLayoutEngine for SimpleLayoutEngine {
     fn caret_rect_at(&mut self, text: &str, offset: usize) -> CaretRect {
         let metrics = self.compute_metrics(text);
         if metrics.is_empty() {
-            return CaretRect { x: 0.0, y: 0.0, height: self.line_height };
+            return CaretRect {
+                x: 0.0,
+                y: 0.0,
+                height: self.line_height,
+            };
         }
 
         // Forward-scan: first line where offset < end_index.
@@ -156,7 +164,10 @@ impl TextLayoutEngine for SimpleLayoutEngine {
     }
 
     fn selection_rects_for_range(
-        &mut self, text: &str, start: usize, end: usize
+        &mut self,
+        text: &str,
+        start: usize,
+        end: usize,
     ) -> Vec<SelectionRect> {
         if start >= end {
             return Vec::new();

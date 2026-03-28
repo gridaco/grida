@@ -56,17 +56,18 @@ fn make_renderer(scene: Scene, vp_w: i32, vp_h: i32) -> Renderer {
     renderer
 }
 
-fn flush_and_get_stats(
-    renderer: &mut Renderer,
-) -> cg::runtime::scene::FrameFlushStats {
+fn flush_and_get_stats(renderer: &mut Renderer) -> cg::runtime::scene::FrameFlushStats {
     match renderer.flush() {
         FrameFlushResult::OK(stats) => stats,
-        other => panic!("Expected OK flush, got {:?}", match other {
-            FrameFlushResult::NoPending => "NoPending",
-            FrameFlushResult::NoFrame => "NoFrame",
-            FrameFlushResult::NoScene => "NoScene",
-            _ => "OK",
-        }),
+        other => panic!(
+            "Expected OK flush, got {:?}",
+            match other {
+                FrameFlushResult::NoPending => "NoPending",
+                FrameFlushResult::NoFrame => "NoFrame",
+                FrameFlushResult::NoScene => "NoScene",
+                _ => "OK",
+            }
+        ),
     }
 }
 
@@ -180,8 +181,7 @@ fn pan_changes_visible_set() {
 
     println!(
         "top_left:     display_list={}, pic_used={}",
-        stats_topleft.frame.display_list_size_estimated,
-        stats_topleft.draw.cache_picture_used,
+        stats_topleft.frame.display_list_size_estimated, stats_topleft.draw.cache_picture_used,
     );
     println!(
         "bottom_right: display_list={}, pic_used={}",

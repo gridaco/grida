@@ -7,7 +7,7 @@
 //! coordinates, eliminating canvas.save(), canvas.concat(), and canvas.restore().
 //! These tests verify pixel-identical output at the Skia canvas level.
 
-use skia_safe::{surfaces, Paint, Path, Point, Rect, RRect, Surface};
+use skia_safe::{surfaces, Paint, Path, Point, RRect, Rect, Surface};
 
 const W: i32 = 400;
 const H: i32 = 400;
@@ -67,11 +67,11 @@ fn translate_fold_rect_pixel_identical() {
     let local_rect = Rect::from_xywh(0.0, 0.0, 50.0, 35.0);
     let offsets: &[(f32, f32)] = &[
         (10.0, 20.0),
-        (100.5, 50.5),    // sub-pixel
-        (0.0, 0.0),       // identity
-        (200.0, 300.0),   // large offset
-        (0.3, 0.7),       // fractional
-        (123.456, 78.9),  // non-round
+        (100.5, 50.5),   // sub-pixel
+        (0.0, 0.0),      // identity
+        (200.0, 300.0),  // large offset
+        (0.3, 0.7),      // fractional
+        (123.456, 78.9), // non-round
     ];
 
     for &(tx, ty) in offsets {
@@ -199,11 +199,7 @@ fn translate_fold_oval_pixel_identical() {
 #[test]
 fn translate_fold_opacity_pixel_identical() {
     let local_rect = Rect::from_xywh(0.0, 0.0, 60.0, 40.0);
-    let offsets: &[(f32, f32)] = &[
-        (30.0, 40.0),
-        (100.5, 70.5),
-        (0.0, 0.0),
-    ];
+    let offsets: &[(f32, f32)] = &[(30.0, 40.0), (100.5, 70.5), (0.0, 0.0)];
     let opacities: &[f32] = &[0.5, 0.3, 0.8, 0.1, 1.0];
 
     for &(tx, ty) in offsets {
@@ -263,12 +259,48 @@ fn translate_fold_multi_shape_scene_pixel_identical() {
     }
 
     let shapes = vec![
-        ShapeDef { x: 10.0, y: 10.0, w: 40.0, h: 30.0, color: skia_safe::Color::from_argb(255, 255, 0, 0) },
-        ShapeDef { x: 60.0, y: 20.0, w: 50.0, h: 40.0, color: skia_safe::Color::from_argb(200, 0, 255, 0) },
-        ShapeDef { x: 120.5, y: 80.5, w: 35.0, h: 25.0, color: skia_safe::Color::from_argb(180, 0, 0, 255) },
-        ShapeDef { x: 200.0, y: 150.0, w: 60.0, h: 50.0, color: skia_safe::Color::from_argb(150, 255, 255, 0) },
-        ShapeDef { x: 50.0, y: 250.0, w: 80.0, h: 20.0, color: skia_safe::Color::from_argb(255, 128, 0, 255) },
-        ShapeDef { x: 300.0, y: 10.0, w: 45.0, h: 45.0, color: skia_safe::Color::from_argb(200, 0, 200, 200) },
+        ShapeDef {
+            x: 10.0,
+            y: 10.0,
+            w: 40.0,
+            h: 30.0,
+            color: skia_safe::Color::from_argb(255, 255, 0, 0),
+        },
+        ShapeDef {
+            x: 60.0,
+            y: 20.0,
+            w: 50.0,
+            h: 40.0,
+            color: skia_safe::Color::from_argb(200, 0, 255, 0),
+        },
+        ShapeDef {
+            x: 120.5,
+            y: 80.5,
+            w: 35.0,
+            h: 25.0,
+            color: skia_safe::Color::from_argb(180, 0, 0, 255),
+        },
+        ShapeDef {
+            x: 200.0,
+            y: 150.0,
+            w: 60.0,
+            h: 50.0,
+            color: skia_safe::Color::from_argb(150, 255, 255, 0),
+        },
+        ShapeDef {
+            x: 50.0,
+            y: 250.0,
+            w: 80.0,
+            h: 20.0,
+            color: skia_safe::Color::from_argb(255, 128, 0, 255),
+        },
+        ShapeDef {
+            x: 300.0,
+            y: 10.0,
+            w: 45.0,
+            h: 45.0,
+            color: skia_safe::Color::from_argb(200, 0, 200, 200),
+        },
     ];
 
     // Path A: each shape drawn via save/concat/restore
@@ -326,11 +358,7 @@ fn translate_fold_path_fallback_pixel_identical() {
         None,
     );
 
-    let offsets: &[(f32, f32)] = &[
-        (50.0, 50.0),
-        (150.5, 100.5),
-        (0.0, 0.0),
-    ];
+    let offsets: &[(f32, f32)] = &[(50.0, 50.0), (150.5, 100.5), (0.0, 0.0)];
 
     for &(tx, ty) in offsets {
         let mut paint = Paint::default();

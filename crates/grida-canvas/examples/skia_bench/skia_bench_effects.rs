@@ -20,8 +20,7 @@ fn main() {
 fn main() {
     use cg::window::headless::HeadlessGpu;
     use skia_safe::{
-        canvas::SaveLayerRec, color_filters, image_filters, Color, Paint, Rect,
-        Surface,
+        canvas::SaveLayerRec, color_filters, image_filters, Color, Paint, Rect, Surface,
     };
     use std::time::{Duration, Instant};
 
@@ -129,26 +128,36 @@ fn main() {
     ));
 
     // 3. Rounded rect (border-radius)
-    results.push(run_bench(surface, "rounded rect (r=3)", 10000, &|canvas, i| {
-        let (x, y) = grid_pos(i);
-        let mut p = Paint::default();
-        p.set_color(Color::BLACK);
-        let rrect = skia_safe::RRect::new_rect_xy(
-            Rect::from_xywh(x, y, RECT_SIZE, RECT_SIZE),
-            3.0,
-            3.0,
-        );
-        canvas.draw_rrect(rrect, &p);
-    }));
+    results.push(run_bench(
+        surface,
+        "rounded rect (r=3)",
+        10000,
+        &|canvas, i| {
+            let (x, y) = grid_pos(i);
+            let mut p = Paint::default();
+            p.set_color(Color::BLACK);
+            let rrect = skia_safe::RRect::new_rect_xy(
+                Rect::from_xywh(x, y, RECT_SIZE, RECT_SIZE),
+                3.0,
+                3.0,
+            );
+            canvas.draw_rrect(rrect, &p);
+        },
+    ));
 
     // 4. Anti-aliased rect
-    results.push(run_bench(surface, "rect (anti-aliased)", 10000, &|canvas, i| {
-        let (x, y) = grid_pos(i);
-        let mut p = Paint::default();
-        p.set_color(Color::BLACK);
-        p.set_anti_alias(true);
-        canvas.draw_rect(Rect::from_xywh(x, y, RECT_SIZE, RECT_SIZE), &p);
-    }));
+    results.push(run_bench(
+        surface,
+        "rect (anti-aliased)",
+        10000,
+        &|canvas, i| {
+            let (x, y) = grid_pos(i);
+            let mut p = Paint::default();
+            p.set_color(Color::BLACK);
+            p.set_anti_alias(true);
+            canvas.draw_rect(Rect::from_xywh(x, y, RECT_SIZE, RECT_SIZE), &p);
+        },
+    ));
 
     // 5. Rect with opacity (simple alpha on paint — no save_layer)
     results.push(run_bench(
@@ -184,12 +193,15 @@ fn main() {
 
     // 7. Color filter: brightness (4x5 color matrix — cheap)
     {
-        let brightness_cf = color_filters::matrix_row_major(&[
-            1.2, 0.0, 0.0, 0.0, 0.0, // R
-            0.0, 1.2, 0.0, 0.0, 0.0, // G
-            0.0, 0.0, 1.2, 0.0, 0.0, // B
-            0.0, 0.0, 0.0, 1.0, 0.0, // A
-        ], None);
+        let brightness_cf = color_filters::matrix_row_major(
+            &[
+                1.2, 0.0, 0.0, 0.0, 0.0, // R
+                0.0, 1.2, 0.0, 0.0, 0.0, // G
+                0.0, 0.0, 1.2, 0.0, 0.0, // B
+                0.0, 0.0, 0.0, 1.0, 0.0, // A
+            ],
+            None,
+        );
         results.push(run_bench(
             surface,
             "rect + brightness (color filter)",
@@ -206,12 +218,13 @@ fn main() {
 
     // 8. Color filter: grayscale matrix
     {
-        let grayscale_cf = color_filters::matrix_row_major(&[
-            0.2126, 0.7152, 0.0722, 0.0, 0.0,
-            0.2126, 0.7152, 0.0722, 0.0, 0.0,
-            0.2126, 0.7152, 0.0722, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0, 0.0,
-        ], None);
+        let grayscale_cf = color_filters::matrix_row_major(
+            &[
+                0.2126, 0.7152, 0.0722, 0.0, 0.0, 0.2126, 0.7152, 0.0722, 0.0, 0.0, 0.2126, 0.7152,
+                0.0722, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+            ],
+            None,
+        );
         results.push(run_bench(
             surface,
             "rect + grayscale (color filter)",
@@ -474,18 +487,20 @@ fn main() {
 
     // 18. Chained color filters (brightness + contrast + saturate)
     {
-        let cf1 = color_filters::matrix_row_major(&[
-            1.2, 0.0, 0.0, 0.0, 0.0,
-            0.0, 1.2, 0.0, 0.0, 0.0,
-            0.0, 0.0, 1.2, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0, 0.0,
-        ], None);
-        let cf2 = color_filters::matrix_row_major(&[
-            1.1, 0.0, 0.0, 0.0, -0.05,
-            0.0, 1.1, 0.0, 0.0, -0.05,
-            0.0, 0.0, 1.1, 0.0, -0.05,
-            0.0, 0.0, 0.0, 1.0, 0.0,
-        ], None);
+        let cf1 = color_filters::matrix_row_major(
+            &[
+                1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+            ],
+            None,
+        );
+        let cf2 = color_filters::matrix_row_major(
+            &[
+                1.1, 0.0, 0.0, 0.0, -0.05, 0.0, 1.1, 0.0, 0.0, -0.05, 0.0, 0.0, 1.1, 0.0, -0.05,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ],
+            None,
+        );
         let chained = cf1.composed(&cf2).unwrap_or(cf1);
         results.push(run_bench(
             surface,
@@ -541,7 +556,10 @@ fn main() {
     // ── Print results ───────────────────────────────────────────────
 
     println!("\n{}", "=".repeat(90));
-    println!("EFFECT COST BENCHMARK — {} warmup, {} iterations", WARMUP, ITERS);
+    println!(
+        "EFFECT COST BENCHMARK — {} warmup, {} iterations",
+        WARMUP, ITERS
+    );
     println!("{}", "=".repeat(90));
     println!(
         "{:<40} {:>6} {:>12} {:>12} {:>8}",

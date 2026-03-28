@@ -105,10 +105,7 @@ impl ImageRepository {
     /// After draining, these refs are marked as reported.
     pub fn drain_missing(&mut self) -> Vec<String> {
         let mut missing = self.missing_refs.borrow_mut();
-        let new: Vec<String> = missing
-            .difference(&self.reported_refs)
-            .cloned()
-            .collect();
+        let new: Vec<String> = missing.difference(&self.reported_refs).cloned().collect();
         self.reported_refs.extend(new.iter().cloned());
         missing.clear();
         new

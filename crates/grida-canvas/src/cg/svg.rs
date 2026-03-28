@@ -161,7 +161,11 @@ impl SVGStrokeAttributes {
 ///
 /// SVG allows opacity on fill/stroke independently of paints; our runtime stores
 /// opacity within each `Paint`. This function is the bridging layer.
-fn svg_paint_with_opacity(paint: &SVGPaint, opacity: f32, bounds: Option<(f32, f32, f32, f32)>) -> Paint {
+fn svg_paint_with_opacity(
+    paint: &SVGPaint,
+    opacity: f32,
+    bounds: Option<(f32, f32, f32, f32)>,
+) -> Paint {
     match paint {
         SVGPaint::Solid(solid) => Paint::Solid(SolidPaint {
             active: true,

@@ -7,14 +7,11 @@
 
 use crate::cg::types::{
     AttributedString as CgAttributedString, FontWeight, Paint, Paints,
-    StyledTextRun as CgStyledTextRun, TextDecorationLine, TextDecorationRec,
-    TextDecorationStyle, TextLetterSpacing, TextLineHeight, TextStyleRec,
-    TextWordSpacing,
+    StyledTextRun as CgStyledTextRun, TextDecorationLine, TextDecorationRec, TextDecorationStyle,
+    TextLetterSpacing, TextLineHeight, TextStyleRec, TextWordSpacing,
 };
 
-use super::{
-    AttributedText, StyledRun, TextDimension, TextStroke, TextStyle,
-};
+use super::{AttributedText, StyledRun, TextDimension, TextStroke, TextStyle};
 
 // ---------------------------------------------------------------------------
 // TextDimension ↔ spacing enums
@@ -88,13 +85,20 @@ impl From<&TextStyleRec> for TextStyle {
             if let Some(ref d) = rec.text_decoration {
                 (
                     d.text_decoration_line,
-                    d.text_decoration_style.unwrap_or(TextDecorationStyle::Solid),
+                    d.text_decoration_style
+                        .unwrap_or(TextDecorationStyle::Solid),
                     d.text_decoration_color,
                     d.text_decoration_skip_ink.unwrap_or(true),
                     d.text_decoration_thickness.unwrap_or(1.0),
                 )
             } else {
-                (TextDecorationLine::None, TextDecorationStyle::Solid, None, true, 1.0)
+                (
+                    TextDecorationLine::None,
+                    TextDecorationStyle::Solid,
+                    None,
+                    true,
+                    1.0,
+                )
             };
 
         TextStyle {

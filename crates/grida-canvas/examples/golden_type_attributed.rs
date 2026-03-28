@@ -648,7 +648,14 @@ fn main() {
         ]));
 
         let attr = AttributedStringBuilder::new()
-            .push_painted("Rainbow ", &bold, Some(vec![rainbow_gradient]), None, None, None)
+            .push_painted(
+                "Rainbow ",
+                &bold,
+                Some(vec![rainbow_gradient]),
+                None,
+                None,
+                None,
+            )
             .push("mixed with ", &style, Some(CGColor::BLACK))
             .push_painted("cool ", &bold, Some(vec![cool_gradient]), None, None, None)
             .push("and ", &style, Some(CGColor::BLACK))
@@ -680,7 +687,9 @@ fn main() {
                 "RED ",
                 &style,
                 Some(vec![Paint::from(CGColor::RED)]),
-                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(120, 0, 0, 255))])),
+                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(
+                    120, 0, 0, 255,
+                ))])),
                 Some(2.0),
                 None,
             )
@@ -688,7 +697,9 @@ fn main() {
                 "BLUE ",
                 &style,
                 Some(vec![Paint::from(CGColor::BLUE)]),
-                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(0, 0, 120, 255))])),
+                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(
+                    0, 0, 120, 255,
+                ))])),
                 Some(2.0),
                 None,
             )
@@ -696,7 +707,9 @@ fn main() {
                 "OUTLINE",
                 &style,
                 Some(vec![Paint::from(CGColor::from_rgba(240, 240, 240, 255))]),
-                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(40, 40, 40, 255))])),
+                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(
+                    40, 40, 40, 255,
+                ))])),
                 Some(1.5),
                 None,
             )
@@ -767,7 +780,9 @@ fn main() {
                 "stroked bold",
                 &bold,
                 Some(vec![Paint::from(CGColor::from_rgba(255, 200, 220, 255))]),
-                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(200, 0, 100, 255))])),
+                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(
+                    200, 0, 100, 255,
+                ))])),
                 Some(1.5),
                 None,
             )
@@ -801,7 +816,7 @@ fn main() {
         let base_solid = Paint::Solid(SolidPaint::new_color(CGColor::from_rgba(30, 30, 30, 255)));
         let overlay_gradient = Paint::LinearGradient(LinearGradientPaint::from_colors(vec![
             CGColor::from_rgba(255, 0, 80, 160),  // semi-transparent red
-            CGColor::from_rgba(0, 120, 255, 160),  // semi-transparent blue
+            CGColor::from_rgba(0, 120, 255, 160), // semi-transparent blue
         ]));
 
         // Two solid fills stacked
@@ -855,7 +870,9 @@ fn main() {
                 "HOLLOW ",
                 &style,
                 Some(vec![Paint::from(CGColor::TRANSPARENT)]),
-                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(40, 40, 40, 255))])),
+                Some(Paints::new(vec![Paint::from(CGColor::from_rgba(
+                    40, 40, 40, 255,
+                ))])),
                 Some(1.5),
                 None,
             )
@@ -863,10 +880,12 @@ fn main() {
                 "GRADIENT",
                 &style,
                 Some(vec![Paint::from(CGColor::TRANSPARENT)]),
-                Some(Paints::new(vec![Paint::LinearGradient(LinearGradientPaint::from_colors(vec![
-                    CGColor::from_rgba(200, 0, 80, 255),
-                    CGColor::from_rgba(80, 0, 200, 255),
-                ]))])),
+                Some(Paints::new(vec![Paint::LinearGradient(
+                    LinearGradientPaint::from_colors(vec![
+                        CGColor::from_rgba(200, 0, 80, 255),
+                        CGColor::from_rgba(80, 0, 200, 255),
+                    ]),
+                )])),
                 Some(2.5),
                 None,
             )

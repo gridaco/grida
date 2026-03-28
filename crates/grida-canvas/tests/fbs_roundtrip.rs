@@ -129,7 +129,8 @@ fn assert_roundtrip_scene(scene: &Scene, scene_id: &str, label: &str) {
         &dr2.position_map,
     );
     assert_eq!(
-        bytes2, bytes3,
+        bytes2,
+        bytes3,
         "{label}: encode not stable (len {} vs {})",
         bytes2.len(),
         bytes3.len()
@@ -522,7 +523,13 @@ fn gen_ellipse() {
         layout_child: None,
     });
 
-    let scene = build_scene("Ellipse Test", None, vec![(1, ellipse)], HashMap::new(), vec![1]);
+    let scene = build_scene(
+        "Ellipse Test",
+        None,
+        vec![(1, ellipse)],
+        HashMap::new(),
+        vec![1],
+    );
     assert_roundtrip_scene(&scene, "s1", "ellipse");
 }
 
@@ -535,7 +542,10 @@ fn gen_ellipse_arc() {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         transform: AffineTransform::from_box_center(0.0, 0.0, 100.0, 100.0, 0.0),
-        size: Size { width: 100.0, height: 100.0 },
+        size: Size {
+            width: 100.0,
+            height: 100.0,
+        },
         fills: Paints::new(vec![solid(0, 200, 0, 255)]),
         strokes: Paints::new(vec![]),
         stroke_style: StrokeStyle::default(),
@@ -555,7 +565,10 @@ fn gen_ellipse_arc() {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         transform: AffineTransform::from_box_center(120.0, 0.0, 100.0, 100.0, 0.0),
-        size: Size { width: 100.0, height: 100.0 },
+        size: Size {
+            width: 100.0,
+            height: 100.0,
+        },
         fills: Paints::new(vec![solid(200, 0, 0, 255)]),
         strokes: Paints::new(vec![]),
         stroke_style: StrokeStyle::default(),
@@ -576,7 +589,10 @@ fn gen_ellipse_arc() {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         transform: AffineTransform::from_box_center(240.0, 0.0, 100.0, 100.0, 0.0),
-        size: Size { width: 100.0, height: 100.0 },
+        size: Size {
+            width: 100.0,
+            height: 100.0,
+        },
         fills: Paints::new(vec![solid(0, 0, 200, 255)]),
         strokes: Paints::new(vec![]),
         stroke_style: StrokeStyle::default(),
@@ -781,13 +797,7 @@ fn gen_text_span_underline() {
         effects: LayerEffects::default(),
     });
 
-    let scene = build_scene(
-        "Underline",
-        None,
-        vec![(1, text)],
-        HashMap::new(),
-        vec![1],
-    );
+    let scene = build_scene("Underline", None, vec![(1, text)], HashMap::new(), vec![1]);
     assert_roundtrip_scene(&scene, "s1", "text_span_underline");
 }
 
@@ -867,7 +877,9 @@ fn gen_boolean_operation() {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         effects: LayerEffects::default(),
-        transform: Some(AffineTransform::from_box_center(0.0, 0.0, 100.0, 100.0, 0.0)),
+        transform: Some(AffineTransform::from_box_center(
+            0.0, 0.0, 100.0, 100.0, 0.0,
+        )),
         op: BooleanPathOperation::Intersection,
         corner_radius: Some(4.0),
         fills: Paints::new(vec![solid(200, 100, 50, 255)]),
@@ -1322,13 +1334,7 @@ fn gen_all_paint_types() {
         layout_child: None,
     });
 
-    let scene = build_scene(
-        "AllPaints",
-        None,
-        vec![(1, rect)],
-        HashMap::new(),
-        vec![1],
-    );
+    let scene = build_scene("AllPaints", None, vec![(1, rect)], HashMap::new(), vec![1]);
     assert_roundtrip_scene(&scene, "s1", "all_paint_types");
 }
 
@@ -1356,13 +1362,7 @@ fn gen_all_effects() {
         layout_child: None,
     });
 
-    let scene = build_scene(
-        "AllEffects",
-        None,
-        vec![(1, rect)],
-        HashMap::new(),
-        vec![1],
-    );
+    let scene = build_scene("AllEffects", None, vec![(1, rect)], HashMap::new(), vec![1]);
     assert_roundtrip_scene(&scene, "s1", "all_effects");
 }
 
@@ -1390,13 +1390,7 @@ fn gen_inactive_node() {
         layout_child: None,
     });
 
-    let scene = build_scene(
-        "Inactive",
-        None,
-        vec![(1, rect)],
-        HashMap::new(),
-        vec![1],
-    );
+    let scene = build_scene("Inactive", None, vec![(1, rect)], HashMap::new(), vec![1]);
     assert_roundtrip_scene(&scene, "s1", "inactive_node");
 }
 
@@ -1530,8 +1524,14 @@ fn gen_deep_nesting() {
 #[test]
 fn gen_all_stroke_markers() {
     let markers = [
-        (StrokeMarkerPreset::None, StrokeMarkerPreset::RightTriangleOpen),
-        (StrokeMarkerPreset::EquilateralTriangle, StrokeMarkerPreset::Circle),
+        (
+            StrokeMarkerPreset::None,
+            StrokeMarkerPreset::RightTriangleOpen,
+        ),
+        (
+            StrokeMarkerPreset::EquilateralTriangle,
+            StrokeMarkerPreset::Circle,
+        ),
         (StrokeMarkerPreset::Square, StrokeMarkerPreset::Diamond),
         (StrokeMarkerPreset::VerticalBar, StrokeMarkerPreset::None),
     ];
@@ -1785,10 +1785,7 @@ fn gen_path_node_complex() {
         mask: None,
         effects: LayerEffects::default(),
         transform: AffineTransform::from_box_center(0.0, 0.0, 200.0, 200.0, 0.0),
-        fills: Paints::new(vec![
-            solid(100, 150, 200, 255),
-            solid(200, 100, 50, 128),
-        ]),
+        fills: Paints::new(vec![solid(100, 150, 200, 255), solid(200, 100, 50, 128)]),
         data: "M10,80 C40,10 65,10 95,80 S150,150 180,80".to_string(),
         strokes: Paints::default(),
         stroke_style: StrokeStyle::default(),

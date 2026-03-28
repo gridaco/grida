@@ -27,13 +27,12 @@ fn create_grid_scene(cols: u32, rows: u32) -> Scene {
                 y as f32 * (size + gap),
                 0.0,
             );
-            rect.size = Size { width: size, height: size };
+            rect.size = Size {
+                width: size,
+                height: size,
+            };
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: CGColor::from_rgba(
-                    ((x * 7) % 255) as u8,
-                    ((y * 11) % 255) as u8,
-                    180, 255,
-                ),
+                color: CGColor::from_rgba(((x * 7) % 255) as u8, ((y * 11) % 255) as u8, 180, 255),
                 blend_mode: BlendMode::default(),
                 active: true,
             }));
@@ -73,11 +72,21 @@ fn run_benchmark(gpu: &mut HeadlessGpu, cols: u32, rows: u32) {
 
     let scene_extent = cols as f32 * 30.0; // size(20) + gap(10)
     let scenarios: Vec<(&str, f32, f32, f32)> = vec![
-        ("all_visible (zoom out)", scene_extent / 2.0, scene_extent / 2.0, 1000.0 / scene_extent),
-        ("partial (~25%)",         0.0,    0.0,    1.0),
-        ("corner (~5%)",           0.0,    0.0,    2.0),
-        ("zoomed_in (~1%)",        scene_extent / 2.0, scene_extent / 2.0, 10.0),
-        ("empty (offscreen)",      99999.0, 99999.0, 1.0),
+        (
+            "all_visible (zoom out)",
+            scene_extent / 2.0,
+            scene_extent / 2.0,
+            1000.0 / scene_extent,
+        ),
+        ("partial (~25%)", 0.0, 0.0, 1.0),
+        ("corner (~5%)", 0.0, 0.0, 2.0),
+        (
+            "zoomed_in (~1%)",
+            scene_extent / 2.0,
+            scene_extent / 2.0,
+            10.0,
+        ),
+        ("empty (offscreen)", 99999.0, 99999.0, 1.0),
     ];
 
     let num_frames = 100;

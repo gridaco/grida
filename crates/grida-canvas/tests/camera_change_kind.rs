@@ -181,15 +181,27 @@ fn pan_then_zoom_then_pan() {
 
     r.camera.translate(5.0, 0.0);
     let s = queue_flush(&mut r);
-    assert_eq!(s.frame.camera_change, CameraChangeKind::PanOnly, "step 1: pan");
+    assert_eq!(
+        s.frame.camera_change,
+        CameraChangeKind::PanOnly,
+        "step 1: pan"
+    );
 
     r.camera.set_zoom(2.0);
     let s = queue_flush(&mut r);
-    assert_eq!(s.frame.camera_change, CameraChangeKind::ZoomIn, "step 2: zoom-in");
+    assert_eq!(
+        s.frame.camera_change,
+        CameraChangeKind::ZoomIn,
+        "step 2: zoom-in"
+    );
 
     r.camera.translate(5.0, 0.0);
     let s = queue_flush(&mut r);
-    assert_eq!(s.frame.camera_change, CameraChangeKind::PanOnly, "step 3: pan after zoom");
+    assert_eq!(
+        s.frame.camera_change,
+        CameraChangeKind::PanOnly,
+        "step 3: pan after zoom"
+    );
 }
 
 #[test]
@@ -224,7 +236,11 @@ fn pinch_zoom_in_out_then_pan() {
 
     r.camera.set_zoom_at(2.0, [150.0, 150.0]);
     let s = queue_flush(&mut r);
-    assert!(matches!(s.frame.camera_change, CameraChangeKind::PanAndZoom(_)), "step 1: pinch-in, got: {:?}", s.frame.camera_change);
+    assert!(
+        matches!(s.frame.camera_change, CameraChangeKind::PanAndZoom(_)),
+        "step 1: pinch-in, got: {:?}",
+        s.frame.camera_change
+    );
 
     r.camera.set_zoom_at(0.5, [150.0, 150.0]);
     let s = queue_flush(&mut r);
@@ -410,8 +426,11 @@ fn app_steady_after_zoom_shows_none() {
     // Zoom out
     app_zoom_delta(&mut r, -0.01, cursor);
     let s = app_redraw(&mut r).expect("should render");
-    assert!(s.frame.camera_change.zoom_changed(),
-        "zoom frame should show zoom, got: {}", cam_label(s.frame.camera_change));
+    assert!(
+        s.frame.camera_change.zoom_changed(),
+        "zoom frame should show zoom, got: {}",
+        cam_label(s.frame.camera_change)
+    );
 
     // Steady: no mutation, but queue+flush again
     r.queue_unstable();
@@ -434,15 +453,22 @@ fn app_zoom_out_via_pinch_classification() {
     // Pinch at center
     app_zoom_delta(&mut r, -0.01, [100.0, 100.0]);
     let s = app_redraw(&mut r).expect("should render");
-    assert_eq!(s.frame.camera_change, CameraChangeKind::ZoomOut,
-        "pinch at center should be ZoomOut, got: {}", cam_label(s.frame.camera_change));
+    assert_eq!(
+        s.frame.camera_change,
+        CameraChangeKind::ZoomOut,
+        "pinch at center should be ZoomOut, got: {}",
+        cam_label(s.frame.camera_change)
+    );
 
     // Pinch at off-center (typical real-world)
     app_zoom_delta(&mut r, -0.01, [150.0, 150.0]);
     let s = app_redraw(&mut r).expect("should render");
     // PanAndZoom is CORRECT here — the focal-point translation is real.
-    assert!(matches!(s.frame.camera_change, CameraChangeKind::PanAndZoom(_)),
-        "pinch at off-center should be PanAndZoom, got: {}", cam_label(s.frame.camera_change));
+    assert!(
+        matches!(s.frame.camera_change, CameraChangeKind::PanAndZoom(_)),
+        "pinch at off-center should be PanAndZoom, got: {}",
+        cam_label(s.frame.camera_change)
+    );
 }
 
 #[test]
@@ -471,7 +497,8 @@ fn app_pinch_zoom_in_out_then_pan() {
             s.frame.camera_change,
             CameraChangeKind::PanOnly,
             "pan frame {} after pinch in+out should be PanOnly, got: {}",
-            i, cam_label(s.frame.camera_change)
+            i,
+            cam_label(s.frame.camera_change)
         );
     }
 }
@@ -488,8 +515,12 @@ fn app_cmd_scroll_zoom_then_settle() {
         r.camera.set_zoom(z * 0.99);
         r.queue_unstable();
         let s = app_redraw(&mut r).expect("should render");
-        assert_eq!(s.frame.camera_change, CameraChangeKind::ZoomOut,
-            "cmd+scroll zoom-out should be ZoomOut, got: {}", cam_label(s.frame.camera_change));
+        assert_eq!(
+            s.frame.camera_change,
+            CameraChangeKind::ZoomOut,
+            "cmd+scroll zoom-out should be ZoomOut, got: {}",
+            cam_label(s.frame.camera_change)
+        );
     }
 }
 

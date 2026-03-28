@@ -70,6 +70,7 @@
 //! // paragraph.paint(canvas, point); // Use with actual canvas and point
 //! ```
 
+use crate::cache::fast_hash::DenseNodeMap;
 use crate::cg::prelude::*;
 use crate::node::schema::NodeId;
 use crate::painter::paint;
@@ -78,7 +79,6 @@ use crate::text::text_style::textstyle;
 use skia_safe::textlayout;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
-use crate::cache::fast_hash::DenseNodeMap;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -229,11 +229,8 @@ impl ParagraphCache {
     ) -> LayoutMeasurements {
         let shape_key = Some(Self::shape_key(text, style, align, max_lines));
         self.measure_inner(width, fonts, id, shape_key, |fonts| {
-            let paragraph_style = crate::text::make_paragraph_style(
-                *align,
-                *max_lines,
-                ellipsis.as_deref(),
-            );
+            let paragraph_style =
+                crate::text::make_paragraph_style(*align, *max_lines, ellipsis.as_deref());
 
             let ctx = TextStyleRecBuildContext {
                 color: CGColor::TRANSPARENT, // No color for measurement
@@ -405,11 +402,8 @@ impl ParagraphCache {
         id: Option<&NodeId>,
     ) -> LayoutMeasurements {
         self.measure_inner(width, fonts, id, None, |fonts| {
-            let paragraph_style = crate::text::make_paragraph_style(
-                *align,
-                *max_lines,
-                ellipsis.as_deref(),
-            );
+            let paragraph_style =
+                crate::text::make_paragraph_style(*align, *max_lines, ellipsis.as_deref());
 
             let mut para_builder =
                 textlayout::ParagraphBuilder::new(&paragraph_style, fonts.font_collection());
@@ -487,11 +481,8 @@ impl ParagraphCache {
             None
         };
 
-        let paragraph_style = crate::text::make_paragraph_style(
-            *align,
-            *max_lines,
-            ellipsis.as_deref(),
-        );
+        let paragraph_style =
+            crate::text::make_paragraph_style(*align, *max_lines, ellipsis.as_deref());
 
         let ctx = TextStyleRecBuildContext {
             color: fills

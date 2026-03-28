@@ -65,7 +65,9 @@ pub enum SurfaceEvent {
     ///
     /// This is the *committed* text that should be inserted. It may arrive
     /// alongside or instead of a `KeyDown` event, depending on the platform.
-    TextInput { text: String },
+    TextInput {
+        text: String,
+    },
 
     /// IME composition event.
     Ime(ImeEvent),

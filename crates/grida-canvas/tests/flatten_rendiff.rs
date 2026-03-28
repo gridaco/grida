@@ -88,7 +88,13 @@ fn flatten_rect_no_radius() {
     let vn_paths = vn.to_paths();
     let flattened = render_to_rgba(&vn_paths[0], w, h);
 
-    assert_rendiff_match("rect_no_radius", original, flattened, w as usize, h as usize);
+    assert_rendiff_match(
+        "rect_no_radius",
+        original,
+        flattened,
+        w as usize,
+        h as usize,
+    );
 }
 
 #[test]
@@ -245,7 +251,13 @@ fn flatten_star_no_radius() {
     let vn_paths = vn.to_paths();
     let flattened = render_to_rgba(&vn_paths[0], w, h);
 
-    assert_rendiff_match("star_no_radius", original, flattened, w as usize, h as usize);
+    assert_rendiff_match(
+        "star_no_radius",
+        original,
+        flattened,
+        w as usize,
+        h as usize,
+    );
 }
 
 #[test]

@@ -239,14 +239,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
                     })
                     .unwrap_or("root");
 
-                diffs.push((
-                    id,
-                    type_name,
-                    parent_info,
-                    *full,
-                    *schema,
-                    (dx, dy, dw, dh),
-                ));
+                diffs.push((id, type_name, parent_info, *full, *schema, (dx, dy, dw, dh)));
             }
         } else {
             // Node in full but not in schema — should not happen
