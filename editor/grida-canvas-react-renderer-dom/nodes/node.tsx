@@ -211,7 +211,7 @@ const fillings = {
   boolean: "none",
   group: "none",
   tspan: "color",
-  attrib: "color",
+  text: "color",
   container: "background",
   component: "background",
   iframe: "background",
