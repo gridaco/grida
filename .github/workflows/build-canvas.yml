@@ -8,13 +8,6 @@ on:
       - main
       - canary
 
-# For PRs, github.head_ref = source branch name (e.g. "canary").
-# For push, github.head_ref is empty, github.ref = "refs/heads/canary".
-# Using head_ref || ref_name ensures both events for the same branch
-# share one concurrency group (ref_name strips the refs/heads/ prefix).
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
 
 jobs:
   build:
