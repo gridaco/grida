@@ -296,14 +296,21 @@ export function useSingleSelection(
   node_id: string,
   {
     enabled,
+    parentNodeId,
   }: {
     enabled: boolean;
+    /** When set, recompute position when this parent node changes (e.g. tray child containers). */
+    parentNodeId?: string;
   } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
   const instance = useCurrentEditor();
   const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
   const node = document.nodes[node_id];
+  // When a parent moves, the child's absolute position changes even though
+  // the child's own node data is unchanged.  Including the parent node
+  // object in the effect deps lets us pick up that change cheaply.
+  const parentNode = parentNodeId ? document.nodes[parentNodeId] : undefined;
 
   const [data, setData] = useState<SurfaceSingleSelection | undefined>(
     undefined
@@ -411,7 +418,7 @@ export function useSingleSelection(
         },
       },
     });
-  }, [node, node_id, transform, enabled]);
+  }, [node, node_id, transform, enabled, parentNode]);
 
   return data;
 }
