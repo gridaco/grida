@@ -592,6 +592,15 @@ pub unsafe extern "C" fn command(app: *mut UnknownTargetApplication, id: u32, a:
             4 => ApplicationCommand::Pan { tx: a, ty: b },
             5 => ApplicationCommand::SelectAll,
             6 => ApplicationCommand::DeselectAll,
+            7 => ApplicationCommand::Select(cg::query::Selector::Children),
+            8 => ApplicationCommand::Select(cg::query::Selector::Parent),
+            9 => ApplicationCommand::Select(cg::query::Selector::NextSibling),
+            10 => ApplicationCommand::Select(cg::query::Selector::PreviousSibling),
+            11 => ApplicationCommand::Select(cg::query::Selector::Siblings),
+            12 => ApplicationCommand::Select(cg::query::Selector::All),
+            13 => ApplicationCommand::ZoomToFit,
+            14 => ApplicationCommand::ZoomToSelection,
+            15 => ApplicationCommand::ZoomTo100,
             _ => ApplicationCommand::None,
         };
         app.command(cmd);

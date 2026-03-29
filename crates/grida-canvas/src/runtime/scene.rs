@@ -841,11 +841,16 @@ impl Renderer {
         let Some(scene) = self.scene.as_ref() else {
             return;
         };
+        let ids: Vec<_> = scene.graph.roots().to_vec();
+        self.fit_camera_to_nodes(&ids);
+    }
 
+    /// Adjust the camera to fit the given nodes in view with padding.
+    pub fn fit_camera_to_nodes(&mut self, ids: &[NodeId]) {
         let geometry = self.scene_cache.geometry();
         let mut union: Option<rect::Rectangle> = None;
-        for root in scene.graph.roots() {
-            if let Some(bounds) = geometry.get_world_bounds(&root) {
+        for id in ids {
+            if let Some(bounds) = geometry.get_world_bounds(id) {
                 union = Some(match union {
                     Some(existing) => rect::union(&[existing, bounds]),
                     None => bounds,

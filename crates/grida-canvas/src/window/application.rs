@@ -391,6 +391,44 @@ impl ApplicationApi for UnknownTargetApplication {
                     return true;
                 }
             }
+            ApplicationCommand::Select(selector) => {
+                if let Some(scene) = self.renderer.scene.as_ref() {
+                    let selection = self.surface.selection.as_slice();
+                    let result = crate::query::query_select(&scene.graph, selection, selector);
+
+                    if !result.is_empty() {
+                        self.surface.selection.set(result);
+                        self.queue();
+                        return true;
+                    }
+                    // Children on a leaf node: try entering text edit mode.
+                    if matches!(selector, crate::query::Selector::Children) && selection.len() == 1
+                    {
+                        let id = selection[0];
+                        self.try_enter_text_edit(id);
+                        self.queue();
+                        return true;
+                    }
+                }
+            }
+            ApplicationCommand::ZoomToFit => {
+                self.renderer.fit_camera_to_scene();
+                self.queue();
+                return true;
+            }
+            ApplicationCommand::ZoomToSelection => {
+                let ids: Vec<_> = self.surface.selection.iter().copied().collect();
+                if !ids.is_empty() {
+                    self.renderer.fit_camera_to_nodes(&ids);
+                    self.queue();
+                    return true;
+                }
+            }
+            ApplicationCommand::ZoomTo100 => {
+                self.renderer.camera.set_zoom(1.0);
+                self.queue();
+                return true;
+            }
             ApplicationCommand::None
             | ApplicationCommand::NextScene
             | ApplicationCommand::PrevScene => {}
@@ -2117,8 +2155,39 @@ impl UnknownTargetApplication {
             }
             response.needs_redraw = true;
         }
-        // When not editing, we don't consume the key — the host can
-        // fall through to ApplicationCommand handling.
+        // When not editing, handle canvas-level key commands.
+        if self.text_edit.is_none() {
+            use crate::query::Selector;
+
+            // Selection navigation
+            let selector = match key {
+                KeyName::Enter if modifiers.shift => Some(Selector::Parent),
+                KeyName::Enter => Some(Selector::Children),
+                KeyName::Tab if modifiers.shift => Some(Selector::PreviousSibling),
+                KeyName::Tab => Some(Selector::NextSibling),
+                _ => Option::None,
+            };
+            if let Some(sel) = selector {
+                if self.command(ApplicationCommand::Select(sel)) {
+                    response.needs_redraw = true;
+                }
+            }
+
+            // Viewport zoom shortcuts (Shift + digit)
+            if modifiers.shift {
+                let zoom_cmd = match key {
+                    KeyName::Digit(1) => Some(ApplicationCommand::ZoomToFit),
+                    KeyName::Digit(2) => Some(ApplicationCommand::ZoomToSelection),
+                    KeyName::Digit(0) => Some(ApplicationCommand::ZoomTo100),
+                    _ => Option::None,
+                };
+                if let Some(cmd) = zoom_cmd {
+                    if self.command(cmd) {
+                        response.needs_redraw = true;
+                    }
+                }
+            }
+        }
 
         response
     }
