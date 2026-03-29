@@ -1745,43 +1745,36 @@ export namespace format {
             shapeNode.stroke_width ?? 0
           );
           // strokeWidthProfile omitted — not in TS model, decoder reads null.
-          // Create structs inline (must be done while table is being built)
-          const rectangularCornerRadiusOffsetInline =
-            shapeNode.type === "rectangle"
-              ? fbs.RectangularCornerRadius.createRectangularCornerRadius(
-                  builder,
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_left ?? 0, // tl_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_left ?? 0, // tl_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_right ?? 0, // tr_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_right ?? 0, // tr_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_left ?? 0, // bl_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_left ?? 0, // bl_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_right ?? 0, // br_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_right ?? 0 // br_ry
-                )
-              : fbs.RectangularCornerRadius.createRectangularCornerRadius(
-                  builder,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0
-                );
-          fbs.BasicShapeNode.addRectangularCornerRadius(
-            builder,
-            rectangularCornerRadiusOffsetInline
-          );
+          // Only write rectangular_corner_radius for rectangles.
+          // Non-rectangle shapes (polygon, star, ellipse) use the scalar
+          // corner_radius field. Writing an all-zeros struct here would
+          // shadow the scalar value in the Rust decoder.
+          if (shapeNode.type === "rectangle") {
+            const rectangularCornerRadiusOffsetInline =
+              fbs.RectangularCornerRadius.createRectangularCornerRadius(
+                builder,
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_left ?? 0, // tl_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_left ?? 0, // tl_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_right ?? 0, // tr_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_right ?? 0, // tr_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_left ?? 0, // bl_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_left ?? 0, // bl_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_right ?? 0, // br_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_right ?? 0 // br_ry
+              );
+            fbs.BasicShapeNode.addRectangularCornerRadius(
+              builder,
+              rectangularCornerRadiusOffsetInline
+            );
+          }
 
           const rectangularStrokeWidthOffsetInline =
             format.shape.encode.rectangular_stroke_width_from(
