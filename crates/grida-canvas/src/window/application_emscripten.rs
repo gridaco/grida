@@ -228,6 +228,10 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.to_vector_network(id)
     }
 
+    fn get_node_id_path(&self, id: &str) -> Option<Vec<String>> {
+        self.base.get_node_id_path(id)
+    }
+
     fn runtime_renderer_set_layer_compositing(&mut self, enable: bool) {
         self.base.runtime_renderer_set_layer_compositing(enable);
     }

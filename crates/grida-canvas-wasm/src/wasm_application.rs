@@ -921,6 +921,31 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
     std::ptr::null()
 }
 
+#[no_mangle]
+/// js::_get_node_id_path
+///
+/// Return the structural node ID ancestry path from root to the target node,
+/// inclusive, as a JSON array of user-facing string IDs.
+///
+/// Returns null if the node does not exist.
+pub unsafe extern "C" fn get_node_id_path(
+    app: *mut UnknownTargetApplication,
+    ptr: *const u8,
+    len: usize,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        let id = __str_from_ptr_len(ptr, len);
+        if let Some(id) = id {
+            if let Some(path) = app.get_node_id_path(&id) {
+                if let Ok(json) = serde_json::to_string(&path) {
+                    return alloc_len_prefixed(json.as_bytes());
+                }
+            }
+        }
+    }
+    std::ptr::null()
+}
+
 // #endregion
 
 // ====================================================================================================

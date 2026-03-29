@@ -137,6 +137,26 @@ pub fn ancestors(hierarchy: &impl Hierarchy, id: NodeId) -> Vec<NodeId> {
     path
 }
 
+/// Return the structural identity path from the scene root to `id`, inclusive.
+///
+/// The returned vector contains the ordered node ID chain:
+/// `[root, ..., grandparent, parent, id]`.
+///
+/// - For a root node, the result is `[id]`.
+/// - The path reflects the structural parent–child containment hierarchy only,
+///   not visual layout, transform order, or render traversal order.
+/// - The result is stable under sibling reordering.
+///
+/// Returns `None` if the hierarchy has no record of `id` (i.e. `id` has no
+/// parent *and* is not reachable from any root). Callers that need to
+/// distinguish "root node" from "unknown node" should check membership
+/// separately before calling this function.
+pub fn node_id_path(hierarchy: &impl Hierarchy, id: NodeId) -> Vec<NodeId> {
+    let mut path = ancestors(hierarchy, id);
+    path.push(id);
+    path
+}
+
 // -------------------------------------------------------------------------
 // Internal helpers
 // -------------------------------------------------------------------------
@@ -357,6 +377,55 @@ mod tests {
     fn ancestors_deep() {
         let t = tree();
         assert_eq!(ancestors(&t, 7), vec![1, 2, 4]);
+    }
+
+    // ---- node_id_path ----
+
+    #[test]
+    fn node_id_path_root() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 1), vec![1]);
+    }
+
+    #[test]
+    fn node_id_path_deep() {
+        let t = tree();
+        // 7 → 4 → 2 → 1, so path is [1, 2, 4, 7]
+        assert_eq!(node_id_path(&t, 7), vec![1, 2, 4, 7]);
+    }
+
+    #[test]
+    fn node_id_path_child() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 2), vec![1, 2]);
+    }
+
+    #[test]
+    fn node_id_path_separate_root() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 8), vec![8]);
+    }
+
+    #[test]
+    fn node_id_path_under_separate_root() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 9), vec![8, 9]);
+    }
+
+    #[test]
+    fn node_id_path_unknown_node() {
+        let t = tree();
+        // Node 999 has no parent entry → treated as a root-like node
+        assert_eq!(node_id_path(&t, 999), vec![999]);
+    }
+
+    #[test]
+    fn node_id_path_stable_under_sibling_order() {
+        // Sibling order doesn't affect ancestry path
+        let t = tree();
+        // Nodes 4 and 5 are siblings under 2; both paths are independent
+        assert_eq!(node_id_path(&t, 4), vec![1, 2, 4]);
+        assert_eq!(node_id_path(&t, 5), vec![1, 2, 5]);
     }
 
     // ---- query_selection with prune_nested = false ----

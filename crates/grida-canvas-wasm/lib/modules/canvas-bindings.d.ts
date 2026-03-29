@@ -141,6 +141,11 @@ declare namespace canvas {
       ptr: number,
       len: number
     ): Ptr;
+    _get_node_id_path(
+      state: GridaCanvasApplicationPtr,
+      ptr: number,
+      len: number
+    ): Ptr;
 
     _export_node_as(
       state: GridaCanvasApplicationPtr,

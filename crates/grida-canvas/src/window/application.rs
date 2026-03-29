@@ -76,6 +76,12 @@ pub trait ApplicationApi {
     /// returns all node ids intersecting with the envelope in canvas space.
     fn get_node_ids_from_envelope(&mut self, envelope: Rectangle) -> Vec<String>;
     fn get_node_absolute_bounding_box(&mut self, target: BoundsTarget) -> Option<Rectangle>;
+    /// Return the structural node ID ancestry path from root to `id`, inclusive.
+    ///
+    /// The returned vector contains user-facing string IDs ordered as
+    /// `[root, ..., parent, id]`. Returns `None` if the node does not exist in
+    /// the scene.
+    fn get_node_id_path(&self, id: &str) -> Option<Vec<String>>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
@@ -552,6 +558,19 @@ impl ApplicationApi for UnknownTargetApplication {
             }
         }
         None
+    }
+
+    fn get_node_id_path(&self, id: &str) -> Option<Vec<String>> {
+        use crate::query::node_id_path;
+
+        let internal_id = self.user_id_to_internal(id)?;
+        let scene = self.renderer.scene.as_ref()?;
+        let path = node_id_path(&scene.graph, internal_id);
+        Some(
+            path.into_iter()
+                .filter_map(|nid| self.internal_id_to_user(nid))
+                .collect(),
+        )
     }
 
     fn runtime_renderer_set_layer_compositing(&mut self, enable: bool) {
