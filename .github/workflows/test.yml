@@ -12,44 +12,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Build (or re-upload) WASM artifacts first.
-  # Reuses build-canvas.yml — runs the full Emscripten build only when
-  # crates/ changed, otherwise re-uploads the last artifact (~10s).
-  build-wasm:
-    uses: ./.github/workflows/build-canvas.yml
-
   test:
-    needs: build-wasm
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           lfs: true
-
-      - name: Download WASM artifacts
-        id: wasm-download
-        uses: actions/download-artifact@v4
-        with:
-          name: canvas-wasm-artifacts
-          path: crates/grida-canvas-wasm/lib/bin/
-        continue-on-error: true
-
-      # Fallback: download from npm if artifact is unavailable
-      - name: Fallback — download WASM from npm
-        if: steps.wasm-download.outcome == 'failure'
-        run: bash crates/grida-canvas-wasm/scripts/ensure-wasm.sh --tag canary
-        continue-on-error: true
-
-      - name: Check WASM availability
-        id: wasm-check
-        run: |
-          if [ -f crates/grida-canvas-wasm/lib/bin/grida_canvas_wasm.wasm ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::WASM artifacts not found — canvas-wasm, editor, and refig tests will be skipped"
-          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -63,10 +32,6 @@ jobs:
       - name: Build Packages
         run: pnpm turbo build --filter='./packages/*'
 
-      - name: Build Canvas WASM Package
-        if: steps.wasm-check.outputs.available == 'true'
-        run: pnpm turbo build --filter='@grida/canvas-wasm'
-
       - name: Run Typecheck
         run: pnpm typecheck
 
@@ -74,9 +39,4 @@ jobs:
         run: pnpm turbo lint
 
       - name: Run Tests
-        run: |
-          if [ "${{ steps.wasm-check.outputs.available }}" == "true" ]; then
-            pnpm turbo test --filter='!./crates/*'
-          else
-            pnpm turbo test --filter='!./crates/*' --filter='!@grida/canvas-wasm' --filter='!editor' --filter='!@grida/refig'
-          fi
+        run: pnpm turbo test --filter='!./crates/*' --filter='!@grida/canvas-wasm' --filter='!editor' --filter='!@grida/refig'

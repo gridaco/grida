@@ -4,14 +4,57 @@
 
 | Workflow | Triggers | Purpose |
 |----------|----------|---------|
-| `test.yml` | push to `main`, all PRs | Lint + test all JS/TS packages |
+| `test.yml` | push to `main`, all PRs | Lint + typecheck + test non-WASM packages |
+| `test-canvas.yml` | push to `main`/`canary`, PRs touching `crates/` | Test WASM-dependent packages (editor, canvas-wasm, refig) |
 | `test-crates.yml` | push to `main`, PRs touching `crates/` | `cargo test` + `cargo fmt --check` |
 | `typos.yml` | push to `main`, all PRs | Spell checking via `crate-ci/typos` |
-| `build-canvas.yml` | push to `main`/`canary` (when `crates/` changes), PRs touching `crates/` | Build WASM via Emscripten, upload artifact |
+| `build-canvas.yml` | push to `main`/`canary` (when `crates/` changes), `workflow_call` | Build WASM via Emscripten, upload artifact |
 | `publish-canvas-wasm.yml` | chains from `build-canvas.yml`, manual dispatch | Publish `@grida/canvas-wasm` to npm |
 | `check-generated-fbs.yml` | PRs touching `format/` or FBS files | Verify generated FlatBuffers code is up to date |
 | `database-tests.yml` | PRs touching `supabase/` | Run Supabase migration tests |
 | `realease-desktop-app.yml` | manual dispatch | Build and release Electron desktop app |
+
+## Test Pipeline
+
+```
+PR push (any file)
+  ├─ test.yml (always)
+  │   └─ lint, typecheck, test (non-wasm packages)
+  │
+  ├─ test-canvas.yml (only crates/ changed)
+  │   ├─ build-wasm (calls build-canvas.yml)
+  │   │   └─ Emscripten build → upload artifact
+  │   └─ test
+  │       └─ download artifact → test editor, canvas-wasm, refig
+  │
+  ├─ test-crates.yml (only crates/ changed)
+  │   └─ cargo test, cargo fmt --check
+  │
+  └─ typos.yml (always)
+```
+
+### `test.yml` (test packages — fast path)
+
+Runs on every PR regardless of path. Tests all JS/TS packages that do **not** depend on WASM:
+
+```
+--filter='!./crates/*' --filter='!@grida/canvas-wasm' --filter='!editor' --filter='!@grida/refig'
+```
+
+No WASM download needed. This is the fast-feedback path for most PRs (~2 min).
+
+### `test-canvas.yml` (test WASM-dependent packages)
+
+Only runs when `crates/` or its workflow files change. Steps:
+
+1. Call `build-canvas.yml` as reusable workflow (builds WASM or re-uploads cached artifact)
+2. Download WASM artifact (falls back to npm if unavailable)
+3. Build `@grida/canvas-wasm` via tsup
+4. Test `@grida/canvas-wasm`, `editor`, `@grida/refig`
+
+### `test-crates.yml` (test crates)
+
+Runs on PRs touching `crates/`, `Cargo.lock`, or workflow files. Runs `cargo test` and `cargo fmt --check`.
 
 ## WASM Build + Publish Pipeline
 
@@ -27,7 +70,7 @@ push to main/canary (crates/ changed)
   → publish-canvas-wasm.yml (workflow_run)
     → downloads artifact
     → builds JS wrapper (tsup)
-    → publishes to npm
+    → publishes to npm (via pnpm publish)
 ```
 
 ### Versioning
@@ -46,34 +89,9 @@ Publishing uses OIDC trusted publishers (no npm tokens stored in secrets).
 - GitHub environment `npm-publish` must exist with deployment branch policies for `main` and `canary`
 - Node 24 is required in the publish workflow (npm >=11.5.1 for OIDC support)
 
-### Path Filters
+### Why `pnpm publish`?
 
-`build-canvas.yml` only triggers on push when these paths change:
-
-- `.github/workflows/build-canvas.yml`
-- `.github/workflows/publish-canvas-wasm.yml`
-- `crates/**`
-
-This prevents unnecessary WASM builds when only editor/package code changes.
-
-### `workflow_run` Limitation
-
-`publish-canvas-wasm.yml` uses `workflow_run` to chain from `build-canvas.yml`. GitHub requires `workflow_run` listeners to exist on the **default branch** (`main`). If the workflow file only exists on a feature branch, it will not trigger automatically. A stub file on `main` is sufficient for `workflow_dispatch` but not for `workflow_run`.
-
-## Test Pipeline
-
-### `test.yml` (test packages)
-
-Runs on every PR regardless of path. Steps:
-
-1. Checkout with `lfs: true` (`.fig` test fixtures are stored in Git LFS)
-2. Download WASM artifacts from the latest successful `build-canvas.yml` run on `main`
-3. If WASM artifacts are unavailable, `@grida/canvas-wasm` tests are skipped (the package's test script checks for the binary before running vitest)
-4. Build all packages, lint, run tests
-
-### `test-crates.yml` (test crates)
-
-Runs on PRs touching `crates/`, `Cargo.lock`, or workflow files. Runs `cargo test` and `cargo fmt --check`.
+`lib/bin/.gitignore` (containing `*.wasm`, `*.js`) gets copied into `dist/` by tsup's `publicDir`. `npm publish` reads `dist/.gitignore` and excludes binaries from the tarball. `pnpm publish` ignores nested `.gitignore` files, so the tarball correctly includes all files.
 
 ## Vercel Deployment
 
@@ -98,3 +116,7 @@ The `.fig` test fixtures are stored in Git LFS. If the checkout does not include
 ### PR checks not triggering
 
 GitHub Actions may skip `pull_request` workflow triggers when a PR has merge conflicts (`mergeable: CONFLICTING`). Resolve conflicts to restore normal CI behavior.
+
+### `workflow_run` Limitation
+
+`publish-canvas-wasm.yml` uses `workflow_run` to chain from `build-canvas.yml`. GitHub requires `workflow_run` listeners to exist on the **default branch** (`main`). If the workflow file only exists on a feature branch, it will not trigger automatically. A stub file on `main` is sufficient for `workflow_dispatch` but not for `workflow_run`.

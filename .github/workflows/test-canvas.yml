@@ -1,0 +1,78 @@
+name: test canvas packages
+
+on:
+  push:
+    branches:
+      - main
+      - canary
+    paths:
+      - "crates/**"
+      - ".github/workflows/build-canvas.yml"
+      - ".github/workflows/test-canvas.yml"
+  pull_request:
+    paths:
+      - "crates/**"
+      - ".github/workflows/build-canvas.yml"
+      - ".github/workflows/test-canvas.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-wasm:
+    uses: ./.github/workflows/build-canvas.yml
+
+  test:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Download WASM artifacts
+        id: wasm-download
+        uses: actions/download-artifact@v4
+        with:
+          name: canvas-wasm-artifacts
+          path: crates/grida-canvas-wasm/lib/bin/
+        continue-on-error: true
+
+      # Fallback: download from npm if artifact is unavailable
+      - name: Fallback — download WASM from npm
+        if: steps.wasm-download.outcome == 'failure'
+        run: bash crates/grida-canvas-wasm/scripts/ensure-wasm.sh --tag canary
+        continue-on-error: true
+
+      - name: Check WASM availability
+        id: wasm-check
+        run: |
+          if [ -f crates/grida-canvas-wasm/lib/bin/grida_canvas_wasm.wasm ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::WASM artifacts not found — canvas tests will be skipped"
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Packages
+        run: pnpm turbo build --filter='./packages/*'
+
+      - name: Build Canvas WASM Package
+        if: steps.wasm-check.outputs.available == 'true'
+        run: pnpm turbo build --filter='@grida/canvas-wasm'
+
+      - name: Run Tests
+        if: steps.wasm-check.outputs.available == 'true'
+        run: pnpm turbo test --filter='@grida/canvas-wasm' --filter='editor' --filter='@grida/refig'
