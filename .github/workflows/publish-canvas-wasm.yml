@@ -2,6 +2,8 @@ name: Publish @grida/canvas-wasm
 
 # Automatically publish after a successful canvas build on main or canary.
 # Uses workflow_run to chain: build-canvas.yml → this workflow.
+# build-canvas.yml only triggers when crates/ changes, so every run here
+# represents a real change worth publishing.
 on:
   workflow_dispatch:
     inputs:
@@ -50,7 +52,7 @@ jobs:
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Download WASM artifacts
@@ -58,33 +60,40 @@ jobs:
         with:
           name: canvas-wasm-artifacts
           path: crates/grida-canvas-wasm/lib/bin/
-          # workflow_run: use the triggering run's artifacts
-          # workflow_dispatch: use the latest successful build-canvas run
           run_id: ${{ github.event.workflow_run.id || '' }}
           workflow: ${{ github.event.workflow_run.id && '' || 'build-canvas.yml' }}
           branch: ${{ github.event.workflow_run.id && '' || github.ref_name }}
 
-      - name: Bump version
+      - name: Build package (tsup)
+        run: pnpm turbo build --filter='@grida/canvas-wasm'
+
+      - name: Verify dist contents
+        run: |
+          test -f crates/grida-canvas-wasm/dist/grida_canvas_wasm.wasm || { echo "::error::Missing grida_canvas_wasm.wasm in dist"; exit 1; }
+          test -f crates/grida-canvas-wasm/dist/grida-canvas-wasm.js || { echo "::error::Missing grida-canvas-wasm.js in dist"; exit 1; }
+          test -f crates/grida-canvas-wasm/dist/index.js || { echo "::error::Missing index.js in dist"; exit 1; }
+          ls -lh crates/grida-canvas-wasm/dist/
+
+      - name: Determine version and tag
         working-directory: crates/grida-canvas-wasm
         run: |
           BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
           CURRENT=$(node -p "require('./package.json').version")
-          # Strip any pre-release suffix to get the base version
           BASE=$(echo "$CURRENT" | sed 's/-canary.*//')
-          MAJOR=$(echo "$BASE" | cut -d. -f1)
-          MINOR=$(echo "$BASE" | cut -d. -f2)
-          PATCH=$(echo "$BASE" | cut -d. -f3)
-          NEXT_PATCH=$((PATCH + 1))
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
 
           if [ "$BRANCH" == "canary" ]; then
-            VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-canary.${{ github.event.workflow_run.run_number || github.run_number }}"
+            VERSION="${BASE}-canary.${SHORT_SHA}"
             TAG=canary
           else
-            VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+            MAJOR=$(echo "$BASE" | cut -d. -f1)
+            MINOR=$(echo "$BASE" | cut -d. -f2)
+            PATCH=$(echo "$BASE" | cut -d. -f3)
+            VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
             TAG=latest
           fi
 
-          # Allow manual tag override via workflow_dispatch
+          # Allow manual tag override
           INPUT_TAG="${{ inputs.tag }}"
           if [ -n "$INPUT_TAG" ] && [ "$INPUT_TAG" != "auto" ]; then
             TAG="$INPUT_TAG"
@@ -95,19 +104,6 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "Publishing @grida/canvas-wasm@$VERSION with tag $TAG"
 
-      - name: Build package (tsup)
-        run: pnpm turbo build --filter='@grida/canvas-wasm'
-
-      - name: Verify dist contents
-        run: |
-          test -f crates/grida-canvas-wasm/dist/grida_canvas_wasm.wasm || { echo "::error::Missing grida_canvas_wasm.wasm in dist"; exit 1; }
-          test -f crates/grida-canvas-wasm/dist/grida-canvas-wasm.js || { echo "::error::Missing grida-canvas-wasm.js in dist"; exit 1; }
-          test -f crates/grida-canvas-wasm/dist/index.js || { echo "::error::Missing index.js in dist"; exit 1; }
-          echo "dist/ contents verified:"
-          ls -lh crates/grida-canvas-wasm/dist/
-
-      # Use pnpm publish (not npm publish) — pnpm correctly respects the
-      # "files" glob patterns for .wasm and .js; npm ignores them.
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
         working-directory: crates/grida-canvas-wasm
@@ -121,7 +117,7 @@ jobs:
           npm publish --tag ${{ env.TAG }} --access public --provenance --dry-run
 
       - name: Commit version bump (stable only)
-        if: env.TAG == 'latest' && inputs.dry_run != 'true'
+        if: env.TAG == 'latest' && !inputs.dry_run
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

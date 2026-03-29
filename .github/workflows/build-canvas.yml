@@ -6,9 +6,14 @@ on:
     branches:
       - main
       - canary
+    paths:
+      - ".github/workflows/build-canvas.yml"
+      - ".github/workflows/publish-canvas-wasm.yml"
+      - "crates/**"
   pull_request:
     paths:
-      - ".github/workflows/**"
+      - ".github/workflows/build-canvas.yml"
+      - ".github/workflows/publish-canvas-wasm.yml"
       - "crates/**"
 
 concurrency:
