@@ -16,7 +16,9 @@
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida.git",
   "files": [
-    "dist"
+    "dist",
+    "dist/*.wasm",
+    "dist/*.js"
   ],
   "main": "dist/index.js",
   "scripts": {
