@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Wait for canvas build to finish first so artifacts are available.
   # On PRs, build-canvas runs in parallel — we need its artifact.
