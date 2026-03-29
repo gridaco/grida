@@ -3198,4 +3198,105 @@ describe("format roundtrip", () => {
       );
     });
   });
+
+  describe("polygon corner_radius", () => {
+    it("roundtrips polygon with corner_radius=0", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePolygon(nodeId),
+          point_count: 5,
+          corner_radius: 0,
+        },
+      });
+      roundtripTest<grida.program.nodes.RegularPolygonNode>(
+        doc,
+        nodeId,
+        "polygon",
+        (node) => {
+          expect(node.point_count).toBe(5);
+          expect(node.corner_radius).toBe(0);
+        }
+      );
+    });
+
+    it("roundtrips polygon with corner_radius=4 (user payload)", () => {
+      const sceneId = "0-1";
+      const nodeId = "gx14whi8utm";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePolygon(nodeId),
+          name: "polygon",
+          layout_target_width: 108,
+          layout_target_height: 104,
+          layout_inset_left: -157,
+          layout_inset_top: 92,
+          point_count: 5,
+          corner_radius: 4,
+          fill_paints: [
+            {
+              type: "solid",
+              color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } as cg.RGBA32F,
+              blend_mode: "normal",
+              active: true,
+            },
+          ],
+        },
+      });
+      roundtripTest<grida.program.nodes.RegularPolygonNode>(
+        doc,
+        nodeId,
+        "polygon",
+        (node) => {
+          expect(node.point_count).toBe(5);
+          expect(node.corner_radius).toBe(4);
+        }
+      );
+    });
+
+    it("roundtrips polygon with large corner_radius=30", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...basePolygon(nodeId),
+          point_count: 6,
+          corner_radius: 30,
+        },
+      });
+      roundtripTest<grida.program.nodes.RegularPolygonNode>(
+        doc,
+        nodeId,
+        "polygon",
+        (node) => {
+          expect(node.point_count).toBe(6);
+          expect(node.corner_radius).toBe(30);
+        }
+      );
+    });
+
+    it("roundtrips star with corner_radius=6", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseStar(nodeId),
+          point_count: 5,
+          inner_radius: 0.4,
+          corner_radius: 6,
+        },
+      });
+      roundtripTest<grida.program.nodes.RegularStarPolygonNode>(
+        doc,
+        nodeId,
+        "star",
+        (node) => {
+          expect(node.point_count).toBe(5);
+          expect(node.inner_radius).toBeCloseTo(0.4);
+          expect(node.corner_radius).toBe(6);
+        }
+      );
+    });
+  });
 });

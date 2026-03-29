@@ -495,6 +495,29 @@ export class Scene {
   }
 
   /**
+   * Return the structural node ID ancestry path from the scene root to the
+   * target node, inclusive.
+   *
+   * The returned array contains user-facing string IDs ordered as
+   * `[root, ..., parent, id]`.
+   *
+   * Returns `null` if the node does not exist in the scene.
+   */
+  getNodeIdPath(id: string): string[] | null {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(id);
+    const outptr = this.module._get_node_id_path(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+
+    if (outptr === 0) {
+      return null;
+    }
+
+    const str = ffi.readLenPrefixedString(this.module, outptr);
+    return JSON.parse(str);
+  }
+
+  /**
    * Convert a node into a vector network representation.
    * Supports primitive shapes and text nodes.
    *

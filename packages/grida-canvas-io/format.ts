@@ -1092,10 +1092,7 @@ export namespace format {
               (style.font_weight as number) ?? 400
             )
           );
-          fbs.TextStyleRec.addFontKerning(
-            builder,
-            style.font_kerning ?? true
-          );
+          fbs.TextStyleRec.addFontKerning(builder, style.font_kerning ?? true);
           if (fontFeaturesOffset !== undefined) {
             fbs.TextStyleRec.addFontFeatures(builder, fontFeaturesOffset);
           }
@@ -1158,10 +1155,12 @@ export namespace format {
             // Per-run stroke geometry
             let runStrokeGeometryOffset: flatbuffers.Offset | null = null;
             if (run.stroke_width !== undefined) {
-              runStrokeGeometryOffset =
-                format.shape.encode.strokeGeometryTrait(builder, {
+              runStrokeGeometryOffset = format.shape.encode.strokeGeometryTrait(
+                builder,
+                {
                   stroke_width: run.stroke_width,
-                });
+                }
+              );
             }
 
             fbs.StyledTextRunItem.startStyledTextRunItem(builder);
@@ -1169,16 +1168,10 @@ export namespace format {
               builder,
               c2b ? c2b[run.start] : run.start
             );
-            fbs.StyledTextRunItem.addEnd(
-              builder,
-              c2b ? c2b[run.end] : run.end
-            );
+            fbs.StyledTextRunItem.addEnd(builder, c2b ? c2b[run.end] : run.end);
             fbs.StyledTextRunItem.addTextStyle(builder, runStyleOffset);
             if (runFillPaintsOffset !== null) {
-              fbs.StyledTextRunItem.addFillPaints(
-                builder,
-                runFillPaintsOffset
-              );
+              fbs.StyledTextRunItem.addFillPaints(builder, runFillPaintsOffset);
             }
             if (runStrokePaintsOffset !== null) {
               fbs.StyledTextRunItem.addStrokePaints(
@@ -1204,10 +1197,12 @@ export namespace format {
             );
 
           // Node-level stroke geometry
-          const strokeGeometryOffset =
-            format.shape.encode.strokeGeometryTrait(builder, {
+          const strokeGeometryOffset = format.shape.encode.strokeGeometryTrait(
+            builder,
+            {
               stroke_width: node.stroke_width ?? 0,
-            });
+            }
+          );
 
           // Node-level fill/stroke paints
           const fillPaintsFiltered = node.fill_paints?.filter(isPaint);
@@ -1745,43 +1740,36 @@ export namespace format {
             shapeNode.stroke_width ?? 0
           );
           // strokeWidthProfile omitted — not in TS model, decoder reads null.
-          // Create structs inline (must be done while table is being built)
-          const rectangularCornerRadiusOffsetInline =
-            shapeNode.type === "rectangle"
-              ? fbs.RectangularCornerRadius.createRectangularCornerRadius(
-                  builder,
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_left ?? 0, // tl_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_left ?? 0, // tl_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_right ?? 0, // tr_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_right ?? 0, // tr_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_left ?? 0, // bl_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_left ?? 0, // bl_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_right ?? 0, // br_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_right ?? 0 // br_ry
-                )
-              : fbs.RectangularCornerRadius.createRectangularCornerRadius(
-                  builder,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0
-                );
-          fbs.BasicShapeNode.addRectangularCornerRadius(
-            builder,
-            rectangularCornerRadiusOffsetInline
-          );
+          // Only write rectangular_corner_radius for rectangles.
+          // Non-rectangle shapes (polygon, star, ellipse) use the scalar
+          // corner_radius field. Writing an all-zeros struct here would
+          // shadow the scalar value in the Rust decoder.
+          if (shapeNode.type === "rectangle") {
+            const rectangularCornerRadiusOffsetInline =
+              fbs.RectangularCornerRadius.createRectangularCornerRadius(
+                builder,
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_left ?? 0, // tl_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_left ?? 0, // tl_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_right ?? 0, // tr_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_right ?? 0, // tr_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_left ?? 0, // bl_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_left ?? 0, // bl_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_right ?? 0, // br_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_right ?? 0 // br_ry
+              );
+            fbs.BasicShapeNode.addRectangularCornerRadius(
+              builder,
+              rectangularCornerRadiusOffsetInline
+            );
+          }
 
           const rectangularStrokeWidthOffsetInline =
             format.shape.encode.rectangular_stroke_width_from(
@@ -1926,13 +1914,11 @@ export namespace format {
             break;
           }
           case "text": {
-            const attribNode =
-              node as grida.program.nodes.AttributedTextNode;
-            const propertiesOffset =
-              format.node.encode.nodeData.attributedText(
-                builder,
-                attribNode
-              ).dataOffset;
+            const attribNode = node as grida.program.nodes.AttributedTextNode;
+            const propertiesOffset = format.node.encode.nodeData.attributedText(
+              builder,
+              attribNode
+            ).dataOffset;
 
             fbs.AttributedTextNode.startAttributedTextNode(builder);
             fbs.AttributedTextNode.addNode(builder, systemNodeTraitOffset);
@@ -5761,9 +5747,7 @@ export namespace format {
 
             const letterSpacingStruct = textStyle.letterSpacing();
             if (letterSpacingStruct) {
-              if (
-                letterSpacingStruct.kind() === fbs.TextDimensionKind.Factor
-              ) {
+              if (letterSpacingStruct.kind() === fbs.TextDimensionKind.Factor) {
                 letterSpacing = letterSpacingStruct.value() ?? undefined;
               }
             }

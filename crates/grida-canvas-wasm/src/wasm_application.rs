@@ -592,6 +592,15 @@ pub unsafe extern "C" fn command(app: *mut UnknownTargetApplication, id: u32, a:
             4 => ApplicationCommand::Pan { tx: a, ty: b },
             5 => ApplicationCommand::SelectAll,
             6 => ApplicationCommand::DeselectAll,
+            7 => ApplicationCommand::Select(cg::query::Selector::Children),
+            8 => ApplicationCommand::Select(cg::query::Selector::Parent),
+            9 => ApplicationCommand::Select(cg::query::Selector::NextSibling),
+            10 => ApplicationCommand::Select(cg::query::Selector::PreviousSibling),
+            11 => ApplicationCommand::Select(cg::query::Selector::Siblings),
+            12 => ApplicationCommand::Select(cg::query::Selector::All),
+            13 => ApplicationCommand::ZoomToFit,
+            14 => ApplicationCommand::ZoomToSelection,
+            15 => ApplicationCommand::ZoomTo100,
             _ => ApplicationCommand::None,
         };
         app.command(cmd);
@@ -915,6 +924,31 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
                 let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
                 std::ptr::copy_nonoverlapping(vec4.as_ptr(), out, 4);
                 return out;
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
+/// js::_get_node_id_path
+///
+/// Return the structural node ID ancestry path from root to the target node,
+/// inclusive, as a JSON array of user-facing string IDs.
+///
+/// Returns null if the node does not exist.
+pub unsafe extern "C" fn get_node_id_path(
+    app: *mut UnknownTargetApplication,
+    ptr: *const u8,
+    len: usize,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        let id = __str_from_ptr_len(ptr, len);
+        if let Some(id) = id {
+            if let Some(path) = app.get_node_id_path(&id) {
+                if let Ok(json) = serde_json::to_string(&path) {
+                    return alloc_len_prefixed(json.as_bytes());
+                }
             }
         }
     }

@@ -54,6 +54,18 @@ fn winit_key_to_surface_key_down(
                 let ch = s.chars().next().unwrap();
                 match ch {
                     'a'..='z' | 'A'..='Z' => KeyName::Letter(ch.to_ascii_lowercase()),
+                    '0'..='9' => KeyName::Digit(ch as u8 - b'0'),
+                    // Shifted digits on US layout → normalize back to Digit.
+                    '!' => KeyName::Digit(1),
+                    '@' => KeyName::Digit(2),
+                    '#' => KeyName::Digit(3),
+                    '$' => KeyName::Digit(4),
+                    '%' => KeyName::Digit(5),
+                    '^' => KeyName::Digit(6),
+                    '&' => KeyName::Digit(7),
+                    '*' => KeyName::Digit(8),
+                    '(' => KeyName::Digit(9),
+                    ')' => KeyName::Digit(0),
                     '.' => KeyName::Period,
                     ',' => KeyName::Comma,
                     _ => KeyName::Character(s.to_string()),

@@ -137,6 +137,26 @@ pub fn ancestors(hierarchy: &impl Hierarchy, id: NodeId) -> Vec<NodeId> {
     path
 }
 
+/// Return the structural identity path from the scene root to `id`, inclusive.
+///
+/// The returned vector contains the ordered node ID chain:
+/// `[root, ..., grandparent, parent, id]`.
+///
+/// - For a root node, the result is `[id]`.
+/// - The path reflects the structural parent–child containment hierarchy only,
+///   not visual layout, transform order, or render traversal order.
+/// - The result is stable under sibling reordering.
+///
+/// Returns `None` if the hierarchy has no record of `id` (i.e. `id` has no
+/// parent *and* is not reachable from any root). Callers that need to
+/// distinguish "root node" from "unknown node" should check membership
+/// separately before calling this function.
+pub fn node_id_path(hierarchy: &impl Hierarchy, id: NodeId) -> Vec<NodeId> {
+    let mut path = ancestors(hierarchy, id);
+    path.push(id);
+    path
+}
+
 // -------------------------------------------------------------------------
 // Internal helpers
 // -------------------------------------------------------------------------
@@ -161,6 +181,179 @@ fn has_ancestor_in_set(
 fn dedup_preserve_order(ids: &[NodeId]) -> Vec<NodeId> {
     let mut seen = std::collections::HashSet::with_capacity(ids.len());
     ids.iter().copied().filter(|id| seen.insert(*id)).collect()
+}
+
+// -------------------------------------------------------------------------
+// Selection navigation (Selector)
+// -------------------------------------------------------------------------
+
+use crate::node::scene_graph::SceneGraph;
+
+/// CSS-like selector for navigating the node hierarchy relative to the
+/// current selection.
+///
+/// Mirrors the web editor's `Selector` vocabulary (`">"`, `".."`, `"~"`,
+/// `"~+"`, `"~-"`, `"*"`) but represented as a Rust enum for type safety
+/// and zero-cost dispatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Selector {
+    /// `"*"` — every node in the scene (roots + all descendants).
+    All,
+    /// `">"` — direct children of every selected node.
+    Children,
+    /// `".."` — parent of every selected node (deduplicated).
+    Parent,
+    /// `"~"` — siblings of the current selection.
+    ///
+    /// - Empty selection → falls back to [`All`](Selector::All).
+    /// - Single node → all children of that node's parent (including self).
+    /// - Multiple nodes → siblings only if they share a parent; empty otherwise.
+    Siblings,
+    /// `"~+"` — next sibling of `selection[0]`, wrapping to first.
+    NextSibling,
+    /// `"~-"` — previous sibling of `selection[0]`, wrapping to last.
+    PreviousSibling,
+}
+
+/// Resolve a [`Selector`] against the scene graph and current selection.
+///
+/// Returns the resulting node IDs. The output is always deduplicated and
+/// preserves child-order where applicable.
+pub fn query_select(graph: &SceneGraph, selection: &[NodeId], selector: Selector) -> Vec<NodeId> {
+    match selector {
+        Selector::All => all_nodes(graph),
+        Selector::Children => select_children(graph, selection),
+        Selector::Parent => select_parent(graph, selection),
+        Selector::Siblings => select_siblings(graph, selection),
+        Selector::NextSibling => select_adjacent_sibling(graph, selection, Direction::Next),
+        Selector::PreviousSibling => select_adjacent_sibling(graph, selection, Direction::Previous),
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Direction {
+    Next,
+    Previous,
+}
+
+/// Collect every node in the scene (roots, then depth-first children).
+fn all_nodes(graph: &SceneGraph) -> Vec<NodeId> {
+    let mut result = Vec::new();
+    for &root in graph.roots() {
+        collect_subtree(graph, root, &mut result);
+    }
+    result
+}
+
+fn collect_subtree(graph: &SceneGraph, id: NodeId, out: &mut Vec<NodeId>) {
+    out.push(id);
+    if let Some(children) = graph.get_children(&id) {
+        for &child in children {
+            collect_subtree(graph, child, out);
+        }
+    }
+}
+
+/// `">"` — direct children of every selected node.
+fn select_children(graph: &SceneGraph, selection: &[NodeId]) -> Vec<NodeId> {
+    let mut result = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for id in selection {
+        if let Some(children) = graph.get_children(id) {
+            for &child in children {
+                if seen.insert(child) {
+                    result.push(child);
+                }
+            }
+        }
+    }
+    result
+}
+
+/// `".."` — parent of every selected node (deduplicated).
+fn select_parent(graph: &SceneGraph, selection: &[NodeId]) -> Vec<NodeId> {
+    let mut result = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for id in selection {
+        if let Some(parent) = graph.get_parent(id) {
+            if seen.insert(parent) {
+                result.push(parent);
+            }
+        }
+    }
+    result
+}
+
+/// `"~"` — siblings of the selection.
+fn select_siblings(graph: &SceneGraph, selection: &[NodeId]) -> Vec<NodeId> {
+    if selection.is_empty() {
+        return all_nodes(graph);
+    }
+    // Get the sibling list for the first selected node.
+    let siblings = siblings_of(graph, &selection[0]);
+    if selection.len() == 1 {
+        return siblings;
+    }
+    // Multiple selection: only return siblings if all selected nodes share
+    // the same parent. Otherwise return empty (ambiguous context).
+    let first_parent = graph.get_parent(&selection[0]);
+    let all_same_parent = selection[1..]
+        .iter()
+        .all(|id| graph.get_parent(id) == first_parent);
+    if all_same_parent {
+        siblings
+    } else {
+        Vec::new()
+    }
+}
+
+/// `"~+"` / `"~-"` — adjacent sibling of `selection[0]` with wrap-around.
+fn select_adjacent_sibling(
+    graph: &SceneGraph,
+    selection: &[NodeId],
+    direction: Direction,
+) -> Vec<NodeId> {
+    let id = match selection.first() {
+        Some(id) => id,
+        None => return Vec::new(),
+    };
+    let siblings = siblings_of(graph, id);
+    if siblings.is_empty() {
+        return Vec::new();
+    }
+    let pos = match siblings.iter().position(|s| s == id) {
+        Some(p) => p,
+        None => return Vec::new(),
+    };
+    let next_pos = match direction {
+        Direction::Next => {
+            if pos + 1 < siblings.len() {
+                pos + 1
+            } else {
+                0
+            }
+        }
+        Direction::Previous => {
+            if pos > 0 {
+                pos - 1
+            } else {
+                siblings.len() - 1
+            }
+        }
+    };
+    vec![siblings[next_pos]]
+}
+
+/// Return all children of `id`'s parent (the sibling list including `id`).
+/// For root nodes, returns all roots.
+fn siblings_of(graph: &SceneGraph, id: &NodeId) -> Vec<NodeId> {
+    match graph.get_parent(id) {
+        Some(parent) => graph
+            .get_children(&parent)
+            .map(|c| c.clone())
+            .unwrap_or_default(),
+        None => graph.roots().to_vec(),
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -359,6 +552,55 @@ mod tests {
         assert_eq!(ancestors(&t, 7), vec![1, 2, 4]);
     }
 
+    // ---- node_id_path ----
+
+    #[test]
+    fn node_id_path_root() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 1), vec![1]);
+    }
+
+    #[test]
+    fn node_id_path_deep() {
+        let t = tree();
+        // 7 → 4 → 2 → 1, so path is [1, 2, 4, 7]
+        assert_eq!(node_id_path(&t, 7), vec![1, 2, 4, 7]);
+    }
+
+    #[test]
+    fn node_id_path_child() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 2), vec![1, 2]);
+    }
+
+    #[test]
+    fn node_id_path_separate_root() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 8), vec![8]);
+    }
+
+    #[test]
+    fn node_id_path_under_separate_root() {
+        let t = tree();
+        assert_eq!(node_id_path(&t, 9), vec![8, 9]);
+    }
+
+    #[test]
+    fn node_id_path_unknown_node() {
+        let t = tree();
+        // Node 999 has no parent entry → treated as a root-like node
+        assert_eq!(node_id_path(&t, 999), vec![999]);
+    }
+
+    #[test]
+    fn node_id_path_stable_under_sibling_order() {
+        // Sibling order doesn't affect ancestry path
+        let t = tree();
+        // Nodes 4 and 5 are siblings under 2; both paths are independent
+        assert_eq!(node_id_path(&t, 4), vec![1, 2, 4]);
+        assert_eq!(node_id_path(&t, 5), vec![1, 2, 5]);
+    }
+
     // ---- query_selection with prune_nested = false ----
 
     #[test]
@@ -388,5 +630,347 @@ mod tests {
             query_selection(&t, &[1, 4, 8], QueryOptions::default()),
             vec![1, 8]
         );
+    }
+
+    // ====================================================================
+    // Selector / query_select tests (require SceneGraph)
+    // ====================================================================
+
+    mod selector_tests {
+        use super::*;
+        use crate::node::factory::NodeFactory;
+        use crate::node::scene_graph::{Parent, SceneGraph};
+        use crate::node::schema::Node;
+
+        /// Build a test scene graph:
+        ///
+        ///   root_group                 (id varies)
+        ///     ├── child_a  (rect)
+        ///     ├── child_b  (rect)
+        ///     └── nested_group
+        ///           └── grandchild (rect)
+        ///   lone_rect  (root, no children)
+        struct Scene {
+            g: SceneGraph,
+            root_group: NodeId,
+            child_a: NodeId,
+            child_b: NodeId,
+            nested_group: NodeId,
+            grandchild: NodeId,
+            lone_rect: NodeId,
+        }
+
+        fn build_scene() -> Scene {
+            let f = NodeFactory::new();
+            let mut g = SceneGraph::new();
+
+            let root_group = g.append_child(Node::Group(f.create_group_node()), Parent::Root);
+            let child_a = g.append_child(
+                Node::Rectangle(f.create_rectangle_node()),
+                Parent::NodeId(root_group),
+            );
+            let child_b = g.append_child(
+                Node::Rectangle(f.create_rectangle_node()),
+                Parent::NodeId(root_group),
+            );
+            let nested_group = g.append_child(
+                Node::Group(f.create_group_node()),
+                Parent::NodeId(root_group),
+            );
+            let grandchild = g.append_child(
+                Node::Rectangle(f.create_rectangle_node()),
+                Parent::NodeId(nested_group),
+            );
+            let lone_rect =
+                g.append_child(Node::Rectangle(f.create_rectangle_node()), Parent::Root);
+
+            Scene {
+                g,
+                root_group,
+                child_a,
+                child_b,
+                nested_group,
+                grandchild,
+                lone_rect,
+            }
+        }
+
+        fn qs(g: &SceneGraph, sel: &[NodeId], selector: Selector) -> Vec<NodeId> {
+            query_select(g, sel, selector)
+        }
+
+        // ---- Children ----
+
+        #[test]
+        fn children_of_group() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.root_group], Selector::Children),
+                vec![s.child_a, s.child_b, s.nested_group]
+            );
+        }
+
+        #[test]
+        fn children_of_leaf_is_empty() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.child_a], Selector::Children),
+                Vec::<NodeId>::new()
+            );
+        }
+
+        #[test]
+        fn children_of_nested_group() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.nested_group], Selector::Children),
+                vec![s.grandchild]
+            );
+        }
+
+        #[test]
+        fn children_of_multiple() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.root_group, s.nested_group], Selector::Children),
+                vec![s.child_a, s.child_b, s.nested_group, s.grandchild]
+            );
+        }
+
+        #[test]
+        fn children_empty_selection() {
+            let s = build_scene();
+            assert_eq!(qs(&s.g, &[], Selector::Children), Vec::<NodeId>::new());
+        }
+
+        // ---- Parent ----
+
+        #[test]
+        fn parent_single() {
+            let s = build_scene();
+            assert_eq!(qs(&s.g, &[s.child_a], Selector::Parent), vec![s.root_group]);
+        }
+
+        #[test]
+        fn parent_root_has_none() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.root_group], Selector::Parent),
+                Vec::<NodeId>::new()
+            );
+        }
+
+        #[test]
+        fn parent_siblings_deduped() {
+            let s = build_scene();
+            // child_a and child_b share root_group → single entry
+            assert_eq!(
+                qs(&s.g, &[s.child_a, s.child_b], Selector::Parent),
+                vec![s.root_group]
+            );
+        }
+
+        #[test]
+        fn parent_different_branches() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.child_a, s.grandchild], Selector::Parent),
+                vec![s.root_group, s.nested_group]
+            );
+        }
+
+        // ---- Parent ↔ Children round-trip ----
+
+        #[test]
+        fn parent_then_children_round_trip() {
+            let s = build_scene();
+            let parents = qs(&s.g, &[s.child_a], Selector::Parent);
+            assert_eq!(parents, vec![s.root_group]);
+            let children = qs(&s.g, &parents, Selector::Children);
+            assert_eq!(children, vec![s.child_a, s.child_b, s.nested_group]);
+        }
+
+        // ---- NextSibling ----
+
+        #[test]
+        fn next_sibling_middle() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.child_a], Selector::NextSibling),
+                vec![s.child_b]
+            );
+        }
+
+        #[test]
+        fn next_sibling_wraps() {
+            let s = build_scene();
+            // nested_group is last child → wraps to child_a
+            assert_eq!(
+                qs(&s.g, &[s.nested_group], Selector::NextSibling),
+                vec![s.child_a]
+            );
+        }
+
+        #[test]
+        fn next_sibling_empty_selection() {
+            let s = build_scene();
+            assert_eq!(qs(&s.g, &[], Selector::NextSibling), Vec::<NodeId>::new());
+        }
+
+        #[test]
+        fn next_sibling_only_child() {
+            let s = build_scene();
+            // grandchild is the only child of nested_group → wraps to itself
+            assert_eq!(
+                qs(&s.g, &[s.grandchild], Selector::NextSibling),
+                vec![s.grandchild]
+            );
+        }
+
+        #[test]
+        fn next_sibling_root_level() {
+            let s = build_scene();
+            // root_group → lone_rect (next root)
+            assert_eq!(
+                qs(&s.g, &[s.root_group], Selector::NextSibling),
+                vec![s.lone_rect]
+            );
+        }
+
+        // ---- PreviousSibling ----
+
+        #[test]
+        fn prev_sibling_middle() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.child_b], Selector::PreviousSibling),
+                vec![s.child_a]
+            );
+        }
+
+        #[test]
+        fn prev_sibling_wraps() {
+            let s = build_scene();
+            // child_a is first child → wraps to nested_group (last)
+            assert_eq!(
+                qs(&s.g, &[s.child_a], Selector::PreviousSibling),
+                vec![s.nested_group]
+            );
+        }
+
+        #[test]
+        fn prev_sibling_root_level_wraps() {
+            let s = build_scene();
+            // root_group is first root → wraps to lone_rect (last root)
+            assert_eq!(
+                qs(&s.g, &[s.root_group], Selector::PreviousSibling),
+                vec![s.lone_rect]
+            );
+        }
+
+        // ---- Siblings ----
+
+        #[test]
+        fn siblings_single_selection() {
+            let s = build_scene();
+            // child_a's siblings = all children of root_group
+            assert_eq!(
+                qs(&s.g, &[s.child_a], Selector::Siblings),
+                vec![s.child_a, s.child_b, s.nested_group]
+            );
+        }
+
+        #[test]
+        fn siblings_multiple_same_parent() {
+            let s = build_scene();
+            assert_eq!(
+                qs(&s.g, &[s.child_a, s.child_b], Selector::Siblings),
+                vec![s.child_a, s.child_b, s.nested_group]
+            );
+        }
+
+        #[test]
+        fn siblings_multiple_different_parents_is_empty() {
+            let s = build_scene();
+            // child_a (under root_group) and grandchild (under nested_group) → empty
+            assert_eq!(
+                qs(&s.g, &[s.child_a, s.grandchild], Selector::Siblings),
+                Vec::<NodeId>::new()
+            );
+        }
+
+        #[test]
+        fn siblings_empty_falls_back_to_all() {
+            let s = build_scene();
+            let result = qs(&s.g, &[], Selector::Siblings);
+            // Should contain all nodes (depth-first)
+            assert_eq!(result.len(), 6);
+            assert!(result.contains(&s.root_group));
+            assert!(result.contains(&s.child_a));
+            assert!(result.contains(&s.grandchild));
+            assert!(result.contains(&s.lone_rect));
+        }
+
+        #[test]
+        fn siblings_root_node() {
+            let s = build_scene();
+            // root_group's siblings = all roots
+            assert_eq!(
+                qs(&s.g, &[s.root_group], Selector::Siblings),
+                vec![s.root_group, s.lone_rect]
+            );
+        }
+
+        // ---- All ----
+
+        #[test]
+        fn all_returns_every_node() {
+            let s = build_scene();
+            let result = qs(&s.g, &[], Selector::All);
+            assert_eq!(result.len(), 6);
+            // Depth-first order: root_group, child_a, child_b, nested_group, grandchild, lone_rect
+            assert_eq!(
+                result,
+                vec![
+                    s.root_group,
+                    s.child_a,
+                    s.child_b,
+                    s.nested_group,
+                    s.grandchild,
+                    s.lone_rect
+                ]
+            );
+        }
+
+        #[test]
+        fn all_ignores_selection() {
+            let s = build_scene();
+            // All always returns everything regardless of selection
+            assert_eq!(
+                qs(&s.g, &[s.child_a], Selector::All),
+                qs(&s.g, &[], Selector::All)
+            );
+        }
+
+        // ---- Full navigation cycle ----
+
+        #[test]
+        fn full_navigation_enter_tab_tab_shift_enter() {
+            let s = build_scene();
+            // Start: select root_group
+            let sel = vec![s.root_group];
+            // Enter → children
+            let sel = qs(&s.g, &sel, Selector::Children);
+            assert_eq!(sel, vec![s.child_a, s.child_b, s.nested_group]);
+            // Tab from child_a → child_b
+            let sel = qs(&s.g, &[sel[0]], Selector::NextSibling);
+            assert_eq!(sel, vec![s.child_b]);
+            // Tab → nested_group
+            let sel = qs(&s.g, &sel, Selector::NextSibling);
+            assert_eq!(sel, vec![s.nested_group]);
+            // Shift+Enter → back to root_group
+            let sel = qs(&s.g, &sel, Selector::Parent);
+            assert_eq!(sel, vec![s.root_group]);
+        }
     }
 }

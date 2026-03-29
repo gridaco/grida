@@ -316,6 +316,9 @@ pub enum KeyName {
     /// A-Z (lowercase). For shortcut matching only — actual character
     /// insertion uses [`Character`](Self::Character).
     Letter(char),
+    /// 0-9. For shortcut matching (e.g. Shift+1 = zoom to fit).
+    /// The bridge normalizes shifted symbols (`!@#…`) back to digits.
+    Digit(u8),
     /// `.` key (for Cmd+Shift+> = increase font size).
     Period,
     /// `,` key (for Cmd+Shift+< = decrease font size).
