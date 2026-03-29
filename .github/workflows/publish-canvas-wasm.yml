@@ -3,18 +3,34 @@ name: Publish @grida/canvas-wasm
 # Automatically publish after a successful canvas build on main or canary.
 # Uses workflow_run to chain: build-canvas.yml → this workflow.
 on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (skip npm publish)"
+        type: boolean
+        default: false
+      tag:
+        description: "npm dist-tag override"
+        type: choice
+        options:
+          - auto
+          - canary
+          - latest
+        default: auto
   workflow_run:
     workflows: ["canvas build"]
     types: [completed]
     branches: [main, canary]
 
 concurrency:
-  group: publish-canvas-wasm-${{ github.event.workflow_run.head_branch }}
+  group: publish-canvas-wasm-${{ github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -42,12 +58,16 @@ jobs:
         with:
           name: canvas-wasm-artifacts
           path: crates/grida-canvas-wasm/lib/bin/
-          run_id: ${{ github.event.workflow_run.id }}
+          # workflow_run: use the triggering run's artifacts
+          # workflow_dispatch: use the latest successful build-canvas run
+          run_id: ${{ github.event.workflow_run.id || '' }}
+          workflow: ${{ github.event.workflow_run.id && '' || 'build-canvas.yml' }}
+          branch: ${{ github.event.workflow_run.id && '' || github.ref_name }}
 
       - name: Bump version
         working-directory: crates/grida-canvas-wasm
         run: |
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
           CURRENT=$(node -p "require('./package.json').version")
           # Strip any pre-release suffix to get the base version
           BASE=$(echo "$CURRENT" | sed 's/-canary.*//')
@@ -57,11 +77,17 @@ jobs:
           NEXT_PATCH=$((PATCH + 1))
 
           if [ "$BRANCH" == "canary" ]; then
-            VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-canary.${{ github.event.workflow_run.run_number }}"
+            VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-canary.${{ github.event.workflow_run.run_number || github.run_number }}"
             TAG=canary
           else
             VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
             TAG=latest
+          fi
+
+          # Allow manual tag override via workflow_dispatch
+          INPUT_TAG="${{ inputs.tag }}"
+          if [ -n "$INPUT_TAG" ] && [ "$INPUT_TAG" != "auto" ]; then
+            TAG="$INPUT_TAG"
           fi
 
           npm version "$VERSION" --no-git-tag-version
@@ -81,11 +107,19 @@ jobs:
           ls -lh crates/grida-canvas-wasm/dist/
 
       - name: Publish to npm
+        if: inputs.dry_run != 'true'
         working-directory: crates/grida-canvas-wasm
         run: npm publish --tag ${{ env.TAG }} --access public --provenance
 
+      - name: Publish to npm (dry run)
+        if: inputs.dry_run == 'true'
+        working-directory: crates/grida-canvas-wasm
+        run: |
+          echo "DRY RUN — would publish @grida/canvas-wasm@${{ env.VERSION }} with tag ${{ env.TAG }}"
+          npm publish --tag ${{ env.TAG }} --access public --provenance --dry-run
+
       - name: Commit version bump (stable only)
-        if: env.TAG == 'latest'
+        if: env.TAG == 'latest' && inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
