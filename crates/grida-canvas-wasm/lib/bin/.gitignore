@@ -1,0 +1,3 @@
+# WASM build artifacts — built in CI, published to npm
+*.wasm
+*.js
