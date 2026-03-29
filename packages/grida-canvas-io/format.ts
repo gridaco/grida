@@ -1092,10 +1092,7 @@ export namespace format {
               (style.font_weight as number) ?? 400
             )
           );
-          fbs.TextStyleRec.addFontKerning(
-            builder,
-            style.font_kerning ?? true
-          );
+          fbs.TextStyleRec.addFontKerning(builder, style.font_kerning ?? true);
           if (fontFeaturesOffset !== undefined) {
             fbs.TextStyleRec.addFontFeatures(builder, fontFeaturesOffset);
           }
@@ -1158,10 +1155,12 @@ export namespace format {
             // Per-run stroke geometry
             let runStrokeGeometryOffset: flatbuffers.Offset | null = null;
             if (run.stroke_width !== undefined) {
-              runStrokeGeometryOffset =
-                format.shape.encode.strokeGeometryTrait(builder, {
+              runStrokeGeometryOffset = format.shape.encode.strokeGeometryTrait(
+                builder,
+                {
                   stroke_width: run.stroke_width,
-                });
+                }
+              );
             }
 
             fbs.StyledTextRunItem.startStyledTextRunItem(builder);
@@ -1169,16 +1168,10 @@ export namespace format {
               builder,
               c2b ? c2b[run.start] : run.start
             );
-            fbs.StyledTextRunItem.addEnd(
-              builder,
-              c2b ? c2b[run.end] : run.end
-            );
+            fbs.StyledTextRunItem.addEnd(builder, c2b ? c2b[run.end] : run.end);
             fbs.StyledTextRunItem.addTextStyle(builder, runStyleOffset);
             if (runFillPaintsOffset !== null) {
-              fbs.StyledTextRunItem.addFillPaints(
-                builder,
-                runFillPaintsOffset
-              );
+              fbs.StyledTextRunItem.addFillPaints(builder, runFillPaintsOffset);
             }
             if (runStrokePaintsOffset !== null) {
               fbs.StyledTextRunItem.addStrokePaints(
@@ -1204,10 +1197,12 @@ export namespace format {
             );
 
           // Node-level stroke geometry
-          const strokeGeometryOffset =
-            format.shape.encode.strokeGeometryTrait(builder, {
+          const strokeGeometryOffset = format.shape.encode.strokeGeometryTrait(
+            builder,
+            {
               stroke_width: node.stroke_width ?? 0,
-            });
+            }
+          );
 
           // Node-level fill/stroke paints
           const fillPaintsFiltered = node.fill_paints?.filter(isPaint);
@@ -1919,13 +1914,11 @@ export namespace format {
             break;
           }
           case "text": {
-            const attribNode =
-              node as grida.program.nodes.AttributedTextNode;
-            const propertiesOffset =
-              format.node.encode.nodeData.attributedText(
-                builder,
-                attribNode
-              ).dataOffset;
+            const attribNode = node as grida.program.nodes.AttributedTextNode;
+            const propertiesOffset = format.node.encode.nodeData.attributedText(
+              builder,
+              attribNode
+            ).dataOffset;
 
             fbs.AttributedTextNode.startAttributedTextNode(builder);
             fbs.AttributedTextNode.addNode(builder, systemNodeTraitOffset);
@@ -5754,9 +5747,7 @@ export namespace format {
 
             const letterSpacingStruct = textStyle.letterSpacing();
             if (letterSpacingStruct) {
-              if (
-                letterSpacingStruct.kind() === fbs.TextDimensionKind.Factor
-              ) {
+              if (letterSpacingStruct.kind() === fbs.TextDimensionKind.Factor) {
                 letterSpacing = letterSpacingStruct.value() ?? undefined;
               }
             }

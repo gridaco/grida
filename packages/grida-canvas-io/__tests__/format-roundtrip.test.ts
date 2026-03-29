@@ -3237,7 +3237,7 @@ describe("format roundtrip", () => {
           fill_paints: [
             {
               type: "solid",
-              color: { r: 0.5, g: 0.5, b: 0.5, a: 1 },
+              color: { r: 0.5, g: 0.5, b: 0.5, a: 1 } as cg.RGBA32F,
               blend_mode: "normal",
               active: true,
             },
