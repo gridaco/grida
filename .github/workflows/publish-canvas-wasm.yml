@@ -1,6 +1,6 @@
 # Stub so GitHub recognizes workflow_dispatch on the default branch.
 # Real implementation lives on canary — will replace this on merge.
-name: publish canvas-wasm
+name: Publish @grida/canvas-wasm
 
 on:
   workflow_dispatch:
@@ -16,6 +16,10 @@ on:
           - canary
           - latest
         default: canary
+  workflow_run:
+    workflows: ["canvas build"]
+    types: [completed]
+    branches: [main, canary]
 
 jobs:
   stub:
