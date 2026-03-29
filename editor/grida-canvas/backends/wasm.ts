@@ -46,6 +46,27 @@ export class CanvasWasmGeometryQueryInterfaceProvider
   }
 }
 
+export class CanvasWasmPropertiesQueryProvider
+  implements editor.api.IDocumentPropertiesQueryProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Scene
+  ) {}
+
+  queryPaintGroups(
+    ids: string[],
+    target: "fill" | "stroke",
+    options?: { recursive?: boolean; limit?: number }
+  ): editor.api.PaintGroup[] {
+    const groups = this.surface.queryPaintGroups(ids, target, options);
+    return groups.map((g) => ({
+      value: g.paint,
+      ids: g.node_ids,
+    }));
+  }
+}
+
 export class CanvasWasmDefaultExportInterfaceProvider
   implements editor.api.IDocumentExporterInterfaceProvider
 {

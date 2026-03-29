@@ -1246,6 +1246,31 @@ impl Node {
         }
     }
 
+    /// Returns the node's fill paints, if it has any.
+    ///
+    /// `Error`, `Group`, and `Line` have no fills and return `None`.
+    /// `Image` wraps its single `ImagePaint` into a one-element `Paints`.
+    pub fn fills(&self) -> Option<&Paints> {
+        match self {
+            Node::InitialContainer(_) => None,
+            Node::Container(n) => Some(&n.fills),
+            Node::Tray(n) => Some(&n.fills),
+            Node::Rectangle(n) => Some(&n.fills),
+            Node::Ellipse(n) => Some(&n.fills),
+            Node::Polygon(n) => Some(&n.fills),
+            Node::RegularPolygon(n) => Some(&n.fills),
+            Node::RegularStarPolygon(n) => Some(&n.fills),
+            Node::TextSpan(n) => Some(&n.fills),
+            Node::AttributedText(n) => Some(&n.fills),
+            Node::Path(n) => Some(&n.fills),
+            Node::Vector(n) => Some(&n.fills),
+            Node::BooleanOperation(n) => Some(&n.fills),
+            // Image has a single ImagePaint, not a Paints stack
+            Node::Image(_) => None,
+            Node::Error(_) | Node::Group(_) | Node::Line(_) => None,
+        }
+    }
+
     /// Returns the node's blend mode.
     /// `InitialContainer` and `Error` default to `PassThrough`.
     pub fn blend_mode(&self) -> LayerBlendMode {

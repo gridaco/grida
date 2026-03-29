@@ -1,7 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { editor } from "@/grida-canvas";
 import { useCurrentEditor, useEditorState } from "./use-editor";
-import { dq } from "@/grida-canvas/query";
 import grida from "@grida/schema";
 import mixed, {
   type KeyIgnoreFn,
@@ -9,7 +7,6 @@ import mixed, {
   type PropertyCompareFn,
 } from "@grida/mixed-properties";
 import type cg from "@grida/cg";
-import equal from "fast-deep-equal";
 
 type WithId<T extends Record<string, any>> = T & { id: string };
 
@@ -79,80 +76,60 @@ export function useMixedProperties<T extends Record<string, any>>(
 }
 
 /**
- * @deprecated expensive
+ * Query fill paints across the current selection and all descendants.
  *
- * @todo This function is expensive because it resolves all paint values at once.
- * The UI only initially shows a partial set (n values). Optimize this by:
- * - First limiting by n and early exiting
- * - Adding a method to load all values on demand
+ * Delegates to `editor.propertiesQuery` which dispatches to the active backend:
+ * - **canvas (WASM)**: hash-based O(n) grouping in Rust
+ * - **DOM**: JS-side traversal with deep-equality grouping
+ *
+ * Re-queries are suppressed during active gestures (translate, scale, rotate,
+ * etc.) since those only affect geometry, not paints.
  */
 export function useMixedPaints() {
   const instance = useCurrentEditor();
-  /**
-   * Subscribe ONLY to:
-   * - `selection`
-   * - derived `ids` (selection + recursive children)
-   * - active fill paints for those ids
-   *
-   * This avoids re-rendering on unrelated document mutations.
-   */
+
+  // Subscribe to selection + gesture + document.
+  // During an active gesture, `document` changes on every pointer move (transforms),
+  // but paints are stable — so we freeze the document identity while gesturing.
+  //
+  // TODO: Replace gesture-based gating with fine-grained change tracking.
+  // Editor should emit typed change events (e.g. "geometry" | "paint" | "style" | …)
+  // so subscribers can react only to relevant mutations instead of inferring
+  // staleness from gesture state. This would also cover non-gesture paint
+  // changes (e.g. undo/redo, programmatic mutations) without the idle check.
   const slice = useEditorState(
     instance,
-    (state) => {
-      const selection = state.selection;
-
-      // selection & its recursive children (stable insertion order)
-      const idsSet = new Set<string>();
-      for (const id of selection) {
-        idsSet.add(id);
-        for (const childId of dq.getChildren(state.document_ctx, id, true)) {
-          idsSet.add(childId);
-        }
-      }
-      const ids = Array.from(idsSet);
-
-      const paintEntries: Array<{ nodeId: string; paint: cg.Paint }> = [];
-      for (const nodeId of ids) {
-        const node = state.document.nodes[
-          nodeId
-        ] as grida.program.nodes.UnknownNode;
-        if (!node) continue;
-
-        const { paints } = editor.resolvePaints(node, "fill", 0);
-        const activePaints = paints.filter((p) => p?.active !== false);
-        for (const paint of activePaints) {
-          paintEntries.push({ nodeId, paint });
-        }
-      }
-
-      return { selection, ids, paintEntries };
-    },
-    equal
+    (state) => ({
+      selection: state.selection,
+      gestureIdle: state.gesture.type === "idle",
+      // Only track document identity when idle — during gestures, paints
+      // can't change so we keep the stale reference to prevent re-queries.
+      document: state.gesture.type === "idle" ? state.document : null,
+    }),
+    (a, b) =>
+      a.gestureIdle === b.gestureIdle &&
+      a.document === b.document &&
+      a.selection.length === b.selection.length &&
+      a.selection.every((id, i) => id === b.selection[i])
   );
 
-  // TODO: @grida/mixed-properties should support array properties (e.g., fill_paints[] per node)
-  // Once array handling is added to mixed(), replace this custom logic with normalized nodes + mixed()
-  const paints = useMemo(() => {
-    // Group by paint value (using deep equality)
-    const paintGroups: Array<{ value: cg.Paint; ids: string[] }> = [];
+  const { selection } = slice;
 
-    for (const { nodeId, paint } of slice.paintEntries) {
-      // Find existing group with same paint value
-      const existingGroup = paintGroups.find((group) =>
-        equal(group.value, paint)
-      );
+  const paints = useMemo(
+    () => instance.propertiesQuery.queryPaintGroups(selection, "fill", { recursive: true }),
+    [slice, instance]
+  );
 
-      if (existingGroup) {
-        if (!existingGroup.ids.includes(nodeId)) {
-          existingGroup.ids.push(nodeId);
-        }
-      } else {
-        paintGroups.push({ value: paint, ids: [nodeId] });
+  // Collect all node IDs across groups for display-gating
+  const ids = useMemo(() => {
+    const set = new Set<string>();
+    for (const group of paints) {
+      for (const id of group.ids) {
+        set.add(id);
       }
     }
-
-    return paintGroups;
-  }, [slice.paintEntries]);
+    return Array.from(set);
+  }, [paints]);
 
   const setPaint = useCallback(
     (
@@ -168,10 +145,10 @@ export function useMixedPaints() {
 
   return useMemo(() => {
     return {
-      selection: slice.selection,
-      ids: slice.ids,
+      selection,
+      ids,
       paints,
       setPaint,
     };
-  }, [slice.selection, slice.ids, paints, setPaint]);
+  }, [selection, ids, paints, setPaint]);
 }

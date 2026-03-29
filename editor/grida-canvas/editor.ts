@@ -19,7 +19,9 @@ import {
   CanvasWasmDefaultExportInterfaceProvider,
   CanvasWasmSVGInterfaceProvider,
   CanvasWasmMarkdownInterfaceProvider,
+  CanvasWasmPropertiesQueryProvider,
 } from "./backends";
+import { DOMPropertiesQueryProvider } from "./backends/dom-content";
 import { domapi } from "./backends/dom";
 import { dq } from "@/grida-canvas/query";
 import {
@@ -2783,6 +2785,11 @@ export class Editor
     return this._m_font_parser;
   }
 
+  _m_properties_query: editor.api.IDocumentPropertiesQueryProvider;
+  public get propertiesQuery() {
+    return this._m_properties_query;
+  }
+
   private readonly _fontManager: DocumentFontManager;
 
   readonly onMount?: (surface: Scene) => void;
@@ -2871,7 +2878,7 @@ export class Editor
 
     this._m_geometry =
       typeof geometry === "function" ? geometry(this) : geometry;
-    //
+    this._m_properties_query = new DOMPropertiesQueryProvider(this);
 
     if (interfaces?.exporter) {
       this._m_exporter = resolveWithEditorInstance(this, interfaces.exporter);
@@ -3056,6 +3063,11 @@ export class Editor
     );
 
     this._m_font_parser = new CanvasWasmFontParserInterfaceProvider(
+      this,
+      surface
+    );
+
+    this._m_properties_query = new CanvasWasmPropertiesQueryProvider(
       this,
       surface
     );

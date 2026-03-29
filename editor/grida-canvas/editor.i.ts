@@ -2593,6 +2593,45 @@ export namespace editor.api {
     ): cmath.Rectangle | null;
   }
 
+  /**
+   * Aggregated paint query result: a paint value shared by one or more nodes.
+   */
+  export interface PaintGroup {
+    /** The paint value (matches `cg.Paint` shape). */
+    value: cg.Paint;
+    /** Node IDs that share this exact paint. */
+    ids: string[];
+  }
+
+  /**
+   * Backend-agnostic provider for querying aggregated property data
+   * across sets of nodes.
+   *
+   * - **canvas (WASM)**: delegates traversal, collection, and hash-based
+   *   grouping to Rust — O(n) with optional early-exit `limit`.
+   * - **DOM**: performs the same logic in JS using the editor state tree.
+   */
+  export interface IDocumentPropertiesQueryProvider {
+    /**
+     * Collect and group active paints across the given nodes.
+     *
+     * @param ids       - Root node IDs to query.
+     * @param target    - Which paint slot to query (`"fill"` or `"stroke"`).
+     * @param options   - Query options.
+     * @param options.recursive - When `true` (default), include all
+     *   descendants of each id. When `false`, only query the listed ids.
+     * @param options.limit - Maximum number of distinct paint groups to
+     *   return. `0` means unlimited.
+     * @returns An array of paint groups, each containing the shared paint
+     *          value and the node IDs that use it.
+     */
+    queryPaintGroups(
+      ids: string[],
+      target: "fill" | "stroke",
+      options?: { recursive?: boolean; limit?: number }
+    ): PaintGroup[];
+  }
+
   export interface IDocumentImageExportInterfaceProvider {
     /**
      * exports the node as an image
