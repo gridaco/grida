@@ -140,6 +140,10 @@ pub struct FramePlan {
     /// Used by downstream stages to take optimized paths (e.g. skip tile
     /// invalidation when only panning, skip LOD recomputation, etc.).
     pub camera_change: CameraChangeKind,
+    /// World-space viewport rectangle used for the R-tree query.
+    /// Stored explicitly for downstream use (viewport culling construction,
+    /// future RenderSurface geometric culling).
+    pub viewport: rect::Rectangle,
     /// Node IDs that will be drawn via cached layer images (compositor blit).
     pub promoted: Vec<NodeId>,
     /// regions with their intersecting indices (live-drawn nodes only)
@@ -500,6 +504,11 @@ impl Renderer {
 
         self.prefill_picture_cache_for_plan(plan, policy);
 
+        // Build the viewport culling context from the frame plan.
+        // This enables the draw loop to skip off-screen Draw commands with
+        // a ~1ns bitset check instead of dispatching each to Skia (~0.5µs).
+        let viewport_cull = crate::painter::ViewportCull::from_plan(plan, &self.scene_cache.layers);
+
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,
@@ -507,6 +516,7 @@ impl Renderer {
             &self.scene_cache,
             policy,
         );
+        let painter = painter.with_viewport_cull(&viewport_cull);
         let painter = if let Some(blits) = promoted_blits {
             painter.with_promoted_blits(blits)
         } else {
@@ -1029,6 +1039,12 @@ impl Renderer {
                     let plan = FramePlan {
                         stable,
                         camera_change,
+                        viewport: rect::Rectangle {
+                            x: 0.0,
+                            y: 0.0,
+                            width: 0.0,
+                            height: 0.0,
+                        },
                         promoted: Vec::new(),
                         regions: Vec::new(),
                         compositor_indices: Vec::new(),
@@ -1073,6 +1089,12 @@ impl Renderer {
                 &FramePlan {
                     stable,
                     camera_change,
+                    viewport: rect::Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    },
                     promoted: Vec::new(),
                     regions: Vec::new(),
                     compositor_indices: Vec::new(),
@@ -1084,6 +1106,12 @@ impl Renderer {
                 let plan = FramePlan {
                     stable,
                     camera_change,
+                    viewport: rect::Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    },
                     promoted: Vec::new(),
                     regions: Vec::new(),
                     compositor_indices: Vec::new(),
@@ -2058,6 +2086,7 @@ impl Renderer {
         FramePlan {
             stable,
             camera_change,
+            viewport: bounds,
             promoted: promoted_ids,
             regions,
             compositor_indices,
