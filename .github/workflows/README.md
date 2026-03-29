@@ -75,11 +75,21 @@ Runs on every PR regardless of path. Steps:
 
 Runs on PRs touching `crates/`, `Cargo.lock`, or workflow files. Runs `cargo test` and `cargo fmt --check`.
 
+## Vercel Deployment
+
+### Deployment Checks
+
+Vercel production deployments are gated by GitHub status checks. The `build-canvas` check must pass before a Vercel deployment is promoted to production. This is configured in Vercel's project settings under Deployment Protection → Deployment Checks.
+
+### Editor build and WASM
+
+The Vercel deployment for the editor (`grida`) requires the WASM binary at build time. Vercel runs its own build and does not have access to GitHub Actions artifacts.
+
+**Current status**: The editor build fails on Vercel when crate changes are in-flight because the published npm version may not match the local source. This is a known limitation being addressed.
+
+**Planned fix**: A prebuild script in the Vercel build command will install `@grida/canvas-wasm@canary` from npm before running `turbo build`, ensuring the WASM binary is available. The trade-off is that PRs changing both `crates/` and `editor/` in the same PR will use the previously-published WASM version until the new one is published.
+
 ## Known Issues
-
-### Vercel editor build failure
-
-The Vercel deployment for the editor (`grida`) fails because the WASM binary is not available at build time. Vercel runs its own build and does not have access to GitHub Actions artifacts. This needs a separate solution (e.g., installing `@grida/canvas-wasm` from npm during the Vercel build, or making the import lazy).
 
 ### `@grida/io-figma` test failures
 
