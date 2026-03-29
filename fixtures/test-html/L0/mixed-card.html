@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mixed: Card Component</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .cards {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .card {
+        width: 280px;
+        background: #0f172a;
+        border: 1px solid #1e293b;
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #f8fafc;
+        line-height: 1.2;
+      }
+
+      .card-subtitle {
+        font-size: 13px;
+        color: #94a3b8;
+        line-height: 1.5;
+      }
+
+      .tags {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .tag {
+        background: #1e293b;
+        color: #a5b4fc;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 9999px;
+      }
+
+      .tag-accent {
+        background: #6366f1;
+        color: #fff;
+      }
+
+      .card-footer {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .footer-label {
+        font-size: 12px;
+        color: #64748b;
+      }
+
+      .footer-value {
+        font-size: 12px;
+        font-weight: 700;
+        color: #22c55e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">Canvas Renderer</div>
+        <div class="card-subtitle">
+          High-performance 2D rendering engine built on Skia with support for
+          complex scene graphs and real-time interaction.
+        </div>
+        <div class="tags">
+          <span class="tag tag-accent">Rust</span>
+          <span class="tag">Skia</span>
+          <span class="tag">WASM</span>
+        </div>
+        <div class="card-footer">
+          <span class="footer-label">Status</span>
+          <span class="footer-value">Active</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Form Builder</div>
+        <div class="card-subtitle">
+          Drag-and-drop form editor with conditional logic, validation rules,
+          and multi-step workflows.
+        </div>
+        <div class="tags">
+          <span class="tag tag-accent">React</span>
+          <span class="tag">TypeScript</span>
+        </div>
+        <div class="card-footer">
+          <span class="footer-label">Status</span>
+          <span class="footer-value">Stable</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

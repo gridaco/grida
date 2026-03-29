@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Linear Gradient</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .rect {
+        width: 180px;
+        height: 120px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .to-right {
+        background-image: linear-gradient(to right, #6366f1, #ec4899);
+      }
+      .to-bottom {
+        background-image: linear-gradient(to bottom, #22c55e, #0ea5e9);
+      }
+      .angle135 {
+        background-image: linear-gradient(135deg, #f59e0b, #ef4444);
+      }
+      .to-bl {
+        background-image: linear-gradient(to bottom left, #8b5cf6, #06b6d4);
+      }
+      .multi-stop {
+        background-image: linear-gradient(
+          to right,
+          #ef4444,
+          #f59e0b 30%,
+          #22c55e 60%,
+          #3b82f6
+        );
+      }
+      .to-top {
+        background-image: linear-gradient(to top, #1e293b, #6366f1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">to right</div>
+        <div class="rect to-right">to right</div>
+      </div>
+      <div>
+        <div class="label">to bottom</div>
+        <div class="rect to-bottom">to bottom</div>
+      </div>
+      <div>
+        <div class="label">135deg</div>
+        <div class="rect angle135">135deg</div>
+      </div>
+      <div>
+        <div class="label">to bottom left</div>
+        <div class="rect to-bl">to bottom left</div>
+      </div>
+      <div>
+        <div class="label">multi-stop (4 colors)</div>
+        <div class="rect multi-stop">multi-stop</div>
+      </div>
+      <div>
+        <div class="label">to top</div>
+        <div class="rect to-top">to top</div>
+      </div>
+    </div>
+  </body>
+</html>

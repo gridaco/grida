@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Decoration</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .sections {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        font-size: 18px;
+      }
+
+      .none {
+        text-decoration: none;
+      }
+      .underline {
+        text-decoration: underline;
+      }
+      .overline {
+        text-decoration: overline;
+      }
+      .linethrough {
+        text-decoration: line-through;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sections">
+      <div class="none">no decoration (plain)</div>
+      <div class="underline">text-decoration: underline</div>
+      <div class="overline">text-decoration: overline</div>
+      <div class="linethrough">text-decoration: line-through</div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Letter Spacing</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 4px;
+      }
+
+      .sections {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .line {
+        font-size: 18px;
+        background: #0f172a;
+        border-radius: 8px;
+        padding: 16px;
+      }
+
+      .ls-0 {
+        letter-spacing: 0;
+      }
+      .ls-2 {
+        letter-spacing: 2px;
+      }
+      .ls-5 {
+        letter-spacing: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sections">
+      <div>
+        <div class="label">letter-spacing: 0</div>
+        <div class="line ls-0">The quick brown fox jumps</div>
+      </div>
+      <div>
+        <div class="label">letter-spacing: 2px</div>
+        <div class="line ls-2">The quick brown fox jumps</div>
+      </div>
+      <div>
+        <div class="label">letter-spacing: 5px</div>
+        <div class="line ls-5">The quick brown fox jumps</div>
+      </div>
+    </div>
+  </body>
+</html>

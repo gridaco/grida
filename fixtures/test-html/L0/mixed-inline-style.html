@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mixed: Inline Style Override</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 4px;
+      }
+
+      .sections {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .base {
+        background: #1e293b;
+        color: #e2e8f0;
+        font-size: 14px;
+        padding: 12px 16px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sections">
+      <div>
+        <div class="label">class only (no inline override)</div>
+        <div class="base">Default from stylesheet</div>
+      </div>
+
+      <div>
+        <div class="label">inline font-size override</div>
+        <div class="base" style="font-size: 24px">
+          font-size: 24px via style=""
+        </div>
+      </div>
+
+      <div>
+        <div class="label">inline color override</div>
+        <div class="base" style="color: #f59e0b">
+          color: #f59e0b via style=""
+        </div>
+      </div>
+
+      <div>
+        <div class="label">inline background override</div>
+        <div class="base" style="background: #6366f1">
+          background: #6366f1 via style=""
+        </div>
+      </div>
+
+      <div>
+        <div class="label">inline padding + border-radius override</div>
+        <div class="base" style="padding: 24px 32px; border-radius: 16px">
+          padding + radius via style=""
+        </div>
+      </div>
+
+      <div>
+        <div class="label">multiple inline overrides combined</div>
+        <div
+          class="base"
+          style="
+            font-size: 18px;
+            color: #22c55e;
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 12px;
+          "
+        >
+          all overrides combined
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

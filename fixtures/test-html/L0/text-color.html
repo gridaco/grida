@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Color</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .lines {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 16px;
+      }
+
+      .hex {
+        color: #6366f1;
+      }
+      .rgb {
+        color: rgb(34, 197, 94);
+      }
+      .rgba {
+        color: rgba(239, 68, 68, 0.7);
+      }
+      .named {
+        color: dodgerblue;
+      }
+      .inherit-parent {
+        color: #f59e0b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="lines">
+      <div class="hex">color: #6366f1 (hex)</div>
+      <div class="rgb">color: rgb(34, 197, 94)</div>
+      <div class="rgba">color: rgba(239, 68, 68, 0.7)</div>
+      <div class="named">color: dodgerblue (named)</div>
+      <div class="inherit-parent">
+        parent is #f59e0b
+        <span>child inherits color</span>
+      </div>
+    </div>
+  </body>
+</html>

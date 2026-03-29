@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Alignment</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 4px;
+      }
+
+      .sections {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .block {
+        background: #0f172a;
+        border-radius: 8px;
+        padding: 16px;
+        width: 400px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .left {
+        text-align: left;
+      }
+      .right {
+        text-align: right;
+      }
+      .center {
+        text-align: center;
+      }
+      .justify {
+        text-align: justify;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sections">
+      <div>
+        <div class="label">text-align: left</div>
+        <div class="block left">
+          The quick brown fox jumps over the lazy dog. This text is
+          left-aligned, which is the default for LTR content.
+        </div>
+      </div>
+      <div>
+        <div class="label">text-align: right</div>
+        <div class="block right">
+          The quick brown fox jumps over the lazy dog. This text is
+          right-aligned, pushing content to the end of the line.
+        </div>
+      </div>
+      <div>
+        <div class="label">text-align: center</div>
+        <div class="block center">
+          The quick brown fox jumps over the lazy dog. This text is centered
+          within its container.
+        </div>
+      </div>
+      <div>
+        <div class="label">text-align: justify</div>
+        <div class="block justify">
+          The quick brown fox jumps over the lazy dog. This text is justified,
+          stretching words to fill each line evenly from edge to edge.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
