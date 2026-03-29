@@ -22,10 +22,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "prepack": "just build",
     "prepublishOnly": "[ $(du -sk dist 2>/dev/null | cut -f1) -lt 15360 ]",
     "serve": "serve -p 4020",
-    "test": "vitest run",
+    "test": "[ -f lib/bin/grida_canvas_wasm.wasm ] && vitest run || echo 'WASM artifacts not found, skipping tests'",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

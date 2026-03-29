@@ -12,8 +12,30 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      # Download pre-built WASM artifacts from the latest successful
+      # build-canvas.yml run instead of checking them in via Git LFS.
+      - name: Download WASM artifacts
+        id: wasm-download
+        uses: dawidd6/action-download-artifact@v6
         with:
-          lfs: true
+          name: canvas-wasm-artifacts
+          path: crates/grida-canvas-wasm/lib/bin/
+          workflow: build-canvas.yml
+          branch: main
+          if_no_artifact_found: warn
+        continue-on-error: true
+
+      - name: Check WASM availability
+        id: wasm-check
+        run: |
+          if [ -f crates/grida-canvas-wasm/lib/bin/grida_canvas_wasm.wasm ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::WASM artifacts not found — canvas-wasm tests will be skipped"
+          fi
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Setup Node.js
@@ -25,17 +47,22 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build Packages
         run: pnpm turbo build --filter='./packages/*'
-      # Build the @grida/canvas-wasm TypeScript wrapper only (tsup).
-      # The pre-compiled .wasm binary and Emscripten glue (.js) live in
-      # crates/grida-canvas-wasm/lib/bin/ and are checked in via Git LFS
-      # (fetched above). No Rust/Emscripten toolchain is needed here.
-      # tsup copies lib/bin/ into dist/ and emits dist/index.d.ts, which
-      # is what the editor typecheck depends on.
+
+      # Build the @grida/canvas-wasm TypeScript wrapper (tsup).
+      # When WASM artifacts are present, tsup copies them into dist/ via
+      # publicDir. When absent, dist/ still gets index.d.ts which is
+      # sufficient for typecheck.
       - name: Build Canvas WASM Package
+        if: steps.wasm-check.outputs.available == 'true'
         run: pnpm turbo build --filter='@grida/canvas-wasm'
+
+      # Typecheck works even without WASM binaries — tsc only needs
+      # dist/index.d.ts which tsup emits from lib/index.ts alone.
       - name: Run Typecheck
         run: pnpm typecheck
+
       - name: Run Lint
         run: pnpm turbo lint
+
       - name: Run Tests
         run: pnpm turbo test --filter='!./crates/*'
