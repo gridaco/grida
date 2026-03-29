@@ -905,6 +905,7 @@ pub enum NodeTypeTag {
     Container,
     Error,
     Group,
+    Tray,
     Rectangle,
     Ellipse,
     Polygon,
@@ -990,6 +991,16 @@ pub fn extract_layer_core(node: &Node) -> NodeLayerCore {
             clips_content: false,
             has_effects: false,
             node_type: NodeTypeTag::Group,
+            is_flex: false,
+        },
+        Node::Tray(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: false, // Tray never has effects
+            node_type: NodeTypeTag::Tray,
             is_flex: false,
         },
         Node::Rectangle(n) => NodeLayerCore {
@@ -1121,6 +1132,7 @@ pub enum Node {
     Container(ContainerNodeRec),
     Error(ErrorNodeRec),
     Group(GroupNodeRec),
+    Tray(TrayNodeRec),
     Rectangle(RectangleNodeRec),
     Ellipse(EllipseNodeRec),
     Polygon(PolygonNodeRec),
@@ -1145,6 +1157,7 @@ impl NodeTrait for Node {
         match self {
             Node::Error(n) => n.active,
             Node::Group(n) => n.active,
+            Node::Tray(n) => n.active,
             Node::Container(n) => n.active,
             Node::InitialContainer(n) => n.active,
             Node::Rectangle(n) => n.active,
@@ -1167,6 +1180,7 @@ impl Node {
     pub fn mask(&self) -> Option<LayerMaskType> {
         match self {
             Node::Group(n) => n.mask,
+            Node::Tray(n) => n.mask,
             Node::Container(n) => n.mask,
             Node::InitialContainer(_) => None,
             Node::Rectangle(n) => n.mask,
@@ -1193,6 +1207,7 @@ impl Node {
             Node::Container(n) => n.opacity,
             Node::Error(n) => n.opacity,
             Node::Group(n) => n.opacity,
+            Node::Tray(n) => n.opacity,
             Node::Rectangle(n) => n.opacity,
             Node::Ellipse(n) => n.opacity,
             Node::Polygon(n) => n.opacity,
@@ -1215,6 +1230,7 @@ impl Node {
             Node::Container(_) => "Frame",
             Node::Error(_) => "Error",
             Node::Group(_) => "Group",
+            Node::Tray(_) => "Tray",
             Node::Rectangle(_) => "Rectangle",
             Node::Ellipse(_) => "Ellipse",
             Node::Polygon(_) => "Polygon",
@@ -1230,6 +1246,31 @@ impl Node {
         }
     }
 
+    /// Returns the node's fill paints, if it has any.
+    ///
+    /// `Error`, `Group`, and `Line` have no fills and return `None`.
+    /// `Image` wraps its single `ImagePaint` into a one-element `Paints`.
+    pub fn fills(&self) -> Option<&Paints> {
+        match self {
+            Node::InitialContainer(_) => None,
+            Node::Container(n) => Some(&n.fills),
+            Node::Tray(n) => Some(&n.fills),
+            Node::Rectangle(n) => Some(&n.fills),
+            Node::Ellipse(n) => Some(&n.fills),
+            Node::Polygon(n) => Some(&n.fills),
+            Node::RegularPolygon(n) => Some(&n.fills),
+            Node::RegularStarPolygon(n) => Some(&n.fills),
+            Node::TextSpan(n) => Some(&n.fills),
+            Node::AttributedText(n) => Some(&n.fills),
+            Node::Path(n) => Some(&n.fills),
+            Node::Vector(n) => Some(&n.fills),
+            Node::BooleanOperation(n) => Some(&n.fills),
+            // Image has a single ImagePaint, not a Paints stack
+            Node::Image(_) => None,
+            Node::Error(_) | Node::Group(_) | Node::Line(_) => None,
+        }
+    }
+
     /// Returns the node's blend mode.
     /// `InitialContainer` and `Error` default to `PassThrough`.
     pub fn blend_mode(&self) -> LayerBlendMode {
@@ -1238,6 +1279,7 @@ impl Node {
             Node::Error(_) => LayerBlendMode::PassThrough,
             Node::Container(n) => n.blend_mode,
             Node::Group(n) => n.blend_mode,
+            Node::Tray(n) => n.blend_mode,
             Node::Rectangle(n) => n.blend_mode,
             Node::Ellipse(n) => n.blend_mode,
             Node::Polygon(n) => n.blend_mode,
@@ -1260,6 +1302,7 @@ impl Node {
             Node::InitialContainer(_) => None,
             Node::Error(_) => None,
             Node::Group(_) => None,
+            Node::Tray(_) => None,
             Node::Container(n) => Some(&n.effects),
             Node::Rectangle(n) => Some(&n.effects),
             Node::Ellipse(n) => Some(&n.effects),
@@ -1292,6 +1335,7 @@ impl Node {
             Node::InitialContainer(_)
                 | Node::Container(_)
                 | Node::Group(_)
+                | Node::Tray(_)
                 | Node::BooleanOperation(_)
         )
     }
@@ -1420,6 +1464,35 @@ pub struct GroupNodeRec {
     pub transform: Option<AffineTransform>,
 }
 
+/// Tray node — a canvas-level organizational primitive (Figma SECTION).
+///
+/// Has explicit dimensions, fills, strokes, and corner radius (unlike Group).
+/// No layout, no clipping, no effects.
+/// Children are freely placed and treated as root-level containers.
+#[derive(Debug, Clone)]
+pub struct TrayNodeRec {
+    pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+
+    pub rotation: f32,
+
+    /// positioning
+    pub position: LayoutPositioningBasis,
+
+    /// Explicit width/height (unlike Group which derives size from children).
+    pub layout_dimensions: LayoutDimensionStyle,
+
+    pub corner_radius: RectangularCornerRadius,
+    pub corner_smoothing: CornerSmoothing,
+    pub fills: Paints,
+    pub strokes: Paints,
+    pub stroke_style: StrokeStyle,
+    pub stroke_width: StrokeWidth,
+}
+
 #[derive(Debug, Clone)]
 pub struct ContainerNodeRec {
     pub active: bool,
@@ -1496,6 +1569,47 @@ impl NodeFillsMixin for ContainerNodeRec {
 }
 
 impl NodeGeometryMixin for ContainerNodeRec {
+    fn has_stroke_geometry(&self) -> bool {
+        !self.stroke_width.is_none() && self.strokes.is_visible()
+    }
+
+    fn render_bounds_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width.max()
+        } else {
+            0.0
+        }
+    }
+
+    fn rectangular_stroke_width(&self) -> Option<RectangularStrokeWidth> {
+        match &self.stroke_width {
+            StrokeWidth::Rectangular(rect_stroke) => Some(rect_stroke.clone()),
+            _ => None,
+        }
+    }
+}
+
+impl TrayNodeRec {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.layout_dimensions.layout_target_width.unwrap_or(0.0),
+            height: self.layout_dimensions.layout_target_height.unwrap_or(0.0),
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
+impl NodeFillsMixin for TrayNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = Paints::new([fill]);
+    }
+
+    fn set_fills(&mut self, fills: Paints) {
+        self.fills = fills;
+    }
+}
+
+impl NodeGeometryMixin for TrayNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         !self.stroke_width.is_none() && self.strokes.is_visible()
     }

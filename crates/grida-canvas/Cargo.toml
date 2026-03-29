@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # skia
-skia-safe = { version = "0.91.0", features = [
+skia-safe = { version = "0.93.1", features = [
   "gpu",
   "gl",
   "textlayout",

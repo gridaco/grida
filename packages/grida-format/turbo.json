@@ -2,6 +2,7 @@
   "extends": ["//"],
   "tasks": {
     "generate": {
+      "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "../../format/grida.fbs"],
       "outputs": ["src/grida.ts", "src/grida/**"]
     },

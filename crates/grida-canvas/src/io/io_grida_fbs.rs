@@ -57,7 +57,7 @@ use crate::node::{
         GroupNodeRec, InitialContainerNodeRec, LayerEffects, LayoutChildStyle,
         LayoutContainerStyle, LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node,
         PathNodeRec, RectangleNodeRec, RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene,
-        Size, StrokeStyle, TextSpanNodeRec, VectorNodeRec,
+        Size, StrokeStyle, TextSpanNodeRec, TrayNodeRec, VectorNodeRec,
     },
 };
 use crate::vectornetwork::{
@@ -331,6 +331,9 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                 }
                 fbs::Node::GroupNode => {
                     decode_layer_node!(slot, node_as_group_node, decode_group_node);
+                }
+                fbs::Node::TrayNode => {
+                    decode_layer_node!(slot, node_as_tray_node, decode_tray_node);
                 }
                 fbs::Node::ContainerNode => {
                     decode_layer_node!(slot, node_as_container_node, decode_container_node);
@@ -1529,6 +1532,35 @@ fn decode_group_node(
     })
 }
 
+fn decode_tray_node(lc: &LayerCommon, layer: &fbs::LayerTrait<'_>, tn: &fbs::TrayNode<'_>) -> Node {
+    let layout = layer.layout();
+    let position = layout
+        .as_ref()
+        .map(decode_layout_position)
+        .unwrap_or_default();
+    let layout_dimensions = layout
+        .as_ref()
+        .map(decode_layout_dimension_style)
+        .unwrap_or_default();
+    let (stroke_style, stroke_width) = decode_rectangular_stroke_geometry(tn.stroke_geometry());
+
+    Node::Tray(TrayNodeRec {
+        active: lc.active,
+        opacity: lc.opacity,
+        blend_mode: lc.blend_mode,
+        mask: lc.mask,
+        rotation: lc.rotation,
+        position,
+        layout_dimensions,
+        corner_radius: decode_corner_radius(tn.corner_radius()),
+        corner_smoothing: decode_corner_smoothing(tn.corner_radius()),
+        fills: decode_paints_vec(tn.fill_paints()),
+        strokes: decode_paints_vec(tn.stroke_paints()),
+        stroke_style,
+        stroke_width,
+    })
+}
+
 fn decode_container_node(
     lc: &LayerCommon,
     layer: &fbs::LayerTrait<'_>,
@@ -2447,6 +2479,7 @@ fn encode_node<'a, A: flatbuffers::Allocator + 'a>(
             BasicShapeFields::RegularStarPolygon(r),
         ),
         Node::Group(r) => encode_group_node(fbb, r, node_id, parent_id, position),
+        Node::Tray(r) => encode_tray_node(fbb, r, node_id, parent_id, position),
         Node::Line(r) => encode_line_node(fbb, r, node_id, parent_id, position),
         Node::Vector(r) => encode_vector_node(fbb, r, node_id, parent_id, position),
         Node::TextSpan(r) => encode_text_span_node(fbb, r, node_id, parent_id, position),
@@ -3358,6 +3391,31 @@ fn encode_shape_layout<'a, A: flatbuffers::Allocator + 'a>(
     )
 }
 
+/// Build a LayoutStyle for tray nodes (position + dimensions, no layout_container or layout_child).
+fn encode_positional_layout<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    position: &LayoutPositioningBasis,
+    dimensions: &LayoutDimensionStyle,
+) -> flatbuffers::WIPOffset<fbs::LayoutStyle<'a>> {
+    let (pos_type, pos_offset) = encode_layout_position(fbb, position);
+    let dims = encode_dimensions_with_aspect(
+        fbb,
+        dimensions.layout_target_width,
+        dimensions.layout_target_height,
+        dimensions.layout_target_aspect_ratio,
+    );
+    fbs::LayoutStyle::create(
+        fbb,
+        &fbs::LayoutStyleArgs {
+            layout_position_type: pos_type,
+            layout_position: pos_offset,
+            layout_dimensions: Some(dims),
+            layout_container: None,
+            layout_child: None,
+        },
+    )
+}
+
 /// Build a LayoutStyle for container nodes (position, dimensions, container style, child style).
 fn encode_container_layout<'a, A: flatbuffers::Allocator + 'a>(
     fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
@@ -3653,6 +3711,70 @@ fn encode_group_node<'a, A: flatbuffers::Allocator + 'a>(
         },
     );
     make_node_slot(fbb, fbs::Node::GroupNode, gn.as_union_value())
+}
+
+fn encode_tray_node<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    r: &TrayNodeRec,
+    node_id: &str,
+    parent_id: &str,
+    position: &str,
+) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
+    let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
+    // Tray has position + dimensions but no layout_container or layout_child
+    let layout = encode_positional_layout(fbb, &r.position, &r.layout_dimensions);
+    let default_effects = LayerEffects::default();
+    let layer = encode_layer_trait(
+        fbb,
+        &LayerTraitInput {
+            parent_id,
+            position,
+            opacity: r.opacity,
+            blend_mode: r.blend_mode,
+            mask: r.mask,
+            effects: &default_effects,
+            post_layout_transform: rotation_degrees_to_transform(r.rotation),
+            layout: Some(layout),
+        },
+    );
+
+    // Corner radius
+    let rcr = encode_rectangular_corner_radius(&r.corner_radius);
+    let cr_trait = fbs::RectangularCornerRadiusTrait::create(
+        fbb,
+        &fbs::RectangularCornerRadiusTraitArgs {
+            rectangular_corner_radius: Some(&rcr),
+            corner_smoothing: r.corner_smoothing.0,
+        },
+    );
+
+    // Stroke geometry
+    let stroke_style_offset = encode_stroke_style(fbb, &r.stroke_style);
+    let rsw = encode_rectangular_stroke_width(&r.stroke_width);
+    let sg = fbs::RectangularStrokeGeometryTrait::create(
+        fbb,
+        &fbs::RectangularStrokeGeometryTraitArgs {
+            stroke_style: Some(stroke_style_offset),
+            rectangular_stroke_width: rsw.as_ref(),
+            stroke_width_profile: None,
+        },
+    );
+
+    let fill_offsets = encode_paints(fbb, &r.fills);
+    let stroke_offsets = encode_paints(fbb, &r.strokes);
+
+    let tn = fbs::TrayNode::create(
+        fbb,
+        &fbs::TrayNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            corner_radius: Some(cr_trait),
+            stroke_geometry: Some(sg),
+            fill_paints: fill_offsets,
+            stroke_paints: stroke_offsets,
+        },
+    );
+    make_node_slot(fbb, fbs::Node::TrayNode, tn.as_union_value())
 }
 
 /// Unified data source for BasicShapeNode encoding.

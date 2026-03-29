@@ -157,6 +157,7 @@ impl IdConverter {
     fn convert_json_node(json_node: JSONNode) -> Node {
         match json_node {
             JSONNode::Group(group) => Node::Group(GroupNodeRec::from(group)),
+            JSONNode::Tray(tray) => Node::Tray(TrayNodeRec::from(tray)),
             JSONNode::Container(container) => Node::Container(ContainerNodeRec::from(container)),
             JSONNode::Vector(vector) => Node::from(JSONNode::Vector(vector)),
             JSONNode::Path(path) => Node::from(JSONNode::Path(path)),

@@ -49,6 +49,7 @@ fn main() {
         ),
         ("L0-container", fixtures::l0_container::build()),
         ("L0-group", fixtures::l0_group::build()),
+        ("L0-tray", fixtures::l0_tray::build()),
         ("L0-layout-position", fixtures::l0_layout_position::build()),
         ("L0-layout-flex", fixtures::l0_layout_flex::build()),
         (

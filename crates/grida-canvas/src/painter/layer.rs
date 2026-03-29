@@ -514,6 +514,77 @@ impl LayerList {
                     mask: n.mask,
                 }
             }
+            Node::Tray(n) => {
+                // Tray renders like a simplified Container — has fills, strokes, corner_radius,
+                // explicit dimensions. No effects, no clipping, no render surface.
+                let opacity = parent_opacity * n.opacity;
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
+                let size = Size {
+                    width: bounds.width,
+                    height: bounds.height,
+                };
+                let stroke_path = Self::compute_rectangular_stroke_path(
+                    &n.stroke_width,
+                    &n.corner_radius,
+                    &n.stroke_style,
+                    &size,
+                    &shape,
+                );
+
+                let fills = Self::filter_visible_paints(&n.fills);
+                let strokes = Self::filter_visible_paints(&n.strokes);
+                let stroke_overlaps_fill =
+                    !matches!(n.stroke_style.stroke_align, StrokeAlign::Outside);
+                let non_overlapping_fill_path = Self::compute_non_overlapping_fill_path(
+                    &shape,
+                    stroke_path.as_ref(),
+                    stroke_overlaps_fill,
+                    &fills,
+                    &strokes,
+                    n.opacity,
+                );
+
+                let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
+                    base: PainterPictureLayerBase {
+                        id: id.clone(),
+                        z_index: out.len(),
+                        opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: None, // Tray never clips
+                    },
+                    shape,
+                    effects: LayerEffects::default(), // Tray has no effects
+                    strokes,
+                    fills,
+                    stroke_path,
+                    marker_start_shape: StrokeMarkerPreset::None,
+                    marker_end_shape: StrokeMarkerPreset::None,
+                    stroke_width: 0.0,
+                    stroke_overlaps_fill,
+                    non_overlapping_fill_path,
+                });
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
+
+                // Children (no clipping — Tray never clips)
+                let children = graph.get_children(id).map(|c| c.as_slice()).unwrap_or(&[]);
+                let child_commands =
+                    Self::build_render_commands(children, graph, scene_cache, opacity, out);
+
+                let mut commands = vec![PainterRenderCommand::Draw(layer)];
+                commands.extend(child_commands);
+                FlattenResult {
+                    commands,
+                    mask: n.mask,
+                }
+            }
             Node::Container(n) => {
                 let opacity = parent_opacity * n.opacity;
                 let bounds = scene_cache

@@ -459,6 +459,88 @@ pub unsafe extern "C" fn surface_set_selection(
 }
 
 #[no_mangle]
+/// js::_query_paint_groups
+///
+/// Collect and group active paints across a set of nodes.
+/// Returns a length-prefixed JSON array of `{ paint, node_ids }` groups.
+///
+/// - `ids_json_ptr` / `ids_json_len`: JSON array of user-facing node ID strings
+/// - `target`: 0 = fill, 1 = stroke
+/// - `recursive`: whether to include descendant subtrees
+/// - `limit`: max number of distinct paint groups to return (0 = unlimited)
+pub unsafe extern "C" fn query_paint_groups(
+    app: *const UnknownTargetApplication,
+    ids_json_ptr: *const u8,
+    ids_json_len: u32,
+    target: u32,
+    recursive: bool,
+    limit: u32,
+) -> *const u8 {
+    let Some(app) = app.as_ref() else {
+        return std::ptr::null();
+    };
+    let Some(scene) = app.renderer().scene.as_ref() else {
+        return alloc_len_prefixed(b"[]");
+    };
+
+    // Parse user-facing IDs from JSON
+    let slice = std::slice::from_raw_parts(ids_json_ptr, ids_json_len as usize);
+    let Ok(user_ids) = serde_json::from_slice::<Vec<String>>(slice) else {
+        return alloc_len_prefixed(b"[]");
+    };
+
+    let internal_ids: Vec<cg::node::schema::NodeId> = user_ids
+        .iter()
+        .filter_map(|uid| app.user_id_to_internal(uid))
+        .collect();
+
+    if internal_ids.is_empty() {
+        return alloc_len_prefixed(b"[]");
+    }
+
+    let paint_target = match target {
+        1 => cg::query::paint::PaintTarget::Stroke,
+        _ => cg::query::paint::PaintTarget::Fill,
+    };
+    let limit = if limit == 0 {
+        None
+    } else {
+        Some(limit as usize)
+    };
+
+    let groups = cg::query::paint::query_paint_groups(
+        &scene.graph,
+        &scene.graph,
+        &internal_ids,
+        paint_target,
+        recursive,
+        limit,
+    );
+
+    // Serialize with user-facing string IDs
+    #[derive(Serialize)]
+    struct PaintGroupOut {
+        paint: cg::cg::types::Paint,
+        node_ids: Vec<String>,
+    }
+
+    let out: Vec<PaintGroupOut> = groups
+        .into_iter()
+        .map(|g| PaintGroupOut {
+            paint: g.paint,
+            node_ids: g
+                .node_ids
+                .into_iter()
+                .filter_map(|id| app.internal_id_to_user(id))
+                .collect(),
+        })
+        .collect();
+
+    let json = serde_json::to_vec(&out).unwrap_or_else(|_| b"[]".to_vec());
+    alloc_len_prefixed(&json)
+}
+
+#[no_mangle]
 /// js::_set_surface_overlay_config
 ///
 /// Configure surface overlay rendering from JSON.

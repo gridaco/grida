@@ -59,6 +59,7 @@ pub type SceneGraphResult<T> = Result<T, SceneGraphError>;
 #[repr(u8)]
 pub enum GeoNodeKind {
     Group,
+    Tray,
     InitialContainer,
     Container,
     BooleanOperation,
@@ -156,6 +157,34 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             render_bounds_inflation: RenderBoundsInflation::ZERO, // union of children
             rotation: 0.0,
         },
+        Node::Tray(n) => {
+            let fallback_x = n.position.x().unwrap_or(0.0);
+            let fallback_y = n.position.y().unwrap_or(0.0);
+            let schema_transform = AffineTransform::new(fallback_x, fallback_y, n.rotation);
+
+            let render_bounds_inflation = if let Some(rect_stroke) = n.rectangular_stroke_width() {
+                compute_inflation_rectangular(
+                    &rect_stroke,
+                    n.stroke_style.stroke_align,
+                    &super::schema::LayerEffects::default(),
+                )
+            } else {
+                compute_inflation_uniform(
+                    n.render_bounds_stroke_width(),
+                    n.stroke_style.stroke_align,
+                    &super::schema::LayerEffects::default(),
+                )
+            };
+
+            NodeGeoData {
+                schema_transform,
+                schema_width: n.layout_dimensions.layout_target_width.unwrap_or(0.0),
+                schema_height: n.layout_dimensions.layout_target_height.unwrap_or(0.0),
+                kind: GeoNodeKind::Tray,
+                render_bounds_inflation,
+                rotation: n.rotation,
+            }
+        }
         Node::InitialContainer(_) => NodeGeoData {
             schema_transform: AffineTransform::identity(),
             schema_width: 0.0,

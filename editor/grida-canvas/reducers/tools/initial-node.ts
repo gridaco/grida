@@ -56,7 +56,8 @@ export default function initialNode(
     | "rectangle"
     | "polygon"
     | "star"
-    | "line",
+    | "line"
+    | "tray",
   idfac: () => string,
   seed: Partial<Omit<grida.program.nodes.UnknownNode, "type">> = {},
   constraints: {
@@ -302,6 +303,32 @@ export default function initialNode(
         fill_paints: constraints.fill === "fill_paints" ? [gray] : undefined,
         ...seed,
       } satisfies grida.program.nodes.RegularStarPolygonNode;
+    }
+    case "tray": {
+      const tray_stroke: cg.Paint = {
+        type: "solid",
+        color: kolor.colorformats.newRGBA32F(0, 0, 0, 0.1),
+        active: true,
+      };
+      return {
+        ...base,
+        ...position,
+        opacity: 1,
+        blend_mode: cg.def.LAYER_BLENDMODE,
+        type: "tray",
+        corner_radius: 2,
+        layout_target_width: 100,
+        layout_target_height: 100,
+        rotation: 0,
+        fill: constraints.fill === "fill_paints" ? undefined : white,
+        fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
+        stroke_paints: [tray_stroke],
+        stroke_width: 1,
+        stroke_align: "inside",
+        stroke_cap: "butt",
+        stroke_join: "miter",
+        ...seed,
+      } satisfies grida.program.nodes.TrayNode;
     }
     case "line": {
       return {

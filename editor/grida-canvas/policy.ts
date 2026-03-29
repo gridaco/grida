@@ -18,6 +18,7 @@ export const EDITOR_GRAPH_POLICY: tree.graph.IGraphPolicy<grida.program.nodes.No
       return [
         "scene",
         "container",
+        "tray",
         "group",
         "boolean",
         "component",

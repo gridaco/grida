@@ -403,6 +403,47 @@ impl GeometryCache {
                 union_world_bounds
             }
 
+            // Tray has explicit dimensions (like Container) but no clipping.
+            // Children render inside the tray bounds.
+            GeoNodeKind::Tray => {
+                let local_bounds = Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: geo.width,
+                    height: geo.height,
+                };
+
+                let world_transform = parent_world.compose(&geo.transform);
+                let world_bounds = transform_rect(&local_bounds, &world_transform);
+                let render_bounds = inflate_rect_sides(world_bounds, &geo.render_bounds_inflation);
+
+                if let Some(children) = graph.get_children(id) {
+                    for child_id in children {
+                        Self::build_recursive(
+                            child_id,
+                            &world_transform,
+                            Some(*id),
+                            cache,
+                            graph,
+                            geo_inputs,
+                        );
+                    }
+                }
+
+                let entry = GeometryEntry {
+                    transform: geo.transform,
+                    absolute_transform: world_transform,
+                    bounding_box: local_bounds,
+                    absolute_bounding_box: world_bounds,
+                    absolute_render_bounds: render_bounds,
+                    parent: parent_id,
+                    dirty_transform: false,
+                    dirty_bounds: false,
+                };
+                cache.entries.insert(*id, entry);
+                world_bounds
+            }
+
             GeoNodeKind::TextSpan => {
                 let local_bounds = Rectangle {
                     x: 0.0,
@@ -503,6 +544,21 @@ impl GeometryCache {
 // Layout resolution — NodeGeoData + LayoutResult → GeoInput
 // ---------------------------------------------------------------------------
 
+/// Build a `GeoInput` directly from schema data, bypassing any layout result.
+fn geo_input_from_schema(geo: &NodeGeoData) -> GeoInput {
+    GeoInput {
+        transform: AffineTransform::new(
+            geo.schema_transform.x(),
+            geo.schema_transform.y(),
+            geo.rotation,
+        ),
+        width: geo.schema_width,
+        height: geo.schema_height,
+        kind: geo.kind,
+        render_bounds_inflation: geo.render_bounds_inflation,
+    }
+}
+
 /// Resolve layout-dependent fields from `NodeGeoData` + `LayoutResult`.
 ///
 /// For most nodes this is a lightweight copy from the pre-extracted data
@@ -536,28 +592,24 @@ fn resolve_layout(
             render_bounds_inflation: geo.render_bounds_inflation,
         },
         GeoNodeKind::Container => {
-            let (x, y, width, height) =
-                if let Some(computed) = layout_result.and_then(|r| r.get(id)) {
-                    (computed.x, computed.y, computed.width, computed.height)
-                } else {
-                    // Fallback to schema data when layout result is missing.
-                    // This happens for orphan nodes not reachable from scene roots,
-                    // or when layout is skipped entirely (layout_result == None).
-                    (
-                        geo.schema_transform.x(),
-                        geo.schema_transform.y(),
-                        geo.schema_width,
-                        geo.schema_height,
-                    )
-                };
-            GeoInput {
-                transform: AffineTransform::new(x, y, geo.rotation),
-                width,
-                height,
-                kind: geo.kind,
-                render_bounds_inflation: geo.render_bounds_inflation,
+            if let Some(computed) = layout_result.and_then(|r| r.get(id)) {
+                GeoInput {
+                    transform: AffineTransform::new(computed.x, computed.y, geo.rotation),
+                    width: computed.width,
+                    height: computed.height,
+                    kind: geo.kind,
+                    render_bounds_inflation: geo.render_bounds_inflation,
+                }
+            } else {
+                // Fallback to schema data when layout result is missing.
+                // This happens for orphan nodes not reachable from scene roots,
+                // or when layout is skipped entirely (layout_result == None).
+                geo_input_from_schema(geo)
             }
         }
+        // Tray has explicit dimensions but never participates in Taffy layout,
+        // so it always uses schema data directly.
+        GeoNodeKind::Tray => geo_input_from_schema(geo),
         GeoNodeKind::TextSpan => {
             let layout = layout_result.and_then(|r| r.get(id));
             const MIN_SIZE_DIRTY_HACK: f32 = 1.0;

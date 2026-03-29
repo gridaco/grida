@@ -535,6 +535,60 @@ impl<'a> NodePainter<'a> {
         match node {
             Node::Error(n) => self.draw_error_node(n),
             Node::Group(n) => self.draw_group_node_recursively(id, n, graph, cache),
+            // Tray renders like Container — has fills, strokes, corner_radius, explicit dimensions.
+            Node::Tray(n) => {
+                // Get pre-computed local transform from geometry cache
+                let local_transform = cache
+                    .get_transform(id)
+                    .expect("Geometry must exist - pipeline bug");
+
+                self.painter.with_transform(&local_transform.matrix, || {
+                    self.painter.with_opacity(n.opacity, None, || {
+                        let bounds = cache
+                            .get_world_bounds(id)
+                            .expect("Geometry must exist - pipeline bug");
+                        let shape = build_shape(node, &bounds);
+                        let identity_transform =
+                            math2::transform::AffineTransform::identity().matrix;
+
+                        self.painter.with_blendmode(
+                            n.blend_mode,
+                            &shape,
+                            &LayerEffects::default(), // Tray has no effects
+                            &identity_transform,
+                            None,
+                            || {
+                                // Paint fills
+                                self.painter.draw_fills(&shape, &n.fills);
+
+                                // Draw children (no clipping — Tray never clips)
+                                if let Some(children) = graph.get_children(id) {
+                                    for child_id in children {
+                                        if let Ok(child) = graph.get_node(child_id) {
+                                            self.draw_node_recursively(
+                                                child_id, child, graph, cache,
+                                            );
+                                        }
+                                    }
+                                }
+
+                                // Paint strokes
+                                let stroke_width = n.render_bounds_stroke_width();
+                                self.painter.draw_strokes(
+                                    &shape,
+                                    &n.strokes,
+                                    stroke_width,
+                                    n.stroke_style.stroke_align,
+                                    n.stroke_style.stroke_cap,
+                                    n.stroke_style.stroke_join,
+                                    n.stroke_style.stroke_miter_limit,
+                                    n.stroke_style.stroke_dash_array.as_ref(),
+                                );
+                            },
+                        );
+                    });
+                });
+            }
             Node::Container(n) => {
                 // Get pre-computed local transform from geometry cache
                 let local_transform = cache

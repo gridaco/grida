@@ -1579,14 +1579,12 @@ export namespace iofigma {
                 blendMode: "PASS_THROUGH",
               }),
               ...positioning_trait(node, parent),
-              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...fills_trait(node.fills ?? [], context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
-              ...style_trait({}),
-              ...corner_radius_trait({ cornerRadius: 0 }),
-              ...container_layout_trait({}, false),
-              type: "container",
-              clips_content: false,
-            } satisfies grida.program.nodes.ContainerNode;
+              ...rectangular_stroke_width_trait(node as any),
+              ...corner_radius_trait(node as any),
+              type: "tray",
+            } satisfies grida.program.nodes.TrayNode;
           }
           //
           case "COMPONENT":

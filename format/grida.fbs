@@ -260,6 +260,7 @@ enum NodeType : ubyte {
 
   // groups and containers
   Group,
+  Tray,
   InitialContainer,
   Container,
   BooleanOperation,
@@ -1381,6 +1382,21 @@ table GroupNode {
   layer:LayerTrait (required);
 }
 
+/// Node variant: Tray.
+///
+/// A canvas-level organizational primitive (maps to Figma SECTION).
+/// Has explicit dimensions, fills, strokes, corner radius.
+/// No effects, no layout, no clipping.
+/// Children are freely placed and treated as root-level containers.
+table TrayNode {
+  node: SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  stroke_geometry:RectangularStrokeGeometryTrait;
+  corner_radius:RectangularCornerRadiusTrait;
+  fill_paints:[PaintStackItem];
+  stroke_paints:[PaintStackItem];
+}
+
 // TODO: review the shape, should boolop have direct child ?
 /// Node variant: Boolean operation.
 table BooleanOperationNode {
@@ -1561,6 +1577,7 @@ union Node {
   TextSpanNode,
   PathNode, // SVG path data (render-only, no vector network)
   AttributedTextNode,
+  TrayNode,
 }
 
 // -----------------------------------------------------------------------------

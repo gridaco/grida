@@ -1397,6 +1397,17 @@ impl Renderer {
         }
     }
 
+    /// Submit any pending overlay draws to the GPU.
+    ///
+    /// Call this after drawing overlays on [`Self::canvas()`] to make the
+    /// additional pixels visible. This is the same GPU submit that
+    /// `Application::draw_and_flush_devtools_overlay` performs after painting
+    /// selection outlines, frame title badges, and the size meter.
+    pub fn flush_overlay(&mut self) {
+        let surface = unsafe { &mut *self.backend.get_surface() };
+        Self::gpu_flush(surface);
+    }
+
     /// Invoke the request redraw callback.
     fn request_redraw(&self) {
         if let Some(cb) = &self.request_redraw {

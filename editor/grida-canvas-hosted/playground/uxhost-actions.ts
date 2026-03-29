@@ -346,6 +346,13 @@ export const actions = {
     keybindings: [kb(KeyCode.KeyA, 0), kb(KeyCode.KeyF, 0)],
   },
 
+  ["workbench.surface.cursor.tray"]: {
+    name: "tray",
+    description: "Tray tool",
+    command: "editor.surface.action.setTool.tray",
+    keybindings: kb(KeyCode.KeyF, M.Shift),
+  },
+
   ["workbench.surface.cursor.pencil"]: {
     name: "pencil",
     description: "Pencil tool",

@@ -669,6 +669,54 @@ export class Scene {
   }
 
   /**
+   * Collect and group active paints across a set of nodes.
+   *
+   * Returns groups of identical paints with the node IDs that share each paint.
+   * Uses hash-based grouping (O(n)) instead of pairwise deep equality.
+   *
+   * Paint objects are converted from Rust's externally-tagged enum format to
+   * the JS `cg.Paint` format (internally tagged with `type` field, RGBA32F colors).
+   *
+   * @param ids - Node IDs to query.
+   * @param target - "fill" or "stroke"
+   * @param options.recursive - Include descendant subtrees (default: true).
+   * @param options.limit - Max distinct paint groups to return (0 = unlimited).
+   */
+  queryPaintGroups(
+    ids: string[],
+    target: "fill" | "stroke" = "fill",
+    options?: { recursive?: boolean; limit?: number }
+  ): Array<{ paint: any; node_ids: string[] }> {
+    this._assertAlive();
+    const recursive = options?.recursive ?? true;
+    const limit = options?.limit ?? 0;
+    const targetCode = target === "stroke" ? 1 : 0;
+
+    const idsJson = JSON.stringify(ids);
+    const [idsPtr, idsLen] = this._alloc_string(idsJson);
+    const ptr = this.module._query_paint_groups(
+      this.appptr,
+      idsPtr,
+      idsLen - 1,
+      targetCode,
+      recursive,
+      limit
+    );
+    this._free_string(idsPtr, idsLen);
+
+    if (ptr === 0) return [];
+    const str = ffi.readLenPrefixedString(this.module, ptr);
+    const raw = JSON.parse(str) as Array<{
+      paint: Record<string, any>;
+      node_ids: string[];
+    }>;
+    return raw.map((g) => ({
+      paint: convertRustPaintToJS(g.paint),
+      node_ids: g.node_ids,
+    }));
+  }
+
+  /**
    * Configure surface overlay rendering (size meter, frame titles, etc.).
    */
   setSurfaceOverlayConfig(config: SurfaceOverlayConfig) {
@@ -1095,3 +1143,59 @@ export type TextEditCommand =
   | { type: "SelectAll" }
   | { type: "Undo" }
   | { type: "Redo" };
+
+// ---------------------------------------------------------------------------
+// Paint format conversion: Rust externally-tagged enum → JS cg.Paint
+// ---------------------------------------------------------------------------
+
+/** Map from Rust enum variant name to JS `type` string. */
+const PAINT_TYPE_MAP: Record<string, string> = {
+  Solid: "solid",
+  LinearGradient: "linear_gradient",
+  RadialGradient: "radial_gradient",
+  SweepGradient: "sweep_gradient",
+  DiamondGradient: "diamond_gradient",
+  Image: "image",
+};
+
+/**
+ * Convert a CGColor from Rust u8 array `[r, g, b, a]` to JS RGBA32F object.
+ */
+function convertColor(c: number[]): { r: number; g: number; b: number; a: number } {
+  return { r: c[0] / 255, g: c[1] / 255, b: c[2] / 255, a: c[3] / 255 };
+}
+
+/**
+ * Convert a GradientStop from Rust format to JS format.
+ */
+function convertStop(stop: { offset: number; color: number[] }): {
+  offset: number;
+  color: { r: number; g: number; b: number; a: number };
+} {
+  return { offset: stop.offset, color: convertColor(stop.color) };
+}
+
+/**
+ * Convert a Paint from Rust's externally-tagged serde format to the JS
+ * cg.Paint format (internally tagged with `type`, RGBA32F colors).
+ *
+ * Rust: `{ "Solid": { active: true, color: [255, 0, 0, 255], blend_mode: "normal" } }`
+ * JS:   `{ type: "solid", active: true, color: { r: 1, g: 0, b: 0, a: 1 }, blend_mode: "normal" }`
+ */
+function convertRustPaintToJS(paint: Record<string, any>): any {
+  const variant = Object.keys(paint)[0];
+  const data = paint[variant];
+  const type = PAINT_TYPE_MAP[variant] ?? variant.toLowerCase();
+
+  const result: any = { type, ...data };
+
+  // Convert colors from u8 arrays to RGBA32F objects
+  if (data.color && Array.isArray(data.color)) {
+    result.color = convertColor(data.color);
+  }
+  if (data.stops && Array.isArray(data.stops)) {
+    result.stops = data.stops.map(convertStop);
+  }
+
+  return result;
+}

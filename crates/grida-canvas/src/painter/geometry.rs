@@ -272,6 +272,34 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
                 PainterShape::from_rect(rect)
             }
         }
+        Node::Tray(n) => {
+            // Tray uses resolved bounds (like Container) with optional corner radius
+            let width = bounds.width;
+            let height = bounds.height;
+
+            let r = n.corner_radius;
+            if !r.is_zero() {
+                if n.corner_smoothing.value() > 0.0 {
+                    let smooth = OrthogonalSmoothRRectShape {
+                        width,
+                        height,
+                        corner_radius: n.corner_radius,
+                        corner_smoothing: n.corner_smoothing,
+                    };
+                    PainterShape::from_path(build_orthogonal_smooth_rrect_path(&smooth))
+                } else {
+                    let rrect = build_rrect(&RRectShape {
+                        width,
+                        height,
+                        corner_radius: n.corner_radius,
+                    });
+                    PainterShape::from_rrect(rrect)
+                }
+            } else {
+                let rect = Rect::from_xywh(0.0, 0.0, width, height);
+                PainterShape::from_rect(rect)
+            }
+        }
         Node::Error(n) => {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_rect(rect)

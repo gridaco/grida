@@ -8,6 +8,7 @@ import {
   HandIcon,
   FrameIcon,
   ImageIcon,
+  LayersIcon,
   TextIcon,
   CaretDownIcon,
   EraserIcon,
@@ -191,14 +192,30 @@ export default function Toolbar() {
           }}
         />
         <VerticalDivider />
-        <ToolGroupItem
-          value={"container" satisfies ToolbarToolType}
-          className="aspect-square"
-          label="Container tool"
-          shortcut={keyboardShortcutText("workbench.surface.cursor.container")}
-        >
-          <FrameIcon />
-        </ToolGroupItem>
+        <ToolsGroup
+          value={value}
+          open={open === "container"}
+          onOpenChange={(o) => setOpen(o ? "container" : null)}
+          options={[
+            {
+              value: "container",
+              label: "Container",
+              shortcut: keyboardShortcutText(
+                "workbench.surface.cursor.container"
+              ),
+            },
+            {
+              value: "tray",
+              label: "Tray",
+              shortcut: keyboardShortcutText("workbench.surface.cursor.tray"),
+            },
+          ]}
+          onValueChange={(v) => {
+            editor.surface.surfaceSetTool(
+              toolbar_value_to_cursormode(v as ToolbarToolType)
+            );
+          }}
+        />
         <ToolGroupItem
           value={"text" satisfies ToolbarToolType}
           className="aspect-square"
@@ -351,6 +368,8 @@ export function ToolIcon({
       return <HandIcon {...props} />;
     case "container":
       return <FrameIcon {...props} />;
+    case "tray":
+      return <LayersIcon {...props} />;
     case "text":
       return <TextIcon {...props} />;
     case "rectangle":

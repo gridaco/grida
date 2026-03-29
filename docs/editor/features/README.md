@@ -8,3 +8,4 @@
 - [copy & paste images](./copy-paste-image.md)
 - [copy & paste SVG](./copy-paste-svg.md)
 - [copy & paste from Figma](./copy-paste-figma.md)
+- [tray (organizational section)](./tray.md)

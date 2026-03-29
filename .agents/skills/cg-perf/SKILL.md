@@ -134,6 +134,36 @@ reports `min/p50/p95/p99/MAX` plus per-stage breakdown and settle cost.
 | `frameloop`       | 16/50/80/120/200/300/500ms interval                 | **Real FrameLoop path** — the only bench that captures stable-frame jank during panning (see below)                |
 | `resize`          | alternating viewport sizes                          | `--resize` flag. Measures `resize()` + `redraw()` cost per cycle (layout rebuild + cache invalidation + repaint)   |
 
+**SurfaceUI overlay measurement (`--overlay`):**
+
+By default, benchmarks measure content rendering only — the SurfaceUI
+overlay (frame titles, node badges, hit regions) is **not** included.
+Pass `--overlay` to include overlay drawing after each content flush,
+matching the real `Application::frame()` pipeline where
+`draw_and_flush_devtools_overlay()` runs after `Renderer::flush()`.
+
+```sh
+# A/B test: content only vs content + overlay (MUST be sequential, never parallel)
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/L0.grida --scene 22 --frames 200 && \
+cargo run -p grida-dev --release -- bench ./fixtures/test-grida/L0.grida --scene 22 --frames 200 --overlay
+
+# Bulk report with overlay
+cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --overlay --output overlay.json
+```
+
+The overlay cost is opt-in because it is a devtools feature, not user
+content. Overlay cost scales with visible labeled nodes — viewport
+culling skips off-screen labels, so zoomed-in views are nearly free.
+At fit-zoom on large scenes (yrr-main, 437 labels visible), overlay
+adds ~1.8ms per frame (paragraph layout dominates). At typical editing
+zoom, the cost drops to ~190µs or less.
+
+| Question                                 | Flag           |
+| ---------------------------------------- | -------------- |
+| Is content rendering fast enough?        | (no flag)      |
+| Is the overlay adding visible latency?   | `--overlay`    |
+| Compare content-only vs content+overlay? | Run both, diff |
+
 The `realtime` scenarios use actual `thread::sleep()` between frames
 and simulate the native viewer's 240Hz tick thread + settle countdown.
 These produce frame timings that match what users actually see,
@@ -187,12 +217,18 @@ of scenes, configs, and operations. The naming convention is
 | Are there frame drops during gestures?        | Check `p99` and `MAX` in scenario stats          |
 | Is slow panning janky (stable frame spikes)?  | `frameloop` scenarios (real FrameLoop path)      |
 | Is resize janky?                              | Single-scene GPU bench with `--resize`           |
+| Is the SurfaceUI overlay causing slowdowns?   | A/B with `--overlay` flag on GPU bench           |
 
 ---
 
 ## The Verification Workflow
 
 **Every performance change follows this sequence. No exceptions.**
+
+**Critical: all GPU benchmarks must run sequentially.** Never run two
+bench processes at the same time — GPU contention, CPU cache thrashing,
+and memory bandwidth competition produce unreliable numbers. Chain A/B
+runs with `&&`.
 
 ### Step 1: Baseline
 
@@ -418,6 +454,29 @@ loading a scene.
 These are failure modes learned from experience. Each one has caused
 real bugs or wasted time.
 
+### Never run GPU benchmarks in parallel
+
+GPU benchmarks must run **sequentially**, one at a time. Running two
+bench processes simultaneously on the same machine causes GPU pipeline
+contention, CPU cache thrashing, and memory bandwidth competition —
+all of which distort timing data. When doing A/B comparisons (e.g.
+with/without `--overlay`, before/after an optimization), always chain
+the runs with `&&`:
+
+```sh
+# CORRECT — sequential
+cargo run -p grida-dev --release -- bench file.grida --scene 0 --frames 100 && \
+cargo run -p grida-dev --release -- bench file.grida --scene 0 --frames 100 --overlay
+
+# WRONG — parallel (results are unreliable)
+cargo run ... --frames 100 &
+cargo run ... --frames 100 --overlay &
+```
+
+This applies to all GPU benchmark invocations: `bench`, `bench-report`,
+and any combination thereof. Criterion (CPU raster) is less sensitive
+but should still be run alone for best accuracy.
+
 ### GPU and raster backends behave differently
 
 An optimization that helps on GPU may hurt on raster, and vice versa.
@@ -481,6 +540,20 @@ draw **must recapture** the caches afterwards, so the next unstable
 frame gets a cache hit. Without recapture, every frame after settle
 is also a full draw, producing 7fps instead of 100+fps. The capture
 guard should be `if self.backend.is_gpu()` — NOT `if !plan.stable`.
+
+### SurfaceUI overlay is not free
+
+The SurfaceUI overlay (frame titles, node badges, hit regions) runs
+after content `flush()` and requires a second GPU flush. The overlay
+cost is dominated by Skia paragraph creation (one per visible label) —
+viewport culling skips off-screen labels, and style objects are hoisted
+out of the per-label loop. On scenes with many labeled nodes at
+fit-zoom (e.g. yrr-main with 437 labels), the overlay adds ~1.8ms per
+frame. At typical editing zoom, most labels are culled and cost drops
+to ~190µs. Standard benchmarks exclude overlay by default — use
+`--overlay` to include it. If the app feels slower after adding new
+overlay features (badges, labels, decorations), use the A/B overlay
+benchmark to quantify the regression before optimizing.
 
 ### Layout is the cold-start bottleneck, not rendering
 

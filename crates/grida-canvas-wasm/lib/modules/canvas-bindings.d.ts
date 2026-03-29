@@ -199,6 +199,14 @@ declare namespace canvas {
       json_ptr: number,
       json_len: number
     ): void;
+    _query_paint_groups(
+      state: GridaCanvasApplicationPtr,
+      ids_json_ptr: number,
+      ids_json_len: number,
+      target: number,
+      recursive: boolean,
+      limit: number
+    ): Ptr;
     _set_surface_overlay_config(
       state: GridaCanvasApplicationPtr,
       json_ptr: number,
