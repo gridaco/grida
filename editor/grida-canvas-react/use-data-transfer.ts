@@ -606,8 +606,11 @@ export function useDataTransferEventTarget() {
           continue;
         }
 
-        // Check for .grida files and show helpful message
-        if (file.name.toLowerCase().endsWith(".grida")) {
+        // Check for .grida / .grida1 files and show helpful message
+        if (
+          file.name.toLowerCase().endsWith(".grida") ||
+          file.name.toLowerCase().endsWith(".grida1")
+        ) {
           toast.info("Use [File] > [Open .grida] to import .grida files");
           continue;
         }

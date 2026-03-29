@@ -14,7 +14,15 @@ import { toast } from "sonner";
 import { io } from "@grida/io";
 import { FileDropzone } from "./file-dropzone";
 
-export function ImportFromGridaFileJsonDialog({
+const ACCEPTED_EXTENSIONS = [".grida", ".grida1"] as const;
+const ACCEPT = ACCEPTED_EXTENSIONS.join(",");
+
+function isAcceptedFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+export function ImportFromGridaDialog({
   onImport,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
@@ -22,27 +30,20 @@ export function ImportFromGridaFileJsonDialog({
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const validateFile = (file: File) => {
-    return (
-      file.name.toLowerCase().endsWith(".grida") ||
-      file.name.toLowerCase().endsWith(".json")
-    );
-  };
-
   const handleFileImport = async () => {
-    if (selectedFile) {
-      try {
-        const doc = await io.load(selectedFile);
-        onImport?.(doc);
-        toast.success("File successfully imported!");
-        props.onOpenChange?.(false); // Close the dialog
-        setSelectedFile(null);
-      } catch (error) {
-        toast.error("Failed to parse the file. Please check the format.");
-        console.error(error);
-      }
-    } else {
+    if (!selectedFile) {
       toast.error("No file selected.");
+      return;
+    }
+    try {
+      const doc = await io.load(selectedFile);
+      onImport?.(doc);
+      toast.success("File successfully imported!");
+      props.onOpenChange?.(false);
+      setSelectedFile(null);
+    } catch (error) {
+      toast.error("Failed to parse the file. Please check the format.");
+      console.error(error);
     }
   };
 
@@ -50,22 +51,21 @@ export function ImportFromGridaFileJsonDialog({
     <Dialog {...props}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Import from .grida File</DialogTitle>
+          <DialogTitle>Open .grida</DialogTitle>
           <DialogDescription>
-            Import a document from a .grida or .json file.
-            <br />
-            <small>Supported file formats: .grida, .json</small>
+            Import a document from a <code>.grida</code> or{" "}
+            <code>.grida1</code> file.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <Label>Select a .grida file</Label>
+          <Label>Select a file</Label>
           <FileDropzone
-            accept=".grida,.json"
+            accept={ACCEPT}
             onFileSelected={setSelectedFile}
             buttonText="Select File or Drag & Drop"
             dragText="Drop file here"
-            errorMessage="Please drop a .grida or .json file"
-            validateFile={validateFile}
+            errorMessage={`Please drop a ${ACCEPTED_EXTENSIONS.join(" or ")} file`}
+            validateFile={isAcceptedFile}
           />
           {selectedFile && (
             <p>

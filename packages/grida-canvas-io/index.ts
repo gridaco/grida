@@ -658,7 +658,7 @@ export namespace io {
   }
 
   export namespace fileformat {
-    export type Kind = "grida" | "zip" | "unknown";
+    export type Kind = "grida" | "zip" | "grida1" | "unknown";
 
     export type Detected =
       | { kind: "grida"; bytes: Uint8Array }
@@ -672,6 +672,7 @@ export namespace io {
             bitmaps: Record<string, io.Bitmap>;
           };
         }
+      | { kind: "grida1"; model: SnapshotDocumentModel }
       | { kind: "unknown"; bytes?: Uint8Array };
 
     /**
@@ -754,6 +755,18 @@ export namespace io {
         return { kind: "grida", bytes };
       }
 
+      // `.grida1` — JSON snapshot (the sidecar format found inside `.grida` archives)
+      if (file.name.toLowerCase().endsWith(".grida1")) {
+        try {
+          const model = snapshot.parse(await file.text());
+          if (model?.version && model?.document) {
+            return { kind: "grida1", model };
+          }
+        } catch {
+          // malformed JSON; fall through
+        }
+      }
+
       return { kind: "unknown" };
     }
   }
@@ -814,7 +827,28 @@ export namespace io {
       } satisfies LoadedDocument;
     }
 
-    throw new Error(`Unsupported file type: ${file.type}`);
+    // JSON snapshot (`document.grida1` sidecar format)
+    if (detected.kind === "grida1") {
+      const { model } = detected;
+      if (!grida.program.document.isSchemaCompatible(model.version)) {
+        throw new Error(
+          `schema incompatible: file version "${model.version}" is not compatible with current "${grida.program.document.SCHEMA_VERSION}"`
+        );
+      }
+      const doc = model.document;
+      return {
+        version: grida.program.document.SCHEMA_VERSION,
+        document: {
+          ...doc,
+          images: doc.images ?? {},
+          bitmaps: doc.bitmaps ?? {},
+        },
+      } satisfies LoadedDocument;
+    }
+
+    throw new Error(
+      `Unsupported file: "${file.name}" (type=${file.type || "unknown"}). Expected .grida or .grida1.`
+    );
   }
 
   /**
