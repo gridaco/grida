@@ -14,15 +14,15 @@ use crate::{
         config::{PixelPreviewStrategy, RuntimeRendererConfig},
         font_repository::FontRepository,
         image_repository::ImageRepository,
-        pixel_preview::{PixelPreviewInputs, compute_pixel_preview_plan},
+        pixel_preview::{compute_pixel_preview_plan, PixelPreviewInputs},
         system_images,
     },
 };
 
 use math2::{self, rect};
 use skia_safe::{
-    Canvas, Color, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture, PictureRecorder, Rect,
-    SamplingOptions, Surface, surfaces,
+    surfaces, Canvas, Color, FilterMode, Image, MipmapMode, Paint as SkPaint, Picture,
+    PictureRecorder, Rect, SamplingOptions, Surface,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};

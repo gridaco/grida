@@ -15,12 +15,12 @@ use crate::runtime::render_policy::{OutlineStyle, RenderPolicy};
 use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
 use crate::sk;
-use crate::vectornetwork::VectorNetwork;
 use crate::vectornetwork::vn_painter::StrokeOptions;
+use crate::vectornetwork::VectorNetwork;
 use math2::transform::AffineTransform;
 use skia_safe::{
-    Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect, Shader, canvas::SaveLayerRec,
-    textlayout,
+    canvas::SaveLayerRec, textlayout, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
+    Shader,
 };
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
