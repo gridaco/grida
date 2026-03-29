@@ -1,0 +1,24 @@
+# Stub so GitHub recognizes workflow_dispatch on the default branch.
+# Real implementation lives on canary — will replace this on merge.
+name: publish canvas-wasm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no actual publish)"
+        type: boolean
+        default: true
+      tag:
+        description: "npm dist-tag"
+        type: choice
+        options:
+          - canary
+          - latest
+        default: canary
+
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This is a stub. The real workflow runs from the canary/main branch after merge."
