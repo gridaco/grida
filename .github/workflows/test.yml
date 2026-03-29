@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       # Download pre-built WASM artifacts from the latest successful
       # build-canvas.yml run instead of checking them in via Git LFS.
