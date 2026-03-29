@@ -15,15 +15,109 @@ use crate::runtime::render_policy::{OutlineStyle, RenderPolicy};
 use crate::runtime::{font_repository::FontRepository, image_repository::ImageRepository};
 use crate::shape::*;
 use crate::sk;
-use crate::vectornetwork::vn_painter::StrokeOptions;
 use crate::vectornetwork::VectorNetwork;
+use crate::vectornetwork::vn_painter::StrokeOptions;
 use math2::transform::AffineTransform;
 use skia_safe::{
-    canvas::SaveLayerRec, textlayout, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
-    Shader,
+    Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect, Shader, canvas::SaveLayerRec,
+    textlayout,
 };
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+
+/// A compact bitset for O(1) node-visibility queries during drawing.
+///
+/// Built from the R-tree spatial query results in the frame plan. Nodes
+/// whose bit is set are visible; all others are skipped in the draw loop.
+///
+/// Uses a `Vec<u64>` bitset (8 bytes per 64 nodes) instead of a HashSet
+/// for minimal memory and branch-free lookups.
+pub struct VisibilitySet {
+    /// Bitset: bit `(id % 64)` of `bits[id / 64]` is set when the node is visible.
+    bits: Vec<u64>,
+}
+
+impl VisibilitySet {
+    /// Build from an iterator of visible `NodeId`s.
+    pub fn from_ids(ids: impl Iterator<Item = NodeId>) -> Self {
+        let mut bits = Vec::new();
+        for id in ids {
+            let word = id as usize / 64;
+            let bit = id as usize % 64;
+            if word >= bits.len() {
+                bits.resize(word + 1, 0u64);
+            }
+            bits[word] |= 1u64 << bit;
+        }
+        Self { bits }
+    }
+
+    /// Returns `true` if the node is in the visible set.
+    #[inline]
+    pub fn contains(&self, id: &NodeId) -> bool {
+        let word = *id as usize / 64;
+        let bit = *id as usize % 64;
+        word < self.bits.len() && (self.bits[word] & (1u64 << bit)) != 0
+    }
+}
+
+/// Per-frame viewport culling context.
+///
+/// Encapsulates visibility data from the R-tree spatial query. The Painter
+/// uses this to skip off-screen commands during the draw loop — a draw-time
+/// optimization that does not modify the cached command tree (LayerList).
+///
+/// Culling strategy per command type:
+/// - `Draw`: O(1) bitset lookup on `visible_leaves`. The R-tree provides
+///   effect-expanded bounds so nodes whose effects bleed into viewport are
+///   correctly retained.
+/// - `RenderSurface`: always drawn. Surface bounds lack surface-level effect
+///   inflation (shadow offset, blur radius), making geometric culling unsafe.
+/// - `MaskGroup`: always drawn. No bounds available; rare in practice.
+///
+/// This mirrors Chromium's compositor architecture: the display list is
+/// stable and cached; visibility culling is a per-frame draw-time concern.
+pub struct ViewportCull {
+    /// Bitset of visible leaf NodeIds from R-tree intersection query.
+    visible_leaves: VisibilitySet,
+    /// World-space viewport rectangle. Stored for future use when
+    /// RenderSurface bounds include effect inflation.
+    #[allow(dead_code)]
+    viewport: math2::Rectangle,
+}
+
+impl ViewportCull {
+    /// Build from a [`FramePlan`] and the scene's [`LayerList`].
+    ///
+    /// Extracts visible NodeIds from the plan's region indices (live-drawn
+    /// nodes) and promoted IDs (compositor-cached nodes), then builds the
+    /// compact bitset.
+    pub fn from_plan(
+        plan: &crate::runtime::scene::FramePlan,
+        layers: &super::layer::LayerList,
+    ) -> Self {
+        let visible_leaves = VisibilitySet::from_ids(
+            plan.regions
+                .iter()
+                .flat_map(|(_, indices)| {
+                    indices
+                        .iter()
+                        .filter_map(|&idx| layers.layers.get(idx).map(|entry| entry.id))
+                })
+                .chain(plan.promoted.iter().copied()),
+        );
+        Self {
+            visible_leaves,
+            viewport: plan.viewport,
+        }
+    }
+
+    /// Returns `true` if the leaf node is visible (in the R-tree result set).
+    #[inline]
+    pub fn is_leaf_visible(&self, id: &NodeId) -> bool {
+        self.visible_leaves.contains(id)
+    }
+}
 
 /// Pre-extracted blit data for a single promoted (compositor-cached) node.
 ///
@@ -59,6 +153,10 @@ pub struct Painter<'a> {
     /// When present, promoted nodes are blitted inline at their correct
     /// z-position instead of being skipped.
     promoted_blits: Option<&'a NodeIdHashMap<NodeId, PromotedBlit>>,
+    /// Per-frame viewport culling context. When set, the draw loop skips
+    /// off-screen `Draw` commands using the bitset built from the R-tree
+    /// spatial query. `None` means draw everything (wireframe, tests, etc.).
+    viewport_cull: Option<&'a ViewportCull>,
 }
 
 impl<'a> Painter<'a> {
@@ -107,6 +205,7 @@ impl<'a> Painter<'a> {
             policy,
             variant_key,
             promoted_blits: None,
+            viewport_cull: None,
         }
     }
 
@@ -115,6 +214,13 @@ impl<'a> Painter<'a> {
     /// in the render command tree, instead of being re-drawn live.
     pub fn with_promoted_blits(mut self, blits: &'a NodeIdHashMap<NodeId, PromotedBlit>) -> Self {
         self.promoted_blits = Some(blits);
+        self
+    }
+
+    /// Set the viewport culling context. When set, the draw loop skips
+    /// off-screen `Draw` commands using the R-tree visibility bitset.
+    pub fn with_viewport_cull(mut self, cull: &'a ViewportCull) -> Self {
+        self.viewport_cull = Some(cull);
         self
     }
 
@@ -2126,6 +2232,16 @@ impl<'a> Painter<'a> {
         for command in commands {
             match command {
                 PainterRenderCommand::Draw(layer) => {
+                    // Leaf culling: skip nodes not in the R-tree visible set.
+                    // The bitset lookup (~1ns) eliminates all downstream work:
+                    // promoted-blit hashmap lookup, picture cache lookup, and
+                    // Skia draw_picture dispatch for off-screen nodes.
+                    if let Some(cull) = self.viewport_cull {
+                        if !cull.is_leaf_visible(layer.id()) {
+                            continue;
+                        }
+                    }
+
                     // Blit promoted nodes from the compositor cache inline at
                     // their correct z-position. This preserves z-order when a
                     // live parent (e.g. Container with fills) has promoted

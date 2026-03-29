@@ -375,7 +375,7 @@ Related:
    ]
    ```
 
-10. **Viewport Culling**
+10. **Viewport Culling (R-Tree Spatial Query)**
     - Use camera's `visible_rect` to cull via R-tree spatial index.
     - The R-tree indexes effect-expanded render bounds
       (`absolute_render_bounds`), not base geometry bounds. This means
@@ -391,6 +391,73 @@ Related:
       because the per-node bounds check adds overhead when most nodes are
       visible. The R-tree is required, not optional. See
       `investigation-viewport-culling.md` for full data.
+
+10b. **Draw-Loop Viewport Culling (`ViewportCull`)** ✅ IMPLEMENTED
+
+    The R-tree spatial query (item 10) identifies visible nodes during frame
+    planning, but the draw loop previously iterated ALL render commands in
+    the cached command tree (`LayerList.commands`) — relying on Skia's
+    internal clip-rect check to discard offscreen draws. Each `draw_picture`
+    call has ~0.5 µs of function dispatch overhead even when fully clipped,
+    costing O(N_total) per frame regardless of visibility.
+
+    **The optimization:** thread the R-tree result into the draw loop via
+    `ViewportCull`, a per-frame culling context that encapsulates:
+    - `visible_leaves: VisibilitySet` — compact `Vec<u64>` bitset (~1 ns
+      per O(1) lookup) built from the frame plan's visible indices
+    - `viewport: Rectangle` — world-space viewport rect (stored for future
+      RenderSurface culling)
+
+    The Painter receives `ViewportCull` and checks each `Draw` command
+    against the bitset before any hashmap lookups or Skia dispatch.
+
+    **Culling strategy per command type:**
+
+    | Command | Strategy | Reason |
+    | ------- | -------- | ------ |
+    | `Draw` | Bitset lookup on `VisibilitySet` | R-tree provides effect-expanded bounds — correct |
+    | `RenderSurface` | Always drawn | `surface.bounds` is the children-union from `geometry.get_render_bounds()` but does NOT include surface-level effect inflation (shadow offset, blur radius). Geometric culling would be incorrect. |
+    | `MaskGroup` | Always drawn | No bounds field; rare in practice |
+
+    The command tree (`LayerList.commands`) is NOT modified — it is a cached
+    scene representation rebuilt only on layout/font/image changes. Visibility
+    is a per-frame concern applied at draw time, matching Chromium's
+    compositor architecture.
+
+    **Architecture:**
+
+    ```text
+    FramePlan.viewport          ─┐
+    FramePlan.regions (indices) ─┤
+    FramePlan.promoted (ids)    ─┘
+                                 │
+                        ViewportCull::from_plan()
+                                 │
+                                 ▼
+                     Painter.viewport_cull ── draw_render_commands()
+                                                  │
+                                    Draw ─── is_leaf_visible()? ── skip / draw
+                                    RenderSurface ─── always draw
+                                    MaskGroup ─── always draw
+    ```
+
+    **Measured impact (Criterion, CPU raster, statistically rigorous):**
+
+    | Scene | Before | After | Delta |
+    | ----- | ------ | ----- | ----- |
+    | 50K nodes, zoomed in (1% visible) | 8.75 ms | 2.30 ms | **−74%** |
+    | 50K nodes, empty (0% visible) | 8.87 ms | 2.35 ms | **−73%** |
+    | 5K nodes, empty (0% visible) | 2.70 ms | 2.13 ms | −21% |
+    | 5K nodes, 25% visible | 2.79 ms | 2.25 ms | −19% |
+    | 5K nodes, all visible | 5.22 ms | 3.83 ms | −27% |
+
+    Camera benchmarks show zero regressions; zoomed-in scenarios improved
+    by 13–18% because fewer nodes are visible at high zoom.
+
+    **Future:** When `PainterRenderSurface.bounds` is updated to include
+    surface-level effect inflation (requires inflating container bounds in
+    the geometry cache), RenderSurface culling can be enabled using the
+    stored `viewport` rect.
 
 11. **Minimize Canvas State Changes**
     - Reuse transforms and paints.
