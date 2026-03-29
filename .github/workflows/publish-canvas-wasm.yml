@@ -1,0 +1,94 @@
+name: Publish @grida/canvas-wasm
+
+# Automatically publish after a successful canvas build on main or canary.
+# Uses workflow_run to chain: build-canvas.yml → this workflow.
+on:
+  workflow_run:
+    workflows: ["canvas build"]
+    types: [completed]
+    branches: [main, canary]
+
+concurrency:
+  group: publish-canvas-wasm-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: write
+      id-token: write # npm trusted publishers (provenance via OIDC)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download WASM artifacts
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: canvas-wasm-artifacts
+          path: crates/grida-canvas-wasm/lib/bin/
+          run_id: ${{ github.event.workflow_run.id }}
+
+      - name: Bump version
+        working-directory: crates/grida-canvas-wasm
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          CURRENT=$(node -p "require('./package.json').version")
+          # Strip any pre-release suffix to get the base version
+          BASE=$(echo "$CURRENT" | sed 's/-canary.*//')
+          MAJOR=$(echo "$BASE" | cut -d. -f1)
+          MINOR=$(echo "$BASE" | cut -d. -f2)
+          PATCH=$(echo "$BASE" | cut -d. -f3)
+          NEXT_PATCH=$((PATCH + 1))
+
+          if [ "$BRANCH" == "canary" ]; then
+            VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-canary.${{ github.event.workflow_run.run_number }}"
+            TAG=canary
+          else
+            VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+            TAG=latest
+          fi
+
+          npm version "$VERSION" --no-git-tag-version
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Publishing @grida/canvas-wasm@$VERSION with tag $TAG"
+
+      - name: Build package (tsup)
+        run: pnpm turbo build --filter='@grida/canvas-wasm'
+
+      - name: Verify dist contents
+        run: |
+          test -f crates/grida-canvas-wasm/dist/grida_canvas_wasm.wasm || { echo "::error::Missing grida_canvas_wasm.wasm in dist"; exit 1; }
+          test -f crates/grida-canvas-wasm/dist/grida-canvas-wasm.js || { echo "::error::Missing grida-canvas-wasm.js in dist"; exit 1; }
+          test -f crates/grida-canvas-wasm/dist/index.js || { echo "::error::Missing index.js in dist"; exit 1; }
+          echo "dist/ contents verified:"
+          ls -lh crates/grida-canvas-wasm/dist/
+
+      - name: Publish to npm
+        working-directory: crates/grida-canvas-wasm
+        run: npm publish --tag ${{ env.TAG }} --access public --provenance
+
+      - name: Commit version bump (stable only)
+        if: env.TAG == 'latest'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add crates/grida-canvas-wasm/package.json
+          git commit -m "chore: release @grida/canvas-wasm@${{ env.VERSION }}"
+          git push

@@ -1170,8 +1170,8 @@ importers:
   packages/grida-canvas-sdk-render-figma:
     dependencies:
       '@grida/canvas-wasm':
-        specifier: 0.90.0-canary.9
-        version: 0.90.0-canary.9
+        specifier: workspace:*
+        version: link:../../crates/grida-canvas-wasm
       commander:
         specifier: ^12.1.0
         version: 12.1.0
@@ -3375,9 +3375,6 @@ packages:
 
   '@formatjs/intl-localematcher@0.6.2':
     resolution: {integrity: sha512-XOMO2Hupl0wdd172Y06h6kLpBz6Dv+J4okPLl4LPtzbr8f66WbIoy4ev98EBuZ6ZK4h5ydTN6XneT4QVpD7cdA==}
-
-  '@grida/canvas-wasm@0.90.0-canary.9':
-    resolution: {integrity: sha512-Bg/ipGH0PglCg57HW9PF1CycFsvlw1J4X4zq20aOUEekN7E5xBj7HHs8t+jTQ1hMlph4RZs1kPG1w3UXgkd/EA==}
 
   '@grida/fonts@0.0.0':
     resolution: {integrity: sha512-ZuuuO4nfdNC5ImLZuwSyNYGVnFDa9H2fpG1hEY0vgp0rNR16ZkOH+IRARbq7EHOlnHTrMDlwDLpBQEGsLrTStw==}
@@ -18061,8 +18058,6 @@ snapshots:
   '@formatjs/intl-localematcher@0.6.2':
     dependencies:
       tslib: 2.8.1
-
-  '@grida/canvas-wasm@0.90.0-canary.9': {}
 
   '@grida/fonts@0.0.0': {}
 

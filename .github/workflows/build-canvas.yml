@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - canary
   pull_request:
     paths:
       - ".github/workflows/**"
@@ -68,3 +69,12 @@ jobs:
       - name: Build canvas wasm artifacts
         run: just build
         working-directory: crates/grida-canvas-wasm
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: canvas-wasm-artifacts
+          path: |
+            crates/grida-canvas-wasm/lib/bin/grida-canvas-wasm.js
+            crates/grida-canvas-wasm/lib/bin/grida_canvas_wasm.wasm
+          retention-days: 30
