@@ -1,9 +1,9 @@
 name: Publish @grida/canvas-wasm
 
-# Automatically publish after a successful canvas build on main or canary.
-# Uses workflow_run to chain: build-canvas.yml → this workflow.
-# build-canvas.yml only triggers when crates/ changes, so every run here
-# represents a real change worth publishing.
+# Manual re-publish only. Automatic publishing is handled by build-canvas.yml's
+# publish job (same workflow run, no cross-run artifact resolution needed).
+#
+# Use this to manually re-publish from the latest successful build on a branch.
 on:
   workflow_dispatch:
     inputs:
@@ -19,25 +19,14 @@ on:
           - canary
           - latest
         default: auto
-  workflow_run:
-    workflows: ["canvas build"]
-    types: [completed]
-    branches: [main, canary]
-
-concurrency:
-  group: publish-canvas-wasm-${{ github.event.workflow_run.head_branch || github.ref_name }}
-  cancel-in-progress: false
 
 jobs:
   publish:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
       contents: write
-      id-token: write # npm trusted publishers (provenance via OIDC)
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -55,14 +44,32 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve latest build run
+        id: resolve-run
+        run: |
+          RUN_ID=$(gh run list \
+            --workflow=build-canvas.yml \
+            --branch="${{ github.ref_name }}" \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::No successful canvas build found on ${{ github.ref_name }}"
+            exit 1
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "Using artifacts from build-canvas.yml run $RUN_ID"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Download WASM artifacts
-        uses: dawidd6/action-download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: canvas-wasm-artifacts
           path: crates/grida-canvas-wasm/lib/bin/
-          run_id: ${{ github.event.workflow_run.id || '' }}
-          workflow: ${{ github.event.workflow_run.id && '' || 'build-canvas.yml' }}
-          branch: ${{ github.event.workflow_run.id && '' || github.ref_name }}
+          run-id: ${{ steps.resolve-run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build package (tsup)
         run: pnpm turbo build --filter='@grida/canvas-wasm'
@@ -77,10 +84,10 @@ jobs:
       - name: Determine version and tag
         working-directory: crates/grida-canvas-wasm
         run: |
-          BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
+          BRANCH="${{ github.ref_name }}"
           CURRENT=$(node -p "require('./package.json').version")
           BASE=$(echo "$CURRENT" | sed 's/-canary.*//')
-          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
 
           if [ "$BRANCH" == "canary" ]; then
             VERSION="${BASE}-canary.${SHORT_SHA}"

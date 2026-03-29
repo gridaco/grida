@@ -7,7 +7,10 @@ on:
     branches:
       - main
       - canary
-
+    paths:
+      - "crates/**"
+      - ".github/workflows/build-canvas.yml"
+      - ".github/workflows/publish-canvas-wasm.yml"
 
 jobs:
   build:
@@ -17,48 +20,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
           submodules: recursive
 
-      - name: Check for crate changes
-        id: changes
-        run: |
-          if git diff --name-only HEAD~1 -- crates/ .github/workflows/build-canvas.yml .github/workflows/publish-canvas-wasm.yml | grep -q .; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Crate or workflow changes detected — will build WASM"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No crate changes — will re-upload last artifact"
-          fi
-
-      # --- Fast path: no crate changes, re-upload existing artifact ---
-
-      - name: Download previous WASM artifact
-        if: steps.changes.outputs.changed == 'false'
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          name: canvas-wasm-artifacts
-          path: crates/grida-canvas-wasm/lib/bin/
-          workflow: build-canvas.yml
-          branch: ${{ github.event.pull_request.base.ref || github.ref_name }}
-          if_no_artifact_found: warn
-        continue-on-error: true
-
-      # --- Full build path: crate changes detected ---
-
       - name: Setup pnpm
-        if: steps.changes.outputs.changed == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        if: steps.changes.outputs.changed == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install system dependencies
-        if: steps.changes.outputs.changed == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -68,46 +41,119 @@ jobs:
             just
 
       - name: Setup Rust toolchain
-        if: steps.changes.outputs.changed == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.92.0
 
       - name: Add wasm32-unknown-emscripten target
-        if: steps.changes.outputs.changed == 'true'
         run: rustup target add wasm32-unknown-emscripten
 
       - name: Cache cargo build outputs
-        if: steps.changes.outputs.changed == 'true'
         uses: Swatinem/rust-cache@v2
         with:
           key: wasm32-unknown-emscripten
 
       - name: Install workspace dependencies for @grida/canvas-wasm
-        if: steps.changes.outputs.changed == 'true'
         run: pnpm install --filter "@grida/canvas-wasm..." --frozen-lockfile
 
       - name: Install Emscripten SDK
-        if: steps.changes.outputs.changed == 'true'
         run: python3 bin/activate-emsdk
 
       - name: Fix missing xlocale.h header for Emscripten
-        if: steps.changes.outputs.changed == 'true'
         run: |
           sudo ln -s /usr/include/locale.h /usr/include/xlocale.h
 
       - name: Build canvas wasm artifacts
-        if: steps.changes.outputs.changed == 'true'
         run: just build
         working-directory: crates/grida-canvas-wasm
 
-      # --- Always upload (new build or re-uploaded previous) ---
-
       - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: canvas-wasm-artifacts
           path: |
             crates/grida-canvas-wasm/lib/bin/grida-canvas-wasm.js
             crates/grida-canvas-wasm/lib/bin/grida_canvas_wasm.wasm
           retention-days: 30
+
+  # Publish to npm after a successful build on main or canary.
+  # Skipped for workflow_call (test-canvas.yml) and PRs — only runs on push/dispatch.
+  publish:
+    needs: build
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: canvas-wasm-artifacts
+          path: crates/grida-canvas-wasm/lib/bin/
+
+      - name: Build package (tsup)
+        run: pnpm turbo build --filter='@grida/canvas-wasm'
+
+      - name: Verify dist contents
+        run: |
+          test -f crates/grida-canvas-wasm/dist/grida_canvas_wasm.wasm || { echo "::error::Missing grida_canvas_wasm.wasm in dist"; exit 1; }
+          test -f crates/grida-canvas-wasm/dist/grida-canvas-wasm.js || { echo "::error::Missing grida-canvas-wasm.js in dist"; exit 1; }
+          test -f crates/grida-canvas-wasm/dist/index.js || { echo "::error::Missing index.js in dist"; exit 1; }
+          ls -lh crates/grida-canvas-wasm/dist/
+
+      - name: Determine version and tag
+        working-directory: crates/grida-canvas-wasm
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          CURRENT=$(node -p "require('./package.json').version")
+          BASE=$(echo "$CURRENT" | sed 's/-canary.*//')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+
+          if [ "$BRANCH" == "canary" ]; then
+            VERSION="${BASE}-canary.${SHORT_SHA}"
+            TAG=canary
+          else
+            MAJOR=$(echo "$BASE" | cut -d. -f1)
+            MINOR=$(echo "$BASE" | cut -d. -f2)
+            PATCH=$(echo "$BASE" | cut -d. -f3)
+            VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+            TAG=latest
+          fi
+
+          npm version "$VERSION" --no-git-tag-version
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Publishing @grida/canvas-wasm@$VERSION with tag $TAG"
+
+      - name: Publish to npm
+        working-directory: crates/grida-canvas-wasm
+        run: pnpm publish --tag ${{ env.TAG }} --access public --provenance --no-git-checks
+
+      - name: Commit version bump (stable only)
+        if: env.TAG == 'latest'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add crates/grida-canvas-wasm/package.json
+          git commit -m "chore: release @grida/canvas-wasm@${{ env.VERSION }}"
+          git push

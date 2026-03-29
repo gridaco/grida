@@ -35,7 +35,7 @@ jobs:
 
       - name: Download WASM artifacts
         id: wasm-download
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: canvas-wasm-artifacts
           path: crates/grida-canvas-wasm/lib/bin/
