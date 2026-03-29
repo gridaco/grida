@@ -226,3 +226,7 @@ __pycache__/
 .claude/todos.json
 .claude/worktrees
 CLAUDE.local.md
+
+# WASM build artifacts — built in CI, published to npm
+crates/grida-canvas-wasm/lib/bin/*.wasm
+crates/grida-canvas-wasm/lib/bin/*.js
