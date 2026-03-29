@@ -2,11 +2,11 @@ name: canvas build
 
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     branches:
       - main
       - canary
-  pull_request:
 
 # For PRs, github.head_ref = source branch name (e.g. "canary").
 # For push, github.head_ref is empty, github.ref = "refs/heads/canary".
