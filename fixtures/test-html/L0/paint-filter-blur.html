@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Filter Blur</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #6366f1;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .blur-2 {
+        filter: blur(2px);
+      }
+      .blur-6 {
+        filter: blur(6px);
+      }
+      .blur-12 {
+        filter: blur(12px);
+      }
+      .drop-shadow {
+        filter: drop-shadow(4px 4px 8px rgba(99, 102, 241, 0.6));
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">no filter</div>
+        <div class="box">sharp</div>
+      </div>
+      <div>
+        <div class="label">blur(2px)</div>
+        <div class="box blur-2">2px</div>
+      </div>
+      <div>
+        <div class="label">blur(6px)</div>
+        <div class="box blur-6">6px</div>
+      </div>
+      <div>
+        <div class="label">blur(12px)</div>
+        <div class="box blur-12">12px</div>
+      </div>
+      <div>
+        <div class="label">drop-shadow()</div>
+        <div class="box drop-shadow">drop-shadow</div>
+      </div>
+    </div>
+  </body>
+</html>

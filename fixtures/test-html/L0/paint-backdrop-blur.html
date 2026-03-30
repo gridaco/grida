@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Backdrop Filter Blur</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .scene {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .card {
+        width: 200px;
+        height: 160px;
+        background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .overlay {
+        width: 140px;
+        height: 80px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .no-blur {
+        background: rgba(255, 255, 255, 0.15);
+      }
+      .blur-4 {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(4px);
+      }
+      .blur-12 {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(12px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scene">
+      <div>
+        <div class="label">no backdrop-filter</div>
+        <div class="card">
+          <div class="overlay no-blur">none</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">backdrop-filter: blur(4px)</div>
+        <div class="card">
+          <div class="overlay blur-4">4px</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">backdrop-filter: blur(12px)</div>
+        <div class="card">
+          <div class="overlay blur-12">12px</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

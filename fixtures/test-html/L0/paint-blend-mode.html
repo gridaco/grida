@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Mix Blend Mode</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .cell {
+        width: 120px;
+        height: 120px;
+        background: #6366f1;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .inner {
+        width: 80px;
+        height: 80px;
+        background: #ef4444;
+        border-radius: 6px;
+      }
+
+      .normal .inner { mix-blend-mode: normal; }
+      .multiply .inner { mix-blend-mode: multiply; }
+      .screen .inner { mix-blend-mode: screen; }
+      .overlay .inner { mix-blend-mode: overlay; }
+      .darken .inner { mix-blend-mode: darken; }
+      .lighten .inner { mix-blend-mode: lighten; }
+      .color-dodge .inner { mix-blend-mode: color-dodge; }
+      .color-burn .inner { mix-blend-mode: color-burn; }
+      .hard-light .inner { mix-blend-mode: hard-light; }
+      .soft-light .inner { mix-blend-mode: soft-light; }
+      .difference .inner { mix-blend-mode: difference; }
+      .exclusion .inner { mix-blend-mode: exclusion; }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">normal</div>
+        <div class="cell normal"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">multiply</div>
+        <div class="cell multiply"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">screen</div>
+        <div class="cell screen"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">overlay</div>
+        <div class="cell overlay"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">darken</div>
+        <div class="cell darken"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">lighten</div>
+        <div class="cell lighten"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">color-dodge</div>
+        <div class="cell color-dodge"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">color-burn</div>
+        <div class="cell color-burn"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">hard-light</div>
+        <div class="cell hard-light"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">soft-light</div>
+        <div class="cell soft-light"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">difference</div>
+        <div class="cell difference"><div class="inner"></div></div>
+      </div>
+      <div>
+        <div class="label">exclusion</div>
+        <div class="cell exclusion"><div class="inner"></div></div>
+      </div>
+    </div>
+  </body>
+</html>
