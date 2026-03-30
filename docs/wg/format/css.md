@@ -1,3 +1,13 @@
+---
+title: "CSS Property Mapping"
+format: md
+tags:
+  - internal
+  - wg
+  - format
+  - css
+---
+
 # CSS Property Mapping
 
 CSS → Grida IR property mapping table and TODO tracker.

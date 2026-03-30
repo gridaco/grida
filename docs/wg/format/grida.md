@@ -1,3 +1,12 @@
+---
+title: "Grida IR"
+format: md
+tags:
+  - internal
+  - wg
+  - format
+---
+
 # Grida IR -- Format Reference
 
 The Grida IR is the in-memory scene graph used by all Grida rendering, layout, and editing pipelines. It is the single representation that CSS, HTML, SVG, and `.grida` files all target.

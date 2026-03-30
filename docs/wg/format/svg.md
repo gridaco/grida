@@ -1,3 +1,13 @@
+---
+title: "SVG Import Mapping"
+format: md
+tags:
+  - internal
+  - wg
+  - format
+  - svg
+---
+
 # SVG Import Mapping
 
 SVG → Grida IR property mapping and TODO tracker.

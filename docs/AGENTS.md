@@ -92,6 +92,7 @@ This prevents all MDX-related parsing issues for the entire file.
 | directory                        | name          | description                                                            | active |
 | -------------------------------- | ------------- | ---------------------------------------------------------------------- | ------ |
 | [/docs/wg](./wg)                 | working group | working group documents, architecture documents, todo list, etc        | yes    |
+| [/docs/wg/format](./wg/format)   | format        | Grida IR spec and CSS/HTML/SVG import mapping trackers                 | yes    |
 | [/docs/reference](./reference)   | reference     | glossary and references (technical documents)                          | yes    |
 | [/docs/math](./math)             | math          | Math reference, used for internal docs referencing                     | yes    |
 | [/docs/platform](./platform)     | platform      | Grida Platform (API/Spec) documents                                    | yes    |
