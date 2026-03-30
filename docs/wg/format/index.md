@@ -1,5 +1,6 @@
 ---
 title: Format & Import Mapping
+format: md
 tags:
   - internal
   - wg

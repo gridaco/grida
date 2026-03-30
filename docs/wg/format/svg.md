@@ -54,15 +54,15 @@ usvg simplifies the SVG DOM before we see it: `<use>` is resolved, CSS is comput
 
 ## Stroke
 
-| SVG Attribute       | Grida IR Field                                | Status |
+| SVG Attribute       | Grida IR Field                                | Status | Notes      |
 | ------------------- | --------------------------------------------- | ------ | ---------- |
-| `stroke-width`      | `StrokeWidth::Uniform`                        | ✅     |
-| `stroke-linecap`    | `StrokeCap` (Butt, Round, Square)             | ✅     |
-| `stroke-linejoin`   | `StrokeJoin` (Miter, MiterClip, Round, Bevel) | ✅     |
-| `stroke-miterlimit` | `StrokeMiterLimit`                            | ✅     |
-| `stroke-dasharray`  | `StrokeDashArray`                             | ✅     |
+| `stroke-width`      | `StrokeWidth::Uniform`                        | ✅     |            |
+| `stroke-linecap`    | `StrokeCap` (Butt, Round, Square)             | ✅     |            |
+| `stroke-linejoin`   | `StrokeJoin` (Miter, MiterClip, Round, Bevel) | ✅     |            |
+| `stroke-miterlimit` | `StrokeMiterLimit`                            | ✅     |            |
+| `stroke-dasharray`  | `StrokeDashArray`                             | ✅     |            |
 | `stroke-dashoffset` | --                                            | ❌     | Not mapped |
-| `stroke-opacity`    | paint alpha                                   | ✅     |
+| `stroke-opacity`    | paint alpha                                   | ✅     |            |
 
 ## Transform
 

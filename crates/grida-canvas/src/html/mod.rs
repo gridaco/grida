@@ -32,6 +32,12 @@ use style::values::specified::text::TextDecorationLine as StyloTextDecorationLin
 /// Parse an HTML string and convert it into a Grida [`SceneGraph`].
 ///
 /// This is the main entry point, analogous to [`crate::svg::pack::from_svg_str`].
+///
+/// # Thread Safety
+///
+/// This function uses a process-global DOM slot ([`csscascade::adapter::DEMO_DOM`])
+/// and is **not thread-safe**. Concurrent calls will race on the shared state.
+/// Callers must serialize access externally (e.g. via a mutex).
 pub fn from_html_str(html: &str) -> Result<SceneGraph, String> {
     // Ensure Stylo thread state is initialized (idempotent after first call).
     let _ = thread_state::initialize(ThreadState::LAYOUT);
@@ -49,8 +55,6 @@ pub fn from_html_str(html: &str) -> Result<SceneGraph, String> {
     // 4. Flush stylist + resolve all styles
     driver.flush(document);
     let styled_count = driver.style_document(document);
-    eprintln!("[html] resolved {} elements", styled_count);
-
     // 5. Build scene graph from styled DOM
     let mut builder = SceneBuilder::new();
     if let Some(root) = document.root_element() {
@@ -268,15 +272,6 @@ impl SceneBuilder {
         // Width / height / min / max dimensions
         css_dimensions_to_cg(style, &mut node.layout_dimensions);
 
-        // HTML containers auto-size from content; clear the factory's 100x100 default
-        // only when no explicit width/height was set.
-        if node.layout_dimensions.layout_target_width.is_none() {
-            node.layout_dimensions.layout_target_width = None;
-        }
-        if node.layout_dimensions.layout_target_height.is_none() {
-            node.layout_dimensions.layout_target_height = None;
-        }
-
         // Flex child properties (for nested containers inside flex parents)
         node.layout_child = css_flex_child_to_cg(style);
 
@@ -364,6 +359,10 @@ impl SceneBuilder {
         }
 
         // text-decoration
+        // NOTE: CSS allows combining multiple lines (e.g. `underline line-through`),
+        // but our IR `TextDecorationLine` is an enum, so only one value is preserved.
+        // Priority: line-through > underline > overline.
+        // TODO: support combined text-decoration-line (requires IR change to bitflags or Vec).
         let td_line = style.clone_text_decoration_line();
         if td_line != StyloTextDecorationLine::NONE {
             let line = if td_line.intersects(StyloTextDecorationLine::LINE_THROUGH) {

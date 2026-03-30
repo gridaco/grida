@@ -70,8 +70,6 @@ These are intentionally excluded because the IR does not support them:
 - `<table>`, `<ol>`, `<ul>`, `<dl>` and related elements
 - `vh`, `vw` viewport units
 - `transform`
-- `text-shadow`
-- `text-transform`
 - `background-image: url(...)`
 - `-webkit-background-clip: text`
 
