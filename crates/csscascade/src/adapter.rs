@@ -201,9 +201,10 @@ impl HtmlElement {
 
     fn has_class_token(&self, name: &AtomIdent, case_sensitivity: CaseSensitivity) -> bool {
         let needle = atom_ident_str(name);
-        self.element_data().class_list.iter().any(|class| {
-            case_sensitivity.eq(atom_ident_str(class).as_bytes(), needle.as_bytes())
-        })
+        self.element_data()
+            .class_list
+            .iter()
+            .any(|class| case_sensitivity.eq(atom_ident_str(class).as_bytes(), needle.as_bytes()))
     }
 
     fn id_string(&self) -> Option<&str> {

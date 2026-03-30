@@ -18,17 +18,17 @@ use markup5ever::interface::tree_builder::{
     ElemName as ElemNameTrait, ElementFlags, NodeOrText, QuirksMode, TreeSink,
 };
 use markup5ever::{Attribute, LocalName, Namespace, QualName};
-use style::{
-    LocalName as StyleLocalName, Namespace as StyleNamespace, data::ElementData,
-    properties::PropertyDeclarationBlock, shared_lock::Locked, values::AtomIdent,
-};
 use style::context::QuirksMode as StyleQuirksMode;
 use style::properties::parse_style_attribute;
 use style::servo_arc::Arc;
 use style::stylesheets::{CssRuleType, UrlExtraData};
+use style::{
+    LocalName as StyleLocalName, Namespace as StyleNamespace, data::ElementData,
+    properties::PropertyDeclarationBlock, shared_lock::Locked, values::AtomIdent,
+};
 use stylo_atoms::Atom as WeakAtom;
-use url::Url;
 use tendril::StrTendril;
+use url::Url;
 
 // ---------------------------------------------------------------------------
 // Public types

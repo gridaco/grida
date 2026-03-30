@@ -34,8 +34,8 @@ pub fn from_html_str(html: &str) -> Result<SceneGraph, String> {
     let _ = thread_state::initialize(ThreadState::LAYOUT);
 
     // 1. Parse HTML into arena DOM
-    let dom = DemoDom::parse_from_bytes(html.as_bytes())
-        .map_err(|e| format!("HTML parse error: {e}"))?;
+    let dom =
+        DemoDom::parse_from_bytes(html.as_bytes()).map_err(|e| format!("HTML parse error: {e}"))?;
 
     // 2. Build cascade driver (collects <style> blocks, builds UA + author sheets)
     let mut driver = CascadeDriver::new(&dom);
@@ -95,9 +95,9 @@ impl SceneBuilder {
         let has_element_children = element.first_element_child().is_some();
         let has_text_children = {
             let node = dom.node(element.node_id());
-            node.children.iter().any(|cid| {
-                matches!(&dom.node(*cid).data, DemoNodeData::Text(t) if !t.trim().is_empty())
-            })
+            node.children.iter().any(
+                |cid| matches!(&dom.node(*cid).data, DemoNodeData::Text(t) if !t.trim().is_empty()),
+            )
         };
 
         let is_structural = matches!(tag.as_str(), "html" | "body");
@@ -244,8 +244,7 @@ impl SceneBuilder {
             || bx.overflow_y != style::values::specified::box_::Overflow::Visible;
 
         // Borders → strokes + stroke_width
-        let (border_strokes, border_stroke_width, border_stroke_style) =
-            css_border_to_cg(style);
+        let (border_strokes, border_stroke_width, border_stroke_style) = css_border_to_cg(style);
         node.strokes = border_strokes;
         node.stroke_width = border_stroke_width;
         node.stroke_style = border_stroke_style;
@@ -395,8 +394,7 @@ impl SceneBuilder {
         node.opacity = style.get_effects().opacity;
 
         // Borders
-        let (border_strokes, border_stroke_width, border_stroke_style) =
-            css_border_to_cg(style);
+        let (border_strokes, border_stroke_width, border_stroke_style) = css_border_to_cg(style);
         node.strokes = border_strokes;
         node.stroke_width = border_stroke_width;
         node.stroke_style = border_stroke_style;
@@ -414,9 +412,7 @@ impl SceneBuilder {
 
 /// Convert a Stylo computed color (GenericColor) to a CG color.
 /// Returns None for fully transparent or currentcolor.
-fn css_color_to_cg(
-    color: &style::values::computed::Color,
-) -> Option<CGColor> {
+fn css_color_to_cg(color: &style::values::computed::Color) -> Option<CGColor> {
     let abs = color.as_absolute()?;
     let srgb = abs.to_color_space(ColorSpace::Srgb);
     let r = (srgb.components.0.clamp(0.0, 1.0) * 255.0) as u8;
@@ -486,9 +482,7 @@ fn css_padding_to_cg(style: &ComputedValues) -> CSSPadding {
 }
 
 /// Convert CSS gap value to pixels. Returns 0 for `normal`.
-fn gap_to_px(
-    gap: &style::values::computed::length::NonNegativeLengthPercentageOrNormal,
-) -> f32 {
+fn gap_to_px(gap: &style::values::computed::length::NonNegativeLengthPercentageOrNormal) -> f32 {
     match gap {
         LengthPercentageOrNormal::Normal => 0.0,
         LengthPercentageOrNormal::LengthPercentage(lp) => {
@@ -598,14 +592,13 @@ fn gradient_items_to_stops(
                 raw.push((None, cg));
             }
             GenericGradientItem::ComplexColorStop { color, position } => {
-                let offset = position
-                    .to_percentage()
-                    .map(|p| p.0)
-                    .or_else(|| position.to_length().map(|_l| {
+                let offset = position.to_percentage().map(|p| p.0).or_else(|| {
+                    position.to_length().map(|_l| {
                         // For absolute lengths in gradients, we can't resolve without
                         // knowing the gradient line length. Treat as 0.
                         0.0
-                    }));
+                    })
+                });
                 let cg = css_color_to_cg(color).unwrap_or_else(|| CGColor::from_rgba(0, 0, 0, 0));
                 raw.push((offset, cg));
             }
@@ -759,12 +752,8 @@ fn line_direction_to_alignment(
             VerticalPositionKeyword::Bottom => (Alignment::TOP_CENTER, Alignment::BOTTOM_CENTER),
         },
         LineDirection::Horizontal(h) => match h {
-            HorizontalPositionKeyword::Left => {
-                (Alignment::CENTER_RIGHT, Alignment::CENTER_LEFT)
-            }
-            HorizontalPositionKeyword::Right => {
-                (Alignment::CENTER_LEFT, Alignment::CENTER_RIGHT)
-            }
+            HorizontalPositionKeyword::Left => (Alignment::CENTER_RIGHT, Alignment::CENTER_LEFT),
+            HorizontalPositionKeyword::Right => (Alignment::CENTER_LEFT, Alignment::CENTER_RIGHT),
         },
         LineDirection::Corner(h, v) => {
             let x1 = match h {
@@ -847,8 +836,8 @@ fn css_box_shadow_to_cg(style: &ComputedValues) -> LayerEffects {
     let mut shadows = Vec::new();
 
     for shadow in shadow_list.0.iter() {
-        let color = css_color_to_cg(&shadow.base.color)
-            .unwrap_or_else(|| CGColor::from_rgba(0, 0, 0, 255));
+        let color =
+            css_color_to_cg(&shadow.base.color).unwrap_or_else(|| CGColor::from_rgba(0, 0, 0, 255));
 
         let fe = FeShadow {
             dx: shadow.base.horizontal.px(),
@@ -955,9 +944,19 @@ fn css_dimensions_to_cg(style: &ComputedValues, dims: &mut LayoutDimensionStyle)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Global mutex to serialize HTML tests.
+    ///
+    /// The CSS cascade adapter uses a process-global `DEMO_DOM` static, so
+    /// concurrent `from_html_str` calls race on that shared slot and cause
+    /// Stylo `debug_assert` panics ("Why are we here?").  A mutex ensures
+    /// only one test touches the global DOM at a time.
+    static HTML_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn smoke_test_basic_html() {
+        let _guard = HTML_TEST_LOCK.lock().unwrap();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -986,6 +985,7 @@ mod tests {
 
     #[test]
     fn test_inline_style_attribute() {
+        let _guard = HTML_TEST_LOCK.lock().unwrap();
         let html = r#"<!doctype html>
 <html>
   <body>
@@ -998,6 +998,7 @@ mod tests {
 
     #[test]
     fn test_borders_and_shadows() {
+        let _guard = HTML_TEST_LOCK.lock().unwrap();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1015,6 +1016,7 @@ mod tests {
 
     #[test]
     fn test_flex_alignment() {
+        let _guard = HTML_TEST_LOCK.lock().unwrap();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1035,6 +1037,7 @@ mod tests {
 
     #[test]
     fn test_gradient_backgrounds() {
+        let _guard = HTML_TEST_LOCK.lock().unwrap();
         let html = r#"<!doctype html>
 <html>
   <head>

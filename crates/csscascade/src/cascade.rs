@@ -13,8 +13,8 @@
 use euclid::{Scale, Size2D};
 use markup5ever::interface::tree_builder::QuirksMode as HtmlQuirksMode;
 use style::context::{
-    RegisteredSpeculativePainter, RegisteredSpeculativePainters, SharedStyleContext,
-    StyleContext, StyleSystemOptions, ThreadLocalStyleContext,
+    RegisteredSpeculativePainter, RegisteredSpeculativePainters, SharedStyleContext, StyleContext,
+    StyleSystemOptions, ThreadLocalStyleContext,
 };
 use style::dom::TElement;
 use style::font_metrics::FontMetrics;
@@ -27,9 +27,7 @@ use style::servo::media_queries::{Device, FontMetricsProvider};
 use style::servo::selector_parser::SnapshotMap;
 use style::servo_arc::Arc as ServoArc;
 use style::shared_lock::{SharedRwLock, SharedRwLockReadGuard, StylesheetGuards};
-use style::stylesheets::{
-    AllowImportRules, DocumentStyleSheet, Origin, Stylesheet, UrlExtraData,
-};
+use style::stylesheets::{AllowImportRules, DocumentStyleSheet, Origin, Stylesheet, UrlExtraData};
 use style::stylist::{RuleInclusion, Stylist};
 use style::traversal::resolve_style;
 use style::traversal_flags::TraversalFlags;

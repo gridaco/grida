@@ -320,8 +320,8 @@ fn scene_from_svg_path(path: &Path) -> Result<Scene> {
 
 fn scene_from_html_path(path: &Path) -> Result<Scene> {
     use cg::cg::prelude::CGColor;
-    let html_source =
-        std::fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let html_source = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
     let graph = cg::html::from_html_str(&html_source)
         .map_err(|err| anyhow::anyhow!("failed to convert HTML {}: {err}", path.display()))?;
 

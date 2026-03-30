@@ -100,11 +100,7 @@ fn print_element(element: HtmlElement, document: &HtmlDocument, depth: usize) {
 
 /// Truncate a string for display.
 fn truncate(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        s
-    } else {
-        &s[..max]
-    }
+    if s.len() <= max { s } else { &s[..max] }
 }
 
 /// Iterate over every CSS longhand property ID.
