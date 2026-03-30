@@ -26,7 +26,7 @@ pub fn build() -> Scene {
         image_paint_with(img(), ImagePaintFit::Fit(BoxFit::Contain)),
     );
 
-    // Transform fit (scale + offset)
+    // Transform fit (zoom 1.5× centered with slight offset)
     let r3 = rect(
         gap * 2.0,
         0.0,
@@ -34,13 +34,34 @@ pub fn build() -> Scene {
         s,
         image_paint_with(
             img(),
-            ImagePaintFit::Transform(AffineTransform::new(10.0, 20.0, 0.0)),
+            ImagePaintFit::Transform(AffineTransform {
+                matrix: [[1.5, 0.0, -0.25], [0.0, 1.5, -0.15]],
+            }),
         ),
     );
 
+    // Transform fit with 15° rotation
+    let r4 = {
+        let deg: f32 = 15.0;
+        let rad = deg.to_radians();
+        let (sin, cos) = rad.sin_cos();
+        rect(
+            gap * 3.0,
+            0.0,
+            s,
+            s,
+            image_paint_with(
+                img(),
+                ImagePaintFit::Transform(AffineTransform {
+                    matrix: [[cos, -sin, 0.0], [sin, cos, 0.0]],
+                }),
+            ),
+        )
+    };
+
     // Quarter turns + alignment + Screen blend
-    let r4 = rect(
-        gap * 3.0,
+    let r5 = rect(
+        gap * 4.0,
         0.0,
         s,
         s,
@@ -56,5 +77,5 @@ pub fn build() -> Scene {
         }),
     );
 
-    flat_scene("L0 Image", vec![r1, r2, r3, r4])
+    flat_scene("L0 Image", vec![r1, r2, r3, r4, r5])
 }
