@@ -8,6 +8,7 @@ You are editing Grida’s **canonical on-disk contract** (the `.grida` file form
 
 - **Schema**: `format/grida.fbs` (FlatBuffers)
 - **Tooling notes**: `format/README.md` (how to validate/compile with `flatc`, including pinned `flatc` via `bin/activate-flatc`)
+- **Import mapping docs**: `docs/wg/format/` — tracks how CSS, HTML, and SVG properties map to the Grida IR, including TODO lists for missing IR fields. Consult these when deciding what to add to the schema.
 
 ## Where the schema is consumed (update these together)
 

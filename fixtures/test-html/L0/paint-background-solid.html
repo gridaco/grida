@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Solid Background</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .swatch {
+        width: 100px;
+        height: 100px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #fff;
+      }
+
+      .hex6 {
+        background-color: #6366f1;
+      }
+      .hex3 {
+        background-color: #f0f;
+      }
+      .rgb {
+        background-color: rgb(34, 197, 94);
+      }
+      .rgba {
+        background-color: rgba(239, 68, 68, 0.7);
+      }
+      .named {
+        background-color: dodgerblue;
+      }
+      .white {
+        background-color: white;
+        color: #030712;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">#6366f1</div>
+        <div class="swatch hex6">hex6</div>
+      </div>
+      <div>
+        <div class="label">#f0f</div>
+        <div class="swatch hex3">hex3</div>
+      </div>
+      <div>
+        <div class="label">rgb(34,197,94)</div>
+        <div class="swatch rgb">rgb</div>
+      </div>
+      <div>
+        <div class="label">rgba(239,68,68,0.7)</div>
+        <div class="swatch rgba">rgba</div>
+      </div>
+      <div>
+        <div class="label">dodgerblue</div>
+        <div class="swatch named">named</div>
+      </div>
+      <div>
+        <div class="label">white</div>
+        <div class="swatch white">white</div>
+      </div>
+    </div>
+  </body>
+</html>

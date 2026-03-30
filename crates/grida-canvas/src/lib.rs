@@ -6,6 +6,7 @@ pub mod export;
 pub mod fonts;
 pub mod helpers;
 pub mod hittest;
+pub mod html;
 pub mod io;
 pub mod layout;
 pub mod node;

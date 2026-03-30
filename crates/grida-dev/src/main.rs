@@ -23,7 +23,7 @@ use winit::event_loop::EventLoopProxy;
     about = "Rust-native dev runtime for previewing grida-canvas scenes with winit.\n\n\
              Opens an interactive window. Optionally pass a file path or URL to load it\n\
              immediately. Drop files onto the window at any time to replace the scene.\n\n\
-             Supported formats: .grida, .grida1, .svg, .png, .jpg, .jpeg, .webp"
+             Supported formats: .grida, .grida1, .svg, .html, .png, .jpg, .jpeg, .webp"
 )]
 struct Cli {
     /// File path or URL to load on startup (optional).
@@ -192,6 +192,7 @@ async fn load_scenes_from_source(source: &str) -> Result<Vec<Scene>> {
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             match ext.to_ascii_lowercase().as_str() {
                 "svg" => return scene_from_svg_path(path).map(|s| vec![s]),
+                "html" | "htm" => return scene_from_html_path(path).map(|s| vec![s]),
                 // Raster images should be loaded via load_raster() by the caller
                 // so bytes can be registered with the renderer.
                 ext if is_raster_ext(ext) => return load_raster(path).map(|r| vec![r.scene]),
@@ -317,6 +318,23 @@ fn scene_from_svg_path(path: &Path) -> Result<Scene> {
     })
 }
 
+fn scene_from_html_path(path: &Path) -> Result<Scene> {
+    use cg::cg::prelude::CGColor;
+    let html_source = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let graph = cg::html::from_html_str(&html_source)
+        .map_err(|err| anyhow::anyhow!("failed to convert HTML {}: {err}", path.display()))?;
+
+    Ok(Scene {
+        name: path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "HTML".to_string()),
+        graph,
+        background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
+    })
+}
+
 /// Result of loading a raster image: the scene plus the raw bytes and RID
 /// so the caller can register the image with the renderer directly.
 struct RasterScene {
@@ -384,6 +402,7 @@ async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
     match ext.as_str() {
         "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
         "svg" => scene_from_svg_path(path).map(|s| vec![s]),
+        "html" | "htm" => scene_from_html_path(path).map(|s| vec![s]),
         // Raster images are handled separately in start_master_drop_task.
         other => Err(anyhow::anyhow!(
             "Unsupported dropped file type ({}): {}",

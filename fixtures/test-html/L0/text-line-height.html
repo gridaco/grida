@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Line Height</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 4px;
+      }
+
+      .sections {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .block {
+        background: #0f172a;
+        border-radius: 8px;
+        padding: 16px;
+        width: 360px;
+        font-size: 14px;
+      }
+
+      .lh-1 {
+        line-height: 1;
+      }
+      .lh-1-5 {
+        line-height: 1.5;
+      }
+      .lh-2 {
+        line-height: 2;
+      }
+      .lh-px {
+        line-height: 28px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sections">
+      <div>
+        <div class="label">line-height: 1.0</div>
+        <div class="block lh-1">
+          The quick brown fox jumps over the lazy dog. Lines are tightly packed
+          with no extra spacing between them.
+        </div>
+      </div>
+      <div>
+        <div class="label">line-height: 1.5</div>
+        <div class="block lh-1-5">
+          The quick brown fox jumps over the lazy dog. Lines have comfortable
+          spacing, common for body text readability.
+        </div>
+      </div>
+      <div>
+        <div class="label">line-height: 2.0</div>
+        <div class="block lh-2">
+          The quick brown fox jumps over the lazy dog. Lines are double-spaced
+          with generous vertical room between them.
+        </div>
+      </div>
+      <div>
+        <div class="label">line-height: 28px</div>
+        <div class="block lh-px">
+          The quick brown fox jumps over the lazy dog. Line height set to a
+          fixed pixel value independent of font size.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

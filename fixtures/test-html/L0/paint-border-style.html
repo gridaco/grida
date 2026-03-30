@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Border Style</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #0f172a;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #e2e8f0;
+      }
+
+      .solid {
+        border: 3px solid #6366f1;
+      }
+      .dashed {
+        border: 3px dashed #22c55e;
+      }
+      .dotted {
+        border: 3px dotted #f59e0b;
+      }
+      .thick {
+        border: 6px solid #ec4899;
+      }
+      .per-side {
+        border-top: 2px solid #6366f1;
+        border-right: 4px dashed #22c55e;
+        border-bottom: 6px dotted #f59e0b;
+        border-left: 8px solid #ec4899;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">3px solid</div>
+        <div class="box solid">solid</div>
+      </div>
+      <div>
+        <div class="label">3px dashed</div>
+        <div class="box dashed">dashed</div>
+      </div>
+      <div>
+        <div class="label">3px dotted</div>
+        <div class="box dotted">dotted</div>
+      </div>
+      <div>
+        <div class="label">6px solid (thick)</div>
+        <div class="box thick">thick</div>
+      </div>
+      <div>
+        <div class="label">per-side (2/4/6/8)</div>
+        <div class="box per-side">per-side</div>
+      </div>
+    </div>
+  </body>
+</html>

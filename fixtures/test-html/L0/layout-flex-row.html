@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: Flex Row</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 12px;
+        color: #94a3b8;
+        padding-bottom: 8px;
+      }
+
+      .section {
+        padding-bottom: 24px;
+      }
+
+      /* Row with space-between + center alignment */
+      .row-between {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px;
+        background: #0f172a;
+        border-radius: 8px;
+      }
+
+      /* Row with wrap */
+      .row-wrap {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 16px;
+        background: #0f172a;
+        border-radius: 8px;
+      }
+
+      /* Row with flex-grow */
+      .row-grow {
+        display: flex;
+        flex-direction: row;
+        gap: 12px;
+        padding: 16px;
+        background: #0f172a;
+        border-radius: 8px;
+      }
+
+      .box {
+        width: 80px;
+        height: 48px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .box-sm {
+        width: 60px;
+        height: 32px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #fff;
+      }
+
+      .grow {
+        flex-grow: 1;
+      }
+
+      .c1 {
+        background: #6366f1;
+      }
+      .c2 {
+        background: #8b5cf6;
+      }
+      .c3 {
+        background: #a855f7;
+      }
+      .c4 {
+        background: #d946ef;
+      }
+      .c5 {
+        background: #ec4899;
+      }
+
+      .tall {
+        height: 72px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Section 1: justify-content: space-between + align-items: center -->
+    <div class="section">
+      <div class="label">
+        justify-content: space-between, align-items: center
+      </div>
+      <div class="row-between">
+        <div class="box c1">A</div>
+        <div class="box c2 tall">B tall</div>
+        <div class="box c3">C</div>
+        <div class="box c4">D</div>
+      </div>
+    </div>
+
+    <!-- Section 2: flex-wrap -->
+    <div class="section">
+      <div class="label">flex-wrap: wrap</div>
+      <div class="row-wrap">
+        <div class="box-sm c1">1</div>
+        <div class="box-sm c2">2</div>
+        <div class="box-sm c3">3</div>
+        <div class="box-sm c4">4</div>
+        <div class="box-sm c5">5</div>
+        <div class="box-sm c1">6</div>
+        <div class="box-sm c2">7</div>
+        <div class="box-sm c3">8</div>
+        <div class="box-sm c4">9</div>
+        <div class="box-sm c5">10</div>
+      </div>
+    </div>
+
+    <!-- Section 3: flex-grow -->
+    <div class="section">
+      <div class="label">flex-grow on middle child</div>
+      <div class="row-grow">
+        <div class="box c1">Fixed</div>
+        <div class="box c2 grow">Grows</div>
+        <div class="box c3">Fixed</div>
+      </div>
+    </div>
+  </body>
+</html>

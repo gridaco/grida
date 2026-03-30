@@ -61,6 +61,16 @@ python3 bin/activate-flatc -- --rust -o /tmp/grida-fbs-gen/rust format/grida.fbs
 >
 > **Contributor workflow**: after editing `grida.fbs`, run `pnpm build` (or the individual `prebuild` scripts in each package) to regenerate bindings, then commit the updated generated files alongside your schema change.
 
+## Format & Import Mapping Docs
+
+For tracking how CSS, HTML, and SVG map into the Grida IR (and which properties are still missing), see the working group docs:
+
+- **[docs/wg/format/](../docs/wg/format/)** — index page with links to:
+  - [Grida IR reference](../docs/wg/format/grida.md) — canonical IR node types, paint, layout, effects
+  - [CSS mapping](../docs/wg/format/css.md) — CSS → Grida IR property mapping and TODO tracker
+  - [HTML mapping](../docs/wg/format/html.md) — HTML element → Grida IR node mapping
+  - [SVG mapping](../docs/wg/format/svg.md) — SVG → usvg → Grida IR mapping tracker
+
 ## References
 
 - [Adobe Photoshop File Format Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/) — PSD/PSB structure, image resources, layer and mask info; useful when comparing or aligning design-tool format concepts.
