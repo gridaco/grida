@@ -39,8 +39,31 @@ export class CanvasWasmGeometryQueryInterfaceProvider
     return this.getNodeIdsFromPoint(p);
   }
 
-  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
-    return this.surface.getNodeAbsoluteBoundingBox(node_id);
+  getNodeAbsoluteBoundingRect(
+    target: (string & {}) | "<scene>"
+  ): cmath.Rectangle | null {
+    return this.surface.getNodeAbsoluteBoundingBox(target);
+  }
+}
+
+export class CanvasWasmPropertiesQueryProvider
+  implements editor.api.IDocumentPropertiesQueryProvider
+{
+  constructor(
+    readonly editor: Editor,
+    readonly surface: Scene
+  ) {}
+
+  queryPaintGroups(
+    ids: string[],
+    target: "fill" | "stroke",
+    options?: { recursive?: boolean; limit?: number }
+  ): editor.api.PaintGroup[] {
+    const groups = this.surface.queryPaintGroups(ids, target, options);
+    return groups.map((g) => ({
+      value: g.paint,
+      ids: g.node_ids,
+    }));
   }
 }
 

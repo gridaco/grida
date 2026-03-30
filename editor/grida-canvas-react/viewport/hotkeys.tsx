@@ -807,6 +807,10 @@ export function useEditorHotKeys() {
     editor.surface.surfaceSetTool({ type: "insert", node: "container" });
   });
 
+  useHotkeys("shift+f", () => {
+    editor.surface.surfaceSetTool({ type: "insert", node: "tray" });
+  });
+
   useHotkeys("r", () => {
     editor.surface.surfaceSetTool({ type: "insert", node: "rectangle" });
   });
@@ -894,7 +898,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+1, shift+9", (e) => {
-    editor.camera.fit("*", { margin: 64 });
+    editor.camera.fit("<scene>", { margin: 64 });
     toast.success(`Zoom to fit`);
   });
 

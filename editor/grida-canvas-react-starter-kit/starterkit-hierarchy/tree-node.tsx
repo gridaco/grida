@@ -298,6 +298,7 @@ export function NodeHierarchyList() {
       return (
         node.type === "scene" ||
         node.type === "container" ||
+        node.type === "tray" ||
         node.type === "group" ||
         node.type === "boolean"
       );

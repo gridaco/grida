@@ -1,5 +1,13 @@
 ---
 title: Resource Management (resources)
+tags:
+  - internal
+  - wg
+  - resources
+  - canvas
+  - wasm
+  - performance
+
 ---
 
 # Resources - `resources`

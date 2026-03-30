@@ -35,7 +35,7 @@ impl StrokeOverlay {
         nodes: &[NodeId],
         camera: &Camera2D,
         cache: &SceneCache,
-        _fonts: &FontRepository,
+        fonts: &FontRepository,
         style: Option<&StrokeOverlayStyle>,
     ) {
         let style = style.cloned().unwrap_or_default();
@@ -66,7 +66,7 @@ impl StrokeOverlay {
                             PainterPictureLayer::Text(text_layer) => {
                                 if let Some(text_path) =
                                     text_overlay::TextOverlay::text_layer_baseline(
-                                        cache, text_layer,
+                                        cache, text_layer, fonts,
                                     )
                                 {
                                     text_path

@@ -1,8 +1,12 @@
 import grida from "@grida/schema";
 import cmath from "@grida/cmath";
+import type cg from "@grida/cg";
 import type { Editor } from "../editor";
 import { editor } from "..";
 import { domapi } from "./dom";
+import { dq } from "../query";
+import { editor as editorUtils } from "../editor.i";
+import equal from "fast-deep-equal";
 
 class DOMContentApi {
   constructor(readonly containerId: string) {}
@@ -78,7 +82,12 @@ export class DOMGeometryQueryInterfaceProvider
     return contained;
   }
 
-  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
+  getNodeAbsoluteBoundingRect(
+    target: (string & {}) | "<scene>"
+  ): cmath.Rectangle | null {
+    // DOM backend does not support "<scene>" — fall back to null
+    if (target === "<scene>") return null;
+    const node_id = target;
     const contentrect = this.content.getBoundingClientRect()!;
     const noderect = window.document
       .getElementById(node_id)
@@ -117,5 +126,70 @@ export class DOMGeometryQueryInterfaceProvider
     // return qrect
 
     return rect;
+  }
+}
+
+export class DOMPropertiesQueryProvider
+  implements editor.api.IDocumentPropertiesQueryProvider
+{
+  constructor(readonly editor: Editor) {}
+
+  queryPaintGroups(
+    ids: string[],
+    target: "fill" | "stroke",
+    options?: { recursive?: boolean; limit?: number }
+  ): editor.api.PaintGroup[] {
+    const recursive = options?.recursive ?? true;
+    const limit = options?.limit ?? 0;
+    const state = this.editor.getSnapshot();
+
+    // Expand into subtrees if recursive
+    const nodeIds = new Set<string>();
+    for (const id of ids) {
+      nodeIds.add(id);
+      if (recursive) {
+        for (const childId of dq.getChildren(state.document_ctx, id, true)) {
+          nodeIds.add(childId);
+        }
+      }
+    }
+
+    // Collect active paints per node
+    const paintEntries: Array<{ nodeId: string; paint: cg.Paint }> = [];
+    for (const nodeId of nodeIds) {
+      const node = state.document.nodes[
+        nodeId
+      ] as grida.program.nodes.UnknownNode;
+      if (!node) continue;
+
+      const { paints } = editorUtils.resolvePaints(node, target, 0);
+      const activePaints = paints.filter((p) => p?.active !== false);
+      for (const paint of activePaints) {
+        paintEntries.push({ nodeId, paint });
+      }
+    }
+
+    // Group by paint value (deep equality)
+    const groups: editor.api.PaintGroup[] = [];
+    for (const { nodeId, paint } of paintEntries) {
+      if (limit > 0 && groups.length >= limit) {
+        const existing = groups.find((g) => equal(g.value, paint));
+        if (existing && !existing.ids.includes(nodeId)) {
+          existing.ids.push(nodeId);
+        }
+        continue;
+      }
+
+      const existing = groups.find((g) => equal(g.value, paint));
+      if (existing) {
+        if (!existing.ids.includes(nodeId)) {
+          existing.ids.push(nodeId);
+        }
+      } else {
+        groups.push({ value: paint, ids: [nodeId] });
+      }
+    }
+
+    return groups;
   }
 }

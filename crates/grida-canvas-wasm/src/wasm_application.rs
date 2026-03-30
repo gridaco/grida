@@ -25,14 +25,39 @@ fn alloc_len_prefixed(bytes: &[u8]) -> *const u8 {
 const BACKEND_WEBGL: u32 = 0;
 const BACKEND_RASTER: u32 = 1;
 
+/// Renderer config bitflags passed at init time.
+///
+/// Bit layout (LSB-first):
+///   bit 0: skip_layout
+///
+/// Unset bits use `RuntimeRendererConfig::default()` values.
+/// Extend by assigning higher bits — existing callers passing 0
+/// get the default behaviour.
+const CONFIG_FLAG_SKIP_LAYOUT: u32 = 1 << 0;
+
+fn config_from_flags(flags: u32) -> cg::runtime::config::RuntimeRendererConfig {
+    let mut config = cg::runtime::config::RuntimeRendererConfig::default();
+    if flags & CONFIG_FLAG_SKIP_LAYOUT != 0 {
+        config.skip_layout = true;
+    }
+    config
+}
+
 #[no_mangle]
 /// js::_init
 pub extern "C" fn init(
     width: i32,
     height: i32,
     use_embedded_fonts: bool,
+    config_flags: u32,
 ) -> Box<UnknownTargetApplication> {
-    init_with_backend(BACKEND_WEBGL, width, height, use_embedded_fonts)
+    init_with_backend(
+        BACKEND_WEBGL,
+        width,
+        height,
+        use_embedded_fonts,
+        config_flags,
+    )
 }
 
 #[no_mangle]
@@ -41,13 +66,21 @@ pub extern "C" fn init(
 /// backend_id:
 /// - 0 (`BACKEND_WEBGL`): webgl (emscripten/webgl2)
 /// - 1 (`BACKEND_RASTER`): raster (cpu)
+///
+/// config_flags: bitfield for `RuntimeRendererConfig` (see `CONFIG_FLAG_*`).
+/// Pass 0 for defaults.
 pub extern "C" fn init_with_backend(
     backend_id: u32,
     width: i32,
     height: i32,
     use_embedded_fonts: bool,
+    config_flags: u32,
 ) -> Box<UnknownTargetApplication> {
-    let options = cg::runtime::scene::RendererOptions { use_embedded_fonts };
+    let options = cg::runtime::scene::RendererOptions {
+        use_embedded_fonts,
+        use_system_fonts: false, // WASM has no system font manager
+        config: config_from_flags(config_flags),
+    };
     match backend_id {
         BACKEND_RASTER => UnknownTargetApplication::new_raster(width, height, options),
         _ => cg::window::application_emscripten::new_webgl_app(width, height, options),
@@ -149,11 +182,25 @@ pub unsafe extern "C" fn switch_scene(
 }
 
 #[no_mangle]
+/// js::_loaded_scene_ids
+/// Returns a len-prefixed JSON array of scene ID strings, or null if empty.
+pub unsafe extern "C" fn loaded_scene_ids(app: *mut UnknownTargetApplication) -> *const u8 {
+    if let Some(app) = app.as_ref() {
+        let ids = app.loaded_scene_ids();
+        if ids.is_empty() {
+            return std::ptr::null();
+        }
+        if let Ok(json) = serde_json::to_string(&ids) {
+            return alloc_len_prefixed(json.as_bytes());
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
 /// js::_drain_missing_images
 /// Returns a len-prefixed JSON array of missing image ref strings, or null if empty.
-pub unsafe extern "C" fn drain_missing_images(
-    app: *mut UnknownTargetApplication,
-) -> *const u8 {
+pub unsafe extern "C" fn drain_missing_images(app: *mut UnknownTargetApplication) -> *const u8 {
     if let Some(app) = app.as_mut() {
         let refs = app.drain_missing_images();
         if refs.is_empty() {
@@ -412,6 +459,88 @@ pub unsafe extern "C" fn surface_set_selection(
 }
 
 #[no_mangle]
+/// js::_query_paint_groups
+///
+/// Collect and group active paints across a set of nodes.
+/// Returns a length-prefixed JSON array of `{ paint, node_ids }` groups.
+///
+/// - `ids_json_ptr` / `ids_json_len`: JSON array of user-facing node ID strings
+/// - `target`: 0 = fill, 1 = stroke
+/// - `recursive`: whether to include descendant subtrees
+/// - `limit`: max number of distinct paint groups to return (0 = unlimited)
+pub unsafe extern "C" fn query_paint_groups(
+    app: *const UnknownTargetApplication,
+    ids_json_ptr: *const u8,
+    ids_json_len: u32,
+    target: u32,
+    recursive: bool,
+    limit: u32,
+) -> *const u8 {
+    let Some(app) = app.as_ref() else {
+        return std::ptr::null();
+    };
+    let Some(scene) = app.renderer().scene.as_ref() else {
+        return alloc_len_prefixed(b"[]");
+    };
+
+    // Parse user-facing IDs from JSON
+    let slice = std::slice::from_raw_parts(ids_json_ptr, ids_json_len as usize);
+    let Ok(user_ids) = serde_json::from_slice::<Vec<String>>(slice) else {
+        return alloc_len_prefixed(b"[]");
+    };
+
+    let internal_ids: Vec<cg::node::schema::NodeId> = user_ids
+        .iter()
+        .filter_map(|uid| app.user_id_to_internal(uid))
+        .collect();
+
+    if internal_ids.is_empty() {
+        return alloc_len_prefixed(b"[]");
+    }
+
+    let paint_target = match target {
+        1 => cg::query::paint::PaintTarget::Stroke,
+        _ => cg::query::paint::PaintTarget::Fill,
+    };
+    let limit = if limit == 0 {
+        None
+    } else {
+        Some(limit as usize)
+    };
+
+    let groups = cg::query::paint::query_paint_groups(
+        &scene.graph,
+        &scene.graph,
+        &internal_ids,
+        paint_target,
+        recursive,
+        limit,
+    );
+
+    // Serialize with user-facing string IDs
+    #[derive(Serialize)]
+    struct PaintGroupOut {
+        paint: cg::cg::types::Paint,
+        node_ids: Vec<String>,
+    }
+
+    let out: Vec<PaintGroupOut> = groups
+        .into_iter()
+        .map(|g| PaintGroupOut {
+            paint: g.paint,
+            node_ids: g
+                .node_ids
+                .into_iter()
+                .filter_map(|id| app.internal_id_to_user(id))
+                .collect(),
+        })
+        .collect();
+
+    let json = serde_json::to_vec(&out).unwrap_or_else(|_| b"[]".to_vec());
+    alloc_len_prefixed(&json)
+}
+
+#[no_mangle]
 /// js::_set_surface_overlay_config
 ///
 /// Configure surface overlay rendering from JSON.
@@ -463,6 +592,15 @@ pub unsafe extern "C" fn command(app: *mut UnknownTargetApplication, id: u32, a:
             4 => ApplicationCommand::Pan { tx: a, ty: b },
             5 => ApplicationCommand::SelectAll,
             6 => ApplicationCommand::DeselectAll,
+            7 => ApplicationCommand::Select(cg::query::Selector::Children),
+            8 => ApplicationCommand::Select(cg::query::Selector::Parent),
+            9 => ApplicationCommand::Select(cg::query::Selector::NextSibling),
+            10 => ApplicationCommand::Select(cg::query::Selector::PreviousSibling),
+            11 => ApplicationCommand::Select(cg::query::Selector::Siblings),
+            12 => ApplicationCommand::Select(cg::query::Selector::All),
+            13 => ApplicationCommand::ZoomToFit,
+            14 => ApplicationCommand::ZoomToSelection,
+            15 => ApplicationCommand::ZoomTo100,
             _ => ApplicationCommand::None,
         };
         app.command(cmd);
@@ -543,10 +681,7 @@ pub unsafe extern "C" fn add_image_with_rid(
     rid_ptr: *const u8,
     rid_len: usize,
 ) -> *const u8 {
-    if let (Some(app), Some(rid)) = (
-        app.as_mut(),
-        __str_from_ptr_len(rid_ptr, rid_len),
-    ) {
+    if let (Some(app), Some(rid)) = (app.as_mut(), __str_from_ptr_len(rid_ptr, rid_len)) {
         let data = std::slice::from_raw_parts(data_ptr, data_len);
         if let Some((width, height, r#type)) = app.add_image_with_rid(data, &rid) {
             let result = AddImageWithRidResult {
@@ -783,11 +918,37 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
     if let Some(app) = app.as_mut() {
         let id = __str_from_ptr_len(ptr, len);
         if let Some(id) = id {
-            if let Some(rect) = app.get_node_absolute_bounding_box(&id) {
+            let target = cg::window::application::BoundsTarget::from_str(&id);
+            if let Some(rect) = app.get_node_absolute_bounding_box(target) {
                 let vec4 = rect.to_vec4(); // [f32; 4]
                 let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
                 std::ptr::copy_nonoverlapping(vec4.as_ptr(), out, 4);
                 return out;
+            }
+        }
+    }
+    std::ptr::null()
+}
+
+#[no_mangle]
+/// js::_get_node_id_path
+///
+/// Return the structural node ID ancestry path from root to the target node,
+/// inclusive, as a JSON array of user-facing string IDs.
+///
+/// Returns null if the node does not exist.
+pub unsafe extern "C" fn get_node_id_path(
+    app: *mut UnknownTargetApplication,
+    ptr: *const u8,
+    len: usize,
+) -> *const u8 {
+    if let Some(app) = app.as_mut() {
+        let id = __str_from_ptr_len(ptr, len);
+        if let Some(id) = id {
+            if let Some(path) = app.get_node_id_path(&id) {
+                if let Ok(json) = serde_json::to_string(&path) {
+                    return alloc_len_prefixed(json.as_bytes());
+                }
             }
         }
     }
@@ -957,6 +1118,17 @@ pub unsafe extern "C" fn runtime_renderer_set_render_policy_flags(
 ) {
     if let Some(app) = app.as_mut() {
         app.runtime_renderer_set_render_policy_flags(flags);
+    }
+}
+
+#[no_mangle]
+/// js::_runtime_renderer_set_skip_layout
+pub unsafe extern "C" fn runtime_renderer_set_skip_layout(
+    app: *mut UnknownTargetApplication,
+    skip: bool,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_skip_layout(skip);
     }
 }
 

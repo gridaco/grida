@@ -161,7 +161,11 @@ impl SVGStrokeAttributes {
 ///
 /// SVG allows opacity on fill/stroke independently of paints; our runtime stores
 /// opacity within each `Paint`. This function is the bridging layer.
-fn svg_paint_with_opacity(paint: &SVGPaint, opacity: f32, bounds: Option<(f32, f32, f32, f32)>) -> Paint {
+fn svg_paint_with_opacity(
+    paint: &SVGPaint,
+    opacity: f32,
+    bounds: Option<(f32, f32, f32, f32)>,
+) -> Paint {
     match paint {
         SVGPaint::Solid(solid) => Paint::Solid(SolidPaint {
             active: true,
@@ -337,20 +341,31 @@ pub struct IRSVGGroupNode {
 
 /// <text>
 ///
-/// Incomplete PoC: stores a single flattened string plus primary fill/stroke.
-/// Does not yet capture per-span styling or tspans; structure is designed to
-/// expand with richer text data later.
+/// SVG `<text>` element IR representation.
+///
+/// Contains one or more positioned chunks. Each chunk is either uniform
+/// (single style) or attributed (per-span variation).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IRSVGTextNode {
     pub transform: CGTransform2D,
     pub text_content: String,
     pub fill: Option<SVGFillAttributes>,
     pub stroke: Option<SVGStrokeAttributes>,
-    pub spans: Vec<IRSVGTextSpanNode>,
+    pub chunks: Vec<IRSVGTextChunk>,
     pub bounds: CGRect,
 }
 
-/// <tspan>
+/// A positioned text chunk — either uniform (single style) or attributed
+/// (per-span style variation).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum IRSVGTextChunk {
+    /// Single-style chunk → packs to `TextSpanNode`.
+    Uniform(IRSVGTextSpanNode),
+    /// Multi-style chunk → packs to `AttributedTextNode`.
+    Attributed(IRSVGAttributedTextChunk),
+}
+
+/// `<tspan>` — a positioned text chunk with uniform styling.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IRSVGTextSpanNode {
     pub transform: CGTransform2D,
@@ -359,6 +374,46 @@ pub struct IRSVGTextSpanNode {
     pub stroke: Option<SVGStrokeAttributes>,
     pub font_size: Option<f32>,
     pub anchor: SVGTextAnchor,
+}
+
+/// A positioned text chunk with per-span style variation.
+///
+/// Produced when a `<text>` chunk contains multiple `<tspan>` children with
+/// different font/fill/stroke attributes. Each span maps to a
+/// [`IRSVGTextStyledRun`] with byte offsets into the chunk text.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IRSVGAttributedTextChunk {
+    pub transform: CGTransform2D,
+    /// Full text content of the chunk (untrimmed from usvg).
+    pub text: String,
+    pub anchor: SVGTextAnchor,
+    /// Per-span styled runs (byte offsets into `text`).
+    pub runs: Vec<IRSVGTextStyledRun>,
+}
+
+/// A styled sub-range within a text chunk, derived from a usvg `TextSpan`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IRSVGTextStyledRun {
+    /// Byte offset (start, inclusive) into the parent chunk's text.
+    pub start: usize,
+    /// Byte offset (end, exclusive) into the parent chunk's text.
+    pub end: usize,
+    pub fill: Option<SVGFillAttributes>,
+    pub stroke: Option<SVGStrokeAttributes>,
+    pub font_size: f32,
+    pub font_weight: u16,
+    pub font_style: SVGFontStyle,
+    pub font_family: String,
+    pub letter_spacing: f32,
+    pub word_spacing: f32,
+}
+
+/// SVG font-style mapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SVGFontStyle {
+    Normal,
+    Italic,
+    Oblique,
 }
 
 /// <path>

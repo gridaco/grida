@@ -665,29 +665,77 @@ function RootFramesBarOverlay() {
   const { document } = useDocumentState();
   const scene = useCurrentSceneState();
 
-  const rootframes = useMemo(() => {
-    const children = scene.children_refs.map((id) => document.nodes[id]);
-    return children.filter(
-      (n) =>
-        n &&
-        n.active !== false &&
-        (n.type === "container" ||
-          n.type === "template_instance" ||
-          n.type === "component" ||
-          n.type === "instance")
-    );
-  }, [scene.children_refs, document.nodes]);
+  // Mirrors Rust collect_labeled_nodes():
+  //  - Trays at scene root → badge-style label
+  //  - Containers at scene root → plain label
+  //  - Containers that are direct children of a root Tray → plain label
+  //    (they are "root-like" — tray children are treated as top-level frames)
+  const labeledNodes = useMemo(() => {
+    type LabelVariant = "badge" | "plain";
+    type LabeledNode = {
+      node: grida.program.nodes.Node;
+      variant: LabelVariant;
+      /** For tray-child containers, the parent tray id. */
+      parentNodeId?: string;
+    };
 
-  if (scene.constraints.children === "single") {
-    const rootframe = rootframes[0];
-    if (!rootframe) return null;
+    const labels: LabeledNode[] = [];
+    const { nodes, links } = document;
+
+    const isContainer = (n: grida.program.nodes.Node) =>
+      n.type === "container" ||
+      n.type === "template_instance" ||
+      n.type === "component" ||
+      n.type === "instance";
+
+    for (const rootId of scene.children_refs) {
+      const node = nodes[rootId];
+      if (!node || node.active === false) continue;
+
+      if (node.type === "tray") {
+        // Tray itself gets a badge label
+        labels.push({ node, variant: "badge" });
+
+        // Tray's direct container children get plain labels (root-like)
+        const trayChildren = links[rootId];
+        if (trayChildren) {
+          for (const childId of trayChildren) {
+            const child = nodes[childId];
+            if (child && child.active !== false && isContainer(child)) {
+              labels.push({
+                node: child,
+                variant: "plain",
+                parentNodeId: rootId,
+              });
+            }
+          }
+        }
+      } else if (isContainer(node)) {
+        // Root container gets a plain label
+        labels.push({ node, variant: "plain" });
+      }
+    }
+
+    return labels;
+  }, [scene.children_refs, document.nodes, document.links]);
+
+  const isSingleMode = scene.constraints.children === "single";
+
+  const nodeState = (node_id: string) =>
+    selection.includes(node_id)
+      ? ("active" as const)
+      : hovered_node_id === node_id
+        ? ("hover" as const)
+        : ("idle" as const);
+
+  if (isSingleMode) {
+    const first = labeledNodes[0];
+    if (!first) return null;
     return (
-      <NodeTitleBar node={rootframe} node_id={rootframe.id} state={"active"}>
-        {/* Single-mode: full styling with padding, rounded corners, and background */}
-        {/* Use padding-bottom on wrapper instead of margin to ensure events work in the gap */}
+      <NodeTitleBar node={first.node} node_id={first.node.id} state={"active"}>
         <div className="pb-1.5">
           <div className="w-full flex items-center gap-2 rounded-lg py-2 px-2.5 bg-background/80 group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent group-data-[layer-is-component-consumer='true']:!bg-workbench-accent-violet/50">
-            <NodeTitleBarTitle node={rootframe}>
+            <NodeTitleBarTitle node={first.node}>
               {" (single mode)"}
             </NodeTitleBarTitle>
           </div>
@@ -698,26 +746,29 @@ function RootFramesBarOverlay() {
 
   return (
     <>
-      {rootframes.map((node) => (
+      {labeledNodes.map(({ node, variant, parentNodeId }) => (
         <NodeTitleBar
           key={node.id}
           node={node}
           node_id={node.id}
-          state={
-            selection.includes(node.id)
-              ? "active"
-              : hovered_node_id === node.id
-                ? "hover"
-                : "idle"
-          }
+          state={nodeState(node.id)}
+          parentNodeId={parentNodeId}
         >
-          {/* Multi-mode: plain text, no styling */}
-          {/* Use padding-bottom on wrapper instead of margin to ensure events work in the gap */}
-          <div className="pb-1.5 py-px">
-            <div className="w-full flex items-center gap-2">
-              <NodeTitleBarTitle node={node} />
+          {variant === "badge" ? (
+            // Badge: tray-style title bar with rounded bar and background
+            <div className="pb-1.5">
+              <div className="w-full flex items-center gap-2 rounded-lg py-2 px-2.5 bg-background/80 border group-data-[state=hover]:bg-accent group-data-[state=active]:bg-accent group-data-[layer-is-component-consumer='true']:!bg-workbench-accent-violet/50">
+                <NodeTitleBarTitle node={node} />
+              </div>
             </div>
-          </div>
+          ) : (
+            // Plain: text-only title bar for containers
+            <div className="pb-1.5 py-px">
+              <div className="w-full flex items-center gap-2">
+                <NodeTitleBarTitle node={node} />
+              </div>
+            </div>
+          )}
         </NodeTitleBar>
       ))}
     </>
@@ -728,11 +779,14 @@ function NodeTitleBar({
   node,
   node_id,
   state,
+  parentNodeId,
   children,
 }: React.PropsWithChildren<{
   node: grida.program.nodes.Node;
   node_id: string;
   state: "idle" | "hover" | "active";
+  /** Pass parent id so the floating bar repositions when the parent moves. */
+  parentNodeId?: string;
 }>) {
   const editor = useCurrentEditor();
 
@@ -775,6 +829,7 @@ function NodeTitleBar({
       node_id={node_id}
       state={state}
       isComponentConsumer={is_direct_component_consumer(node.type)}
+      parentNodeId={parentNodeId}
     >
       <FloatingBarContentWrapper {...bind()} style={{ touchAction: "none" }}>
         {children}

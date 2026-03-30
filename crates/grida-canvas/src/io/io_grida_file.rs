@@ -215,8 +215,8 @@ fn resolve_fbs_bytes(bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn decode_json(bytes: &[u8]) -> Result<Vec<Scene>, DecodeError> {
-    let json_str = std::str::from_utf8(bytes)
-        .map_err(|e| DecodeError::Json(format!("invalid UTF-8: {e}")))?;
+    let json_str =
+        std::str::from_utf8(bytes).map_err(|e| DecodeError::Json(format!("invalid UTF-8: {e}")))?;
     let file = io_grida::parse(json_str).map_err(|e| DecodeError::Json(format!("{e}")))?;
     let mut converter = IdConverter::new();
     let scene = converter

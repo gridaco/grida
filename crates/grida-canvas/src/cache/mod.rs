@@ -1,7 +1,7 @@
 pub mod atlas;
 pub mod compositor;
+pub mod fast_hash;
 pub mod geometry;
-pub mod mipmap;
 pub mod paragraph;
 pub mod picture;
 pub mod scene;

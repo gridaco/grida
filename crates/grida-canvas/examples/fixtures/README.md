@@ -412,6 +412,31 @@ scene "L0 Layout Transform"
 
 ---
 
+## L0-tray
+
+Tray node (Figma SECTION equivalent) with explicit dimensions, fills, strokes, corner radius. All children are Container (frame) nodes — the realistic SECTION usage pattern.
+
+```text
+scene "L0 Tray"
+├─ tray  500×250  light grey-blue fill, grey border 1px
+│  ├─ container  200×180  white fill, corner_radius=8
+│  └─ container  200×180  blue fill, corner_radius=8
+├─ tray  400×250  alice blue fill, cornflower blue border 2px, corner_radius=16
+│  ├─ container  100×180  pink card, corner_radius=6
+│  ├─ container  100×180  green card, corner_radius=6
+│  └─ container  100×180  blue card, corner_radius=6
+├─ tray  250×180  linen fill, tan border (overflow demo — no clip)
+│  └─ container  250×160  green fill (overflows tray bounds — fully visible)
+├─ tray  250×180  opacity=0.5, pink fill, red border 2px, corner_radius=8
+│  ├─ container  100×120  purple fill, corner_radius=6
+│  └─ container  100×120  magenta fill, corner_radius=6
+└─ tray  200×180  empty tray (no children), grey fill + border
+```
+
+**Exercises:** TrayNodeRec (explicit dimensions, fills, strokes, corner_radius, opacity), Container children (the primary Tray use case), child overflow (no clip), empty tray.
+
+---
+
 ## Not included (rationale)
 
 | Topic                 | Reason                                                                                                                                                         |

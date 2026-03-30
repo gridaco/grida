@@ -34,15 +34,14 @@ import { io } from "@grida/io";
 import grida from "@grida/schema";
 import kolor from "@grida/color";
 
-export interface Fig2GridaOptions {
+export interface Fig2GridaOptions extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  | "placeholder_for_missing_images"
+  | "preserve_figma_ids"
+  | "prefer_fixed_text_sizing"
+> {
   /** Convert specific page indices only (only applies to `.fig` input). */
   pages?: number[];
-  /**
-   * When true (default), unresolved image refs are replaced with a checker
-   * pattern placeholder. When false, refs are preserved as `res://images/<ref>`
-   * so the lazy image loading system can request them at render time.
-   */
-  placeholder_for_missing_images?: boolean;
 }
 
 export interface Fig2GridaResult {
@@ -110,106 +109,105 @@ function tryReadRestArchiveZip(
 // Shared merge logic
 // ---------------------------------------------------------------------------
 
-interface PageResult {
-  name: string;
-  result: iofigma.restful.factory.FigmaImportResult;
-}
-
 interface MergedDocument {
   document: grida.program.document.Document;
   imageRecord: Record<string, Uint8Array>;
-  imageRefsUsed: string[];
+  imageRefsUsed: Set<string>;
   pageNames: string[];
+  /** Non-scene node count, accumulated during conversion. */
+  nodeCount: number;
 }
 
 /**
- * Merge per-page conversion results into a single multi-scene Document and
- * collect referenced image bytes.
+ * Build a multi-scene Document by converting canvases directly into shared
+ * buffers, avoiding per-root / per-page Object.assign merge passes.
  */
-function mergePages(
-  pageResults: PageResult[],
+function buildMergedDocument(
+  canvases: Array<{
+    name: string;
+    children: Array<Record<string, unknown>>;
+    backgroundColor?: { r: number; g: number; b: number; a: number };
+  }>,
+  context: iofigma.restful.factory.FactoryContext,
   imageProvider: (ref: string) => Uint8Array | undefined
 ): MergedDocument {
-  const allImageRefsUsed = new Set<string>();
-  const mergedNodes: Record<string, any> = {};
-  const mergedLinks: Record<string, string[] | undefined> = {};
-  const mergedImages: Record<string, any> = {};
-  const mergedBitmaps: Record<string, any> = {};
-  const mergedProperties: Record<string, any> = {};
+  // Single shared buffers — factory.document() writes directly here.
+  const sharedNodes: Record<string, grida.program.nodes.Node> = {};
+  const sharedLinks: Record<string, string[]> = {};
+  const sharedImageRefsUsed = new Set<string>();
+  const sharedFigmaIdMap = new Map<string, string>();
+
   const scenesRef: string[] = [];
+  const pageNames: string[] = [];
+  let nodeCount = 0;
 
-  for (const { name, result } of pageResults) {
-    const packed = result.document;
+  const sharedContext: iofigma.restful.factory.FactoryContext = {
+    ...context,
+    _shared_nodes: sharedNodes,
+    _shared_links: sharedLinks,
+    _shared_image_refs_used: sharedImageRefsUsed,
+    _shared_figma_id_map: sharedFigmaIdMap,
+  };
 
-    const sceneId =
-      packed.scene.id === "tmp" ? makeIdGenerator("scene")() : packed.scene.id;
+  for (const canvas of canvases) {
+    const background_color = canvas.backgroundColor
+      ? kolor.colorformats.newRGBA32F(
+          canvas.backgroundColor.r,
+          canvas.backgroundColor.g,
+          canvas.backgroundColor.b,
+          canvas.backgroundColor.a
+        )
+      : undefined;
+
+    const sceneId = makeIdGenerator("scene")();
+    const childrenRefs: string[] = [];
+
+    // Count nodes before this page so we can compute delta
+    const nodesBefore = Object.keys(sharedNodes).length;
+
+    for (const rootNode of canvas.children) {
+      const result = iofigma.restful.factory.document(
+        rootNode as any,
+        {},
+        sharedContext
+      );
+      // factory.document() already wrote nodes/links/imageRefs into shared
+      // buffers. We only need the scene's children_refs from the result.
+      childrenRefs.push(...result.document.scene.children_refs);
+    }
+
+    nodeCount += Object.keys(sharedNodes).length - nodesBefore;
 
     const sceneNode: grida.program.nodes.SceneNode = {
       type: "scene",
       id: sceneId,
-      name: name,
+      name: canvas.name,
       active: true,
       locked: false,
-      constraints: packed.scene.constraints,
-      guides: packed.scene.guides,
-      edges: packed.scene.edges,
-      background_color: packed.scene.background_color,
+      constraints: { children: "multiple" },
+      guides: [],
+      edges: [],
+      background_color,
     };
 
-    mergedNodes[sceneId] = sceneNode;
-    mergedLinks[sceneId] = packed.scene.children_refs;
+    (sharedNodes as any)[sceneId] = sceneNode;
+    sharedLinks[sceneId] = childrenRefs;
     scenesRef.push(sceneId);
-
-    Object.assign(mergedNodes, packed.nodes);
-    for (const [key, value] of Object.entries(packed.links)) {
-      if (key !== sceneId) {
-        mergedLinks[key] = value;
-      }
-    }
-    Object.assign(mergedImages, packed.images);
-    Object.assign(mergedBitmaps, packed.bitmaps);
-    Object.assign(mergedProperties, packed.properties);
-
-    for (const ref of result.imageRefsUsed) {
-      allImageRefsUsed.add(ref);
-    }
-  }
-
-  // Prune orphan nodes
-  const reachable = new Set<string>(scenesRef);
-  const queue = [...scenesRef];
-  while (queue.length > 0) {
-    const id = queue.pop()!;
-    const children = mergedLinks[id];
-    if (children) {
-      for (const childId of children) {
-        if (!reachable.has(childId)) {
-          reachable.add(childId);
-          queue.push(childId);
-        }
-      }
-    }
-  }
-  for (const id of Object.keys(mergedNodes)) {
-    if (!reachable.has(id)) {
-      delete mergedNodes[id];
-      delete mergedLinks[id];
-    }
+    pageNames.push(canvas.name);
   }
 
   const document: grida.program.document.Document = {
-    nodes: mergedNodes,
-    links: mergedLinks,
-    images: mergedImages,
-    bitmaps: mergedBitmaps,
-    properties: mergedProperties,
+    nodes: sharedNodes,
+    links: sharedLinks,
+    images: {},
+    bitmaps: {},
+    properties: {},
     scenes_ref: scenesRef,
     entry_scene_id: scenesRef[0],
   };
 
-  const imageRefsUsed = Array.from(allImageRefsUsed);
   const imageRecord: Record<string, Uint8Array> = {};
-  for (const ref of imageRefsUsed) {
+  for (const ref of sharedImageRefsUsed) {
     const imageBytes = imageProvider(ref);
     if (imageBytes) {
       imageRecord[ref] = imageBytes;
@@ -219,21 +217,25 @@ function mergePages(
   return {
     document,
     imageRecord,
-    imageRefsUsed,
-    pageNames: pageResults.map((p) => p.name),
+    imageRefsUsed: sharedImageRefsUsed,
+    pageNames,
+    nodeCount,
   };
 }
 
 function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
-  const archiveBytes = io.archive.pack(merged.document, merged.imageRecord);
-  const nodeCount = Object.keys(merged.document.nodes).filter(
-    (id) => merged.document.nodes[id]?.type !== "scene"
-  ).length;
+  const archiveBytes = io.archive.pack(
+    merged.document,
+    merged.imageRecord,
+    undefined,
+    undefined,
+    { level: 0, snapshot: false, skip_sort: true }
+  );
 
   return {
     bytes: archiveBytes,
     pageNames: merged.pageNames,
-    nodeCount,
+    nodeCount: merged.nodeCount,
     imageCount: Object.keys(merged.imageRecord).length,
   };
 }
@@ -258,9 +260,18 @@ export function fig2grida(
   const placeholderForMissing =
     options?.placeholder_for_missing_images !== false;
 
+  const preserveFigmaIds = options?.preserve_figma_ids;
+  const preferFixedTextSizing = options?.prefer_fixed_text_sizing;
+
   // --- Object input: REST JSON directly ---
   if (!(input instanceof Uint8Array)) {
-    return fig2gridaFromRestJson(input, undefined, placeholderForMissing);
+    return fig2gridaFromRestJson(
+      input,
+      undefined,
+      placeholderForMissing,
+      preserveFigmaIds,
+      preferFixedTextSizing
+    );
   }
 
   // --- Bytes input: detect format ---
@@ -271,14 +282,22 @@ export function fig2grida(
       return fig2gridaFromRestJson(
         restArchive.json,
         restArchive.images,
-        placeholderForMissing
+        placeholderForMissing,
+        preserveFigmaIds,
+        preferFixedTextSizing
       );
     }
     // Otherwise fall through to .fig parser (handles both ZIP and raw Kiwi)
   } else if (input.length > 0 && input[0] === 0x7b /* '{' */) {
     // JSON text — parse and treat as REST API response
     const json = JSON.parse(new TextDecoder().decode(input));
-    return fig2gridaFromRestJson(json, undefined, placeholderForMissing);
+    return fig2gridaFromRestJson(
+      json,
+      undefined,
+      placeholderForMissing,
+      preserveFigmaIds,
+      preferFixedTextSizing
+    );
   }
 
   return fig2gridaFromFigBytes(input, options);
@@ -287,6 +306,88 @@ export function fig2grida(
 // ---------------------------------------------------------------------------
 // .fig bytes path
 // ---------------------------------------------------------------------------
+
+interface FigPageResult {
+  name: string;
+  result: iofigma.restful.factory.FigmaImportResult;
+}
+
+/**
+ * Merge per-page results from the .fig/Kiwi path into a single Document.
+ * (The REST path uses buildMergedDocument with shared buffers instead.)
+ */
+function mergeFigPages(
+  pageResults: FigPageResult[],
+  imageProvider: (ref: string) => Uint8Array | undefined
+): MergedDocument {
+  const allImageRefsUsed = new Set<string>();
+  const mergedNodes: Record<string, any> = {};
+  const mergedLinks: Record<string, string[] | undefined> = {};
+  const scenesRef: string[] = [];
+  let nodeCount = 0;
+
+  for (const { name, result } of pageResults) {
+    const packed = result.document;
+
+    const sceneId =
+      packed.scene.id === "tmp" ? makeIdGenerator("scene")() : packed.scene.id;
+
+    const sceneNode: grida.program.nodes.SceneNode = {
+      type: "scene",
+      id: sceneId,
+      name: name,
+      active: true,
+      locked: false,
+      constraints: packed.scene.constraints,
+      guides: packed.scene.guides,
+      edges: packed.scene.edges,
+      background_color: packed.scene.background_color,
+    };
+
+    mergedNodes[sceneId] = sceneNode;
+    mergedLinks[sceneId] = packed.scene.children_refs;
+    scenesRef.push(sceneId);
+
+    const pageSizeBefore = Object.keys(mergedNodes).length;
+    Object.assign(mergedNodes, packed.nodes);
+    for (const [key, value] of Object.entries(packed.links)) {
+      if (key !== sceneId) {
+        mergedLinks[key] = value;
+      }
+    }
+    nodeCount += Object.keys(mergedNodes).length - pageSizeBefore;
+
+    for (const ref of result.imageRefsUsed) {
+      allImageRefsUsed.add(ref);
+    }
+  }
+
+  const document: grida.program.document.Document = {
+    nodes: mergedNodes,
+    links: mergedLinks,
+    images: {},
+    bitmaps: {},
+    properties: {},
+    scenes_ref: scenesRef,
+    entry_scene_id: scenesRef[0],
+  };
+
+  const imageRecord: Record<string, Uint8Array> = {};
+  for (const ref of allImageRefsUsed) {
+    const imageBytes = imageProvider(ref);
+    if (imageBytes) {
+      imageRecord[ref] = imageBytes;
+    }
+  }
+
+  return {
+    document,
+    imageRecord,
+    imageRefsUsed: allImageRefsUsed,
+    pageNames: pageResults.map((p) => p.name),
+    nodeCount,
+  };
+}
 
 function fig2gridaFromFigBytes(
   input: Uint8Array,
@@ -305,7 +406,7 @@ function fig2gridaFromFigBytes(
       .map((i) => pages[i]);
   }
 
-  const pageResults: PageResult[] = [];
+  const pageResults: FigPageResult[] = [];
   for (const page of pages) {
     const placeholderForMissing =
       options?.placeholder_for_missing_images !== false;
@@ -315,12 +416,14 @@ function fig2gridaFromFigBytes(
       gradient_id_generator: makeIdGenerator("grad"),
       prefer_path_for_geometry: true,
       placeholder_for_missing_images: placeholderForMissing,
+      preserve_figma_ids: options?.preserve_figma_ids,
+      prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
     });
     pageResults.push({ name: page.name, result });
   }
 
   return packMergedDocument(
-    mergePages(pageResults, (ref) => extractedImages.get(ref))
+    mergeFigPages(pageResults, (ref) => extractedImages.get(ref))
   );
 }
 
@@ -424,9 +527,11 @@ function extractCanvases(json: unknown): Array<{
 function restJsonToMergedDocument(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
-  placeholderForMissing: boolean
+  placeholderForMissing: boolean,
+  preserveFigmaIds?: boolean,
+  preferFixedTextSizing?: boolean
 ): MergedDocument {
-  const canvases = extractCanvases(json);
+  const rawCanvases = extractCanvases(json);
 
   // A single shared context across all pages prevents ID collisions when
   // merging nodes from different canvases.
@@ -434,7 +539,11 @@ function restJsonToMergedDocument(
     gradient_id_generator: makeIdGenerator("grad"),
     prefer_path_for_geometry: true,
     placeholder_for_missing_images: placeholderForMissing,
-    node_id_generator: makeIdGenerator("rest-import"),
+    preserve_figma_ids: preserveFigmaIds,
+    prefer_fixed_text_sizing: preferFixedTextSizing,
+    node_id_generator: preserveFigmaIds
+      ? undefined
+      : makeIdGenerator("rest-import"),
     ...(images &&
       Object.keys(images).length > 0 && {
         resolve_image_src: (ref: string) =>
@@ -442,119 +551,43 @@ function restJsonToMergedDocument(
       }),
   };
 
-  const pageResults: PageResult[] = canvases.map((canvas) => ({
-    name: canvas.name ?? "Page",
-    result: convertRootsToPackedScene(
-      canvas.name ?? "Page",
-      canvas.children ?? [],
-      canvas.backgroundColor,
-      context
-    ),
+  const canvases = rawCanvases.map((c) => ({
+    name: c.name ?? "Page",
+    children: c.children ?? [],
+    backgroundColor: c.backgroundColor,
   }));
 
-  return mergePages(pageResults, (ref) => (images ? images[ref] : undefined));
+  return buildMergedDocument(canvases, context, (ref) =>
+    images ? images[ref] : undefined
+  );
 }
 
 function fig2gridaFromRestJson(
   json: unknown,
   images: Record<string, Uint8Array> | undefined,
-  placeholderForMissing: boolean
+  placeholderForMissing: boolean,
+  preserveFigmaIds?: boolean,
+  preferFixedTextSizing?: boolean
 ): Fig2GridaResult {
   return packMergedDocument(
-    restJsonToMergedDocument(json, images, placeholderForMissing)
+    restJsonToMergedDocument(
+      json,
+      images,
+      placeholderForMissing,
+      preserveFigmaIds,
+      preferFixedTextSizing
+    )
   );
-}
-
-// ---------------------------------------------------------------------------
-// Shared per-page conversion: root nodes → FigmaImportResult
-// ---------------------------------------------------------------------------
-
-/**
- * Convert an array of root nodes into a single packed scene document.
- * Used by both the REST JSON path and the .fig Kiwi path (via
- * `iofigma.kiwi.convertPageToScene`).
- */
-function convertRootsToPackedScene(
-  name: string,
-  rootNodes: Array<Record<string, unknown>>,
-  backgroundColor: { r: number; g: number; b: number; a: number } | undefined,
-  context: iofigma.restful.factory.FactoryContext
-): iofigma.restful.factory.FigmaImportResult {
-  const background_color = backgroundColor
-    ? kolor.colorformats.newRGBA32F(
-        backgroundColor.r,
-        backgroundColor.g,
-        backgroundColor.b,
-        backgroundColor.a
-      )
-    : undefined;
-
-  if (rootNodes.length === 0) {
-    return {
-      document: emptyPackedScene(name, background_color),
-      imageRefsUsed: [],
-    };
-  }
-
-  const individualResults = rootNodes.map((rootNode) =>
-    iofigma.restful.factory.document(rootNode as any, {}, context)
-  );
-
-  const imageRefsUsed = new Set<string>();
-  for (const r of individualResults) {
-    for (const ref of r.imageRefsUsed) imageRefsUsed.add(ref);
-  }
-
-  let packed: grida.program.document.IPackedSceneDocument;
-  if (individualResults.length === 1) {
-    packed = individualResults[0].document;
-    packed.scene.background_color = background_color;
-  } else {
-    packed = emptyPackedScene(name, background_color);
-    for (const { document: d } of individualResults) {
-      Object.assign(packed.nodes, d.nodes);
-      Object.assign(packed.links, d.links);
-      Object.assign(packed.images, d.images);
-      Object.assign(packed.bitmaps, d.bitmaps);
-      Object.assign(packed.properties, d.properties);
-      packed.scene.children_refs.push(...d.scene.children_refs);
-    }
-  }
-
-  return {
-    document: packed,
-    imageRefsUsed: Array.from(imageRefsUsed),
-  };
-}
-
-function emptyPackedScene(
-  name: string,
-  background_color: ReturnType<typeof kolor.colorformats.newRGBA32F> | undefined
-): grida.program.document.IPackedSceneDocument {
-  return {
-    nodes: {},
-    links: {},
-    images: {},
-    bitmaps: {},
-    properties: {},
-    scene: {
-      type: "scene",
-      id: "tmp",
-      name,
-      children_refs: [],
-      guides: [],
-      edges: [],
-      constraints: { children: "multiple" },
-      background_color,
-    },
-  };
 }
 
 // ---------------------------------------------------------------------------
 // restJsonToGridaDocument — returns in-memory Document (no .grida packing)
 // ---------------------------------------------------------------------------
 
-export interface RestJsonToGridaOptions {
+export interface RestJsonToGridaOptions extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  "prefer_fixed_text_sizing"
+> {
   /**
    * Image hashes from Figma `images` metadata to raw bytes. When provided,
    * resolves `IMAGE` paint refs to `res://images/<hash>`.
@@ -583,11 +616,17 @@ export function restJsonToGridaDocument(
 ): RestJsonToGridaResult {
   _idCounter = 0;
   const images = options?.images;
-  const merged = restJsonToMergedDocument(json, images, true);
+  const merged = restJsonToMergedDocument(
+    json,
+    images,
+    true,
+    undefined,
+    options?.prefer_fixed_text_sizing
+  );
 
   return {
     document: merged.document,
     assets: merged.imageRecord,
-    imageRefsUsed: merged.imageRefsUsed,
+    imageRefsUsed: Array.from(merged.imageRefsUsed),
   };
 }

@@ -32,6 +32,7 @@ function allows_hierarchy_change(
   switch (node_type) {
     case "scene":
     case "container":
+    case "tray":
       return true;
     case "group":
     case "boolean":
@@ -298,6 +299,13 @@ function __self_update_gesture_transform_translate(
             // Current parent doesn't allow hierarchy changes, so prevent escaping
             return;
           }
+        }
+
+        // Tray can only be a child of Scene or another Tray
+        const moving_node = dq.__getNodeById(draft, node_id);
+        if (moving_node.type === "tray" && new_parent_id !== null) {
+          const target_node = dq.__getNodeById(draft, new_parent_id);
+          if (target_node.type !== "tray") return;
         }
 
         is_parent_changed = true;

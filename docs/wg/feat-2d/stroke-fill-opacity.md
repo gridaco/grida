@@ -1,5 +1,11 @@
 ---
 title: "Stroke-Fill Opacity Compositing"
+tags:
+  - internal
+  - wg
+  - canvas
+  - rendering
+
 ---
 
 # Stroke-Fill Opacity Compositing

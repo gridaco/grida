@@ -292,6 +292,28 @@ export namespace cg {
   export type TextAlignVertical = "top" | "center" | "bottom";
 
   /**
+   * A styled text run within an attributed string.
+   *
+   * Offsets (`start`, `end`) are **JS character indices** (UTF-16 code units)
+   * into the parent text string.  The FBS codec converts these to/from the
+   * UTF-8 byte offsets that the Rust side expects.
+   */
+  export interface StyledTextRun {
+    /** Inclusive start character index. */
+    start: number;
+    /** Exclusive end character index. */
+    end: number;
+    /** Per-run fill paints override. When absent, node-level fills are used. */
+    fill_paints?: cg.Paint[];
+    /** Per-run stroke paints override. */
+    stroke_paints?: cg.Paint[];
+    /** Per-run stroke width override. */
+    stroke_width?: number;
+    /** Per-run stroke alignment override. */
+    stroke_align?: cg.StrokeAlign;
+  }
+
+  /**
    * Open type feature tags
    *
    * @see https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist

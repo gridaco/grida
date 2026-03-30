@@ -1,0 +1,6 @@
+# Bench fixtures are large and not tracked in git.
+# Only source files and docs are tracked.
+*
+!.gitignore
+!README.md
+!*.bench.ts

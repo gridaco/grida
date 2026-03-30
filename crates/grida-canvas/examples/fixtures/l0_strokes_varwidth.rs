@@ -15,9 +15,24 @@ pub fn build() -> Scene {
             network: VectorNetwork {
                 vertices: vec![(0.0, 100.0), (66.0, 0.0), (133.0, 100.0), (200.0, 0.0)],
                 segments: vec![
-                    VectorNetworkSegment { a: 0, b: 1, ta: (22.0, -40.0), tb: (-22.0, 20.0) },
-                    VectorNetworkSegment { a: 1, b: 2, ta: (22.0, 20.0), tb: (-22.0, -40.0) },
-                    VectorNetworkSegment { a: 2, b: 3, ta: (22.0, -40.0), tb: (-22.0, 20.0) },
+                    VectorNetworkSegment {
+                        a: 0,
+                        b: 1,
+                        ta: (22.0, -40.0),
+                        tb: (-22.0, 20.0),
+                    },
+                    VectorNetworkSegment {
+                        a: 1,
+                        b: 2,
+                        ta: (22.0, 20.0),
+                        tb: (-22.0, -40.0),
+                    },
+                    VectorNetworkSegment {
+                        a: 2,
+                        b: 3,
+                        ta: (22.0, -40.0),
+                        tb: (-22.0, 20.0),
+                    },
                 ],
                 regions: vec![],
             },
@@ -40,52 +55,72 @@ pub fn build() -> Scene {
     let gap_y = 130.0;
 
     // Taper: thick start → thin end
-    let taper = s_curve(0.0, 0.0, cg::cg::varwidth::VarWidthProfile {
-        base: 3.0,
-        stops: vec![
-            cg::cg::varwidth::WidthStop { u: 0.0, r: 6.0 },
-            cg::cg::varwidth::WidthStop { u: 1.0, r: 0.5 },
-        ],
-    });
+    let taper = s_curve(
+        0.0,
+        0.0,
+        cg::cg::varwidth::VarWidthProfile {
+            base: 3.0,
+            stops: vec![
+                cg::cg::varwidth::WidthStop { u: 0.0, r: 6.0 },
+                cg::cg::varwidth::WidthStop { u: 1.0, r: 0.5 },
+            ],
+        },
+    );
 
     // Reverse taper: thin start → thick end
-    let reverse_taper = s_curve(0.0, gap_y, cg::cg::varwidth::VarWidthProfile {
-        base: 3.0,
-        stops: vec![
-            cg::cg::varwidth::WidthStop { u: 0.0, r: 0.5 },
-            cg::cg::varwidth::WidthStop { u: 1.0, r: 6.0 },
-        ],
-    });
+    let reverse_taper = s_curve(
+        0.0,
+        gap_y,
+        cg::cg::varwidth::VarWidthProfile {
+            base: 3.0,
+            stops: vec![
+                cg::cg::varwidth::WidthStop { u: 0.0, r: 0.5 },
+                cg::cg::varwidth::WidthStop { u: 1.0, r: 6.0 },
+            ],
+        },
+    );
 
     // Bulge: thin → thick → thin (calligraphy / brush-pen feel)
-    let bulge = s_curve(0.0, gap_y * 2.0, cg::cg::varwidth::VarWidthProfile {
-        base: 3.0,
-        stops: vec![
-            cg::cg::varwidth::WidthStop { u: 0.0, r: 1.0 },
-            cg::cg::varwidth::WidthStop { u: 0.5, r: 8.0 },
-            cg::cg::varwidth::WidthStop { u: 1.0, r: 1.0 },
-        ],
-    });
+    let bulge = s_curve(
+        0.0,
+        gap_y * 2.0,
+        cg::cg::varwidth::VarWidthProfile {
+            base: 3.0,
+            stops: vec![
+                cg::cg::varwidth::WidthStop { u: 0.0, r: 1.0 },
+                cg::cg::varwidth::WidthStop { u: 0.5, r: 8.0 },
+                cg::cg::varwidth::WidthStop { u: 1.0, r: 1.0 },
+            ],
+        },
+    );
 
     // Multi-stop: irregular width profile (4 stops)
-    let multi_stop = s_curve(0.0, gap_y * 3.0, cg::cg::varwidth::VarWidthProfile {
-        base: 3.0,
-        stops: vec![
-            cg::cg::varwidth::WidthStop { u: 0.0, r: 2.0 },
-            cg::cg::varwidth::WidthStop { u: 0.25, r: 7.0 },
-            cg::cg::varwidth::WidthStop { u: 0.6, r: 1.0 },
-            cg::cg::varwidth::WidthStop { u: 1.0, r: 5.0 },
-        ],
-    });
+    let multi_stop = s_curve(
+        0.0,
+        gap_y * 3.0,
+        cg::cg::varwidth::VarWidthProfile {
+            base: 3.0,
+            stops: vec![
+                cg::cg::varwidth::WidthStop { u: 0.0, r: 2.0 },
+                cg::cg::varwidth::WidthStop { u: 0.25, r: 7.0 },
+                cg::cg::varwidth::WidthStop { u: 0.6, r: 1.0 },
+                cg::cg::varwidth::WidthStop { u: 1.0, r: 5.0 },
+            ],
+        },
+    );
 
     // Uniform profile: single stop (should render like a regular constant-width stroke)
-    let uniform = s_curve(0.0, gap_y * 4.0, cg::cg::varwidth::VarWidthProfile {
-        base: 3.0,
-        stops: vec![
-            cg::cg::varwidth::WidthStop { u: 0.0, r: 3.0 },
-            cg::cg::varwidth::WidthStop { u: 1.0, r: 3.0 },
-        ],
-    });
+    let uniform = s_curve(
+        0.0,
+        gap_y * 4.0,
+        cg::cg::varwidth::VarWidthProfile {
+            base: 3.0,
+            stops: vec![
+                cg::cg::varwidth::WidthStop { u: 0.0, r: 3.0 },
+                cg::cg::varwidth::WidthStop { u: 1.0, r: 3.0 },
+            ],
+        },
+    );
 
     flat_scene(
         "L0 Strokes VarWidth",

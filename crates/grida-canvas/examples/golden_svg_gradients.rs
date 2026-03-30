@@ -58,6 +58,7 @@ fn render_scene(
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, width, height)),
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
     renderer.load_scene(scene);

@@ -1,5 +1,12 @@
 ---
 title: "Chromium Compositor — Glossary"
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - compositing
+
 ---
 
 # Chromium Compositor — Glossary

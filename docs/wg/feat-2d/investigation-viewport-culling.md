@@ -2,6 +2,13 @@
 title: "Investigation: Viewport Culling & Camera Caching"
 status: rejected
 date: 2026-03-22
+tags:
+  - internal
+  - wg
+  - canvas
+  - performance
+  - rendering
+
 ---
 
 # Investigation: Viewport Culling & Camera Caching

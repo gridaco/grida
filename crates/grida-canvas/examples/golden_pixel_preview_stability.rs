@@ -63,6 +63,7 @@ fn render_frame(scale: u8, zoom: f32, cx: f32, cy: f32) -> skia_safe::Image {
         camera,
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 
@@ -136,10 +137,7 @@ fn main() {
         border.set_color(Color::from_argb(255, 220, 220, 220));
         border.set_style(skia_safe::paint::Style::Stroke);
         border.set_stroke_width(1.0);
-        canvas.draw_rect(
-            Rect::from_xywh(x, y + label_h, cell_w, cell_h),
-            &border,
-        );
+        canvas.draw_rect(Rect::from_xywh(x, y + label_h, cell_w, cell_h), &border);
     }
 
     let image = surface.image_snapshot();
@@ -147,9 +145,11 @@ fn main() {
         .encode(None, skia_safe::EncodedImageFormat::PNG, None)
         .expect("encode");
     std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/pixel_preview_stability.png"),
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/goldens/pixel_preview_stability.png"
+        ),
         data.as_bytes(),
     )
     .expect("write png");
 }
-

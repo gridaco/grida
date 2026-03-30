@@ -17,7 +17,7 @@ use crate::node::schema::NodeId;
 use crate::painter::layer::Layer;
 use crate::runtime::camera::Camera2D;
 use crate::sk;
-use grida_text_edit::{CaretRect, SelectionRect, DEFAULT_CARET_WIDTH};
+use crate::text_edit::{CaretRect, SelectionRect, DEFAULT_CARET_WIDTH};
 use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, Rect};
 
 // ---------------------------------------------------------------------------
@@ -83,11 +83,7 @@ impl TextEditDecorationOverlay {
         cache: &SceneCache,
     ) {
         // Look up the node's world transform from the layer list.
-        let entry = cache
-            .layers
-            .layers
-            .iter()
-            .find(|e| e.id == deco.node_id);
+        let entry = cache.layers.layers.iter().find(|e| e.id == deco.node_id);
         let Some(entry) = entry else {
             return;
         };

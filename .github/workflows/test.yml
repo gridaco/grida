@@ -25,6 +25,16 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build Packages
         run: pnpm turbo build --filter='./packages/*'
+      # Build the @grida/canvas-wasm TypeScript wrapper only (tsup).
+      # The pre-compiled .wasm binary and Emscripten glue (.js) live in
+      # crates/grida-canvas-wasm/lib/bin/ and are checked in via Git LFS
+      # (fetched above). No Rust/Emscripten toolchain is needed here.
+      # tsup copies lib/bin/ into dist/ and emits dist/index.d.ts, which
+      # is what the editor typecheck depends on.
+      - name: Build Canvas WASM Package
+        run: pnpm turbo build --filter='@grida/canvas-wasm'
+      - name: Run Typecheck
+        run: pnpm typecheck
       - name: Run Lint
         run: pnpm turbo lint
       - name: Run Tests

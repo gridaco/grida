@@ -1,6 +1,13 @@
 ---
 id: attributed-text
 title: "Attributed Text: Data Model Specification"
+tags:
+  - internal
+  - wg
+  - typography
+  - text
+  - editor
+
 ---
 
 ## Motivation

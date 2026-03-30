@@ -1,6 +1,13 @@
 ---
 title: "Chromium Damage Tracking"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - performance
+
 ---
 
 # Chromium Damage Tracking

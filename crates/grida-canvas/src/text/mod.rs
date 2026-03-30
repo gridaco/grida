@@ -1,10 +1,33 @@
-pub mod attributed_text_conv;
+pub mod attributed_paragraph;
 pub mod paragraph_cache_layout;
 pub mod text_style;
 pub mod text_transform;
 
+use crate::cg::types::TextAlign;
 use crate::vectornetwork::VectorNetwork;
+use skia_safe::textlayout;
 use skia_safe::{textlayout::Paragraph, Matrix, Path, PathBuilder, Point};
+
+/// Create a [`ParagraphStyle`] with standard settings.
+///
+/// Shared by measurement (`ParagraphCache`), rendering (`attributed_paragraph`),
+/// and the text editing layout adapter. Centralises text-direction, alignment,
+/// rounding-hack suppression, and max-lines/ellipsis.
+pub fn make_paragraph_style(
+    align: TextAlign,
+    max_lines: Option<usize>,
+    ellipsis: Option<&str>,
+) -> textlayout::ParagraphStyle {
+    let mut ps = textlayout::ParagraphStyle::new();
+    ps.set_text_direction(textlayout::TextDirection::LTR);
+    ps.set_text_align(align.into());
+    ps.set_apply_rounding_hack(false);
+    if let Some(max_lines) = max_lines.filter(|&m| m > 0) {
+        ps.set_max_lines(max_lines);
+        ps.set_ellipsis(ellipsis.unwrap_or("..."));
+    }
+    ps
+}
 
 /// Convert a Skia [`Paragraph`] into a [`Path`].
 pub fn paragraph_to_path(paragraph: &mut Paragraph) -> Path {

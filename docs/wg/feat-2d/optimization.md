@@ -1,5 +1,12 @@
 ---
 title: Rendering Optimization Strategies
+format: md
+tags:
+  - internal
+  - wg
+  - canvas
+  - performance
+  - rendering
 ---
 
 # Rendering Optimization Strategies
@@ -368,7 +375,7 @@ Related:
    ]
    ```
 
-10. **Viewport Culling**
+10. **Viewport Culling (R-Tree Spatial Query)**
     - Use camera's `visible_rect` to cull via R-tree spatial index.
     - The R-tree indexes effect-expanded render bounds
       (`absolute_render_bounds`), not base geometry bounds. This means
@@ -384,6 +391,73 @@ Related:
       because the per-node bounds check adds overhead when most nodes are
       visible. The R-tree is required, not optional. See
       `investigation-viewport-culling.md` for full data.
+
+10b. **Draw-Loop Viewport Culling (`ViewportCull`)** ✅ IMPLEMENTED
+
+    The R-tree spatial query (item 10) identifies visible nodes during frame
+    planning, but the draw loop previously iterated ALL render commands in
+    the cached command tree (`LayerList.commands`) — relying on Skia's
+    internal clip-rect check to discard offscreen draws. Each `draw_picture`
+    call has ~0.5 µs of function dispatch overhead even when fully clipped,
+    costing O(N_total) per frame regardless of visibility.
+
+    **The optimization:** thread the R-tree result into the draw loop via
+    `ViewportCull`, a per-frame culling context that encapsulates:
+    - `visible_leaves: VisibilitySet` — compact `Vec<u64>` bitset (~1 ns
+      per O(1) lookup) built from the frame plan's visible indices
+    - `viewport: Rectangle` — world-space viewport rect (stored for future
+      RenderSurface culling)
+
+    The Painter receives `ViewportCull` and checks each `Draw` command
+    against the bitset before any hashmap lookups or Skia dispatch.
+
+    **Culling strategy per command type:**
+
+    | Command | Strategy | Reason |
+    | ------- | -------- | ------ |
+    | `Draw` | Bitset lookup on `VisibilitySet` | R-tree provides effect-expanded bounds — correct |
+    | `RenderSurface` | Always drawn | `surface.bounds` is the children-union from `geometry.get_render_bounds()` but does NOT include surface-level effect inflation (shadow offset, blur radius). Geometric culling would be incorrect. |
+    | `MaskGroup` | Always drawn | No bounds field; rare in practice |
+
+    The command tree (`LayerList.commands`) is NOT modified — it is a cached
+    scene representation rebuilt only on layout/font/image changes. Visibility
+    is a per-frame concern applied at draw time, matching Chromium's
+    compositor architecture.
+
+    **Architecture:**
+
+    ```text
+    FramePlan.viewport          ─┐
+    FramePlan.regions (indices) ─┤
+    FramePlan.promoted (ids)    ─┘
+                                 │
+                        ViewportCull::from_plan()
+                                 │
+                                 ▼
+                     Painter.viewport_cull ── draw_render_commands()
+                                                  │
+                                    Draw ─── is_leaf_visible()? ── skip / draw
+                                    RenderSurface ─── always draw
+                                    MaskGroup ─── always draw
+    ```
+
+    **Measured impact (Criterion, CPU raster, statistically rigorous):**
+
+    | Scene | Before | After | Delta |
+    | ----- | ------ | ----- | ----- |
+    | 50K nodes, zoomed in (1% visible) | 8.75 ms | 2.30 ms | **−74%** |
+    | 50K nodes, empty (0% visible) | 8.87 ms | 2.35 ms | **−73%** |
+    | 5K nodes, empty (0% visible) | 2.70 ms | 2.13 ms | −21% |
+    | 5K nodes, 25% visible | 2.79 ms | 2.25 ms | −19% |
+    | 5K nodes, all visible | 5.22 ms | 3.83 ms | −27% |
+
+    Camera benchmarks show zero regressions; zoomed-in scenarios improved
+    by 13–18% because fewer nodes are visible at high zoom.
+
+    **Future:** When `PainterRenderSurface.bounds` is updated to include
+    surface-level effect inflation (requires inflating container bounds in
+    the geometry cache), RenderSurface culling can be enabled using the
+    stored `viewport` rect.
 
 11. **Minimize Canvas State Changes**
     - Reuse transforms and paints.
@@ -850,17 +924,78 @@ missing the cheapest possible camera-change path.
 
 ---
 
+## Scene Loading & Layout
+
+Scene loading (`Renderer::load_scene`) is the cold-start path that runs
+before the first frame. For large documents (100K–150K+ nodes), the
+layout phase dominates (~95%+ of `load_scene` time). The remaining
+stages (geometry, effects, layers) are comparatively cheap.
+
+**Pipeline:** `load_scene` runs five stages in order: font collection,
+layout (Taffy tree build + flexbox + text measurement), geometry
+propagation, effect classification, and layer flattening.
+
+WASM runs ~5x slower than native for this workload due to allocator
+and single-thread overhead.
+
+34. **Skip Layout for Absolute-Position Documents** ✅ IMPLEMENTED
+
+    `skip_layout` bypasses the Taffy flexbox engine entirely.
+    `compute_schema_only()` walks the scene graph once and copies
+    schema positions/sizes — O(n) with no allocations, no text
+    measurement, no tree construction.
+
+    Correct for absolute-positioned documents. Documents with
+    auto-layout/flex containers require the full Taffy path.
+
+    ~5x layout speedup on small scenes; orders of magnitude on
+    100K+ node scenes where Taffy + text measurement dominate.
+
+    CLI: `cargo run -p grida-dev --release -- load-bench file.grida --skip-layout`
+
+35. **Pre-Allocate Layout Data Structures** ✅ IMPLEMENTED
+
+    `LayoutTree::reserve(node_count)` pre-allocates the TaffyTree slab
+    and ID-mapping HashMaps before tree construction. Avoids ~17
+    doubling reallocations for 100K+ node scenes. More impactful in
+    WASM where per-reallocation cost is higher.
+
+36. **Deferred / Viewport-Only Layout** (future)
+
+    Compute layout only for viewport-visible nodes on cold start.
+    Remaining nodes computed lazily as the user pans. Requires
+    bounding-box estimates from schema data.
+
+37. **Pre-Measure Text Before Taffy** (future)
+
+    Decouple text measurement from the Taffy measure callback.
+    Pre-measure all text nodes in a single pass, then run Taffy
+    with a lookup-table measure function. Eliminates repeated
+    Skia calls and enables future parallelization on native.
+
+38. **Cache Text Measurements by Width Constraint** (future)
+
+    Add a secondary cache keyed on `(node_id, width_constraint)`
+    that returns measurements directly, skipping Skia entirely for
+    repeated queries with the same width.
+
+**Diagnostic tooling:** `load-bench` CLI (`grida-dev load-bench`)
+for per-stage timing; `cargo bench -p cg --bench bench_load_scene`
+for Criterion benchmarks at synthetic scale.
+
+---
+
 ## Engine-Level
 
-34. **Precomputed World Transforms**
+39. **Precomputed World Transforms**
     - Avoid recalculating transforms per draw call.
     - Essential for random-access rendering.
 
-35. **Flat Table Architecture**
+40. **Flat Table Architecture**
     - All node data (transforms, bounds, styles) stored in flat maps.
     - Enables fast diffing, syncing, and concurrent access.
 
-36. **Scene Planner & Scheduler**
+41. **Scene Planner & Scheduler**
     - Builds the render pass list per frame.
     - Reacts to scene changes, memory pressure, frame budget.
     - Drives decisions to re-record, cache, evict, or degrade fidelity.
@@ -869,7 +1004,7 @@ missing the cheapest possible camera-change path.
 
 ## Future: Worker-Thread Rasterization
 
-37. **Multithreaded Rasterization**
+42. **Multithreaded Rasterization**
 
     Move SkPicture recording and/or render surface rasterization to worker
     threads. This is the single largest performance gap vs. Chromium:
@@ -891,11 +1026,11 @@ missing the cheapest possible camera-change path.
     specifically to compensate for this. Multithreaded rasterization
     applies only to native (desktop) builds.
 
-38. **BVH or Quadtree Spatial Index**
+43. **BVH or Quadtree Spatial Index**
     - Build dynamic index from `world_bounds` for fast spatial queries.
     - Currently using R-tree (rstar crate).
 
-39. **CRDT-Ready Data Stores**
+44. **CRDT-Ready Data Stores**
     - Flat table model enables future collaboration support.
 
 ---
@@ -912,6 +1047,87 @@ Each cached item costs GPU memory:
 
 Default budget: 128 MB. When exceeded, evict least-recently-used items.
 Chromium uses 64 MB default with soft/hard limits.
+
+---
+
+## Slow-Pan Smoothness (FrameLoop)
+
+Slow trackpad panning (80-120ms between scroll events) was laggier than
+fast panning — the fixed 50ms stable delay caused stable frames to fire
+between every pair of scroll events, nuking the pan image cache and forcing
+expensive full redraws.
+
+45. **Adaptive Stable Delay** ✅ IMPLEMENTED
+
+    `FrameLoop` tracks input cadence via exponential moving average and
+    extends the effective stable delay to `max(base_delay, cadence × 2.5)`.
+    During 80ms trackpad scrolling, the delay becomes ~200ms. Stable frames
+    only fire when the user truly stops interacting.
+
+    Cadence resets on session breaks (>500ms gap between events). Cadence
+    persists across stable frames (the user may still be scrolling slowly).
+
+    **Measured impact (synthetic 200-node scene, `fl_80ms` scenario):**
+
+    | Metric            | Before   | After  | Improvement |
+    | ----------------- | -------- | ------ | ----------- |
+    | Stable intrusions | 25       | 1      | -96%        |
+    | p50 frame time    | 3,025 µs | 163 µs | 18.6×       |
+
+    Implementation: `FrameLoop` in `runtime/frame_loop.rs`.
+
+46. **Pan Cache Preservation on Stable Frames** ✅ IMPLEMENTED
+
+    Stable frames no longer invalidate `pan_image_cache`. Previously,
+    `apply_changes()` and `queue()` nuked the pan cache when `stable=true`,
+    forcing the next unstable frame to do a full redraw. Since the stable
+    frame's render path recaptures the cache from every full-quality draw
+    anyway, the next unstable frame always has a fresh cache to blit from.
+
+    Implementation: removed `|| stable` from `invalidate_pan` condition in
+    both `apply_changes()` and `queue()` in `runtime/scene.rs`.
+
+47. **Fully-Visible Stable Frame Fast Path** (reverted — correctness issues)
+
+    When the viewport fully contains all scene content (`scene_envelope()`
+    containment check, O(1) via R-tree root node), the stable frame's full
+    draw path is redundant — the pan image cache already has the correct
+    pixels. The idea: blit from pan cache instead of doing an O(N) redraw.
+
+    **Why it was reverted:** Three correctness bugs in succession:
+    1. Blitting at `(0,0)` instead of the correct `(dx, dy)` offset caused
+       content to jump to the wrong position after panning stopped.
+    2. Blitting at `(dx, dy)` clips content at viewport edges — the stable
+       frame never filled in the exposed strips, leaving permanent culling
+       artifacts at max zoom-out.
+    3. Requiring `dx == dy == 0` and skipping the blit entirely (assuming
+       GPU surface persistence) caused stale back-buffer content to
+       accumulate — double-buffered GPU surfaces don't preserve content
+       across swaps.
+
+    **The idea is valid but needs a different approach:**
+    - The `scene_envelope()` utility (O(1) R-tree root AABB) is kept in
+      `cache/scene.rs` for future use.
+    - A correct implementation would need either: (a) always blit the pan
+      cache at `(0,0)` after verifying the cache was captured at the
+      current camera position (not just any position), or (b) use a
+      `last_had_data_changes` flag that is reliably set in BOTH the
+      `frame()` and legacy `redraw()` code paths.
+    - The legacy `redraw()` path does not call `apply_changes()`, so any
+      flag set there is stale. Migrating all hosts to `frame()` would
+      eliminate this dual-path problem.
+    - The `queue()` stable promotion (non-camera events → stable quality)
+      interacts badly with clamped zoom at min/max zoom limits — the zoom
+      doesn't actually change, so `camera_change == None`, causing
+      unintended stable promotion that nukes the zoom cache and forces a
+      ~100ms full redraw.
+
+    **Key files for future implementation:**
+    - `runtime/scene.rs` — `render_frame_with_plan_state()`, between the
+      pan-only cache check and the zoom cache check
+    - `cache/scene.rs` — `scene_envelope()` (already implemented)
+    - `runtime/scene.rs` — `apply_changes()` for `last_had_data_changes`
+    - `window/application.rs` — `frame()` vs `redraw()` dual-path issue
 
 ---
 

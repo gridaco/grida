@@ -2,6 +2,7 @@ use crate::cg::prelude::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::Painter;
 use crate::runtime::camera::CameraChangeKind;
+use crate::runtime::changes::{ChangeFlags, ChangeSet};
 use crate::runtime::counter::FrameCounter;
 use crate::runtime::render_policy::RenderPolicy;
 use crate::sk;
@@ -75,22 +76,40 @@ fn detect_image_mime(bytes: &[u8]) -> &'static str {
 /// Callback type used to request a redraw from the host window.
 pub type RequestRedrawCallback = Arc<dyn Fn()>;
 
-/// Options controlling renderer behaviour.
+/// Options controlling renderer behaviour at construction time.
+///
+/// Passed through the entire init chain: TS → C ABI → Application → Renderer.
+/// Fields here are applied once during construction. Most can also be changed
+/// at runtime via individual setters on `Renderer` / `ApplicationApi`.
 #[derive(Clone, Copy)]
 pub struct RendererOptions {
-    /// When true, embedded fonts will be registered.
+    /// When true, embedded fonts (Geist, GeistMono) will be registered.
     pub use_embedded_fonts: bool,
+    /// When true, the platform's system font manager is added as the default
+    /// fallback. This enables Skia's built-in font fallback for scripts not
+    /// covered by explicitly registered fonts (e.g. CJK via system-installed
+    /// Noto Sans).
+    ///
+    /// **Default: `false`** — matches the WASM/web environment where only
+    /// explicitly provided fonts are available. Set to `true` in native-only
+    /// dev tools (grida-dev `--system-fonts`) for convenient local previewing.
+    pub use_system_fonts: bool,
+    /// Initial renderer configuration. Applied at construction; individual
+    /// fields remain mutable via `Renderer::set_*` / `ApplicationApi` setters.
+    pub config: super::config::RuntimeRendererConfig,
 }
 
 impl Default for RendererOptions {
     fn default() -> Self {
         Self {
             use_embedded_fonts: false,
+            use_system_fonts: false,
+            config: Default::default(),
         }
     }
 }
 
-fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
+pub fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
     fn walk(id: &NodeId, graph: &SceneGraph, set: &mut HashSet<String>) {
         if let Ok(node) = graph.get_node(id) {
             match node {
@@ -121,6 +140,10 @@ pub struct FramePlan {
     /// Used by downstream stages to take optimized paths (e.g. skip tile
     /// invalidation when only panning, skip LOD recomputation, etc.).
     pub camera_change: CameraChangeKind,
+    /// World-space viewport rectangle used for the R-tree query.
+    /// Stored explicitly for downstream use (viewport culling construction,
+    /// future RenderSurface geometric culling).
+    pub viewport: rect::Rectangle,
     /// Node IDs that will be drawn via cached layer images (compositor blit).
     pub promoted: Vec<NodeId>,
     /// regions with their intersecting indices (live-drawn nodes only)
@@ -333,6 +356,12 @@ pub struct Renderer {
     /// Cached composited frame for zoom fast path.
     /// See [`ZoomImageCache`] for details.
     zoom_image_cache: Option<ZoomImageCache>,
+    /// Accumulated changes since the last frame.
+    ///
+    /// Mutation sites call [`mark_changed`] to declare what changed;
+    /// [`apply_changes`] consumes the set once per frame and performs
+    /// the correct invalidation for every cache layer.
+    changes: ChangeSet,
 }
 
 impl Renderer {
@@ -354,12 +383,12 @@ impl Renderer {
     }
 
     #[inline]
-    fn prefill_picture_cache_for_plan(
-        &mut self,
-        plan: &FramePlan,
-        policy: RenderPolicy,
-    ) {
+    fn prefill_picture_cache_for_plan(&mut self, plan: &FramePlan, policy: RenderPolicy) {
         let variant_key = policy.variant_key();
+        // Pre-compute whether variant key unification is safe for this policy.
+        // True when the policy differs from STANDARD only in effect-related
+        // fields — content, compositing, and clip policies are unchanged.
+        let can_unify = variant_key != 0 && policy.is_effect_only_variant();
         // Prefill picture cache for visible layers so Painter can reuse pictures even with masks.
         // Fast path: skip clone + recording when the picture is already cached (common case
         // on cache-warm frames). The clone of LayerEntry is expensive because it deep-copies
@@ -368,11 +397,29 @@ impl Renderer {
             for idx in indices {
                 if let Some(entry) = self.scene_cache.layers.layers.get(*idx) {
                     let id = entry.id;
+                    // Variant key unification for effects-free nodes.
+                    //
+                    // When a node has no effects (no blur, shadow, noise, glass,
+                    // backdrop blur), the SkPicture recorded under the "reduced
+                    // effects" policy (unstable frames) is byte-identical to the
+                    // "full quality" policy (stable frames). Storing such nodes
+                    // under the default variant key (0) avoids redundant
+                    // re-recording when the renderer switches between unstable
+                    // and stable frames — the first frame records the picture,
+                    // and the settle frame finds it immediately.
+                    //
+                    // On yrr-main (135K nodes, 0 effects), this eliminates ~800 us
+                    // of LayerEntry clones + SkPicture recordings on every settle.
+                    let effective_key = if can_unify && entry.layer.effects_empty() {
+                        0
+                    } else {
+                        variant_key
+                    };
                     // Check cache before cloning — avoids expensive deep clone on cache hits.
                     if self
                         .scene_cache
                         .picture
-                        .get_node_picture_variant(&id, variant_key)
+                        .get_node_picture_variant(&id, effective_key)
                         .is_some()
                     {
                         continue;
@@ -381,7 +428,7 @@ impl Renderer {
                     let entry = entry.clone();
                     let _ = self.with_recording_cached_with_policy(
                         &id,
-                        variant_key,
+                        effective_key,
                         policy,
                         |painter| {
                             painter.draw_layer(&entry.layer);
@@ -402,10 +449,10 @@ impl Renderer {
         &mut self,
         plan: &FramePlan,
     ) -> (
-        std::collections::HashMap<NodeId, crate::painter::PromotedBlit>,
+        crate::cache::fast_hash::NodeIdHashMap<NodeId, crate::painter::PromotedBlit>,
         usize,
     ) {
-        let mut blits = std::collections::HashMap::new();
+        let mut blits = crate::cache::fast_hash::new_node_id_map();
         let mut cache_hits = 0usize;
 
         for id in &plan.promoted {
@@ -433,12 +480,7 @@ impl Renderer {
                     }
                 } else if let Some(img) = layer_img.individual_image() {
                     // Individual texture path.
-                    let src_rect = Rect::new(
-                        0.0,
-                        0.0,
-                        img.width() as f32,
-                        img.height() as f32,
-                    );
+                    let src_rect = Rect::new(0.0, 0.0, img.width() as f32, img.height() as f32);
                     Some(crate::painter::PromotedBlit {
                         image: std::rc::Rc::clone(img),
                         src_rect,
@@ -469,7 +511,9 @@ impl Renderer {
         &mut self,
         canvas: &Canvas,
         plan: &FramePlan,
-        promoted_blits: Option<&std::collections::HashMap<NodeId, crate::painter::PromotedBlit>>,
+        promoted_blits: Option<
+            &crate::cache::fast_hash::NodeIdHashMap<NodeId, crate::painter::PromotedBlit>,
+        >,
     ) -> usize {
         // Select effect quality based on frame stability.
         // Unstable (interactive) frames use reduced effects for performance.
@@ -482,6 +526,11 @@ impl Renderer {
 
         self.prefill_picture_cache_for_plan(plan, policy);
 
+        // Build the viewport culling context from the frame plan.
+        // This enables the draw loop to skip off-screen Draw commands with
+        // a ~1ns bitset check instead of dispatching each to Skia (~0.5µs).
+        let viewport_cull = crate::painter::ViewportCull::from_plan(plan, &self.scene_cache.layers);
+
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,
@@ -489,6 +538,7 @@ impl Renderer {
             &self.scene_cache,
             policy,
         );
+        let painter = painter.with_viewport_cull(&viewport_cull);
         let painter = if let Some(blits) = promoted_blits {
             painter.with_promoted_blits(blits)
         } else {
@@ -533,6 +583,9 @@ impl Renderer {
         if options.use_embedded_fonts {
             font_repository.register_embedded_fonts();
         }
+        if options.use_system_fonts {
+            font_repository.enable_system_fallback();
+        }
         let mut image_repository = ImageRepository::new(store);
         system_images::register(&mut resources, &mut image_repository);
         let viewport_size = *camera.get_size();
@@ -547,7 +600,7 @@ impl Renderer {
             request_redraw,
             fc: FrameCounter::new(),
             plan: None,
-            config: RuntimeRendererConfig::default(),
+            config: options.config,
             layout_engine: crate::layout::engine::LayoutEngine::new(),
             window_context: RendererWindowContext::new(viewport_size),
             compositor_surface: None,
@@ -558,6 +611,7 @@ impl Renderer {
             downscale_dims: (0, 0),
             pan_image_cache: None,
             zoom_image_cache: None,
+            changes: ChangeSet::new(),
         }
     }
 
@@ -585,13 +639,47 @@ impl Renderer {
     /// `PainterRenderCommand` variants are added, the inner
     /// `update_commands` function must be updated to traverse them.
     pub fn update_layer_text(&mut self, node_id: NodeId, text: &str) {
+        self.update_layer_text_inner(node_id, text, None);
+    }
+
+    /// Update the text content for an attributed text node, replacing
+    /// both the plain text and the full `AttributedString` (text + runs).
+    ///
+    /// This keeps the run byte offsets in sync with the backing string,
+    /// preventing out-of-bounds panics in the paragraph cache.
+    pub fn update_layer_attributed_text(
+        &mut self,
+        node_id: NodeId,
+        text: &str,
+        attributed: crate::cg::types::AttributedString,
+    ) {
+        self.update_layer_text_inner(node_id, text, Some(attributed));
+    }
+
+    fn update_layer_text_inner(
+        &mut self,
+        node_id: NodeId,
+        text: &str,
+        attributed: Option<crate::cg::types::AttributedString>,
+    ) {
         use crate::painter::layer::{PainterPictureLayer, PainterRenderCommand};
+
+        fn update_text_layer(
+            tl: &mut crate::painter::layer::PainterPictureTextLayer,
+            text: &str,
+            attributed: &Option<crate::cg::types::AttributedString>,
+        ) {
+            tl.text = text.to_owned();
+            if let Some(ref attr) = attributed {
+                tl.attributed_string = Some(attr.clone());
+            }
+        }
 
         // Update text in the flat layer entries.
         for entry in &mut self.scene_cache.layers.layers {
             if let PainterPictureLayer::Text(ref mut tl) = entry.layer {
                 if tl.base.id == node_id {
-                    tl.text = text.to_owned();
+                    update_text_layer(tl, text, &attributed);
                     break;
                 }
             }
@@ -599,34 +687,44 @@ impl Renderer {
 
         // Update text in the render command tree (this is what the Painter
         // actually draws via draw_render_commands).
-        fn update_commands(commands: &mut [PainterRenderCommand], node_id: NodeId, text: &str) {
+        fn update_commands(
+            commands: &mut [PainterRenderCommand],
+            node_id: NodeId,
+            text: &str,
+            attributed: &Option<crate::cg::types::AttributedString>,
+        ) {
             for cmd in commands.iter_mut() {
                 match cmd {
                     PainterRenderCommand::Draw(ref mut layer) => {
                         if let PainterPictureLayer::Text(ref mut tl) = layer {
                             if tl.base.id == node_id {
-                                tl.text = text.to_owned();
+                                update_text_layer(tl, text, attributed);
                             }
                         }
                     }
                     PainterRenderCommand::MaskGroup(ref mut group) => {
-                        update_commands(&mut group.mask_commands, node_id, text);
-                        update_commands(&mut group.content_commands, node_id, text);
+                        update_commands(&mut group.mask_commands, node_id, text, attributed);
+                        update_commands(&mut group.content_commands, node_id, text, attributed);
                     }
                     PainterRenderCommand::RenderSurface(ref mut surface) => {
                         if let Some(ref mut own_layer) = surface.own_layer {
                             if let PainterPictureLayer::Text(ref mut tl) = own_layer {
                                 if tl.base.id == node_id {
-                                    tl.text = text.to_owned();
+                                    update_text_layer(tl, text, attributed);
                                 }
                             }
                         }
-                        update_commands(&mut surface.children, node_id, text);
+                        update_commands(&mut surface.children, node_id, text, attributed);
                     }
                 }
             }
         }
-        update_commands(&mut self.scene_cache.layers.commands, node_id, text);
+        update_commands(
+            &mut self.scene_cache.layers.commands,
+            node_id,
+            text,
+            &attributed,
+        );
 
         // Invalidate the paragraph cache for this node so the Painter
         // rebuilds the paragraph with the new text.
@@ -635,14 +733,31 @@ impl Renderer {
             .borrow_mut()
             .invalidate_by_id(node_id);
 
-        // Invalidate the picture cache for this node so the Painter
-        // doesn't use a stale cached picture.
-        self.scene_cache.picture.invalidate_node(node_id);
+        // Invalidate the pan image cache so mouse-move frames don't blit
+        // stale content while text is being edited.
+        self.pan_image_cache = None;
 
-        // Invalidate the compositor layer image for this node.
-        self.scene_cache.compositor.invalidate(&node_id);
-        // Free the atlas slot — it will be re-allocated on next capture.
-        self.compositor_atlas.free_node(&node_id);
+        // Record the change. apply_changes() will handle per-node
+        // picture/compositor/atlas invalidation and viewport caches.
+        self.mark_node_changed(node_id, ChangeFlags::NODE_TEXT);
+    }
+
+    /// Update the shape bounding rect for a text node's layer.
+    ///
+    /// Called during text editing to keep the surface overlay (selection/hover
+    /// outline) in sync with the paragraph's laid-out dimensions.
+    pub fn update_layer_text_shape(&mut self, node_id: NodeId, width: f32, height: f32) {
+        use crate::painter::layer::PainterPictureLayer;
+
+        for entry in &mut self.scene_cache.layers.layers {
+            if entry.id == node_id {
+                if let PainterPictureLayer::Text(ref mut tl) = entry.layer {
+                    let rect = skia_safe::Rect::from_xywh(0.0, 0.0, width, height);
+                    tl.shape = crate::painter::geometry::PainterShape::from_rect(rect);
+                }
+                break;
+            }
+        }
     }
 
     pub fn canvas(&self) -> &Canvas {
@@ -717,6 +832,7 @@ impl Renderer {
         if !enable {
             self.scene_cache.compositor.clear();
             self.compositor_atlas.clear();
+            self.mark_changed(ChangeFlags::CONFIG);
         }
     }
 
@@ -748,8 +864,7 @@ impl Renderer {
             // re-captured as individual textures on the next frame.
             self.scene_cache.compositor.invalidate_all();
             self.compositor_atlas.clear();
-            self.pan_image_cache = None;
-            self.zoom_image_cache = None;
+            self.mark_changed(ChangeFlags::CONFIG);
         }
     }
 
@@ -758,11 +873,16 @@ impl Renderer {
         let Some(scene) = self.scene.as_ref() else {
             return;
         };
+        let ids: Vec<_> = scene.graph.roots().to_vec();
+        self.fit_camera_to_nodes(&ids);
+    }
 
+    /// Adjust the camera to fit the given nodes in view with padding.
+    pub fn fit_camera_to_nodes(&mut self, ids: &[NodeId]) {
         let geometry = self.scene_cache.geometry();
         let mut union: Option<rect::Rectangle> = None;
-        for root in scene.graph.roots() {
-            if let Some(bounds) = geometry.get_world_bounds(&root) {
+        for id in ids {
+            if let Some(bounds) = geometry.get_world_bounds(id) {
                 union = Some(match union {
                     Some(existing) => rect::union(&[existing, bounds]),
                     None => bounds,
@@ -833,6 +953,18 @@ impl Renderer {
         self.config.render_policy = policy;
     }
 
+    /// Enable or disable layout computation during `load_scene`.
+    ///
+    /// When `skip` is true, `load_scene` bypasses the Taffy flexbox engine
+    /// and derives layout results directly from each node's schema position
+    /// and size. This is appropriate for documents with only absolute
+    /// positioning (e.g. imported Figma files without auto-layout).
+    ///
+    /// This flag must be set **before** calling `load_scene` / `switch_scene`.
+    pub fn set_skip_layout(&mut self, skip: bool) {
+        self.config.skip_layout = skip;
+    }
+
     /// Render the queued frame if any and return the completed statistics.
     /// Intended to be called by the host when a redraw request is received.
     ///
@@ -896,7 +1028,7 @@ impl Renderer {
         //
         // When the offset exceeds the viewport (no overlap with cached frame),
         // we fall through to a full redraw which captures a new snapshot.
-        if camera_change == CameraChangeKind::PanOnly && self.backend.is_gpu() {
+        if !stable && !camera_change.zoom_changed() && self.backend.is_gpu() {
             if let Some(ref cache) = self.pan_image_cache {
                 let width = surface.width() as f32;
                 let height = surface.height() as f32;
@@ -929,6 +1061,12 @@ impl Renderer {
                     let plan = FramePlan {
                         stable,
                         camera_change,
+                        viewport: rect::Rectangle {
+                            x: 0.0,
+                            y: 0.0,
+                            width: 0.0,
+                            height: 0.0,
+                        },
                         promoted: Vec::new(),
                         regions: Vec::new(),
                         compositor_indices: Vec::new(),
@@ -967,19 +1105,35 @@ impl Renderer {
             && self.zoom_image_cache.is_some()
             && camera_change.zoom_changed()
         {
-            let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &FramePlan {
-                stable,
-                camera_change,
-                promoted: Vec::new(),
-                regions: Vec::new(),
-                compositor_indices: Vec::new(),
-                display_list_duration: Duration::ZERO,
-                display_list_size_estimated: 0,
-            });
+            let zoom_cache_hit = self.try_zoom_cache_blit(
+                surface,
+                scene,
+                &FramePlan {
+                    stable,
+                    camera_change,
+                    viewport: rect::Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    },
+                    promoted: Vec::new(),
+                    regions: Vec::new(),
+                    compositor_indices: Vec::new(),
+                    display_list_duration: Duration::ZERO,
+                    display_list_size_estimated: 0,
+                },
+            );
             if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
                 let plan = FramePlan {
                     stable,
                     camera_change,
+                    viewport: rect::Rectangle {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 0.0,
+                        height: 0.0,
+                    },
                     promoted: Vec::new(),
                     regions: Vec::new(),
                     compositor_indices: Vec::new(),
@@ -1130,8 +1284,7 @@ impl Renderer {
 
         // Reuse or create a downscaled offscreen for interaction rendering.
         let interaction_scale = self.config.interaction_render_scale;
-        let use_downscale =
-            !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
+        let use_downscale = !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
         if use_downscale {
             let sw = (width * interaction_scale).ceil() as i32;
             let sh = (height * interaction_scale).ceil() as i32;
@@ -1249,8 +1402,7 @@ impl Renderer {
         let zoom_ratio = current_zoom / cache.zoom;
 
         // Only use cache if zoom ratio is within acceptable range.
-        if !((1.0 / ZOOM_IMAGE_CACHE_MAX_RATIO)..=ZOOM_IMAGE_CACHE_MAX_RATIO)
-            .contains(&zoom_ratio)
+        if !((1.0 / ZOOM_IMAGE_CACHE_MAX_RATIO)..=ZOOM_IMAGE_CACHE_MAX_RATIO).contains(&zoom_ratio)
         {
             // Too extreme — invalidate and fall through.
             self.zoom_image_cache = None;
@@ -1280,12 +1432,7 @@ impl Renderer {
         );
         let mut paint = SkPaint::default();
         paint.set_anti_alias(false);
-        canvas.draw_image_with_sampling_options(
-            &cache.image,
-            (0.0, 0.0),
-            sampling,
-            Some(&paint),
-        );
+        canvas.draw_image_with_sampling_options(&cache.image, (0.0, 0.0), sampling, Some(&paint));
         canvas.restore();
 
         let mid_flush_start = Instant::now();
@@ -1303,6 +1450,17 @@ impl Renderer {
                 direct_context.flush_and_submit();
             }
         }
+    }
+
+    /// Submit any pending overlay draws to the GPU.
+    ///
+    /// Call this after drawing overlays on [`Self::canvas()`] to make the
+    /// additional pixels visible. This is the same GPU submit that
+    /// `Application::draw_and_flush_devtools_overlay` performs after painting
+    /// selection outlines, frame title badges, and the size meter.
+    pub fn flush_overlay(&mut self) {
+        let surface = unsafe { &mut *self.backend.get_surface() };
+        Self::gpu_flush(surface);
     }
 
     /// Invoke the request redraw callback.
@@ -1325,6 +1483,9 @@ impl Renderer {
     /// Load a scene into the renderer. Caching will be performed lazily during
     /// rendering based on the configured caching strategy.
     pub fn load_scene(&mut self, scene: Scene) {
+        #[cfg(feature = "perf")]
+        let _t0 = crate::sys::perf_now();
+
         self.scene = Some(scene);
 
         self.scene_cache = cache::scene::SceneCache::new();
@@ -1332,13 +1493,28 @@ impl Renderer {
         self.zoom_image_cache = None;
         self.images.clear_missing_tracking();
         if let Some(scene) = self.scene.as_ref() {
+            #[cfg(feature = "perf")]
+            let _t_fonts_start = crate::sys::perf_now();
             let requested = collect_scene_font_families(scene);
             self.fonts.set_requested_families(requested.into_iter());
+            #[cfg(feature = "perf")]
+            let _t_fonts = crate::sys::perf_now();
 
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Compute layout phase
-            {
+            //
+            // NOTE: We cannot auto-skip Taffy based on has_flex() alone because
+            // compute_schema_only() skips text measurement — text nodes with
+            // height=None would get height=0 and become invisible. A future
+            // optimization could use a hybrid path that skips flex computation
+            // but still measures text via the paragraph cache.
+            if self.config.skip_layout {
+                // Fast path: derive layout directly from schema positions/sizes.
+                // Skips Taffy tree construction, flexbox computation, and text
+                // measurement — O(n) with minimal per-node work.
+                self.layout_engine.compute_schema_only(scene);
+            } else {
                 let mut paragraph_cache = self.scene_cache.paragraph.borrow_mut();
                 self.layout_engine.compute(
                     scene,
@@ -1349,6 +1525,8 @@ impl Renderer {
                     }),
                 );
             }
+            #[cfg(feature = "perf")]
+            let _t_layout = crate::sys::perf_now();
 
             // 2. Build geometry with layout results
             let layout_result = self.layout_engine.result();
@@ -1358,13 +1536,37 @@ impl Renderer {
                 layout_result,
                 viewport_size,
             );
+            #[cfg(feature = "perf")]
+            let _t_geometry = crate::sys::perf_now();
 
             // 3. Build effect tree (identifies render surface boundaries)
             self.scene_cache.update_effect_tree(scene);
+            #[cfg(feature = "perf")]
+            let _t_effects = crate::sys::perf_now();
 
             // 4. Build layers
             self.scene_cache.update_layers(scene);
+
+            #[cfg(feature = "perf")]
+            {
+                let _t_layers = crate::sys::perf_now();
+                eprintln!(
+                    "[load_scene] fonts={:.0}ms layout={:.0}ms geometry={:.0}ms effects={:.0}ms layers={:.0}ms total={:.0}ms",
+                    _t_fonts - _t_fonts_start,
+                    _t_layout - _t_fonts,
+                    _t_geometry - _t_layout,
+                    _t_effects - _t_geometry,
+                    _t_layers - _t_effects,
+                    _t_layers - _t0,
+                );
+            }
         }
+        // Record SCENE_LOAD so apply_changes() knows to clear picture/paragraph/
+        // path/compositor caches on the next frame. The scene_cache was already
+        // replaced above (empty), so the caches are naturally fresh — but the
+        // flag is still needed for viewport snapshot caches and any future
+        // apply_changes() logic.
+        self.mark_changed(ChangeFlags::SCENE_LOAD);
         self.queue_stable();
     }
 
@@ -1385,10 +1587,13 @@ impl Renderer {
             self.scene_cache.compositor.mark_all_stale();
         }
 
-        // Invalidate pan image cache when zoom changes or on stable frames.
+        // Invalidate pan image cache on zoom changes only.
         // Zoom changes alter the pixel content (different scale/density).
-        // Stable frames should produce a full-quality render, not a cached blit.
-        if camera_change.zoom_changed() || stable {
+        // Stable frames do NOT nuke the pan cache — the cache is valid for
+        // pan-only and no-change scenarios. The render path recaptures it
+        // from the full-quality draw anyway, so the next unstable frame
+        // always has a fresh cache to blit from.
+        if camera_change.zoom_changed() {
             self.pan_image_cache = None;
         }
 
@@ -1409,8 +1614,10 @@ impl Renderer {
         let can_defer = !stable
             && self.backend.is_gpu()
             && (
+                // No content or camera change — overlay-only (marquee, hover)
+                (!camera_change.any_changed() && self.pan_image_cache.is_some())
                 // Pan cache will likely hit
-                (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
+                || (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
                 // Zoom cache will likely hit
                 || (camera_change.zoom_changed() && self.zoom_image_cache.is_some())
             );
@@ -1486,7 +1693,55 @@ impl Renderer {
         Some(self.render_frame(plan))
     }
 
+    /// Restore cached content for overlay-only frames.
+    ///
+    /// Blits the pan image cache at (0,0) onto the backend surface,
+    /// restoring the content layer without the previous overlay pixels.
+    /// Returns `true` if the blit succeeded, `false` if no cache exists.
+    ///
+    /// Used when neither scene data nor the camera changed — the content
+    /// is identical, so we skip the expensive frame-plan + draw and just
+    /// repaint the overlay on top of cached content.
+    pub fn blit_content_cache(&mut self) -> bool {
+        if !self.backend.is_gpu() {
+            return false;
+        }
+        let cache = match self.pan_image_cache.as_ref() {
+            Some(c) => c,
+            None => return false,
+        };
+        // The pan cache image was captured at (origin_tx, origin_ty).
+        // If the camera has since moved (e.g. pan-only fast-path frames
+        // that don't recapture), we must offset the blit — otherwise the
+        // settle frame "reverts" to the old camera position.
+        let vm = self.camera.view_matrix();
+        let dx = vm.matrix[0][2] - cache.origin_tx;
+        let dy = vm.matrix[1][2] - cache.origin_ty;
+
+        let surface = unsafe { &mut *self.backend.get_surface() };
+        let canvas = surface.canvas();
+        if dx != 0.0 || dy != 0.0 {
+            // Offset blit — need to clear first (exposed edges).
+            if let Some(scene) = self.scene.as_ref() {
+                if let Some(bg) = scene.background_color {
+                    canvas.clear(skia_safe::Color::from(bg));
+                } else {
+                    canvas.clear(skia_safe::Color::TRANSPARENT);
+                }
+            } else {
+                canvas.clear(skia_safe::Color::TRANSPARENT);
+            }
+        }
+        canvas.draw_image(&cache.image, (dx, dy), None);
+        Self::gpu_flush(surface);
+        true
+    }
+
     /// Clear the cached scene picture.
+    ///
+    /// **Prefer [`mark_changed`] + [`apply_changes`]** for new code.
+    /// This method is retained for the few call sites that have not yet
+    /// been migrated to the central change-tracking system.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();
         // Also invalidate all compositor layer images so they re-rasterize.
@@ -1496,6 +1751,167 @@ impl Renderer {
         self.zoom_image_cache = None;
     }
 
+    // -------------------------------------------------------------------
+    // Central change-tracking
+    // -------------------------------------------------------------------
+
+    /// Declare that something changed.
+    ///
+    /// Callers set the appropriate [`ChangeFlags`] to describe the
+    /// mutation. The renderer accumulates them until the next frame,
+    /// when [`apply_changes`] translates the flags into precise
+    /// per-cache invalidation.
+    pub fn mark_changed(&mut self, flags: ChangeFlags) {
+        self.changes.mark(flags);
+    }
+
+    /// Declare that a specific node changed.
+    ///
+    /// Same as [`mark_changed`] but also records the node ID for
+    /// surgical per-node cache invalidation.
+    pub fn mark_node_changed(&mut self, id: NodeId, flags: ChangeFlags) {
+        self.changes.push_node(id, flags);
+    }
+
+    /// Consume accumulated changes and perform cache invalidation.
+    ///
+    /// Called once per frame (at the start of `Application::frame()`)
+    /// before building the frame plan.  This is the **single source of
+    /// truth** for which caches are invalidated by which mutations.
+    ///
+    /// The `camera_change` parameter is folded in so that zoom/pan
+    /// invalidation lives in the same dispatch table.
+    /// Returns `true` when content actually needs re-rendering (data or
+    /// camera changed).  Returns `false` for overlay-only frames (e.g.
+    /// marquee drag, hover highlight) where the caller can skip the
+    /// expensive frame-plan + draw and just blit the cached content.
+    pub fn apply_changes(&mut self, camera_change: CameraChangeKind, stable: bool) -> bool {
+        let cs = self.changes.take();
+        let flags = cs.flags();
+
+        // Fast path: nothing changed (pure camera move handled below).
+        let has_data_changes = !flags.is_empty();
+        let content_changed = has_data_changes || camera_change.any_changed();
+
+        // ----- Layout -----
+        // Scene load handles its own layout in load_scene(); skip here.
+        // Viewport resize needs layout only when the scene has ICB nodes
+        // or auto-sized roots (the common infinite-canvas case has neither).
+        // Invalidate paragraph cache before layout so rebuild_scene_caches()
+        // measures text with the new fonts rather than stale fallback paragraphs.
+        if flags.contains(ChangeFlags::FONT_LOADED) {
+            self.scene_cache.paragraph.borrow_mut().invalidate();
+        }
+
+        if has_data_changes && !flags.contains(ChangeFlags::SCENE_LOAD) {
+            let needs_layout = flags
+                .intersects(ChangeFlags::LAYOUT_DIRTY | ChangeFlags::FONT_LOADED)
+                || (flags.contains(ChangeFlags::VIEWPORT_SIZE)
+                    && self.scene_has_viewport_dependent_layout());
+            if needs_layout {
+                self.rebuild_scene_caches();
+            }
+        }
+
+        // ----- Picture cache (per-node recorded Skia Pictures) -----
+        if flags.intersects(
+            ChangeFlags::SCENE_LOAD | ChangeFlags::FONT_LOADED | ChangeFlags::IMAGE_LOADED,
+        ) {
+            self.scene_cache.picture.invalidate();
+        } else if has_data_changes {
+            for &id in cs.nodes() {
+                self.scene_cache.picture.invalidate_node(id);
+            }
+        }
+
+        // ----- Paragraph cache (text layout) -----
+        // FONT_LOADED is handled above (before rebuild_scene_caches) so that
+        // layout measurement uses fresh paragraphs. Only SCENE_LOAD needs
+        // invalidation here.
+        if flags.contains(ChangeFlags::SCENE_LOAD) {
+            self.scene_cache.paragraph.borrow_mut().invalidate();
+        }
+        // Per-node paragraph invalidation is handled by update_layer_text
+        // which runs before mark_changed, so we don't repeat it here.
+
+        // ----- Vector path cache -----
+        if flags.contains(ChangeFlags::SCENE_LOAD) {
+            self.scene_cache.path.borrow_mut().invalidate();
+        }
+
+        // ----- Compositor (LayerImageCache) + Atlas -----
+        if flags.contains(ChangeFlags::SCENE_LOAD) {
+            self.scene_cache.compositor.clear();
+            self.compositor_atlas.clear();
+        } else if flags.intersects(ChangeFlags::FONT_LOADED | ChangeFlags::IMAGE_LOADED) {
+            self.scene_cache.compositor.invalidate_all();
+            self.compositor_atlas.clear();
+        } else if flags.contains(ChangeFlags::CONFIG) {
+            // Config changes (e.g. atlas toggle off) may need full compositor reset.
+            // The config-change call site sets compositor state directly before
+            // marking CONFIG; this handles the residual viewport cache clearing.
+        }
+        // Zoom-triggered compositor staleness
+        if camera_change.zoom_changed() && self.config.layer_compositing {
+            self.scene_cache.compositor.mark_all_stale();
+        }
+        // Per-node compositor invalidation
+        for &id in cs.nodes() {
+            self.scene_cache.compositor.invalidate(&id);
+            self.compositor_atlas.free_node(&id);
+        }
+
+        // ----- Viewport snapshot caches (pan/zoom image caches) -----
+        // These are the ONLY caches that truly depend on viewport dimensions.
+        //
+        // Pan cache: invalidate on data changes or zoom changes.  Stable
+        // frames do NOT nuke the pan cache — during slow panning, a stable
+        // frame firing between scroll events would destroy the cache and
+        // force an expensive full redraw on the next unstable frame.  The
+        // stable frame's render path recaptures the pan cache anyway.
+        let invalidate_pan = has_data_changes || camera_change.zoom_changed();
+        // Zoom cache: invalidate when content changed OR when a stable frame
+        // follows a camera change (full-quality recapture needed).  Overlay-
+        // only frames (no data + no camera change) must NOT nuke the zoom
+        // cache — the content is identical, and destroying the cache forces
+        // an expensive full draw on the next real zoom interaction.
+        let invalidate_zoom = has_data_changes || (stable && camera_change.any_changed());
+
+        if invalidate_pan {
+            self.pan_image_cache = None;
+        }
+        if invalidate_zoom {
+            self.zoom_image_cache = None;
+        }
+
+        content_changed
+    }
+
+    /// Check whether the current scene has layout that depends on viewport size.
+    ///
+    /// Returns `true` if any root node is an `InitialContainer` (ICB) — the
+    /// only node type whose Taffy style size is derived from viewport dimensions.
+    ///
+    /// When this returns `false`, `rebuild_scene_caches()` produces identical
+    /// output regardless of viewport size, so it can be skipped on resize.
+    fn scene_has_viewport_dependent_layout(&self) -> bool {
+        if self.config.skip_layout {
+            // compute_schema_only doesn't use viewport_size at all.
+            return false;
+        }
+        let Some(scene) = self.scene.as_ref() else {
+            return false;
+        };
+        for &root_id in scene.graph.roots() {
+            if let Ok(node) = scene.graph.get_node(&root_id) {
+                if matches!(node, Node::InitialContainer(_)) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     /// Rebuild scene caches after scene geometry has changed.
     /// Call this after modifying node sizes, positions, or other geometry properties.
     pub fn rebuild_scene_caches(&mut self) {
@@ -1503,7 +1919,9 @@ impl Renderer {
             let viewport_size = self.window_context.viewport_size;
 
             // 1. Recompute layout
-            {
+            if self.config.skip_layout {
+                self.layout_engine.compute_schema_only(scene);
+            } else {
                 let mut paragraph_cache = self.scene_cache.paragraph.borrow_mut();
                 self.layout_engine.compute(
                     scene,
@@ -1563,6 +1981,9 @@ impl Renderer {
             bounds.y + bounds.height,
         );
         let canvas = recorder.begin_recording(sk_bounds, true);
+        // Skia's built-in mipmaps evaluate LOD at rasterization time based on
+        // the final canvas transform, so Picture playback at different zoom
+        // levels automatically selects the correct mipmap level.
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,
@@ -1581,12 +2002,7 @@ impl Renderer {
         variant_key: u64,
         draw: impl FnOnce(&Painter),
     ) -> Option<Picture> {
-        self.with_recording_cached_with_policy(
-            id,
-            variant_key,
-            self.config.render_policy,
-            draw,
-        )
+        self.with_recording_cached_with_policy(id, variant_key, self.config.render_policy, draw)
     }
 
     fn with_recording_cached_with_policy(
@@ -1633,8 +2049,8 @@ impl Renderer {
     ) -> FramePlan {
         let __start = Instant::now();
 
-        let effective_layer_compositing = self.config.layer_compositing
-            && self.config.render_policy.allows_layer_compositing();
+        let effective_layer_compositing =
+            self.config.layer_compositing && self.config.render_policy.allows_layer_compositing();
 
         let mut promoted_ids: Vec<NodeId> = Vec::new();
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
@@ -1692,6 +2108,7 @@ impl Renderer {
         FramePlan {
             stable,
             camera_change,
+            viewport: bounds,
             promoted: promoted_ids,
             regions,
             compositor_indices,
@@ -1798,9 +2215,14 @@ impl Renderer {
             let scaled_w = offscreen.width();
             let scaled_h = offscreen.height();
             let result = self.draw_to_offscreen_and_upscale(
-                canvas, offscreen, plan, background_color,
-                width, height,
-                scaled_w, scaled_h,
+                canvas,
+                offscreen,
+                plan,
+                background_color,
+                width,
+                height,
+                scaled_w,
+                scaled_h,
                 scale,
             );
             if let Some(r) = result {
@@ -2023,11 +2445,7 @@ impl Renderer {
     /// during unstable (interactive) frames, and without limit on stable
     /// (settled) frames. Stale entries (zoom mismatch) are blitted with
     /// GPU texture stretching until re-rasterized.
-    fn update_compositor(
-        &mut self,
-        parent_surface: &mut Surface,
-        visible_indices: &[usize],
-    ) {
+    fn update_compositor(&mut self, parent_surface: &mut Surface, visible_indices: &[usize]) {
         self.update_compositor_inner(parent_surface, false, visible_indices);
     }
 
@@ -2076,8 +2494,7 @@ impl Renderer {
 
         // Time budget for stale re-rasterization during interactive frames.
         // 8ms leaves headroom within a 16ms frame budget (60fps target).
-        const ZOOM_RERASTER_BUDGET: std::time::Duration =
-            std::time::Duration::from_micros(8000);
+        const ZOOM_RERASTER_BUDGET: std::time::Duration = std::time::Duration::from_micros(8000);
         let budget_start = std::time::Instant::now();
 
         for &idx in visible_indices {
@@ -2216,11 +2633,11 @@ impl Renderer {
                         } else {
                             // Shouldn't reach here if our needs_new_page check was correct,
                             // but fall back to creating from the compositor surface.
-                            let info = skia_safe::ImageInfo::new_n32_premul(
-                                (w as i32, h as i32),
-                                None,
-                            );
-                            self.compositor_surface.as_mut().and_then(|cs| cs.new_surface(&info))
+                            let info =
+                                skia_safe::ImageInfo::new_n32_premul((w as i32, h as i32), None);
+                            self.compositor_surface
+                                .as_mut()
+                                .and_then(|cs| cs.new_surface(&info))
                         }
                     })
                     .is_some();
@@ -2239,7 +2656,11 @@ impl Renderer {
                         slot_canvas.scale((zoom, zoom));
                         slot_canvas.translate((-render_bounds.x, -render_bounds.y));
                         let painter = Painter::new_with_scene_cache(
-                            slot_canvas, fonts, images, scene_cache, policy,
+                            slot_canvas,
+                            fonts,
+                            images,
+                            scene_cache,
+                            policy,
                         );
                         painter.draw_layer(&entry_layer);
                     });
@@ -2291,12 +2712,16 @@ impl Renderer {
                 let bounds = skia_safe::IRect::from_wh(pixel_width, pixel_height);
                 if let Some(image) = offscreen.image_snapshot_with_bounds(bounds) {
                     self.scene_cache.compositor.insert(
-                        id, image, zoom, render_bounds, node_opacity, node_blend,
+                        id,
+                        image,
+                        zoom,
+                        render_bounds,
+                        node_opacity,
+                        node_blend,
                     );
                 }
             }
         }
-
     }
 }
 

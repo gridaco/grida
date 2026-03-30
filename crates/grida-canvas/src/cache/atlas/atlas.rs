@@ -10,9 +10,9 @@
 //! dependencies.
 
 use super::packing::{ShelfPacker, Slot, SlotId};
+use crate::cache::fast_hash::{new_node_id_map, NodeIdHashMap};
 use crate::node::schema::NodeId;
 use skia_safe::{Canvas, Image, Rect, Surface};
-use std::collections::HashMap;
 
 /// A single atlas page.
 ///
@@ -26,9 +26,9 @@ pub struct AtlasPage {
     /// Shelf packer managing slot allocation.
     packer: ShelfPacker,
     /// Map from slot ID to the node that occupies it.
-    slot_to_node: HashMap<SlotId, NodeId>,
+    slot_to_node: NodeIdHashMap<SlotId, NodeId>,
     /// Map from node ID to its allocated slot.
-    node_to_slot: HashMap<NodeId, Slot>,
+    node_to_slot: NodeIdHashMap<NodeId, Slot>,
     /// Whether the surface has been modified since the last snapshot.
     dirty: bool,
     /// Page index (for multi-page atlas sets).
@@ -70,8 +70,8 @@ impl AtlasPage {
             surface,
             image: None,
             packer: ShelfPacker::new(w, h),
-            slot_to_node: HashMap::new(),
-            node_to_slot: HashMap::new(),
+            slot_to_node: new_node_id_map(),
+            node_to_slot: new_node_id_map(),
             dirty: false,
             page_index,
         }
@@ -80,7 +80,12 @@ impl AtlasPage {
     /// Try to allocate a slot for a node of the given pixel dimensions.
     ///
     /// Returns `None` if the node doesn't fit on this page.
-    pub fn allocate(&mut self, node_id: NodeId, width: u32, height: u32) -> Option<AtlasAllocation> {
+    pub fn allocate(
+        &mut self,
+        node_id: NodeId,
+        width: u32,
+        height: u32,
+    ) -> Option<AtlasAllocation> {
         // If this node already has a slot, free it first.
         self.free_node(&node_id);
 
@@ -144,11 +149,7 @@ impl AtlasPage {
     /// at (0, 0) with the slot's width/height.
     ///
     /// Returns `false` if the node has no slot on this page.
-    pub fn draw_into_slot(
-        &mut self,
-        node_id: &NodeId,
-        draw_fn: impl FnOnce(&Canvas),
-    ) -> bool {
+    pub fn draw_into_slot(&mut self, node_id: &NodeId, draw_fn: impl FnOnce(&Canvas)) -> bool {
         let slot = match self.node_to_slot.get(node_id) {
             Some(s) => *s,
             None => return false,

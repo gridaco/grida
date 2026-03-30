@@ -3,10 +3,10 @@ use crate::io::io_grida_patch::TransactionApplyReport;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
+use crate::runtime::changes::ChangeFlags;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
-use crate::window::application::ApplicationApi;
-use crate::window::application::UnknownTargetApplication;
+use crate::window::application::{ApplicationApi, BoundsTarget, UnknownTargetApplication};
 use crate::window::command::ApplicationCommand;
 use crate::window::state::{self, GpuState, SurfaceState};
 #[cfg(not(target_arch = "wasm32"))]
@@ -212,8 +212,8 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.get_node_ids_from_envelope(rect)
     }
 
-    fn get_node_absolute_bounding_box(&mut self, id: &str) -> Option<Rectangle> {
-        self.base.get_node_absolute_bounding_box(id)
+    fn get_node_absolute_bounding_box(&mut self, target: BoundsTarget) -> Option<Rectangle> {
+        self.base.get_node_absolute_bounding_box(target)
     }
 
     fn export_node_as(
@@ -226,6 +226,10 @@ impl ApplicationApi for EmscriptenApplication {
 
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         self.base.to_vector_network(id)
+    }
+
+    fn get_node_id_path(&self, id: &str) -> Option<Vec<String>> {
+        self.base.get_node_id_path(id)
     }
 
     fn runtime_renderer_set_layer_compositing(&mut self, enable: bool) {
@@ -245,6 +249,10 @@ impl ApplicationApi for EmscriptenApplication {
         flags: crate::runtime::render_policy::RenderPolicyFlags,
     ) {
         self.base.runtime_renderer_set_render_policy_flags(flags);
+    }
+
+    fn runtime_renderer_set_skip_layout(&mut self, skip: bool) {
+        self.base.runtime_renderer_set_skip_layout(skip);
     }
 
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {
@@ -290,6 +298,10 @@ impl ApplicationApi for EmscriptenApplication {
 
     fn switch_scene(&mut self, scene_id: &str) {
         self.base.switch_scene(scene_id);
+    }
+
+    fn loaded_scene_ids(&self) -> Vec<String> {
+        self.base.loaded_scene_ids()
     }
 
     fn apply_document_transactions(
@@ -403,10 +415,10 @@ impl EmscriptenApplication {
     /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.base.renderer.add_font(family, data);
-        // Newly registered fonts may affect cached text layout; invalidate any
-        // existing cache so that the renderer re-computes geometry using the
-        // new typeface.
-        self.base.renderer.invalidate_cache();
+        // Newly registered fonts may affect cached text layout; the central
+        // apply_changes() dispatcher will invalidate paragraph + picture +
+        // compositor caches on the next frame.
+        self.base.renderer.mark_changed(ChangeFlags::FONT_LOADED);
     }
 
     /// Register an image with the renderer and return metadata.

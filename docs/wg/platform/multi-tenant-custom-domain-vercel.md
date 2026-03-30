@@ -1,5 +1,11 @@
 ---
 title: Multi-tenant Custom Domains on Vercel
+tags:
+  - internal
+  - wg
+  - platform
+  - infra
+
 ---
 
 | feature id            | status      | description                                                                                                      | PRs                                               |

@@ -6,6 +6,7 @@
  *
  * Supported input formats:
  *   .fig          Figma native binary (Kiwi/ZIP)
+ *   .deck         Figma Deck/Slides binary (same format as .fig)
  *   .json         Figma REST API JSON response
  *   .json.gz      Gzip-compressed REST API JSON
  *   .zip          REST API archive ZIP (contains document.json + images)
@@ -19,6 +20,7 @@
  *   --out, -o       Output path (default: input with .grida extension)
  *   --pages, -p     Comma-separated page indices to include (default: all)
  *   --info          Print file info (pages, node counts) — .fig only
+ *   --prefer-fixed-text-sizing  Use fixed width/height for text nodes
  *   --verbose       Print progress details
  *   --help          Show help
  */
@@ -32,7 +34,7 @@ function printHelp(): void {
   console.log(`
 fig2grida — Convert Figma files to .grida archives
 
-Supported inputs: .fig, .json, .json.gz, .zip
+Supported inputs: .fig, .deck, .json, .json.gz, .zip
 
 Usage:
   fig2grida <input> [output.grida]
@@ -43,11 +45,13 @@ Options:
   --out, -o       Output path (default: input with .grida extension)
   --pages, -p     Comma-separated page indices to include (default: all)
   --info          Print file info (pages, node counts) — .fig only
+  --prefer-fixed-text-sizing  Use fixed width/height for text nodes
   --verbose       Print progress details
   --help          Show help
 
 Examples:
   fig2grida design.fig
+  fig2grida presentation.deck
   fig2grida api-response.json.gz output.grida
   fig2grida design.fig --pages 0,2 --verbose
   fig2grida design.fig --info
@@ -61,6 +65,7 @@ interface CliArgs {
   info: boolean;
   verbose: boolean;
   help: boolean;
+  prefer_fixed_text_sizing: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -68,6 +73,7 @@ function parseArgs(argv: string[]): CliArgs {
     info: false,
     verbose: false,
     help: false,
+    prefer_fixed_text_sizing: false,
   };
 
   const positional: string[] = [];
@@ -92,6 +98,9 @@ function parseArgs(argv: string[]): CliArgs {
       case "-o":
         i++;
         args.output = argv[i];
+        break;
+      case "--prefer-fixed-text-sizing":
+        args.prefer_fixed_text_sizing = true;
         break;
       case "--pages":
       case "-p":
@@ -168,14 +177,16 @@ function main(): void {
   const inputPath = resolve(args.input);
   const lower = inputPath.toLowerCase();
 
-  // Reject .fig-only flags for REST-format inputs
-  if (!lower.endsWith(".fig")) {
+  const isFigLike = lower.endsWith(".fig") || lower.endsWith(".deck");
+
+  // Reject .fig/.deck-only flags for REST-format inputs
+  if (!isFigLike) {
     if (args.info) {
-      console.error("--info is only supported for .fig input.");
+      console.error("--info is only supported for .fig/.deck input.");
       process.exit(1);
     }
     if (args.pages) {
-      console.error("--pages is currently only supported for .fig input.");
+      console.error("--pages is currently only supported for .fig/.deck input.");
       process.exit(1);
     }
   }
@@ -188,7 +199,7 @@ function main(): void {
 
   // Strip known extensions to derive the default output name
   const stripExt = (name: string): string => {
-    for (const ext of [".json.gz", ".json", ".fig", ".zip"]) {
+    for (const ext of [".json.gz", ".json", ".fig", ".deck", ".zip"]) {
       if (name.toLowerCase().endsWith(ext)) {
         return name.slice(0, -ext.length);
       }
@@ -232,7 +243,9 @@ function main(): void {
   }
 
   // Build options
-  const options: Fig2GridaOptions = {};
+  const options: Fig2GridaOptions = {
+    prefer_fixed_text_sizing: args.prefer_fixed_text_sizing || undefined,
+  };
   if (args.pages) {
     options.pages = args.pages;
     if (args.verbose) {

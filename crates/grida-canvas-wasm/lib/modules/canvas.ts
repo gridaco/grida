@@ -196,6 +196,19 @@ export class Scene {
   }
 
   /**
+   * Return the IDs of all scenes decoded by the last `loadSceneGrida` call.
+   */
+  loadedSceneIds(): string[] {
+    this._assertAlive();
+    const outptr = this.module._loaded_scene_ids(this.appptr);
+    if (outptr === 0) {
+      return [];
+    }
+    const str = ffi.readLenPrefixedString(this.module, outptr);
+    return JSON.parse(str) as string[];
+  }
+
+  /**
    * Returns image refs that were needed during the last render but not found.
    * Only returns refs not yet reported in a previous call.
    * Returns an empty array if no new missing images.
@@ -452,7 +465,16 @@ export class Scene {
     return JSON.parse(str);
   }
 
-  getNodeAbsoluteBoundingBox(id: string): types.Rect | null {
+  /**
+   * Get the absolute bounding box of a node or the active scene.
+   *
+   * @param target - A node ID, or `"<scene>"` to get the union bounds of the
+   *   active scene's root children (computed in a single WASM call).
+   */
+  getNodeAbsoluteBoundingBox(
+    target: (string & {}) | "<scene>"
+  ): types.Rect | null {
+    const id = target;
     this._assertAlive();
     const [ptr, len] = this._alloc_string(id);
     const outptr = this.module._get_node_absolute_bounding_box(
@@ -470,6 +492,29 @@ export class Scene {
     this.module._deallocate(outptr, 4 * 4);
 
     return memory.rect_from_vec4(rect);
+  }
+
+  /**
+   * Return the structural node ID ancestry path from the scene root to the
+   * target node, inclusive.
+   *
+   * The returned array contains user-facing string IDs ordered as
+   * `[root, ..., parent, id]`.
+   *
+   * Returns `null` if the node does not exist in the scene.
+   */
+  getNodeIdPath(id: string): string[] | null {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(id);
+    const outptr = this.module._get_node_id_path(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+
+    if (outptr === 0) {
+      return null;
+    }
+
+    const str = ffi.readLenPrefixedString(this.module, outptr);
+    return JSON.parse(str);
   }
 
   /**
@@ -553,9 +598,7 @@ export class Scene {
    */
   surfacePointerMove(x: number, y: number): SurfaceResponse {
     this._assertAlive();
-    return unpackResponse(
-      this.module._surface_pointer_move(this.appptr, x, y)
-    );
+    return unpackResponse(this.module._surface_pointer_move(this.appptr, x, y));
   }
 
   /**
@@ -649,6 +692,54 @@ export class Scene {
   }
 
   /**
+   * Collect and group active paints across a set of nodes.
+   *
+   * Returns groups of identical paints with the node IDs that share each paint.
+   * Uses hash-based grouping (O(n)) instead of pairwise deep equality.
+   *
+   * Paint objects are converted from Rust's externally-tagged enum format to
+   * the JS `cg.Paint` format (internally tagged with `type` field, RGBA32F colors).
+   *
+   * @param ids - Node IDs to query.
+   * @param target - "fill" or "stroke"
+   * @param options.recursive - Include descendant subtrees (default: true).
+   * @param options.limit - Max distinct paint groups to return (0 = unlimited).
+   */
+  queryPaintGroups(
+    ids: string[],
+    target: "fill" | "stroke" = "fill",
+    options?: { recursive?: boolean; limit?: number }
+  ): Array<{ paint: any; node_ids: string[] }> {
+    this._assertAlive();
+    const recursive = options?.recursive ?? true;
+    const limit = options?.limit ?? 0;
+    const targetCode = target === "stroke" ? 1 : 0;
+
+    const idsJson = JSON.stringify(ids);
+    const [idsPtr, idsLen] = this._alloc_string(idsJson);
+    const ptr = this.module._query_paint_groups(
+      this.appptr,
+      idsPtr,
+      idsLen - 1,
+      targetCode,
+      recursive,
+      limit
+    );
+    this._free_string(idsPtr, idsLen);
+
+    if (ptr === 0) return [];
+    const str = ffi.readLenPrefixedString(this.module, ptr);
+    const raw = JSON.parse(str) as Array<{
+      paint: Record<string, any>;
+      node_ids: string[];
+    }>;
+    return raw.map((g) => ({
+      paint: convertRustPaintToJS(g.paint),
+      node_ids: g.node_ids,
+    }));
+  }
+
+  /**
    * Configure surface overlay rendering (size meter, frame titles, etc.).
    */
   setSurfaceOverlayConfig(config: SurfaceOverlayConfig) {
@@ -707,6 +798,21 @@ export class Scene {
   runtime_renderer_set_render_policy_flags(flags: number) {
     this._assertAlive();
     this.module._runtime_renderer_set_render_policy_flags(this.appptr, flags);
+  }
+
+  /**
+   * Skip layout computation during scene loading.
+   *
+   * When enabled, `load_scene` derives layout from schema positions/sizes
+   * instead of running the Taffy flexbox engine. Set **before** loading a scene.
+   *
+   * Use this for documents with only absolute positioning (e.g. imported
+   * Figma files without auto-layout) to eliminate the layout phase, which
+   * is the dominant cost in `load_scene` for large documents.
+   */
+  runtime_renderer_set_skip_layout(skip: boolean) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_skip_layout(this.appptr, skip);
   }
 
   runtime_renderer_set_outline_mode(enable: boolean) {
@@ -1060,3 +1166,59 @@ export type TextEditCommand =
   | { type: "SelectAll" }
   | { type: "Undo" }
   | { type: "Redo" };
+
+// ---------------------------------------------------------------------------
+// Paint format conversion: Rust externally-tagged enum → JS cg.Paint
+// ---------------------------------------------------------------------------
+
+/** Map from Rust enum variant name to JS `type` string. */
+const PAINT_TYPE_MAP: Record<string, string> = {
+  Solid: "solid",
+  LinearGradient: "linear_gradient",
+  RadialGradient: "radial_gradient",
+  SweepGradient: "sweep_gradient",
+  DiamondGradient: "diamond_gradient",
+  Image: "image",
+};
+
+/**
+ * Convert a CGColor from Rust u8 array `[r, g, b, a]` to JS RGBA32F object.
+ */
+function convertColor(c: number[]): { r: number; g: number; b: number; a: number } {
+  return { r: c[0] / 255, g: c[1] / 255, b: c[2] / 255, a: c[3] / 255 };
+}
+
+/**
+ * Convert a GradientStop from Rust format to JS format.
+ */
+function convertStop(stop: { offset: number; color: number[] }): {
+  offset: number;
+  color: { r: number; g: number; b: number; a: number };
+} {
+  return { offset: stop.offset, color: convertColor(stop.color) };
+}
+
+/**
+ * Convert a Paint from Rust's externally-tagged serde format to the JS
+ * cg.Paint format (internally tagged with `type`, RGBA32F colors).
+ *
+ * Rust: `{ "Solid": { active: true, color: [255, 0, 0, 255], blend_mode: "normal" } }`
+ * JS:   `{ type: "solid", active: true, color: { r: 1, g: 0, b: 0, a: 1 }, blend_mode: "normal" }`
+ */
+function convertRustPaintToJS(paint: Record<string, any>): any {
+  const variant = Object.keys(paint)[0];
+  const data = paint[variant];
+  const type = PAINT_TYPE_MAP[variant] ?? variant.toLowerCase();
+
+  const result: any = { type, ...data };
+
+  // Convert colors from u8 arrays to RGBA32F objects
+  if (data.color && Array.isArray(data.color)) {
+    result.color = convertColor(data.color);
+  }
+  if (data.stops && Array.isArray(data.stops)) {
+    result.stops = data.stops.map(convertStop);
+  }
+
+  return result;
+}

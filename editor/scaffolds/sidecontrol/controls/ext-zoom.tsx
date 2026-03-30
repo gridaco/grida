@@ -80,7 +80,7 @@ export function ZoomControl({ className }: { className?: string }) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => editor.camera.fit("*")}
+          onSelect={() => editor.camera.fit("<scene>")}
           className="text-xs"
         >
           Zoom to fit

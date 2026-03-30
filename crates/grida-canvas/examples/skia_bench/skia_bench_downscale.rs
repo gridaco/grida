@@ -26,9 +26,7 @@ fn main() {
 #[cfg(feature = "native-gl-context")]
 fn main() {
     use cg::window::headless::HeadlessGpu;
-    use skia_safe::{
-        canvas::SrcRectConstraint, Color, ImageInfo, Paint, Rect, Surface,
-    };
+    use skia_safe::{canvas::SrcRectConstraint, Color, ImageInfo, Paint, Rect, Surface};
     use std::time::Instant;
 
     let mut gpu = HeadlessGpu::new(2000, 2000).expect("GPU init");
@@ -77,10 +75,7 @@ fn main() {
             (i * 31 % 256) as u8,
             (i * 53 % 256) as u8,
         ));
-        atlas_canvas.draw_rect(
-            Rect::from_xywh(x as f32, y as f32, ns, ns),
-            &p,
-        );
+        atlas_canvas.draw_rect(Rect::from_xywh(x as f32, y as f32, ns, ns), &p);
         atlas_src_rects.push(Rect::from_xywh(x as f32, y as f32, ns, ns));
     }
     flush(&mut atlas_surface);
@@ -200,7 +195,8 @@ fn main() {
 
         println!(
             "  target {:>4}x{:<4} | {:>6} us  ({:>5.0} fps)  {:.1} us/blit  scale={:.3}",
-            target_size, target_size,
+            target_size,
+            target_size,
             avg.as_micros(),
             1_000_000.0 / avg.as_micros() as f64,
             avg.as_micros() as f64 / node_count as f64,
@@ -279,7 +275,8 @@ fn main() {
 
         println!(
             "  target {:>4}x{:<4} | {:>6} us  ({:>5.0} fps)  {:.1} us/blit  scale={:.3}",
-            target_size, target_size,
+            target_size,
+            target_size,
             avg.as_micros(),
             1_000_000.0 / avg.as_micros() as f64,
             avg.as_micros() as f64 / node_count as f64,
@@ -395,10 +392,7 @@ fn main() {
             tc.translate((pan_x, 0.0));
             for i in 0..node_count {
                 let (wx, wy) = world_positions[i];
-                tc.draw_rect(
-                    Rect::from_xywh(wx, wy, ns, ns),
-                    &node_paints[i],
-                );
+                tc.draw_rect(Rect::from_xywh(wx, wy, ns, ns), &node_paints[i]);
             }
             tc.restore();
             flush(&mut target);
@@ -416,10 +410,7 @@ fn main() {
             tc.translate((pan_x, 0.0));
             for i in 0..node_count {
                 let (wx, wy) = world_positions[i];
-                tc.draw_rect(
-                    Rect::from_xywh(wx, wy, ns, ns),
-                    &node_paints[i],
-                );
+                tc.draw_rect(Rect::from_xywh(wx, wy, ns, ns), &node_paints[i]);
             }
             tc.restore();
             flush(&mut target);
@@ -428,7 +419,8 @@ fn main() {
 
         println!(
             "  target {:>4}x{:<4} | {:>6} us  ({:>5.0} fps)  {:.1} us/blit  scale={:.3}",
-            target_size, target_size,
+            target_size,
+            target_size,
             avg.as_micros(),
             1_000_000.0 / avg.as_micros() as f64,
             avg.as_micros() as f64 / node_count as f64,
@@ -459,12 +451,7 @@ fn main() {
         let world_extent = cols as f32 * spacing;
         let camera_scale = target_size as f32 / world_extent;
 
-        let blur_filter = skia_safe::image_filters::blur(
-            (8.0, 8.0),
-            None,
-            None,
-            None,
-        );
+        let blur_filter = skia_safe::image_filters::blur((8.0, 8.0), None, None, None);
 
         // Warmup
         for frame in 0..warmup {
@@ -520,7 +507,8 @@ fn main() {
 
         println!(
             "  target {:>4}x{:<4} | {:>6} us  ({:>5.0} fps)  {:>5.1} us/blur  scale={:.3}",
-            target_size, target_size,
+            target_size,
+            target_size,
             avg.as_micros(),
             1_000_000.0 / avg.as_micros() as f64,
             avg.as_micros() as f64 / blur_count as f64,
@@ -609,7 +597,8 @@ fn main() {
 
         println!(
             "  target {:>4}x{:<4} | {:>6} us  ({:>5.0} fps)  {:>5.1} us/shadow  scale={:.3}",
-            target_size, target_size,
+            target_size,
+            target_size,
             avg.as_micros(),
             1_000_000.0 / avg.as_micros() as f64,
             avg.as_micros() as f64 / blur_count as f64,
@@ -645,10 +634,8 @@ fn main() {
             tc.translate((pan_x, 0.0));
             for i in 0..node_count {
                 let (wx, wy) = world_positions[i];
-                let rrect = skia_safe::RRect::new_rect_xy(
-                    Rect::from_xywh(wx, wy, ns, ns),
-                    8.0, 8.0,
-                );
+                let rrect =
+                    skia_safe::RRect::new_rect_xy(Rect::from_xywh(wx, wy, ns, ns), 8.0, 8.0);
                 // Fill
                 tc.draw_rrect(rrect, &node_paints[i]);
                 // Stroke
@@ -675,10 +662,8 @@ fn main() {
             tc.translate((pan_x, 0.0));
             for i in 0..node_count {
                 let (wx, wy) = world_positions[i];
-                let rrect = skia_safe::RRect::new_rect_xy(
-                    Rect::from_xywh(wx, wy, ns, ns),
-                    8.0, 8.0,
-                );
+                let rrect =
+                    skia_safe::RRect::new_rect_xy(Rect::from_xywh(wx, wy, ns, ns), 8.0, 8.0);
                 tc.draw_rrect(rrect, &node_paints[i]);
                 let mut stroke = Paint::default();
                 stroke.set_style(skia_safe::PaintStyle::Stroke);
@@ -694,7 +679,8 @@ fn main() {
 
         println!(
             "  target {:>4}x{:<4} | {:>6} us  ({:>5.0} fps)  {:.1} us/node  scale={:.3}",
-            target_size, target_size,
+            target_size,
+            target_size,
             avg.as_micros(),
             1_000_000.0 / avg.as_micros() as f64,
             avg.as_micros() as f64 / node_count as f64,

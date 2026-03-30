@@ -138,6 +138,29 @@ impl RenderPolicy {
         self
     }
 
+    /// Returns true when this policy differs from [`STANDARD`] only in
+    /// effect-related fields (`effect_quality`, `effects`).
+    ///
+    /// When true AND a node has no effects, the recorded `SkPicture` is
+    /// byte-identical to the default variant (`variant_key = 0`). The
+    /// picture cache can safely store such nodes under key 0, avoiding
+    /// redundant re-recording when switching between stable and unstable
+    /// frames.
+    ///
+    /// Returns false for wireframe, disabled compositing, suppressed
+    /// fills/strokes, or any other non-standard content configuration.
+    #[inline]
+    pub fn is_effect_only_variant(&self) -> bool {
+        matches!(
+            self.content,
+            ContentPolicy::Standard {
+                render_fills: true,
+                render_strokes: true
+            }
+        ) && self.compositing == CompositingPolicy::Enabled
+            && !self.ignore_clips_content
+    }
+
     /// True only for the default renderer behavior (full fills/strokes + effects + compositing).
     #[inline]
     pub fn is_default(&self) -> bool {
@@ -185,8 +208,13 @@ impl RenderPolicy {
     /// interactive frames still benefit from layer compositing.
     #[inline]
     pub fn allows_layer_compositing(&self) -> bool {
-        matches!(self.content, ContentPolicy::Standard { render_fills: true, render_strokes: true })
-            && self.effects == EffectsPolicy::Enabled
+        matches!(
+            self.content,
+            ContentPolicy::Standard {
+                render_fills: true,
+                render_strokes: true
+            }
+        ) && self.effects == EffectsPolicy::Enabled
             && self.compositing == CompositingPolicy::Enabled
             && !self.ignore_clips_content
     }

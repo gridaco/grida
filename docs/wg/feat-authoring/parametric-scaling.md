@@ -1,5 +1,11 @@
 ---
 title: Scale tool (K) — parameter-space scaling (A.k.a Apply Scale or K-Scale)
+tags:
+  - internal
+  - wg
+  - editor
+  - authoring
+
 ---
 
 | feature id           | status   | description                                  | PRs                                               |

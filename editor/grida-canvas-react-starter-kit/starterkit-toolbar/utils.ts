@@ -10,6 +10,7 @@ export type ToolbarToolType =
   | "polygon"
   | "star"
   | "container"
+  | "tray"
   | "image"
   | "line"
   | "arrow"
@@ -65,6 +66,7 @@ export function toolbar_value_to_cursormode(
     case "hand":
       return { type: "hand" };
     case "container":
+    case "tray":
     case "ellipse":
     case "image":
     case "rectangle":

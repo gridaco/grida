@@ -42,6 +42,12 @@ pub struct RuntimeRendererConfig {
     pub pixel_preview_strategy: PixelPreviewStrategy,
     /// Render policy describing how content/effects/compositing should be rendered.
     pub render_policy: super::render_policy::RenderPolicy,
+    /// When true, `load_scene` skips the Taffy layout computation and instead
+    /// derives each node's layout directly from its schema position and size.
+    ///
+    /// Use this for documents where all positioning is absolute (e.g. SVG). Eliminates the layout phase entirely,
+    /// which is the dominant cost in `load_scene` for large documents.
+    pub skip_layout: bool,
 }
 
 impl Default for RuntimeRendererConfig {
@@ -53,6 +59,7 @@ impl Default for RuntimeRendererConfig {
             pixel_preview_scale: 0,
             pixel_preview_strategy: PixelPreviewStrategy::Stable,
             render_policy: Default::default(),
+            skip_layout: false,
         }
     }
 }

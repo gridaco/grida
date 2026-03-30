@@ -1,5 +1,12 @@
 ---
 title: Rectangular Stroke Model (stroke-rect)
+tags:
+  - internal
+  - wg
+  - canvas
+  - painting
+  - rendering
+
 ---
 
 # Rectangular Stroke - `stroke-rect`

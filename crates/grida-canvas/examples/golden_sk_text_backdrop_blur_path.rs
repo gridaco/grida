@@ -94,15 +94,17 @@ fn draw_background_image(canvas: &sk::Canvas, width: i32, height: i32) {
     ];
     let positions = vec![0.0, 0.33, 0.66, 1.0];
 
-    if let Some(shader) = sk::Shader::radial_gradient(
-        center,
-        radius,
-        &*colors,
-        Some(&*positions),
-        sk::TileMode::Clamp,
-        None,
-        None,
-    ) {
+    let colors4f: Vec<_> = colors.iter().map(|c| sk::Color4f::from(*c)).collect();
+    let grad = sk::gradient_shader::Gradient::new(
+        sk::gradient_shader::GradientColors::new(
+            &colors4f,
+            Some(&positions),
+            sk::TileMode::Clamp,
+            None,
+        ),
+        sk::gradient_shader::Interpolation::default(),
+    );
+    if let Some(shader) = sk::shaders::radial_gradient((center, radius), &grad, None) {
         paint.set_shader(shader);
         canvas.draw_rect(Rect::from_wh(width as f32, height as f32), &paint);
     }
@@ -153,7 +155,7 @@ fn create_paragraph(text: &str, text_color: Color) -> Paragraph {
         text_transform: TextTransform::None,
     };
 
-    let text_style = textstyle(&text_style_rec, &None);
+    let text_style = textstyle(&text_style_rec, &None, None);
     let mut skia_text_style = text_style;
     skia_text_style.set_color(text_color);
 

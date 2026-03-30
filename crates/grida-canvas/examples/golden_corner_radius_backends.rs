@@ -32,16 +32,10 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     // Paints
-    let mut paint_rrect = Paint::new(
-        Color4f::new(0.84, 0.36, 0.36, 1.0),
-        &ColorSpace::new_srgb(),
-    );
+    let mut paint_rrect = Paint::new(Color4f::new(0.84, 0.36, 0.36, 1.0), &ColorSpace::new_srgb());
     paint_rrect.set_anti_alias(true);
 
-    let mut paint_corner = Paint::new(
-        Color4f::new(0.20, 0.47, 0.76, 1.0),
-        &ColorSpace::new_srgb(),
-    );
+    let mut paint_corner = Paint::new(Color4f::new(0.20, 0.47, 0.76, 1.0), &ColorSpace::new_srgb());
     paint_corner.set_anti_alias(true);
 
     let mut paint_rrect_overlay = paint_rrect.clone();

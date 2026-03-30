@@ -1,53 +1,53 @@
-use cg::cache::mipmap::{ImageMipmaps, MipmapConfig, MipmapLevels};
 use skia_safe::surfaces;
 
+/// Verifies that `Image::with_default_mipmaps()` produces a mipmapped image.
 #[test]
-fn full_chain_down_to_1x1() {
-    let width = 300;
-    let height = 200;
-
-    let mut surface = surfaces::raster_n32_premul((width, height)).unwrap();
+fn skia_with_default_mipmaps_works() {
+    let mut surface = surfaces::raster_n32_premul((512, 512)).unwrap();
     let image = surface.image_snapshot();
 
-    let config = MipmapConfig {
-        levels: MipmapLevels::FullChain,
-        chained: true,
-    };
-    let mip = ImageMipmaps::from_image(image, &config);
-    let expected_levels = (width.max(height) as f32).log2().ceil() as usize + 1;
-    assert_eq!(mip.level_count(), expected_levels);
+    let mipmapped = image.with_default_mipmaps();
+    assert!(
+        mipmapped.is_some(),
+        "with_default_mipmaps() should succeed for a 512×512 image"
+    );
 
-    let last = mip.last_level_image().unwrap();
-    assert!(last.width() <= 1 && last.height() <= 1);
+    let mipmapped = mipmapped.unwrap();
+    // The mipmapped image should have the same dimensions as the original.
+    assert_eq!(mipmapped.width(), 512);
+    assert_eq!(mipmapped.height(), 512);
 }
 
+/// Verifies that mipmapped images can be used to create shaders with mipmap sampling.
 #[test]
-fn best_for_size_selects_correct_level() {
-    let mut surface = surfaces::raster_n32_premul((300, 200)).unwrap();
+fn mipmapped_image_shader_creation() {
+    use skia_safe::{FilterMode, MipmapMode, SamplingOptions, TileMode};
+
+    let mut surface = surfaces::raster_n32_premul((256, 256)).unwrap();
     let image = surface.image_snapshot();
+    let mipmapped = image.with_default_mipmaps().unwrap();
 
-    let config = MipmapConfig {
-        levels: MipmapLevels::FullChain,
-        chained: true,
-    };
-    let mip = ImageMipmaps::from_image(image, &config);
-    let level = mip.best_for_size(100.0, 100.0).unwrap();
+    let sampling = SamplingOptions::new(FilterMode::Linear, MipmapMode::Nearest);
+    let tile_modes = (TileMode::Decal, TileMode::Decal);
 
-    assert_eq!(level.width(), 150);
-    assert_eq!(level.height(), 100);
+    let shader = mipmapped.to_shader(Some(tile_modes), sampling, None);
+    assert!(
+        shader.is_some(),
+        "Shader creation should succeed with mipmapped image"
+    );
 }
 
+/// Verifies that 1×1 images handle mipmaps gracefully.
 #[test]
-fn handles_nan_in_levels() {
-    let mut surface = surfaces::raster_n32_premul((100, 100)).unwrap();
+fn tiny_image_mipmaps() {
+    let mut surface = surfaces::raster_n32_premul((1, 1)).unwrap();
     let image = surface.image_snapshot();
 
-    let config = MipmapConfig {
-        levels: MipmapLevels::Fixed(vec![1.0, f32::NAN, 0.5]),
-        chained: true,
-    };
-
-    // should not panic
-    let mip = ImageMipmaps::from_image(image, &config);
-    assert_eq!(mip.level_count(), 3);
+    // with_default_mipmaps() may return None for 1×1 images — that's fine,
+    // the fallback in ImageRepository handles this.
+    let result = image.with_default_mipmaps();
+    // Either succeeds or falls back gracefully.
+    let img = result.unwrap_or(image);
+    assert_eq!(img.width(), 1, "Fallback image should be 1px wide");
+    assert_eq!(img.height(), 1, "Fallback image should be 1px tall");
 }

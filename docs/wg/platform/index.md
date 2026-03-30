@@ -1,5 +1,10 @@
 ---
 title: Platform (WG)
+tags:
+  - internal
+  - wg
+  - platform
+
 ---
 
 # Platform (WG)

@@ -118,12 +118,14 @@ fn draw_complex(canvas: &Canvas) {
         Color::from_argb(0xFF, 0x00, 0x00, 0xFF), // Blue
     ];
     let positions = [0.0, 0.5, 1.0];
-    let shader = Shader::linear_gradient(
+    let colors4f: Vec<_> = colors.iter().map(|c| Color4f::from(*c)).collect();
+    let grad = gradient_shader::Gradient::new(
+        gradient_shader::GradientColors::new(&colors4f, Some(&positions), TileMode::Clamp, None),
+        gradient_shader::Interpolation::default(),
+    );
+    let shader = shaders::linear_gradient(
         (Point::new(0.0, 0.0), Point::new(width, height)),
-        &colors[..],
-        Some(&positions[..]),
-        TileMode::Clamp,
-        None,
+        &grad,
         None,
     )
     .unwrap();
@@ -196,13 +198,22 @@ fn draw_complex(canvas: &Canvas) {
         Color::from_argb(0x00, 0xFF, 0xFF, 0xFF), // Transparent
     ];
     let radial_positions = [0.0, 1.0];
-    let radial_shader = Shader::radial_gradient(
-        Point::new(width / 2.0, height / 2.0),
-        width.min(height) / 2.0,
-        &radial_colors[..],
-        Some(&radial_positions[..]),
-        TileMode::Clamp,
-        None,
+    let radial_colors4f: Vec<_> = radial_colors.iter().map(|c| Color4f::from(*c)).collect();
+    let radial_grad = gradient_shader::Gradient::new(
+        gradient_shader::GradientColors::new(
+            &radial_colors4f,
+            Some(&radial_positions),
+            TileMode::Clamp,
+            None,
+        ),
+        gradient_shader::Interpolation::default(),
+    );
+    let radial_shader = shaders::radial_gradient(
+        (
+            Point::new(width / 2.0, height / 2.0),
+            width.min(height) / 2.0,
+        ),
+        &radial_grad,
         None,
     )
     .unwrap();

@@ -1,6 +1,13 @@
 ---
 title: "Chromium Resolution Scaling During Interaction"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - performance
+
 ---
 
 # Chromium Resolution Scaling During Interaction

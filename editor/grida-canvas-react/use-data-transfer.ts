@@ -597,14 +597,20 @@ export function useDataTransferEventTarget() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
 
-        // Check for .fig files and show helpful message
-        if (file.name.toLowerCase().endsWith(".fig")) {
+        // Check for .fig/.deck files and show helpful message
+        if (
+          file.name.toLowerCase().endsWith(".fig") ||
+          file.name.toLowerCase().endsWith(".deck")
+        ) {
           toast.info("Use [File] > [Import Figma] to import .fig files");
           continue;
         }
 
-        // Check for .grida files and show helpful message
-        if (file.name.toLowerCase().endsWith(".grida")) {
+        // Check for .grida / .grida1 files and show helpful message
+        if (
+          file.name.toLowerCase().endsWith(".grida") ||
+          file.name.toLowerCase().endsWith(".grida1")
+        ) {
           toast.info("Use [File] > [Open .grida] to import .grida files");
           continue;
         }

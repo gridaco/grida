@@ -59,10 +59,12 @@
 //! - Missing results indicate a bug in the layout engine.
 
 use crate::layout::cache::LayoutResult;
-use crate::layout::tree::{LayoutTree, TextMeasureContext, TextMeasureProvider};
+use crate::layout::tree::{
+    AttributedTextMeasureContext, LayoutTree, TextMeasureContext, TextMeasureProvider,
+};
 use crate::layout::ComputedLayout;
 use crate::node::scene_graph::SceneGraph;
-use crate::node::schema::{Node, NodeId, NodeRectMixin, Size};
+use crate::node::schema::{Node, NodeId, NodeRectMixin, NodeTypeTag, Size};
 use taffy::prelude::*;
 
 /// Layout engine for the scene graph.
@@ -94,11 +96,18 @@ impl LayoutEngine {
         viewport_size: Size,
         mut text_measure: Option<TextMeasureProvider<'_>>,
     ) -> &LayoutResult {
-        // Clear previous state
+        // Clear previous state and pre-allocate for the new scene size.
+        // HashMap::clear() preserves capacity, so subsequent calls with
+        // similar-sized scenes pay no allocation cost. The reserve() calls
+        // only allocate when the new scene exceeds prior capacity.
         self.tree.clear();
         self.result.clear();
 
         let graph = &scene.graph;
+        let node_count = graph.node_count();
+        self.tree.reserve(node_count);
+        self.result.reserve(node_count);
+
         let roots: Vec<NodeId> = graph.roots().to_vec();
 
         // Build and compute layout for each root subtree
@@ -136,10 +145,63 @@ impl LayoutEngine {
             // (Group, BoolOp) get manual layout results from schema data.
             // Children of non-Taffy parents get schema-position correction
             // via parent-type check (no extra bookkeeping needed).
-            self.extract_all_layouts(root_id, graph);
+            // Text nodes not in Taffy are measured on-the-fly if they lack
+            // explicit height in the schema.
+            self.extract_all_layouts(root_id, graph, &mut text_measure);
         }
 
         &self.result
+    }
+
+    /// Produce layout results directly from schema positions and sizes,
+    /// bypassing the Taffy layout engine entirely.
+    ///
+    /// This is a fast path for documents where all nodes are absolutely
+    /// positioned (e.g. Figma imports without auto-layout). Each node's
+    /// schema position and size are copied verbatim into the layout result.
+    ///
+    /// Only nodes reachable from the scene's roots are included (same
+    /// scope as the full Taffy path).
+    pub fn compute_schema_only(&mut self, scene: &crate::node::schema::Scene) -> &LayoutResult {
+        self.result.clear();
+        let graph = &scene.graph;
+        let node_count = graph.node_count();
+        self.result.reserve(node_count);
+
+        let roots: Vec<NodeId> = graph.roots().to_vec();
+        for root_id in &roots {
+            self.extract_schema_only_recursive(root_id, graph);
+        }
+        &self.result
+    }
+
+    /// Recursively extract schema positions/sizes for a node and its children.
+    ///
+    /// Uses `NodeGeoData` (~48 bytes) instead of full `Node` (~500+ bytes) to
+    /// read schema positions and sizes — avoids 136K full-Node reads.
+    fn extract_schema_only_recursive(
+        &mut self,
+        id: &NodeId,
+        graph: &crate::node::scene_graph::SceneGraph,
+    ) {
+        if let Some(geo) = graph.geo_data().get(id) {
+            let x = geo.schema_transform.x();
+            let y = geo.schema_transform.y();
+            self.result.insert(
+                *id,
+                ComputedLayout {
+                    x,
+                    y,
+                    width: geo.schema_width,
+                    height: geo.schema_height,
+                },
+            );
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                self.extract_schema_only_recursive(child_id, graph);
+            }
+        }
     }
 
     /// Get the full layout result
@@ -165,6 +227,7 @@ impl LayoutEngine {
             Node::RegularPolygon(n) => (n.size.width, n.size.height),
             Node::RegularStarPolygon(n) => (n.size.width, n.size.height),
             Node::TextSpan(n) => (n.width.unwrap_or(0.0), n.height.unwrap_or(0.0)),
+            Node::AttributedText(n) => (n.width.unwrap_or(0.0), n.height.unwrap_or(0.0)),
             Node::Vector(n) => {
                 let rect = n.network.bounds();
                 (rect.width, rect.height)
@@ -178,6 +241,13 @@ impl LayoutEngine {
             Node::Group(_) | Node::BooleanOperation(_) => {
                 // Size derived from children bounds (dynamic)
                 (0.0, 0.0)
+            }
+            Node::Tray(n) => {
+                // Tray has explicit dimensions
+                (
+                    n.layout_dimensions.layout_target_width.unwrap_or(0.0),
+                    n.layout_dimensions.layout_target_height.unwrap_or(0.0),
+                )
             }
             Node::Error(n) => (n.size.width, n.size.height),
             Node::InitialContainer(_) => (0.0, 0.0), // Size set by viewport
@@ -207,6 +277,7 @@ impl LayoutEngine {
             Node::RegularPolygon(n) => (n.transform.x(), n.transform.y()),
             Node::RegularStarPolygon(n) => (n.transform.x(), n.transform.y()),
             Node::TextSpan(n) => (n.transform.x(), n.transform.y()),
+            Node::AttributedText(n) => (n.transform.x(), n.transform.y()),
             Node::Vector(n) => (n.transform.x(), n.transform.y()),
             Node::Path(n) => (n.transform.x(), n.transform.y()),
             Node::Error(n) => (n.transform.x(), n.transform.y()),
@@ -216,6 +287,7 @@ impl LayoutEngine {
                 let t = n.transform.unwrap_or_default();
                 (t.x(), t.y())
             }
+            Node::Tray(n) => (n.position.x().unwrap_or(0.0), n.position.y().unwrap_or(0.0)),
             Node::BooleanOperation(n) => {
                 let t = n.transform.unwrap_or_default();
                 (t.x(), t.y())
@@ -223,13 +295,17 @@ impl LayoutEngine {
         }
     }
 
-    /// Check if a node type participates in Taffy layout.
+    /// Check if a node type participates in Taffy layout (using NodeTypeTag).
     ///
-    /// Virtual grouping nodes (Group, BooleanOperation) are excluded — they
-    /// have no intrinsic size, don't constrain children, and their bounds are
-    /// derived from children. Their children form independent Taffy subtrees.
-    fn is_layout_node(node: &Node) -> bool {
-        !matches!(node, Node::Group(_) | Node::BooleanOperation(_))
+    /// Group and BooleanOperation are excluded because their bounds are derived
+    /// from children. Tray is excluded because its children are independently
+    /// positioned and do not form a Taffy subtree. All three form independent
+    /// Taffy subtrees rooted at each of their children.
+    fn is_layout_node_tag(tag: NodeTypeTag) -> bool {
+        !matches!(
+            tag,
+            NodeTypeTag::Group | NodeTypeTag::Tray | NodeTypeTag::BooleanOperation
+        )
     }
 
     /// Recursively build Taffy tree for a node and its descendants.
@@ -245,11 +321,13 @@ impl LayoutEngine {
         viewport_size: Size,
         extra_roots: &mut Vec<taffy::NodeId>,
     ) -> Option<taffy::NodeId> {
-        let node = graph.get_node(node_id).ok()?;
+        // Fast-path: use compact layer_core (~16 bytes) for is_layout_node
+        // and is_flex_container checks before touching the full Node (~500+ bytes).
+        let lc = graph.get_layer_core(node_id)?;
 
         // Virtual grouping nodes don't participate in Taffy — skip them but
         // recurse into their children to discover Taffy-capable subtrees.
-        if !Self::is_layout_node(node) {
+        if !Self::is_layout_node_tag(lc.node_type) {
             if let Some(children) = graph.get_children(node_id) {
                 for child_id in children {
                     if let Some(taffy_id) =
@@ -262,6 +340,9 @@ impl LayoutEngine {
             return None;
         }
 
+        // Only access full Node for nodes that participate in Taffy layout.
+        let node = graph.get_node(node_id).ok()?;
+
         // Get style for this node (universal mapping)
         let mut style = crate::layout::into_taffy::node_to_taffy_style(node, graph, node_id);
 
@@ -269,7 +350,7 @@ impl LayoutEngine {
         // extract_all_layouts() post-processes to apply schema positions
 
         // Special handling for root ICB nodes - use viewport size
-        if let Node::InitialContainer(_) = node {
+        if lc.node_type == NodeTypeTag::InitialContainer {
             style.size = taffy::Size {
                 width: Dimension::length(viewport_size.width),
                 height: Dimension::length(viewport_size.height),
@@ -281,7 +362,20 @@ impl LayoutEngine {
 
         if let Some(children) = children {
             if !children.is_empty() {
-                // Build children recursively, filtering out those that shouldn't participate
+                // For non-flex containers (LayoutMode::Normal), children are
+                // positioned via schema coordinates, not flex layout. Create
+                // this container as a Taffy leaf — it only needs its own size
+                // for its parent's flex computation. Children will be handled
+                // by extract_all_layouts using schema positions directly.
+                //
+                // This is the critical optimization for Figma imports: most
+                // containers use Normal mode, so we skip building Taffy nodes
+                // for their entire subtrees (~90%+ of nodes).
+                if !lc.is_flex {
+                    return self.tree.new_leaf(*node_id, style).ok();
+                }
+
+                // Flex containers: build children as Taffy children
                 let taffy_children: Vec<taffy::NodeId> = children
                     .iter()
                     .filter_map(|child_id| {
@@ -312,6 +406,20 @@ impl LayoutEngine {
                 };
                 self.tree.new_text_leaf(*node_id, style, ctx).ok()
             }
+            Node::AttributedText(n) => {
+                let ctx = AttributedTextMeasureContext {
+                    scene_node_id: *node_id,
+                    attributed_string: n.attributed_string.clone(),
+                    text_align: n.text_align.clone(),
+                    max_lines: n.max_lines.clone(),
+                    ellipsis: n.ellipsis.clone(),
+                    width: n.width,
+                    height: n.height,
+                };
+                self.tree
+                    .new_attributed_text_leaf(*node_id, style, ctx)
+                    .ok()
+            }
             _ => self.tree.new_leaf(*node_id, style).ok(),
         }
     }
@@ -322,48 +430,129 @@ impl LayoutEngine {
     /// We override root positions with their schema positions so multiple
     /// artboards/nodes can be positioned anywhere in the viewport.
     ///
-    /// **Virtual grouping nodes** (Group, BooleanOperation) are not in the
-    /// Taffy tree — they get manual layout results from their schema.
-    /// Their children become independent Taffy subtree roots (computed at 0,0),
-    /// so we detect this via parent-type check and apply schema positions.
-    /// No extra bookkeeping is needed; this handles arbitrary nesting depth.
-    fn extract_all_layouts(&mut self, id: &NodeId, graph: &SceneGraph) {
+    /// **Non-layout nodes** (Group, BooleanOperation) are not in the Taffy
+    /// tree — they get manual layout results from their schema.
+    /// **Non-flex containers** (LayoutMode::Normal) ARE in Taffy (as leaves
+    /// for their parent's flex computation) but their children are independent
+    /// subtrees with schema positions.
+    /// In both cases, children become independent Taffy subtree roots
+    /// (computed at 0,0), so we detect this via parent-type check and apply
+    /// schema positions. No extra bookkeeping is needed.
+    fn extract_all_layouts(
+        &mut self,
+        id: &NodeId,
+        graph: &SceneGraph,
+        text_measure: &mut Option<TextMeasureProvider<'_>>,
+    ) {
         if let Some(layout) = self.tree.get_layout(id) {
             let mut computed = ComputedLayout::from(layout);
 
-            // Taffy roots are computed at (0,0). Two cases need schema-position
+            // Taffy roots are computed at (0,0). Three cases need schema-position
             // correction:
             // 1. Graph roots — top-level nodes on the infinite canvas
-            // 2. Children of non-layout parents (Group/BoolOp) — these are
-            //    independent Taffy subtree roots, also computed at (0,0)
+            // 2. Children of non-layout parents (Group/BoolOp) — independent
+            //    Taffy subtree roots, also computed at (0,0)
+            // 3. Children of non-flex containers (LayoutMode::Normal) — these
+            //    are also extra_roots with schema positions
+            //
+            // Uses layer_core (~16 bytes) instead of full Node (~500+ bytes)
+            // for parent type checks.
             let needs_schema_position = graph.is_root(id)
                 || graph
                     .get_parent(id)
-                    .and_then(|pid| graph.get_node(&pid).ok())
-                    .is_some_and(|parent| !Self::is_layout_node(parent));
+                    .and_then(|pid| graph.get_layer_core(&pid))
+                    .is_some_and(|parent_lc| {
+                        !Self::is_layout_node_tag(parent_lc.node_type) || !parent_lc.is_flex
+                    });
 
             if needs_schema_position {
-                if let Ok(node) = graph.get_node(id) {
-                    let (schema_x, schema_y) = Self::get_schema_position(node);
-                    computed.x = schema_x;
-                    computed.y = schema_y;
+                // Use geo_data (~48 bytes) for schema position instead of full Node.
+                if let Some(geo) = graph.geo_data().get(id) {
+                    computed.x = geo.schema_transform.x();
+                    computed.y = geo.schema_transform.y();
                 }
             }
 
             self.result.insert(*id, computed);
         } else {
-            // Node not in Taffy tree (virtual grouping node) — use schema
-            if let Ok(node) = graph.get_node(id) {
-                let (x, y) = Self::get_schema_position(node);
-                let (width, height) = Self::get_schema_size(node);
+            // Node not in Taffy tree — use schema positions/sizes from geo_data.
+            // For text nodes with missing dimensions, access full Node for measurement.
+            let lc = graph.get_layer_core(id);
+            let is_text = lc
+                .map(|c| {
+                    c.node_type == NodeTypeTag::TextSpan
+                        || c.node_type == NodeTypeTag::AttributedText
+                })
+                .unwrap_or(false);
 
+            if is_text {
+                // Text node: may need on-the-fly measurement — access full Node.
+                if let Ok(node) = graph.get_node(id) {
+                    let (x, y) = Self::get_schema_position(node);
+                    let (mut width, mut height) = Self::get_schema_size(node);
+
+                    if let Node::TextSpan(n) = node {
+                        if n.width.is_none() || n.height.is_none() {
+                            if let Some(ref mut provider) = text_measure {
+                                let measurements = provider.paragraph_cache.measure(
+                                    &n.text,
+                                    &n.text_style,
+                                    &n.text_align,
+                                    &n.max_lines,
+                                    &n.ellipsis,
+                                    n.width,
+                                    provider.fonts,
+                                    Some(id),
+                                );
+                                if n.width.is_none() {
+                                    width = measurements.max_width;
+                                }
+                                if n.height.is_none() {
+                                    height = measurements.height;
+                                }
+                            }
+                        }
+                    } else if let Node::AttributedText(n) = node {
+                        if n.width.is_none() || n.height.is_none() {
+                            if let Some(ref mut provider) = text_measure {
+                                let measurements = provider.paragraph_cache.measure_attributed(
+                                    &n.attributed_string,
+                                    &n.text_align,
+                                    &n.max_lines,
+                                    &n.ellipsis,
+                                    n.width,
+                                    provider.fonts,
+                                    Some(id),
+                                );
+                                if n.width.is_none() {
+                                    width = measurements.max_width;
+                                }
+                                if n.height.is_none() {
+                                    height = measurements.height;
+                                }
+                            }
+                        }
+                    }
+
+                    self.result.insert(
+                        *id,
+                        ComputedLayout {
+                            x,
+                            y,
+                            width,
+                            height,
+                        },
+                    );
+                }
+            } else if let Some(geo) = graph.geo_data().get(id) {
+                // Non-text: use geo_data (~48 bytes) instead of full Node (~500+ bytes).
                 self.result.insert(
                     *id,
                     ComputedLayout {
-                        x,
-                        y,
-                        width,
-                        height,
+                        x: geo.schema_transform.x(),
+                        y: geo.schema_transform.y(),
+                        width: geo.schema_width,
+                        height: geo.schema_height,
                     },
                 );
             }
@@ -372,7 +561,7 @@ impl LayoutEngine {
         // Recurse for children
         if let Some(children) = graph.get_children(id) {
             for child_id in children {
-                self.extract_all_layouts(child_id, graph);
+                self.extract_all_layouts(child_id, graph, text_measure);
             }
         }
     }

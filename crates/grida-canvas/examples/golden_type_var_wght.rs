@@ -51,7 +51,7 @@ fn main() {
 
     // Draw title using cg TextStyle
     let title_style = TextStyleRec::from_font("Geist", 32.0);
-    let mut title_ts = textstyle(&title_style, &None);
+    let mut title_ts = textstyle(&title_style, &None, None);
     title_ts.set_foreground_paint(&paint);
 
     let mut title_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -63,7 +63,7 @@ fn main() {
 
     // Draw subtitle using cg TextStyle
     let subtitle_style = TextStyleRec::from_font("Geist", 16.0);
-    let mut subtitle_ts = textstyle(&subtitle_style, &None);
+    let mut subtitle_ts = textstyle(&subtitle_style, &None, None);
     subtitle_ts.set_foreground_paint(&paint);
 
     let mut subtitle_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -108,7 +108,7 @@ fn main() {
         };
 
         // Convert to Skia TextStyle using our textstyle() function
-        let mut skia_text_style = textstyle(&text_style, &None);
+        let mut skia_text_style = textstyle(&text_style, &None, None);
         skia_text_style.set_foreground_paint(&paint);
 
         para_builder.push_style(&skia_text_style);

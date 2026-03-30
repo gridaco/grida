@@ -1,11 +1,11 @@
+use crate::cache::fast_hash::DenseNodeMap;
 use crate::node::schema::{Node, NodeId};
-use std::collections::HashMap;
 
 /// A repository for managing nodes with automatic ID indexing.
 #[derive(Debug, Clone)]
 pub struct NodeRepository {
     /// The map of all nodes indexed by their IDs
-    nodes: HashMap<NodeId, Node>,
+    nodes: DenseNodeMap<Node>,
     /// ID generator for auto-assigning IDs
     id_generator: crate::node::id::NodeIdGenerator,
 }
@@ -14,7 +14,7 @@ impl NodeRepository {
     /// Creates a new empty node repository
     pub fn new() -> Self {
         Self {
-            nodes: HashMap::new(),
+            nodes: DenseNodeMap::new(),
             id_generator: crate::node::id::NodeIdGenerator::new(),
         }
     }
@@ -49,7 +49,7 @@ impl NodeRepository {
     }
 
     /// Returns an iterator over all nodes in the repository
-    pub fn iter(&self) -> impl Iterator<Item = (&NodeId, &Node)> {
+    pub fn iter(&self) -> impl Iterator<Item = (NodeId, &Node)> {
         self.nodes.iter()
     }
 
@@ -64,15 +64,16 @@ impl NodeRepository {
     }
 
     pub fn filter(&self, filter: impl Fn(&Node) -> bool) -> Self {
-        NodeRepository {
-            nodes: self
-                .nodes
-                .iter()
-                .filter(|(_, node)| filter(node))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
+        let mut new_repo = NodeRepository {
+            nodes: DenseNodeMap::new(),
             id_generator: self.id_generator.clone(),
+        };
+        for (id, node) in self.nodes.iter() {
+            if filter(node) {
+                new_repo.nodes.insert(id, node.clone());
+            }
         }
+        new_repo
     }
 }
 

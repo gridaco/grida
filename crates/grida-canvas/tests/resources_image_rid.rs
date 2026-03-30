@@ -19,6 +19,7 @@ fn add_image_with_rid_succeeds_and_retrieval_works() {
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, 64.0, 64.0)),
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 
@@ -26,10 +27,16 @@ fn add_image_with_rid_succeeds_and_retrieval_works() {
     let result = renderer.add_image_with_rid(IMAGE_DATA, rid);
     assert!(result.is_some(), "add_image_with_rid should succeed");
     let (width, height, _) = result.unwrap();
-    assert!(width > 0 && height > 0, "image dimensions should be positive");
+    assert!(
+        width > 0 && height > 0,
+        "image dimensions should be positive"
+    );
 
     let bytes = renderer.get_image_bytes(rid);
-    assert!(bytes.is_some(), "get_image_bytes by full RID should return bytes");
+    assert!(
+        bytes.is_some(),
+        "get_image_bytes by full RID should return bytes"
+    );
     assert_eq!(bytes.as_ref().unwrap(), IMAGE_DATA);
 
     let bytes_normalized = renderer.get_image_bytes("test-logo");
@@ -48,15 +55,20 @@ fn add_image_with_rid_rejects_invalid_rid() {
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, 64.0, 64.0)),
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 
     assert!(
-        renderer.add_image_with_rid(IMAGE_DATA, "invalid-no-prefix").is_none(),
+        renderer
+            .add_image_with_rid(IMAGE_DATA, "invalid-no-prefix")
+            .is_none(),
         "rid without res:// or system:// should be rejected"
     );
     assert!(
-        renderer.add_image_with_rid(IMAGE_DATA, "mem://abc123").is_none(),
+        renderer
+            .add_image_with_rid(IMAGE_DATA, "mem://abc123")
+            .is_none(),
         "mem:// is content-addressed; custom RID should use res:// or system://"
     );
 }
@@ -98,6 +110,7 @@ fn add_image_with_rid_scene_renders() {
         Camera2D::new_from_bounds(Rectangle::from_xywh(0.0, 0.0, 64.0, 64.0)),
         RendererOptions {
             use_embedded_fonts: true,
+            ..Default::default()
         },
     );
 

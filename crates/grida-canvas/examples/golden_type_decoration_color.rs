@@ -45,7 +45,7 @@ fn main() {
 
     // Draw title
     let title_style = TextStyleRec::from_font("Geist", 32.0);
-    let mut title_ts = textstyle(&title_style, &None);
+    let mut title_ts = textstyle(&title_style, &None, None);
     title_ts.set_foreground_paint(&paint);
 
     let mut title_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -57,7 +57,7 @@ fn main() {
 
     // Draw subtitle
     let subtitle_style = TextStyleRec::from_font("Geist", 16.0);
-    let mut subtitle_ts = textstyle(&subtitle_style, &None);
+    let mut subtitle_ts = textstyle(&subtitle_style, &None, None);
     subtitle_ts.set_foreground_paint(&paint);
 
     let mut subtitle_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -107,7 +107,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         // Keep text color black for readability
         let mut text_paint = Paint::default();
         text_paint.set_anti_alias(true);

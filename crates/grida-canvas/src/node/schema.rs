@@ -894,12 +894,245 @@ impl Default for LayoutDimensionStyle {
     }
 }
 
+/// Discriminant tag for the [`Node`] enum — lets hot loops dispatch on node
+/// type without touching the full 500+ byte `Node` variant.
+///
+/// Used by [`NodeLayerCore`] and performance-critical DFS paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum NodeTypeTag {
+    InitialContainer,
+    Container,
+    Error,
+    Group,
+    Tray,
+    Rectangle,
+    Ellipse,
+    Polygon,
+    RegularPolygon,
+    RegularStarPolygon,
+    Line,
+    TextSpan,
+    AttributedText,
+    Path,
+    Vector,
+    BooleanOperation,
+    Image,
+}
+
+/// Compact, layer-relevant data extracted from a `Node` at construction time.
+///
+/// Stored in a parallel `DenseNodeMap` on `SceneGraph` so that the layers DFS
+/// and effect tree never need to iterate over the full `Node` enum for basic
+/// visibility / dispatch checks.
+///
+/// This struct is `Copy` — no heap allocations, ~16 bytes total.
+#[derive(Debug, Clone, Copy)]
+pub struct NodeLayerCore {
+    /// Whether this node is visible.
+    pub active: bool,
+    /// Node opacity (0.0–1.0).
+    pub opacity: f32,
+    /// Blend mode.
+    pub blend_mode: LayerBlendMode,
+    /// Mask type (if any).
+    pub mask: Option<LayerMaskType>,
+    /// Whether this container clips its descendants.
+    pub clips_content: bool,
+    /// Whether the node has any non-empty effects (quick check).
+    pub has_effects: bool,
+    /// Node type discriminant for dispatch.
+    pub node_type: NodeTypeTag,
+    /// Whether this node is a flex layout container (Container with LayoutMode::Flex
+    /// or InitialContainer). Used by the layout engine to skip Taffy for normal containers.
+    pub is_flex: bool,
+}
+
+/// Extract compact layer-core data from a `Node`.
+///
+/// Called once per node during `SceneGraph` construction. All values are `Copy`.
+pub fn extract_layer_core(node: &Node) -> NodeLayerCore {
+    match node {
+        Node::InitialContainer(n) => NodeLayerCore {
+            active: n.active,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
+            clips_content: false,
+            has_effects: false,
+            node_type: NodeTypeTag::InitialContainer,
+            is_flex: true, // ICB always uses flex layout
+        },
+        Node::Container(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: n.clip,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Container,
+            is_flex: n.layout_container.layout_mode == crate::cg::types::LayoutMode::Flex,
+        },
+        Node::Error(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
+            clips_content: false,
+            has_effects: false,
+            node_type: NodeTypeTag::Error,
+            is_flex: false,
+        },
+        Node::Group(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: false,
+            node_type: NodeTypeTag::Group,
+            is_flex: false,
+        },
+        Node::Tray(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: false, // Tray never has effects
+            node_type: NodeTypeTag::Tray,
+            is_flex: false,
+        },
+        Node::Rectangle(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Rectangle,
+            is_flex: false,
+        },
+        Node::Ellipse(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Ellipse,
+            is_flex: false,
+        },
+        Node::Polygon(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Polygon,
+            is_flex: false,
+        },
+        Node::RegularPolygon(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::RegularPolygon,
+            is_flex: false,
+        },
+        Node::RegularStarPolygon(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::RegularStarPolygon,
+            is_flex: false,
+        },
+        Node::Line(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Line,
+            is_flex: false,
+        },
+        Node::TextSpan(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::TextSpan,
+            is_flex: false,
+        },
+        Node::AttributedText(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::AttributedText,
+            is_flex: false,
+        },
+        Node::Path(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Path,
+            is_flex: false,
+        },
+        Node::Vector(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Vector,
+            is_flex: false,
+        },
+        Node::BooleanOperation(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::BooleanOperation,
+            is_flex: false,
+        },
+        Node::Image(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Image,
+            is_flex: false,
+        },
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Node {
     InitialContainer(InitialContainerNodeRec),
     Container(ContainerNodeRec),
     Error(ErrorNodeRec),
     Group(GroupNodeRec),
+    Tray(TrayNodeRec),
     Rectangle(RectangleNodeRec),
     Ellipse(EllipseNodeRec),
     Polygon(PolygonNodeRec),
@@ -907,6 +1140,7 @@ pub enum Node {
     RegularStarPolygon(RegularStarPolygonNodeRec),
     Line(LineNodeRec),
     TextSpan(TextSpanNodeRec),
+    AttributedText(AttributedTextNodeRec),
     Path(PathNodeRec),
     Vector(VectorNodeRec),
     BooleanOperation(BooleanPathOperationNodeRec),
@@ -923,6 +1157,7 @@ impl NodeTrait for Node {
         match self {
             Node::Error(n) => n.active,
             Node::Group(n) => n.active,
+            Node::Tray(n) => n.active,
             Node::Container(n) => n.active,
             Node::InitialContainer(n) => n.active,
             Node::Rectangle(n) => n.active,
@@ -932,6 +1167,7 @@ impl NodeTrait for Node {
             Node::RegularStarPolygon(n) => n.active,
             Node::Line(n) => n.active,
             Node::TextSpan(n) => n.active,
+            Node::AttributedText(n) => n.active,
             Node::Path(n) => n.active,
             Node::Vector(n) => n.active,
             Node::BooleanOperation(n) => n.active,
@@ -944,6 +1180,7 @@ impl Node {
     pub fn mask(&self) -> Option<LayerMaskType> {
         match self {
             Node::Group(n) => n.mask,
+            Node::Tray(n) => n.mask,
             Node::Container(n) => n.mask,
             Node::InitialContainer(_) => None,
             Node::Rectangle(n) => n.mask,
@@ -953,6 +1190,7 @@ impl Node {
             Node::RegularStarPolygon(n) => n.mask,
             Node::Line(n) => n.mask,
             Node::TextSpan(n) => n.mask,
+            Node::AttributedText(n) => n.mask,
             Node::Path(n) => n.mask,
             Node::Vector(n) => n.mask,
             Node::BooleanOperation(n) => n.mask,
@@ -969,6 +1207,7 @@ impl Node {
             Node::Container(n) => n.opacity,
             Node::Error(n) => n.opacity,
             Node::Group(n) => n.opacity,
+            Node::Tray(n) => n.opacity,
             Node::Rectangle(n) => n.opacity,
             Node::Ellipse(n) => n.opacity,
             Node::Polygon(n) => n.opacity,
@@ -976,6 +1215,7 @@ impl Node {
             Node::RegularStarPolygon(n) => n.opacity,
             Node::Line(n) => n.opacity,
             Node::TextSpan(n) => n.opacity,
+            Node::AttributedText(n) => n.opacity,
             Node::Path(n) => n.opacity,
             Node::Vector(n) => n.opacity,
             Node::BooleanOperation(n) => n.opacity,
@@ -990,6 +1230,7 @@ impl Node {
             Node::Container(_) => "Frame",
             Node::Error(_) => "Error",
             Node::Group(_) => "Group",
+            Node::Tray(_) => "Tray",
             Node::Rectangle(_) => "Rectangle",
             Node::Ellipse(_) => "Ellipse",
             Node::Polygon(_) => "Polygon",
@@ -997,10 +1238,36 @@ impl Node {
             Node::RegularStarPolygon(_) => "Star",
             Node::Line(_) => "Line",
             Node::TextSpan(_) => "Text",
+            Node::AttributedText(_) => "AttributedText",
             Node::Path(_) => "Path",
             Node::Vector(_) => "Vector",
             Node::BooleanOperation(_) => "Boolean",
             Node::Image(_) => "Image",
+        }
+    }
+
+    /// Returns the node's fill paints, if it has any.
+    ///
+    /// `Error`, `Group`, and `Line` have no fills and return `None`.
+    /// `Image` wraps its single `ImagePaint` into a one-element `Paints`.
+    pub fn fills(&self) -> Option<&Paints> {
+        match self {
+            Node::InitialContainer(_) => None,
+            Node::Container(n) => Some(&n.fills),
+            Node::Tray(n) => Some(&n.fills),
+            Node::Rectangle(n) => Some(&n.fills),
+            Node::Ellipse(n) => Some(&n.fills),
+            Node::Polygon(n) => Some(&n.fills),
+            Node::RegularPolygon(n) => Some(&n.fills),
+            Node::RegularStarPolygon(n) => Some(&n.fills),
+            Node::TextSpan(n) => Some(&n.fills),
+            Node::AttributedText(n) => Some(&n.fills),
+            Node::Path(n) => Some(&n.fills),
+            Node::Vector(n) => Some(&n.fills),
+            Node::BooleanOperation(n) => Some(&n.fills),
+            // Image has a single ImagePaint, not a Paints stack
+            Node::Image(_) => None,
+            Node::Error(_) | Node::Group(_) | Node::Line(_) => None,
         }
     }
 
@@ -1012,6 +1279,7 @@ impl Node {
             Node::Error(_) => LayerBlendMode::PassThrough,
             Node::Container(n) => n.blend_mode,
             Node::Group(n) => n.blend_mode,
+            Node::Tray(n) => n.blend_mode,
             Node::Rectangle(n) => n.blend_mode,
             Node::Ellipse(n) => n.blend_mode,
             Node::Polygon(n) => n.blend_mode,
@@ -1019,6 +1287,7 @@ impl Node {
             Node::RegularStarPolygon(n) => n.blend_mode,
             Node::Line(n) => n.blend_mode,
             Node::TextSpan(n) => n.blend_mode,
+            Node::AttributedText(n) => n.blend_mode,
             Node::Path(n) => n.blend_mode,
             Node::Vector(n) => n.blend_mode,
             Node::BooleanOperation(n) => n.blend_mode,
@@ -1033,6 +1302,7 @@ impl Node {
             Node::InitialContainer(_) => None,
             Node::Error(_) => None,
             Node::Group(_) => None,
+            Node::Tray(_) => None,
             Node::Container(n) => Some(&n.effects),
             Node::Rectangle(n) => Some(&n.effects),
             Node::Ellipse(n) => Some(&n.effects),
@@ -1041,6 +1311,7 @@ impl Node {
             Node::RegularStarPolygon(n) => Some(&n.effects),
             Node::Line(n) => Some(&n.effects),
             Node::TextSpan(n) => Some(&n.effects),
+            Node::AttributedText(n) => Some(&n.effects),
             Node::Path(n) => Some(&n.effects),
             Node::Vector(n) => Some(&n.effects),
             Node::BooleanOperation(n) => Some(&n.effects),
@@ -1064,6 +1335,7 @@ impl Node {
             Node::InitialContainer(_)
                 | Node::Container(_)
                 | Node::Group(_)
+                | Node::Tray(_)
                 | Node::BooleanOperation(_)
         )
     }
@@ -1192,6 +1464,35 @@ pub struct GroupNodeRec {
     pub transform: Option<AffineTransform>,
 }
 
+/// Tray node — a canvas-level organizational primitive (Figma SECTION).
+///
+/// Has explicit dimensions, fills, strokes, and corner radius (unlike Group).
+/// No layout, no clipping, no effects.
+/// Children are freely placed and treated as root-level containers.
+#[derive(Debug, Clone)]
+pub struct TrayNodeRec {
+    pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+
+    pub rotation: f32,
+
+    /// positioning
+    pub position: LayoutPositioningBasis,
+
+    /// Explicit width/height (unlike Group which derives size from children).
+    pub layout_dimensions: LayoutDimensionStyle,
+
+    pub corner_radius: RectangularCornerRadius,
+    pub corner_smoothing: CornerSmoothing,
+    pub fills: Paints,
+    pub strokes: Paints,
+    pub stroke_style: StrokeStyle,
+    pub stroke_width: StrokeWidth,
+}
+
 #[derive(Debug, Clone)]
 pub struct ContainerNodeRec {
     pub active: bool,
@@ -1268,6 +1569,47 @@ impl NodeFillsMixin for ContainerNodeRec {
 }
 
 impl NodeGeometryMixin for ContainerNodeRec {
+    fn has_stroke_geometry(&self) -> bool {
+        !self.stroke_width.is_none() && self.strokes.is_visible()
+    }
+
+    fn render_bounds_stroke_width(&self) -> f32 {
+        if self.has_stroke_geometry() {
+            self.stroke_width.max()
+        } else {
+            0.0
+        }
+    }
+
+    fn rectangular_stroke_width(&self) -> Option<RectangularStrokeWidth> {
+        match &self.stroke_width {
+            StrokeWidth::Rectangular(rect_stroke) => Some(rect_stroke.clone()),
+            _ => None,
+        }
+    }
+}
+
+impl TrayNodeRec {
+    pub fn to_own_shape(&self) -> RRectShape {
+        RRectShape {
+            width: self.layout_dimensions.layout_target_width.unwrap_or(0.0),
+            height: self.layout_dimensions.layout_target_height.unwrap_or(0.0),
+            corner_radius: self.corner_radius,
+        }
+    }
+}
+
+impl NodeFillsMixin for TrayNodeRec {
+    fn set_fill(&mut self, fill: Paint) {
+        self.fills = Paints::new([fill]);
+    }
+
+    fn set_fills(&mut self, fills: Paints) {
+        self.fills = fills;
+    }
+}
+
+impl NodeGeometryMixin for TrayNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         !self.stroke_width.is_none() && self.strokes.is_visible()
     }
@@ -2380,6 +2722,76 @@ pub struct TextSpanNodeRec {
 }
 
 impl NodeTransformMixin for TextSpanNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
+/// A rich text node with per-run styling (attributed string).
+///
+/// Unlike [`TextSpanNodeRec`] which carries a single uniform style, this node
+/// type stores an [`AttributedString`] with per-run styles, fills, and strokes.
+/// Each run can have its own font weight, size, color, gradient fill, stroke, etc.
+///
+/// The `default_style` field provides the fallback [`TextStyleRec`] used for
+/// runs that don't override a particular property, and for geometry measurement
+/// when the full attributed run data isn't needed.
+#[derive(Debug, Clone)]
+pub struct AttributedTextNodeRec {
+    pub active: bool,
+
+    /// Transform applied to the text container.
+    pub transform: AffineTransform,
+
+    /// Layout bounds width (used for wrapping).
+    pub width: Option<f32>,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
+
+    /// Height of the text container box (see [`TextSpanNodeRec::height`] for semantics).
+    pub height: Option<f32>,
+
+    /// The attributed string: text content + per-run styled runs.
+    pub attributed_string: AttributedString,
+
+    /// Default / fallback text style (used for measurement and unstyled segments).
+    pub default_style: TextStyleRec,
+
+    /// Horizontal alignment.
+    pub text_align: TextAlign,
+
+    /// Vertical alignment of text within its container height.
+    pub text_align_vertical: TextAlignVertical,
+
+    /// Maximum number of lines to render.
+    pub max_lines: Option<usize>,
+
+    /// Ellipsis text to be shown when the text is too long.
+    pub ellipsis: Option<String>,
+
+    /// Node-level fill paints (base paint for runs that don't specify their own).
+    pub fills: Paints,
+
+    /// Node-level stroke paints.
+    pub strokes: Paints,
+
+    /// Stroke width.
+    pub stroke_width: f32,
+    pub stroke_align: StrokeAlign,
+
+    /// Overall node opacity.
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub mask: Option<LayerMaskType>,
+    pub effects: LayerEffects,
+}
+
+impl NodeTransformMixin for AttributedTextNodeRec {
     fn x(&self) -> f32 {
         self.transform.x()
     }

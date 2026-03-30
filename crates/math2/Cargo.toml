@@ -11,5 +11,11 @@ keywords = ["canvas", "geometry", "layout", "rasterization", "bezier"]
 categories = ["algorithms", "graphics", "mathematics", "data-structures"]
 authors = ["Grida"]
 
+[features]
+serde = ["dep:serde"]
+
 [lib]
 crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }

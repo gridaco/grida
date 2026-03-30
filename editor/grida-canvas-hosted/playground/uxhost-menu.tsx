@@ -64,7 +64,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import {
   ImportFromFigmaDialog,
-  ImportFromGridaFileJsonDialog,
+  ImportFromGridaDialog,
 } from "@/grida-canvas-react-starter-kit/starterkit-import";
 import { canvas_examples } from "./examples";
 import { sitemap } from "@/www/data/sitemap";
@@ -91,7 +91,7 @@ export function PlaygroundMenuContent({
 } = {}) {
   const instance = useCurrentEditor();
   const importFromFigmaDialog = useDialogState("import-from-figma");
-  const importFromJson = useDialogState("import-from-json", {
+  const importFromGrida = useDialogState("import-from-grida", {
     refreshkey: true,
   });
   const settingsDialog = useDialogState("settings");
@@ -156,9 +156,9 @@ export function PlaygroundMenuContent({
 
   return (
     <>
-      <ImportFromGridaFileJsonDialog
-        key={importFromJson.refreshkey}
-        {...importFromJson.props}
+      <ImportFromGridaDialog
+        key={importFromGrida.refreshkey}
+        {...importFromGrida.props}
         onImport={(file) => {
           if (
             file.assets?.images &&
@@ -254,7 +254,7 @@ export function PlaygroundMenuContent({
       <DropdownMenuContent align="start" className="min-w-52">
         <FileMenuContent
           onExport={onExport}
-          onImportJson={importFromJson.openDialog}
+          onImportGrida={importFromGrida.openDialog}
           onImportImage={handleImportImageClick}
           onImportFigma={importFromFigmaDialog.openDialog}
         />
@@ -308,12 +308,12 @@ export function PlaygroundMenuContent({
 
 function FileMenuContent({
   onExport,
-  onImportJson,
+  onImportGrida,
   onImportImage,
   onImportFigma,
 }: {
   onExport: () => void;
-  onImportJson: () => void;
+  onImportGrida: () => void;
   onImportImage: () => void;
   onImportFigma: () => void;
 }) {
@@ -321,7 +321,7 @@ function FileMenuContent({
     <DropdownMenuSub>
       <DropdownMenuSubTrigger className="text-xs">File</DropdownMenuSubTrigger>
       <DropdownMenuSubContent className="min-w-40">
-        <DropdownMenuItem onClick={onImportJson} className="text-xs">
+        <DropdownMenuItem onClick={onImportGrida} className="text-xs">
           <FileIcon className="size-3.5" />
           Open .grida
         </DropdownMenuItem>
@@ -525,7 +525,7 @@ function ViewMenuContent({
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={false}
-          onSelect={() => instance.camera.fit("*")}
+          onSelect={() => instance.camera.fit("<scene>")}
           className="text-xs"
         >
           Zoom to fit

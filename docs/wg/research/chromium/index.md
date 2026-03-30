@@ -1,5 +1,11 @@
 ---
 title: "Chromium Compositor Research"
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - compositing
 ---
 
 # Chromium Compositor Research
@@ -29,6 +35,7 @@ material when designing rendering systems that face similar problems.
 | [resolution-scaling-during-interaction.md](./resolution-scaling-during-interaction.md) | Source-level: pinch-zoom raster scale, stale-tile reuse, CoverageIterator |
 | [pinch-zoom-deep-dive.md](./pinch-zoom-deep-dive.md)                                   | Pinch-zoom: GPU tile stretching, anchor point, settle/refine, data flow   |
 | [effect-optimizations.md](./effect-optimizations.md)                                   | Effect optimization: filter demotion, render pass bypass, damage tracking |
+| [node-data-layout.md](./node-data-layout.md)                                           | Node data layout: DOM RareData, compositor property trees, ECS comparison |
 | [svg-pattern.md](./svg-pattern.md)                                                     | SVG `<pattern>` paint server semantics, Chromium/resvg/Skia comparison    |
 
 ## Source locations

@@ -84,6 +84,7 @@ export function NodeElement<P extends Record<string, any>>({
         return r;
       }
       case "container":
+      case "tray":
       case "image":
       case "video":
       case "tspan":
@@ -210,7 +211,9 @@ const fillings = {
   scene: "background",
   boolean: "none",
   group: "none",
+  tray: "background",
   tspan: "color",
+  text: "color",
   container: "background",
   component: "background",
   iframe: "background",

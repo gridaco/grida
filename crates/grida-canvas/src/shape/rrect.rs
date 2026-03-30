@@ -115,12 +115,18 @@ mod tests {
         let mut pixels_a = vec![0u8; row_bytes * h as usize];
         let mut pixels_b = vec![0u8; row_bytes * h as usize];
         img_a.read_pixels(
-            &info, &mut pixels_a, row_bytes,
-            skia_safe::IPoint::new(0, 0), skia_safe::image::CachingHint::Allow,
+            &info,
+            &mut pixels_a,
+            row_bytes,
+            skia_safe::IPoint::new(0, 0),
+            skia_safe::image::CachingHint::Allow,
         );
         img_b.read_pixels(
-            &info, &mut pixels_b, row_bytes,
-            skia_safe::IPoint::new(0, 0), skia_safe::image::CachingHint::Allow,
+            &info,
+            &mut pixels_b,
+            row_bytes,
+            skia_safe::IPoint::new(0, 0),
+            skia_safe::image::CachingHint::Allow,
         );
 
         let pixel_count = (w * h) as usize;
@@ -195,9 +201,7 @@ mod tests {
         let mut paint = Paint::new(Color4f::new(1.0, 0.0, 0.0, 1.0), &ColorSpace::new_srgb());
         paint.set_anti_alias(true);
         let mut surface = surfaces::raster_n32_premul((w, h)).expect("surface");
-        surface
-            .canvas()
-            .clear(Color4f::new(0.0, 0.0, 0.0, 0.0));
+        surface.canvas().clear(Color4f::new(0.0, 0.0, 0.0, 0.0));
         surface.canvas().draw_path(path, &paint);
         let img = surface.image_snapshot();
         let info = img.image_info();

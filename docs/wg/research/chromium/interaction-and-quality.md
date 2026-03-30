@@ -1,5 +1,12 @@
 ---
 title: "Chromium Interaction and Quality Management"
+tags:
+  - internal
+  - research
+  - chromium
+  - rendering
+  - compositing
+
 ---
 
 # Chromium Interaction and Quality Management

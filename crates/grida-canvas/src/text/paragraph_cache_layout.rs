@@ -1,12 +1,12 @@
 //! `ParagraphCacheLayout` — an adapter that implements
-//! [`grida_text_edit::ManagedTextLayout`] using the same paragraph-building
+//! [`crate::text_edit::ManagedTextLayout`] using the same paragraph-building
 //! code path as the scene's [`ParagraphCache`].
 //!
 //! ## Why this exists
 //!
 //! The text editing session needs geometry queries (caret position, selection
 //! rects, hit testing, word boundaries) that match the **exact** paragraph
-//! the Painter renders. Previously, `SkiaLayoutEngine` (from `grida-text-edit`)
+//! the Painter renders. Previously, `SkiaLayoutEngine` (from `text_edit`)
 //! built its *own* paragraphs with its *own* font configuration — a completely
 //! separate code path from `ParagraphCache`. This caused:
 //!
@@ -47,7 +47,7 @@
 use skia_safe;
 use skia_safe::textlayout;
 
-use grida_text_edit::{
+use crate::text_edit::{
     layout::{CaretRect, LineMetrics, ManagedTextLayout, SelectionRect, TextLayoutEngine},
     prev_grapheme_boundary, snap_grapheme_boundary, utf16_to_utf8_offset, utf8_to_utf16_offset,
 };
@@ -73,9 +73,7 @@ pub struct ParagraphCacheLayout {
     node_width: Option<f32>,
 
     // -- Font resources (cloned from FontRepository at session start) --
-    font_collection: textlayout::FontCollection,
-    /// User fallback font families (e.g. CJK coverage fonts).
-    user_fallback_families: Vec<String>,
+    fonts: FontRepository,
 
     // -- Cached paragraph state --
     /// The Skia paragraph built with the same code as the Painter.
@@ -120,8 +118,7 @@ impl ParagraphCacheLayout {
             text_style,
             text_align,
             node_width,
-            font_collection: fonts.font_collection().clone(),
-            user_fallback_families: fonts.user_fallback_families(),
+            fonts: fonts.clone(),
             paragraph: None,
             cached_text: String::new(),
             cached_generation: 0,
@@ -146,11 +143,10 @@ impl ParagraphCacheLayout {
 
         let ctx = TextStyleRecBuildContext {
             color: CGColor::TRANSPARENT,
-            user_fallback_fonts: self.user_fallback_families.clone(),
         };
         let mut builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &self.font_collection);
-        let ts = textstyle(&self.text_style, &Some(ctx));
+            textlayout::ParagraphBuilder::new(&paragraph_style, self.fonts.font_collection());
+        let ts = textstyle(&self.text_style, &Some(ctx), Some(&self.fonts));
         builder.push_style(&ts);
         builder.add_text(text);
         let para = builder.build();
@@ -169,7 +165,7 @@ impl ParagraphCacheLayout {
     /// Falls back to uniform styling if no runs overlap the text range.
     fn build_paragraph_attributed(
         &self,
-        content: &grida_text_edit::attributed_text::AttributedText,
+        content: &crate::text_edit::attributed_text::AttributedText,
     ) -> textlayout::Paragraph {
         let text = content.text();
         let runs = content.runs();
@@ -180,15 +176,14 @@ impl ParagraphCacheLayout {
         paragraph_style.set_apply_rounding_hack(false);
 
         let mut builder =
-            textlayout::ParagraphBuilder::new(&paragraph_style, &self.font_collection);
+            textlayout::ParagraphBuilder::new(&paragraph_style, self.fonts.font_collection());
 
         if runs.is_empty() || text.is_empty() {
             // No runs — fall back to uniform node style.
             let ctx = Some(TextStyleRecBuildContext {
                 color: CGColor::TRANSPARENT,
-                user_fallback_fonts: self.user_fallback_families.clone(),
             });
-            let ts = textstyle(&self.text_style, &ctx);
+            let ts = textstyle(&self.text_style, &ctx, Some(&self.fonts));
             builder.push_style(&ts);
             builder.add_text(text);
         } else {
@@ -202,19 +197,15 @@ impl ParagraphCacheLayout {
                 let run_rec: TextStyleRec = (&run.style).into();
                 let ctx = Some(TextStyleRecBuildContext {
                     color: CGColor::TRANSPARENT,
-                    user_fallback_fonts: self.user_fallback_families.clone(),
                 });
-                let mut ts = textstyle(&run_rec, &ctx);
+                let mut ts = textstyle(&run_rec, &ctx, Some(&self.fonts));
                 // Apply the run's fill color (textstyle() doesn't handle fill).
-                match &run.style.fill {
-                    grida_text_edit::attributed_text::TextFill::Solid(rgba) => {
-                        ts.set_color(skia_safe::Color::from_argb(
-                            (rgba.a * 255.0) as u8,
-                            (rgba.r * 255.0) as u8,
-                            (rgba.g * 255.0) as u8,
-                            (rgba.b * 255.0) as u8,
-                        ));
-                    }
+                // For layout/measurement, extract the first solid color.
+                // Full paint stacks are rendered by the cg painter separately.
+                if let Some(color) = run.style.fills.iter().find_map(|p| p.solid_color()) {
+                    ts.set_color(skia_safe::Color::from_argb(
+                        color.a, color.r, color.g, color.b,
+                    ));
                 }
                 builder.push_style(&ts);
                 builder.add_text(&text[run_start..run_end]);
@@ -228,10 +219,7 @@ impl ParagraphCacheLayout {
     /// Build and layout the paragraph with **per-run** attributed styling,
     /// handling intrinsic width for auto-width nodes (same logic as
     /// `ParagraphCache::compute_measurements`).
-    fn rebuild_attributed(
-        &mut self,
-        content: &grida_text_edit::attributed_text::AttributedText,
-    ) {
+    fn rebuild_attributed(&mut self, content: &crate::text_edit::attributed_text::AttributedText) {
         let text = content.text();
         let mut para = self.build_paragraph_attributed(content);
 
@@ -240,7 +228,11 @@ impl ParagraphCacheLayout {
         } else {
             para.layout(f32::INFINITY);
             let intrinsic = para.max_intrinsic_width();
-            if intrinsic < 1.0 { 1.0 } else { intrinsic }
+            if intrinsic < 1.0 {
+                1.0
+            } else {
+                intrinsic
+            }
         };
 
         para.layout(layout_width);
@@ -263,7 +255,11 @@ impl ParagraphCacheLayout {
         } else {
             para.layout(f32::INFINITY);
             let intrinsic = para.max_intrinsic_width();
-            if intrinsic < 1.0 { 1.0 } else { intrinsic }
+            if intrinsic < 1.0 {
+                1.0
+            } else {
+                intrinsic
+            }
         };
 
         para.layout(layout_width);
@@ -408,8 +404,7 @@ impl TextLayoutEngine for ParagraphCacheLayout {
             Some(p) => p,
             None => return 0,
         };
-        let pwa =
-            para.get_glyph_position_at_coordinate(skia_safe::Point::new(x, y));
+        let pwa = para.get_glyph_position_at_coordinate(skia_safe::Point::new(x, y));
         let raw_u16 = pwa.position.max(0) as usize;
         let raw_u8 = utf16_to_utf8_offset(text, raw_u16).min(text.len());
         snap_grapheme_boundary(text, raw_u8)
@@ -439,7 +434,13 @@ impl TextLayoutEngine for ParagraphCacheLayout {
         } else {
             let para = match &self.paragraph {
                 Some(p) => p,
-                None => return CaretRect { x: lm.left, y, height },
+                None => {
+                    return CaretRect {
+                        x: lm.left,
+                        y,
+                        height,
+                    }
+                }
             };
 
             let u16_end = utf8_to_utf16_offset(text, offset);
@@ -515,8 +516,8 @@ impl TextLayoutEngine for ParagraphCacheLayout {
             .collect();
 
         // Empty-line invariant.
-        let first_line = grida_text_edit::line_index_for_offset_utf8(&metrics, start);
-        let last_line = grida_text_edit::line_index_for_offset_utf8(
+        let first_line = crate::text_edit::line_index_for_offset_utf8(&metrics, start);
+        let last_line = crate::text_edit::line_index_for_offset_utf8(
             &metrics,
             end.saturating_sub(1).max(start),
         );
@@ -552,13 +553,10 @@ impl TextLayoutEngine for ParagraphCacheLayout {
 // ---------------------------------------------------------------------------
 
 impl ManagedTextLayout for ParagraphCacheLayout {
-    fn ensure_layout(&mut self, content: &grida_text_edit::attributed_text::AttributedText) {
+    fn ensure_layout(&mut self, content: &crate::text_edit::attributed_text::AttributedText) {
         let gen = content.generation();
         let text = content.text();
-        if self.paragraph.is_some()
-            && self.cached_text == text
-            && self.cached_generation == gen
-        {
+        if self.paragraph.is_some() && self.cached_text == text && self.cached_generation == gen {
             return;
         }
         self.cached_generation = gen;

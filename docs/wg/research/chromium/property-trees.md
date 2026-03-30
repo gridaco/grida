@@ -1,6 +1,13 @@
 ---
 title: "Chromium Property Trees"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - rendering
+
 ---
 
 # Chromium Property Trees

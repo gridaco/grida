@@ -7,13 +7,30 @@ on:
   pull_request:
     paths:
       - ".github/workflows/**"
+      - "Cargo.lock"
       - "crates/**"
+      - "rust-toolchain.toml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  fmt:
+    name: cargo fmt --check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
   test:
     name: cargo test
     runs-on: ubuntu-latest

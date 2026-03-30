@@ -278,4 +278,68 @@ impl<'a> HitTester<'a> {
         }
         out
     }
+
+    /// Returns the shallowest nodes whose bounding boxes intersect `rect`.
+    ///
+    /// Like [`intersects`], but when a node and one of its descendants
+    /// both match, only the ancestor is returned. The result contains no
+    /// node whose ancestor is also in the result.
+    ///
+    /// Layers are processed in ascending z-index order (parents before
+    /// children in the paint tree). Once a node is accepted, all of its
+    /// descendants are skipped with a single parent lookup each, making
+    /// the pruning effectively O(K) amortized.
+    pub fn intersects_topmost(&self, rect: &Rectangle) -> Vec<NodeId> {
+        let mut indices = self.cache.intersects(*rect);
+        if indices.is_empty() {
+            return Vec::new();
+        }
+        indices.sort();
+
+        // Set of selected node IDs — used for O(1) ancestor lookups.
+        let mut selected_set = std::collections::HashSet::with_capacity(indices.len().min(256));
+        let mut out = Vec::with_capacity(indices.len().min(256));
+
+        let center_point = [rect.x + rect.width / 2.0, rect.y + rect.height / 2.0];
+
+        // Ascending z-index order: parents appear before their children.
+        for idx in indices {
+            let entry = &self.cache.layers.layers[idx];
+            let id = &entry.id;
+
+            // Quick check: does any ancestor already cover this node?
+            if self.has_selected_ancestor(id, &selected_set) {
+                continue;
+            }
+
+            // Bounds + clip check (same as `intersects`)
+            if let Some(bounds) = self.cache.geometry.get_world_bounds(id) {
+                if rect::intersects(&bounds, rect) {
+                    if self.is_point_within_parent_clip_bounds(id, center_point) {
+                        selected_set.insert(*id);
+                        out.push(*id);
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Walk up the parent chain and return `true` if any ancestor is in
+    /// `selected`. Stops as soon as a match is found — amortized O(1)
+    /// when parents are typically selected before their children.
+    fn has_selected_ancestor(
+        &self,
+        id: &NodeId,
+        selected: &std::collections::HashSet<NodeId>,
+    ) -> bool {
+        let mut current = self.cache.geometry.get_parent(id);
+        while let Some(parent) = current {
+            if selected.contains(&parent) {
+                return true;
+            }
+            current = self.cache.geometry.get_parent(&parent);
+        }
+        false
+    }
 }

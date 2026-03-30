@@ -105,9 +105,7 @@ fn main() {
         Format::Json => inspect_json(&bytes, &cli),
         Format::RawFbs | Format::Zip => inspect_fbs(&bytes, &cli),
         Format::Unknown => {
-            eprintln!(
-                "error: unrecognized format. Expected .grida FlatBuffers, ZIP, or JSON."
-            );
+            eprintln!("error: unrecognized format. Expected .grida FlatBuffers, ZIP, or JSON.");
             std::process::exit(1);
         }
     }
@@ -121,7 +119,9 @@ fn inspect_json(bytes: &[u8], cli: &Cli) {
     // --list-scenes and --scene are FBS/ZIP-only features; reject them for
     // legacy JSON input to avoid silent misuse.
     if cli.list_scenes {
-        eprintln!("error: --list-scenes is not supported for legacy JSON files (single scene only).");
+        eprintln!(
+            "error: --list-scenes is not supported for legacy JSON files (single scene only)."
+        );
         std::process::exit(1);
     }
     if cli.scene_index.is_some() {
@@ -197,6 +197,7 @@ fn inspect_json(bytes: &[u8], cli: &Cli) {
 fn classify_json_node(node: &io_grida::JSONNode) -> &'static str {
     match node {
         io_grida::JSONNode::Group(_) => "group",
+        io_grida::JSONNode::Tray(_) => "tray",
         io_grida::JSONNode::Container(_) => "container",
         io_grida::JSONNode::Vector(_) => "vector",
         io_grida::JSONNode::Path(_) => "path",
@@ -296,7 +297,7 @@ fn print_scene_stats(scene: &Scene, id_map: &HashMap<NodeId, String>, verbose: b
     // Node type breakdown
     let mut type_counts: BTreeMap<&str, usize> = BTreeMap::new();
     for (node_id, node) in graph.nodes_iter() {
-        if !reachable.contains(node_id) {
+        if !reachable.contains(&node_id) {
             continue;
         }
         let label = classify_node(node);
@@ -333,13 +334,7 @@ fn print_node_tree(
         .get(id)
         .map(|s| s.as_str())
         .unwrap_or("<no-string-id>");
-    println!(
-        "{}{} {:?} ({})",
-        indent,
-        classify_node(node),
-        id,
-        string_id,
-    );
+    println!("{}{} {:?} ({})", indent, classify_node(node), id, string_id,);
 
     if let Some(children) = graph.get_children(id) {
         for child in children {
@@ -371,19 +366,19 @@ fn run_layout_check(scene: &Scene, id_map: &HashMap<NodeId, String>) -> bool {
     let mut missing: Vec<(NodeId, String, Vec<String>)> = Vec::new();
 
     for (node_id, node) in graph.nodes_iter() {
-        if !reachable.contains(node_id) {
+        if !reachable.contains(&node_id) {
             continue;
         }
         if let Node::Container(_) = node {
-            if layout_result.get(node_id).is_none() {
+            if layout_result.get(&node_id).is_none() {
                 let string_id = id_map
-                    .get(node_id)
+                    .get(&node_id)
                     .cloned()
                     .unwrap_or_else(|| format!("{:?}", node_id));
 
-                let mut ancestor_ids: Vec<NodeId> = graph.ancestors(node_id).unwrap_or_default();
+                let mut ancestor_ids: Vec<NodeId> = graph.ancestors(&node_id).unwrap_or_default();
                 ancestor_ids.reverse();
-                ancestor_ids.push(*node_id);
+                ancestor_ids.push(node_id);
                 let path: Vec<String> = ancestor_ids
                     .iter()
                     .map(|id| {
@@ -394,7 +389,7 @@ fn run_layout_check(scene: &Scene, id_map: &HashMap<NodeId, String>) -> bool {
                     })
                     .collect();
 
-                missing.push((*node_id, string_id, path));
+                missing.push((node_id, string_id, path));
             }
         }
     }
@@ -456,6 +451,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::InitialContainer(_) => "initial_container",
         Node::Container(_) => "container",
         Node::Group(_) => "group",
+        Node::Tray(_) => "tray",
         Node::Vector(_) => "vector",
         Node::Path(_) => "path",
         Node::BooleanOperation(_) => "boolean",
@@ -467,6 +463,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::Line(_) => "line",
         Node::Image(_) => "image",
         Node::TextSpan(_) => "tspan",
+        Node::AttributedText(_) => "attributed_text",
         Node::Error(_) => "error",
     }
 }

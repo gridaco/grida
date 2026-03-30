@@ -140,7 +140,12 @@ fn draw_row_endpoints(canvas: &Canvas, path: &Path, _col: usize) {
     let mut m = PathMeasure::new(path, false, None);
     let len = m.length();
     if let Some((p, t)) = m.pos_tan(0.0) {
-        draw_arrow_filled(canvas, p, tangent_angle(&t) + PI, Color::from_rgb(220, 60, 60));
+        draw_arrow_filled(
+            canvas,
+            p,
+            tangent_angle(&t) + PI,
+            Color::from_rgb(220, 60, 60),
+        );
     }
     if let Some((p, t)) = m.pos_tan(len) {
         draw_arrow_filled(canvas, p, tangent_angle(&t), Color::from_rgb(220, 60, 60));
@@ -153,7 +158,12 @@ fn draw_row_auto_start_reverse(canvas: &Canvas, path: &Path, _col: usize) {
     let len = m.length();
     // start: use -t (reversed tangent), so arrow points away from the path
     if let Some((p, t)) = m.pos_tan(0.0) {
-        draw_arrow_filled(canvas, p, tangent_angle(&t) + PI, Color::from_rgb(60, 60, 220));
+        draw_arrow_filled(
+            canvas,
+            p,
+            tangent_angle(&t) + PI,
+            Color::from_rgb(60, 60, 220),
+        );
     }
     // end: use t (normal tangent), arrow points away from the path
     if let Some((p, t)) = m.pos_tan(len) {
@@ -262,7 +272,12 @@ fn draw_row_tangent_offset(canvas: &Canvas, path: &Path, _col: usize) {
 
     // Start: place arrow at ℓ = pullback instead of ℓ = 0
     if let Some((p, t)) = m.pos_tan(pullback.min(len)) {
-        draw_arrow_filled(canvas, p, tangent_angle(&t) + PI, Color::from_rgb(180, 60, 180));
+        draw_arrow_filled(
+            canvas,
+            p,
+            tangent_angle(&t) + PI,
+            Color::from_rgb(180, 60, 180),
+        );
     }
     // End: place arrow at ℓ = L - pullback instead of ℓ = L
     if let Some((p, t)) = m.pos_tan((len - pullback).max(0.0)) {

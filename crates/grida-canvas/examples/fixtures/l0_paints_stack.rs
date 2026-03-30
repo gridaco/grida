@@ -13,7 +13,10 @@ pub fn build() -> Scene {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         transform: AffineTransform::from_box_center(0.0, 0.0, 200.0, 200.0, 0.0),
-        size: Size { width: 200.0, height: 200.0 },
+        size: Size {
+            width: 200.0,
+            height: 200.0,
+        },
         corner_radius: RectangularCornerRadius::default(),
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![
@@ -27,8 +30,24 @@ pub fn build() -> Scene {
                 tile_mode: TileMode::default(),
                 transform: AffineTransform::default(),
                 stops: vec![
-                    GradientStop { offset: 0.0, color: CGColor { r: 255, g: 0, b: 0, a: 255 } },
-                    GradientStop { offset: 1.0, color: CGColor { r: 255, g: 0, b: 0, a: 0 } },
+                    GradientStop {
+                        offset: 0.0,
+                        color: CGColor {
+                            r: 255,
+                            g: 0,
+                            b: 0,
+                            a: 255,
+                        },
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: CGColor {
+                            r: 255,
+                            g: 0,
+                            b: 0,
+                            a: 0,
+                        },
+                    },
                 ],
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,
@@ -38,8 +57,24 @@ pub fn build() -> Scene {
                 active: true,
                 transform: AffineTransform::default(),
                 stops: vec![
-                    GradientStop { offset: 0.0, color: CGColor { r: 255, g: 255, b: 0, a: 255 } },
-                    GradientStop { offset: 1.0, color: CGColor { r: 255, g: 255, b: 0, a: 0 } },
+                    GradientStop {
+                        offset: 0.0,
+                        color: CGColor {
+                            r: 255,
+                            g: 255,
+                            b: 0,
+                            a: 255,
+                        },
+                    },
+                    GradientStop {
+                        offset: 1.0,
+                        color: CGColor {
+                            r: 255,
+                            g: 255,
+                            b: 0,
+                            a: 0,
+                        },
+                    },
                 ],
                 opacity: 1.0,
                 blend_mode: BlendMode::Normal,

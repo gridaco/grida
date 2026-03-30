@@ -2,6 +2,7 @@ use crate::cache::scene::SceneCache;
 use crate::devtools::text_overlay;
 use crate::painter::layer::{Layer, PainterPictureLayer};
 use crate::runtime::camera::Camera2D;
+use crate::runtime::font_repository::FontRepository;
 use crate::sk;
 use crate::surface::gesture::SurfaceGesture;
 use crate::surface::state::SurfaceState;
@@ -52,6 +53,7 @@ impl SurfaceOverlay {
         camera: &Camera2D,
         cache: &SceneCache,
         config: &SurfaceOverlayConfig,
+        fonts: &FontRepository,
     ) {
         let use_text_baseline = config.text_baseline_decoration;
         let view_sk = sk::sk_matrix(camera.view_matrix().matrix);
@@ -62,7 +64,14 @@ impl SurfaceOverlay {
             if !surface.selection.contains(hovered_id) {
                 // Hover: text nodes show baseline only (no bounding rect)
                 Self::draw_node_outline(
-                    canvas, hovered_id, &view_sk, cache, HOVER_COLOR, 1.5, use_text_baseline,
+                    canvas,
+                    hovered_id,
+                    &view_sk,
+                    cache,
+                    HOVER_COLOR,
+                    1.5,
+                    use_text_baseline,
+                    fonts,
                 );
             }
         }
@@ -73,11 +82,18 @@ impl SurfaceOverlay {
             for id in surface.selection.iter() {
                 // Selection: always draw bounding rect
                 Self::draw_node_outline(
-                    canvas, id, &view_sk, cache, SELECTION_COLOR, 1.5, false,
+                    canvas,
+                    id,
+                    &view_sk,
+                    cache,
+                    SELECTION_COLOR,
+                    1.5,
+                    false,
+                    fonts,
                 );
                 // Selection: additionally draw text baseline decoration
                 if use_text_baseline {
-                    Self::draw_text_baseline(canvas, id, &view_sk, cache, SELECTION_COLOR);
+                    Self::draw_text_baseline(canvas, id, &view_sk, cache, SELECTION_COLOR, fonts);
                 }
             }
             if sel_count > 1 {
@@ -107,6 +123,7 @@ impl SurfaceOverlay {
         color: Color,
         stroke_width: f32,
         use_text_baseline: bool,
+        fonts: &FontRepository,
     ) {
         let layer_entry = match cache.layers.layers.iter().find(|e| e.id == *id) {
             Some(e) => e,
@@ -124,7 +141,7 @@ impl SurfaceOverlay {
         } else if use_text_baseline {
             match &layer_entry.layer {
                 PainterPictureLayer::Text(text_layer) => {
-                    match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer) {
+                    match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer, fonts) {
                         Some(text_path) => text_path,
                         None => return,
                     }
@@ -154,6 +171,7 @@ impl SurfaceOverlay {
         view_sk: &Matrix,
         cache: &SceneCache,
         color: Color,
+        fonts: &FontRepository,
     ) {
         let layer_entry = match cache.layers.layers.iter().find(|e| e.id == *id) {
             Some(e) => e,
@@ -166,7 +184,7 @@ impl SurfaceOverlay {
         };
 
         let baseline_path =
-            match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer) {
+            match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer, fonts) {
                 Some(p) => p,
                 None => return,
             };

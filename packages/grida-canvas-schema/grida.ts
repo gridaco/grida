@@ -883,7 +883,8 @@ export namespace grida.program.document {
    * ```
    */
   export interface IDocumentDefinition
-    extends IImagesRepository,
+    extends
+      IImagesRepository,
       IBitmapsRepository,
       document.INodesGraph,
       IDocumentProperties {
@@ -929,9 +930,7 @@ export namespace grida.program.document {
    * TODO: safely remove this
    */
   export interface Scene
-    extends document.ISceneBackground,
-      document.I2DGuides,
-      document.IEdges {
+    extends document.ISceneBackground, document.I2DGuides, document.IEdges {
     type: "scene";
 
     /**
@@ -1059,7 +1058,8 @@ export namespace grida.program.document {
    */
   export namespace template {
     export interface IUserDefinedTemplateNodeReactComponentRenderProps<P>
-      extends nodes.i.IBaseNode,
+      extends
+        nodes.i.IBaseNode,
         nodes.i.ISceneNode,
         nodes.i.ICSSStylable,
         nodes.i.IExpandable {
@@ -1221,7 +1221,9 @@ export namespace grida.program.nodes {
   export type LayerNode =
     | BooleanPathOperationNode
     | GroupNode
+    | TrayNode
     | TextSpanNode
+    | AttributedTextNode
     | ImageNode
     | VideoNode
     | ContainerNode
@@ -1287,7 +1289,9 @@ export namespace grida.program.nodes {
   export type UnknownNode = Omit<
     Partial<BooleanPathOperationNode> &
       Partial<GroupNode> &
+      Partial<TrayNode> &
       Partial<TextSpanNode> &
+      Partial<AttributedTextNode> &
       Partial<BitmapNode> &
       Partial<ImageNode> &
       Partial<VideoNode> &
@@ -1325,6 +1329,10 @@ export namespace grida.program.nodes {
 
   export type GroupNodePrototype = __TPrototypeNode<
     Omit<Partial<GroupNode>, __base_scene_node_properties | "children"> &
+      __IPrototypeNodeChildren
+  >;
+  export type TrayNodePrototype = __TPrototypeNode<
+    Omit<Partial<TrayNode>, __base_scene_node_properties | "children"> &
       __IPrototypeNodeChildren
   >;
   export type TextNodePrototype = __TPrototypeNode<
@@ -1370,6 +1378,7 @@ export namespace grida.program.nodes {
   export type NodePrototype =
     | BooleanPathOperationNodePrototype
     | GroupNodePrototype
+    | TrayNodePrototype
     | TextNodePrototype
     | ImageNodePrototype
     | VideoNodePrototype
@@ -1880,7 +1889,8 @@ export namespace grida.program.nodes {
      * @deprecated
      */
     export interface ICSSStylable
-      extends IStylable<css.ExplicitlySupportedCSSProperties>,
+      extends
+        IStylable<css.ExplicitlySupportedCSSProperties>,
         IBlend,
         ILayerMaskType,
         IRotation,
@@ -1900,12 +1910,11 @@ export namespace grida.program.nodes {
     /**
      * @deprecated
      */
-    export interface IComputedCSSStylable
-      extends __ReplaceSubset<
-        ICSSStylable,
-        IFill<props.PropsPaintValue>,
-        { fill: cg.Paint }
-      > {}
+    export interface IComputedCSSStylable extends __ReplaceSubset<
+      ICSSStylable,
+      IFill<props.PropsPaintValue>,
+      { fill: cg.Paint }
+    > {}
 
     export interface IMouseCursor {
       cursor?: cg.SystemMouseCursor;
@@ -2064,8 +2073,7 @@ export namespace grida.program.nodes {
      * a set of properties that can be applied to a text node, but not to a textspan
      */
     export interface ITextNodeStyle
-      extends ITextStyle,
-        IFill<props.PropsPaintValue> {
+      extends ITextStyle, IFill<props.PropsPaintValue> {
       /**
        * @default "left"
        */
@@ -2076,12 +2084,11 @@ export namespace grida.program.nodes {
       text_align_vertical: cg.TextAlignVertical;
     }
 
-    export interface IComputedTextNodeStyle
-      extends __ReplaceSubset<
-        ITextNodeStyle,
-        IFill<props.PropsPaintValue>,
-        { fill: cg.Paint }
-      > {}
+    export interface IComputedTextNodeStyle extends __ReplaceSubset<
+      ITextNodeStyle,
+      IFill<props.PropsPaintValue>,
+      { fill: cg.Paint }
+    > {}
 
     export interface ITextValue {
       text: props.PropsTextValue | null;
@@ -2144,17 +2151,13 @@ export namespace grida.program.nodes {
     }
 
     export interface IBasicShapeTrait
-      extends i.ICornerRadius,
-        i.IFill<cg.Paint>,
-        i.IStroke {}
+      extends i.ICornerRadius, i.IFill<cg.Paint>, i.IStroke {}
 
     export interface IRectangularShapeTrait
-      extends IRectangularCornerRadius,
-        IRectangularStrokeWidth {}
+      extends IRectangularCornerRadius, IRectangularStrokeWidth {}
 
     export interface ILayoutTrait
-      extends ILayoutTargetAspectRatio,
-        IPositioning {
+      extends ILayoutTargetAspectRatio, IPositioning {
       rotation: number;
       layout_target_width: css.LengthPercentage | "auto";
       layout_target_height: css.LengthPercentage | "auto";
@@ -2163,9 +2166,7 @@ export namespace grida.program.nodes {
     export interface ILayoutChildTrait extends ILayoutTrait {}
 
     export interface ILayoutContainerTrait
-      extends ILayoutTrait,
-        Partial<i.IPadding>,
-        IFlexContainer {}
+      extends ILayoutTrait, Partial<i.IPadding>, IFlexContainer {}
 
     export interface IHotspotTrait extends IHrefable, IMouseCursor {}
   }
@@ -2196,7 +2197,8 @@ export namespace grida.program.nodes {
    * They can contain multiple children based on their constraints.
    */
   export interface SceneNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       document.ISceneBackground,
       document.I2DGuides,
@@ -2217,12 +2219,31 @@ export namespace grida.program.nodes {
    * [GroupNode] is not supported in the html/svg backend.
    */
   export interface GroupNode
-    extends i.IBaseNode,
-      i.ISceneNode,
-      i.IBlend,
-      i.IPositioning {
+    extends i.IBaseNode, i.ISceneNode, i.IBlend, i.IPositioning {
     type: "group";
     //
+  }
+
+  /**
+   * Tray Node — canvas-level organizational primitive (Figma SECTION).
+   *
+   * Has explicit dimensions, fills, strokes, corner radius.
+   * No effects, no layout, no clipping.
+   * Children are freely placed and treated as root-level containers.
+   */
+  export interface TrayNode
+    extends
+      i.IBaseNode,
+      i.ISceneNode,
+      i.IBlend,
+      i.IPositioning,
+      i.ICSSDimension,
+      i.ICornerRadius,
+      i.IRectangularShapeTrait,
+      i.IStroke,
+      i.IFill<cg.Paint> {
+    type: "tray";
+    rotation: number;
   }
 
   /**
@@ -2231,7 +2252,8 @@ export namespace grida.program.nodes {
    * [BooleanPathOperationNode] is not supported in the html/svg backend.
    */
   export interface BooleanPathOperationNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2243,7 +2265,8 @@ export namespace grida.program.nodes {
   }
 
   export interface TextSpanNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2262,18 +2285,68 @@ export namespace grida.program.nodes {
     // text_auto_resize: "none" | "width" | "height" | "auto";
   }
 
-  export interface ComputedTextSpanNode
-    extends __ReplaceSubset<
-      TextSpanNode,
-      i.ITextValue & i.ITextStyle,
-      i.IComputedTextValue & i.IComputedTextNodeStyle
-    > {
+  export interface ComputedTextSpanNode extends __ReplaceSubset<
+    TextSpanNode,
+    i.ITextValue & i.ITextStyle,
+    i.IComputedTextValue & i.IComputedTextNodeStyle
+  > {
     readonly type: "tspan";
     max_lines?: number | null;
   }
 
+  /**
+   * A styled text run with per-run text style.
+   *
+   * Extends the core `cg.StyledTextRun` (offsets + paint overrides)
+   * with a full `ITextStyle` for per-run font/decoration properties.
+   */
+  export interface StyledTextRun extends cg.StyledTextRun {
+    /** Per-run text style (font, size, weight, decoration, etc.). */
+    style: i.ITextStyle;
+  }
+
+  /**
+   * [AttributedTextNode]
+   *
+   * Rich text node with per-run styling (mixed fonts, sizes, colors, decorations
+   * within a single text block).
+   *
+   * Mirrors the Rust `AttributedString` + node wrapper and FBS `AttributedTextNode`.
+   */
+  export interface AttributedTextNode
+    extends
+      i.IBaseNode,
+      i.ISceneNode,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.IHotspotTrait,
+      i.ITextStroke {
+    readonly type: "text";
+
+    /** The full backing text content. */
+    text: string | null;
+
+    /** Default / fallback text style for unstyled segments and measurement. */
+    default_style: i.ITextStyle;
+
+    /** Ordered, contiguous, non-overlapping runs covering the full text. */
+    styled_runs: StyledTextRun[];
+
+    /** Node-level fill paints (used as fallback when runs omit fills). */
+    fill_paints?: cg.Paint[];
+
+    /** @default "left" */
+    text_align: cg.TextAlign;
+    /** @default "top" */
+    text_align_vertical: cg.TextAlignVertical;
+
+    max_lines?: number | null;
+    ellipsis?: string | null;
+  }
+
   export interface ImageNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2286,8 +2359,11 @@ export namespace grida.program.nodes {
     alt?: string;
   }
 
-  export interface ComputedImageNode
-    extends __ReplaceSubset<ImageNode, i.ISourceValue, { src: string }> {
+  export interface ComputedImageNode extends __ReplaceSubset<
+    ImageNode,
+    i.ISourceValue,
+    { src: string }
+  > {
     readonly type: "image";
   }
 
@@ -2301,7 +2377,8 @@ export namespace grida.program.nodes {
    * RichText can hold any html-like text content, including text spans, links, images, etc.
    */
   export interface HTMLRichTextNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.IBlend,
       i.ICSSStylable,
@@ -2311,17 +2388,17 @@ export namespace grida.program.nodes {
     readonly type: "richtext";
   }
 
-  export interface ComputedHTMLRichTextNode
-    extends __ReplaceSubset<
-      HTMLRichTextNode,
-      i.IHTMLRichTextValue,
-      { html: string }
-    > {
+  export interface ComputedHTMLRichTextNode extends __ReplaceSubset<
+    HTMLRichTextNode,
+    i.IHTMLRichTextValue,
+    { html: string }
+  > {
     readonly type: "richtext";
   }
 
   export interface VideoNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2341,13 +2418,17 @@ export namespace grida.program.nodes {
     autoplay: boolean;
   }
 
-  export interface ComputedVideoNode
-    extends __ReplaceSubset<VideoNode, i.ISourceValue, { src: string }> {
+  export interface ComputedVideoNode extends __ReplaceSubset<
+    VideoNode,
+    i.ISourceValue,
+    { src: string }
+  > {
     readonly type: "video";
   }
 
   export interface ContainerNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutContainerTrait,
@@ -2361,8 +2442,11 @@ export namespace grida.program.nodes {
     //
   }
 
-  export interface ComputedContainerNode
-    extends __ReplaceSubset<ContainerNode, {}, {}> {
+  export interface ComputedContainerNode extends __ReplaceSubset<
+    ContainerNode,
+    {},
+    {}
+  > {
     readonly type: "container";
     //
   }
@@ -2373,7 +2457,8 @@ export namespace grida.program.nodes {
    * The use and rendering of iframe node is limited by the environment.
    */
   export interface HTMLIFrameNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ICSSStylable,
       i.ICornerRadius,
@@ -2382,8 +2467,11 @@ export namespace grida.program.nodes {
     readonly type: "iframe";
   }
 
-  export interface ComputedHTMLIFrameNode
-    extends __ReplaceSubset<HTMLIFrameNode, i.ISourceValue, { src: string }> {
+  export interface ComputedHTMLIFrameNode extends __ReplaceSubset<
+    HTMLIFrameNode,
+    i.ISourceValue,
+    { src: string }
+  > {
     readonly type: "iframe";
   }
 
@@ -2399,7 +2487,8 @@ export namespace grida.program.nodes {
    * The bitmap data can by found in {@link document.IBitmapsRepository} images[this.id].data
    */
   export interface BitmapNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2411,7 +2500,8 @@ export namespace grida.program.nodes {
   export type ComputedBitmapNode = BitmapNode;
 
   export interface RegularPolygonNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2422,7 +2512,8 @@ export namespace grida.program.nodes {
   }
 
   export interface RegularStarPolygonNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2434,7 +2525,8 @@ export namespace grida.program.nodes {
   }
 
   export interface VectorNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2462,8 +2554,11 @@ export namespace grida.program.nodes {
     marker_end_shape?: cg.StrokeMarkerPreset;
   }
 
-  export interface ComputedVectorNode
-    extends __ReplaceSubset<VectorNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+  export interface ComputedVectorNode extends __ReplaceSubset<
+    VectorNode,
+    i.IFill<cg.Paint>,
+    i.IFill<cg.Paint>
+  > {
     readonly type: "vector";
   }
 
@@ -2479,7 +2574,8 @@ export namespace grida.program.nodes {
    * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path}
    */
   export interface PathNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2490,8 +2586,11 @@ export namespace grida.program.nodes {
     fill_rule?: cg.FillRule;
   }
 
-  export interface ComputedPathNode
-    extends __ReplaceSubset<PathNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+  export interface ComputedPathNode extends __ReplaceSubset<
+    PathNode,
+    i.IFill<cg.Paint>,
+    i.IFill<cg.Paint>
+  > {
     readonly type: "path";
   }
 
@@ -2509,7 +2608,8 @@ export namespace grida.program.nodes {
    *
    */
   export interface LineNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.IHotspotTrait,
@@ -2545,7 +2645,8 @@ export namespace grida.program.nodes {
    *
    */
   export interface RectangleNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2558,12 +2659,11 @@ export namespace grida.program.nodes {
   /**
    * {@link RectangleNode} with computed properties
    */
-  export interface ComputedRectangleNode
-    extends __ReplaceSubset<
-      RectangleNode,
-      i.IFill<cg.Paint>,
-      i.IFill<cg.Paint>
-    > {
+  export interface ComputedRectangleNode extends __ReplaceSubset<
+    RectangleNode,
+    i.IFill<cg.Paint>,
+    i.IFill<cg.Paint>
+  > {
     readonly type: "rectangle";
   }
 
@@ -2574,7 +2674,8 @@ export namespace grida.program.nodes {
    * - [Env:SVG] on svg rendering, this will be rendered as `<ellipse>` with `cx`, `cy`, `rx`, `ry` attributes calculated from the `width`, `height` and `x`, `y` properties.
    */
   export interface EllipseNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutChildTrait,
@@ -2587,14 +2688,18 @@ export namespace grida.program.nodes {
   /**
    * {@link EllipseNode} with computed properties
    */
-  export interface ComputedEllipseNode
-    extends __ReplaceSubset<EllipseNode, i.IFill<cg.Paint>, i.IFill<cg.Paint>> {
+  export interface ComputedEllipseNode extends __ReplaceSubset<
+    EllipseNode,
+    i.IFill<cg.Paint>,
+    i.IFill<cg.Paint>
+  > {
     readonly type: "ellipse";
   }
 
   //
   export interface ComponentNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutContainerTrait,
@@ -2610,7 +2715,8 @@ export namespace grida.program.nodes {
   export type ComputedComponentNode = ComponentNode;
 
   export interface InstanceNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.ILayerTrait,
       i.ILayoutContainerTrait,
@@ -2636,7 +2742,8 @@ export namespace grida.program.nodes {
    * This is useful when you have a complex structure with custom loggics and state management, use this node and expose only customizable nodes and properties.
    */
   export interface TemplateInstanceNode
-    extends i.IBaseNode,
+    extends
+      i.IBaseNode,
       i.ISceneNode,
       i.IHotspotTrait,
       i.IPositioning,
@@ -2755,6 +2862,7 @@ export namespace grida.program.nodes {
         // TODO:
         case "boolean":
         case "group":
+        case "tray":
         case "component":
         case "instance":
         case "template_instance": {

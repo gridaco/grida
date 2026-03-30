@@ -7,6 +7,8 @@ interface BarProps {
   node_id: string;
   state: "idle" | "hover" | "active";
   isComponentConsumer?: boolean;
+  /** When set, recompute position when this parent node moves. */
+  parentNodeId?: string;
 }
 
 export function FloatingBar({
@@ -14,9 +16,13 @@ export function FloatingBar({
   children,
   state,
   isComponentConsumer,
+  parentNodeId,
   ...porps
 }: React.HtmlHTMLAttributes<HTMLDivElement> & BarProps) {
-  const data = useSingleSelection(porps.node_id);
+  const data = useSingleSelection(porps.node_id, {
+    enabled: true,
+    parentNodeId,
+  });
 
   return (
     <div

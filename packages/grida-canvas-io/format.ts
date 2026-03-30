@@ -5,9 +5,68 @@ import * as fbs from "@grida/format";
 import { unionToPaint, unionToNode, unionToFeBlur } from "@grida/format";
 import type { vn } from "@grida/schema";
 import * as flatbuffers from "flatbuffers";
-import { generateNKeysBetween } from "@grida/sequence";
+// generateNKeysBetween removed — replaced by zero-padded integers for position encoding.
 
 type Builder = flatbuffers.Builder;
+
+// ─── char ↔ UTF-8 byte offset conversion ─────────────────────────────────
+// TS strings are UTF-16; Rust strings are UTF-8.  The FBS wire format uses
+// UTF-8 byte offsets (matching the Rust `StyledTextRun` contract), so we
+// must convert when crossing the boundary.
+
+/**
+ * Build a lookup table that maps JS char index → UTF-8 byte offset.
+ * Returns an array of length `text.length + 1` where `map[i]` is the byte
+ * offset of the i-th JS char, and `map[text.length]` is the total byte length.
+ */
+function charToByteOffsets(text: string): Uint32Array {
+  // Walk the JS string (UTF-16 code units) computing UTF-8 byte positions.
+  const map = new Uint32Array(text.length + 1);
+  let byteIdx = 0;
+  for (let i = 0; i < text.length; i++) {
+    map[i] = byteIdx;
+    const code = text.charCodeAt(i);
+    if (code < 0x80) {
+      byteIdx += 1;
+    } else if (code < 0x800) {
+      byteIdx += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      // High surrogate — this char + next form a surrogate pair (4 UTF-8 bytes).
+      byteIdx += 4;
+      i++; // skip low surrogate
+      map[i] = byteIdx; // low surrogate maps to byte *after* the 4-byte seq
+    } else {
+      byteIdx += 3;
+    }
+  }
+  map[text.length] = byteIdx;
+  return map;
+}
+
+/**
+ * Build a lookup table that maps UTF-8 byte offset → JS char index.
+ * Returns a Map (sparse — only entries at valid byte boundaries).
+ */
+function byteToCharOffsets(text: string): Map<number, number> {
+  const map = new Map<number, number>();
+  let byteIdx = 0;
+  for (let i = 0; i < text.length; i++) {
+    map.set(byteIdx, i);
+    const code = text.charCodeAt(i);
+    if (code < 0x80) {
+      byteIdx += 1;
+    } else if (code < 0x800) {
+      byteIdx += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      byteIdx += 4;
+      i++;
+    } else {
+      byteIdx += 3;
+    }
+  }
+  map.set(byteIdx, text.length); // end sentinel
+  return map;
+}
 
 /**
  * Type guard to check if a paint value is a valid cg.Paint (not tokenized).
@@ -324,6 +383,7 @@ export namespace format {
       ["rectangle", fbs.NodeType.Rectangle],
       ["tspan", fbs.NodeType.TextSpan],
       ["group", fbs.NodeType.Group],
+      ["tray", fbs.NodeType.Tray],
       ["ellipse", fbs.NodeType.Ellipse],
       ["line", fbs.NodeType.Line],
       ["vector", fbs.NodeType.Vector],
@@ -341,6 +401,7 @@ export namespace format {
       [fbs.NodeType.Rectangle, "rectangle"],
       [fbs.NodeType.TextSpan, "tspan"],
       [fbs.NodeType.Group, "group"],
+      [fbs.NodeType.Tray, "tray"],
       [fbs.NodeType.Ellipse, "ellipse"],
       [fbs.NodeType.Line, "line"],
       [fbs.NodeType.Vector, "vector"],
@@ -439,7 +500,9 @@ export namespace format {
       builder: Builder,
       id: string
     ): flatbuffers.Offset {
-      const idOffset = builder.createString(id);
+      const idOffset = id
+        ? builder.createSharedString(id)
+        : builder.createString(id);
       return fbs.NodeIdentifier.createNodeIdentifier(builder, idOffset);
     }
 
@@ -452,7 +515,7 @@ export namespace format {
       position: string
     ): flatbuffers.Offset {
       const parentIdOffset = structs.nodeIdentifier(builder, parentId);
-      const positionOffset = builder.createString(position);
+      const positionOffset = builder.createSharedString(position);
       fbs.ParentReference.startParentReference(builder);
       fbs.ParentReference.addParentId(builder, parentIdOffset);
       fbs.ParentReference.addPosition(builder, positionOffset);
@@ -925,6 +988,283 @@ export namespace format {
             fbs.TextSpanNodeProperties.endTextSpanNodeProperties(builder);
           return { dataOffset };
         }
+
+        /**
+         * Encodes a TextStyleRec table from an ITextStyle-shaped object.
+         * Shared between TextSpanNode and AttributedTextNode encoding.
+         */
+        function encodeTextStyleRec(
+          builder: Builder,
+          style: grida.program.nodes.i.ITextStyle
+        ): flatbuffers.Offset {
+          // TextDecorationRec
+          fbs.TextDecorationRec.startTextDecorationRec(builder);
+          fbs.TextDecorationRec.addTextDecorationLine(
+            builder,
+            styling.encode.textDecorationLine(style.text_decoration_line)
+          );
+          fbs.TextDecorationRec.addTextDecorationColor(
+            builder,
+            fbs.RGBA32F.createRGBA32F(builder, 0.0, 0.0, 0.0, 1.0)
+          );
+          fbs.TextDecorationRec.addTextDecorationStyle(
+            builder,
+            fbs.TextDecorationStyle.Solid
+          );
+          fbs.TextDecorationRec.addTextDecorationSkipInk(builder, true);
+          fbs.TextDecorationRec.addTextDecorationThickness(builder, 1.0);
+          const decorationOffset =
+            fbs.TextDecorationRec.endTextDecorationRec(builder);
+
+          // Font features
+          let fontFeaturesOffset: flatbuffers.Offset | undefined = undefined;
+          if (
+            style.font_features &&
+            Object.keys(style.font_features).length > 0
+          ) {
+            const fontFeatureOffsets: flatbuffers.Offset[] = [];
+            const entries = Object.entries(style.font_features).reverse();
+            for (const [tag, enabled] of entries) {
+              if (enabled !== undefined) {
+                const tagOffset = structs.openTypeFeatureTag(builder, tag);
+                fontFeatureOffsets.push(
+                  fbs.FontFeature.createFontFeature(builder, tagOffset, enabled)
+                );
+              }
+            }
+            if (fontFeatureOffsets.length > 0) {
+              fontFeaturesOffset = fbs.TextStyleRec.createFontFeaturesVector(
+                builder,
+                fontFeatureOffsets
+              );
+            }
+          }
+
+          const fontFamilyOffset = builder.createString(
+            style.font_family ?? ""
+          );
+
+          // TextDimension tables
+          const letterSpacingValue = style.letter_spacing ?? 0;
+          const letterSpacingKind =
+            letterSpacingValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Fixed;
+          const letterSpacingOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            letterSpacingKind,
+            letterSpacingValue
+          );
+
+          const wordSpacingValue = style.word_spacing ?? 0;
+          const wordSpacingKind =
+            wordSpacingValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Fixed;
+          const wordSpacingOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            wordSpacingKind,
+            wordSpacingValue
+          );
+
+          const lineHeightValue = style.line_height ?? 0;
+          const lineHeightKind =
+            lineHeightValue !== 0
+              ? fbs.TextDimensionKind.Factor
+              : fbs.TextDimensionKind.Normal;
+          const lineHeightOffset = fbs.TextDimension.createTextDimension(
+            builder,
+            lineHeightKind,
+            lineHeightValue
+          );
+
+          // Build TextStyleRec
+          fbs.TextStyleRec.startTextStyleRec(builder);
+          fbs.TextStyleRec.addTextDecoration(builder, decorationOffset);
+          fbs.TextStyleRec.addFontFamily(builder, fontFamilyOffset);
+          if (style.font_size !== undefined && style.font_size !== null) {
+            fbs.TextStyleRec.addFontSize(builder, style.font_size);
+          }
+          fbs.TextStyleRec.addFontWeight(
+            builder,
+            fbs.FontWeight.createFontWeight(
+              builder,
+              (style.font_weight as number) ?? 400
+            )
+          );
+          fbs.TextStyleRec.addFontKerning(builder, style.font_kerning ?? true);
+          if (fontFeaturesOffset !== undefined) {
+            fbs.TextStyleRec.addFontFeatures(builder, fontFeaturesOffset);
+          }
+          fbs.TextStyleRec.addLetterSpacing(builder, letterSpacingOffset);
+          fbs.TextStyleRec.addWordSpacing(builder, wordSpacingOffset);
+          fbs.TextStyleRec.addLineHeight(builder, lineHeightOffset);
+          return fbs.TextStyleRec.endTextStyleRec(builder);
+        }
+
+        /**
+         * Encodes AttributedTextNodeProperties.
+         */
+        export function attributedText(
+          builder: Builder,
+          node: grida.program.nodes.AttributedTextNode
+        ): { dataOffset: flatbuffers.Offset } {
+          // Create text string offset BEFORE starting nested tables
+          let textOffset: flatbuffers.Offset | null = null;
+          if (node.text !== null && node.text !== undefined) {
+            textOffset = builder.createString(
+              typeof node.text === "string" ? node.text : String(node.text)
+            );
+          }
+
+          // Encode default_style
+          const defaultStyleOffset = encodeTextStyleRec(
+            builder,
+            node.default_style
+          );
+
+          // Encode styled_runs — convert char indices → UTF-8 byte offsets
+          const c2b =
+            node.text != null ? charToByteOffsets(node.text) : undefined;
+          const runOffsets: flatbuffers.Offset[] = [];
+          for (const run of node.styled_runs) {
+            const runStyleOffset = encodeTextStyleRec(builder, run.style);
+
+            // Per-run fill paints
+            const runFillPaintsFiltered = run.fill_paints?.filter(isPaint);
+            const runFillPaintsOffset =
+              runFillPaintsFiltered && runFillPaintsFiltered.length > 0
+                ? format.paint.encode.fillPaints(
+                    builder,
+                    runFillPaintsFiltered,
+                    fbs.StyledTextRunItem.createFillPaintsVector
+                  )
+                : null;
+
+            // Per-run stroke paints
+            const runStrokePaintsFiltered = run.stroke_paints?.filter(isPaint);
+            const runStrokePaintsOffset =
+              runStrokePaintsFiltered && runStrokePaintsFiltered.length > 0
+                ? format.paint.encode.strokePaints(
+                    builder,
+                    runStrokePaintsFiltered,
+                    fbs.StyledTextRunItem.createStrokePaintsVector
+                  )
+                : null;
+
+            // Per-run stroke geometry
+            let runStrokeGeometryOffset: flatbuffers.Offset | null = null;
+            if (run.stroke_width !== undefined) {
+              runStrokeGeometryOffset = format.shape.encode.strokeGeometryTrait(
+                builder,
+                {
+                  stroke_width: run.stroke_width,
+                }
+              );
+            }
+
+            fbs.StyledTextRunItem.startStyledTextRunItem(builder);
+            fbs.StyledTextRunItem.addStart(
+              builder,
+              c2b ? c2b[run.start] : run.start
+            );
+            fbs.StyledTextRunItem.addEnd(builder, c2b ? c2b[run.end] : run.end);
+            fbs.StyledTextRunItem.addTextStyle(builder, runStyleOffset);
+            if (runFillPaintsOffset !== null) {
+              fbs.StyledTextRunItem.addFillPaints(builder, runFillPaintsOffset);
+            }
+            if (runStrokePaintsOffset !== null) {
+              fbs.StyledTextRunItem.addStrokePaints(
+                builder,
+                runStrokePaintsOffset
+              );
+            }
+            if (runStrokeGeometryOffset !== null) {
+              fbs.StyledTextRunItem.addStrokeGeometry(
+                builder,
+                runStrokeGeometryOffset
+              );
+            }
+            runOffsets.push(
+              fbs.StyledTextRunItem.endStyledTextRunItem(builder)
+            );
+          }
+
+          const styledRunsOffset =
+            fbs.AttributedTextNodeProperties.createStyledRunsVector(
+              builder,
+              runOffsets
+            );
+
+          // Node-level stroke geometry
+          const strokeGeometryOffset = format.shape.encode.strokeGeometryTrait(
+            builder,
+            {
+              stroke_width: node.stroke_width ?? 0,
+            }
+          );
+
+          // Node-level fill/stroke paints
+          const fillPaintsFiltered = node.fill_paints?.filter(isPaint);
+          const fillPaintsOffset = format.paint.encode.fillPaints(
+            builder,
+            fillPaintsFiltered,
+            fbs.AttributedTextNodeProperties.createFillPaintsVector
+          );
+          const strokePaintsFiltered = node.stroke_paints?.filter(isPaint);
+          const strokePaintsOffset = format.paint.encode.strokePaints(
+            builder,
+            strokePaintsFiltered,
+            fbs.AttributedTextNodeProperties.createStrokePaintsVector
+          );
+
+          // Build AttributedTextNodeProperties
+          fbs.AttributedTextNodeProperties.startAttributedTextNodeProperties(
+            builder
+          );
+          fbs.AttributedTextNodeProperties.addStrokeGeometry(
+            builder,
+            strokeGeometryOffset
+          );
+          fbs.AttributedTextNodeProperties.addFillPaints(
+            builder,
+            fillPaintsOffset
+          );
+          fbs.AttributedTextNodeProperties.addStrokePaints(
+            builder,
+            strokePaintsOffset
+          );
+          if (textOffset !== null) {
+            fbs.AttributedTextNodeProperties.addText(builder, textOffset);
+          }
+          fbs.AttributedTextNodeProperties.addDefaultStyle(
+            builder,
+            defaultStyleOffset
+          );
+          fbs.AttributedTextNodeProperties.addTextAlign(
+            builder,
+            styling.encode.textAlign(node.text_align)
+          );
+          fbs.AttributedTextNodeProperties.addTextAlignVertical(
+            builder,
+            styling.encode.textAlignVertical(node.text_align_vertical)
+          );
+          if (node.max_lines !== undefined && node.max_lines !== null) {
+            fbs.AttributedTextNodeProperties.addMaxLines(
+              builder,
+              node.max_lines
+            );
+          }
+          fbs.AttributedTextNodeProperties.addStyledRuns(
+            builder,
+            styledRunsOffset
+          );
+          const dataOffset =
+            fbs.AttributedTextNodeProperties.endAttributedTextNodeProperties(
+              builder
+            );
+          return { dataOffset };
+        }
       }
 
       /**
@@ -935,7 +1275,7 @@ export namespace format {
         node: grida.program.nodes.Node
       ): flatbuffers.Offset {
         const idOffset = structs.nodeIdentifier(builder, node.id);
-        const nameOffset = builder.createString(node.name ?? "");
+        const nameOffset = builder.createSharedString(node.name ?? "");
 
         fbs.SystemNodeTrait.startSystemNodeTrait(builder);
         fbs.SystemNodeTrait.addId(builder, idOffset);
@@ -1062,35 +1402,36 @@ export namespace format {
         }
 
         // 7. Post-layout transform (rotation as transform matrix)
-        // Convert rotation (degrees) to a rotation transform matrix
+        // Only compute trig and emit the transform when rotation is non-zero.
         const nodeWithRotation = node as grida.program.nodes.Node &
           Partial<Pick<grida.program.nodes.UnknownNode, "rotation">>;
         const rotationDegrees = nodeWithRotation.rotation ?? 0;
-        const rotationRad = (rotationDegrees * Math.PI) / 180;
-        const cos = Math.cos(rotationRad);
-        const sin = Math.sin(rotationRad);
+        if (rotationDegrees !== 0) {
+          const rotationRad = (rotationDegrees * Math.PI) / 180;
+          const cos = Math.cos(rotationRad);
+          const sin = Math.sin(rotationRad);
 
-        // Pure rotation matrix: [cos, -sin, 0], [sin, cos, 0]
-        const postLayoutTransformOffset = structs.cgTransform2D(
-          builder,
-          cos, // m00
-          -sin, // m01
-          0, // m02
-          sin, // m10
-          cos, // m11
-          0 // m12
-        );
-        fbs.LayerTrait.addPostLayoutTransform(
-          builder,
-          postLayoutTransformOffset
-        );
+          const postLayoutTransformOffset = structs.cgTransform2D(
+            builder,
+            cos,
+            -sin,
+            0,
+            sin,
+            cos,
+            0
+          );
+          fbs.LayerTrait.addPostLayoutTransform(
+            builder,
+            postLayoutTransformOffset
+          );
 
-        // 8. Post-layout transform origin (default to center: 0, 0 in Alignment coordinates)
-        const transformOriginOffset = structs.alignment(builder, 0, 0);
-        fbs.LayerTrait.addPostLayoutTransformOrigin(
-          builder,
-          transformOriginOffset
-        );
+          // 8. Post-layout transform origin (only needed when rotation is set)
+          const transformOriginOffset = structs.alignment(builder, 0, 0);
+          fbs.LayerTrait.addPostLayoutTransformOrigin(
+            builder,
+            transformOriginOffset
+          );
+        }
 
         return fbs.LayerTrait.endLayerTrait(builder);
       }
@@ -1332,10 +1673,6 @@ export namespace format {
             fbs.BasicShapeNodeType.Rectangle;
 
           // Helper to create StrokeStyle
-          const dashArrayOffset = fbs.StrokeStyle.createStrokeDashArrayVector(
-            builder,
-            []
-          );
           fbs.StrokeStyle.startStrokeStyle(builder);
           fbs.StrokeStyle.addStrokeCap(
             builder,
@@ -1347,7 +1684,7 @@ export namespace format {
           );
           fbs.StrokeStyle.addStrokeAlign(builder, fbs.StrokeAlign.Inside);
           fbs.StrokeStyle.addStrokeMiterLimit(builder, 4.0);
-          fbs.StrokeStyle.addStrokeDashArray(builder, dashArrayOffset);
+          // Skip empty dash array vector — decoder reads null as no dashes
           const strokeStyleOffset = fbs.StrokeStyle.endStrokeStyle(builder);
 
           // Encode paints as PaintStackItem arrays
@@ -1364,15 +1701,8 @@ export namespace format {
             fbs.BasicShapeNode.createStrokePaintsVector
           );
 
-          // Create VariableWidthProfile (empty for now - nodes don't have this in TS model)
-          const emptyStopsOffset = fbs.VariableWidthProfile.createStopsVector(
-            builder,
-            []
-          );
-          fbs.VariableWidthProfile.startVariableWidthProfile(builder);
-          fbs.VariableWidthProfile.addStops(builder, emptyStopsOffset);
-          const strokeWidthProfileOffset =
-            fbs.VariableWidthProfile.endVariableWidthProfile(builder);
+          // Skip VariableWidthProfile — nodes don't have this in TS model.
+          // Decoder reads null when the field is absent.
 
           // Encode corner_radius and rectangular properties
           // For rectangle, use rectangular_corner_radius; for others, use corner_radius
@@ -1409,47 +1739,37 @@ export namespace format {
             builder,
             shapeNode.stroke_width ?? 0
           );
-          fbs.BasicShapeNode.addStrokeWidthProfile(
-            builder,
-            strokeWidthProfileOffset
-          );
-          // Create structs inline (must be done while table is being built)
-          const rectangularCornerRadiusOffsetInline =
-            shapeNode.type === "rectangle"
-              ? fbs.RectangularCornerRadius.createRectangularCornerRadius(
-                  builder,
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_left ?? 0, // tl_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_left ?? 0, // tl_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_right ?? 0, // tr_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_top_right ?? 0, // tr_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_left ?? 0, // bl_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_left ?? 0, // bl_ry
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_right ?? 0, // br_rx
-                  (shapeNode as grida.program.nodes.RectangleNode)
-                    .rectangular_corner_radius_bottom_right ?? 0 // br_ry
-                )
-              : fbs.RectangularCornerRadius.createRectangularCornerRadius(
-                  builder,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0
-                );
-          fbs.BasicShapeNode.addRectangularCornerRadius(
-            builder,
-            rectangularCornerRadiusOffsetInline
-          );
+          // strokeWidthProfile omitted — not in TS model, decoder reads null.
+          // Only write rectangular_corner_radius for rectangles.
+          // Non-rectangle shapes (polygon, star, ellipse) use the scalar
+          // corner_radius field. Writing an all-zeros struct here would
+          // shadow the scalar value in the Rust decoder.
+          if (shapeNode.type === "rectangle") {
+            const rectangularCornerRadiusOffsetInline =
+              fbs.RectangularCornerRadius.createRectangularCornerRadius(
+                builder,
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_left ?? 0, // tl_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_left ?? 0, // tl_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_right ?? 0, // tr_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_top_right ?? 0, // tr_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_left ?? 0, // bl_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_left ?? 0, // bl_ry
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_right ?? 0, // br_rx
+                (shapeNode as grida.program.nodes.RectangleNode)
+                  .rectangular_corner_radius_bottom_right ?? 0 // br_ry
+              );
+            fbs.BasicShapeNode.addRectangularCornerRadius(
+              builder,
+              rectangularCornerRadiusOffsetInline
+            );
+          }
 
           const rectangularStrokeWidthOffsetInline =
             format.shape.encode.rectangular_stroke_width_from(
@@ -1486,6 +1806,7 @@ export namespace format {
                 stroke_cap: containerNode.stroke_cap,
                 stroke_join: containerNode.stroke_join,
                 stroke_width: containerNode.stroke_width,
+                stroke_dash_array: containerNode.stroke_dash_array,
                 rectangular_stroke_width_top:
                   containerNode.rectangular_stroke_width_top,
                 rectangular_stroke_width_right:
@@ -1547,6 +1868,7 @@ export namespace format {
                 stroke_width: lineNode.stroke_width,
                 stroke_cap: lineNode.stroke_cap,
                 stroke_join: lineNode.stroke_join,
+                stroke_dash_array: lineNode.stroke_dash_array,
               });
             const strokePaintsFiltered = paints(lineNode, "stroke");
             const strokePaintsOffset = format.paint.encode.strokePaints(
@@ -1591,6 +1913,21 @@ export namespace format {
             nodeType = fbs.Node.TextSpanNode;
             break;
           }
+          case "text": {
+            const attribNode = node as grida.program.nodes.AttributedTextNode;
+            const propertiesOffset = format.node.encode.nodeData.attributedText(
+              builder,
+              attribNode
+            ).dataOffset;
+
+            fbs.AttributedTextNode.startAttributedTextNode(builder);
+            fbs.AttributedTextNode.addNode(builder, systemNodeTraitOffset);
+            fbs.AttributedTextNode.addLayer(builder, layerOffset);
+            fbs.AttributedTextNode.addProperties(builder, propertiesOffset);
+            nodeOffset = fbs.AttributedTextNode.endAttributedTextNode(builder);
+            nodeType = fbs.Node.AttributedTextNode;
+            break;
+          }
           case "vector": {
             const vectorNode = node as grida.program.nodes.VectorNode;
 
@@ -1600,6 +1937,7 @@ export namespace format {
                 stroke_width: vectorNode.stroke_width,
                 stroke_cap: vectorNode.stroke_cap,
                 stroke_join: vectorNode.stroke_join,
+                stroke_dash_array: vectorNode.stroke_dash_array,
               });
             const vectorWithSmoothing =
               vectorNode as grida.program.nodes.VectorNode &
@@ -1663,6 +2001,7 @@ export namespace format {
                 stroke_width: pathNode.stroke_width,
                 stroke_cap: pathNode.stroke_cap,
                 stroke_join: pathNode.stroke_join,
+                stroke_dash_array: pathNode.stroke_dash_array,
               });
             const fillPaintsFiltered = paints(pathNode, "fill");
             const fillPaintsOffset = format.paint.encode.fillPaints(
@@ -1709,6 +2048,7 @@ export namespace format {
                 stroke_width: booleanNode.stroke_width,
                 stroke_cap: booleanNode.stroke_cap,
                 stroke_join: booleanNode.stroke_join,
+                stroke_dash_array: booleanNode.stroke_dash_array,
               });
             const booleanWithSmoothing =
               booleanNode as grida.program.nodes.BooleanPathOperationNode &
@@ -1772,6 +2112,61 @@ export namespace format {
             fbs.GroupNode.addLayer(builder, layerOffset);
             nodeOffset = fbs.GroupNode.endGroupNode(builder);
             nodeType = fbs.Node.GroupNode;
+            break;
+          }
+          case "tray": {
+            const trayNode = node as grida.program.nodes.TrayNode;
+
+            // Encode traits and paints
+            const strokeGeometryOffset =
+              format.shape.encode.rectangularStrokeGeometryTrait(builder, {
+                stroke_cap: trayNode.stroke_cap,
+                stroke_join: trayNode.stroke_join,
+                stroke_width: trayNode.stroke_width,
+                stroke_dash_array: trayNode.stroke_dash_array,
+                rectangular_stroke_width_top:
+                  trayNode.rectangular_stroke_width_top,
+                rectangular_stroke_width_right:
+                  trayNode.rectangular_stroke_width_right,
+                rectangular_stroke_width_bottom:
+                  trayNode.rectangular_stroke_width_bottom,
+                rectangular_stroke_width_left:
+                  trayNode.rectangular_stroke_width_left,
+              });
+            const cornerRadiusOffset =
+              format.shape.encode.rectangularCornerRadiusTrait(builder, {
+                rectangular_corner_radius_top_left:
+                  trayNode.rectangular_corner_radius_top_left,
+                rectangular_corner_radius_top_right:
+                  trayNode.rectangular_corner_radius_top_right,
+                rectangular_corner_radius_bottom_left:
+                  trayNode.rectangular_corner_radius_bottom_left,
+                rectangular_corner_radius_bottom_right:
+                  trayNode.rectangular_corner_radius_bottom_right,
+                corner_smoothing: trayNode.corner_smoothing,
+              });
+            const fillPaintsFiltered = paints(trayNode, "fill");
+            const fillPaintsOffset = format.paint.encode.fillPaints(
+              builder,
+              fillPaintsFiltered,
+              fbs.TrayNode.createFillPaintsVector
+            );
+            const strokePaintsFiltered = paints(trayNode, "stroke");
+            const strokePaintsOffset = format.paint.encode.strokePaints(
+              builder,
+              strokePaintsFiltered,
+              fbs.TrayNode.createStrokePaintsVector
+            );
+
+            fbs.TrayNode.startTrayNode(builder);
+            fbs.TrayNode.addNode(builder, systemNodeTraitOffset);
+            fbs.TrayNode.addLayer(builder, layerOffset);
+            fbs.TrayNode.addStrokeGeometry(builder, strokeGeometryOffset);
+            fbs.TrayNode.addCornerRadius(builder, cornerRadiusOffset);
+            fbs.TrayNode.addFillPaints(builder, fillPaintsOffset);
+            fbs.TrayNode.addStrokePaints(builder, strokePaintsOffset);
+            nodeOffset = fbs.TrayNode.endTrayNode(builder);
+            nodeType = fbs.Node.TrayNode;
             break;
           }
           default: {
@@ -2177,7 +2572,7 @@ export namespace format {
         ) => flatbuffers.Offset
       ): flatbuffers.Offset {
         if (!paints || paints.length === 0) {
-          return createVector(builder, []);
+          return 0; // No vector — decoder reads null/empty
         }
 
         const stackItemOffsets: flatbuffers.Offset[] = [];
@@ -2668,6 +3063,7 @@ export namespace format {
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
           stroke_width?: number;
+          stroke_dash_array?: number[];
           rectangular_stroke_width_top?: number;
           rectangular_stroke_width_right?: number;
           rectangular_stroke_width_bottom?: number;
@@ -2677,7 +3073,8 @@ export namespace format {
         const strokeStyleOffset = createStrokeStyle(
           builder,
           node.stroke_cap,
-          node.stroke_join
+          node.stroke_join,
+          node.stroke_dash_array
         );
 
         // Create VariableWidthProfile (empty for now)
@@ -3006,6 +3403,7 @@ export namespace format {
         rectangular_stroke_width_left: number;
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
+        stroke_dash_array?: number[];
       } {
         if (!trait) {
           return {
@@ -3026,6 +3424,18 @@ export namespace format {
           ? styling.decode.strokeJoin(strokeStyle.strokeJoin())
           : "miter";
 
+        // Decode dash array
+        let stroke_dash_array: number[] | undefined;
+        if (strokeStyle) {
+          const len = strokeStyle.strokeDashArrayLength();
+          if (len > 0) {
+            stroke_dash_array = [];
+            for (let i = 0; i < len; i++) {
+              stroke_dash_array.push(strokeStyle.strokeDashArray(i)!);
+            }
+          }
+        }
+
         const strokeWidth = trait.rectangularStrokeWidth();
         return {
           rectangular_stroke_width_top: strokeWidth?.strokeTopWidth() ?? 0,
@@ -3035,6 +3445,7 @@ export namespace format {
           rectangular_stroke_width_left: strokeWidth?.strokeLeftWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
+          ...(stroke_dash_array ? { stroke_dash_array } : {}),
         };
       }
 
@@ -4495,52 +4906,67 @@ export namespace format {
        * @param document - The TS IR document to encode
        * @returns Uint8Array containing the FlatBuffers binary data
        */
+      export interface ToFlatbufferOptions {
+        /**
+         * When true, skip sorting node IDs for deterministic output.
+         * Safe for write-once pipelines (e.g. fig2grida) where the
+         * consumer does not depend on node order in the FlatBuffer vector.
+         * @default false
+         */
+        skipSort?: boolean;
+      }
+
       export function toFlatbuffer(
         document: grida.program.document.Document,
-        schemaVersion: string = grida.program.document.SCHEMA_VERSION
+        schemaVersion: string = grida.program.document.SCHEMA_VERSION,
+        options?: ToFlatbufferOptions
       ): Uint8Array {
-        const builder = new flatbuffers.Builder(1024);
+        // Collect node IDs once — reused for pre-sizing and iteration.
+        const nodeIds = Object.keys(document.nodes || {});
+        const nodeCount = nodeIds.length;
+
+        // Pre-size the builder to reduce doubling + copy during growth.
+        const initialSize = Math.max(nodeCount * 256, 256 * 1024);
+        const builder = new flatbuffers.Builder(initialSize);
 
         // Build schema version
         const schemaVersionOffset = builder.createString(schemaVersion);
 
-        // Build parent reference map: for each node, find its parent and generate position
-        // First, build a reverse map: childId -> parentId
-        const childToParentMap = new Map<string, string>();
+        // Build parent→children map from links for position generation.
         const parentToChildrenMap = new Map<string, string[]>();
 
         if (document.links) {
           for (const [parentId, children] of Object.entries(document.links)) {
             if (children && children.length > 0) {
               parentToChildrenMap.set(parentId, children);
-              for (const childId of children) {
-                childToParentMap.set(childId, parentId);
-              }
             }
           }
         }
 
-        // Generate position strings for each parent's children
+        // Generate position strings for each parent's children.
+        // We use zero-padded integers ("000000", "000001", …) which are
+        // trivially lexicographically sortable and nearly free to generate,
+        // replacing the costly fractional-index algorithm.
         const nodeToParentRef = new Map<
           string,
           { parentId: string; position: string }
         >();
         for (const [parentId, children] of parentToChildrenMap.entries()) {
           if (children.length === 0) continue;
-          // Generate position strings for all children
-          const positions = generateNKeysBetween(null, null, children.length);
+          const pad = Math.max(6, String(children.length - 1).length);
           for (let i = 0; i < children.length; i++) {
             nodeToParentRef.set(children[i]!, {
               parentId,
-              position: positions[i]!,
+              position: String(i).padStart(pad, "0"),
             });
           }
         }
 
         // Encode nodes array (TS nodes map -> flat list)
-        const nodeIds = Object.keys(document.nodes || {});
-        // Deterministic ordering: sort by string id
-        nodeIds.sort();
+        // Deterministic ordering: sort by string id (skippable for perf)
+        if (!options?.skipSort) {
+          nodeIds.sort();
+        }
 
         const nodeSlotOffsets: flatbuffers.Offset[] = [];
         for (const nodeId of nodeIds) {
@@ -5067,6 +5493,9 @@ export namespace format {
               format.shape.decode.deriveStrokeWidth(strokeGeometryProps),
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             rectangular_corner_radius_top_left:
               cornerRadiusProps.rectangular_corner_radius_top_left,
             rectangular_corner_radius_top_right:
@@ -5277,6 +5706,214 @@ export namespace format {
         }
 
         /**
+         * Decodes a TextStyleRec into an ITextStyle object.
+         * Shared helper for TextSpanNode and AttributedTextNode.
+         */
+        function decodeTextStyleRec(
+          textStyle: fbs.TextStyleRec | null
+        ): grida.program.nodes.i.ITextStyle {
+          let textDecorationLine: cg.TextDecorationLine = "none";
+          let fontSize: number = 14;
+          let fontWeight: number = 400;
+          let fontKerning: boolean = true;
+          let fontFamily: string | undefined = undefined;
+          let letterSpacing: number | undefined = undefined;
+          let wordSpacing: number | undefined = undefined;
+          let lineHeight: number | undefined = undefined;
+          let fontFeatures:
+            | Partial<Record<cg.OpenTypeFeature, boolean>>
+            | undefined = undefined;
+
+          if (textStyle) {
+            const decoration = textStyle.textDecoration();
+            if (decoration) {
+              textDecorationLine = format.styling.decode.textDecorationLine(
+                decoration.textDecorationLine()
+              );
+            }
+            const fontFamilyValue = textStyle.fontFamily();
+            if (fontFamilyValue) {
+              fontFamily = fontFamilyValue;
+            }
+            const fontSizeValue = textStyle.fontSize();
+            if (fontSizeValue !== 0) {
+              fontSize = fontSizeValue;
+            }
+            const fontWeightStruct = textStyle.fontWeight();
+            if (fontWeightStruct) {
+              fontWeight = fontWeightStruct.value();
+            }
+            fontKerning = textStyle.fontKerning();
+
+            const letterSpacingStruct = textStyle.letterSpacing();
+            if (letterSpacingStruct) {
+              if (letterSpacingStruct.kind() === fbs.TextDimensionKind.Factor) {
+                letterSpacing = letterSpacingStruct.value() ?? undefined;
+              }
+            }
+
+            const wordSpacingStruct = textStyle.wordSpacing();
+            if (wordSpacingStruct) {
+              if (wordSpacingStruct.kind() === fbs.TextDimensionKind.Factor) {
+                wordSpacing = wordSpacingStruct.value() ?? undefined;
+              }
+            }
+
+            const lineHeightStruct = textStyle.lineHeight();
+            if (lineHeightStruct) {
+              if (lineHeightStruct.kind() === fbs.TextDimensionKind.Normal) {
+                lineHeight = undefined;
+              } else if (
+                lineHeightStruct.kind() === fbs.TextDimensionKind.Factor
+              ) {
+                lineHeight = lineHeightStruct.value() ?? undefined;
+              }
+            }
+
+            const fontFeaturesLength = textStyle.fontFeaturesLength();
+            if (fontFeaturesLength > 0) {
+              fontFeatures = {};
+              for (let i = 0; i < fontFeaturesLength; i++) {
+                const feature = textStyle.fontFeatures(i);
+                if (feature) {
+                  const tagObj = feature.openTypeFeatureTag();
+                  if (tagObj) {
+                    const tag = structs.openTypeFeatureTagToString(tagObj);
+                    fontFeatures[tag as cg.OpenTypeFeature] =
+                      feature.openTypeFeatureValue();
+                  }
+                }
+              }
+              if (Object.keys(fontFeatures).length === 0) {
+                fontFeatures = undefined;
+              }
+            }
+          }
+
+          return {
+            font_family: fontFamily,
+            font_size: fontSize,
+            font_weight: fontWeight,
+            font_kerning: fontKerning,
+            text_decoration_line: textDecorationLine,
+            ...(letterSpacing !== undefined
+              ? { letter_spacing: letterSpacing }
+              : {}),
+            ...(wordSpacing !== undefined ? { word_spacing: wordSpacing } : {}),
+            ...(lineHeight !== undefined ? { line_height: lineHeight } : {}),
+            ...(fontFeatures ? { font_features: fontFeatures } : {}),
+          };
+        }
+
+        /**
+         * Decodes AttributedTextNode.
+         */
+        export function attributedText(
+          n: fbs.AttributedTextNode,
+          id: string,
+          systemNode: fbs.SystemNodeTrait,
+          layer: fbs.LayerTrait | null,
+          opacity: number,
+          layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
+          effects?: grida.program.nodes.i.IEffects
+        ): grida.program.nodes.AttributedTextNode {
+          const props = n.properties();
+
+          // Decode text alignment
+          const textAlign: cg.TextAlign = props
+            ? format.styling.decode.textAlign(props.textAlign())
+            : "left";
+          const textAlignVertical: cg.TextAlignVertical = props
+            ? format.styling.decode.textAlignVertical(props.textAlignVertical())
+            : "top";
+
+          // Decode default_style
+          const defaultStyle = decodeTextStyleRec(
+            props?.defaultStyle() ?? null
+          );
+
+          // Decode styled_runs — convert UTF-8 byte offsets → char indices
+          const decodedText = props?.text() ?? null;
+          const b2c =
+            decodedText != null ? byteToCharOffsets(decodedText) : undefined;
+          const styledRuns: grida.program.nodes.StyledTextRun[] = [];
+          if (props) {
+            const runsLength = props.styledRunsLength();
+            for (let i = 0; i < runsLength; i++) {
+              const runItem = props.styledRuns(i);
+              if (!runItem) continue;
+
+              const runStyle = decodeTextStyleRec(runItem.textStyle());
+
+              // Per-run fill paints
+              const runFillPaints = format.paint.decode.fillPaints(runItem);
+              // Per-run stroke paints
+              const runStrokePaints = format.paint.decode.strokePaints(runItem);
+              // Per-run stroke geometry
+              const runStrokeGeometry = runItem.strokeGeometry();
+              const runStrokeWidth = runStrokeGeometry
+                ? format.shape.decode.strokeGeometryTrait(runStrokeGeometry)
+                    .stroke_width
+                : undefined;
+
+              const byteStart = runItem.start();
+              const byteEnd = runItem.end();
+              styledRuns.push({
+                start: b2c ? (b2c.get(byteStart) ?? byteStart) : byteStart,
+                end: b2c ? (b2c.get(byteEnd) ?? byteEnd) : byteEnd,
+                style: runStyle,
+                ...(runFillPaints ? { fill_paints: runFillPaints } : {}),
+                ...(runStrokePaints ? { stroke_paints: runStrokePaints } : {}),
+                ...(runStrokeWidth !== undefined
+                  ? { stroke_width: runStrokeWidth }
+                  : {}),
+              });
+            }
+          }
+
+          // Decode StrokeGeometryTrait
+          const strokeGeometry = props?.strokeGeometry();
+          const strokeGeometryProps = format.shape.decode.strokeGeometryTrait(
+            strokeGeometry ?? null
+          );
+
+          // Decode node-level paints
+          const fillPaints = props
+            ? format.paint.decode.fillPaints(props)
+            : undefined;
+          const strokePaints = props
+            ? format.paint.decode.strokePaints(props)
+            : undefined;
+
+          const baseName = systemNode.name() ?? "text";
+          const baseActive = systemNode.active() ?? true;
+          const baseLocked = systemNode.locked() ?? false;
+
+          return {
+            type: "text",
+            id,
+            name: baseName,
+            active: baseActive,
+            locked: baseLocked,
+            opacity,
+            z_index: 0,
+            ...layoutFields,
+            text: decodedText,
+            default_style: defaultStyle,
+            styled_runs: styledRuns,
+            text_align: textAlign,
+            text_align_vertical: textAlignVertical,
+            ...(fillPaints ? { fill_paints: fillPaints } : {}),
+            ...(strokePaints ? { stroke_paints: strokePaints } : {}),
+            stroke_width: strokeGeometryProps.stroke_width,
+            ...(props?.maxLines() !== undefined && props.maxLines() > 0
+              ? { max_lines: props.maxLines() }
+              : {}),
+            ...(effects || {}),
+          } satisfies grida.program.nodes.AttributedTextNode;
+        }
+
+        /**
          * Decodes LineNode.
          */
         export function line(
@@ -5331,6 +5968,9 @@ export namespace format {
             marker_end_shape:
               enums.STROKE_MARKER_PRESET_DECODE.get(n.markerEndShape()) ??
               "none",
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.LineNode;
         }
@@ -5472,6 +6112,9 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             data: n.data() ?? "",
             fill_rule: fillRule,
             ...(effects || {}),
@@ -5531,6 +6174,9 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.BooleanPathOperationNode;
         }
@@ -5565,6 +6211,69 @@ export namespace format {
             layout_positioning: layoutFields.layout_positioning ?? "relative",
             ...(effects || {}),
           } satisfies grida.program.nodes.GroupNode;
+        }
+
+        /**
+         * Decodes TrayNode — has fills, strokes, corner radius, explicit dimensions.
+         */
+        export function tray(
+          n: fbs.TrayNode,
+          id: string,
+          systemNode: fbs.SystemNodeTrait,
+          layer: fbs.LayerTrait | null,
+          opacity: number,
+          layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
+          effects?: grida.program.nodes.i.IEffects
+        ): grida.program.nodes.TrayNode {
+          const strokeGeometry = n.strokeGeometry();
+          const cornerRadius = n.cornerRadius();
+          const fillPaints = format.paint.decode.fillPaints(n);
+          const strokePaints = format.paint.decode.strokePaints(n);
+
+          const strokeGeometryProps =
+            format.shape.decode.rectangularStrokeGeometryTrait(strokeGeometry);
+          const cornerRadiusProps =
+            format.shape.decode.rectangularCornerRadiusTrait(cornerRadius);
+
+          const baseName = systemNode.name() ?? "node";
+
+          return {
+            type: "tray",
+            id,
+            name: baseName,
+            active: systemNode.active(),
+            locked: systemNode.locked(),
+            opacity,
+            ...(fillPaints ? { fill_paints: fillPaints } : {}),
+            ...(strokePaints ? { stroke_paints: strokePaints } : {}),
+            stroke_width:
+              format.shape.decode.deriveStrokeWidth(strokeGeometryProps),
+            stroke_cap: strokeGeometryProps.stroke_cap,
+            stroke_join: strokeGeometryProps.stroke_join,
+            ...(strokeGeometryProps.stroke_dash_array
+              ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
+            rectangular_corner_radius_top_left:
+              cornerRadiusProps.rectangular_corner_radius_top_left,
+            rectangular_corner_radius_top_right:
+              cornerRadiusProps.rectangular_corner_radius_top_right,
+            rectangular_corner_radius_bottom_left:
+              cornerRadiusProps.rectangular_corner_radius_bottom_left,
+            rectangular_corner_radius_bottom_right:
+              cornerRadiusProps.rectangular_corner_radius_bottom_right,
+            corner_smoothing: cornerRadiusProps.corner_smoothing,
+            rectangular_stroke_width_top:
+              strokeGeometryProps.rectangular_stroke_width_top,
+            rectangular_stroke_width_right:
+              strokeGeometryProps.rectangular_stroke_width_right,
+            rectangular_stroke_width_bottom:
+              strokeGeometryProps.rectangular_stroke_width_bottom,
+            rectangular_stroke_width_left:
+              strokeGeometryProps.rectangular_stroke_width_left,
+            ...layoutFields,
+            layout_positioning: layoutFields.layout_positioning ?? "relative",
+            ...(effects || {}),
+          } satisfies grida.program.nodes.TrayNode;
         }
       }
 
@@ -5702,6 +6411,7 @@ export namespace format {
           type NodeWithLayer =
             | fbs.ContainerNode
             | fbs.TextSpanNode
+            | fbs.AttributedTextNode
             | fbs.LineNode
             | fbs.VectorNode
             | fbs.BooleanOperationNode
@@ -5764,6 +6474,17 @@ export namespace format {
                 decodedEffects
               );
               break;
+            case fbs.Node.AttributedTextNode:
+              nodes[id] = nodeTypes.attributedText(
+                typedNode as fbs.AttributedTextNode,
+                id,
+                systemNode,
+                layer,
+                opacity,
+                layoutFields,
+                decodedEffects
+              );
+              break;
             case fbs.Node.LineNode:
               nodes[id] = nodeTypes.line(
                 typedNode as fbs.LineNode,
@@ -5811,6 +6532,17 @@ export namespace format {
             case fbs.Node.GroupNode:
               nodes[id] = nodeTypes.group(
                 typedNode as fbs.GroupNode,
+                id,
+                systemNode,
+                layer,
+                opacity,
+                layoutFields,
+                decodedEffects
+              );
+              break;
+            case fbs.Node.TrayNode:
+              nodes[id] = nodeTypes.tray(
+                typedNode as fbs.TrayNode,
                 id,
                 systemNode,
                 layer,

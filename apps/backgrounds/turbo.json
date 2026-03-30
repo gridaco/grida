@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typegen": {
+      "outputs": [".next/types/**", ".next/dev/types/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck", "typegen"]
+    }
+  }
+}

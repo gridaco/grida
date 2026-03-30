@@ -34,7 +34,10 @@ pub fn build() -> Scene {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         transform: AffineTransform::from_box_center(0.0, 100.0, 120.0, 60.0, 30.0),
-        size: Size { width: 120.0, height: 60.0 },
+        size: Size {
+            width: 120.0,
+            height: 60.0,
+        },
         fills: Paints::new(vec![solid(59, 100, 220, 200)]),
         strokes: Paints::new(vec![]),
         stroke_style: StrokeStyle::default(),
@@ -63,7 +66,10 @@ pub fn build() -> Scene {
         mask: None,
         // from_box_center uses origin (0.5, 0.5)
         transform: AffineTransform::from_box_center(0.0, 220.0, 100.0, 60.0, 45.0),
-        size: Size { width: 100.0, height: 60.0 },
+        size: Size {
+            width: 100.0,
+            height: 60.0,
+        },
         corner_radius: RectangularCornerRadius::default(),
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![solid(220, 59, 59, 180)]),
@@ -81,7 +87,10 @@ pub fn build() -> Scene {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         transform: AffineTransform::from_box(180.0, 220.0, 100.0, 60.0, 45.0, 0.0, 0.0),
-        size: Size { width: 100.0, height: 60.0 },
+        size: Size {
+            width: 100.0,
+            height: 60.0,
+        },
         corner_radius: RectangularCornerRadius::default(),
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![solid(59, 100, 220, 180)]),
@@ -99,7 +108,10 @@ pub fn build() -> Scene {
         blend_mode: LayerBlendMode::PassThrough,
         mask: None,
         transform: AffineTransform::from_box(360.0, 220.0, 100.0, 60.0, 45.0, 1.0, 1.0),
-        size: Size { width: 100.0, height: 60.0 },
+        size: Size {
+            width: 100.0,
+            height: 60.0,
+        },
         corner_radius: RectangularCornerRadius::default(),
         corner_smoothing: CornerSmoothing(0.0),
         fills: Paints::new(vec![solid(59, 180, 75, 180)]),
@@ -124,8 +136,10 @@ pub fn build() -> Scene {
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(200.0),
             layout_target_height: Some(120.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
@@ -156,8 +170,10 @@ pub fn build() -> Scene {
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(200.0),
             layout_target_height: Some(120.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
@@ -185,14 +201,19 @@ pub fn build() -> Scene {
         mask: None,
         rotation: 45.0,
         position: LayoutPositioningBasis::Inset(EdgeInsets {
-            top: 360.0, right: 0.0, bottom: 0.0, left: 600.0,
+            top: 360.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 600.0,
         }),
         layout_container: LayoutContainerStyle::default(),
         layout_dimensions: LayoutDimensionStyle {
             layout_target_width: Some(120.0),
             layout_target_height: Some(120.0),
-            layout_min_width: None, layout_max_width: None,
-            layout_min_height: None, layout_max_height: None,
+            layout_min_width: None,
+            layout_max_width: None,
+            layout_min_height: None,
+            layout_max_height: None,
             layout_target_aspect_ratio: None,
         },
         layout_child: None,
@@ -237,9 +258,9 @@ pub fn build() -> Scene {
     ];
 
     let mut links: HashMap<u64, Vec<u64>> = HashMap::new();
-    links.insert(13, vec![14]);  // container 90° → child
-    links.insert(15, vec![16]);  // container 30° → child rotated 45°
-    links.insert(17, vec![18]);  // container 45° inset → child
+    links.insert(13, vec![14]); // container 90° → child
+    links.insert(15, vec![16]); // container 30° → child rotated 45°
+    links.insert(17, vec![18]); // container 45° inset → child
 
     build_scene(
         "L0 Layout Transform",

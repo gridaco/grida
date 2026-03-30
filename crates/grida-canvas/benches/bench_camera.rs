@@ -89,12 +89,7 @@ fn create_heavy_scene(cols: u32, rows: u32) -> Scene {
                 height: size,
             };
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: CGColor::from_rgba(
-                    ((x * 13) % 255) as u8,
-                    ((y * 17) % 255) as u8,
-                    200,
-                    255,
-                ),
+                color: CGColor::from_rgba(((x * 13) % 255) as u8, ((y * 17) % 255) as u8, 200, 255),
                 blend_mode: BlendMode::default(),
                 active: true,
             }));
@@ -137,12 +132,7 @@ fn create_simple_scene(cols: u32, rows: u32) -> Scene {
                 height: size,
             };
             rect.set_fill(Paint::Solid(SolidPaint {
-                color: CGColor::from_rgba(
-                    ((x * 7) % 255) as u8,
-                    ((y * 11) % 255) as u8,
-                    180,
-                    255,
-                ),
+                color: CGColor::from_rgba(((x * 7) % 255) as u8, ((y * 11) % 255) as u8, 180, 255),
                 blend_mode: BlendMode::default(),
                 active: true,
             }));
@@ -411,15 +401,7 @@ fn bench_camera(c: &mut Criterion) {
 
                 let mut use_zoom_a = true;
                 let screen_point = [700.0f32, 300.0];
-                b.iter(|| {
-                    run_pinch_zoom(
-                        &mut renderer,
-                        &mut use_zoom_a,
-                        1.0,
-                        1.3,
-                        screen_point,
-                    )
-                })
+                b.iter(|| run_pinch_zoom(&mut renderer, &mut use_zoom_a, 1.0, 1.3, screen_point))
             });
 
             // ── pan_after_zoom ───────────────────────────────────

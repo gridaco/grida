@@ -6,6 +6,29 @@
  *
  * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Fig.kiwi format glossary
  *
+ * ## TODO — Auto-layout conversion (not implemented)
+ *
+ * Currently ALL nodes are emitted with `layout_positioning: "absolute"` and
+ * `layout_mode: "flow"`. Figma auto-layout properties (`layoutMode`,
+ * `layoutAlign`, `layoutGrow`, `primaryAxisAlignItems`,
+ * `counterAxisAlignItems`, `layoutPositioning`, sizing modes, `layoutWrap`)
+ * are completely dropped during conversion. Positions are always derived
+ * from `absoluteBoundingBox` / `relativeTransform`.
+ *
+ * This means:
+ * - The output is always safe for `skip_layout` (no flex containers exist)
+ * - Auto-layout semantics are lost — re-layout in Grida won't match Figma
+ * - Resizing a container won't reflow children as it would in Figma
+ *
+ * To support true auto-layout round-trip:
+ * - Map `layoutMode` → `layout_mode: "flex"`
+ * - Map `layoutAlign`, `layoutGrow`, `layoutPositioning` per child
+ * - Map `primaryAxisAlignItems` / `counterAxisAlignItems` → alignment
+ * - Map `primaryAxisSizingMode` / `counterAxisSizingMode` → sizing
+ * - Map `layoutWrap` → `layout_wrap`
+ * - Only set `layout_positioning: "absolute"` for children with
+ *   `layoutPositioning: "ABSOLUTE"` in Figma
+ *
  * ## TODO — Kiwi → REST (not yet fully mapped)
  *
  * - **Rich text**: `characterStyleOverrides` and `styleOverrideTable` are always empty.
@@ -172,6 +195,45 @@ export namespace iofigma {
           pointCount: number;
           innerRadius: number;
         };
+
+    /**
+     * Slide node from Figma Deck (.fig with fig-deck prelude).
+     *
+     * - rest-api-spec - Not supported (Figma REST API has no Deck/Slides types)
+     * - kiwi-spec - SLIDE, INTERACTIVE_SLIDE_ELEMENT
+     *
+     * Structurally equivalent to a FrameNode (children, fills, clips, layout).
+     * INTERACTIVE_SLIDE_ELEMENT is also mapped here since it behaves as a
+     * frame-like interactive element within a slide.
+     */
+    export type SlideNodeIR = Omit<figrest.FrameNode, "type"> & {
+      type: "X_SLIDE";
+      slideMetadata?: {
+        speakerNotes?: string;
+        isSkipped?: boolean;
+        slideNumber?: string;
+      };
+    };
+
+    /**
+     * Slide grid container from Figma Deck.
+     *
+     * - rest-api-spec - Not supported
+     * - kiwi-spec - SLIDE_GRID
+     */
+    export type SlideGridNodeIR = Omit<figrest.FrameNode, "type"> & {
+      type: "X_SLIDE_GRID";
+    };
+
+    /**
+     * Slide row container from Figma Deck.
+     *
+     * - rest-api-spec - Not supported
+     * - kiwi-spec - SLIDE_ROW
+     */
+    export type SlideRowNodeIR = Omit<figrest.FrameNode, "type"> & {
+      type: "X_SLIDE_ROW";
+    };
   }
 
   export namespace restful {
@@ -427,6 +489,53 @@ export namespace iofigma {
          * @default true
          */
         placeholder_for_missing_images?: boolean;
+        /**
+         * When true, TEXT nodes always use concrete width/height from
+         * absoluteBoundingBox, ignoring Figma's `textAutoResize` ("auto"
+         * sizing). This produces fixed-size text frames whose dimensions
+         * match Figma's rendered output exactly.
+         *
+         * Use this when the consumer skips layout computation (e.g.
+         * `skip_layout` mode) and needs pre-resolved text dimensions.
+         *
+         * When false (default), TEXT nodes respect `textAutoResize`:
+         * "WIDTH_AND_HEIGHT" sets both to auto, "HEIGHT" sets height to
+         * auto. These require layout-time text measurement to resolve.
+         *
+         * **Caveat:** The fixed dimensions come from Figma's own renderer
+         * and font metrics. If the rendering environment uses different
+         * fonts or a different text shaper, the actual text extent may
+         * not match the baked-in size — text may overflow or leave extra
+         * whitespace. Only use this flag when font fidelity cannot be
+         * guaranteed or when layout computation is explicitly skipped.
+         *
+         * @default false
+         */
+        prefer_fixed_text_sizing?: boolean;
+
+        // -- Shared buffers (performance) --
+        // When provided, factory.document() writes directly into these
+        // pre-allocated collections instead of creating its own, eliminating
+        // the Object.assign merge passes in the caller.
+
+        /**
+         * Shared nodes dictionary. When set, `factory.document()` inserts
+         * converted nodes here instead of allocating a local `nodes` object.
+         */
+        _shared_nodes?: Record<string, grida.program.nodes.Node>;
+        /**
+         * Shared links (parent→children) dictionary.
+         */
+        _shared_links?: Record<string, string[]>;
+        /**
+         * Shared mutable set for collecting image refs used across all roots.
+         */
+        _shared_image_refs_used?: Set<string>;
+        /**
+         * Shared Figma-ID → Grida-ID map. Avoids per-root Map allocations
+         * when converting many root nodes.
+         */
+        _shared_figma_id_map?: Map<string, string>;
       };
 
       function toGradientPaint(paint: figrest.GradientPaint) {
@@ -962,26 +1071,35 @@ export namespace iofigma {
         | figrest.BooleanOperationNode
         | figrest.InstanceNode
         | figrest.FrameNode
-        | figrest.GroupNode;
+        | figrest.GroupNode
+        | __ir.SlideNodeIR
+        | __ir.SlideGridNodeIR
+        | __ir.SlideRowNodeIR;
 
       type InputNode =
         | (figrest.SubcanvasNode & Partial<__ir.HasLayoutTraitIR>)
         | __ir.VectorNodeRestInput
         | __ir.VectorNodeWithVectorNetworkDataPresent
         | __ir.StarNodeWithPointsDataPresent
-        | __ir.RegularPolygonNodeWithPointsDataPresent;
+        | __ir.RegularPolygonNodeWithPointsDataPresent
+        | __ir.SlideNodeIR
+        | __ir.SlideGridNodeIR
+        | __ir.SlideRowNodeIR;
 
       export function document(
         node: InputNode,
         images: { [key: string]: string },
         context: FactoryContext
       ): FigmaImportResult {
-        const nodes: Record<string, grida.program.nodes.Node> = {};
-        const graph: Record<string, string[]> = {};
-        const imageRefsUsed = new Set<string>();
+        const nodes: Record<string, grida.program.nodes.Node> =
+          context._shared_nodes ?? {};
+        const graph: Record<string, string[]> = context._shared_links ?? {};
+        const imageRefsUsed: Set<string> =
+          context._shared_image_refs_used ?? new Set<string>();
 
         // Map from Figma ID (ephemeral) to Grida ID (final)
-        const figma_id_to_grida_id = new Map<string, string>();
+        const figma_id_to_grida_id =
+          context._shared_figma_id_map ?? new Map<string, string>();
 
         // ID generator function - use provided generator or fallback
         let counter = 0;
@@ -1419,7 +1537,11 @@ export namespace iofigma {
 
         return {
           document: packed,
-          imageRefsUsed: Array.from(imageRefsUsed),
+          // When shared buffers are in use, the caller reads imageRefsUsed
+          // from the shared Set directly — return empty to avoid copying.
+          imageRefsUsed: context._shared_image_refs_used
+            ? []
+            : Array.from(imageRefsUsed),
         };
       }
 
@@ -1457,14 +1579,12 @@ export namespace iofigma {
                 blendMode: "PASS_THROUGH",
               }),
               ...positioning_trait(node, parent),
-              ...fills_trait(node.fills, context, imageRefsUsed),
+              ...fills_trait(node.fills ?? [], context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
-              ...style_trait({}),
-              ...corner_radius_trait({ cornerRadius: 0 }),
-              ...container_layout_trait({}, false),
-              type: "container",
-              clips_content: false,
-            } satisfies grida.program.nodes.ContainerNode;
+              ...rectangular_stroke_width_trait(node as any),
+              ...corner_radius_trait(node as any),
+              type: "tray",
+            } satisfies grida.program.nodes.TrayNode;
           }
           //
           case "COMPONENT":
@@ -1472,7 +1592,11 @@ export namespace iofigma {
           case "FRAME":
           // Fallback: treat COMPONENT_SET as FRAME for rendering. Grida does not yet
           // support component semantics; proper variant/swap support to be added later.
-          case "COMPONENT_SET": {
+          case "COMPONENT_SET":
+          // Slide IR types (Figma Deck) — structurally identical to frames
+          case "X_SLIDE":
+          case "X_SLIDE_GRID":
+          case "X_SLIDE_ROW": {
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1555,6 +1679,155 @@ export namespace iofigma {
                 figma_constraints_vertical !== "TOP" ? fixedbottom : undefined,
             };
 
+            const textAlignValue: cg.TextAlign = node.style.textAlignHorizontal
+              ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
+              : "left";
+            const textAlignVerticalValue: cg.TextAlignVertical = node.style
+              .textAlignVertical
+              ? map.textAlignVerticalMap[node.style.textAlignVertical]
+              : "top";
+
+            // Shared layout properties for text nodes
+            const textLayoutProps = {
+              layout_positioning: "absolute" as const,
+              layout_inset_left: constraints.left,
+              layout_inset_top: constraints.top,
+              layout_inset_right: constraints.right,
+              layout_inset_bottom: constraints.bottom,
+              layout_target_width:
+                !context.prefer_fixed_text_sizing &&
+                figma_text_resizing_model === "WIDTH_AND_HEIGHT"
+                  ? ("auto" as const)
+                  : fixedwidth,
+              layout_target_height:
+                !context.prefer_fixed_text_sizing &&
+                (figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
+                  figma_text_resizing_model === "HEIGHT")
+                  ? ("auto" as const)
+                  : fixedheight,
+            };
+
+            // Helper to convert a REST-format style object into a Grida ITextStyle
+            const restStyleToGrida = (
+              style: Record<string, unknown>
+            ): grida.program.nodes.i.ITextStyle => ({
+              font_family: (style.fontFamily as string) ?? "Inter",
+              font_size: (style.fontSize as number) ?? DEFAULT_FONT_SIZE,
+              font_weight:
+                ((style.fontWeight as cg.NFontWeight) ?? 400) as cg.NFontWeight,
+              font_kerning: true,
+              text_decoration_line: style.textDecoration
+                ? (map.textDecorationMap[
+                    style.textDecoration as keyof typeof map.textDecorationMap
+                  ] ?? "none")
+                : "none",
+              line_height: (style as { lineHeightPercentFontSize?: number })
+                .lineHeightPercentFontSize
+                ? (style as { lineHeightPercentFontSize: number })
+                    .lineHeightPercentFontSize / 100
+                : undefined,
+              letter_spacing: (style.letterSpacing as number)
+                ? (style.letterSpacing as number) /
+                  ((style.fontSize as number) || DEFAULT_FONT_SIZE)
+                : undefined,
+              font_postscript_name:
+                (style.fontPostScriptName as string) || undefined,
+              font_style_italic: (style.italic as boolean) ?? false,
+            });
+
+            // Check for rich text (per-character style overrides)
+            const charOverrides = (
+              node as { characterStyleOverrides?: number[] }
+            ).characterStyleOverrides;
+            const overrideTable = (
+              node as {
+                styleOverrideTable?: Record<string, Record<string, unknown>>;
+              }
+            ).styleOverrideTable;
+            const hasRichText =
+              charOverrides &&
+              charOverrides.length > 0 &&
+              charOverrides.some((id: number) => id !== 0) &&
+              overrideTable;
+
+            if (hasRichText && node.characters) {
+              // Build styled runs from characterStyleOverrides.
+              //
+              // Figma's `characterStyleOverrides` array may be shorter than
+              // `characters` — positions beyond the array use the base style
+              // (id 0). We treat out-of-bounds indices as id 0 (base style).
+              const characters = node.characters;
+              const runs: grida.program.nodes.StyledTextRun[] = [];
+              let runStart = 0;
+              let currentId = charOverrides[0] ?? 0;
+
+              for (let i = 1; i <= characters.length; i++) {
+                // Characters beyond the charOverrides array use base style (0).
+                const nextId =
+                  i < characters.length
+                    ? (i < charOverrides.length
+                        ? (charOverrides[i] ?? 0)
+                        : 0)
+                    : -1; // sentinel: forces final run to be emitted
+                if (nextId !== currentId) {
+                  // Emit run [runStart, i)
+                  const overrideStyle =
+                    currentId !== 0 && overrideTable[String(currentId)]
+                      ? overrideTable[String(currentId)]
+                      : {};
+
+                  // Merge base style with override
+                  const mergedRestStyle = {
+                    ...node.style,
+                    ...overrideStyle,
+                  };
+                  const gridaStyle = restStyleToGrida(mergedRestStyle);
+
+                  // Per-run fills from override
+                  const overrideFills = (
+                    overrideStyle as { fills?: figrest.Paint[] }
+                  ).fills;
+                  const runFillPaints = overrideFills
+                    ? overrideFills
+                        .map((p) =>
+                          convertPaint(p, context, imageRefsUsed)
+                        )
+                        .filter((p): p is cg.Paint => p !== undefined)
+                    : undefined;
+
+                  runs.push({
+                    start: runStart,
+                    end: i,
+                    style: gridaStyle,
+                    ...(runFillPaints && runFillPaints.length > 0
+                      ? { fill_paints: runFillPaints }
+                      : {}),
+                  });
+
+                  runStart = i;
+                  currentId = nextId;
+                }
+              }
+
+              const defaultStyle = restStyleToGrida(node.style);
+
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...fills_trait(node.fills, context, imageRefsUsed),
+                ...text_stroke_trait(node, context, imageRefsUsed),
+                ...style_trait({}),
+                ...effects_trait(node.effects),
+                type: "text",
+                text: characters,
+                default_style: defaultStyle,
+                styled_runs: runs,
+                ...textLayoutProps,
+                text_align: textAlignValue,
+                text_align_vertical: textAlignVerticalValue,
+              } satisfies grida.program.nodes.AttributedTextNode;
+            }
+
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1564,26 +1837,9 @@ export namespace iofigma {
               ...effects_trait(node.effects),
               type: "tspan",
               text: node.characters,
-              layout_positioning: "absolute",
-              layout_inset_left: constraints.left,
-              layout_inset_top: constraints.top,
-              layout_inset_right: constraints.right,
-              layout_inset_bottom: constraints.bottom,
-              layout_target_width:
-                figma_text_resizing_model === "WIDTH_AND_HEIGHT"
-                  ? "auto"
-                  : fixedwidth,
-              layout_target_height:
-                figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
-                figma_text_resizing_model === "HEIGHT"
-                  ? "auto"
-                  : fixedheight,
-              text_align: node.style.textAlignHorizontal
-                ? (map.textAlignMap[node.style.textAlignHorizontal] ?? "left")
-                : "left",
-              text_align_vertical: node.style.textAlignVertical
-                ? map.textAlignVerticalMap[node.style.textAlignVertical]
-                : "top",
+              ...textLayoutProps,
+              text_align: textAlignValue,
+              text_align_vertical: textAlignVerticalValue,
               text_decoration_line: node.style.textDecoration
                 ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
@@ -2345,13 +2601,138 @@ export namespace iofigma {
       /**
        * TypePropertiesTrait - Text-specific properties
        */
+      /**
+       * Build a REST-compatible style object from a Kiwi NodeChange (shared
+       * between the base node style and per-run overrides).
+       */
+      function kiwi_rest_style_from_nc(
+        nc: figkiwi.NodeChange,
+        fontMetaData: figkiwi.FontMetaData[] | undefined
+      ) {
+        const fontMeta = findFontMetaDataEntry(fontMetaData, nc.fontName);
+        const fontWeight = (fontMeta?.fontWeight ?? 400) as cg.NFontWeight;
+        const italic = fontMeta?.fontStyle === "ITALIC";
+        return {
+          fontFamily: nc.fontName?.family ?? "Inter",
+          fontPostScriptName: nc.fontName?.postscript
+            ? nc.fontName.postscript
+            : undefined,
+          fontWeight,
+          italic,
+          fontSize: nc.fontSize ?? 12,
+          textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
+          textAlignVertical: nc.textAlignVertical ?? "TOP",
+          letterSpacing:
+            nc.letterSpacing?.units === "PERCENT"
+              ? (nc.letterSpacing.value / 100) *
+                (nc.fontSize ?? DEFAULT_FONT_SIZE)
+              : nc.letterSpacing?.units === "PIXELS"
+                ? nc.letterSpacing.value
+                : (nc.letterSpacing?.value ?? 0),
+          lineHeightPx:
+            nc.lineHeight?.units === "PIXELS"
+              ? nc.lineHeight.value
+              : undefined,
+          lineHeightPercent:
+            nc.lineHeight?.units === "PERCENT"
+              ? nc.lineHeight.value
+              : undefined,
+          lineHeightPercentFontSize:
+            nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
+          textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
+          textCase:
+            nc.textCase === "ORIGINAL"
+              ? undefined
+              : (nc.textCase ?? undefined),
+          textDecoration: nc.textDecoration ?? "NONE",
+        };
+      }
+
       function kiwi_text_style_trait(nc: figkiwi.NodeChange) {
         const characters = nc.textData?.characters ?? "";
         const fontMetaData =
           nc.derivedTextData?.fontMetaData ?? nc.textData?.fontMetaData;
-        const fontMeta = findFontMetaDataEntry(fontMetaData, nc.fontName);
-        const fontWeight = (fontMeta?.fontWeight ?? 400) as cg.NFontWeight;
-        const italic = fontMeta?.fontStyle === "ITALIC";
+
+        const style = kiwi_rest_style_from_nc(nc, fontMetaData);
+
+        // Parse per-character style overrides from Kiwi textData
+        const charStyleIDs = nc.textData?.characterStyleIDs;
+        const kiwiOverrideTable = nc.textData?.styleOverrideTable;
+        let characterStyleOverrides: number[] = [];
+        const styleOverrideTable: Record<
+          string,
+          Record<string, unknown>
+        > = {};
+
+        if (
+          charStyleIDs?.length &&
+          kiwiOverrideTable?.length &&
+          charStyleIDs.some((id) => id !== 0)
+        ) {
+          characterStyleOverrides = charStyleIDs;
+          // Build the REST-format styleOverrideTable from the Kiwi array.
+          // Kiwi ID 0 means "base style" (no override). Non-zero IDs are
+          // matched by the `styleID` field inside each override entry — the
+          // array index does NOT necessarily equal `id - 1`.
+          const kiwiOverrideByStyleID = new Map<number, (typeof kiwiOverrideTable)[number]>();
+          for (const entry of kiwiOverrideTable) {
+            if (entry.styleID !== undefined) {
+              kiwiOverrideByStyleID.set(entry.styleID, entry);
+            }
+          }
+          const seenIds = new Set(charStyleIDs.filter((id) => id !== 0));
+          for (const id of seenIds) {
+            const overrideNc =
+              kiwiOverrideByStyleID.get(id) ?? kiwiOverrideTable[id - 1];
+            if (!overrideNc) continue;
+            // Only include properties that are actually set in the override.
+            // Kiwi overrides are sparse — unset fields mean "inherit from base".
+            const o: Record<string, unknown> = {};
+            if (overrideNc.fontName?.family) {
+              o.fontFamily = overrideNc.fontName.family;
+              const fm = findFontMetaDataEntry(
+                fontMetaData,
+                overrideNc.fontName
+              );
+              if (fm?.fontWeight !== undefined)
+                o.fontWeight = fm.fontWeight;
+              if (fm?.fontStyle === "ITALIC") o.italic = true;
+            }
+            if (overrideNc.fontName?.postscript)
+              o.fontPostScriptName = overrideNc.fontName.postscript;
+            if (overrideNc.fontSize !== undefined)
+              o.fontSize = overrideNc.fontSize;
+            if (overrideNc.textDecoration !== undefined)
+              o.textDecoration = overrideNc.textDecoration;
+            if (overrideNc.textCase !== undefined && overrideNc.textCase !== "ORIGINAL")
+              o.textCase = overrideNc.textCase;
+            if (overrideNc.letterSpacing !== undefined) {
+              const ls = overrideNc.letterSpacing;
+              const fs = overrideNc.fontSize ?? nc.fontSize ?? DEFAULT_FONT_SIZE;
+              o.letterSpacing =
+                ls.units === "PERCENT"
+                  ? (ls.value / 100) * fs
+                  : ls.units === "PIXELS"
+                    ? ls.value
+                    : (ls.value ?? 0);
+            }
+            if (overrideNc.lineHeight !== undefined) {
+              const lh = overrideNc.lineHeight;
+              if (lh.units === "PIXELS") o.lineHeightPx = lh.value;
+              if (lh.units === "PERCENT") {
+                o.lineHeightPercent = lh.value;
+                o.lineHeightPercentFontSize = lh.value;
+              }
+            }
+            if (overrideNc.fillPaints) o.fills = paints(overrideNc.fillPaints);
+            if (overrideNc.strokePaints)
+              o.strokes = paints(overrideNc.strokePaints);
+            if (overrideNc.strokeWeight !== undefined)
+              o.strokeWeight = overrideNc.strokeWeight;
+            styleOverrideTable[String(id)] = o;
+          }
+        }
+
         return {
           characters,
           fills: nc.fillPaints ? paints(nc.fillPaints) : [],
@@ -2360,45 +2741,9 @@ export namespace iofigma {
           strokeAlign: nc.strokeAlign
             ? map.strokeAlign(nc.strokeAlign)
             : "INSIDE",
-          style: {
-            fontFamily: nc.fontName?.family ?? "Inter",
-            fontPostScriptName: nc.fontName?.postscript
-              ? nc.fontName.postscript
-              : undefined,
-            fontWeight,
-            italic,
-            fontSize: nc.fontSize ?? 12,
-            textAlignHorizontal: nc.textAlignHorizontal ?? "LEFT",
-            textAlignVertical: nc.textAlignVertical ?? "TOP",
-            // Produce absolute-pixel letterSpacing to match the REST API
-            // format — the downstream consumer (fromRest*) normalizes by
-            // dividing by fontSize, so we must not pre-normalize here.
-            letterSpacing:
-              nc.letterSpacing?.units === "PERCENT"
-                ? (nc.letterSpacing.value / 100) *
-                  (nc.fontSize ?? DEFAULT_FONT_SIZE)
-                : nc.letterSpacing?.units === "PIXELS"
-                  ? nc.letterSpacing.value
-                  : (nc.letterSpacing?.value ?? 0),
-            lineHeightPx:
-              nc.lineHeight?.units === "PIXELS"
-                ? nc.lineHeight.value
-                : undefined,
-            lineHeightPercent:
-              nc.lineHeight?.units === "PERCENT"
-                ? nc.lineHeight.value
-                : undefined,
-            lineHeightPercentFontSize:
-              nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
-            textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
-            textCase:
-              nc.textCase === "ORIGINAL"
-                ? undefined
-                : (nc.textCase ?? undefined),
-            textDecoration: nc.textDecoration ?? "NONE",
-          },
-          characterStyleOverrides: [],
-          styleOverrideTable: {},
+          style,
+          characterStyleOverrides,
+          styleOverrideTable,
           lineTypes: [],
           lineIndentations: [],
         };
@@ -2551,6 +2896,75 @@ export namespace iofigma {
           ...kiwi_effects_trait(nc),
           ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.FrameNode;
+      }
+
+      /**
+       * Convert Kiwi SLIDE / INTERACTIVE_SLIDE_ELEMENT to X_SLIDE IR.
+       * Reuses the same trait pipeline as frame().
+       */
+      function slide(
+        nc: figkiwi.NodeChange
+      ): __ir.SlideNodeIR | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+        return {
+          ...kiwi_is_layer_trait(nc, "FRAME"),
+          ...kiwi_blend_opacity_trait(nc),
+          ...kiwi_layout_trait(nc),
+          ...kiwi_geometry_trait(nc),
+          ...kiwi_corner_trait(nc),
+          ...kiwi_frame_clip_trait(nc),
+          ...kiwi_children_trait(),
+          ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
+          type: "X_SLIDE",
+          slideMetadata: {
+            speakerNotes: nc.slideSpeakerNotes ?? undefined,
+            isSkipped: nc.isSkippedSlide ?? undefined,
+            slideNumber: nc.slideNumber ?? undefined,
+          },
+        } as __ir.SlideNodeIR;
+      }
+
+      /**
+       * Convert Kiwi SLIDE_GRID to X_SLIDE_GRID IR.
+       */
+      function slideGrid(
+        nc: figkiwi.NodeChange
+      ): __ir.SlideGridNodeIR | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+        return {
+          ...kiwi_is_layer_trait(nc, "FRAME"),
+          ...kiwi_blend_opacity_trait(nc),
+          ...kiwi_layout_trait(nc),
+          ...kiwi_geometry_trait(nc),
+          ...kiwi_corner_trait(nc),
+          ...kiwi_frame_clip_trait(nc),
+          ...kiwi_children_trait(),
+          ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
+          type: "X_SLIDE_GRID",
+        } as __ir.SlideGridNodeIR;
+      }
+
+      /**
+       * Convert Kiwi SLIDE_ROW to X_SLIDE_ROW IR.
+       */
+      function slideRow(
+        nc: figkiwi.NodeChange
+      ): __ir.SlideRowNodeIR | undefined {
+        if (!nc.guid || !nc.name || !nc.size) return undefined;
+        return {
+          ...kiwi_is_layer_trait(nc, "FRAME"),
+          ...kiwi_blend_opacity_trait(nc),
+          ...kiwi_layout_trait(nc),
+          ...kiwi_geometry_trait(nc),
+          ...kiwi_corner_trait(nc),
+          ...kiwi_frame_clip_trait(nc),
+          ...kiwi_children_trait(),
+          ...kiwi_effects_trait(nc),
+          ...kiwi_has_export_settings_trait(nc),
+          type: "X_SLIDE_ROW",
+        } as __ir.SlideRowNodeIR;
       }
 
       /**
@@ -2916,6 +3330,9 @@ export namespace iofigma {
         | __ir.VectorNodeWithVectorNetworkDataPresent
         | __ir.StarNodeWithPointsDataPresent
         | __ir.RegularPolygonNodeWithPointsDataPresent
+        | __ir.SlideNodeIR
+        | __ir.SlideGridNodeIR
+        | __ir.SlideRowNodeIR
         | undefined {
         if (!nodeChange.type) return undefined;
 
@@ -2947,6 +3364,13 @@ export namespace iofigma {
             return star(nodeChange);
           case "BOOLEAN_OPERATION":
             return booleanOperation(nodeChange);
+          case "SLIDE":
+          case "INTERACTIVE_SLIDE_ELEMENT":
+            return slide(nodeChange);
+          case "SLIDE_GRID":
+            return slideGrid(nodeChange);
+          case "SLIDE_ROW":
+            return slideRow(nodeChange);
           default:
             return undefined;
         }

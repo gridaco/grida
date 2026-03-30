@@ -2,6 +2,12 @@
 title: Vercel domain configuration snapshot (pre-BYOD)
 status: historical
 unlisted: true
+tags:
+  - internal
+  - platform
+  - infra
+  - historical
+
 ---
 
 This is a historical snapshot of **Grida-owned** domain configurations in Vercel **before** we introduced **Bring Your Own Domain (BYOD)** support.

@@ -62,20 +62,30 @@ pub fn build() -> Scene {
 
     // ── Tree ────────────────────────────────────────────────────────────
     let mut links = HashMap::new();
-    links.insert(1u64, vec![2, 3]);       // g1 → children
-    links.insert(4u64, vec![5, 6]);       // g2 → children
-    links.insert(7u64, vec![8, 9]);       // g3 → children
-    links.insert(10u64, vec![11, 14]);    // g_outer → g_inner + sibling
-    links.insert(11u64, vec![12, 13]);    // g_inner → leaves
+    links.insert(1u64, vec![2, 3]); // g1 → children
+    links.insert(4u64, vec![5, 6]); // g2 → children
+    links.insert(7u64, vec![8, 9]); // g3 → children
+    links.insert(10u64, vec![11, 14]); // g_outer → g_inner + sibling
+    links.insert(11u64, vec![12, 13]); // g_inner → leaves
 
     build_scene(
         "L0 Group",
         None,
         vec![
-            (1, g1), (2, g1_a), (3, g1_b),
-            (4, g2), (5, g2_a), (6, g2_b),
-            (7, g3), (8, g3_a), (9, g3_b),
-            (10, g_outer), (11, g_inner), (12, leaf1), (13, leaf2), (14, sibling),
+            (1, g1),
+            (2, g1_a),
+            (3, g1_b),
+            (4, g2),
+            (5, g2_a),
+            (6, g2_b),
+            (7, g3),
+            (8, g3_a),
+            (9, g3_b),
+            (10, g_outer),
+            (11, g_inner),
+            (12, leaf1),
+            (13, leaf2),
+            (14, sibling),
         ],
         links,
         vec![1, 4, 7, 10],

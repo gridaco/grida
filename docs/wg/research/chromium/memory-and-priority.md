@@ -1,5 +1,12 @@
 ---
 title: "Chromium Memory Management and Tile Priority"
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - performance
+
 ---
 
 # Chromium Memory Management and Tile Priority

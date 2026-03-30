@@ -47,7 +47,10 @@ pub fn build() -> Scene {
             blend_mode: LayerBlendMode::PassThrough,
             mask: None,
             transform: AffineTransform::from_box_center(0.0, 0.0, 80.0, 80.0, 0.0),
-            size: Size { width: 80.0, height: 80.0 },
+            size: Size {
+                width: 80.0,
+                height: 80.0,
+            },
             corner_radius: RectangularCornerRadius::default(),
             corner_smoothing: CornerSmoothing(0.0),
             fills: Paints::new(vec![]),
@@ -66,7 +69,10 @@ pub fn build() -> Scene {
             blend_mode: LayerBlendMode::PassThrough,
             mask: None,
             transform: AffineTransform::from_box_center(40.0, 40.0, 80.0, 80.0, 0.0),
-            size: Size { width: 80.0, height: 80.0 },
+            size: Size {
+                width: 80.0,
+                height: 80.0,
+            },
             corner_radius: RectangularCornerRadius::default(),
             corner_smoothing: CornerSmoothing(0.0),
             fills: Paints::new(vec![]),

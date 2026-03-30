@@ -14,5 +14,6 @@
 //! CI verifies freshness — if `grida.fbs` changes but this file is stale,
 //! the `check-generated-fbs` workflow will fail.
 
+#[rustfmt::skip]
 #[allow(dead_code, unused_imports, clippy::all)]
 pub mod grida;

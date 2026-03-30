@@ -10,8 +10,8 @@
 
 use crate::cg::prelude::*;
 use crate::cg::svg::{
-    IRSVGChildNode, IRSVGGroupNode, IRSVGPathNode, IRSVGTextNode, SVGFillAttributes,
-    SVGStrokeAttributes,
+    IRSVGAttributedTextChunk, IRSVGChildNode, IRSVGGroupNode, IRSVGPathNode, IRSVGTextChunk,
+    IRSVGTextNode, SVGFillAttributes, SVGFontStyle, SVGStrokeAttributes,
 };
 use crate::node::factory::NodeFactory;
 use crate::node::scene_graph::{Parent, SceneGraph};
@@ -91,7 +91,12 @@ impl SceneBuilder {
         });
         node.stroke_style.stroke_align = StrokeAlign::Center;
 
-        let gradient_bounds = Some((path.bounds.x, path.bounds.y, path.bounds.width, path.bounds.height));
+        let gradient_bounds = Some((
+            path.bounds.x,
+            path.bounds.y,
+            path.bounds.width,
+            path.bounds.height,
+        ));
 
         if let Some(fill) = &path.fill {
             node.fills = Paints::new([fill.into_paint_with_opacity(gradient_bounds)]);
@@ -121,8 +126,7 @@ impl SceneBuilder {
     ///
     /// See `docs/wg/feat-svg/text-import.md` for the model.
     fn append_text(&mut self, text: &IRSVGTextNode, parent: Parent) -> Result<(), String> {
-        if text.spans.is_empty() {
-            // Fallback: no chunks resolved — use combined text as a single span.
+        if text.chunks.is_empty() {
             return self.append_text_span_node(
                 text.transform.into(),
                 text.text_content.as_str(),
@@ -134,50 +138,62 @@ impl SceneBuilder {
             );
         }
 
-        if text.spans.len() == 1 {
-            let span = &text.spans[0];
-            return self.append_text_span_node(
-                span.transform.into(),
-                span.text.as_str(),
-                span.fill.as_ref().or(text.fill.as_ref()),
-                span.stroke.as_ref().or(text.stroke.as_ref()),
-                span.font_size,
-                span.anchor,
-                parent,
-            );
+        // Single uniform chunk → no group wrapper needed.
+        if text.chunks.len() == 1 {
+            if let IRSVGTextChunk::Uniform(ref span) = text.chunks[0] {
+                return self.append_text_span_node(
+                    span.transform.into(),
+                    span.text.as_str(),
+                    span.fill.as_ref().or(text.fill.as_ref()),
+                    span.stroke.as_ref().or(text.stroke.as_ref()),
+                    span.font_size,
+                    span.anchor,
+                    parent,
+                );
+            }
         }
 
-        // Multiple chunks → create a Group for the <text>, with each
-        // chunk as a TextSpan child.
+        // Multiple chunks (or single attributed) → Group wrapper.
         let mut group = self.factory.create_group_node();
         group.transform = Some(text.transform.into());
         let group_id = self.graph.append_child(Node::Group(group), parent);
         let group_parent = Parent::NodeId(group_id);
 
-        for span in &text.spans {
-            // Each chunk's transform already includes the text's relative
-            // transform (applied in convert_text). Since the group also
-            // carries the text transform, we need to strip it from each
-            // chunk to avoid double-application. The chunk transform is
-            // `text_relative * translate(chunk_x, chunk_y)`, so the local
-            // transform relative to the group is just `translate(chunk_x, chunk_y)`.
+        for chunk in &text.chunks {
+            let (chunk_transform, _anchor) = match chunk {
+                IRSVGTextChunk::Uniform(s) => (s.transform, s.anchor),
+                IRSVGTextChunk::Attributed(a) => (a.transform, a.anchor),
+            };
             let text_affine: AffineTransform = text.transform.into();
-            let span_affine: AffineTransform = span.transform.into();
+            let chunk_affine: AffineTransform = chunk_transform.into();
             let local = if let Some(inv) = text_affine.inverse() {
-                inv.compose(&span_affine)
+                inv.compose(&chunk_affine)
             } else {
-                span_affine
+                chunk_affine
             };
 
-            self.append_text_span_node(
-                local,
-                span.text.as_str(),
-                span.fill.as_ref().or(text.fill.as_ref()),
-                span.stroke.as_ref().or(text.stroke.as_ref()),
-                span.font_size,
-                span.anchor,
-                group_parent.clone(),
-            )?;
+            match chunk {
+                IRSVGTextChunk::Uniform(span) => {
+                    self.append_text_span_node(
+                        local,
+                        span.text.as_str(),
+                        span.fill.as_ref().or(text.fill.as_ref()),
+                        span.stroke.as_ref().or(text.stroke.as_ref()),
+                        span.font_size,
+                        span.anchor,
+                        group_parent.clone(),
+                    )?;
+                }
+                IRSVGTextChunk::Attributed(attr_chunk) => {
+                    self.append_attributed_text_node(
+                        local,
+                        attr_chunk,
+                        text.fill.as_ref(),
+                        text.stroke.as_ref(),
+                        group_parent.clone(),
+                    )?;
+                }
+            }
         }
         Ok(())
     }
@@ -232,6 +248,104 @@ impl SceneBuilder {
         }
 
         self.graph.append_child(Node::TextSpan(node), parent);
+        Ok(())
+    }
+
+    fn append_attributed_text_node(
+        &mut self,
+        transform: AffineTransform,
+        chunk: &IRSVGAttributedTextChunk,
+        fallback_fill: Option<&SVGFillAttributes>,
+        fallback_stroke: Option<&SVGStrokeAttributes>,
+        parent: Parent,
+    ) -> Result<(), String> {
+        let text = chunk.text.as_str();
+        if text.trim().is_empty() {
+            return Ok(());
+        }
+
+        // Use the first run's font size for baseline adjustment.
+        let first_font_size = chunk.runs.first().map(|r| r.font_size).unwrap_or(16.0);
+        let mut adjusted_transform = transform;
+        // FIXME(svg text): baseline -> top-left conversion needs proper font metrics.
+        adjusted_transform.translate(0.0, -first_font_size);
+
+        let default_style = TextStyleRec::from_font(
+            chunk
+                .runs
+                .first()
+                .map(|r| r.font_family.as_str())
+                .unwrap_or("Geist"),
+            first_font_size,
+        );
+
+        let runs: Vec<StyledTextRun> = chunk
+            .runs
+            .iter()
+            .map(|run| {
+                let mut style = TextStyleRec::from_font(&run.font_family, run.font_size);
+                style.font_weight = FontWeight(run.font_weight as u32);
+                style.font_style_italic =
+                    matches!(run.font_style, SVGFontStyle::Italic | SVGFontStyle::Oblique);
+                if run.letter_spacing != 0.0 {
+                    style.letter_spacing = TextLetterSpacing::Fixed(run.letter_spacing);
+                }
+                if run.word_spacing != 0.0 {
+                    style.word_spacing = TextWordSpacing::Fixed(run.word_spacing);
+                }
+
+                let fills = run
+                    .fill
+                    .as_ref()
+                    .or(fallback_fill)
+                    .map(|f| vec![f.into_paint_with_opacity(None)]);
+
+                let stroke_ref = run.stroke.as_ref().or(fallback_stroke);
+                let strokes =
+                    stroke_ref.map(|s| Paints::new(vec![s.into_paint_with_opacity(None)]));
+                let stroke_width = stroke_ref.map(|s| s.stroke_width);
+
+                StyledTextRun {
+                    start: run.start as u32,
+                    end: run.end as u32,
+                    style,
+                    fills,
+                    strokes,
+                    stroke_width,
+                    stroke_align: None,
+                }
+            })
+            .collect();
+
+        let mut attributed_string = AttributedString::from_runs(text.to_string(), runs);
+        attributed_string.merge_adjacent_runs();
+
+        let node = AttributedTextNodeRec {
+            active: true,
+            transform: adjusted_transform,
+            width: None,
+            height: None,
+            layout_child: Some(LayoutChildStyle {
+                layout_grow: 0.0,
+                layout_positioning: LayoutPositioning::Absolute,
+            }),
+            attributed_string,
+            default_style,
+            text_align: TextAlign::Left,
+            text_align_vertical: TextAlignVertical::Top,
+            max_lines: None,
+            ellipsis: None,
+            fills: Paints::default(),
+            strokes: Paints::default(),
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::Center,
+            opacity: 1.0,
+            blend_mode: LayerBlendMode::PassThrough,
+            mask: None,
+            effects: LayerEffects::default(),
+        };
+
+        self.graph.append_child(Node::AttributedText(node), parent);
         Ok(())
     }
 }

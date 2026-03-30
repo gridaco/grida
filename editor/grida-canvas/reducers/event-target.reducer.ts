@@ -138,7 +138,10 @@ function __self_evt_on_click(
       );
       break;
     case "insert":
-      const parent = __get_insertion_target(draft);
+      const parent =
+        draft.tool.node === "tray"
+          ? __get_tray_insertion_target(draft)
+          : __get_insertion_target(draft);
 
       const nnode = initialNode(
         draft.tool.node,
@@ -457,7 +460,11 @@ function __self_evt_on_drag_start(
       break;
     }
     case "insert": {
-      const parent = __get_insertion_target(draft);
+      // Tray parent must be Scene or Tray (never a Container)
+      const parent =
+        draft.tool.node === "tray"
+          ? __get_tray_insertion_target(draft)
+          : __get_insertion_target(draft);
 
       const initial_rect = {
         x: draft.pointer.position[0],
@@ -482,7 +489,7 @@ function __self_evt_on_drag_start(
         node_id: string;
         prototype: grida.program.nodes.Node;
       } | null = null;
-      if (draft.tool.node === "container") {
+      if (draft.tool.node === "container" || draft.tool.node === "tray") {
         pending = {
           node_id: nnode.id,
           prototype: JSON.parse(JSON.stringify(nnode)),
@@ -1095,8 +1102,11 @@ function __before_end_insert_and_resize(
     pending.node_id
   ) as grida.program.nodes.ContainerNode;
 
-  // UX: for container, the fill is set after insertion
-  if (pending.prototype.type === "container") {
+  // UX: for container/tray, the fill is set after insertion
+  if (
+    pending.prototype.type === "container" ||
+    pending.prototype.type === "tray"
+  ) {
     node.fill_paints = pending.prototype.fill_paints;
   }
 
@@ -1114,7 +1124,8 @@ function __before_end_insert_and_resize(
     if (id === pending.node_id) return;
     const rect = context.geometry.getNodeAbsoluteBoundingRect(id)!;
     if (cmath.rect.contains(container_rect, rect)) {
-      self_moveNode(draft, id, pending.node_id);
+      const moved = self_moveNode(draft, id, pending.node_id);
+      if (!moved) return;
       const child = dq.__getNodeById(
         draft,
         id
@@ -1209,6 +1220,23 @@ function __self_maybe_end_gesture(
  *   2. Applies root node filtering for consistency
  *   3. Preserves z-order (top-to-bottom, deepest first)
  */
+/**
+ * Find insertion target for a Tray node.
+ * Tray parent must be Scene or Tray — find the nearest tray in the hit stack,
+ * or default to scene root (null).
+ */
+function __get_tray_insertion_target(
+  state: editor.state.IEditorState
+): string | null {
+  assert(state.scene_id, "scene_id is not set");
+  const hits = state.hits.slice();
+  for (const hit of hits) {
+    const node = dq.__getNodeById(state, hit);
+    if (node.type === "tray") return hit;
+  }
+  return null;
+}
+
 function __get_insertion_target(
   state: editor.state.IEditorState
 ): string | null {

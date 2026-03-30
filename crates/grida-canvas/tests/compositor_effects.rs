@@ -20,7 +20,6 @@ use cg::runtime::image_repository::ImageRepository;
 use cg::runtime::render_policy::RenderPolicy;
 use math2::rect::Rectangle;
 use skia_safe::{surfaces, Paint as SkPaint, Rect, Surface};
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -615,7 +614,8 @@ fn z_order_promoted_child_visible_above_container() {
     let offscreen_image = offscreen.image_snapshot();
 
     // Step 2: Build the promoted_blits map
-    let mut promoted_blits: HashMap<NodeId, PromotedBlit> = HashMap::new();
+    let mut promoted_blits: cg::cache::fast_hash::NodeIdHashMap<NodeId, PromotedBlit> =
+        cg::cache::fast_hash::new_node_id_map();
     let src_rect = Rect::new(
         0.0,
         0.0,
@@ -762,8 +762,7 @@ fn opacity_folding_pixel_accuracy() {
         let images = ImageRepository::new(store);
         let policy = RenderPolicy::STANDARD;
 
-        let painter =
-            Painter::new_with_scene_cache(canvas, &fonts, &images, &scene_cache, policy);
+        let painter = Painter::new_with_scene_cache(canvas, &fonts, &images, &scene_cache, policy);
         painter.draw_layer_list(&scene_cache.layers);
 
         surface_to_rgba(&mut surface, w, h)
@@ -784,7 +783,7 @@ fn opacity_folding_pixel_accuracy() {
             blur: 0.0,
             spread: 0.0,
             color: CGColor::from_rgba(0, 0, 0, 0), // fully transparent
-            active: true, // but active → forces unfolded path
+            active: true,                          // but active → forces unfolded path
         })],
         ..LayerEffects::default()
     };
@@ -976,7 +975,11 @@ fn normal_blend_elimination_pixel_accuracy() {
         vec![red_fill.clone()],
     );
     let passthrough_semi = render(LayerBlendMode::default(), 0.5, vec![red_fill.clone()]);
-    compare("semitransparent_single_fill", &normal_semi, &passthrough_semi);
+    compare(
+        "semitransparent_single_fill",
+        &normal_semi,
+        &passthrough_semi,
+    );
 
     // Test 3: Multiple overlapping fills (red + semi-transparent blue)
     let blue_semi = Paint::Solid(SolidPaint {
@@ -997,11 +1000,7 @@ fn normal_blend_elimination_pixel_accuracy() {
     // This exercises draw_fills_with_opacity (the new zero-save_layer path)
     let multi_fills_2 = vec![red_fill.clone()];
     let paint_alpha_path = render(LayerBlendMode::default(), 0.5, multi_fills_2.clone());
-    let normal_alpha_path = render(
-        LayerBlendMode::Blend(BlendMode::Normal),
-        0.5,
-        multi_fills_2,
-    );
+    let normal_alpha_path = render(LayerBlendMode::Blend(BlendMode::Normal), 0.5, multi_fills_2);
     compare(
         "semitransparent_paint_alpha",
         &paint_alpha_path,

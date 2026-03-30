@@ -7,6 +7,7 @@ use crate::surface::hover::{HoverSource, HoverState};
 use crate::surface::response::SurfaceResponse;
 use crate::surface::selection::SelectionState;
 use crate::surface::ui::hit_region::{HitRegions, OverlayAction};
+use crate::text_edit::session::ClickTracker;
 
 /// Canvas surface interaction state.
 ///
@@ -22,6 +23,8 @@ pub struct SurfaceState {
     pub cursor: CursorIcon,
     /// Current modifier key state, updated by `ModifiersChanged` events.
     modifiers: Modifiers,
+    /// Multi-click tracker for double-click detection.
+    pub click_tracker: ClickTracker,
 }
 
 impl Default for SurfaceState {
@@ -32,6 +35,7 @@ impl Default for SurfaceState {
             gesture: SurfaceGesture::default(),
             cursor: CursorIcon::Default,
             modifiers: Modifiers::default(),
+            click_tracker: ClickTracker::new(),
         }
     }
 }
@@ -83,6 +87,9 @@ impl SurfaceState {
     /// - Providing a [`Hierarchy`] for selection pruning (typically the scene graph)
     /// - Providing [`HitRegions`] from the most recent draw pass for overlay UI hit testing
     /// - Queueing a redraw if `response.needs_redraw` is true
+    ///
+    /// Keyboard/text/IME events pass through unchanged (handled at the
+    /// application layer, not the surface layer).
     pub fn dispatch(
         &mut self,
         event: SurfaceEvent,
@@ -94,7 +101,7 @@ impl SurfaceState {
             SurfaceEvent::PointerMove {
                 canvas_point,
                 screen_point,
-            } => self.handle_pointer_move(canvas_point, screen_point, hit_tester, hierarchy, ui_hit_regions),
+            } => self.handle_pointer_move(canvas_point, screen_point, hit_tester, ui_hit_regions),
 
             SurfaceEvent::PointerDown {
                 canvas_point,
@@ -105,7 +112,9 @@ impl SurfaceState {
                 self.modifiers = modifiers;
                 // Check overlay UI hit regions first (they are visually on top)
                 if button == PointerButton::Primary {
-                    if let Some(action) = ui_hit_regions.hit_test([screen_point[0], screen_point[1]]) {
+                    if let Some(action) =
+                        ui_hit_regions.hit_test([screen_point[0], screen_point[1]])
+                    {
                         return self.handle_overlay_action(action, hierarchy);
                     }
                 }
@@ -126,6 +135,12 @@ impl SurfaceState {
                 self.modifiers = mods;
                 SurfaceResponse::none()
             }
+
+            // Keyboard/text/IME events are not handled by the surface layer.
+            // They are handled by the application's handle_surface_event().
+            SurfaceEvent::KeyDown { .. }
+            | SurfaceEvent::TextInput { .. }
+            | SurfaceEvent::Ime(_) => SurfaceResponse::none(),
         }
     }
 
@@ -156,7 +171,6 @@ impl SurfaceState {
         canvas_point: math2::vector2::Vector2,
         screen_point: math2::vector2::Vector2,
         hit_tester: &HitTester,
-        hierarchy: &impl Hierarchy,
         ui_hit_regions: &HitRegions,
     ) -> SurfaceResponse {
         let mut response = SurfaceResponse::none();
@@ -206,11 +220,12 @@ impl SurfaceState {
                     current_canvas: canvas_point,
                 };
 
-                // Compute tentative selection from marquee rectangle
+                // Compute tentative selection from marquee rectangle.
+                // Use intersects_topmost to get only the shallowest
+                // matching ancestors — avoids the separate O(K*D) prune.
                 let rect = marquee_rect(anchor_canvas, canvas_point);
-                let hits = hit_tester.intersects(&rect);
+                let hits = hit_tester.intersects_topmost(&rect);
                 self.selection.set(hits);
-                self.prune_selection(hierarchy);
 
                 response.selection_changed = true;
                 response.needs_redraw = true;
@@ -236,6 +251,11 @@ impl SurfaceState {
             return response;
         }
 
+        // Track multi-click sequence for double-click detection.
+        let click_count = self
+            .click_tracker
+            .register(canvas_point[0], canvas_point[1]);
+
         let hit = hit_tester.hit_first(canvas_point);
 
         match hit {
@@ -249,6 +269,11 @@ impl SurfaceState {
                 }
                 response.selection_changed = true;
                 response.needs_redraw = true;
+
+                // Report double-click for text editing activation.
+                if click_count >= 2 {
+                    response.double_clicked_node = Some(id);
+                }
             }
             None => {
                 if self.modifiers.shift {
@@ -295,10 +320,7 @@ impl SurfaceState {
 }
 
 /// Compute a normalized rectangle from two corner points.
-fn marquee_rect(
-    a: math2::vector2::Vector2,
-    b: math2::vector2::Vector2,
-) -> math2::rect::Rectangle {
+fn marquee_rect(a: math2::vector2::Vector2, b: math2::vector2::Vector2) -> math2::rect::Rectangle {
     let x = a[0].min(b[0]);
     let y = a[1].min(b[1]);
     let w = (a[0] - b[0]).abs();

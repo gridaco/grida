@@ -1,6 +1,13 @@
 ---
 title: "Chromium Effect Optimizations"
 format: md
+tags:
+  - internal
+  - research
+  - chromium
+  - compositing
+  - performance
+
 ---
 
 # Chromium Effect Optimizations

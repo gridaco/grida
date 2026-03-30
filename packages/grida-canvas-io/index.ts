@@ -658,7 +658,7 @@ export namespace io {
   }
 
   export namespace fileformat {
-    export type Kind = "grida" | "zip" | "unknown";
+    export type Kind = "grida" | "zip" | "grida1" | "unknown";
 
     export type Detected =
       | { kind: "grida"; bytes: Uint8Array }
@@ -672,6 +672,7 @@ export namespace io {
             bitmaps: Record<string, io.Bitmap>;
           };
         }
+      | { kind: "grida1"; model: SnapshotDocumentModel }
       | { kind: "unknown"; bytes?: Uint8Array };
 
     /**
@@ -754,6 +755,18 @@ export namespace io {
         return { kind: "grida", bytes };
       }
 
+      // `.grida1` — JSON snapshot (the sidecar format found inside `.grida` archives)
+      if (file.name.toLowerCase().endsWith(".grida1")) {
+        try {
+          const model = snapshot.parse(await file.text());
+          if (model?.version && model?.document) {
+            return { kind: "grida1", model };
+          }
+        } catch {
+          // malformed JSON; fall through
+        }
+      }
+
       return { kind: "unknown" };
     }
   }
@@ -814,7 +827,28 @@ export namespace io {
       } satisfies LoadedDocument;
     }
 
-    throw new Error(`Unsupported file type: ${file.type}`);
+    // JSON snapshot (`document.grida1` sidecar format)
+    if (detected.kind === "grida1") {
+      const { model } = detected;
+      if (!grida.program.document.isSchemaCompatible(model.version)) {
+        throw new Error(
+          `schema incompatible: file version "${model.version}" is not compatible with current "${grida.program.document.SCHEMA_VERSION}"`
+        );
+      }
+      const doc = model.document;
+      return {
+        version: grida.program.document.SCHEMA_VERSION,
+        document: {
+          ...doc,
+          images: doc.images ?? {},
+          bitmaps: doc.bitmaps ?? {},
+        },
+      } satisfies LoadedDocument;
+    }
+
+    throw new Error(
+      `Unsupported file: "${file.name}" (type=${file.type || "unknown"}). Expected .grida or .grida1.`
+    );
   }
 
   /**
@@ -932,11 +966,35 @@ export namespace io {
      * @param bitmaps - Optional bitmap assets to include in the archive
      * @returns Uint8Array containing the ZIP archive
      */
+    export interface PackOptions {
+      /**
+       * ZIP compression level (0–9). 0 = store-only (fastest), 6 = default,
+       * 9 = best compression. Use 0 for transient archives that will be
+       * immediately consumed (e.g. fig2grida → io.load round-trip).
+       */
+      level?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+      /**
+       * When false, skip generating the `document.grida1` JSON snapshot.
+       * The snapshot is a migration/fallback format; pipelines that only
+       * need the FlatBuffers document (e.g. fig2grida) can disable it
+       * to avoid a costly `JSON.stringify` over the entire node tree.
+       * @default true
+       */
+      snapshot?: boolean;
+      /**
+       * When true, skip deterministic sorting of node IDs in the FlatBuffer.
+       * Safe for write-once pipelines where node order is irrelevant.
+       * @default false
+       */
+      skip_sort?: boolean;
+    }
+
     export function pack(
       document: grida.program.document.Document,
       images?: Record<string, Uint8Array>,
       schemaVersion: string = grida.program.document.SCHEMA_VERSION,
-      bitmaps?: Record<string, io.Bitmap>
+      bitmaps?: Record<string, io.Bitmap>,
+      options?: PackOptions
     ): Uint8Array {
       // Extract bitmaps from document if not provided
       const inferredBitmaps: Record<string, io.Bitmap> | undefined =
@@ -949,19 +1007,24 @@ export namespace io {
           images: {},
           bitmaps: {},
         },
-        schemaVersion
+        schemaVersion,
+        { skipSort: options?.skip_sort }
       );
 
       // Generate document.grida1 (JSON snapshot) from document (for migration purposes)
-      const {
-        images: _images,
-        bitmaps: _bitmaps,
-        ...persistedDocument
-      } = document;
-      const snapshotJson = io.snapshot.stringify({
-        version: schemaVersion,
-        document: persistedDocument,
-      });
+      const includeSnapshot = options?.snapshot !== false;
+      let snapshotJson: string | undefined;
+      if (includeSnapshot) {
+        const {
+          images: _images,
+          bitmaps: _bitmaps,
+          ...persistedDocument
+        } = document;
+        snapshotJson = io.snapshot.stringify({
+          version: schemaVersion,
+          document: persistedDocument,
+        });
+      }
 
       const manifest: Manifest = {
         document_file: "document.grida",
@@ -985,7 +1048,9 @@ export namespace io {
       const files: Record<string, Uint8Array> = {
         "manifest.json": strToU8(JSON.stringify(manifest)),
         "document.grida": fbBytes,
-        "document.grida1": strToU8(snapshotJson),
+        ...(snapshotJson && {
+          "document.grida1": strToU8(snapshotJson),
+        }),
         ...(images &&
           Object.keys(images).length > 0 && { "images/": new Uint8Array() }), // Ensure folder exists
       };
@@ -1018,7 +1083,7 @@ export namespace io {
         }
       }
 
-      return zipSync(files);
+      return zipSync(files, { level: options?.level ?? 6 });
     }
 
     /**
@@ -1451,8 +1516,7 @@ export namespace io {
        */
       async quarantine(label?: string): Promise<void> {
         const dir = await this.getDirectoryHandle();
-        const safeLabel =
-          label ?? new Date().toISOString().replace(/:/g, "-");
+        const safeLabel = label ?? new Date().toISOString().replace(/:/g, "-");
         const archiveRoot = await dir.getDirectoryHandle("_quarantine", {
           create: true,
         });

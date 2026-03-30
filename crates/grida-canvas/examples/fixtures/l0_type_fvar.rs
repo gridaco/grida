@@ -110,9 +110,18 @@ pub fn build() -> Scene {
         text_style: {
             let mut ts = TextStyleRec::from_font("Roboto Flex", 20.0);
             ts.font_variations = Some(vec![
-                FontVariation { axis: "wght".to_owned(), value: 600.0 },
-                FontVariation { axis: "wdth".to_owned(), value: 80.0 },
-                FontVariation { axis: "GRAD".to_owned(), value: 50.0 },
+                FontVariation {
+                    axis: "wght".to_owned(),
+                    value: 600.0,
+                },
+                FontVariation {
+                    axis: "wdth".to_owned(),
+                    value: 80.0,
+                },
+                FontVariation {
+                    axis: "GRAD".to_owned(),
+                    value: 50.0,
+                },
             ]);
             ts
         },

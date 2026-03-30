@@ -6,7 +6,7 @@
  * Two modes based on the rendering backend:
  *
  * **WASM/Canvas backend (primary):**
- * The text editing engine (grida-text-edit) runs entirely in WASM.
+ * The text editing engine (cg::text_edit) runs entirely in WASM.
  * This component provides a thin input relay — a hidden `<textarea>` for
  * keyboard/IME capture and a transparent overlay for pointer events.
  * All rendering (text, caret, selection highlights) is handled by the
@@ -313,8 +313,7 @@ function WasmTextEditorRelay({ node_id }: { node_id: string }) {
       // Undo/redo: try the WASM session first (word-grouped, IME-aware).
       // When the session has nothing left, fall through to document-level
       // undo/redo so the user can undo their way out of content edit mode
-      // (see ASSERTIONS.md: "Editor History System Takes Precedence in
-      // Content Edit Mode").
+      // (see test/canvas-input-history-undo-cem.md).
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         e.stopPropagation();

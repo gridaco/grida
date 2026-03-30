@@ -46,7 +46,7 @@ fn main() {
 
     // Draw title
     let title_style = TextStyleRec::from_font("Geist", 30.0);
-    let mut title_ts = textstyle(&title_style, &None);
+    let mut title_ts = textstyle(&title_style, &None, None);
     title_ts.set_foreground_paint(&paint);
 
     let mut title_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -58,7 +58,7 @@ fn main() {
 
     // Draw subtitle
     let subtitle_style = TextStyleRec::from_font("Geist", 14.0);
-    let mut subtitle_ts = textstyle(&subtitle_style, &None);
+    let mut subtitle_ts = textstyle(&subtitle_style, &None, None);
     subtitle_ts.set_foreground_paint(&paint);
 
     let mut subtitle_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -73,7 +73,7 @@ fn main() {
 
     // Section title
     let section_style = TextStyleRec::from_font("Geist", 18.0);
-    let mut section_ts = textstyle(&section_style, &None);
+    let mut section_ts = textstyle(&section_style, &None, None);
     section_ts.set_foreground_paint(&paint);
 
     let mut section_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -116,7 +116,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -170,7 +170,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -224,7 +224,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         // Create a paint with the same color as the decoration for better visibility
         let mut text_paint = Paint::default();
         text_paint.set_anti_alias(true);
@@ -282,7 +282,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -334,7 +334,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -405,7 +405,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -462,7 +462,7 @@ fn main() {
             text_transform: TextTransform::None,
         };
 
-        let mut ts = textstyle(&text_style, &None);
+        let mut ts = textstyle(&text_style, &None, None);
         ts.set_foreground_paint(&paint);
 
         let mut para_builder = ParagraphBuilder::new(&paragraph_style, &font_collection);

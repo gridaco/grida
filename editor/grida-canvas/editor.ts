@@ -19,7 +19,9 @@ import {
   CanvasWasmDefaultExportInterfaceProvider,
   CanvasWasmSVGInterfaceProvider,
   CanvasWasmMarkdownInterfaceProvider,
+  CanvasWasmPropertiesQueryProvider,
 } from "./backends";
+import { DOMPropertiesQueryProvider } from "./backends/dom-content";
 import { domapi } from "./backends/dom";
 import { dq } from "@/grida-canvas/query";
 import {
@@ -38,6 +40,8 @@ import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
+
+const __DEV__ = process.env.NODE_ENV === "development";
 
 function resolveNumberChangeValue(
   node: grida.program.nodes.UnknownNode,
@@ -192,7 +196,7 @@ export class Camera implements editor.api.ICameraActions {
    * Transform to fit
    */
   fit(
-    selector: grida.program.document.Selector,
+    selector: grida.program.document.Selector | "<scene>",
     options: {
       margin?: number | [number, number, number, number];
       animate?: boolean;
@@ -202,17 +206,32 @@ export class Camera implements editor.api.ICameraActions {
     }
   ) {
     const { document_ctx, selection, transform } = this.editor.state;
-    const ids = dq.querySelector(document_ctx, selection, selector);
 
-    const rects = ids
-      .map((id) => this.editor.geometryProvider.getNodeAbsoluteBoundingRect(id))
-      .filter((r) => r) as cmath.Rectangle[];
+    let area: cmath.Rectangle | undefined;
 
-    if (rects.length === 0) {
-      return;
+    if (selector === "<scene>") {
+      // Single WASM call — Rust computes union of scene root children
+      const rect =
+        this.editor.geometryProvider.getNodeAbsoluteBoundingRect("<scene>");
+      if (rect) area = rect;
+    } else {
+      const ids = dq.querySelector(document_ctx, selection, selector);
+      // TODO(perf): batch WASM call — each getNodeAbsoluteBoundingRect crosses
+      // the WASM boundary individually. Add a bulk API that accepts multiple IDs
+      // and returns rects + union in a single call.
+      const rects = ids
+        .map((id) =>
+          this.editor.geometryProvider.getNodeAbsoluteBoundingRect(id)
+        )
+        .filter((r) => r) as cmath.Rectangle[];
+      if (rects.length > 0) {
+        area = cmath.rect.union(rects);
+      }
     }
 
-    const area = cmath.rect.union(rects);
+    if (!area) {
+      return;
+    }
 
     const { width, height } = this.viewport.size;
     const view = { x: 0, y: 0, width, height };
@@ -1714,7 +1733,7 @@ class EditorDocumentStore
     this.dispatch({
       type: "node/change/*",
       node_id: node_id,
-      text,
+      text: text as string | null,
     });
   }
 
@@ -2706,6 +2725,16 @@ export class Editor
   readonly doc: EditorDocumentStore;
 
   private _m_wasm_canvas_scene: Scene | null = null;
+  private _m_wasm_canvas_resize_observer: ResizeObserver | null = null;
+
+  /**
+   * Surface init options passed to `createWebGLCanvasSurface()`.
+   * Set before calling `mount()`. Includes renderer config (e.g. `skip_layout`).
+   */
+  __surfaceOptions: {
+    use_embedded_fonts?: boolean;
+    config?: { skip_layout?: boolean };
+  } = { use_embedded_fonts: true };
 
   /**
    * Access the underlying WASM Scene instance for the canvas backend.
@@ -2754,6 +2783,11 @@ export class Editor
   _m_font_parser: editor.api.IDocumentFontParserInterfaceProvider | null = null;
   public get fontParser() {
     return this._m_font_parser;
+  }
+
+  _m_properties_query: editor.api.IDocumentPropertiesQueryProvider;
+  public get propertiesQuery() {
+    return this._m_properties_query;
   }
 
   private readonly _fontManager: DocumentFontManager;
@@ -2844,7 +2878,7 @@ export class Editor
 
     this._m_geometry =
       typeof geometry === "function" ? geometry(this) : geometry;
-    //
+    this._m_properties_query = new DOMPropertiesQueryProvider(this);
 
     if (interfaces?.exporter) {
       this._m_exporter = resolveWithEditorInstance(this, interfaces.exporter);
@@ -3033,6 +3067,11 @@ export class Editor
       surface
     );
 
+    this._m_properties_query = new CanvasWasmPropertiesQueryProvider(
+      this,
+      surface
+    );
+
     this._do_legacy_warmup();
 
     // Start polling for missing images — the renderer records refs it needs
@@ -3086,10 +3125,10 @@ export class Editor
     await init({
       locateFile: locateFile,
     }).then((factory) => {
-      const surface = factory.createWebGLCanvasSurface(el);
-      surface.runtime_renderer_set_layer_compositing(true);
-      // surface.setDebug(this.debug);
-      // surface.setVerbose(this.debug);
+      const surface = factory.createWebGLCanvasSurface(
+        el,
+        this.__surfaceOptions
+      );
       this.__bind_wasm_surface(surface);
       this.onMount?.(surface);
 
@@ -3147,7 +3186,9 @@ export class Editor
         }
       });
 
-      // TODO: cleanup not handled
+      // Store for cleanup on dispose.
+      this._m_wasm_canvas_resize_observer = ro;
+
       // Safari doesn't support the "device-pixel-content-box" box option
       try {
         ro.observe(el, { box: "device-pixel-content-box" });
@@ -3166,14 +3207,36 @@ export class Editor
         });
       }
 
+      // Guards against redundant switchScene calls from the scene_id
+      // subscriber when syncDocument already activated the same scene.
+      //
+      // The problem: syncDocument calls switchScene(X), then camera.fit
+      // dispatches a transform change. The nested emit re-fires ALL
+      // subscribers, including scene_id, which sees the new scene_id and
+      // calls switchScene(X) again — duplicating the expensive layout pass.
+      //
+      // The fix: syncDocument increments this counter before switchScene.
+      // The scene_id subscriber decrements and skips when > 0. The counter
+      // (not a boolean) is safe against re-entrant calls.
+      let __switchSceneGuard = 0;
+
       const syncDocument = (
         surface: Scene,
         document: grida.program.document.Document,
         sceneId?: string
       ) => {
+        const t0 = __DEV__ ? performance.now() : 0;
+        let tLoad = 0;
+        let encodeMs = 0;
+        let loadMs = 0;
+
         try {
           const bytes = io.GRID.encode(document);
+          const tEncode = __DEV__ ? performance.now() : 0;
           surface.loadSceneGrida(bytes);
+          tLoad = __DEV__ ? performance.now() : 0;
+          encodeMs = tEncode - t0;
+          loadMs = tLoad - tEncode;
         } catch {
           // Fallback to JSON if FlatBuffers encoding fails (e.g. unsupported node types)
           const p = JSON.stringify({
@@ -3181,25 +3244,36 @@ export class Editor
             document,
           });
           surface.loadScene(p);
+          tLoad = __DEV__ ? performance.now() : 0;
+          encodeMs = 0;
+          loadMs = tLoad - t0;
         }
+
         // loadSceneGrida only decodes and stores scenes.
         // switchScene activates the requested scene (or first if unspecified).
         const targetScene =
           sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
         if (targetScene) {
+          __switchSceneGuard++;
           surface.switchScene(targetScene);
         }
+
+        const tSwitch = __DEV__ ? performance.now() : 0;
+
         surface.redraw();
+
+        if (__DEV__) {
+          const tRedraw = performance.now();
+          console.log(
+            `[syncDocument] ${Object.keys(document.nodes).length} nodes, ` +
+              `scene=${targetScene ?? "(none)"} in ${(tRedraw - t0).toFixed(0)}ms` +
+              ` (encode=${encodeMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
+              ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=${(tRedraw - tSwitch).toFixed(0)}ms)`
+          );
+        }
       };
 
-      // setup hooks
-      // - state.document
-      // - state.scene_id
-      // - state.debug
-      // - state.transform
-      // - [state.hovered_node_id, state.selection]
-
-      // once
+      // --- initial mount sync ---
       syncDocument(
         this._m_wasm_canvas_scene!,
         this.doc.state.document,
@@ -3211,18 +3285,13 @@ export class Editor
         el.width,
         el.height
       );
+      this.camera.fit("<scene>");
 
-      // fit the camera
-      this.camera.fit("*");
+      // --- state subscribers ---
 
-      // subscribe
       this.doc.subscribeWithSelector(
         (state) => state.document,
         (_, document, _prev, action, patches) => {
-          // FIXME: Unstable
-          // the current patch based sync is not stable, it WILL fail to direct sync when deleting a node, etc.
-          // this is not fully tested, and the direct sync fallback should kept as-is until we fully investicate this.
-
           if (!this._m_wasm_canvas_scene) return;
 
           // Full sync on document reset
@@ -3232,27 +3301,23 @@ export class Editor
               document,
               this.doc.state.scene_id
             );
-            // Perform initial actions after reset
-            this.camera.fit("*");
+            this.camera.fit("<scene>");
             return;
           }
 
           // Patch-based sync for normal changes
+          // FIXME: Unstable — patch sync will fail on some operations (e.g. node deletion).
+          // Direct sync fallback should be kept until this is fully investigated.
           if (!patches || patches.length === 0) return;
 
           const documentPatches = patches.filter(
             (patch) => patch.path[0] === "document"
           );
-
-          if (documentPatches.length === 0) {
-            return;
-          }
+          if (documentPatches.length === 0) return;
 
           const operations =
             editor.api.patch.toJsonPatchOperations(documentPatches);
-          if (operations.length === 0) {
-            return;
-          }
+          if (operations.length === 0) return;
 
           const result = this._m_wasm_canvas_scene.applyTransactions([
             operations,
@@ -3275,6 +3340,12 @@ export class Editor
         (state) => state.scene_id,
         (_, scene_id) => {
           if (!this._m_wasm_canvas_scene || !scene_id) return;
+          // syncDocument already called switchScene — skip the redundant call
+          // which would repeat the expensive layout+geometry pass.
+          if (__switchSceneGuard > 0) {
+            __switchSceneGuard--;
+            return;
+          }
           this._m_wasm_canvas_scene.switchScene(scene_id);
         }
       );
@@ -3298,7 +3369,6 @@ export class Editor
         (state) =>
           [state.outline_mode, state.outline_mode_ignores_clips] as const,
         (_, [outline_mode, outline_mode_ignores_clips]) => {
-          // Always compute flags from the *new* state values (avoid stale `this.state`).
           this.__runtime_renderer_set_outline_mode(
             outline_mode,
             outline_mode_ignores_clips
@@ -4214,6 +4284,10 @@ export class Editor
    */
   dispose() {
     this._stopImagePoll();
+    if (this._m_wasm_canvas_resize_observer) {
+      this._m_wasm_canvas_resize_observer.disconnect();
+      this._m_wasm_canvas_resize_observer = null;
+    }
     this.doc.dispose();
   }
 }

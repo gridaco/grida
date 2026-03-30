@@ -81,7 +81,10 @@ fn pack_basic_shapes() {
       <polygon points="150,110 190,190 110,190" fill="orange"/>
     </svg>"##;
     let scene = assert_pack_ok(svg);
-    assert!(count_nodes(&scene) >= 5, "should have 5+ nodes for 5 shapes");
+    assert!(
+        count_nodes(&scene) >= 5,
+        "should have 5+ nodes for 5 shapes"
+    );
 }
 
 #[test]
@@ -351,7 +354,11 @@ fn pack_currentcolor() {
 fn pack_empty_svg() {
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>"##;
     let scene = assert_pack_ok(svg);
-    assert_eq!(count_nodes(&scene), 0, "empty SVG should have no child nodes");
+    assert_eq!(
+        count_nodes(&scene),
+        0,
+        "empty SVG should have no child nodes"
+    );
 }
 
 #[test]
@@ -671,7 +678,10 @@ fn pack_nested_transforms_world_positions() {
     // L1 Group: world = translate(250,250)
     let (ref label, ref t) = transforms[1];
     assert_eq!(label, "Group");
-    assert!(approx(t.x(), 250.0) && approx(t.y(), 250.0), "L1 group at (250,250)");
+    assert!(
+        approx(t.x(), 250.0) && approx(t.y(), 250.0),
+        "L1 group at (250,250)"
+    );
 
     // Path inside L1: world should place rect top-left at (150,150)
     let (ref label, ref t) = transforms[2];
@@ -979,10 +989,26 @@ fn pack_gradient_transform_rotation_preserved() {
     let expected_ty: f32 = 0.5 - 0.5 * cos45 - 0.5 * cos45; // ≈ -0.2071
 
     // Rotation components
-    assert!(approx(m[0][0], cos45), "m00 should be cos(45)≈0.707, got {:.4}", m[0][0]);
-    assert!(approx(m[1][1], cos45), "m11 should be cos(45)≈0.707, got {:.4}", m[1][1]);
-    assert!(approx(m[0][1], -cos45), "m01 should be -sin(45)≈-0.707, got {:.4}", m[0][1]);
-    assert!(approx(m[1][0], cos45), "m10 should be sin(45)≈0.707, got {:.4}", m[1][0]);
+    assert!(
+        approx(m[0][0], cos45),
+        "m00 should be cos(45)≈0.707, got {:.4}",
+        m[0][0]
+    );
+    assert!(
+        approx(m[1][1], cos45),
+        "m11 should be cos(45)≈0.707, got {:.4}",
+        m[1][1]
+    );
+    assert!(
+        approx(m[0][1], -cos45),
+        "m01 should be -sin(45)≈-0.707, got {:.4}",
+        m[0][1]
+    );
+    assert!(
+        approx(m[1][0], cos45),
+        "m10 should be sin(45)≈0.707, got {:.4}",
+        m[1][0]
+    );
 
     // Translation: must NOT include rect's x/y position (50, 30).
     // Should be pure rotate(45, 0.5, 0.5) translation.
@@ -1023,31 +1049,35 @@ fn pack_text_multiline_tspan_produces_group_with_ordered_y() {
 
     let graph = pack::from_svg_str(svg).expect("should parse");
 
-    // Collect all TextSpan nodes and their schema transforms
-    fn collect_text_spans(
+    // Collect all text nodes and their schema transforms
+    fn collect_text_nodes(
         graph: &cg::node::scene_graph::SceneGraph,
         id: &cg::node::schema::NodeId,
         out: &mut Vec<(String, f32)>, // (text, transform y)
     ) {
         let node = graph.get_node(id).expect("node");
-        if let Node::TextSpan(n) = node {
-            out.push((n.text.clone(), n.transform.y()));
+        match node {
+            Node::TextSpan(n) => out.push((n.text.clone(), n.transform.y())),
+            Node::AttributedText(n) => {
+                out.push((n.attributed_string.text.clone(), n.transform.y()))
+            }
+            _ => {}
         }
         if let Some(children) = graph.get_children(id) {
             for child_id in children {
-                collect_text_spans(graph, child_id, out);
+                collect_text_nodes(graph, child_id, out);
             }
         }
     }
 
     let mut spans = Vec::new();
     for r in graph.roots() {
-        collect_text_spans(&graph, r, &mut spans);
+        collect_text_nodes(&graph, r, &mut spans);
     }
 
     assert!(
         spans.len() >= 3,
-        "expected at least 3 TextSpan nodes (one per line), got {}",
+        "expected at least 3 text nodes (one per line), got {}",
         spans.len()
     );
 
@@ -1082,40 +1112,48 @@ fn pack_text_inline_tspans_single_chunk() {
 
     let graph = pack::from_svg_str(svg).expect("should parse");
 
-    fn collect_text_spans(
+    fn collect_text_content(
         graph: &cg::node::scene_graph::SceneGraph,
         id: &cg::node::schema::NodeId,
         out: &mut Vec<String>,
     ) {
         let node = graph.get_node(id).expect("node");
-        if let Node::TextSpan(n) = node {
-            out.push(n.text.clone());
+        match node {
+            Node::TextSpan(n) => out.push(n.text.clone()),
+            Node::AttributedText(n) => out.push(n.attributed_string.text.clone()),
+            _ => {}
         }
         if let Some(children) = graph.get_children(id) {
             for child_id in children {
-                collect_text_spans(graph, child_id, out);
+                collect_text_content(graph, child_id, out);
             }
         }
     }
 
     let mut spans = Vec::new();
     for r in graph.roots() {
-        collect_text_spans(&graph, r, &mut spans);
+        collect_text_content(&graph, r, &mut spans);
     }
 
-    // Inline tspans within one chunk → single TextSpan with all text
+    // Inline tspans within one chunk → single text node (TextSpan or AttributedText)
     assert_eq!(
         spans.len(),
         1,
-        "inline tspans in one chunk should produce 1 TextSpan, got {} ({:?})",
+        "inline tspans in one chunk should produce 1 text node, got {} ({:?})",
         spans.len(),
         spans
     );
 
     // The text should contain all the words
     let text = &spans[0];
-    assert!(text.contains("Hello"), "text should contain 'Hello': {text}");
-    assert!(text.contains("world"), "text should contain 'world': {text}");
+    assert!(
+        text.contains("Hello"),
+        "text should contain 'Hello': {text}"
+    );
+    assert!(
+        text.contains("world"),
+        "text should contain 'world': {text}"
+    );
     assert!(text.contains("end"), "text should contain 'end': {text}");
 }
 
@@ -1145,9 +1183,9 @@ fn pack_text_multichunk_creates_group_parent() {
         if let Node::Group(_) = node {
             // Check if it has TextSpan children
             if let Some(children) = graph.get_children(id) {
-                let has_text_child = children.iter().any(|cid| {
-                    matches!(graph.get_node(cid), Ok(Node::TextSpan(_)))
-                });
+                let has_text_child = children
+                    .iter()
+                    .any(|cid| matches!(graph.get_node(cid), Ok(Node::TextSpan(_))));
                 if has_text_child {
                     return Some(*id);
                 }
@@ -1233,13 +1271,10 @@ fn svg_to_grida_fbs_group_transform_roundtrip() {
     );
 
     // Check that at least one has non-zero translation
-    let has_translate = group_transforms.iter().any(|t| {
-        t.matrix[0][2].abs() > 0.1 || t.matrix[1][2].abs() > 0.1
-    });
-    assert!(
-        has_translate,
-        "at least one group should have translation"
-    );
+    let has_translate = group_transforms
+        .iter()
+        .any(|t| t.matrix[0][2].abs() > 0.1 || t.matrix[1][2].abs() > 0.1);
+    assert!(has_translate, "at least one group should have translation");
 }
 
 /// Verify that `svg_to_grida_bytes` → `decode` roundtrip preserves
@@ -1319,7 +1354,11 @@ fn svg_to_grida_fbs_roundtrip() {
     let bytes = svg_to_grida_bytes(svg).expect("svg_to_grida_bytes should succeed");
 
     // Must be a valid FBS buffer (starts with valid FlatBuffer, has "GRID" identifier)
-    assert!(bytes.len() > 8, "FBS buffer too small: {} bytes", bytes.len());
+    assert!(
+        bytes.len() > 8,
+        "FBS buffer too small: {} bytes",
+        bytes.len()
+    );
 
     // Decode back into a Scene
     let scene = io_grida_fbs::decode(&bytes).expect("FBS decode should succeed");
@@ -1404,6 +1443,315 @@ fn svg_to_grida_fbs_empty() {
     let bytes = svg_to_grida_bytes(svg).expect("empty SVG should encode");
     let scene = io_grida_fbs::decode(&bytes).expect("should decode");
     assert!(!scene.graph.roots().is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Attributed text SVG import diagnostic
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pack_attributed_text_multi_tspan_diagnostic() {
+    use cg::node::schema::Node;
+    use cg::svg::pack;
+
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">
+  <text x="10" y="40">
+    <tspan font-weight="bold" fill="red" font-size="24">Bold Red </tspan>
+    <tspan fill="blue" font-size="16">Normal Blue </tspan>
+    <tspan font-style="italic" fill="green" font-size="20">Italic Green</tspan>
+  </text>
+  <text x="10" y="100" font-size="18" fill="black">Plain uniform text</text>
+</svg>"#;
+
+    let graph = pack::from_svg_str(svg).expect("should parse");
+
+    let mut text_spans = Vec::new();
+    let mut attributed_texts = Vec::new();
+
+    fn walk(
+        graph: &cg::node::scene_graph::SceneGraph,
+        id: &cg::node::schema::NodeId,
+        text_spans: &mut Vec<String>,
+        attributed_texts: &mut Vec<(String, usize)>, // (text, run_count)
+    ) {
+        let node = graph.get_node(id).expect("node");
+        match node {
+            Node::TextSpan(n) => {
+                eprintln!("  TextSpan: {:?} fills={}", n.text, n.fills.len());
+                text_spans.push(n.text.clone());
+            }
+            Node::AttributedText(n) => {
+                eprintln!(
+                    "  AttributedText: {:?} runs={} default_font={:.1}",
+                    n.attributed_string.text,
+                    n.attributed_string.runs.len(),
+                    n.default_style.font_size
+                );
+                for (i, run) in n.attributed_string.runs.iter().enumerate() {
+                    let rt = &n.attributed_string.text[run.start as usize..run.end as usize];
+                    eprintln!(
+                        "    run[{}]: {:?} font_size={:.1} weight={} italic={} fills={:?}",
+                        i,
+                        rt,
+                        run.style.font_size,
+                        run.style.font_weight.0,
+                        run.style.font_style_italic,
+                        run.fills.as_ref().map(|f| f.len()),
+                    );
+                }
+                attributed_texts.push((
+                    n.attributed_string.text.clone(),
+                    n.attributed_string.runs.len(),
+                ));
+            }
+            _ => {}
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                walk(graph, child_id, text_spans, attributed_texts);
+            }
+        }
+    }
+
+    for r in graph.roots() {
+        walk(&graph, r, &mut text_spans, &mut attributed_texts);
+    }
+
+    // The uniform text should be a TextSpan
+    assert_eq!(text_spans.len(), 1, "expected 1 TextSpan");
+    assert!(text_spans[0].contains("Plain uniform text"));
+
+    // The multi-tspan text should be an AttributedText.
+    // usvg produces 5 spans (3 styled tspans + 2 inter-tspan whitespace spans).
+    assert_eq!(attributed_texts.len(), 1, "expected 1 AttributedText");
+    let (ref attr_text, run_count) = attributed_texts[0];
+    assert!(attr_text.contains("Bold Red"), "text={attr_text:?}");
+    assert!(attr_text.contains("Normal Blue"), "text={attr_text:?}");
+    assert!(attr_text.contains("Italic Green"), "text={attr_text:?}");
+    assert!(run_count >= 3, "expected at least 3 runs, got {run_count}");
+}
+
+/// Full pipeline diagnostic: SVG → pack → layout → geometry.
+/// Uses the existing `text-tspan.svg` L0 fixture which covers inline tspan
+/// style overrides, nested tspans, baseline shifts, and inheritance.
+#[test]
+fn pack_attributed_text_full_pipeline() {
+    use cg::cache::geometry::GeometryCache;
+    use cg::layout::engine::LayoutEngine;
+    use cg::node::schema::{Node, Scene};
+    use cg::runtime::font_repository::FontRepository;
+    use cg::svg::pack;
+    use std::sync::{Arc, Mutex};
+
+    let fixture_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/test-svg/L0/text-tspan.svg"
+    );
+    let svg = std::fs::read_to_string(fixture_path).expect("text-tspan.svg fixture should exist");
+
+    let graph = pack::from_svg_str(&svg).expect("should parse");
+    let scene = Scene {
+        name: "test".to_string(),
+        graph,
+        background_color: None,
+    };
+    let viewport = cg::node::schema::Size {
+        width: 800.0,
+        height: 800.0,
+    };
+
+    let store = Arc::new(Mutex::new(cg::resources::ByteStore::new()));
+    let mut fonts = FontRepository::new(store.clone());
+    fonts.register_embedded_fonts();
+
+    let mut paragraph_cache = cg::cache::paragraph::ParagraphCache::new();
+    let text_measure = cg::layout::tree::TextMeasureProvider {
+        paragraph_cache: &mut paragraph_cache,
+        fonts: &fonts,
+    };
+    let mut layout_engine = LayoutEngine::new();
+    layout_engine.compute(&scene, viewport, Some(text_measure));
+    let layout_result = layout_engine.result();
+    let geometry = GeometryCache::from_scene_with_layout(
+        &scene,
+        &mut paragraph_cache,
+        &fonts,
+        Some(layout_result),
+        viewport,
+    );
+
+    let graph = &scene.graph;
+
+    // Print full tree
+    fn print_tree(
+        graph: &cg::node::scene_graph::SceneGraph,
+        geo: &GeometryCache,
+        id: &cg::node::schema::NodeId,
+        depth: usize,
+    ) {
+        let indent = "  ".repeat(depth);
+        let node = graph.get_node(id).expect("node");
+        let bounds = geo.get_world_bounds(id);
+        let bounds_str = bounds
+            .map(|b| format!("({:.1},{:.1} {:.1}x{:.1})", b.x, b.y, b.width, b.height))
+            .unwrap_or_else(|| "NO BOUNDS".to_string());
+
+        match node {
+            Node::TextSpan(n) => {
+                eprintln!(
+                    "{indent}TextSpan {bounds_str} text={:?} font={:.0} fills={}",
+                    n.text,
+                    n.text_style.font_size,
+                    n.fills.len()
+                );
+            }
+            Node::AttributedText(n) => {
+                eprintln!(
+                    "{indent}AttributedText {bounds_str} text={:?} runs={}",
+                    n.attributed_string.text,
+                    n.attributed_string.runs.len()
+                );
+                for (i, run) in n.attributed_string.runs.iter().enumerate() {
+                    let rt = &n.attributed_string.text[run.start as usize..run.end as usize];
+                    let fill_desc = run
+                        .fills
+                        .as_ref()
+                        .map(|fills| {
+                            fills
+                                .iter()
+                                .map(|f| match f {
+                                    cg::cg::types::Paint::Solid(s) => {
+                                        format!(
+                                            "rgba({:.2},{:.2},{:.2},{:.2})",
+                                            s.color.r, s.color.g, s.color.b, s.color.a
+                                        )
+                                    }
+                                    _ => "non-solid".to_string(),
+                                })
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        })
+                        .unwrap_or_else(|| "none".to_string());
+                    eprintln!(
+                        "{indent}  [{i}] {:?} size={:.0} w={} italic={} family={:?} fill={}",
+                        rt,
+                        run.style.font_size,
+                        run.style.font_weight.0,
+                        run.style.font_style_italic,
+                        run.style.font_family,
+                        fill_desc
+                    );
+                }
+            }
+            Node::Group(_) => eprintln!("{indent}Group {bounds_str}"),
+            Node::Container(_) => eprintln!("{indent}Container {bounds_str}"),
+            _ => eprintln!("{indent}{} {bounds_str}", node.type_label()),
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                print_tree(graph, geo, child_id, depth + 1);
+            }
+        }
+    }
+
+    // Dump layout results for all nodes
+    eprintln!("\n=== Layout Results ===");
+    for r in graph.roots() {
+        fn dump_layout(
+            graph: &cg::node::scene_graph::SceneGraph,
+            layout: &cg::layout::cache::LayoutResult,
+            id: &cg::node::schema::NodeId,
+            depth: usize,
+        ) {
+            let indent = "  ".repeat(depth);
+            let node = graph.get_node(id).expect("node");
+            let lr = layout.get(id);
+            eprintln!(
+                "{indent}{} layout={:?}",
+                node.type_label(),
+                lr.map(|l| format!("({:.1},{:.1} {:.1}x{:.1})", l.x, l.y, l.width, l.height))
+            );
+            if let Some(children) = graph.get_children(id) {
+                for child_id in children {
+                    dump_layout(graph, layout, child_id, depth + 1);
+                }
+            }
+        }
+        dump_layout(graph, layout_result, r, 0);
+    }
+
+    eprintln!("\n=== Full SVG Import Pipeline ===");
+    for r in graph.roots() {
+        print_tree(graph, &geometry, r, 0);
+    }
+    eprintln!("=== End ===\n");
+
+    // Verify we got some attributed text nodes from the multi-tspan sections
+    let mut attr_count = 0;
+    let mut span_count = 0;
+    fn count_text_nodes(
+        graph: &cg::node::scene_graph::SceneGraph,
+        id: &cg::node::schema::NodeId,
+        attr_count: &mut usize,
+        span_count: &mut usize,
+    ) {
+        let node = graph.get_node(id).expect("node");
+        match node {
+            Node::AttributedText(_) => *attr_count += 1,
+            Node::TextSpan(_) => *span_count += 1,
+            _ => {}
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                count_text_nodes(graph, child_id, attr_count, span_count);
+            }
+        }
+    }
+    for r in graph.roots() {
+        count_text_nodes(graph, r, &mut attr_count, &mut span_count);
+    }
+    eprintln!("  attributed_text: {attr_count}, tspan: {span_count}");
+    assert!(
+        attr_count > 0,
+        "expected some AttributedText nodes from multi-tspan SVG"
+    );
+
+    // Assertions: every text node should have valid (non-degenerate) bounds
+    fn check_bounds(
+        graph: &cg::node::scene_graph::SceneGraph,
+        geo: &GeometryCache,
+        id: &cg::node::schema::NodeId,
+    ) {
+        let node = graph.get_node(id).expect("node");
+        match node {
+            Node::TextSpan(_) | Node::AttributedText(_) => {
+                let bounds = geo.get_world_bounds(id);
+                assert!(
+                    bounds.is_some(),
+                    "text node should have bounds: {:?}",
+                    node.type_label()
+                );
+                let b = bounds.unwrap();
+                assert!(
+                    b.width > 2.0 && b.height > 2.0,
+                    "text node bounds too small: {:.1}x{:.1} for {:?}",
+                    b.width,
+                    b.height,
+                    node.type_label()
+                );
+            }
+            _ => {}
+        }
+        if let Some(children) = graph.get_children(id) {
+            for child_id in children {
+                check_bounds(graph, geo, child_id);
+            }
+        }
+    }
+
+    for r in graph.roots() {
+        check_bounds(graph, &geometry, r);
+    }
 }
 
 // ---------------------------------------------------------------------------

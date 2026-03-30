@@ -14,7 +14,10 @@ pub fn build() -> Scene {
         mask: None,
         effects: LayerEffects::default(),
         transform: AffineTransform::from_box_center(340.0, 0.0, 100.0, 100.0, 0.0),
-        size: Size { width: 100.0, height: 100.0 },
+        size: Size {
+            width: 100.0,
+            height: 100.0,
+        },
         point_count: 6,
         corner_radius: 5.0,
         fills: Paints::new(vec![solid(59, 180, 75, 255)]),
@@ -31,7 +34,10 @@ pub fn build() -> Scene {
         mask: None,
         effects: LayerEffects::default(),
         transform: AffineTransform::from_box_center(460.0, 0.0, 120.0, 120.0, 0.0),
-        size: Size { width: 120.0, height: 120.0 },
+        size: Size {
+            width: 120.0,
+            height: 120.0,
+        },
         point_count: 5,
         inner_radius: 0.4,
         corner_radius: 3.0,
@@ -56,10 +62,30 @@ pub fn build() -> Scene {
         network: VectorNetwork {
             vertices: vec![(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
             segments: vec![
-                VectorNetworkSegment { a: 0, b: 1, ta: (30.0, 0.0), tb: (-30.0, 0.0) },
-                VectorNetworkSegment { a: 1, b: 2, ta: (0.0, 30.0), tb: (0.0, -30.0) },
-                VectorNetworkSegment { a: 2, b: 3, ta: (-30.0, 0.0), tb: (30.0, 0.0) },
-                VectorNetworkSegment { a: 3, b: 0, ta: (0.0, -30.0), tb: (0.0, 30.0) },
+                VectorNetworkSegment {
+                    a: 0,
+                    b: 1,
+                    ta: (30.0, 0.0),
+                    tb: (-30.0, 0.0),
+                },
+                VectorNetworkSegment {
+                    a: 1,
+                    b: 2,
+                    ta: (0.0, 30.0),
+                    tb: (0.0, -30.0),
+                },
+                VectorNetworkSegment {
+                    a: 2,
+                    b: 3,
+                    ta: (-30.0, 0.0),
+                    tb: (30.0, 0.0),
+                },
+                VectorNetworkSegment {
+                    a: 3,
+                    b: 0,
+                    ta: (0.0, -30.0),
+                    tb: (0.0, 30.0),
+                },
             ],
             regions: vec![VectorNetworkRegion {
                 loops: vec![VectorNetworkLoop(vec![0, 1, 2, 3])],
@@ -82,5 +108,8 @@ pub fn build() -> Scene {
         layout_child: None,
     });
 
-    flat_scene("L0 Shapes", vec![rectangle, ell, polygon, star, ln, txt, vector])
+    flat_scene(
+        "L0 Shapes",
+        vec![rectangle, ell, polygon, star, ln, txt, vector],
+    )
 }

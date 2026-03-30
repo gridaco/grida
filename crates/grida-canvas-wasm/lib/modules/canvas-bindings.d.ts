@@ -13,14 +13,16 @@ declare namespace canvas {
     _init(
       width: number,
       height: number,
-      use_embedded_fonts: boolean
+      use_embedded_fonts: boolean,
+      config_flags: number
     ): GridaCanvasApplicationPtr;
 
     _init_with_backend(
       backend_id: number,
       width: number,
       height: number,
-      use_embedded_fonts: boolean
+      use_embedded_fonts: boolean,
+      config_flags: number
     ): GridaCanvasApplicationPtr;
 
     // ====================================================================================================
@@ -49,9 +51,8 @@ declare namespace canvas {
       ptr: number,
       len: number
     ): void;
-    _drain_missing_images(
-      state: GridaCanvasApplicationPtr
-    ): Ptr;
+    _loaded_scene_ids(state: GridaCanvasApplicationPtr): Ptr;
+    _drain_missing_images(state: GridaCanvasApplicationPtr): Ptr;
     _resolve_image(
       state: GridaCanvasApplicationPtr,
       rid_ptr: number,
@@ -140,6 +141,11 @@ declare namespace canvas {
       ptr: number,
       len: number
     ): Ptr;
+    _get_node_id_path(
+      state: GridaCanvasApplicationPtr,
+      ptr: number,
+      len: number
+    ): Ptr;
 
     _export_node_as(
       state: GridaCanvasApplicationPtr,
@@ -198,6 +204,14 @@ declare namespace canvas {
       json_ptr: number,
       json_len: number
     ): void;
+    _query_paint_groups(
+      state: GridaCanvasApplicationPtr,
+      ids_json_ptr: number,
+      ids_json_len: number,
+      target: number,
+      recursive: boolean,
+      limit: number
+    ): Ptr;
     _set_surface_overlay_config(
       state: GridaCanvasApplicationPtr,
       json_ptr: number,
@@ -248,6 +262,11 @@ declare namespace canvas {
       flags: number
     ): void;
 
+    _runtime_renderer_set_skip_layout(
+      state: GridaCanvasApplicationPtr,
+      skip: boolean
+    ): void;
+
     _runtime_renderer_set_outline_mode(
       state: GridaCanvasApplicationPtr,
       enable: boolean
@@ -261,10 +280,7 @@ declare namespace canvas {
       node_id_ptr: number,
       node_id_len: number
     ): boolean;
-    _text_edit_exit(
-      state: GridaCanvasApplicationPtr,
-      commit: boolean
-    ): Ptr;
+    _text_edit_exit(state: GridaCanvasApplicationPtr, commit: boolean): Ptr;
     _text_edit_is_active(state: GridaCanvasApplicationPtr): boolean;
     _text_edit_get_text(state: GridaCanvasApplicationPtr): Ptr;
     _text_edit_undo(state: GridaCanvasApplicationPtr): boolean;

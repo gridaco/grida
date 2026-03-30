@@ -8,7 +8,7 @@ pub mod state;
 pub mod ui;
 
 pub use cursor::CursorIcon;
-pub use event::{Modifiers, PointerButton, SurfaceEvent};
+pub use event::{ImeEvent, Modifiers, PointerButton, SurfaceEvent};
 pub use gesture::SurfaceGesture;
 pub use hover::HoverState;
 pub use response::SurfaceResponse;

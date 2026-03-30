@@ -6,19 +6,20 @@ use std::{
 
 use skia_safe::{self, Image};
 
-use crate::{
-    cache::mipmap::{ImageMipmaps, MipmapConfig},
-    resources::ByteStore,
-};
+use crate::resources::ByteStore;
 
-/// A repository for managing images with automatic ID indexing.
+/// A repository for managing images with Skia built-in mipmaps.
+///
+/// Images are stored with Skia's native mipmap chain attached via
+/// [`Image::with_default_mipmaps()`]. Mipmap level selection happens
+/// automatically at rasterization time based on the final canvas transform,
+/// which correctly handles `Picture` playback at different zoom levels.
 #[derive(Debug, Clone)]
 pub struct ImageRepository {
-    images: HashMap<String, ImageMipmaps>,
-    config: MipmapConfig,
+    images: HashMap<String, Image>,
     store: Arc<Mutex<ByteStore>>,
     /// Image refs encountered during render that were not found in the repository.
-    /// Uses `RefCell` for interior mutability — `get_by_size` remains `&self` so the
+    /// Uses `RefCell` for interior mutability — `get` remains `&self` so the
     /// painter can hold an immutable borrow while recording misses.
     missing_refs: RefCell<HashSet<String>>,
     /// Image refs already surfaced to the caller via `drain_missing`.
@@ -31,18 +32,6 @@ impl ImageRepository {
     pub fn new(store: Arc<Mutex<ByteStore>>) -> Self {
         Self {
             images: HashMap::new(),
-            config: MipmapConfig::default(),
-            store,
-            missing_refs: RefCell::new(HashSet::new()),
-            reported_refs: HashSet::new(),
-        }
-    }
-
-    /// Creates a repository with custom mipmap configuration.
-    pub fn with_config(store: Arc<Mutex<ByteStore>>, config: MipmapConfig) -> Self {
-        Self {
-            images: HashMap::new(),
-            config,
             store,
             missing_refs: RefCell::new(HashSet::new()),
             reported_refs: HashSet::new(),
@@ -55,14 +44,20 @@ impl ImageRepository {
     }
 
     /// Adds an image to the repository from bytes referenced by `hash`.
+    ///
+    /// The image is decoded and a Skia-native mipmap chain is attached.
+    /// Skia evaluates the mipmap LOD at rasterization time based on the
+    /// final transform, so this works correctly with `PictureCache`.
     pub fn insert(&mut self, src: String, hash: u64) -> Option<(u32, u32)> {
         if let Some(bytes) = self.store.lock().unwrap().get(hash) {
             let data = skia_safe::Data::new_copy(bytes);
             if let Some(image) = Image::from_encoded(data) {
                 let width = image.width() as u32;
                 let height = image.height() as u32;
-                let set = ImageMipmaps::from_image(image, &self.config);
-                self.images.insert(src.clone(), set);
+                // Attach Skia's built-in mipmap chain. Falls back to the
+                // original image if generation fails (e.g. 1×1 images).
+                let mipmapped = image.with_default_mipmaps().unwrap_or(image);
+                self.images.insert(src.clone(), mipmapped);
                 // Clear from tracking — this ref is now satisfied.
                 self.missing_refs.borrow_mut().remove(&src);
                 self.reported_refs.remove(&src);
@@ -72,11 +67,11 @@ impl ImageRepository {
         None
     }
 
-    /// Gets a reference to an image by its source URL and desired size.
+    /// Gets a reference to an image by its source URL.
     /// Records the ref as missing if not found (for lazy loading).
-    pub fn get_by_size(&self, src: &str, width: f32, height: f32) -> Option<&Image> {
-        if let Some(set) = self.images.get(src) {
-            set.best_for_size(width, height)
+    pub fn get(&self, src: &str) -> Option<&Image> {
+        if let Some(image) = self.images.get(src) {
+            Some(image)
         } else {
             self.missing_refs.borrow_mut().insert(src.to_owned());
             None
@@ -85,11 +80,13 @@ impl ImageRepository {
 
     /// Gets the dimensions of an image by its source URL.
     pub fn get_size(&self, src: &str) -> Option<(u32, u32)> {
-        self.images.get(src).and_then(|set| set.dimensions())
+        self.images
+            .get(src)
+            .map(|img| (img.width() as u32, img.height() as u32))
     }
 
     /// Removes an image from the repository by its source URL.
-    pub fn remove(&mut self, src: &str) -> Option<ImageMipmaps> {
+    pub fn remove(&mut self, src: &str) -> Option<Image> {
         self.images.remove(src)
     }
 
@@ -108,10 +105,7 @@ impl ImageRepository {
     /// After draining, these refs are marked as reported.
     pub fn drain_missing(&mut self) -> Vec<String> {
         let mut missing = self.missing_refs.borrow_mut();
-        let new: Vec<String> = missing
-            .difference(&self.reported_refs)
-            .cloned()
-            .collect();
+        let new: Vec<String> = missing.difference(&self.reported_refs).cloned().collect();
         self.reported_refs.extend(new.iter().cloned());
         missing.clear();
         new

@@ -176,14 +176,8 @@ struct FileResult {
 }
 
 enum StepResult {
-    Ok {
-        _elapsed_ms: f64,
-        info: String,
-    },
-    Err {
-        _elapsed_ms: f64,
-        error: String,
-    },
+    Ok { _elapsed_ms: f64, info: String },
+    Err { _elapsed_ms: f64, error: String },
 }
 
 fn test_optimize(source: &str) -> StepResult {
@@ -216,17 +210,17 @@ fn test_pack(source: &str, verbose: bool) -> StepResult {
             let info = if verbose {
                 format!(
                     "{}x{} | {} groups, {} paths, {} texts | {:.1}ms",
-                    scene.svg.width, scene.svg.height,
-                    stats.groups, stats.paths, stats.texts,
+                    scene.svg.width,
+                    scene.svg.height,
+                    stats.groups,
+                    stats.paths,
+                    stats.texts,
                     elapsed,
                 )
             } else {
                 format!(
                     "{}x{} nodes={} {:.1}ms",
-                    scene.svg.width,
-                    scene.svg.height,
-                    stats.total,
-                    elapsed,
+                    scene.svg.width, scene.svg.height, stats.total, elapsed,
                 )
             };
             StepResult::Ok {

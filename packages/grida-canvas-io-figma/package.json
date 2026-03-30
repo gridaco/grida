@@ -3,9 +3,10 @@
   "private": true,
   "description": "Figma I/O for Grida Canvas",
   "scripts": {
+    "bench": "vitest bench",
+    "fig2grida": "tsx fig2grida.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "fig2grida": "tsx fig2grida.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",
