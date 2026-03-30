@@ -16,6 +16,7 @@ pub mod runtime;
 pub mod shape;
 pub mod sk;
 pub mod sk_tiny;
+pub mod html;
 pub mod svg;
 pub mod query;
 pub mod surface;
