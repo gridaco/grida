@@ -837,6 +837,10 @@ missing the cheapest possible camera-change path.
     - Preserved across: zoom changes, no-change frames, pan+zoom
     - First zoom frame after invalidation: full draw + capture (cache miss)
     - All subsequent zoom frames within ratio: cache hit (single blit)
+    - **Critical:** the `apply_changes()` `stable` parameter controls zoom
+      cache invalidation. The `redraw()` path must pass `stable=false`
+      when the camera is actively changing, otherwise every interaction
+      frame nukes the zoom cache and forces a full O(N) draw.
 
     **Measured impact (yrr-main.grida, 136K nodes, 100 frames):**
 
@@ -859,6 +863,24 @@ missing the cheapest possible camera-change path.
     zoom-in since it discards information rather than interpolating).
     Border strip rasterization remains a future refinement for the settle
     phase (see items 25–27 on progressive refinement).
+
+    **Update (item 21 hardening):** Two improvements to the zoom image cache:
+    1. **Removed hard ratio eviction** — the cache is never evicted during
+       active interaction, regardless of zoom ratio. Previously, exceeding
+       4× ratio caused full-draw spikes (50-60 ms on 135K-node scenes).
+       Now the stretched texture is blitted at any ratio; the settle frame
+       handles quality.
+    2. **No-change frame coverage** — zero-delta zoom frames (which produce
+       `CameraChangeKind::None` because `set_zoom(z)` doesn't change the
+       matrix) now use the zoom image cache instead of falling through to
+       a full draw. This eliminates spikes at gesture bounds where the zoom
+       value quantizes to min/max.
+
+    Measured on 01-135k.perf.grida (135K nodes):
+    | Scenario              | Before p95 | After p95 | Before MAX | After MAX |
+    |---|---|---|---|---|
+    | zoom_slow_around_fit  | 54,062 µs  | 6 µs      | 60,282 µs  | 119 µs    |
+    | zoom_slow_high        | 6 µs       | 5 µs      | 3,848 µs   | 44 µs     |
 
 23. **Settle & Refine (shared)**
 
@@ -1147,9 +1169,11 @@ expensive full redraws.
       current camera position (not just any position), or (b) use a
       `last_had_data_changes` flag that is reliably set in BOTH the
       `frame()` and legacy `redraw()` code paths.
-    - The legacy `redraw()` path does not call `apply_changes()`, so any
-      flag set there is stale. Migrating all hosts to `frame()` would
-      eliminate this dual-path problem.
+    - The legacy `redraw()` path now calls `apply_changes()` but
+      historically passed `stable=true` unconditionally, defeating the
+      zoom cache blit fast path during interaction. This was fixed by
+      deriving `stable` from `!camera_change.any_changed()`. Migrating
+      all hosts to `frame()` would still be preferable long-term.
     - The `queue()` stable promotion (non-camera events → stable quality)
       interacts badly with clamped zoom at min/max zoom limits — the zoom
       doesn't actually change, so `camera_change == None`, causing

@@ -130,8 +130,11 @@ reports `min/p50/p95/p99/MAX` plus per-stage breakdown and settle cost.
 | `zigzag`          | fast (continuous) / slow (with pauses) × fit/zoomed | Diagonal reading pattern with direction changes                                                                    |
 | `zoom`            | slow/fast × around-fit/high                         | Zoom oscillation at different levels                                                                               |
 | `pan_with_settle` | slow/fast × fit/zoomed                              | Pan with settle frames interleaved every 12 frames                                                                 |
+| `zoom_with_settle`| slow/fast × fit/high                                | Zoom with settle frames interleaved every 12 frames — captures cache-cold spike after settle nukes zoom cache      |
+| `zoom_forced_stable` | slow/fast × fit/high (BUG prefix)                | Forces `stable=true` on every zoom frame — reproduces the `redraw()` bug for A/B comparison                        |
 | `realtime`        | fast/slow × fit/zoomed                              | **Real-time event loop simulation** with sleep, 240Hz tick thread, and settle countdown matching the native viewer |
 | `frameloop`       | 16/50/80/120/200/300/500ms interval                 | **Real FrameLoop path** — the only bench that captures stable-frame jank during panning (see below)                |
+| `frameloop_zoom`  | 16/50/80/120/200/500ms interval                     | **Real FrameLoop path for zoom** — captures stable-frame intrusion during zoom gestures                            |
 | `resize`          | alternating viewport sizes                          | `--resize` flag. Measures `resize()` + `redraw()` cost per cycle (layout rebuild + cache invalidation + repaint)   |
 
 **SurfaceUI overlay measurement (`--overlay`):**
@@ -169,15 +172,15 @@ and simulate the native viewer's 240Hz tick thread + settle countdown.
 These produce frame timings that match what users actually see,
 including settle-induced frame drops at their natural frequency.
 
-The `frameloop` scenarios go through the actual `FrameLoop.poll()` /
-`complete()` path — the same code path as `Application::frame()`. All
-other pan/zoom scenarios bypass `FrameLoop` and call `queue_unstable()`
-directly, which means they never produce stable frames mid-interaction.
-The `frameloop` scenarios sweep scroll intervals from 16ms (fast flick)
-to 500ms (discrete clicks) and reveal how `FrameLoop`'s stable-frame
-decisions affect the frame time distribution at each speed. Use these
-when investigating panning jank, adaptive timing, or pan/zoom image
-cache behavior.
+The `frameloop` and `frameloop_zoom` scenarios go through the actual
+`FrameLoop.poll()` / `complete()` path — the same code path as
+`Application::frame()`. All other pan/zoom scenarios bypass `FrameLoop`
+and call `queue_unstable()` directly, which means they never produce
+stable frames mid-interaction. The `frameloop` scenarios sweep event
+intervals from 16ms (fast flick) to 500ms (discrete clicks) and reveal
+how `FrameLoop`'s stable-frame decisions affect the frame time
+distribution at each speed. Use these when investigating panning or
+zooming jank, adaptive timing, or pan/zoom image cache behavior.
 
 **Choosing scenes:** Use `--list-scenes` to see what's available. Pick
 scenes that stress the subsystem you're optimizing. For effects/caching
@@ -527,10 +530,11 @@ catch settle-induced spikes.
 All pan/zoom/circle/zigzag scenarios call `queue_unstable()` directly
 — they never go through `FrameLoop.poll()`. This means they never
 produce stable frames mid-interaction and cannot capture the jank
-pattern where a stable frame interrupts slow panning. Only the
-`frameloop` scenarios use the real `FrameLoop` decision path. When
-investigating panning smoothness or adaptive timing, always use the
-`frameloop` scenarios.
+pattern where a stable frame interrupts slow panning or zooming. Only
+the `frameloop` (pan) and `frameloop_zoom` scenarios use the real
+`FrameLoop` decision path. When investigating panning or zooming
+smoothness or adaptive timing, always use the `frameloop` /
+`frameloop_zoom` scenarios.
 
 ### Stable frames must recapture caches
 
