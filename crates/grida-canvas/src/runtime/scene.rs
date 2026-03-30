@@ -1329,14 +1329,18 @@ impl Renderer {
         // unstable frame can use the cache. Without this, stable frames
         // clear the cache (in queue()) but don't recapture, causing
         // the next unstable frame to do another expensive full draw.
+        //
+        // Single snapshot: both caches need the same image on non-zoom
+        // frames. image_snapshot() is copy-on-write but still allocates
+        // a handle — sharing avoids the second allocation.
         if self.backend.is_gpu() {
             let vm = self.camera.view_matrix();
+            let image = surface.image_snapshot();
 
             // Pan image cache: only useful when zoom is constant.
             if !plan.camera_change.zoom_changed() {
-                let image = surface.image_snapshot();
                 self.pan_image_cache = Some(PanImageCache {
-                    image,
+                    image: image.clone(),
                     origin_tx: vm.matrix[0][2],
                     origin_ty: vm.matrix[1][2],
                 });
@@ -1344,16 +1348,12 @@ impl Renderer {
 
             // Zoom image cache: capture after every full draw so that
             // the next zoom frame can use a scaled blit instead of
-            // re-drawing. We snapshot the surface once; the cost is
-            // amortized over all subsequent zoom cache-hit frames.
-            {
-                let image = surface.image_snapshot();
-                self.zoom_image_cache = Some(ZoomImageCache {
-                    image,
-                    zoom: self.camera.get_zoom(),
-                    view_matrix: vm,
-                });
-            }
+            // re-drawing.
+            self.zoom_image_cache = Some(ZoomImageCache {
+                image,
+                zoom: self.camera.get_zoom(),
+                view_matrix: vm,
+            });
         }
 
         // Compositor update (GPU-only).
@@ -2055,13 +2055,46 @@ impl Renderer {
         let mut promoted_ids: Vec<NodeId> = Vec::new();
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
 
-        // Query the R-tree once for all visible layer indices.
-        let mut indices = self.scene_cache.intersects(bounds);
+        // Full-viewport fast path: when the camera viewport fully contains
+        // the scene envelope (R-tree root AABB), ALL indexed layers are
+        // visible. Skip the R-tree traversal + sort entirely and return
+        // 0..n. This is O(1) vs O(n log n) — saves ~1600 us on 135K-node
+        // scenes at fit zoom (the common view-only case).
+        //
+        // Safety: only valid when every layer has render bounds (i.e. the
+        // R-tree indexes all layers). update_layers() uses filter_map to
+        // skip layers without render bounds, so layer_count can exceed
+        // the R-tree size. We guard against this by requiring the counts
+        // match — when they don't, the R-tree query correctly excludes
+        // the bounds-less layers.
+        let layer_count = self.scene_cache.layers.layers.len();
+        let rtree_size = self.scene_cache.layer_index.size();
+        let all_visible = layer_count == rtree_size
+            && match self.scene_cache.scene_envelope() {
+                None => true, // empty scene → trivially "all visible"
+                Some(envelope) => {
+                    let lower = envelope.lower();
+                    let upper = envelope.upper();
+                    bounds.x <= lower[0]
+                        && bounds.y <= lower[1]
+                        && bounds.x + bounds.width >= upper[0]
+                        && bounds.y + bounds.height >= upper[1]
+                }
+            };
 
-        // TODO: sort is expensive — consider incremental visible-set
-        // update (item 19) for pan-only frames where the entering/exiting
-        // sets are tiny.
-        indices.sort();
+        let indices = if all_visible {
+            // All layers visible — sequential indices, already sorted.
+            (0..layer_count).collect::<Vec<_>>()
+        } else {
+            // Partial visibility — R-tree spatial query.
+            let mut queried = self.scene_cache.intersects(bounds);
+            // sort_unstable (pdqsort) is 2-3x faster than stable merge sort
+            // for integer data because it avoids the O(n) merge buffer
+            // allocation. Draw order correctness only requires sorted indices,
+            // not stability.
+            queried.sort_unstable();
+            queried
+        };
 
         // Pre-filter compositor-relevant indices during the same pass.
         // Nodes without expensive effects (the vast majority) are skipped

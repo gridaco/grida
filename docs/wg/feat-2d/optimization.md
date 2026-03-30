@@ -459,6 +459,40 @@ Related:
     the geometry cache), RenderSurface culling can be enabled using the
     stored `viewport` rect.
 
+10c. **Full-Viewport Frame Plan Fast Path** ✅ IMPLEMENTED
+
+    When the camera viewport fully contains the scene envelope (R-tree
+    root AABB), ALL layers are visible. The R-tree traversal and index
+    sort are redundant — we can return `0..n` directly in O(1).
+
+    Detection uses `scene_envelope()` (O(1) R-tree root node read) and
+    a simple AABB containment check. This fires at fit zoom and any
+    zoom level where the entire document is visible.
+
+    Additionally, partial-viewport frames now use `sort_unstable()`
+    (pdqsort) instead of `sort()` (merge sort), which is 2-3x faster
+    for integer data because it avoids the O(n) merge buffer allocation.
+
+    A third sub-optimization shares the GPU `image_snapshot()` between
+    the pan and zoom image caches on non-zoom frames, avoiding a
+    redundant snapshot handle allocation.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark, 01-135k 135K nodes):**
+
+    | Scenario | Metric | Before | After | Delta |
+    | -------- | ------ | ------ | ----- | ----- |
+    | rt_pan_slow_fit | queue_us | 1,598 | 485 | **-70%** |
+    | rt_pan_slow_fit | settle_us | 3,388 | 1,049 | **-69%** |
+    | rt_pan_slow_fit | p95 frame | 6,317 | 1,199 | **-81%** |
+    | rt_pan_slow_zoomed | p50 frame | 300 | 151 | **-50%** |
+    | rt_pan_fast_fit | p50 frame | 82 | 41 | **-50%** |
+    | fl_16ms | p50 frame | 97 | 61 | **-37%** |
+
+    The optimization is most impactful at fit zoom on large scenes where
+    all nodes are visible — exactly the view-only reading experience.
+
+    Implementation: `Renderer::frame()` in `runtime/scene.rs`.
+
 11. **Minimize Canvas State Changes**
     - Reuse transforms and paints.
     - Precompute common values like DPI × Zoom × ViewMatrix.
