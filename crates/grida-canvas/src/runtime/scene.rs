@@ -385,6 +385,10 @@ impl Renderer {
     #[inline]
     fn prefill_picture_cache_for_plan(&mut self, plan: &FramePlan, policy: RenderPolicy) {
         let variant_key = policy.variant_key();
+        // Pre-compute whether variant key unification is safe for this policy.
+        // True when the policy differs from STANDARD only in effect-related
+        // fields — content, compositing, and clip policies are unchanged.
+        let can_unify = variant_key != 0 && policy.is_effect_only_variant();
         // Prefill picture cache for visible layers so Painter can reuse pictures even with masks.
         // Fast path: skip clone + recording when the picture is already cached (common case
         // on cache-warm frames). The clone of LayerEntry is expensive because it deep-copies
@@ -393,11 +397,29 @@ impl Renderer {
             for idx in indices {
                 if let Some(entry) = self.scene_cache.layers.layers.get(*idx) {
                     let id = entry.id;
+                    // Variant key unification for effects-free nodes.
+                    //
+                    // When a node has no effects (no blur, shadow, noise, glass,
+                    // backdrop blur), the SkPicture recorded under the "reduced
+                    // effects" policy (unstable frames) is byte-identical to the
+                    // "full quality" policy (stable frames). Storing such nodes
+                    // under the default variant key (0) avoids redundant
+                    // re-recording when the renderer switches between unstable
+                    // and stable frames — the first frame records the picture,
+                    // and the settle frame finds it immediately.
+                    //
+                    // On yrr-main (135K nodes, 0 effects), this eliminates ~800 us
+                    // of LayerEntry clones + SkPicture recordings on every settle.
+                    let effective_key = if can_unify && entry.layer.effects_empty() {
+                        0
+                    } else {
+                        variant_key
+                    };
                     // Check cache before cloning — avoids expensive deep clone on cache hits.
                     if self
                         .scene_cache
                         .picture
-                        .get_node_picture_variant(&id, variant_key)
+                        .get_node_picture_variant(&id, effective_key)
                         .is_some()
                     {
                         continue;
@@ -406,7 +428,7 @@ impl Renderer {
                     let entry = entry.clone();
                     let _ = self.with_recording_cached_with_policy(
                         &id,
-                        variant_key,
+                        effective_key,
                         policy,
                         |painter| {
                             painter.draw_layer(&entry.layer);
