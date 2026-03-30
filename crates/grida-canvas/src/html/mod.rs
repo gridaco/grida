@@ -226,14 +226,21 @@ impl SceneBuilder {
         }
 
         // Gap (for flex containers)
+        // CSS column-gap = inline-axis gap, row-gap = block-axis gap.
+        // For flex-direction: row, column-gap is the main-axis gap.
+        // For flex-direction: column, row-gap is the main-axis gap.
         if is_flex {
             let pos = style.get_position();
             let rg = gap_to_px(&pos.row_gap);
             let cg = gap_to_px(&pos.column_gap);
             if rg != 0.0 || cg != 0.0 {
+                let (main_gap, cross_gap) = match style.clone_flex_direction() {
+                    FlexDir::Row | FlexDir::RowReverse => (cg, rg),
+                    FlexDir::Column | FlexDir::ColumnReverse => (rg, cg),
+                };
                 node.layout_container.layout_gap = Some(LayoutGap {
-                    main_axis_gap: cg,
-                    cross_axis_gap: rg,
+                    main_axis_gap: main_gap,
+                    cross_axis_gap: cross_gap,
                 });
             }
         }
@@ -249,8 +256,11 @@ impl SceneBuilder {
         node.stroke_width = border_stroke_width;
         node.stroke_style = border_stroke_style;
 
-        // Box shadow → effects
-        node.effects = css_box_shadow_to_cg(style);
+        // Effects (box-shadow, filter, backdrop-filter)
+        node.effects = css_effects_to_cg(style);
+
+        // Blend mode (mix-blend-mode)
+        node.blend_mode = css_blend_mode_to_cg(style);
 
         // Width / height / min / max dimensions
         css_dimensions_to_cg(style, &mut node.layout_dimensions);
@@ -263,6 +273,9 @@ impl SceneBuilder {
         if node.layout_dimensions.layout_target_height.is_none() {
             node.layout_dimensions.layout_target_height = None;
         }
+
+        // Flex child properties (for nested containers inside flex parents)
+        node.layout_child = css_flex_child_to_cg(style);
 
         self.graph.append_child(Node::Container(node), parent)
     }
@@ -374,6 +387,12 @@ impl SceneBuilder {
         // opacity
         node.opacity = style.get_effects().opacity;
 
+        // Effects (text-shadow, filter, backdrop-filter)
+        node.effects = css_text_shadow_to_effects(style);
+
+        // Blend mode (mix-blend-mode)
+        node.blend_mode = css_blend_mode_to_cg(style);
+
         // flex child: layout_grow
         let flex_grow = style.clone_flex_grow();
         if flex_grow.0 > 0.0 {
@@ -393,14 +412,23 @@ impl SceneBuilder {
         node.corner_radius = css_border_radius_to_cg(style);
         node.opacity = style.get_effects().opacity;
 
+        // CSS dimensions → node size
+        node.size = css_size_to_cg(style);
+
+        // Flex child properties (grow, positioning)
+        node.layout_child = css_flex_child_to_cg(style);
+
         // Borders
         let (border_strokes, border_stroke_width, border_stroke_style) = css_border_to_cg(style);
         node.strokes = border_strokes;
         node.stroke_width = border_stroke_width;
         node.stroke_style = border_stroke_style;
 
-        // Box shadow
-        node.effects = css_box_shadow_to_cg(style);
+        // Effects (box-shadow, filter, backdrop-filter)
+        node.effects = css_effects_to_cg(style);
+
+        // Blend mode (mix-blend-mode)
+        node.blend_mode = css_blend_mode_to_cg(style);
 
         self.graph.append_child(Node::Rectangle(node), parent);
     }
@@ -488,6 +516,46 @@ fn gap_to_px(gap: &style::values::computed::length::NonNegativeLengthPercentageO
         LengthPercentageOrNormal::LengthPercentage(lp) => {
             lp.0.to_length().map(|l| l.px()).unwrap_or(0.0)
         }
+    }
+}
+
+/// Extract flex-child properties (flex-grow, positioning) from CSS computed values.
+/// Returns `None` when all values are at their defaults (grow=0, position=static/relative).
+fn css_flex_child_to_cg(style: &ComputedValues) -> Option<LayoutChildStyle> {
+    let grow = style.clone_flex_grow().0;
+    let is_absolute = style.get_box().clone_position().is_absolutely_positioned();
+    let positioning = if is_absolute {
+        LayoutPositioning::Absolute
+    } else {
+        LayoutPositioning::Auto
+    };
+
+    if grow > 0.0 || is_absolute {
+        Some(LayoutChildStyle {
+            layout_grow: grow,
+            layout_positioning: positioning,
+        })
+    } else {
+        None
+    }
+}
+
+/// Extract CSS width/height into a Size for leaf nodes (Rectangle, etc.).
+/// Returns 0×0 when dimensions are `auto` — unlike the design-tool convention
+/// (100×100 default), HTML leaf elements have no intrinsic size.
+fn css_size_to_cg(style: &ComputedValues) -> Size {
+    let pos = style.get_position();
+    let w = match &pos.width {
+        GenericSize::LengthPercentage(lp) => lp.0.to_length().map(|l| l.px()).unwrap_or(0.0),
+        _ => 0.0,
+    };
+    let h = match &pos.height {
+        GenericSize::LengthPercentage(lp) => lp.0.to_length().map(|l| l.px()).unwrap_or(0.0),
+        _ => 0.0,
+    };
+    Size {
+        width: w,
+        height: h,
     }
 }
 
@@ -830,11 +898,16 @@ fn css_border_to_cg(style: &ComputedValues) -> (Paints, StrokeWidth, StrokeStyle
     (strokes, stroke_width, stroke_style)
 }
 
-/// Convert CSS box-shadow to CG LayerEffects.
-fn css_box_shadow_to_cg(style: &ComputedValues) -> LayerEffects {
-    let shadow_list = style.clone_box_shadow();
-    let mut shadows = Vec::new();
+/// Convert CSS effects (box-shadow, filter, backdrop-filter) to CG LayerEffects.
+fn css_effects_to_cg(style: &ComputedValues) -> LayerEffects {
+    use style::values::generics::effects::Filter;
 
+    let mut shadows = Vec::new();
+    let mut blur = None;
+    let mut backdrop_blur = None;
+
+    // box-shadow → shadows
+    let shadow_list = style.clone_box_shadow();
     for shadow in shadow_list.0.iter() {
         let color =
             css_color_to_cg(&shadow.base.color).unwrap_or_else(|| CGColor::from_rgba(0, 0, 0, 255));
@@ -855,12 +928,92 @@ fn css_box_shadow_to_cg(style: &ComputedValues) -> LayerEffects {
         }
     }
 
+    // filter → blur + drop-shadow
+    let filter_list = style.clone_filter();
+    for f in filter_list.0.iter() {
+        match f {
+            Filter::Blur(len) => {
+                blur = Some(FeLayerBlur::from(len.px()));
+            }
+            Filter::DropShadow(s) => {
+                let color =
+                    css_color_to_cg(&s.color).unwrap_or_else(|| CGColor::from_rgba(0, 0, 0, 255));
+                shadows.push(FilterShadowEffect::DropShadow(FeShadow {
+                    dx: s.horizontal.px(),
+                    dy: s.vertical.px(),
+                    blur: s.blur.px(),
+                    spread: 0.0,
+                    color,
+                    active: true,
+                }));
+            }
+            _ => {}
+        }
+    }
+
+    // backdrop-filter → backdrop_blur
+    let bd_list = style.clone_backdrop_filter();
+    for f in bd_list.0.iter() {
+        if let Filter::Blur(len) = f {
+            backdrop_blur = Some(FeBackdropBlur::from(len.px()));
+        }
+    }
+
     LayerEffects {
-        blur: None,
-        backdrop_blur: None,
+        blur,
+        backdrop_blur,
         shadows,
         glass: None,
         noises: Vec::new(),
+    }
+}
+
+/// Convert CSS text-shadow to CG LayerEffects (for text nodes).
+fn css_text_shadow_to_effects(style: &ComputedValues) -> LayerEffects {
+    let ts_list = style.clone_text_shadow();
+    let mut shadows = Vec::new();
+
+    for s in ts_list.0.iter() {
+        let color = css_color_to_cg(&s.color).unwrap_or_else(|| CGColor::from_rgba(0, 0, 0, 255));
+
+        shadows.push(FilterShadowEffect::DropShadow(FeShadow {
+            dx: s.horizontal.px(),
+            dy: s.vertical.px(),
+            blur: s.blur.px(),
+            spread: 0.0,
+            color,
+            active: true,
+        }));
+    }
+
+    // Text nodes also support filter/backdrop-filter
+    let mut base = css_effects_to_cg(style);
+    base.shadows.extend(shadows);
+    base
+}
+
+/// Convert CSS mix-blend-mode to CG LayerBlendMode.
+fn css_blend_mode_to_cg(style: &ComputedValues) -> LayerBlendMode {
+    use style::computed_values::mix_blend_mode::T as MixBlendMode;
+
+    match style.clone_mix_blend_mode() {
+        MixBlendMode::Normal => LayerBlendMode::PassThrough,
+        MixBlendMode::Multiply => LayerBlendMode::Blend(BlendMode::Multiply),
+        MixBlendMode::Screen => LayerBlendMode::Blend(BlendMode::Screen),
+        MixBlendMode::Overlay => LayerBlendMode::Blend(BlendMode::Overlay),
+        MixBlendMode::Darken => LayerBlendMode::Blend(BlendMode::Darken),
+        MixBlendMode::Lighten => LayerBlendMode::Blend(BlendMode::Lighten),
+        MixBlendMode::ColorDodge => LayerBlendMode::Blend(BlendMode::ColorDodge),
+        MixBlendMode::ColorBurn => LayerBlendMode::Blend(BlendMode::ColorBurn),
+        MixBlendMode::HardLight => LayerBlendMode::Blend(BlendMode::HardLight),
+        MixBlendMode::SoftLight => LayerBlendMode::Blend(BlendMode::SoftLight),
+        MixBlendMode::Difference => LayerBlendMode::Blend(BlendMode::Difference),
+        MixBlendMode::Exclusion => LayerBlendMode::Blend(BlendMode::Exclusion),
+        MixBlendMode::Hue => LayerBlendMode::Blend(BlendMode::Hue),
+        MixBlendMode::Saturation => LayerBlendMode::Blend(BlendMode::Saturation),
+        MixBlendMode::Color => LayerBlendMode::Blend(BlendMode::Color),
+        MixBlendMode::Luminosity => LayerBlendMode::Blend(BlendMode::Luminosity),
+        _ => LayerBlendMode::PassThrough,
     }
 }
 
@@ -944,6 +1097,10 @@ fn css_dimensions_to_cg(style: &ComputedValues, dims: &mut LayoutDimensionStyle)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::layout::engine::LayoutEngine;
+    use crate::layout::ComputedLayout;
+    use crate::node::schema::Scene;
+    use std::collections::HashMap;
     use std::sync::Mutex;
 
     /// Global mutex to serialize HTML tests.
@@ -952,11 +1109,62 @@ mod tests {
     /// concurrent `from_html_str` calls race on that shared slot and cause
     /// Stylo `debug_assert` panics ("Why are we here?").  A mutex ensures
     /// only one test touches the global DOM at a time.
+    ///
+    /// We use `lock().unwrap_or_else(|e| e.into_inner())` to recover from
+    /// poison so that a single test failure doesn't cascade to all others.
     static HTML_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Lock the HTML test mutex, clearing poison if a prior test panicked.
+    fn lock_html() -> std::sync::MutexGuard<'static, ()> {
+        HTML_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Parse HTML and run the layout engine, returning the scene and a
+    /// map of every node's computed layout.
+    fn html_layout(html: &str, vw: f32, vh: f32) -> (Scene, HashMap<NodeId, ComputedLayout>) {
+        let graph = from_html_str(html).expect("HTML parse failed");
+        let scene = Scene {
+            name: "html-test".to_string(),
+            graph,
+            background_color: None,
+        };
+        let mut engine = LayoutEngine::new();
+        let result = engine.compute(
+            &scene,
+            Size {
+                width: vw,
+                height: vh,
+            },
+            None,
+        );
+        let map: HashMap<NodeId, ComputedLayout> = result.iter().map(|(k, v)| (k, *v)).collect();
+        (scene, map)
+    }
+
+    /// Collect all NodeIds in DFS order (pre-order).
+    fn dfs_nodes(graph: &SceneGraph) -> Vec<NodeId> {
+        let mut out = Vec::new();
+        fn walk(graph: &SceneGraph, id: &NodeId, out: &mut Vec<NodeId>) {
+            out.push(*id);
+            if let Some(children) = graph.get_children(id) {
+                for child_id in children {
+                    walk(graph, child_id, out);
+                }
+            }
+        }
+        for root in graph.roots() {
+            walk(graph, root, &mut out);
+        }
+        out
+    }
+
+    // -----------------------------------------------------------------------
+    // Smoke / parsing tests (existing)
+    // -----------------------------------------------------------------------
 
     #[test]
     fn smoke_test_basic_html() {
-        let _guard = HTML_TEST_LOCK.lock().unwrap();
+        let _guard = lock_html();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -975,7 +1183,6 @@ mod tests {
 </html>"#;
 
         let graph = from_html_str(html).expect("should parse and convert HTML");
-        // We should have at least a few nodes: html > body > h1, div.card > p
         assert!(
             graph.node_count() > 3,
             "expected at least 4 nodes, got {}",
@@ -985,7 +1192,7 @@ mod tests {
 
     #[test]
     fn test_inline_style_attribute() {
-        let _guard = HTML_TEST_LOCK.lock().unwrap();
+        let _guard = lock_html();
         let html = r#"<!doctype html>
 <html>
   <body>
@@ -998,7 +1205,7 @@ mod tests {
 
     #[test]
     fn test_borders_and_shadows() {
-        let _guard = HTML_TEST_LOCK.lock().unwrap();
+        let _guard = lock_html();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1016,7 +1223,7 @@ mod tests {
 
     #[test]
     fn test_flex_alignment() {
-        let _guard = HTML_TEST_LOCK.lock().unwrap();
+        let _guard = lock_html();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1037,7 +1244,7 @@ mod tests {
 
     #[test]
     fn test_gradient_backgrounds() {
-        let _guard = HTML_TEST_LOCK.lock().unwrap();
+        let _guard = lock_html();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1053,5 +1260,686 @@ mod tests {
 </html>"#;
         let graph = from_html_str(html).expect("should parse gradient backgrounds");
         assert!(graph.node_count() >= 4);
+    }
+
+    // -----------------------------------------------------------------------
+    // Deterministic flex layout tests (divs only, no text)
+    // -----------------------------------------------------------------------
+
+    /// 3 fixed-size divs in a flex row with gap.
+    #[test]
+    fn test_flex_row_positions() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; flex-direction:row; gap:10px; width:300px; height:100px;">
+    <div style="width:50px; height:50px;"></div>
+    <div style="width:50px; height:50px;"></div>
+    <div style="width:50px; height:50px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        // Find the three leaf rectangles (last 3 in DFS of the flex container subtree)
+        // Tree: html > body > flex-container > [child0, child1, child2]
+        // DFS order should have the 3 children at the end
+        let leaf_layouts: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                // Children are 50×50
+                if (l.width - 50.0).abs() < 1.0 && (l.height - 50.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(leaf_layouts.len(), 3, "expected 3 leaf children");
+
+        assert_eq!(leaf_layouts[0].x, 0.0, "child0 x");
+        assert_eq!(leaf_layouts[1].x, 60.0, "child1 x = 50 + 10 gap");
+        assert_eq!(leaf_layouts[2].x, 120.0, "child2 x = 50+10+50+10");
+    }
+
+    /// 3 fixed-size divs in a flex column with gap.
+    #[test]
+    fn test_flex_column_positions() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; flex-direction:column; gap:10px; width:100px; height:300px;">
+    <div style="width:50px; height:50px;"></div>
+    <div style="width:50px; height:50px;"></div>
+    <div style="width:50px; height:50px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf_layouts: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 50.0).abs() < 1.0 && (l.height - 50.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(leaf_layouts.len(), 3, "expected 3 leaf children");
+
+        assert_eq!(leaf_layouts[0].y, 0.0, "child0 y");
+        assert_eq!(leaf_layouts[1].y, 60.0, "child1 y = 50 + 10 gap");
+        assert_eq!(leaf_layouts[2].y, 120.0, "child2 y = 50+10+50+10");
+    }
+
+    /// justify-content: center with 2 fixed children.
+    #[test]
+    fn test_flex_justify_center() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; justify-content:center; width:200px; height:100px;">
+    <div style="width:40px; height:40px;"></div>
+    <div style="width:40px; height:40px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf_layouts: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 40.0).abs() < 1.0 && (l.height - 40.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(leaf_layouts.len(), 2, "expected 2 leaf children");
+
+        // Total child width = 80, remaining = 120, offset = 60
+        assert_eq!(leaf_layouts[0].x, 60.0, "child0 x centered");
+        assert_eq!(leaf_layouts[1].x, 100.0, "child1 x centered");
+    }
+
+    /// justify-content: space-between with 3 fixed children.
+    #[test]
+    fn test_flex_justify_space_between() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; justify-content:space-between; width:200px; height:100px;">
+    <div style="width:40px; height:40px;"></div>
+    <div style="width:40px; height:40px;"></div>
+    <div style="width:40px; height:40px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf_layouts: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 40.0).abs() < 1.0 && (l.height - 40.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(leaf_layouts.len(), 3, "expected 3 leaf children");
+
+        assert_eq!(leaf_layouts[0].x, 0.0, "first child at start");
+        assert_eq!(leaf_layouts[2].x, 160.0, "last child at end (200-40)");
+    }
+
+    /// align-items: center with a single child shorter than container.
+    #[test]
+    fn test_flex_align_center() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; align-items:center; width:200px; height:100px;">
+    <div style="width:40px; height:40px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf = nodes
+            .iter()
+            .find_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 40.0).abs() < 1.0 && (l.height - 40.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .expect("should find 40×40 child");
+
+        assert_eq!(leaf.y, 30.0, "child centered: (100-40)/2 = 30");
+    }
+
+    /// flex-grow: second child fills remaining space.
+    #[test]
+    fn test_flex_grow() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; width:300px; height:100px;">
+    <div style="width:100px; height:50px;"></div>
+    <div style="flex-grow:1; height:50px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let child_layouts: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.height - 50.0).abs() < 1.0 && l.width > 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(child_layouts.len(), 2, "expected 2 children");
+
+        assert_eq!(child_layouts[0].width, 100.0, "first child fixed 100px");
+        assert_eq!(child_layouts[0].x, 0.0, "first child at x=0");
+        assert_eq!(
+            child_layouts[1].width, 200.0,
+            "second child grows to fill 300-100=200"
+        );
+        assert_eq!(child_layouts[1].x, 100.0, "second child starts after first");
+    }
+
+    /// Container padding offsets children.
+    #[test]
+    fn test_flex_padding() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; padding:10px; width:200px; height:100px;">
+    <div style="width:30px; height:30px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf = nodes
+            .iter()
+            .find_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 30.0).abs() < 1.0 && (l.height - 30.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .expect("should find 30×30 child");
+
+        assert_eq!(leaf.x, 10.0, "child offset by left padding");
+        assert_eq!(leaf.y, 10.0, "child offset by top padding");
+    }
+
+    /// Flex column gap direction is correct (gap applies vertically).
+    #[test]
+    fn test_flex_gap_column_direction() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; flex-direction:column; gap:15px; width:100px; height:300px;">
+    <div style="width:40px; height:40px;"></div>
+    <div style="width:40px; height:40px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf_layouts: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 40.0).abs() < 1.0 && (l.height - 40.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(leaf_layouts.len(), 2, "expected 2 leaf children");
+
+        assert_eq!(leaf_layouts[0].y, 0.0, "child0 at y=0");
+        assert_eq!(leaf_layouts[1].y, 55.0, "child1 at y=40+15 gap");
+    }
+
+    /// Nested flex: outer row, inner column with children.
+    #[test]
+    fn test_nested_flex() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; flex-direction:row; width:400px; height:200px;">
+    <div style="display:flex; flex-direction:column; width:100px; height:200px;">
+      <div style="width:80px; height:60px;"></div>
+      <div style="width:80px; height:60px;"></div>
+    </div>
+    <div style="width:100px; height:100px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        // Find the 80×60 leaves (inner column children)
+        let inner_leaves: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 80.0).abs() < 1.0 && (l.height - 60.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(inner_leaves.len(), 2, "expected 2 inner column children");
+        assert_eq!(inner_leaves[0].y, 0.0, "first inner child at y=0");
+        assert_eq!(inner_leaves[1].y, 60.0, "second inner child at y=60");
+
+        // Find the 100×100 sibling in the outer row
+        let sibling = nodes
+            .iter()
+            .find_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 100.0).abs() < 1.0 && (l.height - 100.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .expect("should find 100×100 sibling");
+        assert_eq!(
+            sibling.x, 100.0,
+            "sibling starts after inner column (width=100)"
+        );
+    }
+
+    /// Explicit width/height dimensions are preserved.
+    #[test]
+    fn test_explicit_dimensions() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="width:200px; height:100px;"></div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf = nodes
+            .iter()
+            .find_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 200.0).abs() < 1.0 && (l.height - 100.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .expect("should find 200×100 div");
+
+        assert_eq!(leaf.width, 200.0);
+        assert_eq!(leaf.height, 100.0);
+    }
+
+    /// flex-wrap: children that overflow wrap to the next line.
+    #[test]
+    fn test_flex_wrap() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; flex-wrap:wrap; width:150px; height:200px;">
+    <div style="width:60px; height:60px;"></div>
+    <div style="width:60px; height:60px;"></div>
+    <div style="width:60px; height:60px;"></div>
+  </div>
+</body></html>"#;
+        let (scene, layouts) = html_layout(html, 800.0, 600.0);
+        let nodes = dfs_nodes(&scene.graph);
+
+        let leaf_layouts: Vec<_> = nodes
+            .iter()
+            .filter_map(|id| {
+                let l = layouts.get(id)?;
+                if (l.width - 60.0).abs() < 1.0 && (l.height - 60.0).abs() < 1.0 {
+                    Some(*l)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(leaf_layouts.len(), 3, "expected 3 children");
+
+        // First two fit on first row (60+60=120 <= 150)
+        assert_eq!(leaf_layouts[0].y, 0.0, "child0 on first row");
+        assert_eq!(leaf_layouts[1].y, 0.0, "child1 on first row");
+        // Third wraps to second row
+        assert!(
+            leaf_layouts[2].y >= 60.0,
+            "child2 should wrap to y >= 60, got {}",
+            leaf_layouts[2].y
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Effects / blend mode tests
+    // -----------------------------------------------------------------------
+
+    /// Parse HTML without running layout — returns just the SceneGraph.
+    fn html_graph(html: &str) -> SceneGraph {
+        from_html_str(html).expect("HTML parse failed")
+    }
+
+    /// text-shadow maps to drop-shadow effects on the TextSpan node.
+    #[test]
+    fn test_text_shadow() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div><span style="text-shadow: 2px 3px 4px rgba(0,0,0,0.6);">Hello</span></div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        // Find the TextSpan node
+        let text_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::TextSpan(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a TextSpan node");
+
+        let effects = text_node.effects().expect("TextSpan should have effects");
+        assert_eq!(effects.shadows.len(), 1, "one text-shadow");
+        match &effects.shadows[0] {
+            FilterShadowEffect::DropShadow(s) => {
+                assert_eq!(s.dx, 2.0);
+                assert_eq!(s.dy, 3.0);
+                assert_eq!(s.blur, 4.0);
+                assert_eq!(s.spread, 0.0, "text-shadow has no spread");
+                assert!(s.active);
+            }
+            _ => panic!("expected DropShadow"),
+        }
+    }
+
+    /// Multiple text-shadows produce multiple DropShadow effects.
+    #[test]
+    fn test_text_shadow_multiple() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div><span style="text-shadow: 1px 1px 2px black, 0 0 8px blue;">Multi</span></div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let text_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::TextSpan(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a TextSpan node");
+
+        let effects = text_node.effects().expect("TextSpan should have effects");
+        assert_eq!(effects.shadows.len(), 2, "two text-shadows");
+    }
+
+    /// box-shadow (inset + outer) maps to InnerShadow + DropShadow.
+    #[test]
+    fn test_box_shadow() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="width:100px; height:100px; box-shadow: 4px 4px 8px black, inset 2px 2px 4px red;"></div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let rect_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::Rectangle(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a Rectangle node");
+
+        let effects = rect_node.effects().expect("Rectangle should have effects");
+        assert_eq!(effects.shadows.len(), 2, "two box-shadows");
+        assert!(
+            matches!(&effects.shadows[0], FilterShadowEffect::DropShadow(_)),
+            "first is DropShadow"
+        );
+        assert!(
+            matches!(&effects.shadows[1], FilterShadowEffect::InnerShadow(_)),
+            "second is InnerShadow"
+        );
+    }
+
+    /// filter: blur() maps to FeLayerBlur on a rectangle.
+    #[test]
+    fn test_filter_blur() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="width:100px; height:100px; filter: blur(6px);"></div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let rect_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::Rectangle(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a Rectangle node");
+
+        let effects = rect_node.effects().expect("Rectangle should have effects");
+        let blur = effects.blur.as_ref().expect("should have blur");
+        match &blur.blur {
+            FeBlur::Gaussian(g) => assert_eq!(g.radius, 6.0),
+            _ => panic!("expected Gaussian blur"),
+        }
+    }
+
+    /// filter: drop-shadow() maps to DropShadow effect on a rectangle.
+    #[test]
+    fn test_filter_drop_shadow() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="width:100px; height:100px; filter: drop-shadow(4px 4px 8px black);"></div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let rect_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::Rectangle(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a Rectangle node");
+
+        let effects = rect_node.effects().expect("Rectangle should have effects");
+        assert_eq!(effects.shadows.len(), 1, "one drop-shadow from filter");
+        match &effects.shadows[0] {
+            FilterShadowEffect::DropShadow(s) => {
+                assert_eq!(s.dx, 4.0);
+                assert_eq!(s.dy, 4.0);
+                assert_eq!(s.blur, 8.0);
+            }
+            _ => panic!("expected DropShadow"),
+        }
+    }
+
+    /// backdrop-filter: blur() maps to FeBackdropBlur.
+    ///
+    /// NOTE: Stylo marks `backdrop-filter` as `servo_pref="layout.unimplemented"`,
+    /// so in servo mode the property is parsed but treated as initial (none).
+    /// The mapping code is correct but untestable until a gecko build or pref
+    /// override is available. This test verifies the pipeline doesn't crash.
+    #[test]
+    fn test_backdrop_filter_blur() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="width:200px; height:200px;">
+    <div style="width:100px; height:100px; backdrop-filter: blur(12px);"></div>
+  </div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let rect_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::Rectangle(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a Rectangle node");
+
+        // backdrop-filter is unimplemented in servo mode so effects may lack backdrop_blur.
+        // Just verify the node exists and effects are accessible (no crash).
+        let _effects = rect_node.effects().expect("Rectangle should have effects");
+    }
+
+    /// mix-blend-mode: multiply maps to LayerBlendMode::Blend(BlendMode::Multiply).
+    #[test]
+    fn test_mix_blend_mode() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="width:100px; height:100px; mix-blend-mode: multiply;"></div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let rect_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::Rectangle(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a Rectangle node");
+
+        assert_eq!(
+            rect_node.blend_mode(),
+            LayerBlendMode::Blend(BlendMode::Multiply)
+        );
+    }
+
+    /// mix-blend-mode: normal stays as PassThrough (default).
+    #[test]
+    fn test_mix_blend_mode_normal() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="width:100px; height:100px; mix-blend-mode: normal;"></div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let rect_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::Rectangle(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a Rectangle node");
+
+        assert_eq!(rect_node.blend_mode(), LayerBlendMode::PassThrough);
+    }
+
+    /// Effects on containers: filter + blend mode on a flex container.
+    #[test]
+    fn test_container_effects() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="display:flex; width:200px; height:100px; filter: blur(4px); mix-blend-mode: screen;">
+    <div style="width:50px; height:50px;"></div>
+  </div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        // Find the container with non-PassThrough blend mode (the one with mix-blend-mode: screen)
+        let container_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::Container(_)) && n.blend_mode() != LayerBlendMode::PassThrough
+                {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a Container with non-default blend mode");
+
+        let effects = container_node
+            .effects()
+            .expect("Container should have effects");
+        assert!(effects.blur.is_some(), "container should have blur");
+        assert_eq!(
+            container_node.blend_mode(),
+            LayerBlendMode::Blend(BlendMode::Screen)
+        );
     }
 }

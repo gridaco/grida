@@ -12,16 +12,19 @@ Properties marked `[ ]` are not yet supported.
 - [x] `flex-wrap` — `layout-flex-row.html`
 - [x] `align-items` (start, center, end, stretch) — `layout-flex-row.html`
 - [x] `justify-content` (start, center, end, between, around, evenly) — `layout-flex-column.html`
-- [x] `flex-grow` — `layout-flex-row.html`
-- [x] `gap` (row-gap, column-gap) — `layout-flex-row.html`, `layout-flex-column.html`
+- [x] `flex-grow` — `layout-flex-row.html`; mapped on rectangles, containers, and text spans
+- [x] `gap` (row-gap, column-gap) — `layout-flex-row.html`, `layout-flex-column.html`; direction-aware mapping (swaps axes for column direction)
+- [x] `position: absolute` — mapped via `css_flex_child_to_cg` → `LayoutPositioning::Absolute`
+- [x] child CSS `width`/`height` on leaf rects — `css_size_to_cg` (0×0 default for auto)
+- [ ] `flex-shrink` — not mapped (hardcoded to 0.0 in Taffy defaults; CSS default is 1.0)
+- [ ] `align-self` — not mapped
+- [ ] `order` — not mapped
+- [ ] `flex-direction: row-reverse` / `column-reverse` — reverse info lost (mapped same as forward)
+- [ ] `flex-wrap: wrap-reverse` — reverse info lost (mapped same as wrap)
 - [ ] `display: grid` — grid layout mode not in IR (`LayoutMode` only has `Normal`/`Flex`)
 - [ ] `grid-template-columns`, `grid-template-rows` — no grid track IR
 - [ ] `place-items` (grid shorthand)
 - [ ] `margin` — no margin in IR; only padding is mapped
-- [ ] `position: absolute/relative/fixed/sticky` — no positioned layout
-- [ ] `flex-shrink` — not mapped
-- [ ] `align-self` — not mapped
-- [ ] `order` — not mapped
 
 ## Box Model
 
@@ -53,11 +56,16 @@ Properties marked `[ ]` are not yet supported.
 - [ ] per-side border colors — only first visible side color is used
 - [ ] `border-image` / gradient borders — IR strokes only support solid paint; gradient stroke rendering would paint the gradient into the full shape bounds, not just the stroke path
 
-## Shadow
+## Shadow / Effects
 
 - [x] `box-shadow` (drop shadow) — `paint-shadow.html`
 - [x] `box-shadow: inset` (inner shadow) — `paint-shadow.html`
-- [ ] `text-shadow` — only `box-shadow` is mapped
+- [x] `text-shadow` — mapped to `FilterShadowEffect::DropShadow` on text nodes — `text-shadow.html`
+- [x] `filter: blur()` — mapped to `FeLayerBlur` — `paint-filter-blur.html`
+- [x] `filter: drop-shadow()` — mapped to `FilterShadowEffect::DropShadow` — `paint-filter-blur.html`
+- [x] `mix-blend-mode` — mapped to `LayerBlendMode::Blend(...)` — `paint-blend-mode.html`
+- [ ] `backdrop-filter: blur()` — mapping code exists but Stylo servo mode marks it as `layout.unimplemented` — `paint-backdrop-blur.html`
+- [ ] `filter: brightness()`, `contrast()`, `grayscale()`, etc. — no IR equivalent for non-blur filters
 
 ## Text
 
@@ -72,7 +80,7 @@ Properties marked `[ ]` are not yet supported.
 - [x] `text-decoration` (underline, overline, line-through) — `text-decoration.html`
 - [x] `text-transform` (uppercase, lowercase, capitalize) — mapped to `TextTransform`
 - [x] `word-spacing` — mapped to `TextWordSpacing::Fixed`
-- [ ] `text-shadow`
+- [x] `text-shadow` — see Shadow / Effects section
 - [ ] `white-space: pre` — whitespace preservation not enforced
 - [ ] text background color (e.g. `<mark>`, `<code>`) — IR `TextSpan` has no background
 
@@ -82,7 +90,7 @@ Properties marked `[ ]` are not yet supported.
 
 ## Integration
 
-- [x] Combined properties (flex + padding + gap + bg + radius + border + shadow + typography) — `mixed-card.html`
+- [x] Combined properties (flex + padding + gap + bg + radius + border + shadow + effects + blend + typography) — `mixed-card.html`
 
 ## HTML Elements — Unsupported
 
