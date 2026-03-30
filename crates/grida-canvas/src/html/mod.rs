@@ -4,6 +4,9 @@
 //! and converts the styled DOM tree into a Grida [`SceneGraph`].
 //!
 //! This is the HTML counterpart to the SVG import pipeline in [`crate::svg`].
+//!
+//! **Property mapping tracker:** `docs/wg/format/css.md` and `docs/wg/format/html.md`
+//! track which CSS properties and HTML elements are mapped, partially mapped, or blocked.
 
 use crate::cg::prelude::*;
 use crate::node::factory::NodeFactory;

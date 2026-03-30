@@ -49,38 +49,41 @@ This mirrors the SVG import path (`usvg` → `from_usvg` → IR), but for HTML/C
 
 ## Roadmap
 
-### Phase 1 — Cascade Resolution
+### Phase 1 — Cascade Resolution ✅
 
-Wire up actual per-element style resolution so `compute_for()` returns real computed values.
+Per-element style resolution via Stylo's `TElement` trait.
 
-- [ ] Promote `TElement` implementation from `exp_impl_telement.rs` into the crate
-- [ ] Collect CSS from `<style>` elements and inline `style` attributes
-- [ ] Inject a user-agent stylesheet (default HTML element styles)
-- [ ] Validate against HTML fixture files in `/fixtures/test-html/L0/`
+- [x] Promote `TElement` implementation into the crate (`adapter.rs`)
+- [x] Collect CSS from `<style>` elements and inline `style` attributes
+- [x] Inject a user-agent stylesheet (default HTML element styles)
+- [x] Validate against HTML fixture files in `/fixtures/test-html/L0/`
 
-### Phase 2 — Font & Media Integration
+### Phase 2 — Font & Media Integration (partial)
 
 Replace stubs with real providers so computed values reflect the runtime environment.
 
 - [ ] Integrate font metrics with the Skia backend (or system fonts)
 - [ ] Plumb viewport size, DPR, and `prefers-color-scheme` from the host
 
-### Phase 3 — IR Conversion
+### Phase 3 — IR Conversion ✅
 
-Bridge the gap between style-resolved tree and grida-canvas, analogous to `from_usvg.rs`.
+HTML → Grida IR pipeline implemented in `crates/grida-canvas/src/html/mod.rs`.
 
-- [ ] Map block/flex containers → rectangle IR nodes
-- [ ] Map text nodes → text IR nodes with font/color properties
-- [ ] Map background, border, opacity → visual properties on IR nodes
-- [ ] Handle `display: none` (exclusion) and `visibility: hidden`
-- [ ] Layout pass via `taffy` to compute geometry before IR emission
+- [x] Map block/flex containers → Container IR nodes
+- [x] Map text nodes → TextSpan IR nodes with font/color properties
+- [x] Map background, border, opacity, gradients, shadows, effects, blend modes
+- [x] Handle `display: none` (exclusion)
+- [x] Layout pass via `taffy` (integrated into grida-canvas layout engine)
+- [ ] `visibility: hidden` — needs dedicated IR field (not opacity:0)
 
 ### Phase 4 — Completeness
 
-- [ ] SVG presentation attribute → CSS mapping (HTML + SVG share >90% of style logic)
+- [ ] CSS `transform` → `AffineTransform`
 - [ ] CSS custom properties / `var()` (Stylo supports these; needs plumbing)
 - [ ] `@media` evaluation hooks
 - [ ] External stylesheet loading (`<link rel="stylesheet">`)
+
+For the full property-by-property tracking, see `docs/wg/format/css.md` and `docs/wg/format/html.md`.
 
 ## Architecture
 
