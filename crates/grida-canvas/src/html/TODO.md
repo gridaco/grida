@@ -78,6 +78,10 @@ Properties marked `[ ]` are not yet supported.
 - [x] `line-height` (unitless, px) — `text-line-height.html`
 - [x] `letter-spacing` — `text-letter-spacing.html`
 - [x] `text-decoration` (underline, overline, line-through) — `text-decoration.html`
+- [x] `text-decoration-color` — `text-decoration-full.html`
+- [x] `text-decoration-style` (solid, double, dotted, dashed, wavy) — `text-decoration-full.html`
+- [ ] `text-decoration-thickness` — Stylo marks as gecko-only (`engines="gecko"`); inaccessible in servo mode
+- [ ] `text-decoration-skip-ink` — Stylo marks as gecko-only
 - [x] `text-transform` (uppercase, lowercase, capitalize) — mapped to `TextTransform`
 - [x] `word-spacing` — mapped to `TextWordSpacing::Fixed`
 - [x] `text-shadow` — see Shadow / Effects section

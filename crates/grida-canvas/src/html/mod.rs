@@ -374,10 +374,21 @@ impl SceneBuilder {
             };
 
             if !matches!(line, TextDecorationLine::None) {
+                // text-decoration-color (currentcolor → None, let downstream resolve)
+                let td_color = css_color_to_cg(&style.clone_text_decoration_color());
+
+                // text-decoration-style
+                let td_style = css_text_decoration_style_to_cg(style);
+
+                // TODO: text-decoration-thickness — Stylo marks this as gecko-only
+                //       (`engines="gecko"`), so it's inaccessible in servo mode.
+                //       When available, map `LengthOrAuto` → `Option<f32>`.
+                // TODO: text-decoration-skip-ink — also gecko-only in Stylo.
+
                 node.text_style.text_decoration = Some(TextDecorationRec {
                     text_decoration_line: line,
-                    text_decoration_color: None,
-                    text_decoration_style: None,
+                    text_decoration_color: td_color,
+                    text_decoration_style: td_style,
                     text_decoration_skip_ink: None,
                     text_decoration_thickness: None,
                 });
@@ -1014,6 +1025,20 @@ fn css_blend_mode_to_cg(style: &ComputedValues) -> LayerBlendMode {
         MixBlendMode::Color => LayerBlendMode::Blend(BlendMode::Color),
         MixBlendMode::Luminosity => LayerBlendMode::Blend(BlendMode::Luminosity),
         _ => LayerBlendMode::PassThrough,
+    }
+}
+
+/// Convert CSS text-decoration-style to CG TextDecorationStyle.
+fn css_text_decoration_style_to_cg(style: &ComputedValues) -> Option<TextDecorationStyle> {
+    use style::computed_values::text_decoration_style::T as TDS;
+
+    match style.clone_text_decoration_style() {
+        TDS::Solid => Some(TextDecorationStyle::Solid),
+        TDS::Double => Some(TextDecorationStyle::Double),
+        TDS::Dotted => Some(TextDecorationStyle::Dotted),
+        TDS::Dashed => Some(TextDecorationStyle::Dashed),
+        TDS::Wavy => Some(TextDecorationStyle::Wavy),
+        _ => None,
     }
 }
 
@@ -1941,5 +1966,127 @@ mod tests {
             container_node.blend_mode(),
             LayerBlendMode::Blend(BlendMode::Screen)
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Text decoration (color, style) tests
+    // -----------------------------------------------------------------------
+
+    /// text-decoration-color maps to TextDecorationRec.text_decoration_color.
+    #[test]
+    fn test_text_decoration_color() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="text-decoration: underline; text-decoration-color: #ef4444;">Red underline</div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let text_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::TextSpan(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a TextSpan node");
+
+        if let Node::TextSpan(ts) = text_node {
+            let dec = ts
+                .text_style
+                .text_decoration
+                .as_ref()
+                .expect("should have decoration");
+            assert_eq!(dec.text_decoration_line, TextDecorationLine::Underline);
+            let color = dec
+                .text_decoration_color
+                .expect("should have decoration color");
+            assert_eq!(color, CGColor::from_rgba(239, 68, 68, 255));
+        } else {
+            panic!("expected TextSpan");
+        }
+    }
+
+    /// text-decoration-style maps to TextDecorationRec.text_decoration_style.
+    #[test]
+    fn test_text_decoration_style() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="text-decoration: underline; text-decoration-style: wavy;">Wavy</div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let text_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::TextSpan(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a TextSpan node");
+
+        if let Node::TextSpan(ts) = text_node {
+            let dec = ts
+                .text_style
+                .text_decoration
+                .as_ref()
+                .expect("should have decoration");
+            assert_eq!(dec.text_decoration_style, Some(TextDecorationStyle::Wavy));
+        } else {
+            panic!("expected TextSpan");
+        }
+    }
+
+    /// Combined: text-decoration with color + style + line.
+    #[test]
+    fn test_text_decoration_combined() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body>
+  <div style="text-decoration: line-through; text-decoration-color: #3b82f6; text-decoration-style: dashed;">Combo</div>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let text_node = nodes
+            .iter()
+            .find_map(|id| {
+                let n = graph.get_node(id).ok()?;
+                if matches!(n, Node::TextSpan(_)) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .expect("should find a TextSpan node");
+
+        if let Node::TextSpan(ts) = text_node {
+            let dec = ts
+                .text_style
+                .text_decoration
+                .as_ref()
+                .expect("should have decoration");
+            assert_eq!(dec.text_decoration_line, TextDecorationLine::LineThrough);
+            assert_eq!(
+                dec.text_decoration_color,
+                Some(CGColor::from_rgba(59, 130, 246, 255))
+            );
+            assert_eq!(dec.text_decoration_style, Some(TextDecorationStyle::Dashed));
+            assert_eq!(
+                dec.text_decoration_thickness, None,
+                "thickness unavailable in servo mode"
+            );
+        } else {
+            panic!("expected TextSpan");
+        }
     }
 }

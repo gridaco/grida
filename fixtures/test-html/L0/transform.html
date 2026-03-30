@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Transform: 2D Transforms</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 48px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 48px;
+      }
+
+      .cell {
+        width: 120px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .box {
+        width: 80px;
+        height: 80px;
+        background: #6366f1;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #fff;
+      }
+
+      /* Individual transforms */
+      .translate { transform: translate(20px, 10px); }
+      .rotate { transform: rotate(45deg); }
+      .scale { transform: scale(1.5); }
+      .scale-xy { transform: scale(0.5, 1.5); }
+      .skew-x { transform: skewX(15deg); }
+      .skew-y { transform: skewY(15deg); }
+      .matrix { transform: matrix(0.866, 0.5, -0.5, 0.866, 10, 20); }
+
+      /* Combined transforms */
+      .combined { transform: translate(10px, 10px) rotate(30deg) scale(0.8); }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">none (identity)</div>
+        <div class="box">none</div>
+      </div>
+      <div class="cell">
+        <div class="label">translate(20px, 10px)</div>
+        <div class="box translate">translate</div>
+      </div>
+      <div class="cell">
+        <div class="label">rotate(45deg)</div>
+        <div class="box rotate">rotate</div>
+      </div>
+      <div class="cell">
+        <div class="label">scale(1.5)</div>
+        <div class="box scale">scale</div>
+      </div>
+      <div class="cell">
+        <div class="label">scale(0.5, 1.5)</div>
+        <div class="box scale-xy">scale-xy</div>
+      </div>
+      <div class="cell">
+        <div class="label">skewX(15deg)</div>
+        <div class="box skew-x">skewX</div>
+      </div>
+      <div class="cell">
+        <div class="label">skewY(15deg)</div>
+        <div class="box skew-y">skewY</div>
+      </div>
+      <div class="cell">
+        <div class="label">matrix(…)</div>
+        <div class="box matrix">matrix</div>
+      </div>
+      <div class="cell">
+        <div class="label">translate + rotate + scale</div>
+        <div class="box combined">combined</div>
+      </div>
+    </div>
+  </body>
+</html>

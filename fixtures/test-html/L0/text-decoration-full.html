@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Decoration (Color, Style, Thickness)</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        font-size: 18px;
+      }
+
+      /* decoration-color */
+      .color-red {
+        text-decoration: underline;
+        text-decoration-color: #ef4444;
+      }
+      .color-blue {
+        text-decoration: underline;
+        text-decoration-color: #3b82f6;
+      }
+      .color-green {
+        text-decoration: line-through;
+        text-decoration-color: #22c55e;
+      }
+      .color-rgba {
+        text-decoration: underline;
+        text-decoration-color: rgba(99, 102, 241, 0.5);
+      }
+
+      /* decoration-style */
+      .style-solid {
+        text-decoration: underline;
+        text-decoration-style: solid;
+      }
+      .style-double {
+        text-decoration: underline;
+        text-decoration-style: double;
+      }
+      .style-dotted {
+        text-decoration: underline;
+        text-decoration-style: dotted;
+      }
+      .style-dashed {
+        text-decoration: underline;
+        text-decoration-style: dashed;
+      }
+      .style-wavy {
+        text-decoration: underline;
+        text-decoration-style: wavy;
+      }
+
+      /* combined: color + style */
+      .combined {
+        text-decoration: underline;
+        text-decoration-color: #f59e0b;
+        text-decoration-style: wavy;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <!-- decoration-color -->
+      <div>
+        <div class="label">text-decoration-color: red</div>
+        <div class="color-red">Red underline</div>
+      </div>
+      <div>
+        <div class="label">text-decoration-color: blue</div>
+        <div class="color-blue">Blue underline</div>
+      </div>
+      <div>
+        <div class="label">text-decoration-color: green (line-through)</div>
+        <div class="color-green">Green line-through</div>
+      </div>
+      <div>
+        <div class="label">text-decoration-color: rgba (semi-transparent)</div>
+        <div class="color-rgba">Semi-transparent underline</div>
+      </div>
+
+      <!-- decoration-style -->
+      <div>
+        <div class="label">text-decoration-style: solid</div>
+        <div class="style-solid">Solid underline</div>
+      </div>
+      <div>
+        <div class="label">text-decoration-style: double</div>
+        <div class="style-double">Double underline</div>
+      </div>
+      <div>
+        <div class="label">text-decoration-style: dotted</div>
+        <div class="style-dotted">Dotted underline</div>
+      </div>
+      <div>
+        <div class="label">text-decoration-style: dashed</div>
+        <div class="style-dashed">Dashed underline</div>
+      </div>
+      <div>
+        <div class="label">text-decoration-style: wavy</div>
+        <div class="style-wavy">Wavy underline</div>
+      </div>
+
+      <!-- combined -->
+      <div>
+        <div class="label">color + style combined (amber wavy)</div>
+        <div class="combined">Combined decoration</div>
+      </div>
+    </div>
+  </body>
+</html>
