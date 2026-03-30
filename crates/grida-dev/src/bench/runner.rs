@@ -997,6 +997,319 @@ fn run_pan_with_settle_pass(
     )
 }
 
+/// Run a zoom pass that interleaves settle (stable) frames at a fixed interval,
+/// simulating what happens in real usage: zoom → pause → settle fires → zoom again.
+///
+/// This is the zoom equivalent of `run_pan_with_settle_pass`. It captures:
+/// - The expensive stable frame cost (full-quality redraw + cache invalidation)
+/// - The cache-cold first frame after settle (zoom cache was nuked)
+/// - The overall frame time distribution including settle spikes
+///
+/// `settle_interval` = number of zoom frames between each settle frame.
+/// settle_interval=12 matches the native viewer's 12-tick countdown at 240Hz (~50ms).
+fn run_zoom_with_settle_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    mut overlay: Option<OverlayBenchState>,
+    frames: u32,
+    step: f32,
+    z_min: f32,
+    z_max: f32,
+    settle_interval: u32,
+) -> PassStats {
+    let start_z = (z_min + z_max) / 2.0;
+    renderer.camera.set_zoom(start_z);
+    renderer.queue_stable();
+    let _ = renderer.flush();
+
+    let wall_start = Instant::now();
+    let mut frame_times =
+        Vec::with_capacity(frames as usize + frames as usize / settle_interval as usize);
+    let mut queue_us_acc = Vec::new();
+    let mut draw_us_acc = Vec::new();
+    let mut mid_flush_us_acc = Vec::new();
+    let mut compositor_us_acc = Vec::new();
+    let mut flush_us_acc = Vec::new();
+    let mut settle_times = Vec::new();
+
+    let mut z = start_z;
+    let mut zdir: i32 = 1;
+    let mut since_settle = 0u32;
+
+    for i in 0..frames {
+        let next_z = z + zdir as f32 * step;
+        if next_z > z_max {
+            zdir = -1;
+            z = z_max;
+        } else if next_z < z_min {
+            zdir = 1;
+            z = z_min;
+        } else {
+            z = next_z;
+        }
+        renderer.camera.set_zoom(z);
+
+        // Interaction frame (unstable)
+        if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, false, overlay.as_mut()) {
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+        }
+
+        since_settle += 1;
+
+        // Insert settle frame at interval (simulates native viewer countdown)
+        if since_settle >= settle_interval && i < frames - 1 {
+            since_settle = 0;
+            if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, true, overlay.as_mut()) {
+                settle_times.push(total);
+                // Include in overall stats — this IS a real frame the user sees
+                frame_times.push(total);
+                queue_us_acc.push(q);
+                draw_us_acc.push(d);
+                mid_flush_us_acc.push(mf);
+                compositor_us_acc.push(c);
+                flush_us_acc.push(f);
+            }
+        }
+    }
+
+    let wall = wall_start.elapsed();
+    let avg_settle = if settle_times.is_empty() {
+        0
+    } else {
+        settle_times.iter().sum::<u64>() / settle_times.len() as u64
+    };
+
+    compute_pass_stats(
+        &frame_times,
+        &queue_us_acc,
+        &draw_us_acc,
+        &mid_flush_us_acc,
+        &compositor_us_acc,
+        &flush_us_acc,
+        wall,
+        avg_settle,
+    )
+}
+
+/// Real-time FrameLoop zoom pass.
+///
+/// Reproduces **exactly** what happens in `Application::frame()` during
+/// zooming — same FrameLoop, same apply_changes/build_plan/flush_with_plan
+/// path, same GPU backend, with real `thread::sleep()` between ticks so
+/// the GPU pipeline sees realistic idle gaps.
+///
+/// This is the zoom equivalent of `run_frameloop_pan_pass`. It captures
+/// the actual user-facing bottleneck: stable frames interrupting zoom
+/// interactions. The zoom cache blit fast path, compositor re-rasterization,
+/// and GPU flush stalls are all exercised on the real GPU backend.
+///
+/// # How it works
+///
+/// Runs a 60fps RAF loop (real 16ms sleeps). Zoom events inject camera
+/// zoom changes at `event_interval_ms` intervals. `FrameLoop` decides
+/// whether each tick produces a frame and at what quality. Stable frames
+/// nuke the zoom image cache, forcing the next unstable frame into a full
+/// draw — this is the spike users feel as "3 FPS during zoom".
+fn run_frameloop_zoom_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    event_interval_ms: f64,
+    step: f32,
+    z_min: f32,
+    z_max: f32,
+    duration_ms: f64,
+) -> PassStats {
+    let raf_interval_us: u64 = 16_000; // 60fps host cadence
+    let t_origin = Instant::now();
+
+    let mut frame_loop = FrameLoop::new();
+
+    let mut frame_times = Vec::new();
+    let mut queue_us_acc = Vec::new();
+    let mut draw_us_acc = Vec::new();
+    let mut mid_flush_us_acc = Vec::new();
+    let mut compositor_us_acc = Vec::new();
+    let mut flush_us_acc = Vec::new();
+    let mut stable_count = 0u32;
+    let mut unstable_count = 0u32;
+
+    let mut next_event_ms = 0.0f64;
+    let mut zoom_events_fired = 0u32;
+    let mut z = (z_min + z_max) / 2.0;
+    let mut zdir: i32 = 1;
+
+    loop {
+        let now_ms = t_origin.elapsed().as_secs_f64() * 1000.0;
+        if now_ms >= duration_ms {
+            break;
+        }
+
+        // --- Inject zoom event if due ---
+        if now_ms >= next_event_ms {
+            let next_z = z + zdir as f32 * step;
+            if next_z > z_max {
+                zdir = -1;
+                z = z_max;
+            } else if next_z < z_min {
+                zdir = 1;
+                z = z_min;
+            } else {
+                z = next_z;
+            }
+            renderer.camera.set_zoom(z);
+            frame_loop.invalidate(now_ms);
+            next_event_ms += event_interval_ms;
+            zoom_events_fired += 1;
+        }
+
+        // --- Application::frame() equivalent ---
+        if let Some(quality) = frame_loop.poll(now_ms) {
+            let camera_change = renderer.camera.change_kind();
+            let stable = quality == FrameQuality::Stable || !camera_change.any_changed();
+
+            // apply_changes (central invalidation dispatch)
+            renderer.apply_changes(camera_change, stable);
+
+            // warm camera cache
+            renderer.camera.warm_cache();
+
+            // build frame plan
+            let rect = renderer.camera.rect();
+            let zoom = renderer.camera.get_zoom();
+            let plan = renderer.build_frame_plan(rect, zoom, stable, camera_change);
+
+            // consume camera change
+            renderer.camera.consume_change();
+
+            // flush (draw + GPU submit) — MEASURED
+            let t0 = Instant::now();
+            let stats_opt = renderer.flush_with_plan(plan);
+            let wall_time = t0.elapsed().as_micros() as u64;
+
+            // complete frame
+            frame_loop.complete(quality);
+
+            if quality == FrameQuality::Stable {
+                stable_count += 1;
+            } else {
+                unstable_count += 1;
+            }
+
+            if let Some(stats) = stats_opt {
+                frame_times.push(wall_time);
+                queue_us_acc.push(0);
+                draw_us_acc.push(stats.draw.painter_duration.as_micros() as u64);
+                mid_flush_us_acc.push(stats.mid_flush_duration.as_micros() as u64);
+                compositor_us_acc.push(stats.compositor_duration.as_micros() as u64);
+                flush_us_acc.push(stats.flush_duration.as_micros() as u64);
+            }
+        }
+
+        // --- Real sleep to next RAF tick ---
+        let elapsed_us = t_origin.elapsed().as_micros() as u64;
+        let next_tick_us = (elapsed_us / raf_interval_us + 1) * raf_interval_us;
+        let sleep_us = next_tick_us.saturating_sub(t_origin.elapsed().as_micros() as u64);
+        if sleep_us > 500 {
+            std::thread::sleep(std::time::Duration::from_micros(sleep_us));
+        }
+    }
+
+    let wall = t_origin.elapsed();
+
+    eprintln!(
+        "    [frameloop-zoom] events every {event_interval_ms:.0}ms | \
+         {zoom_events_fired} events | \
+         {} frames ({unstable_count} unstable, {stable_count} stable) | \
+         wall: {:.0}ms",
+        frame_times.len(),
+        wall.as_millis(),
+    );
+
+    compute_pass_stats(
+        &frame_times,
+        &queue_us_acc,
+        &draw_us_acc,
+        &mid_flush_us_acc,
+        &compositor_us_acc,
+        &flush_us_acc,
+        wall,
+        0, // settle is implicit — stable frames are in frame_times
+    )
+}
+
+/// Run a zoom pass where EVERY frame is forced stable (stable=true).
+///
+/// This reproduces the bug in `Application::redraw()` which passes
+/// `apply_changes(camera_change, true)` on every frame — even during
+/// active zoom interaction. The result:
+/// - Zoom image cache blit fast path is never used (gated on `!plan.stable`)
+/// - Zoom cache is nuked every frame (`invalidate_zoom` fires when stable + camera changed)
+/// - Every frame does a full draw (R-tree query + sort + paint all nodes)
+///
+/// Compare against `run_zoom_pass_at` (which uses stable=false) to see the
+/// performance impact of the bug.
+fn run_zoom_pass_forced_stable(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    step: f32,
+    z_min: f32,
+    z_max: f32,
+    mut overlay: Option<OverlayBenchState>,
+) -> PassStats {
+    let start_z = (z_min + z_max) / 2.0;
+    renderer.camera.set_zoom(start_z);
+    renderer.queue_stable();
+    let _ = renderer.flush();
+
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(frames as usize);
+    let mut queue_us_acc = Vec::with_capacity(frames as usize);
+    let mut draw_us_acc = Vec::with_capacity(frames as usize);
+    let mut mid_flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut compositor_us_acc = Vec::with_capacity(frames as usize);
+    let mut flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut z = start_z;
+    let mut zdir: i32 = 1;
+
+    for _ in 0..frames {
+        let next_z = z + zdir as f32 * step;
+        if next_z > z_max {
+            zdir = -1;
+            z = z_max;
+        } else if next_z < z_min {
+            zdir = 1;
+            z = z_min;
+        } else {
+            z = next_z;
+        }
+        renderer.camera.set_zoom(z);
+        // BUG REPRODUCTION: always pass stable=true, same as redraw() does
+        if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, true, overlay.as_mut()) {
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+        }
+    }
+    let wall = wall_start.elapsed();
+
+    compute_pass_stats(
+        &frame_times,
+        &queue_us_acc,
+        &draw_us_acc,
+        &mid_flush_us_acc,
+        &compositor_us_acc,
+        &flush_us_acc,
+        wall,
+        0,
+    )
+}
+
 /// Diagnostic: pan with settle frames interleaved, printing per-frame timing.
 /// Shows the settle cost and whether the cache recapture works (the frame
 /// AFTER settle should be fast if the cache was recaptured).
@@ -1427,6 +1740,147 @@ fn run_scenarios(
         });
     }
 
+    // Forced-stable zoom scenarios: reproduce the redraw() bug where every frame
+    // passes stable=true, defeating the zoom cache blit fast path.
+    // Compare these against the regular zoom_* scenarios to see the impact.
+    struct ForcedStableZoomScenario {
+        name: &'static str,
+        step: f32,
+        z_min: f32,
+        z_max: f32,
+    }
+
+    let fs_lo = (fit_zoom * 0.5).max(0.01);
+    let fs_hi = fit_zoom * 2.0;
+    let fs_zoomed_in = (fit_zoom * 4.0).min(10.0);
+
+    let forced_stable_scenarios = vec![
+        ForcedStableZoomScenario {
+            name: "BUG_zoom_stable_slow_fit",
+            step: 0.005,
+            z_min: fs_lo,
+            z_max: fs_hi,
+        },
+        ForcedStableZoomScenario {
+            name: "BUG_zoom_stable_fast_fit",
+            step: 0.05,
+            z_min: fs_lo,
+            z_max: fs_hi,
+        },
+        ForcedStableZoomScenario {
+            name: "BUG_zoom_stable_slow_high",
+            step: 0.01,
+            z_min: fs_zoomed_in * 0.5,
+            z_max: fs_zoomed_in,
+        },
+        ForcedStableZoomScenario {
+            name: "BUG_zoom_stable_fast_high",
+            step: 0.1,
+            z_min: fs_zoomed_in * 0.5,
+            z_max: fs_zoomed_in,
+        },
+    ];
+
+    for fss in &forced_stable_scenarios {
+        renderer.camera.set_zoom((fss.z_min + fss.z_max) / 2.0);
+        renderer.queue_stable();
+        let _ = renderer.flush();
+
+        let stats =
+            run_zoom_pass_forced_stable(renderer, frames, fss.step, fss.z_min, fss.z_max, ov());
+        results.push(ScenarioResult {
+            name: fss.name.to_string(),
+            kind: "zoom_forced_stable".to_string(),
+            params: ScenarioParams {
+                speed: Some(fss.step),
+                zoom: None,
+                zoom_min: Some(fss.z_min),
+                zoom_max: Some(fss.z_max),
+            },
+            stats,
+        });
+    }
+
+    // Settle-interleaved zoom scenarios: simulate native viewer's settle countdown
+    // during zoom interactions. This is the zoom equivalent of the pan settle
+    // scenarios — the key missing piece that captures the real UX bottleneck.
+    //
+    // settle_interval=12 matches the native viewer's 12-tick countdown at 240Hz (~50ms).
+    let szs_zoomed_in = (fit_zoom * 4.0).min(10.0);
+    let szs_lo = (fit_zoom * 0.5).max(0.01);
+    let szs_hi = fit_zoom * 2.0;
+
+    struct SettleZoomScenario {
+        name: &'static str,
+        step: f32,
+        z_min: f32,
+        z_max: f32,
+        settle_interval: u32,
+    }
+
+    let settle_zoom_scenarios = vec![
+        SettleZoomScenario {
+            name: "zoom_settle_slow_fit",
+            step: 0.005,
+            z_min: szs_lo,
+            z_max: szs_hi,
+            settle_interval: 12,
+        },
+        SettleZoomScenario {
+            name: "zoom_settle_fast_fit",
+            step: 0.05,
+            z_min: szs_lo,
+            z_max: szs_hi,
+            settle_interval: 12,
+        },
+        SettleZoomScenario {
+            name: "zoom_settle_slow_high",
+            step: 0.01,
+            z_min: szs_zoomed_in * 0.5,
+            z_max: szs_zoomed_in,
+            settle_interval: 12,
+        },
+        SettleZoomScenario {
+            name: "zoom_settle_fast_high",
+            step: 0.1,
+            z_min: szs_zoomed_in * 0.5,
+            z_max: szs_zoomed_in,
+            settle_interval: 12,
+        },
+    ];
+
+    for szs in &settle_zoom_scenarios {
+        renderer.camera.set_zoom((szs.z_min + szs.z_max) / 2.0);
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        for _ in 0..5 {
+            renderer.camera.translate(1.0, 0.0);
+            renderer.queue_unstable();
+            let _ = renderer.flush();
+        }
+
+        let stats = run_zoom_with_settle_pass(
+            renderer,
+            ov(),
+            frames,
+            szs.step,
+            szs.z_min,
+            szs.z_max,
+            szs.settle_interval,
+        );
+        results.push(ScenarioResult {
+            name: szs.name.to_string(),
+            kind: "zoom_with_settle".to_string(),
+            params: ScenarioParams {
+                speed: Some(szs.step),
+                zoom: None,
+                zoom_min: Some(szs.z_min),
+                zoom_max: Some(szs.z_max),
+            },
+            stats,
+        });
+    }
+
     // Realtime event loop simulation scenarios.
     // These use real sleep() and simulate the native viewer's 240Hz tick
     // thread + settle countdown, producing timings that match actual UX.
@@ -1591,6 +2045,102 @@ fn run_scenarios(
                 zoom: Some(fl_s.zoom),
                 zoom_min: None,
                 zoom_max: None,
+            },
+            stats,
+        });
+    }
+
+    // FrameLoop-based zoom scenarios: the real FrameLoop decision path for zoom.
+    // Unlike the plain zoom scenarios, these go through FrameLoop.poll() which
+    // decides Stable vs Unstable based on adaptive delay. This captures:
+    // - Zoom image cache hit rate (GPU-only: unstable zoom = cache blit)
+    // - Stable frame intrusion frequency (the settle frame that nukes zoom cache)
+    // - Cache-cold first frame cost after settle (the "3 FPS" spike)
+    // - Compositor re-rasterization budget impact
+    let flz_lo = (fit_zoom * 0.5).max(0.01);
+    let flz_hi = fit_zoom * 2.0;
+
+    struct FrameLoopZoomScenario {
+        name: &'static str,
+        event_interval_ms: f64,
+        step: f32,
+        z_min: f32,
+        z_max: f32,
+    }
+
+    let frameloop_zoom_scenarios = vec![
+        // Continuous fast pinch — baseline, no stable frames should fire
+        FrameLoopZoomScenario {
+            name: "flz_16ms",
+            event_interval_ms: 16.0,
+            step: 0.01,
+            z_min: flz_lo,
+            z_max: flz_hi,
+        },
+        // Moderate pinch — gaps start approaching old 50ms debounce
+        FrameLoopZoomScenario {
+            name: "flz_50ms",
+            event_interval_ms: 50.0,
+            step: 0.02,
+            z_min: flz_lo,
+            z_max: flz_hi,
+        },
+        // Slow pinch — exceeds old 50ms debounce, adaptive should extend
+        FrameLoopZoomScenario {
+            name: "flz_80ms",
+            event_interval_ms: 80.0,
+            step: 0.02,
+            z_min: flz_lo,
+            z_max: flz_hi,
+        },
+        // Slower — common slow trackpad pinch speed
+        FrameLoopZoomScenario {
+            name: "flz_120ms",
+            event_interval_ms: 120.0,
+            step: 0.03,
+            z_min: flz_lo,
+            z_max: flz_hi,
+        },
+        // Very slow — deliberate, careful zooming
+        FrameLoopZoomScenario {
+            name: "flz_200ms",
+            event_interval_ms: 200.0,
+            step: 0.05,
+            z_min: flz_lo,
+            z_max: flz_hi,
+        },
+        // Discrete scroll-wheel clicks — clearly separate events, stable fires between
+        FrameLoopZoomScenario {
+            name: "flz_500ms",
+            event_interval_ms: 500.0,
+            step: 0.1,
+            z_min: flz_lo,
+            z_max: flz_hi,
+        },
+    ];
+
+    for flz in &frameloop_zoom_scenarios {
+        renderer.camera.set_zoom((flz.z_min + flz.z_max) / 2.0);
+        renderer.queue_stable();
+        let _ = renderer.flush();
+        warmup(renderer);
+
+        let stats = run_frameloop_zoom_pass(
+            renderer,
+            flz.event_interval_ms,
+            flz.step,
+            flz.z_min,
+            flz.z_max,
+            2000.0, // 2 second session
+        );
+        results.push(ScenarioResult {
+            name: flz.name.to_string(),
+            kind: "frameloop_zoom".to_string(),
+            params: ScenarioParams {
+                speed: Some(flz.step),
+                zoom: None,
+                zoom_min: Some(flz.z_min),
+                zoom_max: Some(flz.z_max),
             },
             stats,
         });

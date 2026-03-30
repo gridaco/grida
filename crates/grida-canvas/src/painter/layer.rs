@@ -76,6 +76,25 @@ pub enum PainterPictureLayer {
     Vector(PainterPictureVectorLayer),
 }
 
+impl PainterPictureLayer {
+    /// Returns true when the layer has no effects that would produce different
+    /// `SkPicture` recordings for different `EffectQuality` levels.
+    ///
+    /// When effects are empty, the reduced-quality and full-quality render
+    /// variants produce identical `SkPicture` byte streams. The picture cache
+    /// can safely store such nodes under `variant_key = 0` (default store)
+    /// regardless of the active render policy, avoiding redundant re-recording
+    /// when switching between stable and unstable frames.
+    #[inline]
+    pub fn effects_empty(&self) -> bool {
+        match self {
+            PainterPictureLayer::Shape(s) => s.effects.is_empty(),
+            PainterPictureLayer::Text(t) => t.effects.is_empty(),
+            PainterPictureLayer::Vector(v) => v.effects.is_empty(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum PainterRenderCommand {
     Draw(PainterPictureLayer),

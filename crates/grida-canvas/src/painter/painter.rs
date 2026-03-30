@@ -149,6 +149,10 @@ pub struct Painter<'a> {
     cache_hits: Cell<usize>,
     policy: RenderPolicy,
     variant_key: u64,
+    /// Pre-computed: true when variant_key != 0 and the policy differs from
+    /// STANDARD only in effect-related fields. When true AND a node has empty
+    /// effects, the picture cache lookup uses key 0 instead of variant_key.
+    can_unify_variant: bool,
     /// Pre-extracted blit data for promoted (compositor-cached) nodes.
     /// When present, promoted nodes are blitted inline at their correct
     /// z-position instead of being skipped.
@@ -195,6 +199,7 @@ impl<'a> Painter<'a> {
         policy: RenderPolicy,
     ) -> Self {
         let variant_key = policy.variant_key();
+        let can_unify_variant = variant_key != 0 && policy.is_effect_only_variant();
         Self {
             canvas,
             fonts,
@@ -204,6 +209,7 @@ impl<'a> Painter<'a> {
             cache_hits: Cell::new(0),
             policy,
             variant_key,
+            can_unify_variant,
             promoted_blits: None,
             viewport_cull: None,
         }
@@ -2262,11 +2268,16 @@ impl<'a> Painter<'a> {
                             continue;
                         }
                     }
-                    // Prefer cached picture if available
+                    // Prefer cached picture if available.
+                    // Use variant key 0 for effects-free nodes — their pictures
+                    // are quality-invariant (see prefill_picture_cache_for_plan).
                     if let Some(scene_cache) = self.scene_cache {
-                        if let Some(pic) =
-                            scene_cache.get_node_picture_variant(layer.id(), self.variant_key)
-                        {
+                        let ek = if self.can_unify_variant && layer.effects_empty() {
+                            0
+                        } else {
+                            self.variant_key
+                        };
+                        if let Some(pic) = scene_cache.get_node_picture_variant(layer.id(), ek) {
                             self.canvas.draw_picture(pic, None, None);
                             self.cache_hits.set(self.cache_hits.get() + 1);
                             continue;
@@ -2590,8 +2601,12 @@ impl<'a> Painter<'a> {
 
         for entry in &list.layers {
             if let Some(scene_cache) = self.scene_cache {
-                if let Some(pic) = scene_cache.get_node_picture_variant(&entry.id, self.variant_key)
-                {
+                let ek = if self.can_unify_variant && entry.layer.effects_empty() {
+                    0
+                } else {
+                    self.variant_key
+                };
+                if let Some(pic) = scene_cache.get_node_picture_variant(&entry.id, ek) {
                     self.canvas.draw_picture(pic, None, None);
                     self.cache_hits.set(self.cache_hits.get() + 1);
                     continue;
