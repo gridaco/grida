@@ -1450,9 +1450,15 @@ impl UnknownTargetApplication {
         // flushing so the picture cache is invalidated and the new content
         // is re-recorded. In the frame() path this happens automatically;
         // in the redraw() path (native host) we must do it explicitly.
+        //
+        // Use unstable (stable=false) when a camera change is active — this
+        // preserves the zoom/pan image caches and allows the fast blit paths.
+        // Without this, every zoom frame would nuke the zoom cache and force
+        // a full O(N) draw, causing ~3 FPS on large scenes.
         {
             let camera_change = self.renderer.camera.change_kind();
-            self.renderer.apply_changes(camera_change, true);
+            let stable = !camera_change.any_changed();
+            self.renderer.apply_changes(camera_change, stable);
         }
 
         let __frame_start = std::time::Instant::now();

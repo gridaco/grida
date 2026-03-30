@@ -273,13 +273,11 @@ const COMPOSITOR_SURFACE_SIZE: i32 = 4096;
 // No threshold-based invalidation — the settle frame handles full-quality
 // rendering after the gesture ends.
 
-/// Maximum zoom ratio (cached_zoom / current_zoom or inverse) before the
-/// zoom image cache is invalidated. A ratio of 4.0 means we tolerate up to
-/// 4× scale in either direction before the scaled texture becomes too blurry
-/// or aliased. This is aggressive but acceptable during active interaction
-/// (unstable frames) — the stable frame after interaction ends always
-/// produces a full-quality render at the correct zoom level.
-const ZOOM_IMAGE_CACHE_MAX_RATIO: f32 = 4.0;
+// NOTE: The zoom image cache no longer has a hard eviction ratio.  During
+// active interaction, the cached texture is stretched at any zoom ratio —
+// blurry content is acceptable and avoids catastrophic full-draw spikes.
+// The settle frame always produces a full-quality render at the correct
+// zoom level.  See optimization.md item 21/22.
 
 /// Cached GPU snapshot of the composited frame for pan-only fast path.
 ///
@@ -309,8 +307,6 @@ struct PanImageCache {
 struct ZoomImageCache {
     /// GPU texture snapshot of the composited frame.
     image: Image,
-    /// Zoom level at capture time.
-    zoom: f32,
     /// Full view matrix at capture time (includes translation + zoom).
     view_matrix: math2::transform::AffineTransform,
 }
@@ -1100,11 +1096,18 @@ impl Renderer {
         }
 
         // --- Try zoom image cache fast path (no plan needed) ---
-        if !stable
-            && self.backend.is_gpu()
-            && self.zoom_image_cache.is_some()
-            && camera_change.zoom_changed()
-        {
+        //
+        // Use the zoom cache for:
+        // - Zoom-change frames (the primary use case during active zooming)
+        // - No-change frames when a zoom cache exists (zoom steps may
+        //   quantize to identical values at gesture bounds, producing a
+        //   no-change frame — blitting the existing cache is correct and
+        //   avoids a catastrophic full draw on large scenes)
+        //
+        // Exclude pan-only frames — pan has its own faster blit cache.
+        let use_zoom_cache = self.zoom_image_cache.is_some()
+            && (camera_change.zoom_changed() || camera_change == CameraChangeKind::None);
+        if !stable && self.backend.is_gpu() && use_zoom_cache {
             let zoom_cache_hit = self.try_zoom_cache_blit(
                 surface,
                 scene,
@@ -1243,20 +1246,14 @@ impl Renderer {
         //
         // Triggers on:
         // - Zoom-change frames (the primary use case during active zooming)
-        // - No-change frames during zoom gestures (zoom steps may quantize
-        //   to identical values at bounds, but we still have a valid cache)
+        // - No-change frames when a zoom cache exists (zoom steps may
+        //   quantize to identical values at gesture bounds, but we still
+        //   have a valid cache — blitting it avoids catastrophic full draws)
         //
-        // The image is rendered at a stale zoom level, so text and fine
-        // details are slightly blurry — acceptable during active interaction.
-        // The stable frame after interaction ends always does a full redraw.
-        // Don't use zoom cache for pan-only or no-change frames — pan has its
-        // own faster cache, and no-change frames (e.g. scene mutations without
-        // camera movement) must not replay a stale zoom snapshot.
-        if !plan.stable
-            && self.backend.is_gpu()
-            && self.zoom_image_cache.is_some()
-            && plan.camera_change.zoom_changed()
-        {
+        // Excludes pan-only frames — those use the dedicated pan cache.
+        let zoom_cache_usable = self.zoom_image_cache.is_some()
+            && (plan.camera_change.zoom_changed() || plan.camera_change == CameraChangeKind::None);
+        if !plan.stable && self.backend.is_gpu() && zoom_cache_usable {
             let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &plan);
             if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
                 return FrameFlushStats {
@@ -1351,7 +1348,6 @@ impl Renderer {
             // re-drawing.
             self.zoom_image_cache = Some(ZoomImageCache {
                 image,
-                zoom: self.camera.get_zoom(),
                 view_matrix: vm,
             });
         }
@@ -1398,16 +1394,17 @@ impl Renderer {
         _plan: &FramePlan,
     ) -> Option<(Duration, Duration)> {
         let cache = self.zoom_image_cache.as_ref()?;
-        let current_zoom = self.camera.get_zoom();
-        let zoom_ratio = current_zoom / cache.zoom;
 
-        // Only use cache if zoom ratio is within acceptable range.
-        if !((1.0 / ZOOM_IMAGE_CACHE_MAX_RATIO)..=ZOOM_IMAGE_CACHE_MAX_RATIO).contains(&zoom_ratio)
-        {
-            // Too extreme — invalidate and fall through.
-            self.zoom_image_cache = None;
-            return None;
-        }
+        // Never evict the zoom cache during active interaction — even at
+        // extreme ratios the scaled blit is O(1) and avoids catastrophic
+        // frame spikes (50-60 ms full draws on large scenes).  The settle
+        // frame always produces a full-quality render at the correct zoom.
+        //
+        // At ratios beyond ZOOM_IMAGE_CACHE_SOFT_RATIO the stretched
+        // texture is visibly blurry, but this is acceptable during fast
+        // interaction.  Chromium's compositor uses the same strategy:
+        // stale tiles are stretched during pinch-zoom and re-rasterized
+        // asynchronously after the gesture ends.
 
         let inv_cached = cache.view_matrix.inverse()?;
         let cur_vm = self.camera.view_matrix();
@@ -1614,12 +1611,14 @@ impl Renderer {
         let can_defer = !stable
             && self.backend.is_gpu()
             && (
-                // No content or camera change — overlay-only (marquee, hover)
-                (!camera_change.any_changed() && self.pan_image_cache.is_some())
-                // Pan cache will likely hit
-                || (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
-                // Zoom cache will likely hit
+                // Pan cache will likely hit (pan-only or overlay-only with pan cache)
+                (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
+                // Zoom cache will likely hit (zoom change or no-change with zoom cache)
                 || (camera_change.zoom_changed() && self.zoom_image_cache.is_some())
+                // No-change: prefer zoom cache (covers mid-zoom zero-delta frames),
+                // fall back to pan cache (covers overlay-only marquee/hover frames)
+                || (camera_change == CameraChangeKind::None
+                    && (self.zoom_image_cache.is_some() || self.pan_image_cache.is_some()))
             );
 
         if can_defer {
