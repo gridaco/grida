@@ -31,6 +31,12 @@ pub struct SurfaceOverlayConfig {
     pub show_size_meter: bool,
     /// Show type labels above root frames and selected nodes.
     pub show_frame_titles: bool,
+    /// Show selection handles (resize knobs, rotation zones) and per-node
+    /// bounding rects on selected shapes. Defaults to `false`.
+    ///
+    /// Enabled by the native host (`grida-dev`). The web side keeps this
+    /// off because the JS editor renders its own overlay handles.
+    pub show_selection_handles: bool,
 }
 
 impl Default for SurfaceOverlayConfig {
@@ -40,6 +46,7 @@ impl Default for SurfaceOverlayConfig {
             text_baseline_decoration: false,
             show_size_meter: false,
             show_frame_titles: false,
+            show_selection_handles: false,
         }
     }
 }
@@ -76,11 +83,18 @@ impl SurfaceOverlay {
             }
         }
 
-        // Draw selection outlines
+        // Draw selection outlines.
+        //
+        // The selection highlight model is:
+        //   shape outline (the actual path) + axis-aligned bounding rect
+        //   + text baseline decoration (when enabled).
+        //
+        // This differs from hover which only shows the shape outline (or
+        // text baseline for text nodes).
         let sel_count = surface.selection.len();
         if sel_count >= 1 {
             for id in surface.selection.iter() {
-                // Selection: always draw bounding rect
+                // Draw the shape outline (same as hover but at full alpha).
                 Self::draw_node_outline(
                     canvas,
                     id,
@@ -91,6 +105,20 @@ impl SurfaceOverlay {
                     false,
                     fonts,
                 );
+                // Draw the axis-aligned bounding rect for each selected node.
+                // This gives the "declarative box" look that shows the layout
+                // bounds in addition to the actual shape path.
+                // Only drawn when selection handles are enabled (native).
+                if config.show_selection_handles {
+                    Self::draw_node_bounding_rect(
+                        canvas,
+                        id,
+                        &view_sk,
+                        cache,
+                        SELECTION_COLOR,
+                        1.5,
+                    );
+                }
                 // Selection: additionally draw text baseline decoration
                 if use_text_baseline {
                     Self::draw_text_baseline(canvas, id, &view_sk, cache, SELECTION_COLOR, fonts);
@@ -162,6 +190,47 @@ impl SurfaceOverlay {
         paint.set_anti_alias(true);
 
         canvas.draw_path(&path, &paint);
+    }
+
+    /// Draw the axis-aligned bounding rect for a single node in screen space.
+    ///
+    /// For shapes whose outline *is* their bounding rect (rectangles), this
+    /// effectively draws a second outline on top — visually identical, so
+    /// there's no double-stroke artifact. For non-rectangular shapes (ellipses,
+    /// polygons, paths) the bounding rect provides the "declarative box" frame
+    /// around the shape.
+    fn draw_node_bounding_rect(
+        canvas: &Canvas,
+        id: &crate::node::schema::NodeId,
+        view_sk: &Matrix,
+        cache: &SceneCache,
+        color: Color,
+        stroke_width: f32,
+    ) {
+        let world_bounds = match cache.geometry.get_world_bounds(id) {
+            Some(b) => b,
+            None => return,
+        };
+
+        let p1 = view_sk.map_point((world_bounds.x, world_bounds.y));
+        let p2 = view_sk.map_point((
+            world_bounds.x + world_bounds.width,
+            world_bounds.y + world_bounds.height,
+        ));
+        let screen_rect = skia_safe::Rect::from_ltrb(
+            p1.x.min(p2.x),
+            p1.y.min(p2.y),
+            p1.x.max(p2.x),
+            p1.y.max(p2.y),
+        );
+
+        let mut paint = Paint::default();
+        paint.set_color(color);
+        paint.set_style(PaintStyle::Stroke);
+        paint.set_stroke_width(stroke_width);
+        paint.set_anti_alias(true);
+
+        canvas.draw_rect(screen_rect, &paint);
     }
 
     /// Draw text baseline decoration for a node (no-op if not a text layer).

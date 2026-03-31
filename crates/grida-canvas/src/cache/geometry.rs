@@ -500,6 +500,11 @@ impl GeometryCache {
         }
     }
 
+    /// Access the full geometry entry for a node.
+    pub fn get_entry(&self, id: &NodeId) -> Option<&GeometryEntry> {
+        self.entries.get(id)
+    }
+
     pub fn get_transform(&self, id: &NodeId) -> Option<AffineTransform> {
         self.entries.get(id).map(|e| e.transform)
     }

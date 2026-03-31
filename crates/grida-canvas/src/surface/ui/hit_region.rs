@@ -1,4 +1,5 @@
 use crate::node::schema::NodeId;
+use crate::surface::cursor::{ResizeDirection, RotationCorner};
 use skia_safe::{Contains, Rect};
 
 /// Action to perform when an overlay hit region is activated.
@@ -6,6 +7,12 @@ use skia_safe::{Contains, Rect};
 pub enum OverlayAction {
     /// Select the given node (replaces current selection, or toggles with shift).
     SelectNode(NodeId),
+    /// Pointer is over a resize handle. The surface should show the
+    /// appropriate directional cursor but should **not** begin a gesture
+    /// — that will be added later.
+    ResizeHandle(ResizeDirection),
+    /// Pointer is over a rotation handle.
+    RotateHandle(RotationCorner),
 }
 
 /// A screen-space axis-aligned hit region for overlay UI elements.
@@ -79,15 +86,11 @@ mod tests {
 
         // Point in overlap: should hit node 2 (last pushed)
         let action = regions.hit_test([75.0, 75.0]).unwrap();
-        match action {
-            OverlayAction::SelectNode(id) => assert_eq!(*id, 2),
-        }
+        assert!(matches!(action, OverlayAction::SelectNode(2)));
 
         // Point only in bottom region
         let action = regions.hit_test([25.0, 25.0]).unwrap();
-        match action {
-            OverlayAction::SelectNode(id) => assert_eq!(*id, 1),
-        }
+        assert!(matches!(action, OverlayAction::SelectNode(1)));
 
         // Point outside all
         assert!(regions.hit_test([200.0, 200.0]).is_none());

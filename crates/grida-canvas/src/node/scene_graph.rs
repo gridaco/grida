@@ -798,6 +798,20 @@ impl SceneGraph {
         self.nodes.iter()
     }
 
+    /// Re-sync the compact `geo_data` entry for a node after its schema
+    /// data was mutated via [`get_node_mut`](Self::get_node_mut).
+    ///
+    /// Required because `geo_data` is extracted at insertion time and
+    /// becomes stale after in-place mutation. The geometry cache reads
+    /// from `geo_data` during rebuild, so skipping this produces wrong
+    /// bounds.
+    pub fn refresh_node_geo_data(&mut self, id: &NodeId) {
+        if let Some(node) = self.nodes.get(id) {
+            let geo = extract_geo_data(node);
+            self.geo_data.insert(*id, geo);
+        }
+    }
+
     /// Access the compact, schema-level geometry data map.
     ///
     /// This map is populated at construction time and contains only the fields

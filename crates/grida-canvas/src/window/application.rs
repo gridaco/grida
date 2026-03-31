@@ -1,8 +1,6 @@
 use crate::cg::color::CGColor;
 use crate::cg::types::{Paint, TextAlignVertical};
-use crate::devtools::{
-    fps_overlay, hit_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay,
-};
+use crate::devtools::{fps_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay};
 use crate::dummy;
 use crate::export::{export_node_as, ExportAs, Exported};
 use crate::io::io_grida::{self, JSONFlattenResult};
@@ -209,22 +207,20 @@ pub struct UnknownTargetApplication {
     pub(crate) state: super::state::AnySurfaceState,
     pub(crate) input: super::input::InputState,
     pub(crate) document_json: Option<Value>,
-    pub(crate) hit_test_result: Option<crate::node::schema::NodeId>,
-    pub(crate) hit_test_last: std::time::Instant,
-    pub(crate) hit_test_interval: std::time::Duration,
+
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) font_rx: mpsc::UnboundedReceiver<FontMessage>,
     pub(crate) last_frame_time: std::time::Instant,
     pub(crate) last_stats: Option<String>,
-    pub(crate) devtools_selection: Option<crate::node::schema::NodeId>,
+
     pub(crate) highlight_strokes: Vec<crate::node::schema::NodeId>,
     pub(crate) highlight_stroke_style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     pub(crate) devtools_rendering_show_fps: bool,
     pub(crate) devtools_rendering_show_tiles: bool,
     pub(crate) devtools_rendering_show_stats: bool,
-    pub(crate) devtools_rendering_show_hit_overlay: bool,
+
     pub(crate) devtools_rendering_show_ruler: bool,
     /// Unified frame lifecycle controller.
     frame_loop: FrameLoop,
@@ -356,9 +352,8 @@ impl ApplicationApi for UnknownTargetApplication {
                 return true;
             }
             ApplicationCommand::TryCopyAsPNG => {
-                if let Some(internal_id) = self.devtools_selection.as_ref() {
-                    let internal_id = internal_id.clone();
-                    // Convert internal ID to user ID for API call
+                // Export the first selected node as PNG.
+                if let Some(&internal_id) = self.surface.selection.as_slice().first() {
                     if let Some(user_id) = self.internal_id_to_user(internal_id) {
                         let exported = self.export_node_as(&user_id, ExportAs::png());
                         if let Some(exported) = exported {
@@ -443,7 +438,7 @@ impl ApplicationApi for UnknownTargetApplication {
         self.devtools_rendering_show_fps = self.debug;
         self.devtools_rendering_show_tiles = self.debug;
         self.devtools_rendering_show_stats = self.debug;
-        self.devtools_rendering_show_hit_overlay = self.debug;
+
         self.devtools_rendering_show_ruler = self.debug;
     }
 
@@ -657,8 +652,8 @@ impl ApplicationApi for UnknownTargetApplication {
         self.devtools_rendering_show_stats = show;
     }
 
-    fn devtools_rendering_set_show_hit_testing(&mut self, show: bool) {
-        self.devtools_rendering_show_hit_overlay = show;
+    fn devtools_rendering_set_show_hit_testing(&mut self, _show: bool) {
+        // Legacy hit overlay removed — surface overlay handles hover feedback.
     }
 
     fn devtools_rendering_set_show_ruler(&mut self, show: bool) {
@@ -810,14 +805,6 @@ impl UnknownTargetApplication {
         self.input.cursor
     }
 
-    pub fn perform_hit_test_host(&mut self) {
-        self.perform_hit_test();
-    }
-
-    pub fn capture_hit_test_selection(&mut self) {
-        self.devtools_selection = self.hit_test_result.clone();
-    }
-
     /// Dispatch a surface event (hover, select, gesture) and return what changed.
     ///
     /// The caller provides screen-space coordinates; this method handles the
@@ -826,8 +813,6 @@ impl UnknownTargetApplication {
         &mut self,
         event: crate::surface::SurfaceEvent,
     ) -> crate::surface::SurfaceResponse {
-        // Build hit tester and hierarchy from renderer fields without
-        // borrowing `self` as a whole.
         let (hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
             let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
             let r = self
@@ -842,15 +827,96 @@ impl UnknownTargetApplication {
             (ht, r)
         };
         drop(hit_tester);
+
         if response.needs_redraw {
             self.queue();
         }
         response
     }
 
+    // ── Query API ─────────────────────────────────────────────────────
+    //
+    // High-level read-only queries for the host / editor layer.
+    // These hide cache and hit-tester internals behind the UTA boundary.
+
+    /// Hit-test a canvas-space point against the scene content.
+    /// Returns the topmost node ID at that point, or `None`.
+    pub fn hit_test_point(&self, canvas_point: [f32; 2]) -> Option<crate::node::schema::NodeId> {
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            ht.hit_first(canvas_point)
+        } else {
+            None
+        }
+    }
+
+    /// Hit-test a canvas-space rectangle (marquee) against the scene.
+    /// Returns the topmost ancestors that intersect the rect.
+    pub fn hit_test_rect(&self, rect: &math2::rect::Rectangle) -> Vec<crate::node::schema::NodeId> {
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            ht.intersects_topmost(rect)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the world-space bounding rect for a single node.
+    pub fn get_node_bounds(
+        &self,
+        id: &crate::node::schema::NodeId,
+    ) -> Option<math2::rect::Rectangle> {
+        self.renderer.get_cache().geometry.get_world_bounds(id)
+    }
+
+    /// Get the union world-space bounding rect for a set of nodes.
+    /// Returns `None` if no nodes have geometry.
+    pub fn get_union_bounds(
+        &self,
+        ids: &[crate::node::schema::NodeId],
+    ) -> Option<math2::rect::Rectangle> {
+        let rects: Vec<_> = ids
+            .iter()
+            .filter_map(|id| self.renderer.get_cache().geometry.get_world_bounds(id))
+            .collect();
+        if rects.is_empty() {
+            None
+        } else {
+            Some(math2::rect::union(&rects))
+        }
+    }
+
+    /// Test whether a canvas-space point lies inside the union bounding
+    /// rect of the given node IDs.
+    pub fn point_in_node_bounds(
+        &self,
+        point: [f32; 2],
+        ids: &[crate::node::schema::NodeId],
+    ) -> bool {
+        if let Some(scene) = self.renderer.scene.as_ref() {
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            ht.point_in_selection_bounds(point, ids)
+        } else {
+            false
+        }
+    }
+
+    /// Get the camera's current view matrix (for screen ↔ canvas conversion).
+    pub fn view_matrix(&self) -> math2::transform::AffineTransform {
+        self.renderer.camera.view_matrix()
+    }
+
     /// Read-only access to the surface state.
     pub fn surface(&self) -> &crate::surface::SurfaceState {
         &self.surface
+    }
+
+    /// Mutable access to the surface state.
+    ///
+    /// Used by the host to configure flags like
+    /// [`readonly`](crate::surface::SurfaceState::readonly) at startup.
+    pub fn surface_mut(&mut self) -> &mut crate::surface::SurfaceState {
+        &mut self.surface
     }
 
     // ---- Surface convenience methods ----
@@ -998,22 +1064,18 @@ impl UnknownTargetApplication {
             state,
             input: super::input::InputState::default(),
             document_json: None,
-            hit_test_result: None,
-            hit_test_last: std::time::Instant::now(),
-            hit_test_interval: std::time::Duration::from_millis(0),
+
             #[cfg(not(target_arch = "wasm32"))]
             image_rx,
             #[cfg(not(target_arch = "wasm32"))]
             font_rx,
             last_frame_time: std::time::Instant::now(),
             last_stats: None,
-            devtools_selection: None,
             highlight_strokes: Vec::new(),
             highlight_stroke_style: None,
             devtools_rendering_show_fps: debug,
             devtools_rendering_show_tiles: debug,
             devtools_rendering_show_stats: debug,
-            devtools_rendering_show_hit_overlay: debug,
             devtools_rendering_show_ruler: debug,
             timer: TimerMgr::new(),
             frame_loop: FrameLoop::new(),
@@ -1372,24 +1434,6 @@ impl UnknownTargetApplication {
     }
 
     /// Hit test the current cursor position and store the result.
-    pub(crate) fn perform_hit_test(&mut self) {
-        if self.hit_test_interval != std::time::Duration::ZERO
-            && self.hit_test_last.elapsed() < self.hit_test_interval
-        {
-            return;
-        }
-        self.hit_test_last = std::time::Instant::now();
-        let camera = &self.renderer.camera;
-        let point = camera.screen_to_canvas_point(self.input.cursor);
-        // Get string ID from API, convert to internal ID for storage
-        let new_hit_result = self
-            .get_node_id_from_point(point)
-            .and_then(|user_id| self.user_id_to_internal(&user_id));
-        if self.hit_test_result != new_hit_result {
-            self.queue();
-        }
-        self.hit_test_result = new_hit_result;
-    }
 
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn resource_loaded(&mut self) {
@@ -1519,16 +1563,7 @@ impl UnknownTargetApplication {
                     stats_overlay::StatsOverlay::draw(&canvas, s, &self.clock);
                 }
             }
-            if self.devtools_rendering_show_hit_overlay {
-                hit_overlay::HitOverlay::draw(
-                    &canvas,
-                    self.hit_test_result.as_ref(),
-                    self.devtools_selection.as_ref(),
-                    &self.renderer.camera,
-                    self.renderer.get_cache(),
-                    &self.renderer.fonts,
-                );
-            }
+
             if !self.highlight_strokes.is_empty() {
                 stroke_overlay::StrokeOverlay::draw(
                     &canvas,
@@ -1617,11 +1652,10 @@ impl UnknownTargetApplication {
         self.last_stats = Some(s);
     }
 
-    /// Update the cursor position and run a debounced hit test.
+    /// Update the cursor position.
     #[allow(dead_code)]
     pub fn pointer_move(&mut self, x: f32, y: f32) {
         self.input.cursor = [x, y];
-        self.perform_hit_test();
     }
 
     // Timer convenience methods

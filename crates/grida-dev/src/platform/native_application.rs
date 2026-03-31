@@ -25,6 +25,28 @@ use winit::{
     window::Window,
 };
 
+/// Map a cg `CursorIcon` to a winit `CursorIcon`.
+fn map_cursor_icon(icon: cg::surface::CursorIcon) -> winit::window::CursorIcon {
+    use cg::surface::ResizeDirection;
+    match icon {
+        cg::surface::CursorIcon::Default => winit::window::CursorIcon::Default,
+        cg::surface::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
+        cg::surface::CursorIcon::Grab => winit::window::CursorIcon::Grab,
+        cg::surface::CursorIcon::Grabbing => winit::window::CursorIcon::Grabbing,
+        cg::surface::CursorIcon::Crosshair => winit::window::CursorIcon::Crosshair,
+        cg::surface::CursorIcon::Move => winit::window::CursorIcon::Move,
+        cg::surface::CursorIcon::Resize(dir) => match dir {
+            ResizeDirection::N | ResizeDirection::S => winit::window::CursorIcon::NsResize,
+            ResizeDirection::E | ResizeDirection::W => winit::window::CursorIcon::EwResize,
+            ResizeDirection::NW | ResizeDirection::SE => winit::window::CursorIcon::NwseResize,
+            ResizeDirection::NE | ResizeDirection::SW => winit::window::CursorIcon::NeswResize,
+        },
+        // Rotation uses a custom cursor in the web editor; for native dev
+        // we fall back to a crosshair which is the closest standard cursor.
+        cg::surface::CursorIcon::Rotate(_) => winit::window::CursorIcon::Alias,
+    }
+}
+
 /// Convert a winit KeyEvent to a SurfaceEvent::KeyDown.
 fn winit_key_to_surface_key_down(
     event: &KeyEvent,
@@ -175,6 +197,9 @@ pub struct NativeApplication {
     system_clipboard: Option<arboard::Clipboard>,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     fit_scene_on_load: bool,
+    /// Dev editor document. When `Some`, gesture interactions (translate,
+    /// resize) mutate this document and flush it to the renderer.
+    editor: Option<crate::editor::document::EditorDocument>,
     /// Set to `true` after `CloseRequested` to prevent event processing on
     /// a partially-torn-down application (the tick thread may still deliver
     /// events between `event_loop.exit()` and actual termination).
@@ -261,6 +286,8 @@ impl NativeApplication {
         uta.surface_overlay_config.text_baseline_decoration = true;
         uta.surface_overlay_config.show_size_meter = true;
         uta.surface_overlay_config.show_frame_titles = true;
+        uta.surface_overlay_config.show_selection_handles = true;
+        uta.surface_mut().readonly = false;
 
         let app = NativeApplication {
             app: uta,
@@ -271,6 +298,7 @@ impl NativeApplication {
             system_clipboard: arboard::Clipboard::new().ok(),
             file_drop_tx,
             fit_scene_on_load,
+            editor: None,
             exiting: false,
             settle_countdown: 0,
             scenes: Vec::new(),
@@ -406,23 +434,20 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 canvas_point,
                 screen_point,
             };
+            let gesture_before = self.app.surface().gesture;
             let response = self.app.handle_surface_event(surface_event);
+            if let Some(editor) = self.editor.as_mut() {
+                if editor.handle_gesture_delta(&mut self.app, &gesture_before) {
+                    self.window.request_redraw();
+                }
+            }
             if response.cursor_changed {
-                let cursor = match self.app.surface_cursor() {
-                    cg::surface::CursorIcon::Default => winit::window::CursorIcon::Default,
-                    cg::surface::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
-                    cg::surface::CursorIcon::Grab => winit::window::CursorIcon::Grab,
-                    cg::surface::CursorIcon::Grabbing => winit::window::CursorIcon::Grabbing,
-                    cg::surface::CursorIcon::Crosshair => winit::window::CursorIcon::Crosshair,
-                    cg::surface::CursorIcon::Move => winit::window::CursorIcon::Move,
-                };
+                let cursor = map_cursor_icon(self.app.surface_cursor());
                 self.window.set_cursor(cursor);
             }
             if response.needs_redraw {
                 self.window.request_redraw();
             }
-            // Keep legacy hit test updated for devtools overlay
-            self.app.perform_hit_test_host();
         }
 
         if let WindowEvent::MouseInput { state, button, .. } = &event {
@@ -463,11 +488,6 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 self.window.set_ime_allowed(true);
             } else if !is_editing && was_editing {
                 self.window.set_ime_allowed(false);
-            }
-
-            // Keep legacy selection for devtools
-            if *state == ElementState::Pressed && *button == MouseButton::Left {
-                self.app.capture_hit_test_selection();
             }
         }
 
@@ -636,6 +656,8 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                                 });
                             }
 
+                            self.editor =
+                                Some(crate::editor::document::EditorDocument::new(scene.clone()));
                             let renderer = self.app.renderer_mut();
                             renderer.load_scene(scene);
                             fit_camera_to_scene(renderer);
@@ -685,6 +707,8 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                                 first.name.clone()
                             };
 
+                            self.editor =
+                                Some(crate::editor::document::EditorDocument::new(first.clone()));
                             let renderer = self.app.renderer_mut();
                             renderer.load_scene(first);
                             if self.fit_scene_on_load {
@@ -722,6 +746,7 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             }
             HostEvent::LoadScene(scene) => {
                 {
+                    self.editor = Some(crate::editor::document::EditorDocument::new(scene.clone()));
                     let renderer = self.app.renderer_mut();
                     renderer.load_scene(scene);
                     if self.fit_scene_on_load {

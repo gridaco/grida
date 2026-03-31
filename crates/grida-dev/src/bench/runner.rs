@@ -36,6 +36,7 @@ impl OverlayBenchState {
                 show_frame_titles: true,
                 show_size_meter: false,
                 text_baseline_decoration: false,
+                show_selection_handles: false,
             },
             hit_regions: HitRegions::new(),
         }

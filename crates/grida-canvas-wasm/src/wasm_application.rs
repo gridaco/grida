@@ -389,6 +389,9 @@ pub unsafe extern "C" fn surface_get_cursor(app: *const UnknownTargetApplication
             cg::surface::CursorIcon::Grabbing => 3,
             cg::surface::CursorIcon::Crosshair => 4,
             cg::surface::CursorIcon::Move => 5,
+            // Resize/Rotate cursors are handled by the native editor surface.
+            // The web editor manages its own CSS cursors — map to default.
+            cg::surface::CursorIcon::Resize(_) | cg::surface::CursorIcon::Rotate(_) => 0,
         },
         None => 0,
     }
@@ -563,6 +566,8 @@ pub unsafe extern "C" fn set_surface_overlay_config(
         show_size_meter: bool,
         #[serde(default)]
         show_frame_titles: bool,
+        #[serde(default)]
+        show_selection_handles: bool,
     }
     fn default_dpr() -> f32 {
         1.0
@@ -574,6 +579,7 @@ pub unsafe extern "C" fn set_surface_overlay_config(
             text_baseline_decoration: cfg.text_baseline_decoration,
             show_size_meter: cfg.show_size_meter,
             show_frame_titles: cfg.show_frame_titles,
+            show_selection_handles: cfg.show_selection_handles,
         };
     }
 }

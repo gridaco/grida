@@ -6,6 +6,7 @@ use crate::node::schema::{Node, NodeId};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::font_repository::FontRepository;
 use crate::surface::state::SurfaceState;
+use crate::surface::ui::handles::{HandleHit, SelectionHandles};
 use crate::surface::ui::hit_region::{HitRegion, HitRegions, OverlayAction};
 use skia_safe::textlayout;
 use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Point, RRect, Rect};
@@ -168,6 +169,75 @@ impl SurfaceUI {
 
         if config.show_size_meter && !surface.selection.is_empty() {
             Self::draw_size_meter(canvas, surface, camera, cache, dpr);
+        }
+
+        // Selection handles (resize knobs + rotation zones).
+        // Only shown when enabled (native), there is a selection, and no
+        // active gesture.
+        if config.show_selection_handles
+            && !surface.selection.is_empty()
+            && !surface.gesture.is_active()
+        {
+            Self::draw_selection_handles(canvas, surface, camera, cache, hit_regions, dpr);
+        }
+    }
+
+    /// Compute the screen-space bounding rect for the current selection,
+    /// draw handles, and register their hit regions.
+    fn draw_selection_handles(
+        canvas: &Canvas,
+        surface: &SurfaceState,
+        camera: &Camera2D,
+        cache: &SceneCache,
+        hit_regions: &mut HitRegions,
+        dpr: f32,
+    ) {
+        // Compute union of all selected nodes' world bounds.
+        let rects: Vec<math2::rect::Rectangle> = surface
+            .selection
+            .iter()
+            .filter_map(|id| cache.geometry.get_world_bounds(id))
+            .collect();
+
+        if rects.is_empty() {
+            return;
+        }
+
+        let world_rect = math2::rect::union(&rects);
+        let view = camera.view_matrix();
+
+        // Transform world-space bounds to screen-space.
+        let tl = math2::vector2::transform([world_rect.x, world_rect.y], &view);
+        let br = math2::vector2::transform(
+            [
+                world_rect.x + world_rect.width,
+                world_rect.y + world_rect.height,
+            ],
+            &view,
+        );
+        let screen_rect = Rect::from_ltrb(
+            tl[0].min(br[0]),
+            tl[1].min(br[1]),
+            tl[0].max(br[0]),
+            tl[1].max(br[1]),
+        );
+
+        let handles = SelectionHandles::from_screen_rect(screen_rect, dpr);
+
+        // Draw visible parts (corner knobs).
+        handles.draw(canvas);
+
+        // Register hit regions for all handles. These are pushed *after*
+        // frame title regions so they win in the front-to-back hit test.
+        for hr in handles.resize.iter().chain(handles.rotation.iter()) {
+            let action = match hr.hit {
+                HandleHit::Resize(dir) => OverlayAction::ResizeHandle(dir),
+                HandleHit::Rotate(corner) => OverlayAction::RotateHandle(corner),
+            };
+            hit_regions.push(HitRegion {
+                screen_rect: hr.screen_rect,
+                action,
+            });
         }
     }
 
