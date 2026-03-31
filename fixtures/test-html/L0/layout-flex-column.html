@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: Flex Column</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .columns {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .demo {
+        width: 140px;
+        height: 240px;
+        background: #0f172a;
+        border-radius: 8px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .jc-start {
+        justify-content: flex-start;
+      }
+      .jc-center {
+        justify-content: center;
+      }
+      .jc-end {
+        justify-content: flex-end;
+      }
+      .jc-between {
+        justify-content: space-between;
+      }
+      .jc-around {
+        justify-content: space-around;
+      }
+      .jc-evenly {
+        justify-content: space-evenly;
+      }
+
+      .item {
+        background: #6366f1;
+        border-radius: 4px;
+        padding: 8px;
+        font-size: 12px;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="columns">
+      <div>
+        <div class="label">flex-start</div>
+        <div class="demo jc-start">
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <div class="item">C</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">center</div>
+        <div class="demo jc-center">
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <div class="item">C</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">flex-end</div>
+        <div class="demo jc-end">
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <div class="item">C</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">space-between</div>
+        <div class="demo jc-between">
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <div class="item">C</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">space-around</div>
+        <div class="demo jc-around">
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <div class="item">C</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">space-evenly</div>
+        <div class="demo jc-evenly">
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <div class="item">C</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

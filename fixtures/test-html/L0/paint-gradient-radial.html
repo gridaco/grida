@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Radial Gradient</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .rect {
+        width: 180px;
+        height: 180px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .simple {
+        background: radial-gradient(circle, #6366f1, #030712);
+      }
+      .multi-stop {
+        background: radial-gradient(
+          circle,
+          #f59e0b,
+          #ef4444 40%,
+          #6366f1 80%,
+          #030712
+        );
+      }
+      .stacked {
+        background-color: #1e293b;
+        background-image: radial-gradient(
+          circle,
+          rgba(99, 102, 241, 0.8),
+          transparent 70%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">simple (2 stops)</div>
+        <div class="rect simple">simple</div>
+      </div>
+      <div>
+        <div class="label">multi-stop (4 colors)</div>
+        <div class="rect multi-stop">multi-stop</div>
+      </div>
+      <div>
+        <div class="label">stacked on solid bg</div>
+        <div class="rect stacked">stacked</div>
+      </div>
+    </div>
+  </body>
+</html>

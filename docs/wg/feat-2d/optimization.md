@@ -1187,6 +1187,47 @@ expensive full redraws.
     - `runtime/scene.rs` — `apply_changes()` for `last_had_data_changes`
     - `window/application.rs` — `frame()` vs `redraw()` dual-path issue
 
+48. **Picture Cache Prefill Skip (Generation Tracking)** ✅ IMPLEMENTED
+
+    The `prefill_picture_cache_for_plan()` loop iterates ALL visible nodes
+    each frame to check if their `SkPicture` is cached, doing a HashMap
+    lookup per node. On cache-warm frames (the common case during view-only
+    pan/zoom), every lookup succeeds and no work is done — but the iteration
+    itself costs O(N) per frame.
+
+    **The optimization:** track a monotonically increasing `generation`
+    counter on `PictureCache` that increments on any mutation (insert,
+    invalidate). The prefill stores the generation, variant key, and layer
+    count after each successful pass. On the next frame, if all three
+    match, the entire loop is skipped in O(1).
+
+    For effect-free scenes (the common case for large design docs), the
+    variant key unification optimization stores all pictures under key=0
+    regardless of stable/unstable quality. The generation-based skip is
+    safe across stable/unstable transitions because the cache contents
+    are identical.
+
+    **Measured impact (Apple M2 Pro, GPU benchmark, 01-135k 135K nodes):**
+
+    | Scenario | Metric | Before | After | Delta |
+    | -------- | ------ | ------ | ----- | ----- |
+    | rt_pan_fast_fit | p50 frame | 111 µs | 76 µs | **-32%** |
+    | rt_pan_fast_fit | p95 frame | 263 µs | 153 µs | **-42%** |
+    | rt_pan_slow_fit | settle | 2,323 µs | 1,836 µs | **-21%** |
+    | pan_settle_slow_fit | avg | 87 µs | 59 µs | **-32%** |
+    | pan_settle_slow_fit | settle | 1,034 µs | 709 µs | **-31%** |
+
+    **Criterion (CPU raster, 2000-node scene, statistically rigorous):**
+
+    | Scene | Change | p-value |
+    | ----- | ------ | ------- |
+    | large_baseline/pan | **-14.0%** | < 0.01 |
+    | large_baseline/pan_zoomed_in | -5.4% | 0.02 |
+    | large_compositing/pan | -4.2% | 0.02 |
+
+    Implementation: `PictureCache.generation` in `cache/picture.rs`,
+    `Renderer.last_prefill_*` tracking in `runtime/scene.rs`.
+
 ---
 
 This list is designed to evolve the renderer from single-threaded mode to

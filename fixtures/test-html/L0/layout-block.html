@@ -1,66 +1,68 @@
 <!doctype html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="utf-8" />
-    <title>Layout – Block Flow</title>
+    <title>Layout: Block Flow</title>
     <style>
-        body {
-            font-family: "Inter", system-ui, sans-serif;
-            background: #030712;
-            color: #e2e8f0;
-            margin: 0;
-            padding: 32px;
-        }
-        .canvas {
-            max-width: 760px;
-            margin: 0 auto;
-        }
-        .block {
-            display: block;
-            padding: 16px;
-            border-radius: 10px;
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            background: rgba(15, 23, 42, 0.75);
-            margin-bottom: 16px;
-        }
-        .stack article {
-            margin-bottom: 12px;
-        }
-        .stack article:last-child {
-            margin-bottom: 0;
-        }
-        aside {
-            width: 320px;
-        }
-        footer {
-            background: rgba(59, 130, 246, 0.18);
-        }
-    </style>
-</head>
-<body>
-    <main class="canvas">
-        <header class="block">
-            <h1>Block Flow Layout</h1>
-            <p>Each region stacks vertically and spans the available inline size.</p>
-        </header>
-        <section class="block stack">
-            <article class="block">
-                <h2>Article A</h2>
-                <p>Demonstrates default block behavior within a block-level parent.</p>
-            </article>
-            <article class="block">
-                <h2>Article B</h2>
-                <p>Blocks consume full width, pushing the following sibling downward.</p>
-            </article>
-        </section>
-        <aside class="block">
-            <h3>Sidebar</h3>
-            <p>Marked up as <code>&lt;aside&gt;</code> but still participates in block stacking.</p>
-        </aside>
-        <footer class="block">
-            <small>Footer sticks to the end of the flow.</small>
-        </footer>
-    </main>
-</body>
-</html>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
 
+      .block {
+        background: #1e293b;
+        padding: 16px;
+        border-radius: 8px;
+      }
+
+      .block + .block {
+        /* spacing via parent padding, not margin */
+      }
+
+      .spacer {
+        padding-top: 12px;
+      }
+
+      .inner {
+        background: #334155;
+        padding: 12px;
+        border-radius: 4px;
+      }
+
+      .clipped {
+        background: #1e293b;
+        padding: 16px;
+        border-radius: 8px;
+        overflow: hidden;
+        height: 60px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="block">
+      <div class="inner">Block 1 with padding</div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="block">
+      <div class="inner">Block 2 — nested padding</div>
+      <div class="spacer"></div>
+      <div class="inner">Second child in block 2</div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="clipped">
+      <div class="inner">
+        This container has overflow: hidden and a fixed height. The content
+        below should be clipped and not visible in the rendered output.
+      </div>
+      <div class="spacer"></div>
+      <div class="inner">This text should be clipped.</div>
+    </div>
+  </body>
+</html>

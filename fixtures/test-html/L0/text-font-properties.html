@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Font Properties</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 4px;
+      }
+
+      .sections {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .row {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      /* font-size */
+      .fs-12 {
+        font-size: 12px;
+      }
+      .fs-24 {
+        font-size: 24px;
+      }
+      .fs-48 {
+        font-size: 48px;
+      }
+
+      /* font-weight */
+      .fw-400 {
+        font-weight: 400;
+      }
+      .fw-700 {
+        font-weight: 700;
+      }
+      .fw-900 {
+        font-weight: 900;
+      }
+
+      /* font-family */
+      .ff-sans {
+        font-family: sans-serif;
+      }
+      .ff-serif {
+        font-family: serif;
+      }
+      .ff-mono {
+        font-family: monospace;
+      }
+
+      /* font-style */
+      .italic {
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sections">
+      <div>
+        <div class="label">font-size</div>
+        <div class="row">
+          <div class="fs-12">12px</div>
+          <div class="fs-24">24px</div>
+          <div class="fs-48">48px</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">font-weight</div>
+        <div class="row">
+          <div class="fw-400">400 normal</div>
+          <div class="fw-700">700 bold</div>
+          <div class="fw-900">900 black</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">font-family</div>
+        <div class="row">
+          <div class="ff-sans">sans-serif</div>
+          <div class="ff-serif">serif</div>
+          <div class="ff-mono">monospace</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">font-style</div>
+        <div class="row">
+          <div>normal</div>
+          <div class="italic">italic</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

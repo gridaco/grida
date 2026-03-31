@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Text Shadow</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #94a3b8;
+        padding-bottom: 6px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .text {
+        font-size: 28px;
+        font-weight: 700;
+      }
+
+      .simple {
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
+      }
+      .colored {
+        text-shadow: 0 0 8px #6366f1;
+        color: #a5b4fc;
+      }
+      .multi {
+        text-shadow:
+          1px 1px 2px rgba(0, 0, 0, 0.5),
+          0 0 12px rgba(99, 102, 241, 0.4);
+      }
+      .hard {
+        text-shadow: 3px 3px 0px #ef4444;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">simple drop shadow</div>
+        <div class="text simple">Shadow</div>
+      </div>
+      <div>
+        <div class="label">colored glow</div>
+        <div class="text colored">Glow</div>
+      </div>
+      <div>
+        <div class="label">multiple shadows</div>
+        <div class="text multi">Multi</div>
+      </div>
+      <div>
+        <div class="label">hard shadow (no blur)</div>
+        <div class="text hard">Hard</div>
+      </div>
+    </div>
+  </body>
+</html>
