@@ -149,6 +149,21 @@ path = "examples/skia_bench/skia_bench_cache_image.rs"
 name = "skia_bench_cache_text"
 path = "examples/skia_bench/skia_bench_cache_text.rs"
 
+[[example]]
+name = "skia_bench_cost_model"
+path = "examples/skia_bench/skia_bench_cost_model.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_cache_blit"
+path = "examples/skia_bench/skia_bench_cache_blit.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_scene_scale"
+path = "examples/skia_bench/skia_bench_scene_scale.rs"
+required-features = ["native-gl-context"]
+
 # ── IO tools ─────────────────────────────────────────────────────
 [[example]]
 name = "tool_io_grida"
