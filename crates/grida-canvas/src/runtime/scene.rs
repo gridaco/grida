@@ -407,13 +407,12 @@ impl Renderer {
         // On 135K-node scenes at fit zoom, this eliminates ~800µs of HashMap
         // lookups on every cache-warm frame (the common case during view-only
         // pan/zoom interaction and settle frames).
-        let effective_key_for_tracking = if can_unify
-            && self.scene_cache.picture.variant_store_is_empty()
-        {
-            0
-        } else {
-            variant_key
-        };
+        let effective_key_for_tracking =
+            if can_unify && self.scene_cache.picture.variant_store_is_empty() {
+                0
+            } else {
+                variant_key
+            };
 
         let current_gen = self.scene_cache.picture.generation();
         let layer_count: usize = plan.regions.iter().map(|(_, idx)| idx.len()).sum();
@@ -474,8 +473,7 @@ impl Renderer {
         }
 
         // Update tracking state for future skip-prefill checks.
-        let effective_key_after = if can_unify
-            && self.scene_cache.picture.variant_store_is_empty()
+        let effective_key_after = if can_unify && self.scene_cache.picture.variant_store_is_empty()
         {
             0
         } else {
