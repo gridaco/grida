@@ -36,11 +36,12 @@ pub fn image_shader(
         (image.width() as f32, image.height() as f32),
         size,
     ));
-    // Use Skia's built-in mipmap support. The image stored in ImageRepository
-    // has a mipmap chain attached via `with_default_mipmaps()`. Skia evaluates
-    // the LOD at rasterization time based on the final canvas transform, so
-    // this works correctly with PictureCache playback at different zoom levels.
-    let sampling = SamplingOptions::new(FilterMode::Linear, MipmapMode::Nearest);
+    // Nearest-neighbor keeps every source texel crisp when the image is
+    // displayed larger than its natural size — essential for pixel art,
+    // checker patterns, QR codes, etc. Mipmaps are still used for
+    // downscaling (Skia selects LOD from the mipmap chain built by
+    // `with_default_mipmaps()` in ImageRepository).
+    let sampling = SamplingOptions::new(FilterMode::Nearest, MipmapMode::Nearest);
 
     // Extract repeat mode based on the fit variant
     let tile_modes = match &img.fit {

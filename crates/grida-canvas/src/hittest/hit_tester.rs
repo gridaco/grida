@@ -342,4 +342,46 @@ impl<'a> HitTester<'a> {
         }
         false
     }
+
+    /// Test whether a canvas-space point lies inside the union bounding
+    /// rect of the given node IDs.
+    ///
+    /// Returns `true` if at least one node has known bounds and the union
+    /// rect contains the point.  Returns `false` when `ids` is empty or
+    /// none of the IDs have geometry in the cache.
+    pub fn point_in_selection_bounds(&self, point: Vector2, ids: &[NodeId]) -> bool {
+        if ids.is_empty() {
+            return false;
+        }
+        let rects: Vec<Rectangle> = ids
+            .iter()
+            .filter_map(|id| self.cache.geometry.get_world_bounds(id))
+            .collect();
+        if rects.is_empty() {
+            return false;
+        }
+        let union = rect::union(&rects);
+        rect::contains_point(&union, point)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cache::scene::SceneCache;
+
+    #[test]
+    fn point_in_selection_bounds_empty_ids() {
+        let cache = SceneCache::new();
+        let ht = HitTester::new(&cache);
+        assert!(!ht.point_in_selection_bounds([50.0, 50.0], &[]));
+    }
+
+    #[test]
+    fn point_in_selection_bounds_no_geometry() {
+        // IDs exist but cache has no geometry for them.
+        let cache = SceneCache::new();
+        let ht = HitTester::new(&cache);
+        assert!(!ht.point_in_selection_bounds([50.0, 50.0], &[1, 2, 3]));
+    }
 }

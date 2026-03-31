@@ -423,12 +423,18 @@ impl EmscriptenApplication {
 
     /// Register an image with the renderer and return metadata.
     pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
-        self.base.renderer.add_image(data)
+        let result = self.base.renderer.add_image(data);
+        self.base.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+        result
     }
 
     /// Register image bytes under a caller-specified RID (res:// or system://).
     pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
-        self.base.renderer.add_image_with_rid(data, rid)
+        let result = self.base.renderer.add_image_with_rid(data, rid);
+        if result.is_some() {
+            self.base.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+        }
+        result
     }
 
     pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {

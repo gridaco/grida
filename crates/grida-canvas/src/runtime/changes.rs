@@ -57,6 +57,13 @@ impl ChangeFlags {
     /// Layout inputs changed (node resize, auto-layout property edit, etc.).
     pub const LAYOUT_DIRTY: Self = Self(1 << 7);
 
+    /// Reserved flag for incremental transform updates.
+    ///
+    /// Currently unused — the dev editor flushes full scenes via
+    /// `load_scene()` instead of incremental patching. Defined here to
+    /// reserve the bit for a future incremental property-tree path.
+    pub const NODE_TRANSFORM: Self = Self(1 << 8);
+
     // -- helpers --
 
     pub const fn is_empty(self) -> bool {
