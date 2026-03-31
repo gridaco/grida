@@ -57,8 +57,26 @@ pub fn apply(scene: &mut Scene, cmd: &MutationCommand) -> bool {
 }
 
 /// Whether a node type supports resize.
+///
+/// Returns `true` only for node types that `resize_node` can actually
+/// mutate. Group, BooleanOperation, Vector, Path, Polygon, and
+/// InitialContainer are excluded — they derive size from children or
+/// geometry, and resize_node no-ops for them.
 pub fn node_supports_resize(node: &Node) -> bool {
-    !matches!(node, Node::Vector(_))
+    matches!(
+        node,
+        Node::Rectangle(_)
+            | Node::Ellipse(_)
+            | Node::RegularPolygon(_)
+            | Node::RegularStarPolygon(_)
+            | Node::Line(_)
+            | Node::Image(_)
+            | Node::Error(_)
+            | Node::Container(_)
+            | Node::Tray(_)
+            | Node::TextSpan(_)
+            | Node::AttributedText(_)
+    )
 }
 
 // ── Node accessors ───────────────────────────────────────────────────────

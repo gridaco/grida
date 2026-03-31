@@ -227,6 +227,12 @@ impl SurfaceUI {
         // Draw visible parts (corner knobs).
         handles.draw(canvas);
 
+        // Only register hit regions when handles are visible. Hidden handles
+        // (selection too small) should not produce cursors or start gestures.
+        if !handles.visible {
+            return;
+        }
+
         // Register hit regions for all handles. These are pushed *after*
         // frame title regions so they win in the front-to-back hit test.
         for hr in handles.resize.iter().chain(handles.rotation.iter()) {

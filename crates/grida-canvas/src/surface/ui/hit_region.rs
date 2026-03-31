@@ -7,11 +7,12 @@ use skia_safe::{Contains, Rect};
 pub enum OverlayAction {
     /// Select the given node (replaces current selection, or toggles with shift).
     SelectNode(NodeId),
-    /// Pointer is over a resize handle. The surface should show the
-    /// appropriate directional cursor but should **not** begin a gesture
-    /// — that will be added later.
+    /// Pointer is over a resize handle. Shows the appropriate directional
+    /// cursor. In editing mode (`readonly = false`), pointer-down starts
+    /// a `SurfaceGesture::Resize`.
     ResizeHandle(ResizeDirection),
-    /// Pointer is over a rotation handle.
+    /// Pointer is over a rotation handle. In editing mode, pointer-down
+    /// starts a `SurfaceGesture::Rotate`.
     RotateHandle(RotationCorner),
 }
 

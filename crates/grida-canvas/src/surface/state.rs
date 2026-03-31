@@ -470,6 +470,11 @@ impl SurfaceState {
 
                     if click_count >= 2 {
                         response.double_clicked_node = Some(id);
+                        // Clear translate anchor — double-click enters text
+                        // edit, PointerUp may be swallowed by the text edit
+                        // handler. Without this, the stale anchor causes a
+                        // ghost translate on the next PointerMove.
+                        self.pending_pointer_down = None;
                     }
                 }
                 None => {
