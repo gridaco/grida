@@ -54,7 +54,7 @@ pub fn from_html_str(html: &str) -> Result<SceneGraph, String> {
 
     // 4. Flush stylist + resolve all styles
     driver.flush(document);
-    let styled_count = driver.style_document(document);
+    let _styled_count = driver.style_document(document);
     // 5. Build scene graph from styled DOM
     let mut builder = SceneBuilder::new();
     if let Some(root) = document.root_element() {
@@ -138,6 +138,36 @@ impl SceneBuilder {
             // Empty visual element → Rectangle
             self.emit_rectangle(style, parent);
         }
+    }
+
+    /// Wrap a node in a transparent container whose padding equals the CSS margin.
+    /// The wrapper inherits the `layout_child` role (grow, positioning) from the
+    /// original node so it occupies the correct slot in the parent's flex layout.
+    /// Returns the wrapper's NodeId — the caller should append content into it.
+    fn wrap_with_margin_padding(
+        &mut self,
+        margin: &CSSMargin,
+        layout_child: Option<LayoutChildStyle>,
+        parent: Parent,
+    ) -> NodeId {
+        let mut wrapper = self.factory.create_container_node();
+        wrapper.fills = Paints::default(); // transparent — no visual
+        wrapper.strokes = Default::default();
+        wrapper.stroke_width = StrokeWidth::default();
+        wrapper.layout_container.layout_mode = LayoutMode::Flex;
+        wrapper.layout_container.layout_direction = Axis::Vertical;
+        // Clear factory default 100×100 — wrapper should auto-size to content.
+        wrapper.layout_dimensions.layout_target_width = None;
+        wrapper.layout_dimensions.layout_target_height = None;
+        wrapper.layout_container.layout_padding = Some(EdgeInsets {
+            top: margin.top,
+            right: margin.right,
+            bottom: margin.bottom,
+            left: margin.left,
+        });
+        wrapper.layout_child = layout_child;
+        self.graph
+            .append_child(Node::Container(wrapper), parent)
     }
 
     fn emit_container(
@@ -275,7 +305,37 @@ impl SceneBuilder {
         // Flex child properties (for nested containers inside flex parents)
         node.layout_child = css_flex_child_to_cg(style);
 
-        self.graph.append_child(Node::Container(node), parent)
+        // Margin → tree surgery
+        // Fixed positive margins are absorbed into the container's own padding when
+        // the container has no visual properties (fills, borders) that would bleed
+        // into the margin zone. Otherwise, a separate wrapper is created.
+        let margin = css_margin_to_cg(style);
+        if !margin.is_zero() && !margin.has_any_auto() && !margin.has_any_negative() {
+            let has_visuals = !node.fills.is_empty() || !node.strokes.is_empty();
+            if has_visuals {
+                // Container has background/border — margin must stay outside.
+                // Wrap in a transparent container whose padding = margin.
+                let layout_child = node.layout_child.take();
+                let wrapper_id = self.wrap_with_margin_padding(&margin, layout_child, parent);
+                self.graph
+                    .append_child(Node::Container(node), Parent::NodeId(wrapper_id))
+            } else {
+                // No visual properties — safe to merge margin into padding.
+                // This avoids an extra wrapper node in the tree.
+                let existing = node.layout_container.layout_padding.unwrap_or(EdgeInsets::zero());
+                node.layout_container.layout_padding = Some(EdgeInsets {
+                    top: existing.top + margin.top,
+                    right: existing.right + margin.right,
+                    bottom: existing.bottom + margin.bottom,
+                    left: existing.left + margin.left,
+                });
+                self.graph.append_child(Node::Container(node), parent)
+            }
+        } else {
+            // TODO(margin): auto margins require SpacerNode siblings (not yet implemented).
+            // TODO(margin): negative margins require negative offset support (not planned).
+            self.graph.append_child(Node::Container(node), parent)
+        }
     }
 
     fn emit_text_span(&mut self, text: &str, style: &ComputedValues, parent: Parent) {
@@ -415,6 +475,10 @@ impl SceneBuilder {
             });
         }
 
+        // NOTE: No margin surgery for text spans. Text spans are emitted using
+        // the parent element's style (see build_element line ~126), which may carry
+        // the parent's margin. Applying margin here would double-wrap the text.
+        // Margin is handled at the container/rectangle level instead.
         self.graph.append_child(Node::TextSpan(node), parent);
     }
 
@@ -443,7 +507,17 @@ impl SceneBuilder {
         // Blend mode (mix-blend-mode)
         node.blend_mode = css_blend_mode_to_cg(style);
 
-        self.graph.append_child(Node::Rectangle(node), parent);
+        // Margin → tree surgery (same pattern as emit_container)
+        let margin = css_margin_to_cg(style);
+        if !margin.is_zero() && !margin.has_any_auto() && !margin.has_any_negative() {
+            let layout_child = node.layout_child.take();
+            let wrapper_id = self.wrap_with_margin_padding(&margin, layout_child, parent);
+            self.graph
+                .append_child(Node::Rectangle(node), Parent::NodeId(wrapper_id));
+        } else {
+            // TODO(margin): auto/negative margins not supported for rectangles.
+            self.graph.append_child(Node::Rectangle(node), parent);
+        }
     }
 }
 
@@ -519,6 +593,70 @@ fn css_padding_to_cg(style: &ComputedValues) -> CSSPadding {
         right: lp_to_px(&p.padding_right),
         bottom: lp_to_px(&p.padding_bottom),
         left: lp_to_px(&p.padding_left),
+    }
+}
+
+/// Parsed CSS margin with per-edge auto tracking.
+struct CSSMargin {
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+    top_auto: bool,
+    right_auto: bool,
+    bottom_auto: bool,
+    left_auto: bool,
+}
+
+impl CSSMargin {
+    fn is_zero(&self) -> bool {
+        !self.top_auto
+            && !self.right_auto
+            && !self.bottom_auto
+            && !self.left_auto
+            && self.top == 0.0
+            && self.right == 0.0
+            && self.bottom == 0.0
+            && self.left == 0.0
+    }
+
+    fn has_any_auto(&self) -> bool {
+        self.top_auto || self.right_auto || self.bottom_auto || self.left_auto
+    }
+
+    fn has_any_negative(&self) -> bool {
+        self.top < 0.0 || self.right < 0.0 || self.bottom < 0.0 || self.left < 0.0
+    }
+}
+
+fn css_margin_to_cg(style: &ComputedValues) -> CSSMargin {
+    // Stylo exposes margin fields as `computed::Margin` (GenericMargin<LengthPercentage>).
+    // Variants: Auto | LengthPercentage(lp) | AnchorSizeFunction (CSS anchoring, ignored).
+    fn extract(v: style::values::computed::Margin) -> (f32, bool) {
+        if v.is_auto() {
+            return (0.0, true);
+        }
+        match v {
+            style::values::computed::Margin::LengthPercentage(lp) => {
+                (lp.to_length().map(|l| l.px()).unwrap_or(0.0), false)
+            }
+            _ => (0.0, false),
+        }
+    }
+
+    let (top, top_auto) = extract(style.clone_margin_top());
+    let (right, right_auto) = extract(style.clone_margin_right());
+    let (bottom, bottom_auto) = extract(style.clone_margin_bottom());
+    let (left, left_auto) = extract(style.clone_margin_left());
+    CSSMargin {
+        top,
+        right,
+        bottom,
+        left,
+        top_auto,
+        right_auto,
+        bottom_auto,
+        left_auto,
     }
 }
 
@@ -2090,5 +2228,43 @@ mod tests {
         } else {
             panic!("expected TextSpan");
         }
+    }
+
+    /// h1 margin should merge into padding (no extra wrapper container).
+    #[test]
+    fn test_h1_margin_no_double_wrap() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body style="margin:0; padding:0;">
+  <h1>Hello</h1>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        // h1 has UA margin ~21px top/bottom. With body margin:0, the tree should be:
+        //   ICB → html → h1(margin merged as padding) → TextSpan
+        // Total containers: 3 (ICB + html + h1), no extra wrapper.
+        let container_count = nodes
+            .iter()
+            .filter(|id| matches!(graph.get_node(id).ok(), Some(Node::Container(_))))
+            .count();
+        // ICB is InitialContainer, not Container
+        let icb_count = nodes
+            .iter()
+            .filter(|id| matches!(graph.get_node(id).ok(), Some(Node::InitialContainer(_))))
+            .count();
+        assert_eq!(icb_count + container_count, 3, "ICB + html + h1 = 3 frames, no margin wrapper");
+
+        // h1 container should have margin merged as padding
+        let h1_node = nodes.iter().rev().find_map(|id| {
+            match graph.get_node(id).ok()? {
+                Node::Container(c) if c.layout_container.layout_padding.is_some() => {
+                    Some(c.layout_container.layout_padding.as_ref().unwrap().clone())
+                }
+                _ => None,
+            }
+        }).expect("h1 should have padding from merged margin");
+        assert!(h1_node.top > 10.0, "h1 should have top padding from UA margin");
+        assert!(h1_node.bottom > 10.0, "h1 should have bottom padding from UA margin");
     }
 }
