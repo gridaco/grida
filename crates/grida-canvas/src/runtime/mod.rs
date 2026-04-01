@@ -1,6 +1,7 @@
 pub mod camera;
 pub mod changes;
 pub mod config;
+pub mod cost_prediction;
 pub mod counter;
 pub mod effect_tree;
 pub mod font_repository;

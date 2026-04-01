@@ -155,6 +155,11 @@ pub struct FramePlan {
     pub compositor_indices: Vec<usize>,
     pub display_list_duration: Duration,
     pub display_list_size_estimated: usize,
+    /// Predicted frame cost in microseconds, based on the fixed-overhead cost
+    /// model (sum of per-effect FBO/pipeline costs for visible nodes).
+    /// See `docs/wg/feat-2d/render-cost-prediction.md` for derivation.
+    /// Zero for cache-hit frames (pan/zoom blit).
+    pub predicted_cost_us: f64,
 }
 
 /// Deferred frame plan: stores just the inputs so the expensive R-tree query
@@ -1120,6 +1125,7 @@ impl Renderer {
                         compositor_indices: Vec::new(),
                         display_list_duration: Duration::ZERO,
                         display_list_size_estimated: 0,
+                        predicted_cost_us: 0.0,
                     };
 
                     return FrameFlushStats {
@@ -1177,6 +1183,7 @@ impl Renderer {
                     compositor_indices: Vec::new(),
                     display_list_duration: Duration::ZERO,
                     display_list_size_estimated: 0,
+                    predicted_cost_us: 0.0,
                 },
             );
             if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
@@ -1194,6 +1201,7 @@ impl Renderer {
                     compositor_indices: Vec::new(),
                     display_list_duration: Duration::ZERO,
                     display_list_size_estimated: 0,
+                    predicted_cost_us: 0.0,
                 };
                 return FrameFlushStats {
                     frame: plan,
@@ -2087,6 +2095,10 @@ impl Renderer {
         pic
     }
 
+    // ── Render cost prediction ─────────────────────────────────────
+    // Read-only debug metric. Delegates to `runtime::cost_prediction`.
+    // See docs/wg/feat-2d/render-cost-prediction.md for derivation.
+
     /// Plan the frame for rendering.
     ///
     /// # Arguments
@@ -2190,6 +2202,29 @@ impl Renderer {
 
         let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
 
+        // Predict frame cost: sum per-node fixed overhead costs.
+        let predicted_cost_us = {
+            let promoted_set: std::collections::HashSet<&NodeId> = promoted_ids.iter().collect();
+            let mut total = 0.0_f64;
+            // Live-drawn nodes (from regions)
+            for (_, region_indices) in &regions {
+                for &idx in region_indices {
+                    if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                        total += crate::runtime::cost_prediction::estimate_node_cost(&entry.layer, false);
+                    }
+                }
+            }
+            // Promoted (cache-hit) nodes
+            for &idx in &compositor_indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                    if promoted_set.contains(&entry.id) {
+                        total += crate::runtime::cost_prediction::estimate_node_cost(&entry.layer, true);
+                    }
+                }
+            }
+            total
+        };
+
         let __ll_duration = __start.elapsed();
 
         FramePlan {
@@ -2201,6 +2236,7 @@ impl Renderer {
             compositor_indices,
             display_list_duration: __ll_duration,
             display_list_size_estimated: ll_len,
+            predicted_cost_us,
         }
     }
 
