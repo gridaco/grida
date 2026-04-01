@@ -20,9 +20,7 @@ fn main() {
 #[cfg(feature = "native-gl-context")]
 fn main() {
     use cg::window::headless::HeadlessGpu;
-    use skia_safe::{
-        canvas::SaveLayerRec, image_filters, BlendMode, Color, Paint, Rect, Surface,
-    };
+    use skia_safe::{canvas::SaveLayerRec, image_filters, BlendMode, Color, Paint, Rect, Surface};
     use std::time::Instant;
 
     const W: i32 = 1000;
@@ -84,7 +82,11 @@ fn main() {
         let n = xs.len() as f64;
         let x_mean = xs.iter().sum::<f64>() / n;
         let y_mean = ys.iter().sum::<f64>() / n;
-        let ss_xy: f64 = xs.iter().zip(ys).map(|(x, y)| (x - x_mean) * (y - y_mean)).sum();
+        let ss_xy: f64 = xs
+            .iter()
+            .zip(ys)
+            .map(|(x, y)| (x - x_mean) * (y - y_mean))
+            .sum();
         let ss_xx: f64 = xs.iter().map(|x| (x - x_mean).powi(2)).sum();
         let ss_yy: f64 = ys.iter().map(|y| (y - y_mean).powi(2)).sum();
         if ss_xx == 0.0 || ss_yy == 0.0 {
@@ -208,7 +210,7 @@ fn main() {
             name: "opacity 0.5 (save_layer_alpha)",
             predicted: 2.0,
             draw: Box::new(|canvas, rect| {
-                canvas.save_layer_alpha(Some(rect),128);
+                canvas.save_layer_alpha(Some(rect), 128);
                 let mut p = Paint::default();
                 p.set_color(Color::from_argb(255, 66, 133, 244));
                 canvas.draw_rect(rect, &p);
@@ -310,8 +312,8 @@ fn main() {
             name: "2x nested save_layer",
             predicted: 5.0,
             draw: Box::new(|canvas, rect| {
-                canvas.save_layer_alpha(Some(rect),255);
-                canvas.save_layer_alpha(Some(rect),255);
+                canvas.save_layer_alpha(Some(rect), 255);
+                canvas.save_layer_alpha(Some(rect), 255);
                 let mut p = Paint::default();
                 p.set_color(Color::from_argb(255, 66, 133, 244));
                 canvas.draw_rect(rect, &p);
@@ -324,9 +326,9 @@ fn main() {
             name: "3x nested save_layer",
             predicted: 7.0,
             draw: Box::new(|canvas, rect| {
-                canvas.save_layer_alpha(Some(rect),255);
-                canvas.save_layer_alpha(Some(rect),255);
-                canvas.save_layer_alpha(Some(rect),255);
+                canvas.save_layer_alpha(Some(rect), 255);
+                canvas.save_layer_alpha(Some(rect), 255);
+                canvas.save_layer_alpha(Some(rect), 255);
                 let mut p = Paint::default();
                 p.set_color(Color::from_argb(255, 66, 133, 244));
                 canvas.draw_rect(rect, &p);
@@ -391,13 +393,20 @@ fn main() {
         "  {:<35} {:>10} {:>10} {:>10} {:>6}",
         "Effect", "Predicted", "Measured", "Time(µs)", "Status"
     );
-    println!("  {:-<35} {:->10} {:->10} {:->10} {:->6}", "", "", "", "", "");
+    println!(
+        "  {:-<35} {:->10} {:->10} {:->10} {:->6}",
+        "", "", "", "", ""
+    );
 
     for (vi, variant) in variants.iter().enumerate() {
         let time_us = results[vi][size_idx_200];
         let measured = time_us / baseline_200;
         let ratio = measured / variant.predicted;
-        let status = if ratio >= 0.5 && ratio <= 2.0 { "OK" } else { "WARN" };
+        let status = if ratio >= 0.5 && ratio <= 2.0 {
+            "OK"
+        } else {
+            "WARN"
+        };
         println!(
             "  {:<35} {:>9.1}× {:>9.2}× {:>10.1} {:>6}",
             variant.name, variant.predicted, measured, time_us, status
@@ -469,7 +478,10 @@ fn main() {
     let pixels_per_ms = pixels_per_us * 1000.0;
     let budget_12ms = pixels_per_ms * 12.0;
 
-    println!("  Baseline (solid rect) at 500×500: {:.1} µs", baseline_500_us);
+    println!(
+        "  Baseline (solid rect) at 500×500: {:.1} µs",
+        baseline_500_us
+    );
     println!("  Fill rate: {:.1}M pixels/ms", pixels_per_ms / 1_000_000.0);
     println!(
         "  12ms frame budget: {:.1}B pixels ({:.0}M pixels)",

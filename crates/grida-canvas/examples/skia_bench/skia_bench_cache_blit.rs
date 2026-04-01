@@ -44,10 +44,7 @@ fn main() {
     }
 
     /// Measure median time (µs) for a drawing operation.
-    fn bench_draw(
-        surface: &mut Surface,
-        draw_fn: &dyn Fn(&skia_safe::Canvas),
-    ) -> f64 {
+    fn bench_draw(surface: &mut Surface, draw_fn: &dyn Fn(&skia_safe::Canvas)) -> f64 {
         // Warmup
         for _ in 0..WARMUP {
             let canvas = surface.canvas();
@@ -207,12 +204,7 @@ fn main() {
 
             // Cache hit: texture blit
             let hit_us = bench_draw(surface, &|canvas| {
-                canvas.draw_image_rect(
-                    &cached_image,
-                    None,
-                    dst_rect,
-                    &Paint::default(),
-                );
+                canvas.draw_image_rect(&cached_image, None, dst_rect, &Paint::default());
             });
 
             let ratio = hit_us / miss_us;
@@ -238,18 +230,20 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════════════════");
     println!("  SECTION 2: Blit Cost Constancy (same size, different source complexity)");
     println!("═══════════════════════════════════════════════════════════════════════════");
-    println!(
-        "  Blit cost should NOT vary with source effect complexity at the same size."
-    );
+    println!("  Blit cost should NOT vary with source effect complexity at the same size.");
     println!();
 
     for (si, &size) in sizes.iter().enumerate() {
         let blit_at_size: Vec<f64> = blit_times.iter().map(|bt| bt[si]).collect();
         let mean = blit_at_size.iter().sum::<f64>() / blit_at_size.len() as f64;
-        let variance =
-            blit_at_size.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / blit_at_size.len() as f64;
+        let variance = blit_at_size.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
+            / blit_at_size.len() as f64;
         let stddev = variance.sqrt();
-        let cv = if mean > 0.0 { stddev / mean * 100.0 } else { 0.0 };
+        let cv = if mean > 0.0 {
+            stddev / mean * 100.0
+        } else {
+            0.0
+        };
 
         println!("  Size {}²:", size);
         for (ei, effect) in effects.iter().enumerate() {

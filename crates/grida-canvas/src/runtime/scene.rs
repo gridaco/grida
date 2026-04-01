@@ -2210,7 +2210,10 @@ impl Renderer {
             for (_, region_indices) in &regions {
                 for &idx in region_indices {
                     if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
-                        total += crate::runtime::cost_prediction::estimate_node_cost(&entry.layer, false);
+                        total += crate::runtime::cost_prediction::estimate_node_cost(
+                            &entry.layer,
+                            false,
+                        );
                     }
                 }
             }
@@ -2218,7 +2221,8 @@ impl Renderer {
             for &idx in &compositor_indices {
                 if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
                     if promoted_set.contains(&entry.id) {
-                        total += crate::runtime::cost_prediction::estimate_node_cost(&entry.layer, true);
+                        total +=
+                            crate::runtime::cost_prediction::estimate_node_cost(&entry.layer, true);
                     }
                 }
             }

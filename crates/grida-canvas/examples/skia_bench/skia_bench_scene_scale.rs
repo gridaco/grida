@@ -70,34 +70,30 @@ fn main() {
 
                 let effects = match scene_type {
                     SceneType::Plain => LayerEffects::default(),
-                    SceneType::WithShadow => LayerEffects::from_array(vec![
-                        FilterEffect::DropShadow(FeShadow {
+                    SceneType::WithShadow => {
+                        LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
                             dx: 2.0,
                             dy: 2.0,
                             blur: 4.0,
                             spread: 0.0,
                             color: CGColor::from_rgba(0, 0, 0, 128),
                             active: true,
-                        }),
-                    ]),
-                    SceneType::WithBlur => {
-                        LayerEffects::new().blur(3.0)
+                        })])
                     }
+                    SceneType::WithBlur => LayerEffects::new().blur(3.0),
                     SceneType::Mixed => {
                         let kind = i % 10;
                         if kind < 7 {
                             LayerEffects::default() // 70% plain
                         } else if kind < 9 {
-                            LayerEffects::from_array(vec![
-                                FilterEffect::DropShadow(FeShadow {
-                                    dx: 2.0,
-                                    dy: 2.0,
-                                    blur: 4.0,
-                                    spread: 0.0,
-                                    color: CGColor::from_rgba(0, 0, 0, 128),
-                                    active: true,
-                                }),
-                            ]) // 20% shadow
+                            LayerEffects::from_array(vec![FilterEffect::DropShadow(FeShadow {
+                                dx: 2.0,
+                                dy: 2.0,
+                                blur: 4.0,
+                                spread: 0.0,
+                                color: CGColor::from_rgba(0, 0, 0, 128),
+                                active: true,
+                            })]) // 20% shadow
                         } else {
                             LayerEffects::new().blur(3.0) // 10% blur
                         }
@@ -202,9 +198,18 @@ fn main() {
         flush_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
         total_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-        let frame_us = frame_times.get(frame_times.len() / 2).copied().unwrap_or(0.0);
-        let flush_us = flush_times.get(flush_times.len() / 2).copied().unwrap_or(0.0);
-        let total_us = total_times.get(total_times.len() / 2).copied().unwrap_or(0.0);
+        let frame_us = frame_times
+            .get(frame_times.len() / 2)
+            .copied()
+            .unwrap_or(0.0);
+        let flush_us = flush_times
+            .get(flush_times.len() / 2)
+            .copied()
+            .unwrap_or(0.0);
+        let total_us = total_times
+            .get(total_times.len() / 2)
+            .copied()
+            .unwrap_or(0.0);
         let per_visible = if last_visible > 0 {
             total_us / last_visible as f64
         } else {
@@ -242,7 +247,13 @@ fn main() {
 
     for &scene_type in &scene_types {
         for &count in &counts {
-            eprint!("\r  [{}/{}] {} × {}k", done + 1, total_configs, scene_type.label(), count / 1000);
+            eprint!(
+                "\r  [{}/{}] {} × {}k",
+                done + 1,
+                total_configs,
+                scene_type.label(),
+                count / 1000
+            );
             results.push(run_scale_bench(&mut renderer, count, scene_type));
             done += 1;
         }
@@ -257,7 +268,15 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════════════════════════════════════════");
     println!(
         "  {:<22} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>8} {:>8}",
-        "Scene Type", "Nodes", "Visible", "Frame(µs)", "Flush(µs)", "Total(µs)", "Per-vis", "Hits", "Live"
+        "Scene Type",
+        "Nodes",
+        "Visible",
+        "Frame(µs)",
+        "Flush(µs)",
+        "Total(µs)",
+        "Per-vis",
+        "Hits",
+        "Live"
     );
     println!(
         "  {:-<22} {:->8} {:->8} {:->10} {:->10} {:->10} {:->10} {:->8} {:->8}",
@@ -330,7 +349,10 @@ fn main() {
 
     if let Some(base) = plain_1k {
         let base_per_vis = base.per_visible_us;
-        println!("  Baseline per-visible-node cost (plain, 1k): {:.2} µs", base_per_vis);
+        println!(
+            "  Baseline per-visible-node cost (plain, 1k): {:.2} µs",
+            base_per_vis
+        );
         println!();
         println!(
             "  {:<22} {:>8} {:>12} {:>12} {:>10}",
