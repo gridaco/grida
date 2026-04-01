@@ -166,8 +166,7 @@ impl SceneBuilder {
             left: margin.left,
         });
         wrapper.layout_child = layout_child;
-        self.graph
-            .append_child(Node::Container(wrapper), parent)
+        self.graph.append_child(Node::Container(wrapper), parent)
     }
 
     fn emit_container(
@@ -322,7 +321,10 @@ impl SceneBuilder {
             } else {
                 // No visual properties — safe to merge margin into padding.
                 // This avoids an extra wrapper node in the tree.
-                let existing = node.layout_container.layout_padding.unwrap_or(EdgeInsets::zero());
+                let existing = node
+                    .layout_container
+                    .layout_padding
+                    .unwrap_or(EdgeInsets::zero());
                 node.layout_container.layout_padding = Some(EdgeInsets {
                     top: existing.top + margin.top,
                     right: existing.right + margin.right,
@@ -2253,18 +2255,30 @@ mod tests {
             .iter()
             .filter(|id| matches!(graph.get_node(id).ok(), Some(Node::InitialContainer(_))))
             .count();
-        assert_eq!(icb_count + container_count, 3, "ICB + html + h1 = 3 frames, no margin wrapper");
+        assert_eq!(
+            icb_count + container_count,
+            3,
+            "ICB + html + h1 = 3 frames, no margin wrapper"
+        );
 
         // h1 container should have margin merged as padding
-        let h1_node = nodes.iter().rev().find_map(|id| {
-            match graph.get_node(id).ok()? {
+        let h1_node = nodes
+            .iter()
+            .rev()
+            .find_map(|id| match graph.get_node(id).ok()? {
                 Node::Container(c) if c.layout_container.layout_padding.is_some() => {
                     Some(c.layout_container.layout_padding.as_ref().unwrap().clone())
                 }
                 _ => None,
-            }
-        }).expect("h1 should have padding from merged margin");
-        assert!(h1_node.top > 10.0, "h1 should have top padding from UA margin");
-        assert!(h1_node.bottom > 10.0, "h1 should have bottom padding from UA margin");
+            })
+            .expect("h1 should have padding from merged margin");
+        assert!(
+            h1_node.top > 10.0,
+            "h1 should have top padding from UA margin"
+        );
+        assert!(
+            h1_node.bottom > 10.0,
+            "h1 should have bottom padding from UA margin"
+        );
     }
 }
