@@ -1627,13 +1627,18 @@ impl UnknownTargetApplication {
         wall_time: std::time::Duration,
     ) {
         let s = format!(
-            "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
+            "fps*: {:.0} | t: {:.2}ms | cam: {} | render: {:.1}ms | flush: {:.1}ms | frame: {:.1}ms | pred: {:.0}µs ({:.1}×) | list: {:.1}ms ({:?}) | draw: {:.1}ms | $:pic: {:?} ({:?} use) | $:geo: {:?} | comp: {:?} ({:?} hit, {:.1}KB) | live: {:?} | res: {} | img: {} | fnt: {}",
             1.0 / wall_time.as_secs_f64(),
             wall_time.as_secs_f64() * 1000.0,
             stats.frame.camera_change.label(),
             stats.total_duration.as_secs_f64() * 1000.0,
             stats.flush_duration.as_secs_f64() * 1000.0,
             stats.frame_duration.as_secs_f64() * 1000.0,
+            stats.frame.predicted_cost_us,
+            {
+                let actual_us = stats.frame_duration.as_secs_f64() * 1_000_000.0;
+                if actual_us > 0.0 { stats.frame.predicted_cost_us / actual_us } else { 0.0 }
+            },
             stats.frame.display_list_duration.as_secs_f64() * 1000.0,
             stats.frame.display_list_size_estimated,
             stats.draw.painter_duration.as_secs_f64() * 1000.0,

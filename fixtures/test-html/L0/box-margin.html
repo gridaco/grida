@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Box: Margin</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: 20px;
+        color: #fff;
+        margin-bottom: 32px;
+      }
+      h2 {
+        font-size: 14px;
+        margin-top: 40px;
+        margin-bottom: 6px;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      p.desc {
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 14px;
+      }
+
+      .demo {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 14px;
+        position: relative;
+      }
+
+      .demo-label {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        font-size: 11px;
+        color: #475569;
+        font-family: monospace;
+      }
+
+      .box {
+        background: #6366f1;
+        color: #fff;
+        padding: 12px 16px;
+        font-size: 12px;
+        font-family: monospace;
+      }
+
+      .box-alt {
+        background: #a855f7;
+      }
+      .box-green {
+        background: #059669;
+      }
+
+      .anno {
+        font-size: 11px;
+        color: #f87171;
+        font-family: monospace;
+        text-align: center;
+        padding: 4px;
+      }
+
+      .side {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .side .demo {
+        margin-bottom: 0;
+        flex: 1;
+        min-width: 260px;
+      }
+
+      .collapse-container {
+        background: #0f172a;
+      }
+      .collapse-container .box {
+        margin: 30px 0;
+      }
+
+      .no-collapse-container {
+        display: flex;
+        flex-direction: column;
+        background: #0f172a;
+      }
+      .no-collapse-container .box {
+        margin: 30px 0;
+      }
+
+      .inline-container {
+        background: #0f172a;
+        line-height: 2;
+        padding: 12px;
+      }
+      .inline-box {
+        display: inline;
+        background: #6366f1;
+        color: #fff;
+        padding: 2px 6px;
+        font-size: 12px;
+        font-family: monospace;
+        margin: 40px 8px;
+      }
+
+      .inline-box-alt {
+        background: #a855f7;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CSS Margin Behaviors</h1>
+
+    <!-- 1. Margin Collapse (sibling) -->
+    <h2>1. Margin Collapse (block flow)</h2>
+    <p class="desc">
+      Both boxes have <code>margin: 30px 0</code>. In normal flow, the 30px
+      margins collapse into 30px (not 60px).
+    </p>
+    <div class="side">
+      <div class="demo">
+        <div class="demo-label">normal flow (collapsed)</div>
+        <div class="collapse-container">
+          <div class="box">margin: 30px 0</div>
+          <div class="anno">↕ 30px (collapsed)</div>
+          <div class="box box-alt">margin: 30px 0</div>
+        </div>
+      </div>
+      <div class="demo">
+        <div class="demo-label">flex column (no collapse)</div>
+        <div class="no-collapse-container">
+          <div class="box">margin: 30px 0</div>
+          <div class="anno">↕ 60px (no collapse)</div>
+          <div class="box box-alt">margin: 30px 0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Negative Margin -->
+    <h2>2. Negative Margin</h2>
+    <p class="desc">
+      Second box has <code>margin-top: -20px</code>, pulling it upward and
+      overlapping the first box.
+    </p>
+    <div class="demo">
+      <div style="background: #0f172a; padding-top: 40px">
+        <div class="box">box A</div>
+        <div
+          class="box box-alt"
+          style="margin-top: -20px; opacity: 0.85; position: relative"
+        >
+          box B — margin-top: -20px
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Margin Auto -->
+    <h2>3. Margin Auto</h2>
+    <p class="desc">
+      Auto margins distribute available space. Used for centering and
+      push-alignment.
+    </p>
+    <div class="side">
+      <div class="demo">
+        <div class="demo-label">margin: 0 auto</div>
+        <div style="background: #0f172a">
+          <div class="box" style="width: 180px; margin: 0 auto">centered</div>
+        </div>
+      </div>
+      <div class="demo">
+        <div class="demo-label">margin-left: auto</div>
+        <div style="background: #0f172a">
+          <div class="box box-alt" style="width: 180px; margin-left: auto">
+            pushed right
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="demo">
+      <div class="demo-label">flex + margin-left: auto (spacer pattern)</div>
+      <div style="display: flex; background: #0f172a">
+        <div class="box">A</div>
+        <div class="box box-alt" style="margin-left: auto">B (ml: auto)</div>
+        <div class="box box-green" style="margin-left: auto">C (ml: auto)</div>
+      </div>
+    </div>
+
+    <!-- 4. Background Boundary -->
+    <h2>4. Background Boundary</h2>
+    <p class="desc">
+      Margin is outside the background. Left: margin creates transparent gap.
+      Right: wrapper+padding equivalent — padding zone paints with the wrapper's
+      background.
+    </p>
+    <div class="side">
+      <div class="demo" style="padding: 0">
+        <div class="demo-label">margin: 24px</div>
+        <div class="box" style="margin: 24px">
+          background: blue; margin: 24px;
+        </div>
+      </div>
+      <div class="demo" style="padding: 0">
+        <div class="demo-label">wrapper padding: 24px</div>
+        <div style="padding: 24px; background: transparent">
+          <div class="box">wrapper { padding: 24px } → child</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Inline Element Margin -->
+    <h2>5. Inline Element Margin</h2>
+    <p class="desc">
+      Inline elements ignore vertical margin. These <code>&lt;span&gt;</code>s
+      have <code>margin: 40px 8px</code> but only horizontal margin applies.
+    </p>
+    <div class="demo">
+      <div class="inline-container">
+        text before <span class="inline-box">span A</span> middle text
+        <span class="inline-box inline-box-alt">span B</span> text after
+        <br />
+        next line <span class="inline-box">span C</span> continues
+      </div>
+    </div>
+
+    <!-- 6. Unequal Collapse -->
+    <h2>6. Collapse Variants</h2>
+    <p class="desc">
+      Unequal margins: A has <code>margin-bottom: 50px</code>, B has
+      <code>margin-top: 20px</code>. Collapsed = max(50, 20) = 50px.
+    </p>
+    <div class="side">
+      <div class="demo">
+        <div class="demo-label">collapsed (50px, not 70px)</div>
+        <div class="collapse-container">
+          <div class="box" style="margin: 0 0 50px 0">mb: 50px</div>
+          <div class="box box-alt" style="margin: 20px 0 0 0">mt: 20px</div>
+        </div>
+      </div>
+      <div class="demo">
+        <div class="demo-label">wrapper+padding (70px total)</div>
+        <div style="background: #0f172a">
+          <div style="padding-bottom: 50px">
+            <div class="box">wrapper pb: 50px</div>
+          </div>
+          <div style="padding-top: 20px">
+            <div class="box box-alt">wrapper pt: 20px</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Parent-Child Collapse -->
+    <h2>7. Parent-Child Collapse</h2>
+    <p class="desc">
+      A child's margin can collapse through its parent if the parent has no
+      border, padding, or BFC. Left: margin leaks out. Right: padding on parent
+      prevents collapse.
+    </p>
+    <div class="side">
+      <div class="demo">
+        <div class="demo-label">collapsed (margin leaks)</div>
+        <div style="background: rgba(248, 113, 113, 0.15)">
+          <div class="box" style="margin-top: 30px">child mt: 30px</div>
+        </div>
+        <div class="anno">
+          ↑ parent has no padding/border — child margin leaks out
+        </div>
+      </div>
+      <div class="demo">
+        <div class="demo-label">padding prevents collapse</div>
+        <div style="background: rgba(248, 113, 113, 0.15); padding: 1px">
+          <div class="box" style="margin-top: 30px">child mt: 30px</div>
+        </div>
+        <div class="anno">↑ parent has padding: 1px — margin stays inside</div>
+      </div>
+    </div>
+  </body>
+</html>

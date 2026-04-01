@@ -155,6 +155,11 @@ pub struct FramePlan {
     pub compositor_indices: Vec<usize>,
     pub display_list_duration: Duration,
     pub display_list_size_estimated: usize,
+    /// Predicted frame cost in microseconds, based on the fixed-overhead cost
+    /// model (sum of per-effect FBO/pipeline costs for visible nodes).
+    /// See `docs/wg/feat-2d/render-cost-prediction.md` for derivation.
+    /// Zero for cache-hit frames (pan/zoom blit).
+    pub predicted_cost_us: f64,
 }
 
 /// Deferred frame plan: stores just the inputs so the expensive R-tree query
@@ -358,6 +363,13 @@ pub struct Renderer {
     /// [`apply_changes`] consumes the set once per frame and performs
     /// the correct invalidation for every cache layer.
     changes: ChangeSet,
+    /// Picture cache generation + variant key at the time of the last
+    /// successful prefill. When the cache generation and variant key
+    /// match, the prefill loop can be skipped entirely — all pictures
+    /// are already cached from a previous frame.
+    last_prefill_generation: u64,
+    last_prefill_variant_key: u64,
+    last_prefill_layer_count: usize,
 }
 
 impl Renderer {
@@ -385,6 +397,37 @@ impl Renderer {
         // True when the policy differs from STANDARD only in effect-related
         // fields — content, compositing, and clip policies are unchanged.
         let can_unify = variant_key != 0 && policy.is_effect_only_variant();
+
+        // Skip-prefill fast path: when the picture cache generation hasn't
+        // changed since the last prefill AND we're using the same variant
+        // key AND the layer count matches, every picture from the previous
+        // prefill is still valid. Skip the O(N) iteration entirely.
+        //
+        // For variant key tracking: when can_unify is true AND the variant
+        // store is empty (no per-variant entries — all nodes are effect-free),
+        // we track key=0 since all pictures live under the default key. This
+        // is safe across stable/unstable transitions for effect-free scenes.
+        // Scenes WITH effects track the actual variant_key.
+        //
+        // On 135K-node scenes at fit zoom, this eliminates ~800µs of HashMap
+        // lookups on every cache-warm frame (the common case during view-only
+        // pan/zoom interaction and settle frames).
+        let effective_key_for_tracking =
+            if can_unify && self.scene_cache.picture.variant_store_is_empty() {
+                0
+            } else {
+                variant_key
+            };
+
+        let current_gen = self.scene_cache.picture.generation();
+        let layer_count: usize = plan.regions.iter().map(|(_, idx)| idx.len()).sum();
+        if current_gen == self.last_prefill_generation
+            && effective_key_for_tracking == self.last_prefill_variant_key
+            && layer_count == self.last_prefill_layer_count
+        {
+            return;
+        }
+
         // Prefill picture cache for visible layers so Painter can reuse pictures even with masks.
         // Fast path: skip clone + recording when the picture is already cached (common case
         // on cache-warm frames). The clone of LayerEntry is expensive because it deep-copies
@@ -433,6 +476,17 @@ impl Renderer {
                 }
             }
         }
+
+        // Update tracking state for future skip-prefill checks.
+        let effective_key_after = if can_unify && self.scene_cache.picture.variant_store_is_empty()
+        {
+            0
+        } else {
+            variant_key
+        };
+        self.last_prefill_generation = self.scene_cache.picture.generation();
+        self.last_prefill_variant_key = effective_key_after;
+        self.last_prefill_layer_count = layer_count;
     }
 
     /// Pre-extract blit data for all promoted nodes.
@@ -608,6 +662,9 @@ impl Renderer {
             pan_image_cache: None,
             zoom_image_cache: None,
             changes: ChangeSet::new(),
+            last_prefill_generation: u64::MAX,
+            last_prefill_variant_key: u64::MAX,
+            last_prefill_layer_count: 0,
         }
     }
 
@@ -1068,6 +1125,7 @@ impl Renderer {
                         compositor_indices: Vec::new(),
                         display_list_duration: Duration::ZERO,
                         display_list_size_estimated: 0,
+                        predicted_cost_us: 0.0,
                     };
 
                     return FrameFlushStats {
@@ -1125,6 +1183,7 @@ impl Renderer {
                     compositor_indices: Vec::new(),
                     display_list_duration: Duration::ZERO,
                     display_list_size_estimated: 0,
+                    predicted_cost_us: 0.0,
                 },
             );
             if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
@@ -1142,6 +1201,7 @@ impl Renderer {
                     compositor_indices: Vec::new(),
                     display_list_duration: Duration::ZERO,
                     display_list_size_estimated: 0,
+                    predicted_cost_us: 0.0,
                 };
                 return FrameFlushStats {
                     frame: plan,
@@ -1488,6 +1548,9 @@ impl Renderer {
         self.scene_cache = cache::scene::SceneCache::new();
         self.pan_image_cache = None;
         self.zoom_image_cache = None;
+        self.last_prefill_generation = u64::MAX;
+        self.last_prefill_variant_key = u64::MAX;
+        self.last_prefill_layer_count = 0;
         self.images.clear_missing_tracking();
         if let Some(scene) = self.scene.as_ref() {
             #[cfg(feature = "perf")]
@@ -2032,6 +2095,10 @@ impl Renderer {
         pic
     }
 
+    // ── Render cost prediction ─────────────────────────────────────
+    // Read-only debug metric. Delegates to `runtime::cost_prediction`.
+    // See docs/wg/feat-2d/render-cost-prediction.md for derivation.
+
     /// Plan the frame for rendering.
     ///
     /// # Arguments
@@ -2135,6 +2202,33 @@ impl Renderer {
 
         let ll_len = regions.iter().map(|(_, indices)| indices.len()).sum();
 
+        // Predict frame cost: sum per-node fixed overhead costs.
+        let predicted_cost_us = {
+            let promoted_set: std::collections::HashSet<&NodeId> = promoted_ids.iter().collect();
+            let mut total = 0.0_f64;
+            // Live-drawn nodes (from regions)
+            for (_, region_indices) in &regions {
+                for &idx in region_indices {
+                    if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                        total += crate::runtime::cost_prediction::estimate_node_cost(
+                            &entry.layer,
+                            false,
+                        );
+                    }
+                }
+            }
+            // Promoted (cache-hit) nodes
+            for &idx in &compositor_indices {
+                if let Some(entry) = self.scene_cache.layers.layers.get(idx) {
+                    if promoted_set.contains(&entry.id) {
+                        total +=
+                            crate::runtime::cost_prediction::estimate_node_cost(&entry.layer, true);
+                    }
+                }
+            }
+            total
+        };
+
         let __ll_duration = __start.elapsed();
 
         FramePlan {
@@ -2146,6 +2240,7 @@ impl Renderer {
             compositor_indices,
             display_list_duration: __ll_duration,
             display_list_size_estimated: ll_len,
+            predicted_cost_us,
         }
     }
 
