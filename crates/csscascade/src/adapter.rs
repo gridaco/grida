@@ -136,6 +136,15 @@ impl HtmlDocument {
 // ---------------------------------------------------------------------------
 
 impl HtmlElement {
+    /// Wrap a DOM [`NodeId`] as an [`HtmlElement`].
+    ///
+    /// # Safety (logical)
+    /// The caller must ensure the node is actually an element node.
+    /// Calling methods on a non-element HtmlElement will panic.
+    pub fn from_node_id(id: NodeId) -> Self {
+        Self(id)
+    }
+
     /// Returns the underlying DOM [`NodeId`].
     pub fn node_id(&self) -> NodeId {
         self.0

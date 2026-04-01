@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: Inline Elements</title>
+    <style>
+      body {
+        background: #030712;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.7;
+        padding: 32px;
+        margin: 0;
+      }
+
+      article {
+        display: flex;
+        flex-direction: column;
+        gap: 0px;
+      }
+
+      h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #fff;
+        line-height: 1.3;
+      }
+
+      h2 {
+        font-size: 20px;
+        font-weight: 600;
+        color: #f1f5f9;
+        line-height: 1.4;
+      }
+
+      p {
+        color: #cbd5e1;
+      }
+
+      a {
+        color: #60a5fa;
+        text-decoration: underline;
+      }
+
+      code {
+        font-family: "Fira Code", "SF Mono", monospace;
+        font-size: 0.875em;
+        color: #f0abfc;
+        background: #1e1b4b;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      pre {
+        background: #111827;
+        padding: 16px;
+        border-radius: 8px;
+        font-family: "Fira Code", "SF Mono", monospace;
+        font-size: 14px;
+        color: #a5b4fc;
+        overflow: auto;
+      }
+
+      blockquote {
+        border-left: 3px solid #475569;
+        padding-left: 16px;
+        color: #94a3b8;
+        font-style: italic;
+      }
+
+      mark {
+        background: #854d0e;
+        color: #fef08a;
+        padding: 1px 4px;
+        border-radius: 2px;
+      }
+
+      kbd {
+        font-family: "Fira Code", "SF Mono", monospace;
+        font-size: 0.85em;
+        background: #1e293b;
+        border: 1px solid #475569;
+        border-radius: 4px;
+        padding: 2px 6px;
+        color: #e2e8f0;
+      }
+    </style>
+  </head>
+  <body>
+    <article>
+      <h1>Getting Started with <code>grida-canvas</code></h1>
+
+      <p>
+        The <strong>Grida Canvas</strong> engine is a high-performance rendering
+        backend built in <em>Rust</em>. It powers the
+        <a href="#">interactive editor</a> and supports both
+        <strong>DOM-based</strong> and <strong>Skia-based</strong> output.
+      </p>
+
+      <h2>Installation</h2>
+
+      <p>
+        Run <code>cargo add grida-canvas</code> to add the crate to your
+        project. Make sure you have <strong>Rust 2024 edition</strong> or later
+        installed. See the <a href="#">setup guide</a> for platform-specific
+        instructions.
+      </p>
+
+      <pre>
+cargo add grida-canvas
+cargo build --release</pre
+      >
+
+      <h2>Key Concepts</h2>
+
+      <p>
+        The engine uses a <em>scene graph</em> model where each node carries its
+        own <strong>layout</strong>, <strong>paint</strong>, and
+        <strong>effect</strong> properties. Nodes are organized into a tree and
+        rendered via the <code>Renderer</code> struct.
+      </p>
+
+      <p>
+        For <em>inline text</em>, the engine supports
+        <strong>AttributedText</strong> — a single text node with
+        <em>per-run styling</em>. This means you can have <strong>bold</strong>,
+        <em>italic</em>, <span style="color: #f87171">colored</span>,
+        <u>underlined</u>, and <code>monospace</code> text all within one
+        paragraph, just like this one.
+      </p>
+
+      <blockquote>
+        Design is not just what it looks like and feels like. Design is how it
+        works.
+      </blockquote>
+
+      <h2>Keyboard Shortcuts</h2>
+
+      <p>
+        Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> to undo,
+        <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to redo. Use
+        <kbd>Space</kbd> to pan the canvas.
+      </p>
+
+      <h2>Known Limitations</h2>
+
+      <p>
+        Elements like <code>code</code>, <mark>mark</mark>, and
+        <kbd>kbd</kbd> have <em>visual properties</em> (background color,
+        borders) that go beyond pure text styling. These are
+        <strong>not fully representable</strong> as inline runs — they require
+        box rendering. The current import pipeline handles the
+        <s>text styling</s> portion but drops the background and border
+        decorations.
+      </p>
+
+      <p>
+        Similarly, <strong>negative margins</strong> and
+        <strong>margin collapse</strong> are not supported. See the
+        <a href="#">CSS property mapping</a> document for the full compatibility
+        table.
+      </p>
+    </article>
+  </body>
+</html>

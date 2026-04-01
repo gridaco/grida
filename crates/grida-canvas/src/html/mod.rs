@@ -109,10 +109,33 @@ impl SceneBuilder {
 
         let is_structural = matches!(tag.as_str(), "html" | "body");
 
-        if has_element_children || has_text_children || is_structural {
-            // Every element with children (element or text) becomes a Container.
-            // This preserves box-model properties (border, background, dimensions)
-            // that would be lost if text-only elements were flattened to TextSpan.
+        // Check if all element children are inline (display: inline).
+        // When true and we have text, we can merge everything into AttributedText.
+        let all_children_inline = has_element_children && {
+            let mut all_inline = true;
+            let mut child = element.first_element_child();
+            while let Some(c) = child {
+                let c_data = c.borrow_data();
+                if let Some(c_data) = &c_data {
+                    let c_display = c_data.styles.primary().clone_display();
+                    if c_display.outside() != style::values::specified::box_::DisplayOutside::Inline
+                    {
+                        all_inline = false;
+                        break;
+                    }
+                }
+                child = c.next_element_sibling();
+            }
+            all_inline
+        };
+
+        if has_text_children && all_children_inline && !is_structural {
+            // All children are text or inline elements → emit as a single
+            // Container (for box model) with an AttributedText child (for text).
+            let container_id = self.emit_container(style, &display, parent);
+            self.emit_attributed_text(element, style, Parent::NodeId(container_id));
+        } else if has_element_children || has_text_children || is_structural {
+            // Mixed content or structural element → Container with separate children.
             let container_id = self.emit_container(style, &display, parent);
             let container_parent = Parent::NodeId(container_id);
 
@@ -344,131 +367,14 @@ impl SceneBuilder {
         let mut node = self.factory.create_text_span_node();
         node.text = text.to_string();
 
-        // Font properties
-        let font = style.get_font();
-        let font_size = font.font_size.computed_size().px();
-        node.text_style.font_size = font_size;
-
-        // font-weight
-        node.text_style.font_weight = FontWeight(font.font_weight.value() as u32);
-
-        // font-family
-        if let Some(first) = font.font_family.families.iter().next() {
-            use style::values::computed::font::SingleFontFamily;
-            node.text_style.font_family = match first {
-                SingleFontFamily::FamilyName(name) => name.name.to_string(),
-                SingleFontFamily::Generic(generic) => format!("{:?}", generic),
-            };
-        }
-
-        // font-style
-        node.text_style.font_style_italic =
-            font.font_style == style::values::computed::FontStyle::ITALIC;
-
-        // color → fill
-        let text_color = &style.get_inherited_text().color;
-        let cg_color = abs_color_to_cg(text_color);
-        node.fills = Paints::new([Paint::Solid(SolidPaint {
-            color: cg_color,
-            blend_mode: BlendMode::default(),
-            active: true,
-        })]);
-
-        // text-align
+        let (text_style, fills) = css_text_style_to_cg(style);
+        node.text_style = text_style;
+        node.fills = fills;
         node.text_align = css_text_align_to_cg(style.get_inherited_text().text_align);
-
-        // line-height
-        match &font.line_height {
-            LineHeight::Normal => {}
-            LineHeight::Number(n) => {
-                node.text_style.line_height = TextLineHeight::Factor(n.0);
-            }
-            LineHeight::Length(len) => {
-                node.text_style.line_height = TextLineHeight::Fixed(len.0.px());
-            }
-        }
-
-        // letter-spacing
-        let ls = &style.get_inherited_text().letter_spacing;
-        if let Some(len) = ls.0.to_length() {
-            let px = len.px();
-            if px != 0.0 {
-                node.text_style.letter_spacing = TextLetterSpacing::Fixed(px);
-            }
-        }
-
-        // word-spacing
-        let ws = &style.get_inherited_text().word_spacing;
-        let ws_px = ws.to_length().map(|l| l.px()).unwrap_or(0.0);
-        if ws_px != 0.0 {
-            node.text_style.word_spacing = TextWordSpacing::Fixed(ws_px);
-        }
-
-        // text-transform
-        {
-            use style::values::specified::text::TextTransformCase;
-            let tt = style.clone_text_transform();
-            let case = tt.case();
-            node.text_style.text_transform = if case == TextTransformCase::Uppercase {
-                TextTransform::Uppercase
-            } else if case == TextTransformCase::Lowercase {
-                TextTransform::Lowercase
-            } else if case == TextTransformCase::Capitalize {
-                TextTransform::Capitalize
-            } else {
-                TextTransform::None
-            };
-        }
-
-        // text-decoration
-        // NOTE: CSS allows combining multiple lines (e.g. `underline line-through`),
-        // but our IR `TextDecorationLine` is an enum, so only one value is preserved.
-        // Priority: line-through > underline > overline.
-        // TODO: support combined text-decoration-line (requires IR change to bitflags or Vec).
-        let td_line = style.clone_text_decoration_line();
-        if td_line != StyloTextDecorationLine::NONE {
-            let line = if td_line.intersects(StyloTextDecorationLine::LINE_THROUGH) {
-                TextDecorationLine::LineThrough
-            } else if td_line.intersects(StyloTextDecorationLine::UNDERLINE) {
-                TextDecorationLine::Underline
-            } else if td_line.intersects(StyloTextDecorationLine::OVERLINE) {
-                TextDecorationLine::Overline
-            } else {
-                TextDecorationLine::None
-            };
-
-            if !matches!(line, TextDecorationLine::None) {
-                // text-decoration-color (currentcolor → None, let downstream resolve)
-                let td_color = css_color_to_cg(&style.clone_text_decoration_color());
-
-                // text-decoration-style
-                let td_style = css_text_decoration_style_to_cg(style);
-
-                // TODO: text-decoration-thickness — Stylo marks this as gecko-only
-                //       (`engines="gecko"`), so it's inaccessible in servo mode.
-                //       When available, map `LengthOrAuto` → `Option<f32>`.
-                // TODO: text-decoration-skip-ink — also gecko-only in Stylo.
-
-                node.text_style.text_decoration = Some(TextDecorationRec {
-                    text_decoration_line: line,
-                    text_decoration_color: td_color,
-                    text_decoration_style: td_style,
-                    text_decoration_skip_ink: None,
-                    text_decoration_thickness: None,
-                });
-            }
-        }
-
-        // opacity
         node.opacity = style.get_effects().opacity;
-
-        // Effects (text-shadow, filter, backdrop-filter)
         node.effects = css_text_shadow_to_effects(style);
-
-        // Blend mode (mix-blend-mode)
         node.blend_mode = css_blend_mode_to_cg(style);
 
-        // flex child: layout_grow
         let flex_grow = style.clone_flex_grow();
         if flex_grow.0 > 0.0 {
             node.layout_child = Some(LayoutChildStyle {
@@ -478,10 +384,115 @@ impl SceneBuilder {
         }
 
         // NOTE: No margin surgery for text spans. Text spans are emitted using
-        // the parent element's style (see build_element line ~126), which may carry
-        // the parent's margin. Applying margin here would double-wrap the text.
-        // Margin is handled at the container/rectangle level instead.
+        // the parent element's style (see build_element), which may carry
+        // the parent's margin. Margin is handled at the container/rectangle level.
         self.graph.append_child(Node::TextSpan(node), parent);
+    }
+
+    /// Emit an `AttributedTextNodeRec` by merging all inline children (text nodes
+    /// and inline elements like `<strong>`, `<em>`, `<code>`) into a single rich
+    /// text node with per-run styling.
+    fn emit_attributed_text(
+        &mut self,
+        element: HtmlElement,
+        style: &ComputedValues,
+        parent: Parent,
+    ) {
+        let dom = adapter::dom();
+        let (default_style, default_fills) = css_text_style_to_cg(style);
+        let default_color = Some(abs_color_to_cg(&style.get_inherited_text().color));
+
+        let mut builder = AttributedStringBuilder::new();
+        let node_data = dom.node(element.node_id());
+
+        // Walk children in DOM order — interleaved text nodes and inline elements.
+        // Use CSS white-space collapsing: newlines/tabs → space, collapse runs of spaces.
+        for child_id in &node_data.children {
+            let child_node = dom.node(*child_id);
+            match &child_node.data {
+                DemoNodeData::Text(text) => {
+                    let collapsed = collapse_whitespace(text);
+                    if !collapsed.is_empty() {
+                        builder = builder.push(&collapsed, &default_style, default_color);
+                    }
+                }
+                DemoNodeData::Element(_) => {
+                    // Inline element — get its own computed style and collect text.
+                    let child_el = HtmlElement::from_node_id(*child_id);
+                    let child_data = child_el.borrow_data();
+                    if let Some(child_data) = &child_data {
+                        let child_style = child_data.styles.primary();
+                        Self::collect_inline_text(&mut builder, child_el, child_style);
+                    }
+                }
+                _ => {} // comments, doctypes, etc. — skip
+            }
+        }
+
+        // If nothing was collected (whitespace-only source), skip.
+        if builder.is_empty() {
+            return;
+        }
+        let mut attr_string = builder.build();
+        attr_string.merge_adjacent_runs();
+
+        let node = AttributedTextNodeRec {
+            active: true,
+            transform: Default::default(),
+            width: None,
+            height: None,
+            layout_child: css_flex_child_to_cg(style),
+            attributed_string: attr_string,
+            default_style,
+            text_align: css_text_align_to_cg(style.get_inherited_text().text_align),
+            text_align_vertical: TextAlignVertical::Top,
+            max_lines: None,
+            ellipsis: None,
+            fills: default_fills,
+            strokes: Default::default(),
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::default(),
+            opacity: style.get_effects().opacity,
+            blend_mode: css_blend_mode_to_cg(style),
+            mask: None,
+            effects: css_text_shadow_to_effects(style),
+        };
+
+        self.graph.append_child(Node::AttributedText(node), parent);
+    }
+
+    /// Recursively collect text from an inline element and its children into the builder.
+    fn collect_inline_text(
+        builder: &mut AttributedStringBuilder,
+        element: HtmlElement,
+        style: &ComputedValues,
+    ) {
+        let dom = adapter::dom();
+        let (run_style, _) = css_text_style_to_cg(style);
+        let run_color = Some(abs_color_to_cg(&style.get_inherited_text().color));
+        let node_data = dom.node(element.node_id());
+
+        for child_id in &node_data.children {
+            let child_node = dom.node(*child_id);
+            match &child_node.data {
+                DemoNodeData::Text(text) => {
+                    let collapsed = collapse_whitespace(text);
+                    if !collapsed.is_empty() {
+                        *builder =
+                            std::mem::take(builder).push(&collapsed, &run_style, run_color);
+                    }
+                }
+                DemoNodeData::Element(_) => {
+                    let child_el = HtmlElement::from_node_id(*child_id);
+                    let child_data = child_el.borrow_data();
+                    if let Some(child_data) = &child_data {
+                        let child_style = child_data.styles.primary();
+                        Self::collect_inline_text(builder, child_el, child_style);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     fn emit_rectangle(&mut self, style: &ComputedValues, parent: Parent) {
@@ -660,6 +671,120 @@ fn css_margin_to_cg(style: &ComputedValues) -> CSSMargin {
         bottom_auto,
         left_auto,
     }
+}
+
+/// Collapse whitespace per CSS `white-space: normal` rules.
+/// Newlines and tabs become spaces; consecutive spaces collapse to one.
+/// Leading/trailing whitespace is preserved as a single space (important for
+/// inline text runs where `"Hello "` + `"world"` must keep the space).
+fn collapse_whitespace(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut prev_was_space = false;
+    for ch in s.chars() {
+        if ch.is_ascii_whitespace() {
+            if !prev_was_space {
+                result.push(' ');
+                prev_was_space = true;
+            }
+        } else {
+            result.push(ch);
+            prev_was_space = false;
+        }
+    }
+    result
+}
+
+/// Extract text typography (TextStyleRec) and fill color from CSS computed values.
+/// Shared by emit_text_span and emit_attributed_text.
+fn css_text_style_to_cg(style: &ComputedValues) -> (TextStyleRec, Paints) {
+    let font = style.get_font();
+    let mut text_style = TextStyleRec::from_font("system-ui", 16.0);
+
+    text_style.font_size = font.font_size.computed_size().px();
+    text_style.font_weight = FontWeight(font.font_weight.value() as u32);
+
+    if let Some(first) = font.font_family.families.iter().next() {
+        use style::values::computed::font::SingleFontFamily;
+        text_style.font_family = match first {
+            SingleFontFamily::FamilyName(name) => name.name.to_string(),
+            SingleFontFamily::Generic(generic) => format!("{:?}", generic),
+        };
+    }
+
+    text_style.font_style_italic = font.font_style == style::values::computed::FontStyle::ITALIC;
+
+    match &font.line_height {
+        LineHeight::Normal => {}
+        LineHeight::Number(n) => {
+            text_style.line_height = TextLineHeight::Factor(n.0);
+        }
+        LineHeight::Length(len) => {
+            text_style.line_height = TextLineHeight::Fixed(len.0.px());
+        }
+    }
+
+    let ls = &style.get_inherited_text().letter_spacing;
+    if let Some(len) = ls.0.to_length() {
+        let px = len.px();
+        if px != 0.0 {
+            text_style.letter_spacing = TextLetterSpacing::Fixed(px);
+        }
+    }
+
+    let ws = &style.get_inherited_text().word_spacing;
+    let ws_px = ws.to_length().map(|l| l.px()).unwrap_or(0.0);
+    if ws_px != 0.0 {
+        text_style.word_spacing = TextWordSpacing::Fixed(ws_px);
+    }
+
+    {
+        use style::values::specified::text::TextTransformCase;
+        let tt = style.clone_text_transform();
+        let case = tt.case();
+        text_style.text_transform = if case == TextTransformCase::Uppercase {
+            TextTransform::Uppercase
+        } else if case == TextTransformCase::Lowercase {
+            TextTransform::Lowercase
+        } else if case == TextTransformCase::Capitalize {
+            TextTransform::Capitalize
+        } else {
+            TextTransform::None
+        };
+    }
+
+    let td_line = style.clone_text_decoration_line();
+    if td_line != StyloTextDecorationLine::NONE {
+        let line = if td_line.intersects(StyloTextDecorationLine::LINE_THROUGH) {
+            TextDecorationLine::LineThrough
+        } else if td_line.intersects(StyloTextDecorationLine::UNDERLINE) {
+            TextDecorationLine::Underline
+        } else if td_line.intersects(StyloTextDecorationLine::OVERLINE) {
+            TextDecorationLine::Overline
+        } else {
+            TextDecorationLine::None
+        };
+        if !matches!(line, TextDecorationLine::None) {
+            let td_color = css_color_to_cg(&style.clone_text_decoration_color());
+            let td_style = css_text_decoration_style_to_cg(style);
+            text_style.text_decoration = Some(TextDecorationRec {
+                text_decoration_line: line,
+                text_decoration_color: td_color,
+                text_decoration_style: td_style,
+                text_decoration_skip_ink: None,
+                text_decoration_thickness: None,
+            });
+        }
+    }
+
+    let text_color = &style.get_inherited_text().color;
+    let cg_color = abs_color_to_cg(text_color);
+    let fills = Paints::new([Paint::Solid(SolidPaint {
+        color: cg_color,
+        blend_mode: BlendMode::default(),
+        active: true,
+    })]);
+
+    (text_style, fills)
 }
 
 /// Convert CSS gap value to pixels. Returns 0 for `normal`.
@@ -2279,6 +2404,103 @@ mod tests {
         assert!(
             h1_node.bottom > 10.0,
             "h1 should have bottom padding from UA margin"
+        );
+    }
+
+    /// Inline elements (<strong>, <em>, <code>) should merge into a single AttributedText.
+    #[test]
+    fn test_inline_elements_merge_to_attributed_text() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body style="margin:0;">
+  <p>Hello <strong>world</strong>!</p>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        // Find the AttributedText node
+        let attr_node = nodes
+            .iter()
+            .find_map(|id| match graph.get_node(id).ok()? {
+                Node::AttributedText(n) => Some(n),
+                _ => None,
+            })
+            .expect("should produce an AttributedText node");
+
+        // Full text should be the concatenation of all inline segments
+        assert!(
+            attr_node.attributed_string.text.contains("Hello"),
+            "text should contain 'Hello'"
+        );
+        assert!(
+            attr_node.attributed_string.text.contains("world"),
+            "text should contain 'world'"
+        );
+
+        // Should have multiple runs (at least: normal + bold + normal)
+        assert!(
+            attr_node.attributed_string.runs.len() >= 2,
+            "should have at least 2 styled runs, got {}",
+            attr_node.attributed_string.runs.len()
+        );
+
+        // The "world" run should be bold (font-weight >= 700)
+        let bold_run = attr_node
+            .attributed_string
+            .runs
+            .iter()
+            .find(|r| {
+                let text = &attr_node.attributed_string.text[r.start as usize..r.end as usize];
+                text.contains("world")
+            })
+            .expect("should find a run containing 'world'");
+        assert!(
+            bold_run.style.font_weight.0 >= 700,
+            "bold run should have weight >= 700, got {}",
+            bold_run.style.font_weight.0
+        );
+
+        // There should be NO separate TextSpan nodes (everything merged)
+        let text_span_count = nodes
+            .iter()
+            .filter(|id| matches!(graph.get_node(id).ok(), Some(Node::TextSpan(_))))
+            .count();
+        assert_eq!(text_span_count, 0, "no separate TextSpan nodes expected");
+    }
+
+    /// Whitespace between inline elements must be preserved.
+    #[test]
+    fn test_inline_whitespace_preserved() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body style="margin:0;">
+  <p>Default <span style="color: red;">red</span> and <span style="color: green;">green</span> text.</p>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let attr_node = nodes.iter().find_map(|id| {
+            match graph.get_node(id).ok()? {
+                Node::AttributedText(n) => Some(n),
+                _ => None,
+            }
+        }).expect("should produce an AttributedText node");
+
+        let text = &attr_node.attributed_string.text;
+        assert!(
+            text.contains("Default "),
+            "should preserve space after 'Default', got: {:?}",
+            text
+        );
+        assert!(
+            text.contains(" and "),
+            "should preserve spaces around 'and', got: {:?}",
+            text
+        );
+        assert!(
+            text.contains(" text."),
+            "should preserve space before 'text.', got: {:?}",
+            text
         );
     }
 }
