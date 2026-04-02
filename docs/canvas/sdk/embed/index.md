@@ -12,7 +12,7 @@ Embed the Grida Canvas viewer in any web page via an iframe and control it progr
 ```html
 <iframe
   id="grida"
-  src="https://grida.co/embed/v1/refig?file=https://example.com/design.fig"
+  src="https://grida.co/embed/v1/figma?file=https://example.com/design.fig"
   width="800"
   height="600"
   style="border: none"
@@ -40,7 +40,7 @@ Embed the Grida Canvas viewer in any web page via an iframe and control it progr
 ## Iframe URL
 
 ```
-https://grida.co/embed/v1/refig
+https://grida.co/embed/v1/figma
 ```
 
 ### Query parameters
@@ -254,7 +254,7 @@ Images are loaded lazily -- the renderer reports which image refs it needs as it
 ## Local development
 
 ```html
-<iframe id="grida" src="https://grida.co/embed/v1/refig"></iframe>
+<iframe id="grida" src="https://grida.co/embed/v1/figma"></iframe>
 
 <script type="module">
   import { GridaEmbed } from "@grida/embed";

@@ -98,7 +98,7 @@ export default function EmbedDebugPage() {
     setScenes([]);
     setSelection([]);
     setCurrentScene(null);
-    setEmbedSrc(`/embed/v1/refig?file=${encodeURIComponent(url)}`);
+    setEmbedSrc(`/embed/v1/figma?file=${encodeURIComponent(url)}`);
   };
 
   // Load empty embed (for postMessage load)
@@ -107,7 +107,7 @@ export default function EmbedDebugPage() {
     setScenes([]);
     setSelection([]);
     setCurrentScene(null);
-    setEmbedSrc("/embed/v1/refig");
+    setEmbedSrc("/embed/v1/figma");
   };
 
   // Load file via postMessage
