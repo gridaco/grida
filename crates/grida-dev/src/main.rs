@@ -347,9 +347,11 @@ fn scene_from_markdown_path(path: &Path) -> Result<Scene> {
     let nf = NodeFactory::new();
     let mut node = nf.create_markdown_node();
     node.markdown = md_source;
+    // Use a generous height — content is clipped to this bound.
+    // The markdown renderer draws within (width, height) via PictureRecorder.
     node.size = cg::node::schema::Size {
         width: 800.0,
-        height: 2000.0,
+        height: 100_000.0,
     };
 
     let mut graph = SceneGraph::new();

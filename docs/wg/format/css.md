@@ -266,7 +266,7 @@ For containers without visual properties (no fills, no strokes), the margin is m
 
 Auto margins can be structurally represented by inserting invisible `SpacerNode(flex_grow: 1)` siblings, equivalent to Flutter's `Spacer` widget:
 
-```
+```text
 CSS:  [A] [B margin-left:auto] [C]
 IR:   [A] [SpacerNode(1)] [B] [C]
 

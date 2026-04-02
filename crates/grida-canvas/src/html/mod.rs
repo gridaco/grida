@@ -680,7 +680,7 @@ fn collapse_whitespace(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut prev_was_space = false;
     for ch in s.chars() {
-        if ch.is_ascii_whitespace() {
+        if ch.is_whitespace() {
             if !prev_was_space {
                 result.push(' ');
                 prev_was_space = true;

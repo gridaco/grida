@@ -2092,42 +2092,52 @@ impl<'a> Painter<'a> {
                 let opacity = md_layer.base.opacity;
                 let shape = &md_layer.shape;
                 let clip_path = &md_layer.base.clip_path;
+                let blend_mode = md_layer.base.blend_mode;
 
-                self.with_transform(&md_layer.base.transform.matrix, || {
-                    self.with_optional_clip_path(clip_path.as_ref(), || {
-                        let draw_content = || {
-                            // 1. Draw background fills
-                            if self.policy.render_fills() {
-                                self.draw_fills(shape, &md_layer.fills);
-                            }
+                self.with_blendmode(
+                    blend_mode,
+                    shape,
+                    effects,
+                    &md_layer.base.transform.matrix,
+                    None,
+                    || {
+                        self.with_transform(&md_layer.base.transform.matrix, || {
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
+                                let draw_content = || {
+                                    // 1. Draw background fills
+                                    if self.policy.render_fills() {
+                                        self.draw_fills(shape, &md_layer.fills);
+                                    }
 
-                            // 2. Render markdown content as a Picture
-                            let picture = super::markdown::render_markdown_picture(
-                                &md_layer.markdown,
-                                md_layer.width,
-                                self.fonts,
-                            );
+                                    // 2. Render markdown content as a Picture
+                                    let picture = super::markdown::render_markdown_picture(
+                                        &md_layer.markdown,
+                                        md_layer.width,
+                                        self.fonts,
+                                    );
 
-                            // Clip to node bounds and draw the picture
-                            self.canvas.save();
-                            self.canvas.clip_rect(
-                                Rect::from_xywh(0.0, 0.0, md_layer.width, md_layer.height),
-                                skia_safe::ClipOp::Intersect,
-                                true,
-                            );
-                            self.canvas.draw_picture(&picture, None, None);
-                            self.canvas.restore();
-                        };
+                                    // Clip to node bounds and draw the picture
+                                    self.canvas.save();
+                                    self.canvas.clip_rect(
+                                        Rect::from_xywh(0.0, 0.0, md_layer.width, md_layer.height),
+                                        skia_safe::ClipOp::Intersect,
+                                        true,
+                                    );
+                                    self.canvas.draw_picture(&picture, None, None);
+                                    self.canvas.restore();
+                                };
 
-                        if opacity >= 1.0 && effects.is_empty() {
-                            draw_content();
-                        } else if effects.is_empty() {
-                            self.with_opacity(opacity, Some(&shape.rect), draw_content);
-                        } else {
-                            self.draw_shape_with_effects(effects, shape, draw_content);
-                        }
-                    });
-                });
+                                if opacity >= 1.0 && effects.is_empty() {
+                                    draw_content();
+                                } else if effects.is_empty() {
+                                    self.with_opacity(opacity, Some(&shape.rect), draw_content);
+                                } else {
+                                    self.draw_shape_with_effects(effects, shape, draw_content);
+                                }
+                            });
+                        });
+                    },
+                );
             }
         }
     }

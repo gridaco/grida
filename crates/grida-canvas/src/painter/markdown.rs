@@ -142,14 +142,16 @@ fn text_style_from_state(
         ts.set_foreground_paint(&fg_paint);
     }
 
+    let mut decoration = textlayout::TextDecoration::NO_DECORATION;
     if state.strikethrough {
-        ts.set_decoration_style(textlayout::TextDecorationStyle::Solid);
-        ts.set_decoration_type(textlayout::TextDecoration::LINE_THROUGH);
+        decoration |= textlayout::TextDecoration::LINE_THROUGH;
     }
-
     if state.link {
+        decoration |= textlayout::TextDecoration::UNDERLINE;
+    }
+    if decoration != textlayout::TextDecoration::NO_DECORATION {
         ts.set_decoration_style(textlayout::TextDecorationStyle::Solid);
-        ts.set_decoration_type(textlayout::TextDecoration::UNDERLINE);
+        ts.set_decoration_type(decoration);
     }
 
     ts
@@ -327,6 +329,8 @@ pub fn render_markdown_picture(
     let mut in_blockquote = false;
     let mut list_depth: u32 = 0;
     let mut ordered_list_index: Option<u64> = None;
+    // Stack of parent list index for nested lists.
+    let mut list_stack: Vec<Option<u64>> = Vec::new();
 
     // Image state — collect alt text between Start(Image) and End(Image)
     let mut in_image = false;
@@ -366,6 +370,7 @@ pub fn render_markdown_picture(
             }
             Event::Start(Tag::List(first_item)) => {
                 list_depth += 1;
+                list_stack.push(ordered_list_index);
                 ordered_list_index = *first_item;
             }
             Event::Start(Tag::Item) => {
@@ -653,8 +658,8 @@ pub fn render_markdown_picture(
             }
             Event::End(TagEnd::List(_)) => {
                 list_depth = list_depth.saturating_sub(1);
+                ordered_list_index = list_stack.pop().unwrap_or(None);
                 if list_depth == 0 {
-                    ordered_list_index = None;
                     y += 8.0;
                 }
             }
