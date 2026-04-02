@@ -114,10 +114,7 @@ export class GridaEmbed {
   // Commands
   // -------------------------------------------------------------------------
 
-  select(
-    nodeIds: string[],
-    mode?: "reset" | "add" | "toggle"
-  ): void {
+  select(nodeIds: string[], mode?: "reset" | "add" | "toggle"): void {
     this.send({ type: "grida:select", nodeIds, mode });
   }
 
@@ -161,7 +158,7 @@ export class GridaEmbed {
    */
   async load(
     data: ArrayBuffer | Uint8Array | Blob,
-    format: "fig" | "json" | "json.gz" | "zip"
+    format: "fig" | "json" | "json.gz" | "zip" | "grida" | "grida1"
   ): Promise<void> {
     let buf: ArrayBuffer;
     if (data instanceof Blob) {

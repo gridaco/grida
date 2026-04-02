@@ -202,7 +202,8 @@ export class EmbedBridge {
         break;
       case "grida:load":
         if (this.onFile) {
-          const file = new File([cmd.data], `file.${cmd.format}`, {
+          const ext = cmd.format === "grida1" ? "grida1" : cmd.format;
+          const file = new File([cmd.data], `file.${ext}`, {
             type: "application/octet-stream",
           });
           this.onFile(file);

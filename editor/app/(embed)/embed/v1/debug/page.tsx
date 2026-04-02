@@ -4,6 +4,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/lib/utils";
 
+type EmbedMode = "general" | "figma";
+
+const EMBED_PATHS: Record<EmbedMode, string> = {
+  general: "/embed/v1",
+  figma: "/embed/v1/figma",
+};
+
 type LogEntry = {
   ts: number;
   dir: "in" | "out";
@@ -26,6 +33,7 @@ export default function EmbedDebugPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [embedSrc, setEmbedSrc] = useState<string | null>(null);
+  const [mode, setMode] = useState<EmbedMode>("general");
   const [ready, setReady] = useState(false);
   const [scenes, setScenes] = useState<{ id: string; name: string }[]>([]);
   const [selection, setSelection] = useState<string[]>([]);
@@ -92,13 +100,15 @@ export default function EmbedDebugPage() {
     [addLog]
   );
 
+  const embedBasePath = EMBED_PATHS[mode];
+
   // Load preset via ?file= URL
   const loadPreset = (url: string) => {
     setReady(false);
     setScenes([]);
     setSelection([]);
     setCurrentScene(null);
-    setEmbedSrc(`/embed/v1/figma?file=${encodeURIComponent(url)}`);
+    setEmbedSrc(`${embedBasePath}?file=${encodeURIComponent(url)}`);
   };
 
   // Load empty embed (for postMessage load)
@@ -107,7 +117,7 @@ export default function EmbedDebugPage() {
     setScenes([]);
     setSelection([]);
     setCurrentScene(null);
-    setEmbedSrc("/embed/v1/figma");
+    setEmbedSrc(embedBasePath);
   };
 
   // Load file via postMessage
@@ -117,8 +127,10 @@ export default function EmbedDebugPage() {
     }
     const buf = await file.arrayBuffer();
     const name = file.name.toLowerCase();
-    let format: "fig" | "json" | "json.gz" | "zip";
-    if (name.endsWith(".json.gz")) format = "json.gz";
+    let format: "fig" | "json" | "json.gz" | "zip" | "grida" | "grida1";
+    if (name.endsWith(".grida1")) format = "grida1";
+    else if (name.endsWith(".grida")) format = "grida";
+    else if (name.endsWith(".json.gz")) format = "json.gz";
     else if (name.endsWith(".json")) format = "json";
     else if (name.endsWith(".zip")) format = "zip";
     else if (name.endsWith(".gz")) format = "json.gz";
@@ -148,6 +160,26 @@ export default function EmbedDebugPage() {
     postCommand({ type: "grida:load", data: buf, format });
   };
 
+  // Reset iframe when mode changes
+  const handleModeChange = (newMode: EmbedMode) => {
+    setMode(newMode);
+    setReady(false);
+    setScenes([]);
+    setSelection([]);
+    setCurrentScene(null);
+    setLog([]);
+    // If there's an active embed, reload it with the new mode's path
+    if (embedSrc) {
+      const url = new URL(embedSrc, window.location.origin);
+      const file = url.searchParams.get("file");
+      if (file) {
+        setEmbedSrc(`${EMBED_PATHS[newMode]}?file=${encodeURIComponent(file)}`);
+      } else {
+        setEmbedSrc(EMBED_PATHS[newMode]);
+      }
+    }
+  };
+
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
       {/* Header */}
@@ -163,6 +195,10 @@ export default function EmbedDebugPage() {
         >
           {ready ? "ready" : "not connected"}
         </span>
+        {/* Mode indicator */}
+        <span className="rounded border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {mode === "figma" ? "figma" : "general"}
+        </span>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setLog([])}>
             Clear log
@@ -173,6 +209,34 @@ export default function EmbedDebugPage() {
       <div className="flex min-h-0 flex-1">
         {/* Left: controls */}
         <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r p-4">
+          {/* Embed mode */}
+          <section>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Embed mode
+            </h3>
+            <div className="flex gap-1.5">
+              <Button
+                variant={mode === "general" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleModeChange("general")}
+              >
+                General
+              </Button>
+              <Button
+                variant={mode === "figma" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleModeChange("figma")}
+              >
+                Figma
+              </Button>
+            </div>
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
+              {mode === "figma"
+                ? "Figma ID mapping enabled. Events use original Figma node IDs."
+                : "General-purpose. Events use Grida-internal node IDs."}
+            </p>
+          </section>
+
           {/* Load via URL */}
           <section>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -210,7 +274,7 @@ export default function EmbedDebugPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".fig,.deck,.json,.json.gz,.gz,.zip,application/json,application/gzip,application/x-gzip,application/zip"
+              accept=".grida,.grida1,.fig,.deck,.json,.json.gz,.gz,.zip,application/json,application/gzip,application/x-gzip,application/zip"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -300,6 +364,14 @@ export default function EmbedDebugPage() {
               State
             </h3>
             <div className="space-y-1 text-xs">
+              <div>
+                <span className="text-muted-foreground">Mode: </span>
+                <span className="font-mono">{mode}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Embed: </span>
+                <span className="font-mono">{embedBasePath}</span>
+              </div>
               <div>
                 <span className="text-muted-foreground">Scene: </span>
                 <span className="font-mono">{currentScene ?? "—"}</span>
