@@ -57,6 +57,7 @@ export function useWasmSurface(
       wasmScene,
       target,
       (action) => editor.doc.dispatch(action),
+      editor.camera,
       dpr
     );
 
