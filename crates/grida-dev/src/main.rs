@@ -23,7 +23,7 @@ use winit::event_loop::EventLoopProxy;
     about = "Rust-native dev runtime for previewing grida-canvas scenes with winit.\n\n\
              Opens an interactive window. Optionally pass a file path or URL to load it\n\
              immediately. Drop files onto the window at any time to replace the scene.\n\n\
-             Supported formats: .grida, .grida1, .svg, .html, .png, .jpg, .jpeg, .webp"
+             Supported formats: .grida, .grida1, .svg, .html, .md, .png, .jpg, .jpeg, .webp"
 )]
 struct Cli {
     /// File path or URL to load on startup (optional).
@@ -335,6 +335,36 @@ fn scene_from_html_path(path: &Path) -> Result<Scene> {
     })
 }
 
+fn scene_from_markdown_path(path: &Path) -> Result<Scene> {
+    use cg::cg::prelude::CGColor;
+    use cg::node::factory::NodeFactory;
+    use cg::node::scene_graph::{Parent, SceneGraph};
+    use cg::node::schema::Node;
+
+    let md_source = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+
+    let nf = NodeFactory::new();
+    let mut node = nf.create_markdown_node();
+    node.markdown = md_source;
+    node.size = cg::node::schema::Size {
+        width: 800.0,
+        height: 2000.0,
+    };
+
+    let mut graph = SceneGraph::new();
+    graph.append_child(Node::Markdown(node), Parent::Root);
+
+    Ok(Scene {
+        name: path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "Markdown".to_string()),
+        graph,
+        background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
+    })
+}
+
 /// Result of loading a raster image: the scene plus the raw bytes and RID
 /// so the caller can register the image with the renderer directly.
 struct RasterScene {
@@ -403,6 +433,7 @@ async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
         "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
         "svg" => scene_from_svg_path(path).map(|s| vec![s]),
         "html" | "htm" => scene_from_html_path(path).map(|s| vec![s]),
+        "md" | "markdown" => scene_from_markdown_path(path).map(|s| vec![s]),
         // Raster images are handled separately in start_master_drop_task.
         other => Err(anyhow::anyhow!(
             "Unsupported dropped file type ({}): {}",

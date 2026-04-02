@@ -2711,6 +2711,7 @@ impl Renderer {
                 crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
                 crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
                 crate::painter::layer::PainterPictureLayer::Vector(v) => &v.base,
+                crate::painter::layer::PainterPictureLayer::Markdown(m) => &m.base,
             };
             let node_opacity = base.opacity;
             let node_blend = base.blend_mode;

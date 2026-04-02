@@ -378,4 +378,24 @@ impl NodeFactory {
             layout_child: None,
         }
     }
+
+    /// Creates a new markdown node with default values
+    pub fn create_markdown_node(&self) -> MarkdownNodeRec {
+        MarkdownNodeRec {
+            active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            effects: LayerEffects::default(),
+            mask: None,
+            transform: AffineTransform::identity(),
+            size: Size {
+                width: 400.0,
+                height: 300.0,
+            },
+            corner_radius: RectangularCornerRadius::zero(),
+            markdown: String::new(),
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            layout_child: None,
+        }
+    }
 }

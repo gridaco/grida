@@ -478,8 +478,7 @@ impl SceneBuilder {
                 DemoNodeData::Text(text) => {
                     let collapsed = collapse_whitespace(text);
                     if !collapsed.is_empty() {
-                        *builder =
-                            std::mem::take(builder).push(&collapsed, &run_style, run_color);
+                        *builder = std::mem::take(builder).push(&collapsed, &run_style, run_color);
                     }
                 }
                 DemoNodeData::Element(_) => {
@@ -2479,12 +2478,13 @@ mod tests {
         let graph = html_graph(html);
         let nodes = dfs_nodes(&graph);
 
-        let attr_node = nodes.iter().find_map(|id| {
-            match graph.get_node(id).ok()? {
+        let attr_node = nodes
+            .iter()
+            .find_map(|id| match graph.get_node(id).ok()? {
                 Node::AttributedText(n) => Some(n),
                 _ => None,
-            }
-        }).expect("should produce an AttributedText node");
+            })
+            .expect("should produce an AttributedText node");
 
         let text = &attr_node.attributed_string.text;
         assert!(

@@ -918,6 +918,7 @@ pub enum NodeTypeTag {
     Vector,
     BooleanOperation,
     Image,
+    Markdown,
 }
 
 /// Compact, layer-relevant data extracted from a `Node` at construction time.
@@ -1123,6 +1124,16 @@ pub fn extract_layer_core(node: &Node) -> NodeLayerCore {
             node_type: NodeTypeTag::Image,
             is_flex: false,
         },
+        Node::Markdown(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::Markdown,
+            is_flex: false,
+        },
     }
 }
 
@@ -1145,6 +1156,7 @@ pub enum Node {
     Vector(VectorNodeRec),
     BooleanOperation(BooleanPathOperationNodeRec),
     Image(ImageNodeRec),
+    Markdown(MarkdownNodeRec),
 }
 
 // node trait
@@ -1172,6 +1184,7 @@ impl NodeTrait for Node {
             Node::Vector(n) => n.active,
             Node::BooleanOperation(n) => n.active,
             Node::Image(n) => n.active,
+            Node::Markdown(n) => n.active,
         }
     }
 }
@@ -1195,6 +1208,7 @@ impl Node {
             Node::Vector(n) => n.mask,
             Node::BooleanOperation(n) => n.mask,
             Node::Image(n) => n.mask,
+            Node::Markdown(n) => n.mask,
             Node::Error(_) => None,
         }
     }
@@ -1220,6 +1234,7 @@ impl Node {
             Node::Vector(n) => n.opacity,
             Node::BooleanOperation(n) => n.opacity,
             Node::Image(n) => n.opacity,
+            Node::Markdown(n) => n.opacity,
         }
     }
 
@@ -1243,6 +1258,7 @@ impl Node {
             Node::Vector(_) => "Vector",
             Node::BooleanOperation(_) => "Boolean",
             Node::Image(_) => "Image",
+            Node::Markdown(_) => "Markdown",
         }
     }
 
@@ -1267,6 +1283,8 @@ impl Node {
             Node::BooleanOperation(n) => Some(&n.fills),
             // Image has a single ImagePaint, not a Paints stack
             Node::Image(_) => None,
+            // Markdown renders its own content; background fills are separate
+            Node::Markdown(n) => Some(&n.fills),
             Node::Error(_) | Node::Group(_) | Node::Line(_) => None,
         }
     }
@@ -1292,6 +1310,7 @@ impl Node {
             Node::Vector(n) => n.blend_mode,
             Node::BooleanOperation(n) => n.blend_mode,
             Node::Image(n) => n.blend_mode,
+            Node::Markdown(n) => n.blend_mode,
         }
     }
 
@@ -1316,6 +1335,7 @@ impl Node {
             Node::Vector(n) => Some(&n.effects),
             Node::BooleanOperation(n) => Some(&n.effects),
             Node::Image(n) => Some(&n.effects),
+            Node::Markdown(n) => Some(&n.effects),
         }
     }
 
@@ -2823,6 +2843,72 @@ pub struct TextNodeRec {
     pub blend_mode: LayerBlendMode,
     pub mask: Option<LayerMaskType>,
     pub effects: LayerEffects,
+}
+
+// ---------------------------------------------------------------------------
+// Markdown node
+// ---------------------------------------------------------------------------
+
+/// A node representing a Markdown document rendered directly on the canvas.
+///
+/// The markdown source (GFM) is stored as-is and rendered to a Skia Picture
+/// at paint time using the `MarkdownPainter`. The rendered picture is cached
+/// and invalidated when the markdown content or layout width changes.
+///
+/// Users interact with this as a single editable text block rather than a
+/// tree of individual text/container elements.
+#[derive(Debug, Clone)]
+pub struct MarkdownNodeRec {
+    pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub effects: LayerEffects,
+    pub mask: Option<LayerMaskType>,
+
+    pub transform: AffineTransform,
+    pub size: Size,
+    pub corner_radius: RectangularCornerRadius,
+
+    /// The GitHub Flavored Markdown source text.
+    pub markdown: String,
+
+    /// Background fills for the markdown container.
+    pub fills: Paints,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
+}
+
+impl NodeTransformMixin for MarkdownNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
+impl NodeRectMixin for MarkdownNodeRec {
+    fn rect(&self) -> Rectangle {
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
+    }
+}
+
+impl NodeGeometryMixin for MarkdownNodeRec {
+    fn has_stroke_geometry(&self) -> bool {
+        false
+    }
+
+    fn render_bounds_stroke_width(&self) -> f32 {
+        0.0
+    }
 }
 
 // endregion

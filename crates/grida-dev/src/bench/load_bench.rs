@@ -221,6 +221,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
                         cg::node::schema::Node::AttributedText(_) => "AttributedText",
                         cg::node::schema::Node::Tray(_) => "Tray",
                         cg::node::schema::Node::Error(_) => "Error",
+                        cg::node::schema::Node::Markdown(_) => "Markdown",
                     })
                     .unwrap_or("?");
                 let _ = node_type; // suppress unused

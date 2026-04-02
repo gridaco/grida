@@ -7,6 +7,7 @@ pub mod gradient;
 pub mod image;
 pub mod image_filters;
 pub mod layer;
+pub mod markdown;
 pub mod paint;
 pub mod painter_debug_node;
 pub mod shadow;
