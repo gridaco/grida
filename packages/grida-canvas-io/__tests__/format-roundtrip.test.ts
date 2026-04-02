@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
 import type grida from "@grida/schema";
 import cg from "@grida/cg";
+import { io } from "../index";
 import { format } from "../format";
 
 // Base objects for common node types
@@ -3299,4 +3302,47 @@ describe("format roundtrip", () => {
       );
     });
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Fixture round-trip: load .grida files, re-encode, verify scenes survive
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const FIXTURES_DIR = path.resolve(__dirname, "../../../fixtures/test-grida");
+
+function readFixture(name: string): Uint8Array {
+  return new Uint8Array(fs.readFileSync(path.join(FIXTURES_DIR, name)));
+}
+
+function createFileFromBytes(name: string, bytes: Uint8Array): File {
+  const blob = new Blob([bytes as BlobPart], {
+    type: "application/octet-stream",
+  });
+  return new File([blob], name, { type: "application/octet-stream" });
+}
+
+describe("fixture round-trip (.grida files)", () => {
+  const fixtureFiles = fs
+    .readdirSync(FIXTURES_DIR)
+    .filter((f) => f.endsWith(".grida"));
+
+  for (const fixture of fixtureFiles) {
+    it(`${fixture}: scenes_ref survives io.load → io.GRID.encode → decode`, async () => {
+      const bytes = readFixture(fixture);
+      const file = createFileFromBytes(fixture, bytes);
+      const loaded = await io.load(file);
+
+      if (loaded.document.scenes_ref.length === 0) return;
+
+      const reEncoded = io.GRID.encode(loaded.document);
+      const reDecoded = format.document.decode.fromFlatbuffer(reEncoded);
+
+      expect(reDecoded.scenes_ref).toEqual(loaded.document.scenes_ref);
+
+      for (const sid of reDecoded.scenes_ref) {
+        expect(reDecoded.nodes[sid]).toBeDefined();
+        expect(reDecoded.nodes[sid]!.type).toBe("scene");
+      }
+    });
+  }
 });
