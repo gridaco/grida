@@ -54,7 +54,7 @@ pub fn from_html_str(html: &str) -> Result<SceneGraph, String> {
 
     // 4. Flush stylist + resolve all styles
     driver.flush(document);
-    let styled_count = driver.style_document(document);
+    let _styled_count = driver.style_document(document);
     // 5. Build scene graph from styled DOM
     let mut builder = SceneBuilder::new();
     if let Some(root) = document.root_element() {
@@ -109,10 +109,33 @@ impl SceneBuilder {
 
         let is_structural = matches!(tag.as_str(), "html" | "body");
 
-        if has_element_children || has_text_children || is_structural {
-            // Every element with children (element or text) becomes a Container.
-            // This preserves box-model properties (border, background, dimensions)
-            // that would be lost if text-only elements were flattened to TextSpan.
+        // Check if all element children are inline (display: inline).
+        // When true and we have text, we can merge everything into AttributedText.
+        let all_children_inline = has_element_children && {
+            let mut all_inline = true;
+            let mut child = element.first_element_child();
+            while let Some(c) = child {
+                let c_data = c.borrow_data();
+                if let Some(c_data) = &c_data {
+                    let c_display = c_data.styles.primary().clone_display();
+                    if c_display.outside() != style::values::specified::box_::DisplayOutside::Inline
+                    {
+                        all_inline = false;
+                        break;
+                    }
+                }
+                child = c.next_element_sibling();
+            }
+            all_inline
+        };
+
+        if has_text_children && all_children_inline && !is_structural {
+            // All children are text or inline elements → emit as a single
+            // Container (for box model) with an AttributedText child (for text).
+            let container_id = self.emit_container(style, &display, parent);
+            self.emit_attributed_text(element, style, Parent::NodeId(container_id));
+        } else if has_element_children || has_text_children || is_structural {
+            // Mixed content or structural element → Container with separate children.
             let container_id = self.emit_container(style, &display, parent);
             let container_parent = Parent::NodeId(container_id);
 
@@ -138,6 +161,35 @@ impl SceneBuilder {
             // Empty visual element → Rectangle
             self.emit_rectangle(style, parent);
         }
+    }
+
+    /// Wrap a node in a transparent container whose padding equals the CSS margin.
+    /// The wrapper inherits the `layout_child` role (grow, positioning) from the
+    /// original node so it occupies the correct slot in the parent's flex layout.
+    /// Returns the wrapper's NodeId — the caller should append content into it.
+    fn wrap_with_margin_padding(
+        &mut self,
+        margin: &CSSMargin,
+        layout_child: Option<LayoutChildStyle>,
+        parent: Parent,
+    ) -> NodeId {
+        let mut wrapper = self.factory.create_container_node();
+        wrapper.fills = Paints::default(); // transparent — no visual
+        wrapper.strokes = Default::default();
+        wrapper.stroke_width = StrokeWidth::default();
+        wrapper.layout_container.layout_mode = LayoutMode::Flex;
+        wrapper.layout_container.layout_direction = Axis::Vertical;
+        // Clear factory default 100×100 — wrapper should auto-size to content.
+        wrapper.layout_dimensions.layout_target_width = None;
+        wrapper.layout_dimensions.layout_target_height = None;
+        wrapper.layout_container.layout_padding = Some(EdgeInsets {
+            top: margin.top,
+            right: margin.right,
+            bottom: margin.bottom,
+            left: margin.left,
+        });
+        wrapper.layout_child = layout_child;
+        self.graph.append_child(Node::Container(wrapper), parent)
     }
 
     fn emit_container(
@@ -275,138 +327,54 @@ impl SceneBuilder {
         // Flex child properties (for nested containers inside flex parents)
         node.layout_child = css_flex_child_to_cg(style);
 
-        self.graph.append_child(Node::Container(node), parent)
+        // Margin → tree surgery
+        // Fixed positive margins are absorbed into the container's own padding when
+        // the container has no visual properties (fills, borders) that would bleed
+        // into the margin zone. Otherwise, a separate wrapper is created.
+        let margin = css_margin_to_cg(style);
+        if !margin.is_zero() && !margin.has_any_auto() && !margin.has_any_negative() {
+            let has_visuals = !node.fills.is_empty() || !node.strokes.is_empty();
+            if has_visuals {
+                // Container has background/border — margin must stay outside.
+                // Wrap in a transparent container whose padding = margin.
+                let layout_child = node.layout_child.take();
+                let wrapper_id = self.wrap_with_margin_padding(&margin, layout_child, parent);
+                self.graph
+                    .append_child(Node::Container(node), Parent::NodeId(wrapper_id))
+            } else {
+                // No visual properties — safe to merge margin into padding.
+                // This avoids an extra wrapper node in the tree.
+                let existing = node
+                    .layout_container
+                    .layout_padding
+                    .unwrap_or(EdgeInsets::zero());
+                node.layout_container.layout_padding = Some(EdgeInsets {
+                    top: existing.top + margin.top,
+                    right: existing.right + margin.right,
+                    bottom: existing.bottom + margin.bottom,
+                    left: existing.left + margin.left,
+                });
+                self.graph.append_child(Node::Container(node), parent)
+            }
+        } else {
+            // TODO(margin): auto margins require SpacerNode siblings (not yet implemented).
+            // TODO(margin): negative margins require negative offset support (not planned).
+            self.graph.append_child(Node::Container(node), parent)
+        }
     }
 
     fn emit_text_span(&mut self, text: &str, style: &ComputedValues, parent: Parent) {
         let mut node = self.factory.create_text_span_node();
         node.text = text.to_string();
 
-        // Font properties
-        let font = style.get_font();
-        let font_size = font.font_size.computed_size().px();
-        node.text_style.font_size = font_size;
-
-        // font-weight
-        node.text_style.font_weight = FontWeight(font.font_weight.value() as u32);
-
-        // font-family
-        if let Some(first) = font.font_family.families.iter().next() {
-            use style::values::computed::font::SingleFontFamily;
-            node.text_style.font_family = match first {
-                SingleFontFamily::FamilyName(name) => name.name.to_string(),
-                SingleFontFamily::Generic(generic) => format!("{:?}", generic),
-            };
-        }
-
-        // font-style
-        node.text_style.font_style_italic =
-            font.font_style == style::values::computed::FontStyle::ITALIC;
-
-        // color → fill
-        let text_color = &style.get_inherited_text().color;
-        let cg_color = abs_color_to_cg(text_color);
-        node.fills = Paints::new([Paint::Solid(SolidPaint {
-            color: cg_color,
-            blend_mode: BlendMode::default(),
-            active: true,
-        })]);
-
-        // text-align
+        let (text_style, fills) = css_text_style_to_cg(style);
+        node.text_style = text_style;
+        node.fills = fills;
         node.text_align = css_text_align_to_cg(style.get_inherited_text().text_align);
-
-        // line-height
-        match &font.line_height {
-            LineHeight::Normal => {}
-            LineHeight::Number(n) => {
-                node.text_style.line_height = TextLineHeight::Factor(n.0);
-            }
-            LineHeight::Length(len) => {
-                node.text_style.line_height = TextLineHeight::Fixed(len.0.px());
-            }
-        }
-
-        // letter-spacing
-        let ls = &style.get_inherited_text().letter_spacing;
-        if let Some(len) = ls.0.to_length() {
-            let px = len.px();
-            if px != 0.0 {
-                node.text_style.letter_spacing = TextLetterSpacing::Fixed(px);
-            }
-        }
-
-        // word-spacing
-        let ws = &style.get_inherited_text().word_spacing;
-        let ws_px = ws.to_length().map(|l| l.px()).unwrap_or(0.0);
-        if ws_px != 0.0 {
-            node.text_style.word_spacing = TextWordSpacing::Fixed(ws_px);
-        }
-
-        // text-transform
-        {
-            use style::values::specified::text::TextTransformCase;
-            let tt = style.clone_text_transform();
-            let case = tt.case();
-            node.text_style.text_transform = if case == TextTransformCase::Uppercase {
-                TextTransform::Uppercase
-            } else if case == TextTransformCase::Lowercase {
-                TextTransform::Lowercase
-            } else if case == TextTransformCase::Capitalize {
-                TextTransform::Capitalize
-            } else {
-                TextTransform::None
-            };
-        }
-
-        // text-decoration
-        // NOTE: CSS allows combining multiple lines (e.g. `underline line-through`),
-        // but our IR `TextDecorationLine` is an enum, so only one value is preserved.
-        // Priority: line-through > underline > overline.
-        // TODO: support combined text-decoration-line (requires IR change to bitflags or Vec).
-        let td_line = style.clone_text_decoration_line();
-        if td_line != StyloTextDecorationLine::NONE {
-            let line = if td_line.intersects(StyloTextDecorationLine::LINE_THROUGH) {
-                TextDecorationLine::LineThrough
-            } else if td_line.intersects(StyloTextDecorationLine::UNDERLINE) {
-                TextDecorationLine::Underline
-            } else if td_line.intersects(StyloTextDecorationLine::OVERLINE) {
-                TextDecorationLine::Overline
-            } else {
-                TextDecorationLine::None
-            };
-
-            if !matches!(line, TextDecorationLine::None) {
-                // text-decoration-color (currentcolor → None, let downstream resolve)
-                let td_color = css_color_to_cg(&style.clone_text_decoration_color());
-
-                // text-decoration-style
-                let td_style = css_text_decoration_style_to_cg(style);
-
-                // TODO: text-decoration-thickness — Stylo marks this as gecko-only
-                //       (`engines="gecko"`), so it's inaccessible in servo mode.
-                //       When available, map `LengthOrAuto` → `Option<f32>`.
-                // TODO: text-decoration-skip-ink — also gecko-only in Stylo.
-
-                node.text_style.text_decoration = Some(TextDecorationRec {
-                    text_decoration_line: line,
-                    text_decoration_color: td_color,
-                    text_decoration_style: td_style,
-                    text_decoration_skip_ink: None,
-                    text_decoration_thickness: None,
-                });
-            }
-        }
-
-        // opacity
         node.opacity = style.get_effects().opacity;
-
-        // Effects (text-shadow, filter, backdrop-filter)
         node.effects = css_text_shadow_to_effects(style);
-
-        // Blend mode (mix-blend-mode)
         node.blend_mode = css_blend_mode_to_cg(style);
 
-        // flex child: layout_grow
         let flex_grow = style.clone_flex_grow();
         if flex_grow.0 > 0.0 {
             node.layout_child = Some(LayoutChildStyle {
@@ -415,7 +383,115 @@ impl SceneBuilder {
             });
         }
 
+        // NOTE: No margin surgery for text spans. Text spans are emitted using
+        // the parent element's style (see build_element), which may carry
+        // the parent's margin. Margin is handled at the container/rectangle level.
         self.graph.append_child(Node::TextSpan(node), parent);
+    }
+
+    /// Emit an `AttributedTextNodeRec` by merging all inline children (text nodes
+    /// and inline elements like `<strong>`, `<em>`, `<code>`) into a single rich
+    /// text node with per-run styling.
+    fn emit_attributed_text(
+        &mut self,
+        element: HtmlElement,
+        style: &ComputedValues,
+        parent: Parent,
+    ) {
+        let dom = adapter::dom();
+        let (default_style, default_fills) = css_text_style_to_cg(style);
+        let default_color = Some(abs_color_to_cg(&style.get_inherited_text().color));
+
+        let mut builder = AttributedStringBuilder::new();
+        let node_data = dom.node(element.node_id());
+
+        // Walk children in DOM order — interleaved text nodes and inline elements.
+        // Use CSS white-space collapsing: newlines/tabs → space, collapse runs of spaces.
+        for child_id in &node_data.children {
+            let child_node = dom.node(*child_id);
+            match &child_node.data {
+                DemoNodeData::Text(text) => {
+                    let collapsed = collapse_whitespace(text);
+                    if !collapsed.is_empty() {
+                        builder = builder.push(&collapsed, &default_style, default_color);
+                    }
+                }
+                DemoNodeData::Element(_) => {
+                    // Inline element — get its own computed style and collect text.
+                    let child_el = HtmlElement::from_node_id(*child_id);
+                    let child_data = child_el.borrow_data();
+                    if let Some(child_data) = &child_data {
+                        let child_style = child_data.styles.primary();
+                        Self::collect_inline_text(&mut builder, child_el, child_style);
+                    }
+                }
+                _ => {} // comments, doctypes, etc. — skip
+            }
+        }
+
+        // If nothing was collected (whitespace-only source), skip.
+        if builder.is_empty() {
+            return;
+        }
+        let mut attr_string = builder.build();
+        attr_string.merge_adjacent_runs();
+
+        let node = AttributedTextNodeRec {
+            active: true,
+            transform: Default::default(),
+            width: None,
+            height: None,
+            layout_child: css_flex_child_to_cg(style),
+            attributed_string: attr_string,
+            default_style,
+            text_align: css_text_align_to_cg(style.get_inherited_text().text_align),
+            text_align_vertical: TextAlignVertical::Top,
+            max_lines: None,
+            ellipsis: None,
+            fills: default_fills,
+            strokes: Default::default(),
+            stroke_width: 0.0,
+            stroke_align: StrokeAlign::default(),
+            opacity: style.get_effects().opacity,
+            blend_mode: css_blend_mode_to_cg(style),
+            mask: None,
+            effects: css_text_shadow_to_effects(style),
+        };
+
+        self.graph.append_child(Node::AttributedText(node), parent);
+    }
+
+    /// Recursively collect text from an inline element and its children into the builder.
+    fn collect_inline_text(
+        builder: &mut AttributedStringBuilder,
+        element: HtmlElement,
+        style: &ComputedValues,
+    ) {
+        let dom = adapter::dom();
+        let (run_style, _) = css_text_style_to_cg(style);
+        let run_color = Some(abs_color_to_cg(&style.get_inherited_text().color));
+        let node_data = dom.node(element.node_id());
+
+        for child_id in &node_data.children {
+            let child_node = dom.node(*child_id);
+            match &child_node.data {
+                DemoNodeData::Text(text) => {
+                    let collapsed = collapse_whitespace(text);
+                    if !collapsed.is_empty() {
+                        *builder = std::mem::take(builder).push(&collapsed, &run_style, run_color);
+                    }
+                }
+                DemoNodeData::Element(_) => {
+                    let child_el = HtmlElement::from_node_id(*child_id);
+                    let child_data = child_el.borrow_data();
+                    if let Some(child_data) = &child_data {
+                        let child_style = child_data.styles.primary();
+                        Self::collect_inline_text(builder, child_el, child_style);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     fn emit_rectangle(&mut self, style: &ComputedValues, parent: Parent) {
@@ -443,7 +519,17 @@ impl SceneBuilder {
         // Blend mode (mix-blend-mode)
         node.blend_mode = css_blend_mode_to_cg(style);
 
-        self.graph.append_child(Node::Rectangle(node), parent);
+        // Margin → tree surgery (same pattern as emit_container)
+        let margin = css_margin_to_cg(style);
+        if !margin.is_zero() && !margin.has_any_auto() && !margin.has_any_negative() {
+            let layout_child = node.layout_child.take();
+            let wrapper_id = self.wrap_with_margin_padding(&margin, layout_child, parent);
+            self.graph
+                .append_child(Node::Rectangle(node), Parent::NodeId(wrapper_id));
+        } else {
+            // TODO(margin): auto/negative margins not supported for rectangles.
+            self.graph.append_child(Node::Rectangle(node), parent);
+        }
     }
 }
 
@@ -520,6 +606,184 @@ fn css_padding_to_cg(style: &ComputedValues) -> CSSPadding {
         bottom: lp_to_px(&p.padding_bottom),
         left: lp_to_px(&p.padding_left),
     }
+}
+
+/// Parsed CSS margin with per-edge auto tracking.
+struct CSSMargin {
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+    top_auto: bool,
+    right_auto: bool,
+    bottom_auto: bool,
+    left_auto: bool,
+}
+
+impl CSSMargin {
+    fn is_zero(&self) -> bool {
+        !self.top_auto
+            && !self.right_auto
+            && !self.bottom_auto
+            && !self.left_auto
+            && self.top == 0.0
+            && self.right == 0.0
+            && self.bottom == 0.0
+            && self.left == 0.0
+    }
+
+    fn has_any_auto(&self) -> bool {
+        self.top_auto || self.right_auto || self.bottom_auto || self.left_auto
+    }
+
+    fn has_any_negative(&self) -> bool {
+        self.top < 0.0 || self.right < 0.0 || self.bottom < 0.0 || self.left < 0.0
+    }
+}
+
+fn css_margin_to_cg(style: &ComputedValues) -> CSSMargin {
+    // Stylo exposes margin fields as `computed::Margin` (GenericMargin<LengthPercentage>).
+    // Variants: Auto | LengthPercentage(lp) | AnchorSizeFunction (CSS anchoring, ignored).
+    fn extract(v: style::values::computed::Margin) -> (f32, bool) {
+        if v.is_auto() {
+            return (0.0, true);
+        }
+        match v {
+            style::values::computed::Margin::LengthPercentage(lp) => {
+                (lp.to_length().map(|l| l.px()).unwrap_or(0.0), false)
+            }
+            _ => (0.0, false),
+        }
+    }
+
+    let (top, top_auto) = extract(style.clone_margin_top());
+    let (right, right_auto) = extract(style.clone_margin_right());
+    let (bottom, bottom_auto) = extract(style.clone_margin_bottom());
+    let (left, left_auto) = extract(style.clone_margin_left());
+    CSSMargin {
+        top,
+        right,
+        bottom,
+        left,
+        top_auto,
+        right_auto,
+        bottom_auto,
+        left_auto,
+    }
+}
+
+/// Collapse whitespace per CSS `white-space: normal` rules.
+/// Newlines and tabs become spaces; consecutive spaces collapse to one.
+/// Leading/trailing whitespace is preserved as a single space (important for
+/// inline text runs where `"Hello "` + `"world"` must keep the space).
+fn collapse_whitespace(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut prev_was_space = false;
+    for ch in s.chars() {
+        if ch.is_whitespace() {
+            if !prev_was_space {
+                result.push(' ');
+                prev_was_space = true;
+            }
+        } else {
+            result.push(ch);
+            prev_was_space = false;
+        }
+    }
+    result
+}
+
+/// Extract text typography (TextStyleRec) and fill color from CSS computed values.
+/// Shared by emit_text_span and emit_attributed_text.
+fn css_text_style_to_cg(style: &ComputedValues) -> (TextStyleRec, Paints) {
+    let font = style.get_font();
+    let mut text_style = TextStyleRec::from_font("system-ui", 16.0);
+
+    text_style.font_size = font.font_size.computed_size().px();
+    text_style.font_weight = FontWeight(font.font_weight.value() as u32);
+
+    if let Some(first) = font.font_family.families.iter().next() {
+        use style::values::computed::font::SingleFontFamily;
+        text_style.font_family = match first {
+            SingleFontFamily::FamilyName(name) => name.name.to_string(),
+            SingleFontFamily::Generic(generic) => format!("{:?}", generic),
+        };
+    }
+
+    text_style.font_style_italic = font.font_style == style::values::computed::FontStyle::ITALIC;
+
+    match &font.line_height {
+        LineHeight::Normal => {}
+        LineHeight::Number(n) => {
+            text_style.line_height = TextLineHeight::Factor(n.0);
+        }
+        LineHeight::Length(len) => {
+            text_style.line_height = TextLineHeight::Fixed(len.0.px());
+        }
+    }
+
+    let ls = &style.get_inherited_text().letter_spacing;
+    if let Some(len) = ls.0.to_length() {
+        let px = len.px();
+        if px != 0.0 {
+            text_style.letter_spacing = TextLetterSpacing::Fixed(px);
+        }
+    }
+
+    let ws = &style.get_inherited_text().word_spacing;
+    let ws_px = ws.to_length().map(|l| l.px()).unwrap_or(0.0);
+    if ws_px != 0.0 {
+        text_style.word_spacing = TextWordSpacing::Fixed(ws_px);
+    }
+
+    {
+        use style::values::specified::text::TextTransformCase;
+        let tt = style.clone_text_transform();
+        let case = tt.case();
+        text_style.text_transform = if case == TextTransformCase::Uppercase {
+            TextTransform::Uppercase
+        } else if case == TextTransformCase::Lowercase {
+            TextTransform::Lowercase
+        } else if case == TextTransformCase::Capitalize {
+            TextTransform::Capitalize
+        } else {
+            TextTransform::None
+        };
+    }
+
+    let td_line = style.clone_text_decoration_line();
+    if td_line != StyloTextDecorationLine::NONE {
+        let line = if td_line.intersects(StyloTextDecorationLine::LINE_THROUGH) {
+            TextDecorationLine::LineThrough
+        } else if td_line.intersects(StyloTextDecorationLine::UNDERLINE) {
+            TextDecorationLine::Underline
+        } else if td_line.intersects(StyloTextDecorationLine::OVERLINE) {
+            TextDecorationLine::Overline
+        } else {
+            TextDecorationLine::None
+        };
+        if !matches!(line, TextDecorationLine::None) {
+            let td_color = css_color_to_cg(&style.clone_text_decoration_color());
+            let td_style = css_text_decoration_style_to_cg(style);
+            text_style.text_decoration = Some(TextDecorationRec {
+                text_decoration_line: line,
+                text_decoration_color: td_color,
+                text_decoration_style: td_style,
+                text_decoration_skip_ink: None,
+                text_decoration_thickness: None,
+            });
+        }
+    }
+
+    let text_color = &style.get_inherited_text().color;
+    let cg_color = abs_color_to_cg(text_color);
+    let fills = Paints::new([Paint::Solid(SolidPaint {
+        color: cg_color,
+        blend_mode: BlendMode::default(),
+        active: true,
+    })]);
+
+    (text_style, fills)
 }
 
 /// Convert CSS gap value to pixels. Returns 0 for `normal`.
@@ -2090,5 +2354,153 @@ mod tests {
         } else {
             panic!("expected TextSpan");
         }
+    }
+
+    /// h1 margin should merge into padding (no extra wrapper container).
+    #[test]
+    fn test_h1_margin_no_double_wrap() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body style="margin:0; padding:0;">
+  <h1>Hello</h1>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        // h1 has UA margin ~21px top/bottom. With body margin:0, the tree should be:
+        //   ICB → html → h1(margin merged as padding) → TextSpan
+        // Total containers: 3 (ICB + html + h1), no extra wrapper.
+        let container_count = nodes
+            .iter()
+            .filter(|id| matches!(graph.get_node(id).ok(), Some(Node::Container(_))))
+            .count();
+        // ICB is InitialContainer, not Container
+        let icb_count = nodes
+            .iter()
+            .filter(|id| matches!(graph.get_node(id).ok(), Some(Node::InitialContainer(_))))
+            .count();
+        assert_eq!(
+            icb_count + container_count,
+            3,
+            "ICB + html + h1 = 3 frames, no margin wrapper"
+        );
+
+        // h1 container should have margin merged as padding
+        let h1_node = nodes
+            .iter()
+            .rev()
+            .find_map(|id| match graph.get_node(id).ok()? {
+                Node::Container(c) if c.layout_container.layout_padding.is_some() => {
+                    Some(c.layout_container.layout_padding.as_ref().unwrap().clone())
+                }
+                _ => None,
+            })
+            .expect("h1 should have padding from merged margin");
+        assert!(
+            h1_node.top > 10.0,
+            "h1 should have top padding from UA margin"
+        );
+        assert!(
+            h1_node.bottom > 10.0,
+            "h1 should have bottom padding from UA margin"
+        );
+    }
+
+    /// Inline elements (<strong>, <em>, <code>) should merge into a single AttributedText.
+    #[test]
+    fn test_inline_elements_merge_to_attributed_text() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body style="margin:0;">
+  <p>Hello <strong>world</strong>!</p>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        // Find the AttributedText node
+        let attr_node = nodes
+            .iter()
+            .find_map(|id| match graph.get_node(id).ok()? {
+                Node::AttributedText(n) => Some(n),
+                _ => None,
+            })
+            .expect("should produce an AttributedText node");
+
+        // Full text should be the concatenation of all inline segments
+        assert!(
+            attr_node.attributed_string.text.contains("Hello"),
+            "text should contain 'Hello'"
+        );
+        assert!(
+            attr_node.attributed_string.text.contains("world"),
+            "text should contain 'world'"
+        );
+
+        // Should have multiple runs (at least: normal + bold + normal)
+        assert!(
+            attr_node.attributed_string.runs.len() >= 2,
+            "should have at least 2 styled runs, got {}",
+            attr_node.attributed_string.runs.len()
+        );
+
+        // The "world" run should be bold (font-weight >= 700)
+        let bold_run = attr_node
+            .attributed_string
+            .runs
+            .iter()
+            .find(|r| {
+                let text = &attr_node.attributed_string.text[r.start as usize..r.end as usize];
+                text.contains("world")
+            })
+            .expect("should find a run containing 'world'");
+        assert!(
+            bold_run.style.font_weight.0 >= 700,
+            "bold run should have weight >= 700, got {}",
+            bold_run.style.font_weight.0
+        );
+
+        // There should be NO separate TextSpan nodes (everything merged)
+        let text_span_count = nodes
+            .iter()
+            .filter(|id| matches!(graph.get_node(id).ok(), Some(Node::TextSpan(_))))
+            .count();
+        assert_eq!(text_span_count, 0, "no separate TextSpan nodes expected");
+    }
+
+    /// Whitespace between inline elements must be preserved.
+    #[test]
+    fn test_inline_whitespace_preserved() {
+        let _guard = lock_html();
+        let html = r#"<!doctype html>
+<html><body style="margin:0;">
+  <p>Default <span style="color: red;">red</span> and <span style="color: green;">green</span> text.</p>
+</body></html>"#;
+        let graph = html_graph(html);
+        let nodes = dfs_nodes(&graph);
+
+        let attr_node = nodes
+            .iter()
+            .find_map(|id| match graph.get_node(id).ok()? {
+                Node::AttributedText(n) => Some(n),
+                _ => None,
+            })
+            .expect("should produce an AttributedText node");
+
+        let text = &attr_node.attributed_string.text;
+        assert!(
+            text.contains("Default "),
+            "should preserve space after 'Default', got: {:?}",
+            text
+        );
+        assert!(
+            text.contains(" and "),
+            "should preserve spaces around 'and', got: {:?}",
+            text
+        );
+        assert!(
+            text.contains(" text."),
+            "should preserve space before 'text.', got: {:?}",
+            text
+        );
     }
 }

@@ -74,6 +74,7 @@ pub enum PainterPictureLayer {
     Shape(PainterPictureShapeLayer),
     Text(PainterPictureTextLayer),
     Vector(PainterPictureVectorLayer),
+    Markdown(PainterPictureMarkdownLayer),
 }
 
 impl PainterPictureLayer {
@@ -91,6 +92,7 @@ impl PainterPictureLayer {
             PainterPictureLayer::Shape(s) => s.effects.is_empty(),
             PainterPictureLayer::Text(t) => t.effects.is_empty(),
             PainterPictureLayer::Vector(v) => v.effects.is_empty(),
+            PainterPictureLayer::Markdown(m) => m.effects.is_empty(),
         }
     }
 }
@@ -163,6 +165,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => &layer.base.id,
             PainterPictureLayer::Text(layer) => &layer.base.id,
             PainterPictureLayer::Vector(layer) => &layer.base.id,
+            PainterPictureLayer::Markdown(layer) => &layer.base.id,
         }
     }
 
@@ -171,6 +174,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => layer.base.z_index,
             PainterPictureLayer::Text(layer) => layer.base.z_index,
             PainterPictureLayer::Vector(layer) => layer.base.z_index,
+            PainterPictureLayer::Markdown(layer) => layer.base.z_index,
         }
     }
 
@@ -179,6 +183,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => layer.base.transform,
             PainterPictureLayer::Text(layer) => layer.base.transform,
             PainterPictureLayer::Vector(layer) => layer.base.transform,
+            PainterPictureLayer::Markdown(layer) => layer.base.transform,
         }
     }
 
@@ -187,6 +192,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => &layer.shape,
             PainterPictureLayer::Vector(layer) => &layer.shape,
             PainterPictureLayer::Text(layer) => &layer.shape,
+            PainterPictureLayer::Markdown(layer) => &layer.shape,
         }
     }
 }
@@ -285,6 +291,25 @@ pub struct PainterPictureVectorLayer {
     pub marker_start_shape: StrokeMarkerPreset,
     /// Marker shape at the end endpoint (last vertex).
     pub marker_end_shape: StrokeMarkerPreset,
+}
+
+/// A painter layer for Markdown content rendered directly to a Skia Picture.
+///
+/// The markdown source is carried here so the painter can call
+/// `render_markdown_picture()` at draw time and cache the result.
+#[derive(Debug, Clone)]
+pub struct PainterPictureMarkdownLayer {
+    pub base: PainterPictureLayerBase,
+    pub effects: LayerEffects,
+    pub shape: PainterShape,
+    /// Background fills for the markdown container.
+    pub fills: Paints,
+    /// GFM markdown source text.
+    pub markdown: String,
+    /// Layout width for text wrapping.
+    pub width: f32,
+    /// Layout height for clipping.
+    pub height: f32,
 }
 
 /// A layer with its associated node ID.
@@ -1533,6 +1558,39 @@ impl LayerList {
                 FlattenResult {
                     commands: vec![PainterRenderCommand::Draw(layer)],
                     mask: None,
+                }
+            }
+            Node::Markdown(n) => {
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
+                let fills = Self::filter_visible_paints(&n.fills);
+
+                let layer = PainterPictureLayer::Markdown(PainterPictureMarkdownLayer {
+                    base: PainterPictureLayerBase {
+                        id: id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
+                    },
+                    shape,
+                    effects: Self::filter_active_effects(&n.effects),
+                    fills,
+                    markdown: n.markdown.clone(),
+                    width: n.size.width,
+                    height: n.size.height,
+                });
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
                 }
             }
         }

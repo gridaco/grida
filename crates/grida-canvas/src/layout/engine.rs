@@ -219,6 +219,7 @@ impl LayoutEngine {
             Node::Rectangle(n) => (n.size.width, n.size.height),
             Node::Ellipse(n) => (n.size.width, n.size.height),
             Node::Image(n) => (n.size.width, n.size.height),
+            Node::Markdown(n) => (n.size.width, n.size.height),
             Node::Line(n) => (n.size.width, n.size.height),
             Node::Polygon(n) => {
                 let rect = n.rect();
@@ -272,6 +273,7 @@ impl LayoutEngine {
             Node::Rectangle(n) => (n.transform.x(), n.transform.y()),
             Node::Ellipse(n) => (n.transform.x(), n.transform.y()),
             Node::Image(n) => (n.transform.x(), n.transform.y()),
+            Node::Markdown(n) => (n.transform.x(), n.transform.y()),
             Node::Line(n) => (n.transform.x(), n.transform.y()),
             Node::Polygon(n) => (n.transform.x(), n.transform.y()),
             Node::RegularPolygon(n) => (n.transform.x(), n.transform.y()),
@@ -2030,5 +2032,78 @@ mod tests {
         assert_eq!(container_layout.y, 60.0, "Container y");
         assert_eq!(container_layout.width, 100.0);
         assert_eq!(container_layout.height, 80.0);
+    }
+
+    #[test]
+    fn test_markdown_node_layout_preserves_size() {
+        // Regression: MarkdownNode was returning grida_style_default() with no
+        // explicit dimensions, causing Taffy to compute 0×0 bounds.
+        let nf = NodeFactory::new();
+        let mut graph = SceneGraph::new();
+
+        let mut md = nf.create_markdown_node();
+        md.markdown = "# Hello\nWorld".to_string();
+        md.size = Size {
+            width: 800.0,
+            height: 600.0,
+        };
+        md.transform = AffineTransform::new(50.0, 100.0, 0.0);
+        let md_id = graph.append_child(Node::Markdown(md), Parent::Root);
+
+        let scene = Scene {
+            name: "Markdown layout test".to_string(),
+            graph,
+            background_color: None,
+        };
+
+        let mut engine = LayoutEngine::new();
+        let layout_result = engine.compute(
+            &scene,
+            Size {
+                width: 1024.0,
+                height: 768.0,
+            },
+            None,
+        );
+
+        let md_layout = layout_result
+            .get(&md_id)
+            .expect("Markdown node must have a layout result");
+        assert_eq!(md_layout.width, 800.0, "Markdown width must match schema");
+        assert_eq!(md_layout.height, 600.0, "Markdown height must match schema");
+
+        // Also verify GeometryCache round-trip produces correct bounds
+        use crate::cache::paragraph::ParagraphCache;
+        use crate::resources::ByteStore;
+        use crate::runtime::font_repository::FontRepository;
+        use std::sync::{Arc, Mutex};
+
+        let store = Arc::new(Mutex::new(ByteStore::new()));
+        let fonts = FontRepository::new(store);
+        let mut para_cache = ParagraphCache::new();
+        let geom = crate::cache::geometry::GeometryCache::from_scene_with_layout(
+            &scene,
+            &mut para_cache,
+            &fonts,
+            Some(layout_result),
+            Size {
+                width: 1024.0,
+                height: 768.0,
+            },
+        );
+
+        let bounds = geom
+            .get_world_bounds(&md_id)
+            .expect("Markdown node must have world bounds");
+        assert!(
+            bounds.width >= 800.0,
+            "World bounds width ({}) must be >= 800",
+            bounds.width,
+        );
+        assert!(
+            bounds.height >= 600.0,
+            "World bounds height ({}) must be >= 600",
+            bounds.height,
+        );
     }
 }

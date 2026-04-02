@@ -2064,6 +2064,11 @@ impl AttributedStringBuilder {
         self
     }
 
+    /// Returns `true` if no text has been pushed yet.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
     /// Build the final [`AttributedString`].
     ///
     /// Panics if no text was pushed.

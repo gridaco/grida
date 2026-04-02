@@ -20,18 +20,18 @@ CSS → Grida IR property mapping table and TODO tracker.
 
 ## Box Model & Sizing
 
-| CSS Property          | Grida IR Field                                    | Status | Notes                                 |
-| --------------------- | ------------------------------------------------- | ------ | ------------------------------------- |
-| `width`               | `LayoutDimensionStyle.layout_target_width`        | ✅     | px only; % not resolved               |
-| `height`              | `LayoutDimensionStyle.layout_target_height`       | ✅     | px only                               |
-| `min-width`           | `LayoutDimensionStyle.layout_min_width`           | ✅     |                                       |
-| `min-height`          | `LayoutDimensionStyle.layout_min_height`          | ✅     |                                       |
-| `max-width`           | `LayoutDimensionStyle.layout_max_width`           | ✅     |                                       |
-| `max-height`          | `LayoutDimensionStyle.layout_max_height`          | ✅     |                                       |
-| `padding` (all sides) | `LayoutContainerStyle.layout_padding`             | ✅     | EdgeInsets (top/right/bottom/left)    |
-| `margin`              | --                                                | ❌     | Not in `LayoutChildStyle`             |
-| `box-sizing`          | --                                                | ⚠️     | Assumed border-box; no explicit field |
-| `aspect-ratio`        | `LayoutDimensionStyle.layout_target_aspect_ratio` | 🔧     | Field exists, CSS import not wired    |
+| CSS Property          | Grida IR Field                                    | Status | Notes                                                                                                                   |
+| --------------------- | ------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `width`               | `LayoutDimensionStyle.layout_target_width`        | ✅     | px only; % not resolved                                                                                                 |
+| `height`              | `LayoutDimensionStyle.layout_target_height`       | ✅     | px only                                                                                                                 |
+| `min-width`           | `LayoutDimensionStyle.layout_min_width`           | ✅     |                                                                                                                         |
+| `min-height`          | `LayoutDimensionStyle.layout_min_height`          | ✅     |                                                                                                                         |
+| `max-width`           | `LayoutDimensionStyle.layout_max_width`           | ✅     |                                                                                                                         |
+| `max-height`          | `LayoutDimensionStyle.layout_max_height`          | ✅     |                                                                                                                         |
+| `padding` (all sides) | `LayoutContainerStyle.layout_padding`             | ✅     | EdgeInsets (top/right/bottom/left)                                                                                      |
+| `margin`              | (tree surgery)                                    | ⚠️     | Fixed margins → wrapper+padding; auto/negative not supported; no collapse (see [Known Limitations](#known-limitations)) |
+| `box-sizing`          | --                                                | ⚠️     | Assumed border-box; no explicit field                                                                                   |
+| `aspect-ratio`        | `LayoutDimensionStyle.layout_target_aspect_ratio` | 🔧     | Field exists, CSS import not wired                                                                                      |
 
 ## Display & Layout
 
@@ -210,3 +210,74 @@ Currently transforms are applied around (0, 0). A pivot point field on `AffineTr
 **Unblocks:** `flex-direction: row-reverse` / `column-reverse`, `flex-wrap: wrap-reverse`
 
 `Axis` enum only has `Horizontal`/`Vertical`. Needs reverse variants or a separate bool.
+
+---
+
+## Known Limitations
+
+### Margin collapse is not supported
+
+**CSS spec:** [CSS Box Model Level 3 §5 — Collapsing Margins](https://www.w3.org/TR/css-box-3/#margins), originally CSS2 §8.3.1.
+
+In CSS block formatting context (normal flow), adjacent vertical margins do not stack — they **collapse** into `max(margin_a, margin_b)`. This applies to all block-level elements (not just text), in three cases:
+
+1. **Sibling collapse** — bottom margin of element A meets top margin of element B
+2. **Parent-child collapse** — child's margin leaks through a parent with no padding/border
+3. **Empty element collapse** — an element's own top and bottom margins merge
+
+Grida converts `display: block` to `LayoutMode::Flex` (column), and **flex containers never collapse margins** (CSS Flexbox §4.4). This is an inherent limitation — Taffy's flex layout engine does not implement block formatting context, and no design tool (Figma, Framer, Sketch) does either.
+
+**Impact:** Imported HTML that relies on margin collapse will have more vertical spacing than the original. Two sibling elements with `margin-bottom: 20px` and `margin-top: 30px` produce a 50px gap instead of the expected 30px.
+
+**Workaround:** None at the engine level. Content authors can use `gap` on flex containers instead of sibling margins, which is the modern CSS best practice and avoids collapse entirely.
+
+### Margin auto is not supported
+
+CSS `margin: auto` in flex containers absorbs free space per-child, enabling centering and push-alignment patterns that cannot be expressed with padding or container-level alignment alone. This requires either a first-class `margin: auto` field on `LayoutChildStyle`, or `SpacerNode` siblings (Flutter's `Spacer` widget pattern). Neither is implemented yet.
+
+### Negative margins are not supported
+
+CSS allows negative margins to pull elements closer or create overlapping layouts. Padding cannot be negative, so the wrapper+padding tree surgery cannot represent this. Negative margins are silently dropped during import.
+
+---
+
+## Tree Surgery Reference
+
+CSS properties that lack direct IR representation are converted via structural tree transforms during HTML import (`crates/grida-canvas/src/html/mod.rs`).
+
+### Margin → wrapper + padding
+
+Fixed positive margins are handled by wrapping the element in a transparent container whose padding equals the margin values. The wrapper inherits the element's `layout_child` role (flex-grow, positioning) so it occupies the correct slot in the parent's flex layout.
+
+For containers without visual properties (no fills, no strokes), the margin is merged directly into the container's own padding to avoid an unnecessary wrapper node.
+
+| CSS margin pattern                                | Tree surgery                             | Accurate? | Notes                                               |
+| ------------------------------------------------- | ---------------------------------------- | --------- | --------------------------------------------------- |
+| `margin: 20px` (fixed uniform)                    | Wrapper `{ padding: 20px }` → child      | Yes       | Exact in flex (no collapse)                         |
+| `margin: 10px 20px 30px 40px`                     | Wrapper with matching asymmetric padding | Yes       | Exact in flex                                       |
+| `margin: 0`                                       | No-op                                    | Yes       |                                                     |
+| `margin: 0 auto` (center)                         | Not supported                            | —         | Requires `SpacerNode` or first-class `margin: auto` |
+| `margin-left: auto` (push)                        | Not supported                            | —         | Same                                                |
+| `margin-top: -20px` (negative)                    | Dropped                                  | No        | Padding cannot be negative                          |
+| `margin: 5%` (percentage)                         | Dropped                                  | No        | Would need computed value at import time            |
+| Sibling collapse (`margin-bottom` + `margin-top`) | Summed, not collapsed                    | No        | Flex does not collapse margins; inherent limitation |
+
+### Future: SpacerNode for auto margins
+
+Auto margins can be structurally represented by inserting invisible `SpacerNode(flex_grow: 1)` siblings, equivalent to Flutter's `Spacer` widget:
+
+```text
+CSS:  [A] [B margin-left:auto] [C]
+IR:   [A] [SpacerNode(1)] [B] [C]
+
+CSS:  [A margin:0 auto]
+IR:   [SpacerNode(1)] [A] [SpacerNode(1)]
+```
+
+### Future: first-class margin on LayoutChildStyle
+
+If the wrapper approach proves insufficient (tree bloat, round-trip fidelity), margin can be added as `Option<MarginEdgeInsets>` on `LayoutChildStyle` with per-edge `Fixed(f32)` / `Auto` variants, wired directly to Taffy's `Style.margin: Rect<LengthPercentageAuto>`. See `format/grida.fbs` `LayoutChildStyle` table for the schema extension point.
+
+### Fixture
+
+Visual test fixture for all margin behaviors: [`fixtures/test-html/L0/box-margin.html`](../../../fixtures/test-html/L0/box-margin.html)
