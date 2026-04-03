@@ -51,6 +51,7 @@ import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { cursors } from "../../components/cursor/cursor-data";
 import { SurfaceTextEditor } from "./ui/surface-text-editor";
+import { TextSelectionOverlay } from "./ui/surface-text-selection-overlay";
 import { SurfaceVectorEditor } from "./ui/surface-vector-editor";
 import { SurfaceGradientEditor } from "./ui/surface-gradient-editor";
 import { SurfaceImageEditor } from "./ui/surface-image-editor";
@@ -1042,6 +1043,18 @@ function SingleSelectionOverlay({
 
   const { node, distribution, rotation, boundingSurfaceRect, size, object } =
     data;
+
+  if (node.type === "tspan") {
+    return (
+      <div className="group">
+        <SurfaceFragmentGroup hidden={is_node_translating}>
+          <TextSelectionOverlay node_id={node_id} readonly={readonly}>
+            <NodeOverlay node_id={node_id} readonly={readonly} focused />
+          </TextSelectionOverlay>
+        </SurfaceFragmentGroup>
+      </div>
+    );
+  }
 
   const padding =
     node.type === "container" || node.type === "component"
