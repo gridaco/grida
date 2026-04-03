@@ -1167,7 +1167,9 @@ export namespace iofigma {
             useStroke: boolean;
             /** Stroke geometry is an outlined path: apply stroke color as fill, no stroke. */
             strokeAsFill?: boolean;
-          }
+          },
+          /** Per-path fill override (resolved from fillOverrideTable). Defaults to parentNode.fills. */
+          fillOverrides?: figrest.Paint[]
         ): grida.program.nodes.VectorNode | null {
           if (!pathData) return null;
 
@@ -1177,6 +1179,7 @@ export namespace iofigma {
 
             // Use parent node bounds instead of computing bbox from path; Figma path data aligns with node coordinate space.
             const strokeAsFill = options.strokeAsFill === true;
+            const effectiveFills = fillOverrides ?? parentNode.fills;
             return {
               id: childId,
               ...base_node_trait({
@@ -1215,7 +1218,7 @@ export namespace iofigma {
                   }
                 : {
                     ...(options.useFill
-                      ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                      ? fills_trait(effectiveFills, context, imageRefsUsed)
                       : {}),
                     ...(options.useStroke
                       ? stroke_trait(parentNode, context, imageRefsUsed)
@@ -1259,13 +1262,16 @@ export namespace iofigma {
             useFill: boolean;
             useStroke: boolean;
             strokeAsFill?: boolean;
-          }
+          },
+          /** Per-path fill override (resolved from fillOverrideTable). Defaults to parentNode.fills. */
+          fillOverrides?: figrest.Paint[]
         ): grida.program.nodes.PathNode | null {
           if (!pathData) return null;
 
           try {
             const { width, height } = getParentBounds(parentNode);
             const strokeAsFill = options.strokeAsFill === true;
+            const effectiveFills = fillOverrides ?? parentNode.fills;
             return {
               id: childId,
               ...base_node_trait({
@@ -1304,7 +1310,7 @@ export namespace iofigma {
                   }
                 : {
                     ...(options.useFill
-                      ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                      ? fills_trait(effectiveFills, context, imageRefsUsed)
                       : {}),
                     ...(options.useStroke
                       ? stroke_trait(parentNode, context, imageRefsUsed)
@@ -1330,6 +1336,36 @@ export namespace iofigma {
         }
 
         /**
+         * Resolves the effective fills for a fillGeometry path, accounting
+         * for per-region fill overrides via `fillOverrideTable`.
+         *
+         * Lookup rules (from the Figma REST API spec):
+         * - Path has no `overrideID`           → use node-level `fills`
+         * - `fillOverrideTable[id]` is `null`  → use node-level `fills`
+         * - `fillOverrideTable[id]` is absent  → use node-level `fills`
+         * - `fillOverrideTable[id].fills` exists → use those fills instead
+         */
+        function resolveFillOverride(
+          geometry: figrest.Path,
+          node: InputNode & figrest.HasGeometryTrait
+        ): figrest.Paint[] {
+          if (geometry.overrideID == null) return node.fills;
+
+          const table = node.fillOverrideTable;
+          if (!table) return node.fills;
+
+          const key = String(geometry.overrideID);
+          if (!(key in table)) return node.fills;
+
+          const override = table[key];
+          if (override == null) return node.fills;
+
+          // PaintOverride.fills is the per-region fill array.
+          // An empty array means explicitly no fill (transparent).
+          return override.fills ?? node.fills;
+        }
+
+        /**
          * Processes fill geometries from a node with HasGeometryTrait.
          * Returns array of child node IDs that were successfully created.
          */
@@ -1346,6 +1382,9 @@ export namespace iofigma {
             const childId = `${parentGridaId}_fill_${idx}`;
             const name = `${node.name || nodeTypeName} Fill ${idx + 1}`;
 
+            // Resolve per-path fill overrides from fillOverrideTable.
+            const effectiveFills = resolveFillOverride(geometry, node);
+
             const childNode = context.prefer_path_for_geometry
               ? createPathNodeFromPath(
                   geometry.path ?? "",
@@ -1353,7 +1392,8 @@ export namespace iofigma {
                   node,
                   childId,
                   name,
-                  { useFill: true, useStroke: false }
+                  { useFill: true, useStroke: false },
+                  effectiveFills
                 )
               : createVectorNodeFromPath(
                   geometry.path ?? "",
@@ -1361,7 +1401,8 @@ export namespace iofigma {
                   node,
                   childId,
                   name,
-                  { useFill: true, useStroke: false }
+                  { useFill: true, useStroke: false },
+                  effectiveFills
                 );
 
             if (childNode) {
@@ -1713,8 +1754,8 @@ export namespace iofigma {
             ): grida.program.nodes.i.ITextStyle => ({
               font_family: (style.fontFamily as string) ?? "Inter",
               font_size: (style.fontSize as number) ?? DEFAULT_FONT_SIZE,
-              font_weight:
-                ((style.fontWeight as cg.NFontWeight) ?? 400) as cg.NFontWeight,
+              font_weight: ((style.fontWeight as cg.NFontWeight) ??
+                400) as cg.NFontWeight,
               font_kerning: true,
               text_decoration_line: style.textDecoration
                 ? (map.textDecorationMap[
@@ -1765,9 +1806,9 @@ export namespace iofigma {
                 // Characters beyond the charOverrides array use base style (0).
                 const nextId =
                   i < characters.length
-                    ? (i < charOverrides.length
-                        ? (charOverrides[i] ?? 0)
-                        : 0)
+                    ? i < charOverrides.length
+                      ? (charOverrides[i] ?? 0)
+                      : 0
                     : -1; // sentinel: forces final run to be emitted
                 if (nextId !== currentId) {
                   // Emit run [runStart, i)
@@ -1789,9 +1830,7 @@ export namespace iofigma {
                   ).fills;
                   const runFillPaints = overrideFills
                     ? overrideFills
-                        .map((p) =>
-                          convertPaint(p, context, imageRefsUsed)
-                        )
+                        .map((p) => convertPaint(p, context, imageRefsUsed))
                         .filter((p): p is cg.Paint => p !== undefined)
                     : undefined;
 
@@ -2630,9 +2669,7 @@ export namespace iofigma {
                 ? nc.letterSpacing.value
                 : (nc.letterSpacing?.value ?? 0),
           lineHeightPx:
-            nc.lineHeight?.units === "PIXELS"
-              ? nc.lineHeight.value
-              : undefined,
+            nc.lineHeight?.units === "PIXELS" ? nc.lineHeight.value : undefined,
           lineHeightPercent:
             nc.lineHeight?.units === "PERCENT"
               ? nc.lineHeight.value
@@ -2641,9 +2678,7 @@ export namespace iofigma {
             nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
           textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
           textCase:
-            nc.textCase === "ORIGINAL"
-              ? undefined
-              : (nc.textCase ?? undefined),
+            nc.textCase === "ORIGINAL" ? undefined : (nc.textCase ?? undefined),
           textDecoration: nc.textDecoration ?? "NONE",
         };
       }
@@ -2659,10 +2694,7 @@ export namespace iofigma {
         const charStyleIDs = nc.textData?.characterStyleIDs;
         const kiwiOverrideTable = nc.textData?.styleOverrideTable;
         let characterStyleOverrides: number[] = [];
-        const styleOverrideTable: Record<
-          string,
-          Record<string, unknown>
-        > = {};
+        const styleOverrideTable: Record<string, Record<string, unknown>> = {};
 
         if (
           charStyleIDs?.length &&
@@ -2674,7 +2706,10 @@ export namespace iofigma {
           // Kiwi ID 0 means "base style" (no override). Non-zero IDs are
           // matched by the `styleID` field inside each override entry — the
           // array index does NOT necessarily equal `id - 1`.
-          const kiwiOverrideByStyleID = new Map<number, (typeof kiwiOverrideTable)[number]>();
+          const kiwiOverrideByStyleID = new Map<
+            number,
+            (typeof kiwiOverrideTable)[number]
+          >();
           for (const entry of kiwiOverrideTable) {
             if (entry.styleID !== undefined) {
               kiwiOverrideByStyleID.set(entry.styleID, entry);
@@ -2694,8 +2729,7 @@ export namespace iofigma {
                 fontMetaData,
                 overrideNc.fontName
               );
-              if (fm?.fontWeight !== undefined)
-                o.fontWeight = fm.fontWeight;
+              if (fm?.fontWeight !== undefined) o.fontWeight = fm.fontWeight;
               if (fm?.fontStyle === "ITALIC") o.italic = true;
             }
             if (overrideNc.fontName?.postscript)
@@ -2704,11 +2738,15 @@ export namespace iofigma {
               o.fontSize = overrideNc.fontSize;
             if (overrideNc.textDecoration !== undefined)
               o.textDecoration = overrideNc.textDecoration;
-            if (overrideNc.textCase !== undefined && overrideNc.textCase !== "ORIGINAL")
+            if (
+              overrideNc.textCase !== undefined &&
+              overrideNc.textCase !== "ORIGINAL"
+            )
               o.textCase = overrideNc.textCase;
             if (overrideNc.letterSpacing !== undefined) {
               const ls = overrideNc.letterSpacing;
-              const fs = overrideNc.fontSize ?? nc.fontSize ?? DEFAULT_FONT_SIZE;
+              const fs =
+                overrideNc.fontSize ?? nc.fontSize ?? DEFAULT_FONT_SIZE;
               o.letterSpacing =
                 ls.units === "PERCENT"
                   ? (ls.value / 100) * fs
@@ -2902,9 +2940,7 @@ export namespace iofigma {
        * Convert Kiwi SLIDE / INTERACTIVE_SLIDE_ELEMENT to X_SLIDE IR.
        * Reuses the same trait pipeline as frame().
        */
-      function slide(
-        nc: figkiwi.NodeChange
-      ): __ir.SlideNodeIR | undefined {
+      function slide(nc: figkiwi.NodeChange): __ir.SlideNodeIR | undefined {
         if (!nc.guid || !nc.name || !nc.size) return undefined;
         return {
           ...kiwi_is_layer_trait(nc, "FRAME"),
