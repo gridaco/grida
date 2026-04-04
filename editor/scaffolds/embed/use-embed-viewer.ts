@@ -5,20 +5,21 @@ import { io } from "@grida/io";
 import { editor } from "@/grida-canvas";
 import { useEditor, useEditorState } from "@/grida-canvas-react";
 import { distro } from "@/grida-canvas-hosted/distro";
+import grida from "@grida/schema";
 
 /**
  * File converter function signature.
  *
- * Converts raw file bytes into a `.grida` archive (ZIP containing FlatBuffers).
+ * Converts raw file bytes into an in-memory Grida Document + assets.
  * Used by format-specific embed viewers (e.g. Figma) to plug into the shared
- * viewer pipeline.
+ * viewer pipeline without an intermediate .grida archive round-trip.
  *
  * @param input - Raw bytes (for binary formats) or parsed object (for JSON formats)
- * @returns An object with the `.grida` archive bytes and metadata
+ * @returns An object with the in-memory Document and image assets
  */
 export type FileConverter = (input: Uint8Array | object) => {
-  bytes: Uint8Array;
-  nodeCount: number;
+  document: grida.program.document.Document;
+  assets: Record<string, Uint8Array>;
   pageNames: string[];
 };
 
@@ -251,23 +252,18 @@ export function useEmbedViewer(options: UseEmbedViewerOptions = {}) {
         }
 
         const t0 = performance.now();
-        const { bytes: zipBytes, nodeCount, pageNames } = converter(input);
+        const { document: convertedDoc, assets, pageNames } = converter(input);
+        const nodeCount = Object.keys(convertedDoc.nodes).length;
         console.log(
           `[@grida/embed] convert: ${pageNames.length} page(s), ${nodeCount} nodes in ${(performance.now() - t0).toFixed(0)}ms`
         );
 
-        const blob = new Blob([new Uint8Array(zipBytes)], {
-          type: "application/zip",
-        });
-        const gridaFile = new File([blob], "imported.grida", {
-          type: "application/zip",
-        });
-
-        const t1 = performance.now();
-        const loaded = await io.load(gridaFile);
-        console.log(
-          `[@grida/embed] io.load: ${Object.keys(loaded.document.nodes).length} nodes in ${(performance.now() - t1).toFixed(0)}ms`
-        );
+        const loaded: io.LoadedDocument = {
+          version: grida.program.document.SCHEMA_VERSION,
+          document: convertedDoc,
+          assets:
+            Object.keys(assets).length > 0 ? { images: assets } : undefined,
+        };
 
         loadDocument(loaded, file.name);
       } catch (e) {

@@ -15,16 +15,28 @@ import {
 } from "@/scaffolds/embed/use-embed-viewer";
 import { RefigCanvas } from "@/scaffolds/embed/refig-shared";
 import { useEmbedBridge } from "@/grida-canvas-react/use-embed-bridge";
-import { fig2grida } from "@grida/io-figma/fig2grida-core";
+import {
+  figBytesToGridaDocument,
+  restJsonToGridaDocument,
+} from "@grida/io-figma/fig2grida-core";
 
 /**
  * File converter for the general-purpose embed.
  *
  * Unlike the Figma-specific embed, `preserve_figma_ids` is false —
  * node IDs in events use Grida-internal IDs, not Figma IDs.
+ *
+ * Uses the in-memory API to avoid the pack/unpack round-trip through
+ * .grida archives.
  */
 const generalConverter: FileConverter = (input) => {
-  return fig2grida(input, {
+  if (input instanceof Uint8Array) {
+    return figBytesToGridaDocument(input, {
+      placeholder_for_missing_images: false,
+      preserve_figma_ids: false,
+    });
+  }
+  return restJsonToGridaDocument(input, {
     placeholder_for_missing_images: false,
     preserve_figma_ids: false,
   });

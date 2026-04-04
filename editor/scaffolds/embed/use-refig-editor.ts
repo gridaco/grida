@@ -1,6 +1,10 @@
 "use client";
 
-import { fig2grida } from "@grida/io-figma/fig2grida-core";
+import {
+  figBytesToGridaDocument,
+  restJsonToGridaDocument,
+  type GridaDocumentResult,
+} from "@grida/io-figma/fig2grida-core";
 import type iofigma from "@grida/io-figma";
 import { useEmbedViewer, type FileConverter } from "./use-embed-viewer";
 
@@ -25,11 +29,20 @@ const REFIG_RENDER_CONFIG: RefigRenderConfig = {
 };
 
 /**
- * Create a fig2grida converter function with the refig render config.
+ * Create a Figma file converter that returns an in-memory Grida Document.
+ * Uses the in-memory API (`figBytesToGridaDocument` / `restJsonToGridaDocument`)
+ * to avoid the pack/unpack round-trip through .grida archives.
  */
 function createFigmaConverter(): FileConverter {
-  return (input: Uint8Array | object) => {
-    return fig2grida(input, {
+  return (input: Uint8Array | object): GridaDocumentResult => {
+    if (input instanceof Uint8Array) {
+      return figBytesToGridaDocument(input, {
+        placeholder_for_missing_images: false,
+        preserve_figma_ids: true,
+        prefer_fixed_text_sizing: REFIG_RENDER_CONFIG.prefer_fixed_text_sizing,
+      });
+    }
+    return restJsonToGridaDocument(input, {
       placeholder_for_missing_images: false,
       preserve_figma_ids: true,
       prefer_fixed_text_sizing: REFIG_RENDER_CONFIG.prefer_fixed_text_sizing,
