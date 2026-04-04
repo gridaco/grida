@@ -9,7 +9,7 @@
 //! Performance is not a concern — this is dev-only. A full `load_scene`
 //! rebuilds all caches from scratch.
 
-use cg::node::schema::{NodeId, Scene};
+use cg::node::schema::{Node, NodeId, Scene};
 use cg::surface::gesture::SurfaceGesture;
 use cg::window::application::UnknownTargetApplication;
 
@@ -173,19 +173,54 @@ impl EditorDocument {
         }
         // Per-node resize.
         for (id, w, h) in &node_sizes {
+            let new_width = if affects_w {
+                Some((w * scale_x).max(1.0))
+            } else {
+                None
+            };
+            let new_height = if affects_h {
+                Some((h * scale_y).max(1.0))
+            } else {
+                None
+            };
             mutated |= self.apply(&MutationCommand::Resize {
                 id: *id,
-                width: if affects_w {
-                    Some((w * scale_x).max(1.0))
-                } else {
-                    None
-                },
-                height: if affects_h {
-                    Some((h * scale_y).max(1.0))
-                } else {
-                    None
-                },
+                width: new_width,
+                height: new_height,
             });
+
+            // Auto-height for content-driven nodes: when width changes,
+            // re-measure content height so the node fits its content.
+            if affects_w {
+                if let Ok(node) = self.scene.graph.get_node(id) {
+                    let actual_w = new_width.unwrap_or(*w);
+                    let measured = match node {
+                        Node::MarkdownEmbed(n) => {
+                            let html = cg::htmlcss::markdown_to_styled_html(&n.markdown);
+                            cg::htmlcss::measure_content_height(
+                                &html,
+                                actual_w,
+                                &app.renderer().fonts,
+                            )
+                            .ok()
+                        }
+                        Node::HTMLEmbed(n) => cg::htmlcss::measure_content_height(
+                            &n.html,
+                            actual_w,
+                            &app.renderer().fonts,
+                        )
+                        .ok(),
+                        _ => None,
+                    };
+                    if let Some(h) = measured {
+                        mutated |= self.apply(&MutationCommand::Resize {
+                            id: *id,
+                            width: None,
+                            height: Some(h),
+                        });
+                    }
+                }
+            }
         }
         mutated
     }

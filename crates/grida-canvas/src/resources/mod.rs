@@ -219,7 +219,7 @@ fn extract_image_urls(scene: &Scene) -> Vec<String> {
                 collect_image_urls_from_paints(&n.fills, &mut urls);
                 collect_image_urls_from_paints(&n.strokes, &mut urls);
             }
-            Node::Markdown(n) => {
+            Node::MarkdownEmbed(n) => {
                 collect_image_urls_from_paints(&n.fills, &mut urls);
             }
             Node::HTMLEmbed(n) => {

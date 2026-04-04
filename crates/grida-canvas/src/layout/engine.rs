@@ -219,7 +219,7 @@ impl LayoutEngine {
             Node::Rectangle(n) => (n.size.width, n.size.height),
             Node::Ellipse(n) => (n.size.width, n.size.height),
             Node::Image(n) => (n.size.width, n.size.height),
-            Node::Markdown(n) => (n.size.width, n.size.height),
+            Node::MarkdownEmbed(n) => (n.size.width, n.size.height),
             Node::HTMLEmbed(n) => (n.size.width, n.size.height),
             Node::Line(n) => (n.size.width, n.size.height),
             Node::Polygon(n) => {
@@ -274,7 +274,7 @@ impl LayoutEngine {
             Node::Rectangle(n) => (n.transform.x(), n.transform.y()),
             Node::Ellipse(n) => (n.transform.x(), n.transform.y()),
             Node::Image(n) => (n.transform.x(), n.transform.y()),
-            Node::Markdown(n) => (n.transform.x(), n.transform.y()),
+            Node::MarkdownEmbed(n) => (n.transform.x(), n.transform.y()),
             Node::HTMLEmbed(n) => (n.transform.x(), n.transform.y()),
             Node::Line(n) => (n.transform.x(), n.transform.y()),
             Node::Polygon(n) => (n.transform.x(), n.transform.y()),
@@ -2043,14 +2043,14 @@ mod tests {
         let nf = NodeFactory::new();
         let mut graph = SceneGraph::new();
 
-        let mut md = nf.create_markdown_node();
+        let mut md = nf.create_markdown_embed_node();
         md.markdown = "# Hello\nWorld".to_string();
         md.size = Size {
             width: 800.0,
             height: 600.0,
         };
         md.transform = AffineTransform::new(50.0, 100.0, 0.0);
-        let md_id = graph.append_child(Node::Markdown(md), Parent::Root);
+        let md_id = graph.append_child(Node::MarkdownEmbed(md), Parent::Root);
 
         let scene = Scene {
             name: "Markdown layout test".to_string(),

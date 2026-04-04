@@ -304,7 +304,7 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
             let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
             PainterShape::from_rect(rect)
         }
-        Node::Markdown(n) => {
+        Node::MarkdownEmbed(n) => {
             let r = n.corner_radius;
             if !r.is_zero() {
                 let rrect = build_rrect(&RRectShape {

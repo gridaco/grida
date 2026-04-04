@@ -690,7 +690,7 @@ impl<'a> NodePainter<'a> {
             Node::AttributedText(_) => {
                 // TODO: implement AttributedText debug rendering
             }
-            Node::Markdown(_) => {
+            Node::MarkdownEmbed(_) => {
                 // TODO: implement Markdown debug rendering
             }
             Node::HTMLEmbed(_) => {
