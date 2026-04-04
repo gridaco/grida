@@ -34,8 +34,10 @@
  * - **Rich text**: `characterStyleOverrides` and `styleOverrideTable` are always empty.
  *   Kiwi has `textData.characterStyleIDs` and `textData.styleOverrideTable` (NodeChange[]).
  *   Full support would require per-run font resolution and building the REST override map.
- * - **lineTypes / lineIndentations**: Always `[]`. Should derive from `textData.lines`
- *   (lineType: PLAIN→NONE, ORDERED, UNORDERED; indentationLevel).
+ * - **lineTypes / lineIndentations**: Now derived from `textData.lines`
+ *   (lineType: PLAIN→NONE, ORDERED_LIST→ORDERED, UNORDERED_LIST→UNORDERED; indentationLevel).
+ *   Faux-list rendering (faux-list.ts) converts these into inline bullet/number prefixes
+ *   since Grida has no native list model.
  * - **fontVariant***: `fontVariantCommonLigatures`, etc. are not mapped.
  * - **textTracking vs letterSpacing**: Only letterSpacing is used; clarify canonical source.
  */
@@ -54,6 +56,11 @@ import {
   readFigFileFromStream,
   type ParsedFigmaArchive,
 } from "./fig-kiwi";
+import {
+  applyFauxList,
+  shiftCharOverrides,
+  type FigmaLineType,
+} from "./faux-list";
 
 const _GRIDA_SYSTEM_EMBEDDED_CHECKER =
   "system://images/checker-16-strip-L98L92.png";
@@ -743,6 +750,27 @@ export namespace iofigma {
          * @default false
          */
         prefer_fixed_text_sizing?: boolean;
+
+        /**
+         * When true, disable faux-list rendering for TEXT nodes.
+         *
+         * By default (`false`), Figma list metadata (`lineTypes`,
+         * `lineIndentations`) is converted into inline bullet/number
+         * prefixes and whitespace indentation baked into the text string.
+         * This is a **lossy, one-shot approximation** — the faux
+         * formatting is only correct at import time. Subsequent text
+         * edits (reflow, line insertion/deletion, copy-paste) will NOT
+         * update the synthetic bullets or numbering because there is no
+         * underlying list model to drive them.
+         *
+         * Set to `true` to skip this transform entirely and preserve the
+         * raw text as Figma stores it (without visible bullets/numbers).
+         *
+         * TODO: Remove this flag once Grida has native list support.
+         *
+         * @default false
+         */
+        disable_faux_list?: boolean;
 
         // -- Shared buffers (performance) --
         // When provided, factory.document() writes directly into these
@@ -2290,23 +2318,58 @@ export namespace iofigma {
               charOverrides.some((id: number) => id !== 0) &&
               overrideTable;
 
+            // ── Faux list transform (see faux-list.ts) ──────────────
+            // Reads `lineTypes` / `lineIndentations` from the REST node
+            // and rewrites the text + style indices to fake list appearance.
+            // This is a one-shot approximation — only correct at import
+            // time. Text edits after import will NOT update the synthetic
+            // bullets/numbering. Disable via `disable_faux_list: true`.
+            const restLineTypes = (node as { lineTypes?: FigmaLineType[] })
+              .lineTypes;
+            const restLineIndentations = (
+              node as { lineIndentations?: number[] }
+            ).lineIndentations;
+            const fauxResult =
+              !context.disable_faux_list &&
+              node.characters &&
+              restLineTypes?.length
+                ? applyFauxList({
+                    text: node.characters,
+                    lineTypes: restLineTypes,
+                    lineIndentations: restLineIndentations ?? [],
+                  })
+                : null;
+            // ─────────────────────────────────────────────────────────
+
             if (hasRichText && node.characters) {
               // Build styled runs from characterStyleOverrides.
               //
               // Figma's `characterStyleOverrides` array may be shorter than
               // `characters` — positions beyond the array use the base style
               // (id 0). We treat out-of-bounds indices as id 0 (base style).
-              const characters = node.characters;
+
+              // When faux-list is active, work with the shifted charOverrides
+              // so that styled runs are built against the rewritten text.
+              const origCharacters = node.characters;
+              const characters = fauxResult?.text ?? origCharacters;
+              const effectiveOverrides = fauxResult
+                ? shiftCharOverrides(
+                    charOverrides,
+                    origCharacters,
+                    fauxResult.prefixLengths
+                  )
+                : charOverrides;
+
               const runs: grida.program.nodes.StyledTextRun[] = [];
               let runStart = 0;
-              let currentId = charOverrides[0] ?? 0;
+              let currentId = effectiveOverrides[0] ?? 0;
 
               for (let i = 1; i <= characters.length; i++) {
                 // Characters beyond the charOverrides array use base style (0).
                 const nextId =
                   i < characters.length
-                    ? i < charOverrides.length
-                      ? (charOverrides[i] ?? 0)
+                    ? i < effectiveOverrides.length
+                      ? (effectiveOverrides[i] ?? 0)
                       : 0
                     : -1; // sentinel: forces final run to be emitted
                 if (nextId !== currentId) {
@@ -2374,7 +2437,7 @@ export namespace iofigma {
               ...style_trait({}),
               ...effects_trait(node.effects),
               type: "tspan",
-              text: node.characters,
+              text: fauxResult?.text ?? node.characters,
               ...textLayoutProps,
               text_align: textAlignValue,
               text_align_vertical: textAlignVerticalValue,
@@ -3311,6 +3374,31 @@ export namespace iofigma {
           }
         }
 
+        // Derive lineTypes / lineIndentations from Kiwi textData.lines
+        // (previously hardcoded as [] — see faux-list.ts for why we need these).
+        // NOTE: Kiwi LineType also includes "BLOCKQUOTE" and "HEADER" which
+        // have no REST API equivalent and no Grida representation — they map
+        // to "NONE" here (silently dropped).
+        const kiwiLines = nc.textData?.lines;
+        const lineTypes: ("NONE" | "ORDERED" | "UNORDERED")[] = [];
+        const lineIndentations: number[] = [];
+        if (kiwiLines?.length) {
+          for (const ld of kiwiLines) {
+            switch (ld.lineType) {
+              case "ORDERED_LIST":
+                lineTypes.push("ORDERED");
+                break;
+              case "UNORDERED_LIST":
+                lineTypes.push("UNORDERED");
+                break;
+              default: // PLAIN, BLOCKQUOTE, HEADER → NONE
+                lineTypes.push("NONE");
+                break;
+            }
+            lineIndentations.push(ld.indentationLevel ?? 0);
+          }
+        }
+
         return {
           characters,
           fills: nc.fillPaints ? paints(nc.fillPaints) : [],
@@ -3322,8 +3410,8 @@ export namespace iofigma {
           style,
           characterStyleOverrides,
           styleOverrideTable,
-          lineTypes: [],
-          lineIndentations: [],
+          lineTypes,
+          lineIndentations,
         };
       }
 
