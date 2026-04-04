@@ -42,6 +42,9 @@ impl AffineTransform {
     }
 
     /// Creates a combined transform of translation followed by rotation.
+    ///
+    /// `rotation` is in **radians**. Use [`from_box_center`] (which takes
+    /// degrees) when constructing transforms from CSS-like box properties.
     pub fn new(tx: f32, ty: f32, rotation: f32) -> Self {
         let mut t = Self::identity();
         t.set_translation(tx, ty);

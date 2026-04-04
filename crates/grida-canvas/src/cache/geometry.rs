@@ -557,10 +557,12 @@ impl GeometryCache {
 /// Build a `GeoInput` directly from schema data, bypassing any layout result.
 fn geo_input_from_schema(geo: &NodeGeoData) -> GeoInput {
     GeoInput {
+        // geo.rotation is in degrees (from Container/Tray); convert to
+        // radians for AffineTransform::new which expects radians.
         transform: AffineTransform::new(
             geo.schema_transform.x(),
             geo.schema_transform.y(),
-            geo.rotation,
+            geo.rotation.to_radians(),
         ),
         width: geo.schema_width,
         height: geo.schema_height,
@@ -610,7 +612,12 @@ fn resolve_layout(
         GeoNodeKind::Container => {
             if let Some(computed) = layout_result.and_then(|r| r.get(id)) {
                 GeoInput {
-                    transform: AffineTransform::new(computed.x, computed.y, geo.rotation),
+                    // geo.rotation is in degrees; convert to radians.
+                    transform: AffineTransform::new(
+                        computed.x,
+                        computed.y,
+                        geo.rotation.to_radians(),
+                    ),
                     width: computed.width,
                     height: computed.height,
                     content_origin_x: 0.0,

@@ -172,7 +172,9 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
         Node::Tray(n) => {
             let fallback_x = n.position.x().unwrap_or(0.0);
             let fallback_y = n.position.y().unwrap_or(0.0);
-            let schema_transform = AffineTransform::new(fallback_x, fallback_y, n.rotation);
+            // n.rotation is in degrees; AffineTransform::new expects radians.
+            let schema_transform =
+                AffineTransform::new(fallback_x, fallback_y, n.rotation.to_radians());
 
             let render_bounds_inflation = if let Some(rect_stroke) = n.rectangular_stroke_width() {
                 compute_inflation_rectangular(
@@ -226,7 +228,9 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
         Node::Container(n) => {
             let fallback_x = n.position.x().unwrap_or(0.0);
             let fallback_y = n.position.y().unwrap_or(0.0);
-            let schema_transform = AffineTransform::new(fallback_x, fallback_y, n.rotation);
+            // n.rotation is in degrees; AffineTransform::new expects radians.
+            let schema_transform =
+                AffineTransform::new(fallback_x, fallback_y, n.rotation.to_radians());
 
             let render_bounds_inflation = if let Some(rect_stroke) = n.rectangular_stroke_width() {
                 compute_inflation_rectangular(&rect_stroke, n.stroke_style.stroke_align, &n.effects)

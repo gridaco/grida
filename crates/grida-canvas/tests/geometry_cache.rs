@@ -86,3 +86,86 @@ fn container_world_bounds_include_children() {
     // child bounds also exist
     assert!(cache.has(&rect_id));
 }
+
+/// Verify that Container.rotation (stored in degrees) is correctly
+/// converted to radians when building the scene graph transform.
+///
+/// Before the fix, `AffineTransform::new(x, y, rotation)` received the
+/// degree value directly, but `set_rotation` interprets its argument as
+/// radians. A 90-degree container rotation was treated as 90-radian
+/// rotation, producing a garbled matrix.
+#[test]
+fn rotated_container_world_transform_uses_degrees_correctly() {
+    let nf = NodeFactory::new();
+    let mut graph = SceneGraph::new();
+
+    let mut container = nf.create_container_node();
+    container.position = CGPoint::new(100.0, 50.0).into();
+    container.rotation = 90.0; // degrees
+    container.layout_dimensions.layout_target_width = Some(200.0);
+    container.layout_dimensions.layout_target_height = Some(150.0);
+
+    // Place a rectangle at (10, 20) inside the container.
+    let mut rect = nf.create_rectangle_node();
+    rect.transform = AffineTransform::new(10.0, 20.0, 0.0);
+    rect.size = Size {
+        width: 30.0,
+        height: 40.0,
+    };
+
+    let container_id = graph.append_child(Node::Container(container), Parent::Root);
+    let rect_id = graph.append_child(Node::Rectangle(rect), Parent::NodeId(container_id.clone()));
+
+    let scene = Scene {
+        name: "test".into(),
+        background_color: None,
+        graph,
+    };
+
+    let store = Arc::new(Mutex::new(ByteStore::new()));
+    let fonts = FontRepository::new(store);
+    let cache = GeometryCache::from_scene(&scene, &fonts);
+
+    // Container at (100, 50) rotated 90° around its origin.
+    // AffineTransform::new(100, 50, π/2) should produce:
+    //   cos(π/2) ≈ 0, sin(π/2) ≈ 1
+    //   matrix: [[0, -1, 100], [1, 0, 50]]
+    let ct = cache.get_world_transform(&container_id).unwrap();
+    let cos_90 = ct.matrix[0][0];
+    let sin_90 = ct.matrix[1][0];
+
+    // cos(90°) ≈ 0, sin(90°) ≈ 1
+    assert!(cos_90.abs() < 0.01, "cos(90°) should be ≈0, got {}", cos_90);
+    assert!(
+        (sin_90 - 1.0).abs() < 0.01,
+        "sin(90°) should be ≈1, got {}",
+        sin_90
+    );
+
+    // Child at (10, 20) in container space, rotated by container's 90°.
+    // World transform = container_transform * child_transform
+    // = [[0,-1,100],[1,0,50]] * [[1,0,10],[0,1,20]]
+    // = [[0,-1, 100 + 0*10 + (-1)*20], [1,0, 50 + 1*10 + 0*20]]
+    // = [[0,-1, 80], [1,0, 60]]
+    let rt = cache.get_world_transform(&rect_id).unwrap();
+    assert!(
+        rt.matrix[0][0].abs() < 0.01,
+        "child cos should be ≈0, got {}",
+        rt.matrix[0][0]
+    );
+    assert!(
+        (rt.matrix[1][0] - 1.0).abs() < 0.01,
+        "child sin should be ≈1, got {}",
+        rt.matrix[1][0]
+    );
+    assert!(
+        (rt.matrix[0][2] - 80.0).abs() < 0.1,
+        "child tx should be ≈80, got {}",
+        rt.matrix[0][2]
+    );
+    assert!(
+        (rt.matrix[1][2] - 60.0).abs() < 0.1,
+        "child ty should be ≈60, got {}",
+        rt.matrix[1][2]
+    );
+}
