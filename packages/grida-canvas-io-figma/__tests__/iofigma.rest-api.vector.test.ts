@@ -404,11 +404,22 @@ describe("iofigma.restful.factory.document", () => {
         .map((id: string) => gridaDocument.nodes[id])
         .filter(Boolean) as grida.program.nodes.Node[];
 
+      // The fixture has strokeAlign=INSIDE, so the group should contain:
+      //   1. fill path node(s)
+      //   2. a BooleanPathOperationNode(intersection) clipping stroke to fill
       const pathChildren = childNodes.filter(
         (n): n is grida.program.nodes.PathNode => n.type === "path"
       );
+      const boolChildren = childNodes.filter(
+        (n) => n.type === "boolean"
+      ) as grida.program.nodes.BooleanPathOperationNode[];
+
       expect(pathChildren.length).toBeGreaterThan(0);
-      expect(pathChildren.length).toBe(childNodes.length);
+      expect(boolChildren.length).toBe(1);
+      expect(boolChildren[0].op).toBe("intersection");
+      expect(pathChildren.length + boolChildren.length).toBe(
+        childNodes.length
+      );
 
       pathChildren.forEach((child) => {
         expect(child.type).toBe("path");
@@ -416,6 +427,16 @@ describe("iofigma.restful.factory.document", () => {
         expect(child.data.length).toBeGreaterThan(0);
         expect("vector_network" in child).toBe(false);
       });
+
+      // Verify the boolean node has children (fill clone + stroke)
+      const boolNodeChildren =
+        gridaDocument.links[boolChildren[0].id];
+      expect(boolNodeChildren).toBeDefined();
+      expect(boolNodeChildren!.length).toBe(2);
+
+      // The boolean node should have stroke color applied as fill
+      expect(boolChildren[0].fill_paints).toBeDefined();
+      expect(boolChildren[0].fill_paints!.length).toBeGreaterThan(0);
     });
   });
 
