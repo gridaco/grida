@@ -220,6 +220,7 @@ impl LayoutEngine {
             Node::Ellipse(n) => (n.size.width, n.size.height),
             Node::Image(n) => (n.size.width, n.size.height),
             Node::Markdown(n) => (n.size.width, n.size.height),
+            Node::HTMLEmbed(n) => (n.size.width, n.size.height),
             Node::Line(n) => (n.size.width, n.size.height),
             Node::Polygon(n) => {
                 let rect = n.rect();
@@ -274,6 +275,7 @@ impl LayoutEngine {
             Node::Ellipse(n) => (n.transform.x(), n.transform.y()),
             Node::Image(n) => (n.transform.x(), n.transform.y()),
             Node::Markdown(n) => (n.transform.x(), n.transform.y()),
+            Node::HTMLEmbed(n) => (n.transform.x(), n.transform.y()),
             Node::Line(n) => (n.transform.x(), n.transform.y()),
             Node::Polygon(n) => (n.transform.x(), n.transform.y()),
             Node::RegularPolygon(n) => (n.transform.x(), n.transform.y()),

@@ -77,6 +77,7 @@ pub fn node_supports_resize(node: &Node) -> bool {
             | Node::TextSpan(_)
             | Node::AttributedText(_)
             | Node::Markdown(_)
+            | Node::HTMLEmbed(_)
     )
 }
 
@@ -104,6 +105,7 @@ fn node_transform_mut(node: &mut Node) -> Option<&mut math2::transform::AffineTr
         Node::BooleanOperation(n) => n.transform.as_mut(),
         Node::Vector(n) => Some(&mut n.transform),
         Node::Markdown(n) => Some(&mut n.transform),
+        Node::HTMLEmbed(n) => Some(&mut n.transform),
         Node::Container(_) | Node::Tray(_) | Node::InitialContainer(_) => None,
     }
 }
@@ -120,6 +122,7 @@ fn node_size_mut(node: &mut Node) -> Option<&mut Size> {
         Node::Image(n) => Some(&mut n.size),
         Node::Error(n) => Some(&mut n.size),
         Node::Markdown(n) => Some(&mut n.size),
+        Node::HTMLEmbed(n) => Some(&mut n.size),
         _ => None,
     }
 }

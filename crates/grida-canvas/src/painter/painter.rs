@@ -2139,6 +2139,84 @@ impl<'a> Painter<'a> {
                     },
                 );
             }
+            PainterPictureLayer::HtmlEmbed(html_layer) => {
+                let effects = &html_layer.effects;
+                let opacity = html_layer.base.opacity;
+                let shape = &html_layer.shape;
+                let clip_path = &html_layer.base.clip_path;
+                let blend_mode = html_layer.base.blend_mode;
+
+                self.with_blendmode(
+                    blend_mode,
+                    shape,
+                    effects,
+                    &html_layer.base.transform.matrix,
+                    None,
+                    || {
+                        self.with_transform(&html_layer.base.transform.matrix, || {
+                            self.with_optional_clip_path(clip_path.as_ref(), || {
+                                let draw_content = || {
+                                    // 1. Draw background fills
+                                    if self.policy.render_fills() {
+                                        self.draw_fills(shape, &html_layer.fills);
+                                    }
+
+                                    // 2. Render HTML+CSS content as a Picture
+                                    match crate::htmlcss::render(
+                                        &html_layer.html,
+                                        html_layer.width,
+                                        html_layer.height,
+                                        self.fonts,
+                                    ) {
+                                        Ok(picture) => {
+                                            // Clip to the picture's actual content bounds
+                                            let cull = picture.cull_rect();
+                                            self.canvas.save();
+                                            self.canvas.clip_rect(
+                                                Rect::from_xywh(
+                                                    0.0,
+                                                    0.0,
+                                                    cull.width(),
+                                                    cull.height(),
+                                                ),
+                                                skia_safe::ClipOp::Intersect,
+                                                true,
+                                            );
+                                            self.canvas.draw_picture(&picture, None, None);
+                                            self.canvas.restore();
+                                        }
+                                        Err(_) => {
+                                            // Render error fallback: gray rectangle
+                                            let mut paint = SkPaint::default();
+                                            paint.set_color(skia_safe::Color::from_rgb(
+                                                200, 200, 200,
+                                            ));
+                                            paint.set_style(skia_safe::PaintStyle::Fill);
+                                            self.canvas.draw_rect(
+                                                Rect::from_xywh(
+                                                    0.0,
+                                                    0.0,
+                                                    html_layer.width,
+                                                    html_layer.height,
+                                                ),
+                                                &paint,
+                                            );
+                                        }
+                                    }
+                                };
+
+                                if opacity >= 1.0 && effects.is_empty() {
+                                    draw_content();
+                                } else if effects.is_empty() {
+                                    self.with_opacity(opacity, Some(&shape.rect), draw_content);
+                                } else {
+                                    self.draw_shape_with_effects(effects, shape, draw_content);
+                                }
+                            });
+                        });
+                    },
+                );
+            }
         }
     }
 
@@ -2260,6 +2338,17 @@ impl<'a> Painter<'a> {
                     .concat(&sk::sk_matrix(md_layer.base.transform.matrix));
                 self.with_optional_clip_path(md_layer.base.clip_path.as_ref(), || {
                     let path = md_layer.shape.to_path();
+                    let paint = self.outline_sk_paint(style);
+                    self.canvas.draw_path(&path, &paint);
+                });
+                self.canvas.restore();
+            }
+            PainterPictureLayer::HtmlEmbed(html_layer) => {
+                self.canvas.save();
+                self.canvas
+                    .concat(&sk::sk_matrix(html_layer.base.transform.matrix));
+                self.with_optional_clip_path(html_layer.base.clip_path.as_ref(), || {
+                    let path = html_layer.shape.to_path();
                     let paint = self.outline_sk_paint(style);
                     self.canvas.draw_path(&path, &paint);
                 });

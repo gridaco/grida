@@ -37,6 +37,7 @@ material when designing rendering systems that face similar problems.
 | [effect-optimizations.md](./effect-optimizations.md)                                   | Effect optimization: filter demotion, render pass bypass, damage tracking |
 | [node-data-layout.md](./node-data-layout.md)                                           | Node data layout: DOM RareData, compositor property trees, ECS comparison |
 | [svg-pattern.md](./svg-pattern.md)                                                     | SVG `<pattern>` paint server semantics, Chromium/resvg/Skia comparison    |
+| [blink-rendering-pipeline.md](./blink-rendering-pipeline.md)                           | Blink Style → Layout → Paint pipeline, ComputedStyle groups, LayoutNG, inline layout, list markers |
 
 ## Source locations
 

@@ -265,6 +265,18 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             ),
             rotation: 0.0,
         },
+        Node::HTMLEmbed(n) => NodeGeoData {
+            schema_transform: n.transform,
+            schema_width: n.size.width,
+            schema_height: n.size.height,
+            kind: GeoNodeKind::Leaf,
+            render_bounds_inflation: compute_inflation_uniform(
+                0.0,
+                StrokeAlign::Center,
+                &n.effects,
+            ),
+            rotation: 0.0,
+        },
         _ => {
             // Leaf nodes: Rectangle, Ellipse, Image, RegularPolygon,
             // RegularStarPolygon, Line, Polygon, Path, Vector, Error.

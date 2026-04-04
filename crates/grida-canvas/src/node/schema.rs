@@ -919,6 +919,7 @@ pub enum NodeTypeTag {
     BooleanOperation,
     Image,
     Markdown,
+    HTMLEmbed,
 }
 
 /// Compact, layer-relevant data extracted from a `Node` at construction time.
@@ -1134,6 +1135,16 @@ pub fn extract_layer_core(node: &Node) -> NodeLayerCore {
             node_type: NodeTypeTag::Markdown,
             is_flex: false,
         },
+        Node::HTMLEmbed(n) => NodeLayerCore {
+            active: n.active,
+            opacity: n.opacity,
+            blend_mode: n.blend_mode,
+            mask: n.mask,
+            clips_content: false,
+            has_effects: !n.effects.is_empty(),
+            node_type: NodeTypeTag::HTMLEmbed,
+            is_flex: false,
+        },
     }
 }
 
@@ -1157,6 +1168,7 @@ pub enum Node {
     BooleanOperation(BooleanPathOperationNodeRec),
     Image(ImageNodeRec),
     Markdown(MarkdownNodeRec),
+    HTMLEmbed(HTMLEmbedNodeRec),
 }
 
 // node trait
@@ -1185,6 +1197,7 @@ impl NodeTrait for Node {
             Node::BooleanOperation(n) => n.active,
             Node::Image(n) => n.active,
             Node::Markdown(n) => n.active,
+            Node::HTMLEmbed(n) => n.active,
         }
     }
 }
@@ -1209,6 +1222,7 @@ impl Node {
             Node::BooleanOperation(n) => n.mask,
             Node::Image(n) => n.mask,
             Node::Markdown(n) => n.mask,
+            Node::HTMLEmbed(n) => n.mask,
             Node::Error(_) => None,
         }
     }
@@ -1235,6 +1249,7 @@ impl Node {
             Node::BooleanOperation(n) => n.opacity,
             Node::Image(n) => n.opacity,
             Node::Markdown(n) => n.opacity,
+            Node::HTMLEmbed(n) => n.opacity,
         }
     }
 
@@ -1259,6 +1274,7 @@ impl Node {
             Node::BooleanOperation(_) => "Boolean",
             Node::Image(_) => "Image",
             Node::Markdown(_) => "Markdown",
+            Node::HTMLEmbed(_) => "HTMLEmbed",
         }
     }
 
@@ -1285,6 +1301,7 @@ impl Node {
             Node::Image(_) => None,
             // Markdown renders its own content; background fills are separate
             Node::Markdown(n) => Some(&n.fills),
+            Node::HTMLEmbed(n) => Some(&n.fills),
             Node::Error(_) | Node::Group(_) | Node::Line(_) => None,
         }
     }
@@ -1311,6 +1328,7 @@ impl Node {
             Node::BooleanOperation(n) => n.blend_mode,
             Node::Image(n) => n.blend_mode,
             Node::Markdown(n) => n.blend_mode,
+            Node::HTMLEmbed(n) => n.blend_mode,
         }
     }
 
@@ -1336,6 +1354,7 @@ impl Node {
             Node::BooleanOperation(n) => Some(&n.effects),
             Node::Image(n) => Some(&n.effects),
             Node::Markdown(n) => Some(&n.effects),
+            Node::HTMLEmbed(n) => Some(&n.effects),
         }
     }
 
@@ -2902,6 +2921,66 @@ impl NodeRectMixin for MarkdownNodeRec {
 }
 
 impl NodeGeometryMixin for MarkdownNodeRec {
+    fn has_stroke_geometry(&self) -> bool {
+        false
+    }
+
+    fn render_bounds_stroke_width(&self) -> f32 {
+        0.0
+    }
+}
+
+/// An opaque HTML+CSS embed rendered as a Skia Picture.
+///
+/// Stores raw HTML (with optional `<style>` blocks) and renders it via the
+/// `painter::htmlcss` renderer at paint time. Unlike the `html::from_html_str`
+/// import pipeline, this preserves full CSS visual fidelity as a single
+/// non-editable picture.
+#[derive(Debug, Clone)]
+pub struct HTMLEmbedNodeRec {
+    pub active: bool,
+
+    pub opacity: f32,
+    pub blend_mode: LayerBlendMode,
+    pub effects: LayerEffects,
+    pub mask: Option<LayerMaskType>,
+
+    pub transform: AffineTransform,
+    pub size: Size,
+    pub corner_radius: RectangularCornerRadius,
+
+    /// Raw HTML+CSS source.
+    pub html: String,
+
+    /// Background fills for the embed container.
+    pub fills: Paints,
+
+    /// Layout style for this node when it is a child of a layout container.
+    pub layout_child: Option<LayoutChildStyle>,
+}
+
+impl NodeTransformMixin for HTMLEmbedNodeRec {
+    fn x(&self) -> f32 {
+        self.transform.x()
+    }
+
+    fn y(&self) -> f32 {
+        self.transform.y()
+    }
+}
+
+impl NodeRectMixin for HTMLEmbedNodeRec {
+    fn rect(&self) -> Rectangle {
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        }
+    }
+}
+
+impl NodeGeometryMixin for HTMLEmbedNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         false
     }
