@@ -380,8 +380,8 @@ impl NodeFactory {
     }
 
     /// Creates a new markdown node with default values
-    pub fn create_markdown_node(&self) -> MarkdownNodeRec {
-        MarkdownNodeRec {
+    pub fn create_markdown_embed_node(&self) -> MarkdownEmbedNodeRec {
+        MarkdownEmbedNodeRec {
             active: true,
             opacity: Self::DEFAULT_OPACITY,
             blend_mode: LayerBlendMode::default(),

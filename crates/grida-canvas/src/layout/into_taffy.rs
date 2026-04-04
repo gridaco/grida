@@ -302,7 +302,7 @@ pub fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) 
         Node::Group(_) => grida_style_default(),
         Node::Tray(_) => grida_style_default(),
         Node::BooleanOperation(_) => grida_style_default(),
-        Node::Markdown(n) => n.into(),
+        Node::MarkdownEmbed(n) => n.into(),
         Node::HTMLEmbed(n) => n.into(),
     }
 }
@@ -567,9 +567,9 @@ impl From<&crate::node::schema::PathNodeRec> for Style {
     }
 }
 
-/// Convert MarkdownNodeRec to Taffy Style
-impl From<&crate::node::schema::MarkdownNodeRec> for Style {
-    fn from(node: &crate::node::schema::MarkdownNodeRec) -> Self {
+/// Convert MarkdownEmbedNodeRec to Taffy Style
+impl From<&crate::node::schema::MarkdownEmbedNodeRec> for Style {
+    fn from(node: &crate::node::schema::MarkdownEmbedNodeRec) -> Self {
         let style = Style {
             size: Size {
                 width: Dimension::length(node.size.width),

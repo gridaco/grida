@@ -245,7 +245,7 @@ fn text_measure_func(
 
 /// Convert StyledElement to Taffy Style.
 fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
-    taffy::Style {
+    let mut style = taffy::Style {
         display: match el.display {
             types::Display::Flex => taffy::Display::Flex,
             types::Display::Grid => taffy::Display::Grid,
@@ -324,7 +324,16 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
             y: map_overflow(el.overflow_y),
         },
         ..taffy::Style::default()
+    };
+
+    // Faux-table: override display/flex for CSS table elements.
+    // Try display-based override first, then tag-based fallback for
+    // row-group wrappers (<thead>, <tbody>, <tfoot>).
+    if !super::faux_table::apply_faux_table_style(el.display, &mut style) {
+        super::faux_table::apply_faux_table_style_by_tag(&el.tag, &mut style);
     }
+
+    style
 }
 
 // ─── Conversion helpers ──────────────────────────────────────────────

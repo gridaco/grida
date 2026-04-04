@@ -918,7 +918,7 @@ pub enum NodeTypeTag {
     Vector,
     BooleanOperation,
     Image,
-    Markdown,
+    MarkdownEmbed,
     HTMLEmbed,
 }
 
@@ -1125,14 +1125,14 @@ pub fn extract_layer_core(node: &Node) -> NodeLayerCore {
             node_type: NodeTypeTag::Image,
             is_flex: false,
         },
-        Node::Markdown(n) => NodeLayerCore {
+        Node::MarkdownEmbed(n) => NodeLayerCore {
             active: n.active,
             opacity: n.opacity,
             blend_mode: n.blend_mode,
             mask: n.mask,
             clips_content: false,
             has_effects: !n.effects.is_empty(),
-            node_type: NodeTypeTag::Markdown,
+            node_type: NodeTypeTag::MarkdownEmbed,
             is_flex: false,
         },
         Node::HTMLEmbed(n) => NodeLayerCore {
@@ -1167,7 +1167,7 @@ pub enum Node {
     Vector(VectorNodeRec),
     BooleanOperation(BooleanPathOperationNodeRec),
     Image(ImageNodeRec),
-    Markdown(MarkdownNodeRec),
+    MarkdownEmbed(MarkdownEmbedNodeRec),
     HTMLEmbed(HTMLEmbedNodeRec),
 }
 
@@ -1196,7 +1196,7 @@ impl NodeTrait for Node {
             Node::Vector(n) => n.active,
             Node::BooleanOperation(n) => n.active,
             Node::Image(n) => n.active,
-            Node::Markdown(n) => n.active,
+            Node::MarkdownEmbed(n) => n.active,
             Node::HTMLEmbed(n) => n.active,
         }
     }
@@ -1221,7 +1221,7 @@ impl Node {
             Node::Vector(n) => n.mask,
             Node::BooleanOperation(n) => n.mask,
             Node::Image(n) => n.mask,
-            Node::Markdown(n) => n.mask,
+            Node::MarkdownEmbed(n) => n.mask,
             Node::HTMLEmbed(n) => n.mask,
             Node::Error(_) => None,
         }
@@ -1248,7 +1248,7 @@ impl Node {
             Node::Vector(n) => n.opacity,
             Node::BooleanOperation(n) => n.opacity,
             Node::Image(n) => n.opacity,
-            Node::Markdown(n) => n.opacity,
+            Node::MarkdownEmbed(n) => n.opacity,
             Node::HTMLEmbed(n) => n.opacity,
         }
     }
@@ -1273,7 +1273,7 @@ impl Node {
             Node::Vector(_) => "Vector",
             Node::BooleanOperation(_) => "Boolean",
             Node::Image(_) => "Image",
-            Node::Markdown(_) => "Markdown",
+            Node::MarkdownEmbed(_) => "MarkdownEmbed",
             Node::HTMLEmbed(_) => "HTMLEmbed",
         }
     }
@@ -1300,7 +1300,7 @@ impl Node {
             // Image has a single ImagePaint, not a Paints stack
             Node::Image(_) => None,
             // Markdown renders its own content; background fills are separate
-            Node::Markdown(n) => Some(&n.fills),
+            Node::MarkdownEmbed(n) => Some(&n.fills),
             Node::HTMLEmbed(n) => Some(&n.fills),
             Node::Error(_) | Node::Group(_) | Node::Line(_) => None,
         }
@@ -1327,7 +1327,7 @@ impl Node {
             Node::Vector(n) => n.blend_mode,
             Node::BooleanOperation(n) => n.blend_mode,
             Node::Image(n) => n.blend_mode,
-            Node::Markdown(n) => n.blend_mode,
+            Node::MarkdownEmbed(n) => n.blend_mode,
             Node::HTMLEmbed(n) => n.blend_mode,
         }
     }
@@ -1353,7 +1353,7 @@ impl Node {
             Node::Vector(n) => Some(&n.effects),
             Node::BooleanOperation(n) => Some(&n.effects),
             Node::Image(n) => Some(&n.effects),
-            Node::Markdown(n) => Some(&n.effects),
+            Node::MarkdownEmbed(n) => Some(&n.effects),
             Node::HTMLEmbed(n) => Some(&n.effects),
         }
     }
@@ -2877,7 +2877,7 @@ pub struct TextNodeRec {
 /// Users interact with this as a single editable text block rather than a
 /// tree of individual text/container elements.
 #[derive(Debug, Clone)]
-pub struct MarkdownNodeRec {
+pub struct MarkdownEmbedNodeRec {
     pub active: bool,
 
     pub opacity: f32,
@@ -2899,7 +2899,7 @@ pub struct MarkdownNodeRec {
     pub layout_child: Option<LayoutChildStyle>,
 }
 
-impl NodeTransformMixin for MarkdownNodeRec {
+impl NodeTransformMixin for MarkdownEmbedNodeRec {
     fn x(&self) -> f32 {
         self.transform.x()
     }
@@ -2909,7 +2909,7 @@ impl NodeTransformMixin for MarkdownNodeRec {
     }
 }
 
-impl NodeRectMixin for MarkdownNodeRec {
+impl NodeRectMixin for MarkdownEmbedNodeRec {
     fn rect(&self) -> Rectangle {
         Rectangle {
             x: 0.0,
@@ -2920,7 +2920,7 @@ impl NodeRectMixin for MarkdownNodeRec {
     }
 }
 
-impl NodeGeometryMixin for MarkdownNodeRec {
+impl NodeGeometryMixin for MarkdownEmbedNodeRec {
     fn has_stroke_geometry(&self) -> bool {
         false
     }

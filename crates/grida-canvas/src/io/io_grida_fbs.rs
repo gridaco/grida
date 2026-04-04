@@ -55,9 +55,10 @@ use crate::node::{
     schema::{
         AttributedTextNodeRec, BooleanPathOperationNodeRec, ContainerNodeRec, EllipseNodeRec,
         GroupNodeRec, InitialContainerNodeRec, LayerEffects, LayoutChildStyle,
-        LayoutContainerStyle, LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node,
-        PathNodeRec, RectangleNodeRec, RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene,
-        Size, StrokeStyle, TextSpanNodeRec, TrayNodeRec, VectorNodeRec,
+        LayoutContainerStyle, LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec,
+        MarkdownEmbedNodeRec, Node, PathNodeRec, RectangleNodeRec, RegularPolygonNodeRec,
+        RegularStarPolygonNodeRec, Scene, Size, StrokeStyle, TextSpanNodeRec, TrayNodeRec,
+        VectorNodeRec,
     },
 };
 use crate::vectornetwork::{
@@ -372,6 +373,13 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                         slot,
                         node_as_boolean_operation_node,
                         decode_boolean_operation_node
+                    );
+                }
+                fbs::Node::MarkdownEmbedNode => {
+                    decode_layer_node!(
+                        slot,
+                        node_as_markdown_embed_node,
+                        decode_markdown_embed_node
                     );
                 }
                 fbs::Node::UnknownNode | fbs::Node::NONE | _ => {}
@@ -2043,6 +2051,42 @@ fn decode_text_span_node(
     })
 }
 
+fn decode_markdown_embed_node(
+    lc: &LayerCommon,
+    layer: &fbs::LayerTrait<'_>,
+    mn: &fbs::MarkdownEmbedNode<'_>,
+) -> Node {
+    let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
+    let props = mn.properties();
+
+    let markdown = props
+        .as_ref()
+        .and_then(|p| p.markdown())
+        .unwrap_or("")
+        .to_owned();
+
+    let fills = props
+        .as_ref()
+        .map(|p| decode_paints_vec(p.fill_paints()))
+        .unwrap_or_else(|| Paints::new(Vec::<Paint>::new()));
+
+    let corner_radius = decode_corner_radius(props.as_ref().and_then(|p| p.corner_radius()));
+
+    Node::MarkdownEmbed(MarkdownEmbedNodeRec {
+        active: lc.active,
+        opacity: lc.opacity,
+        blend_mode: lc.blend_mode,
+        effects: lc.effects.clone(),
+        mask: lc.mask,
+        transform: sl.transform,
+        size: sl.size,
+        corner_radius,
+        markdown,
+        fills,
+        layout_child: lc.layout_child.clone(),
+    })
+}
+
 fn decode_attributed_text_node(
     lc: &LayerCommon,
     layer: &fbs::LayerTrait<'_>,
@@ -2490,6 +2534,7 @@ fn encode_node<'a, A: flatbuffers::Allocator + 'a>(
         Node::AttributedText(r) => {
             encode_attributed_text_node(fbb, r, node_id, parent_id, position)
         }
+        Node::MarkdownEmbed(r) => encode_markdown_embed_node(fbb, r, node_id, parent_id, position),
         // Fallback: encode as UnknownNode
         _ => {
             let sys = encode_system_node_trait(fbb, node_id, "", true, false);
@@ -4448,6 +4493,73 @@ fn encode_attributed_text_node<'a, A: flatbuffers::Allocator + 'a>(
         },
     );
     make_node_slot(fbb, fbs::Node::AttributedTextNode, tn.as_union_value())
+}
+
+fn encode_markdown_embed_node<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    r: &MarkdownEmbedNodeRec,
+    node_id: &str,
+    parent_id: &str,
+    position: &str,
+) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
+    let x = r.transform.x();
+    let y = r.transform.y();
+    let plt = affine_to_rotation_transform(&r.transform);
+
+    let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
+    let layout = encode_shape_layout(
+        fbb,
+        x,
+        y,
+        Some(r.size.width),
+        Some(r.size.height),
+        &r.layout_child,
+    );
+    let layer = encode_layer_trait(
+        fbb,
+        &LayerTraitInput {
+            parent_id,
+            position,
+            opacity: r.opacity,
+            blend_mode: r.blend_mode,
+            mask: r.mask,
+            effects: &r.effects,
+            post_layout_transform: plt,
+            layout: Some(layout),
+        },
+    );
+
+    // Corner radius
+    let rcr = encode_rectangular_corner_radius(&r.corner_radius);
+    let cr_trait = fbs::RectangularCornerRadiusTrait::create(
+        fbb,
+        &fbs::RectangularCornerRadiusTraitArgs {
+            rectangular_corner_radius: Some(&rcr),
+            corner_smoothing: 0.0,
+        },
+    );
+
+    let markdown_str = fbb.create_string(&r.markdown);
+    let fill_offsets = encode_paints(fbb, &r.fills);
+
+    let props = fbs::MarkdownEmbedNodeProperties::create(
+        fbb,
+        &fbs::MarkdownEmbedNodePropertiesArgs {
+            fill_paints: fill_offsets,
+            markdown: Some(markdown_str),
+            corner_radius: Some(cr_trait),
+        },
+    );
+
+    let mn = fbs::MarkdownEmbedNode::create(
+        fbb,
+        &fbs::MarkdownEmbedNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            properties: Some(props),
+        },
+    );
+    make_node_slot(fbb, fbs::Node::MarkdownEmbedNode, mn.as_union_value())
 }
 
 fn encode_boolean_operation_node<'a, A: flatbuffers::Allocator + 'a>(

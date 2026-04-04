@@ -394,7 +394,7 @@ fn ask_html_import_mode() -> bool {
     }
 }
 
-fn scene_from_markdown_path(path: &Path) -> Result<Scene> {
+fn scene_from_markdown_embed_path(path: &Path) -> Result<Scene> {
     use cg::cg::prelude::CGColor;
     use cg::node::factory::NodeFactory;
     use cg::node::scene_graph::{Parent, SceneGraph};
@@ -403,24 +403,32 @@ fn scene_from_markdown_path(path: &Path) -> Result<Scene> {
     let md_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
 
-    let nf = NodeFactory::new();
-    let mut node = nf.create_markdown_node();
-    node.markdown = md_source;
-    // Use a generous height — content is clipped to this bound.
-    // The markdown renderer draws within (width, height) via PictureRecorder.
-    node.size = cg::node::schema::Size {
-        width: 800.0,
-        height: 100_000.0,
+    let width = 800.0f32;
+    let temp_fonts = {
+        use cg::resources::ByteStore;
+        use cg::runtime::font_repository::FontRepository;
+        let mut repo =
+            FontRepository::new(std::sync::Arc::new(std::sync::Mutex::new(ByteStore::new())));
+        repo.enable_system_fallback();
+        repo
     };
+    let styled_html = cg::htmlcss::markdown_to_styled_html(&md_source);
+    let height =
+        cg::htmlcss::measure_content_height(&styled_html, width, &temp_fonts).unwrap_or(600.0);
+
+    let nf = NodeFactory::new();
+    let mut node = nf.create_markdown_embed_node();
+    node.markdown = md_source;
+    node.size = cg::node::schema::Size { width, height };
 
     let mut graph = SceneGraph::new();
-    graph.append_child(Node::Markdown(node), Parent::Root);
+    graph.append_child(Node::MarkdownEmbed(node), Parent::Root);
 
     Ok(Scene {
         name: path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "Markdown".to_string()),
+            .unwrap_or_else(|| "MarkdownEmbed".to_string()),
         graph,
         background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
     })
@@ -500,7 +508,7 @@ async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
                 scene_from_html_path(path).map(|s| vec![s])
             }
         }
-        "md" | "markdown" => scene_from_markdown_path(path).map(|s| vec![s]),
+        "md" | "markdown" => scene_from_markdown_embed_path(path).map(|s| vec![s]),
         // Raster images are handled separately in start_master_drop_task.
         other => Err(anyhow::anyhow!(
             "Unsupported dropped file type ({}): {}",

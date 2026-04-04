@@ -240,7 +240,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::AttributedText(_) => "attributed_text",
         Node::Tray(_) => "tray",
         Node::Error(_) => "error",
-        Node::Markdown(_) => "markdown",
+        Node::MarkdownEmbed(_) => "markdown",
         Node::HTMLEmbed(_) => "html_embed",
     }
 }

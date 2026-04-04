@@ -97,7 +97,8 @@ export function NodeElement<P extends Record<string, any>>({
       case "polygon":
       case "star":
       case "iframe":
-      case "richtext": {
+      case "richtext":
+      case "markdown_embed": {
         return ReactNodeRenderers[node.type];
       }
       default:
@@ -218,6 +219,7 @@ const fillings = {
   component: "background",
   iframe: "background",
   richtext: "color",
+  markdown_embed: "background",
   image: "background",
   video: "background",
   rectangle: "none",

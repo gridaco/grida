@@ -10,12 +10,15 @@
 //! Uses Stylo's process-global DOM slot. Calls must be serialized externally.
 
 mod collect;
+mod faux_table;
+mod github_markdown;
 mod layout;
 mod paint;
 pub mod style;
 pub mod types;
 
 use crate::runtime::font_repository::FontRepository;
+use github_markdown::GITHUB_MARKDOWN_CSS;
 
 /// Render HTML+CSS to a Skia Picture.
 pub fn render(
@@ -59,6 +62,18 @@ pub fn measure_content_height(
         return Ok(0.0);
     };
     Ok(layout::compute_content_height(&root, width, fonts))
+}
+
+/// Convert GFM markdown to a self-contained HTML document with GitHub-flavored CSS.
+///
+/// The output is a complete `<html>` document with an embedded `<style>` block
+/// that can be passed directly to [`render()`].
+pub fn markdown_to_styled_html(markdown: &str) -> String {
+    let html_body = crate::io::io_markdown::markdown_to_html(markdown);
+    format!(
+        "<html><head><style>{}</style></head><body class=\"markdown-body\">{}</body></html>",
+        GITHUB_MARKDOWN_CSS, html_body
+    )
 }
 
 #[cfg(test)]
@@ -222,5 +237,73 @@ mod tests {
         assert!(pic.is_ok());
         let h = pic.unwrap().cull_rect().height();
         assert!(h > 0.0, "With head should have height, got {h}");
+    }
+
+    // ── Markdown → htmlcss pipeline roundtrip tests ──
+
+    #[test]
+    fn test_markdown_heading() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let html = markdown_to_styled_html("# Hello World");
+        let pic = render(&html, 400.0, 300.0, &fonts);
+        assert!(pic.is_ok(), "Markdown heading should render");
+        assert!(pic.unwrap().cull_rect().height() > 0.0);
+    }
+
+    #[test]
+    fn test_markdown_mixed_content() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let md = r#"# Title
+
+Some **bold** and *italic* text.
+
+- Item 1
+- Item 2
+
+```
+code block
+```
+
+> blockquote
+
+---
+
+1. First
+2. Second
+"#;
+        let html = markdown_to_styled_html(md);
+        let pic = render(&html, 600.0, 300.0, &fonts);
+        assert!(pic.is_ok(), "Mixed markdown content should render");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(
+            h > 50.0,
+            "Mixed content should have substantial height, got {h}"
+        );
+    }
+
+    #[test]
+    fn test_markdown_table() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let md = r#"
+| Name  | Age | City     |
+|-------|-----|----------|
+| Alice | 30  | New York |
+| Bob   | 25  | London   |
+"#;
+        let html = markdown_to_styled_html(md);
+        let pic = render(&html, 600.0, 300.0, &fonts);
+        assert!(pic.is_ok(), "Markdown table should render");
+    }
+
+    #[test]
+    fn test_markdown_empty() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let html = markdown_to_styled_html("");
+        let pic = render(&html, 400.0, 300.0, &fonts);
+        assert!(pic.is_ok(), "Empty markdown should render");
     }
 }

@@ -10,10 +10,10 @@ pub mod grida {
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_NODE_TYPE: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_NODE_TYPE: u8 = 15;
+pub const ENUM_MAX_NODE_TYPE: u8 = 16;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_NODE_TYPE: [NodeType; 16] = [
+pub const ENUM_VALUES_NODE_TYPE: [NodeType; 17] = [
   NodeType::Exception,
   NodeType::Scene,
   NodeType::Group,
@@ -30,6 +30,7 @@ pub const ENUM_VALUES_NODE_TYPE: [NodeType; 16] = [
   NodeType::Line,
   NodeType::Vector,
   NodeType::TextSpan,
+  NodeType::MarkdownEmbed,
 ];
 
 /// node type
@@ -54,9 +55,10 @@ impl NodeType {
   pub const Line: Self = Self(13);
   pub const Vector: Self = Self(14);
   pub const TextSpan: Self = Self(15);
+  pub const MarkdownEmbed: Self = Self(16);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 15;
+  pub const ENUM_MAX: u8 = 16;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::Exception,
     Self::Scene,
@@ -74,6 +76,7 @@ impl NodeType {
     Self::Line,
     Self::Vector,
     Self::TextSpan,
+    Self::MarkdownEmbed,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
@@ -94,6 +97,7 @@ impl NodeType {
       Self::Line => Some("Line"),
       Self::Vector => Some("Vector"),
       Self::TextSpan => Some("TextSpan"),
+      Self::MarkdownEmbed => Some("MarkdownEmbed"),
       _ => None,
     }
   }
@@ -3864,10 +3868,10 @@ pub struct LayoutPositioningBasisUnionTableOffset {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_NODE: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_NODE: u8 = 13;
+pub const ENUM_MAX_NODE: u8 = 14;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_NODE: [Node; 14] = [
+pub const ENUM_VALUES_NODE: [Node; 15] = [
   Node::NONE,
   Node::UnknownNode,
   Node::SceneNode,
@@ -3882,6 +3886,7 @@ pub const ENUM_VALUES_NODE: [Node; 14] = [
   Node::PathNode,
   Node::AttributedTextNode,
   Node::TrayNode,
+  Node::MarkdownEmbedNode,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -3903,9 +3908,10 @@ impl Node {
   pub const PathNode: Self = Self(11);
   pub const AttributedTextNode: Self = Self(12);
   pub const TrayNode: Self = Self(13);
+  pub const MarkdownEmbedNode: Self = Self(14);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 13;
+  pub const ENUM_MAX: u8 = 14;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::UnknownNode,
@@ -3921,6 +3927,7 @@ impl Node {
     Self::PathNode,
     Self::AttributedTextNode,
     Self::TrayNode,
+    Self::MarkdownEmbedNode,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
@@ -3939,6 +3946,7 @@ impl Node {
       Self::PathNode => Some("PathNode"),
       Self::AttributedTextNode => Some("AttributedTextNode"),
       Self::TrayNode => Some("TrayNode"),
+      Self::MarkdownEmbedNode => Some("MarkdownEmbedNode"),
       _ => None,
     }
   }
@@ -19200,6 +19208,276 @@ impl ::core::fmt::Debug for AttributedTextNode<'_> {
       ds.finish()
   }
 }
+pub enum MarkdownEmbedNodePropertiesOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+/// Properties for a Markdown embed node.
+pub struct MarkdownEmbedNodeProperties<'a> {
+  pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for MarkdownEmbedNodeProperties<'a> {
+  type Inner = MarkdownEmbedNodeProperties<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: unsafe { ::flatbuffers::Table::new(buf, loc) } }
+  }
+}
+
+impl<'a> MarkdownEmbedNodeProperties<'a> {
+  pub const VT_FILL_PAINTS: ::flatbuffers::VOffsetT = 4;
+  pub const VT_MARKDOWN: ::flatbuffers::VOffsetT = 6;
+  pub const VT_CORNER_RADIUS: ::flatbuffers::VOffsetT = 8;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+    MarkdownEmbedNodeProperties { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: ::flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args MarkdownEmbedNodePropertiesArgs<'args>
+  ) -> ::flatbuffers::WIPOffset<MarkdownEmbedNodeProperties<'bldr>> {
+    let mut builder = MarkdownEmbedNodePropertiesBuilder::new(_fbb);
+    if let Some(x) = args.corner_radius { builder.add_corner_radius(x); }
+    if let Some(x) = args.markdown { builder.add_markdown(x); }
+    if let Some(x) = args.fill_paints { builder.add_fill_paints(x); }
+    builder.finish()
+  }
+
+
+  /// Background fill paints for the markdown container.
+  #[inline]
+  pub fn fill_paints(&self) -> Option<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>(MarkdownEmbedNodeProperties::VT_FILL_PAINTS, None)}
+  }
+  /// The GitHub Flavored Markdown source text.
+  #[inline]
+  pub fn markdown(&self) -> Option<&'a str> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<&str>>(MarkdownEmbedNodeProperties::VT_MARKDOWN, None)}
+  }
+  /// Per-corner rectangular corner radius.
+  #[inline]
+  pub fn corner_radius(&self) -> Option<RectangularCornerRadiusTrait<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<RectangularCornerRadiusTrait>>(MarkdownEmbedNodeProperties::VT_CORNER_RADIUS, None)}
+  }
+}
+
+impl ::flatbuffers::Verifiable for MarkdownEmbedNodeProperties<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut ::flatbuffers::Verifier, pos: usize
+  ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+    v.visit_table(pos)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<PaintStackItem>>>>("fill_paints", Self::VT_FILL_PAINTS, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("markdown", Self::VT_MARKDOWN, false)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<RectangularCornerRadiusTrait>>("corner_radius", Self::VT_CORNER_RADIUS, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct MarkdownEmbedNodePropertiesArgs<'a> {
+    pub fill_paints: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, ::flatbuffers::ForwardsUOffset<PaintStackItem<'a>>>>>,
+    pub markdown: Option<::flatbuffers::WIPOffset<&'a str>>,
+    pub corner_radius: Option<::flatbuffers::WIPOffset<RectangularCornerRadiusTrait<'a>>>,
+}
+impl<'a> Default for MarkdownEmbedNodePropertiesArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    MarkdownEmbedNodePropertiesArgs {
+      fill_paints: None,
+      markdown: None,
+      corner_radius: None,
+    }
+  }
+}
+
+pub struct MarkdownEmbedNodePropertiesBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> MarkdownEmbedNodePropertiesBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_fill_paints(&mut self, fill_paints: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b , ::flatbuffers::ForwardsUOffset<PaintStackItem<'b >>>>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(MarkdownEmbedNodeProperties::VT_FILL_PAINTS, fill_paints);
+  }
+  #[inline]
+  pub fn add_markdown(&mut self, markdown: ::flatbuffers::WIPOffset<&'b  str>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(MarkdownEmbedNodeProperties::VT_MARKDOWN, markdown);
+  }
+  #[inline]
+  pub fn add_corner_radius(&mut self, corner_radius: ::flatbuffers::WIPOffset<RectangularCornerRadiusTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<RectangularCornerRadiusTrait>>(MarkdownEmbedNodeProperties::VT_CORNER_RADIUS, corner_radius);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>) -> MarkdownEmbedNodePropertiesBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    MarkdownEmbedNodePropertiesBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> ::flatbuffers::WIPOffset<MarkdownEmbedNodeProperties<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    ::flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl ::core::fmt::Debug for MarkdownEmbedNodeProperties<'_> {
+  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+    let mut ds = f.debug_struct("MarkdownEmbedNodeProperties");
+      ds.field("fill_paints", &self.fill_paints());
+      ds.field("markdown", &self.markdown());
+      ds.field("corner_radius", &self.corner_radius());
+      ds.finish()
+  }
+}
+pub enum MarkdownEmbedNodeOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+/// Node variant: Markdown embed (render-only).
+///
+/// Stores GFM markdown source and renders it directly to a Skia Picture
+/// at paint time. Not structurally editable — treated as a single text block.
+pub struct MarkdownEmbedNode<'a> {
+  pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for MarkdownEmbedNode<'a> {
+  type Inner = MarkdownEmbedNode<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: unsafe { ::flatbuffers::Table::new(buf, loc) } }
+  }
+}
+
+impl<'a> MarkdownEmbedNode<'a> {
+  pub const VT_NODE: ::flatbuffers::VOffsetT = 4;
+  pub const VT_LAYER: ::flatbuffers::VOffsetT = 6;
+  pub const VT_PROPERTIES: ::flatbuffers::VOffsetT = 8;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+    MarkdownEmbedNode { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: ::flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args MarkdownEmbedNodeArgs<'args>
+  ) -> ::flatbuffers::WIPOffset<MarkdownEmbedNode<'bldr>> {
+    let mut builder = MarkdownEmbedNodeBuilder::new(_fbb);
+    if let Some(x) = args.properties { builder.add_properties(x); }
+    if let Some(x) = args.layer { builder.add_layer(x); }
+    if let Some(x) = args.node { builder.add_node(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn node(&self) -> SystemNodeTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>(MarkdownEmbedNode::VT_NODE, None).unwrap()}
+  }
+  #[inline]
+  pub fn layer(&self) -> LayerTrait<'a> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<LayerTrait>>(MarkdownEmbedNode::VT_LAYER, None).unwrap()}
+  }
+  #[inline]
+  pub fn properties(&self) -> Option<MarkdownEmbedNodeProperties<'a>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<::flatbuffers::ForwardsUOffset<MarkdownEmbedNodeProperties>>(MarkdownEmbedNode::VT_PROPERTIES, None)}
+  }
+}
+
+impl ::flatbuffers::Verifiable for MarkdownEmbedNode<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut ::flatbuffers::Verifier, pos: usize
+  ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+    v.visit_table(pos)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<SystemNodeTrait>>("node", Self::VT_NODE, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<LayerTrait>>("layer", Self::VT_LAYER, true)?
+     .visit_field::<::flatbuffers::ForwardsUOffset<MarkdownEmbedNodeProperties>>("properties", Self::VT_PROPERTIES, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct MarkdownEmbedNodeArgs<'a> {
+    pub node: Option<::flatbuffers::WIPOffset<SystemNodeTrait<'a>>>,
+    pub layer: Option<::flatbuffers::WIPOffset<LayerTrait<'a>>>,
+    pub properties: Option<::flatbuffers::WIPOffset<MarkdownEmbedNodeProperties<'a>>>,
+}
+impl<'a> Default for MarkdownEmbedNodeArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    MarkdownEmbedNodeArgs {
+      node: None, // required field
+      layer: None, // required field
+      properties: None,
+    }
+  }
+}
+
+pub struct MarkdownEmbedNodeBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> MarkdownEmbedNodeBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_node(&mut self, node: ::flatbuffers::WIPOffset<SystemNodeTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<SystemNodeTrait>>(MarkdownEmbedNode::VT_NODE, node);
+  }
+  #[inline]
+  pub fn add_layer(&mut self, layer: ::flatbuffers::WIPOffset<LayerTrait<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<LayerTrait>>(MarkdownEmbedNode::VT_LAYER, layer);
+  }
+  #[inline]
+  pub fn add_properties(&mut self, properties: ::flatbuffers::WIPOffset<MarkdownEmbedNodeProperties<'b >>) {
+    self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<MarkdownEmbedNodeProperties>>(MarkdownEmbedNode::VT_PROPERTIES, properties);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>) -> MarkdownEmbedNodeBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    MarkdownEmbedNodeBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> ::flatbuffers::WIPOffset<MarkdownEmbedNode<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, MarkdownEmbedNode::VT_NODE,"node");
+    self.fbb_.required(o, MarkdownEmbedNode::VT_LAYER,"layer");
+    ::flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl ::core::fmt::Debug for MarkdownEmbedNode<'_> {
+  fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+    let mut ds = f.debug_struct("MarkdownEmbedNode");
+      ds.field("node", &self.node());
+      ds.field("layer", &self.layer());
+      ds.field("properties", &self.properties());
+      ds.finish()
+  }
+}
 pub enum NodeSlotOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -19450,6 +19728,21 @@ impl<'a> NodeSlot<'a> {
     }
   }
 
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn node_as_markdown_embed_node(&self) -> Option<MarkdownEmbedNode<'a>> {
+    if self.node_type() == Node::MarkdownEmbedNode {
+      self.node().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { MarkdownEmbedNode::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
 }
 
 impl ::flatbuffers::Verifiable for NodeSlot<'_> {
@@ -19473,6 +19766,7 @@ impl ::flatbuffers::Verifiable for NodeSlot<'_> {
           Node::PathNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<PathNode>>("Node::PathNode", pos),
           Node::AttributedTextNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<AttributedTextNode>>("Node::AttributedTextNode", pos),
           Node::TrayNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<TrayNode>>("Node::TrayNode", pos),
+          Node::MarkdownEmbedNode => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<MarkdownEmbedNode>>("Node::MarkdownEmbedNode", pos),
           _ => Ok(()),
         }
      })?
@@ -19613,6 +19907,13 @@ impl ::core::fmt::Debug for NodeSlot<'_> {
         },
         Node::TrayNode => {
           if let Some(x) = self.node_as_tray_node() {
+            ds.field("node", &x)
+          } else {
+            ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        Node::MarkdownEmbedNode => {
+          if let Some(x) = self.node_as_markdown_embed_node() {
             ds.field("node", &x)
           } else {
             ds.field("node", &"InvalidFlatbuffer: Union discriminant does not match value.")

@@ -169,6 +169,7 @@ impl IdConverter {
             JSONNode::TextSpan(text) => Node::TextSpan(TextSpanNodeRec::from(text)),
             JSONNode::BooleanOperation(bool_op) => Node::from(JSONNode::BooleanOperation(bool_op)),
             JSONNode::Image(image) => Node::from(JSONNode::Image(image)),
+            JSONNode::MarkdownEmbed(md) => Node::from(JSONNode::MarkdownEmbed(md)),
             JSONNode::Unknown(unknown) => Node::from(JSONNode::Unknown(unknown)),
             JSONNode::Scene(_) => {
                 // Scene nodes should not be converted to regular nodes
