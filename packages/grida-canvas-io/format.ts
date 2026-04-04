@@ -5862,6 +5862,56 @@ export namespace format {
         }
 
         /**
+         * Decodes MarkdownEmbedNode.
+         */
+        export function markdownEmbed(
+          n: fbs.MarkdownEmbedNode,
+          id: string,
+          systemNode: fbs.SystemNodeTrait,
+          layer: fbs.LayerTrait | null,
+          opacity: number,
+          layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
+          effects?: grida.program.nodes.i.IEffects
+        ): grida.program.nodes.MarkdownEmbedNode {
+          const props = n.properties();
+          const fillPaints = props
+            ? format.paint.decode.fillPaints(props)
+            : undefined;
+          const cornerRadiusProps =
+            format.shape.decode.rectangularCornerRadiusTrait(
+              props?.cornerRadius() ?? null
+            );
+
+          const baseName = systemNode.name() ?? "markdown";
+          const baseActive = systemNode.active() ?? true;
+          const baseLocked = systemNode.locked() ?? false;
+
+          return {
+            type: "markdown_embed",
+            id,
+            name: baseName,
+            active: baseActive,
+            locked: baseLocked,
+            opacity,
+            z_index: 0,
+            markdown: props?.markdown() ?? "",
+            ...(fillPaints ? { fill_paints: fillPaints } : {}),
+            rectangular_corner_radius_top_left:
+              cornerRadiusProps.rectangular_corner_radius_top_left,
+            rectangular_corner_radius_top_right:
+              cornerRadiusProps.rectangular_corner_radius_top_right,
+            rectangular_corner_radius_bottom_left:
+              cornerRadiusProps.rectangular_corner_radius_bottom_left,
+            rectangular_corner_radius_bottom_right:
+              cornerRadiusProps.rectangular_corner_radius_bottom_right,
+            corner_smoothing: cornerRadiusProps.corner_smoothing,
+            ...layoutFields,
+            rotation: layoutFields.rotation ?? 0,
+            ...(effects || {}),
+          } satisfies grida.program.nodes.MarkdownEmbedNode;
+        }
+
+        /**
          * Decodes AttributedTextNode.
          */
         export function attributedText(
@@ -6533,6 +6583,17 @@ export namespace format {
             case fbs.Node.AttributedTextNode:
               nodes[id] = nodeTypes.attributedText(
                 typedNode as fbs.AttributedTextNode,
+                id,
+                systemNode,
+                layer,
+                opacity,
+                layoutFields,
+                decodedEffects
+              );
+              break;
+            case fbs.Node.MarkdownEmbedNode:
+              nodes[id] = nodeTypes.markdownEmbed(
+                typedNode as fbs.MarkdownEmbedNode,
                 id,
                 systemNode,
                 layer,

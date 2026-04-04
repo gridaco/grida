@@ -2534,6 +2534,9 @@ fn encode_node<'a, A: flatbuffers::Allocator + 'a>(
         Node::AttributedText(r) => {
             encode_attributed_text_node(fbb, r, node_id, parent_id, position)
         }
+        Node::MarkdownEmbed(r) => {
+            encode_markdown_embed_node(fbb, r, node_id, parent_id, position)
+        }
         // Fallback: encode as UnknownNode
         _ => {
             let sys = encode_system_node_trait(fbb, node_id, "", true, false);
@@ -4492,6 +4495,73 @@ fn encode_attributed_text_node<'a, A: flatbuffers::Allocator + 'a>(
         },
     );
     make_node_slot(fbb, fbs::Node::AttributedTextNode, tn.as_union_value())
+}
+
+fn encode_markdown_embed_node<'a, A: flatbuffers::Allocator + 'a>(
+    fbb: &mut flatbuffers::FlatBufferBuilder<'a, A>,
+    r: &MarkdownEmbedNodeRec,
+    node_id: &str,
+    parent_id: &str,
+    position: &str,
+) -> flatbuffers::WIPOffset<fbs::NodeSlot<'a>> {
+    let x = r.transform.x();
+    let y = r.transform.y();
+    let plt = affine_to_rotation_transform(&r.transform);
+
+    let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
+    let layout = encode_shape_layout(
+        fbb,
+        x,
+        y,
+        Some(r.size.width),
+        Some(r.size.height),
+        &r.layout_child,
+    );
+    let layer = encode_layer_trait(
+        fbb,
+        &LayerTraitInput {
+            parent_id,
+            position,
+            opacity: r.opacity,
+            blend_mode: r.blend_mode,
+            mask: r.mask,
+            effects: &r.effects,
+            post_layout_transform: plt,
+            layout: Some(layout),
+        },
+    );
+
+    // Corner radius
+    let rcr = encode_rectangular_corner_radius(&r.corner_radius);
+    let cr_trait = fbs::RectangularCornerRadiusTrait::create(
+        fbb,
+        &fbs::RectangularCornerRadiusTraitArgs {
+            rectangular_corner_radius: Some(&rcr),
+            corner_smoothing: 0.0,
+        },
+    );
+
+    let markdown_str = fbb.create_string(&r.markdown);
+    let fill_offsets = encode_paints(fbb, &r.fills);
+
+    let props = fbs::MarkdownEmbedNodeProperties::create(
+        fbb,
+        &fbs::MarkdownEmbedNodePropertiesArgs {
+            fill_paints: fill_offsets,
+            markdown: Some(markdown_str),
+            corner_radius: Some(cr_trait),
+        },
+    );
+
+    let mn = fbs::MarkdownEmbedNode::create(
+        fbb,
+        &fbs::MarkdownEmbedNodeArgs {
+            node: Some(sys),
+            layer: Some(layer),
+            properties: Some(props),
+        },
+    );
+    make_node_slot(fbb, fbs::Node::MarkdownEmbedNode, mn.as_union_value())
 }
 
 fn encode_boolean_operation_node<'a, A: flatbuffers::Allocator + 'a>(

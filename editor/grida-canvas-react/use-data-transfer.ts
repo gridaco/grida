@@ -174,7 +174,10 @@ export function useInsertFile() {
         const reader = new FileReader();
         reader.onload = (e) => {
           const markdown = (e.target?.result as string) ?? "";
-          const name = file.name.split(".md")[0] || file.name;
+          // Strip a trailing .md / .markdown / .mdown / .mkd extension
+          // case-insensitively. Falls back to the full filename.
+          const name =
+            file.name.replace(/\.(md|markdown|mdown|mkd)$/i, "") || file.name;
           insertMarkdown(name, markdown, position);
         };
         reader.readAsText(file);

@@ -9,6 +9,7 @@ import { SVGLineWidget } from "./line";
 import { SVGPolyLineWidget } from "./polyline";
 import { IFrameWidget } from "./iframe";
 import { RichTextWidget } from "./richtext";
+import { MarkdownEmbedWidget } from "./markdown-embed";
 import { VectorWidget } from "./vector";
 import { BitmapWidget } from "./bitmap";
 import { RegularPolygonWidget } from "./polygon";
@@ -30,6 +31,7 @@ export namespace ReactNodeRenderers {
   export const image = ImageWidget;
   export const video = VideoWidget;
   export const richtext = RichTextWidget;
+  export const markdown_embed = MarkdownEmbedWidget;
   export const bitmap = BitmapWidget;
   // export const icon = IconWidget;
   // export const Theme = ThemeWidget;
