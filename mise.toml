@@ -1,0 +1,7 @@
+[tools]
+node = "22"
+pnpm = "10"
+rust = "1.92.0"
+supabase = "2"
+deno = "2"
+python = "3.12"

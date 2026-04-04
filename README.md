@@ -180,12 +180,15 @@ Docs: [@grida/refig](https://grida.co/docs/packages/@grida/refig)
 
 ## Quickstart (monorepo)
 
-**Requirements:** Node.js **22+**, pnpm **10+**
+**Requirements:** mise, Node.js **22+**, pnpm **10+**
 
 ```bash
-pnpm install
+mise install
+pnpm dev:init
+pnpm dev:services
 pnpm dev
 ```
+now editor is running on `http://localhost:3000`.
 
 Common tasks:
 
