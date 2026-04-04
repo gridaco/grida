@@ -464,8 +464,7 @@ export namespace iofigma {
 
         // Parse path: extract command groups
         const cmdRegex = /([MLHVCSQTAZmlhvcsqtaz])/g;
-        const numRegex =
-          /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
+        const numRegex = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
 
         type CmdGroup = { cmd: string; nums: number[] };
         const groups: CmdGroup[] = [];
@@ -514,9 +513,7 @@ export namespace iofigma {
         // Transform absolute coordinate pairs in each command
         for (const g of groups) {
           const isRel =
-            g.cmd === g.cmd.toLowerCase() &&
-            g.cmd !== "z" &&
-            g.cmd !== "Z";
+            g.cmd === g.cmd.toLowerCase() && g.cmd !== "z" && g.cmd !== "Z";
           const cu = g.cmd.toUpperCase();
 
           switch (cu) {
@@ -587,8 +584,7 @@ export namespace iofigma {
                 g.nums[i + 5] = nx;
                 g.nums[i + 6] = ny;
                 // Flip sweep flag when determinant is negative
-                if (det < 0)
-                  g.nums[i + 4] = g.nums[i + 4] === 0 ? 1 : 0;
+                if (det < 0) g.nums[i + 4] = g.nums[i + 4] === 0 ? 1 : 0;
                 if (!isRel) track(nx, ny);
               }
               break;
@@ -603,9 +599,7 @@ export namespace iofigma {
 
         for (const g of groups) {
           const isRel =
-            g.cmd === g.cmd.toLowerCase() &&
-            g.cmd !== "z" &&
-            g.cmd !== "Z";
+            g.cmd === g.cmd.toLowerCase() && g.cmd !== "z" && g.cmd !== "Z";
           if (isRel) continue;
           const cu = g.cmd.toUpperCase();
           switch (cu) {
@@ -655,8 +649,7 @@ export namespace iofigma {
           .map((g) => {
             if (g.cmd.toUpperCase() === "Z") return g.cmd;
             return (
-              g.cmd +
-              g.nums.map((n) => String(Number(n.toFixed(6)))).join(" ")
+              g.cmd + g.nums.map((n) => String(Number(n.toFixed(6)))).join(" ")
             );
           })
           .join("");
@@ -1788,14 +1781,11 @@ export namespace iofigma {
           if (!("type" in node) || (node as any).type !== "BOOLEAN_OPERATION")
             return false;
 
-          const hasFills =
-            Array.isArray(node.fills) && node.fills.length > 0;
+          const hasFills = Array.isArray(node.fills) && node.fills.length > 0;
           const hasStrokes =
             Array.isArray(node.strokes) && node.strokes.length > 0;
-          const hasFillGeometry =
-            (node.fillGeometry?.length ?? 0) > 0;
-          const hasStrokeGeometry =
-            (node.strokeGeometry?.length ?? 0) > 0;
+          const hasFillGeometry = (node.fillGeometry?.length ?? 0) > 0;
+          const hasStrokeGeometry = (node.strokeGeometry?.length ?? 0) > 0;
           const fillWasProcessed = fillChildIds.length > 0;
 
           return (
@@ -1861,10 +1851,8 @@ export namespace iofigma {
               ];
               const aabbX = Math.min(...corners.map((p) => p[0]));
               const aabbY = Math.min(...corners.map((p) => p[1]));
-              const aabbW =
-                Math.max(...corners.map((p) => p[0])) - aabbX;
-              const aabbH =
-                Math.max(...corners.map((p) => p[1])) - aabbY;
+              const aabbW = Math.max(...corners.map((p) => p[0])) - aabbX;
+              const aabbH = Math.max(...corners.map((p) => p[1])) - aabbY;
 
               // Override the group's position to the AABB top-left
               // (relative to parent) with no rotation, since the 2×2
@@ -1884,8 +1872,10 @@ export namespace iofigma {
             pathTransform
           );
 
-          const skipStrokeGeometry =
-            shouldSkipBooleanOperationStrokeGeometry(node, fillChildIds);
+          const skipStrokeGeometry = shouldSkipBooleanOperationStrokeGeometry(
+            node,
+            fillChildIds
+          );
 
           const strokeChildIds = skipStrokeGeometry
             ? []
@@ -1967,12 +1957,17 @@ export namespace iofigma {
             (currentNode as any).relativeTransform != null
           ) {
             const prt = (currentNode as any).relativeTransform;
-            const pa = prt[0][0], pc = prt[0][1];
-            const pb = prt[1][0], pd = prt[1][1];
-            const ptx = prt[0][2], pty = prt[1][2];
+            const pa = prt[0][0],
+              pc = prt[0][1];
+            const pb = prt[1][0],
+              pd = prt[1][1];
+            const ptx = prt[0][2],
+              pty = prt[1][2];
             const pIsIdentity2x2 =
-              Math.abs(pa - 1) < 1e-6 && Math.abs(pd - 1) < 1e-6 &&
-              Math.abs(pb) < 1e-6 && Math.abs(pc) < 1e-6;
+              Math.abs(pa - 1) < 1e-6 &&
+              Math.abs(pd - 1) < 1e-6 &&
+              Math.abs(pb) < 1e-6 &&
+              Math.abs(pc) < 1e-6;
             // Propagate ALL non-identity 2×2 transforms (rotations, flips,
             // skews) into children. The Grida container model stores
             // (position, rotation_degrees) and reconstructs via
@@ -1988,8 +1983,12 @@ export namespace iofigma {
               for (const child of currentNode.children) {
                 const crt = (child as any).relativeTransform;
                 if (!crt) continue;
-                const ca = crt[0][0], cc = crt[0][1], ctx2 = crt[0][2];
-                const cb = crt[1][0], cd = crt[1][1], cty = crt[1][2];
+                const ca = crt[0][0],
+                  cc = crt[0][1],
+                  ctx2 = crt[0][2];
+                const cb = crt[1][0],
+                  cd = crt[1][1],
+                  cty = crt[1][2];
                 // New 2×2: P_2x2 * C_2x2
                 const na = pa * ca + pc * cb;
                 const nc = pa * cc + pc * cd;
@@ -1998,7 +1997,10 @@ export namespace iofigma {
                 // New translation: P_2x2 * C_t + P_t
                 const ntx = pa * ctx2 + pc * cty + ptx;
                 const nty = pb * ctx2 + pd * cty + pty;
-                (child as any).relativeTransform = [[na, nc, ntx], [nb, nd, nty]];
+                (child as any).relativeTransform = [
+                  [na, nc, ntx],
+                  [nb, nd, nty],
+                ];
               }
               // Fix the container to identity transform (AABB position)
               const corners = [
@@ -2007,8 +2009,8 @@ export namespace iofigma {
                 [pc * ph + ptx, pd * ph + pty],
                 [pa * pw + pc * ph + ptx, pb * pw + pd * ph + pty],
               ];
-              const aabbX = Math.min(...corners.map(p => p[0]));
-              const aabbY = Math.min(...corners.map(p => p[1]));
+              const aabbX = Math.min(...corners.map((p) => p[0]));
+              const aabbY = Math.min(...corners.map((p) => p[1]));
               (processedNode as any).layout_inset_left = aabbX;
               (processedNode as any).layout_inset_top = aabbY;
               (processedNode as any).rotation = 0;
