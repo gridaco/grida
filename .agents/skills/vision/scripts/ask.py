@@ -34,30 +34,17 @@ except ImportError:
     )
     sys.exit(1)
 
-# Ordered by preference. First available wins when --model is not specified.
-# Update this list every ~6 months as better low-cost vision models emerge.
-# Last updated: 2026-03 — qwen3.5 added as top pick.
+# Only Gemma 4 is supported (multimodal on Ollama). First matching tag wins
+# when --model is not specified.
+# Last updated: 2026-04 — Gemma 4 only.
 PREFERRED_VISION_MODELS = [
-    "qwen3.5",
-    "qwen2.5vl",
-    "gemma3",
-    "llama3.2-vision",
-    "llava",
+    "gemma4",
 ]
 
-# Name fragments that reliably indicate vision capability.
-VISION_NAME_FRAGMENTS = [
-    "qwen",
-    "gemma3",
-    "vl",
-    "vision",
-    "llava",
-    "moondream",
-    "bakllava",
-    "cogvlm",
-    "minicpm-v",
-    "phi3.5-vision",
-]
+
+def is_gemma4_vision_model(name: str) -> bool:
+    low = name.lower()
+    return low == "gemma4" or low.startswith("gemma4:")
 
 DESCRIBE_PROMPT = (
     "Describe this image concisely. "
@@ -89,13 +76,8 @@ def _list_models() -> list[str]:
     return [m.model for m in resp.models]
 
 
-def is_vision_model(name: str) -> bool:
-    low = name.lower()
-    return any(frag in low for frag in VISION_NAME_FRAGMENTS)
-
-
 def list_vision_models() -> list[str]:
-    return [m for m in _list_models() if is_vision_model(m)]
+    return [m for m in _list_models() if is_gemma4_vision_model(m)]
 
 
 def pick_model(requested: str | None) -> str:
@@ -105,15 +87,15 @@ def pick_model(requested: str | None) -> str:
         installed = _list_models()
         if installed:
             print(
-                f"error: no vision-capable models found.\n"
+                f"error: no Gemma 4 vision model found.\n"
                 f"       installed models: {', '.join(installed)}\n"
-                f"       install one with: ollama pull qwen3.5",
+                f"       install with: ollama pull gemma4",
                 file=sys.stderr,
             )
         else:
             print(
                 "error: no models installed.\n"
-                "       install one with: ollama pull qwen3.5",
+                "       install with: ollama pull gemma4",
                 file=sys.stderr,
             )
         sys.exit(1)
@@ -122,8 +104,8 @@ def pick_model(requested: str | None) -> str:
         matches = [m for m in available if m == requested or m.startswith(requested + ":")]
         if not matches:
             print(
-                f"error: model '{requested}' is not available or not a vision model.\n"
-                f"       available vision models: {', '.join(available)}",
+                f"error: model '{requested}' is not available or not a Gemma 4 vision model.\n"
+                f"       available Gemma 4 models: {', '.join(available)}",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -135,6 +117,7 @@ def pick_model(requested: str | None) -> str:
             if installed == preferred or installed.startswith(preferred + ":"):
                 return installed
 
+    # Any tag of gemma4 (e.g. :latest, :e4b) is acceptable.
     return available[0]
 
 
@@ -164,22 +147,22 @@ def cmd_list_models() -> None:
     _check_server()
     all_models = _list_models()
     if not all_models:
-        print("No models installed. Install one with: ollama pull qwen3.5")
+        print("No models installed. Install one with: ollama pull gemma4")
         return
 
-    vision = [m for m in all_models if is_vision_model(m)]
-    other = [m for m in all_models if not is_vision_model(m)]
+    vision = [m for m in all_models if is_gemma4_vision_model(m)]
+    other = [m for m in all_models if not is_gemma4_vision_model(m)]
 
     if vision:
-        print("Vision-capable models (usable with ask.py):")
+        print("Gemma 4 vision models (usable with ask.py):")
         for name in vision:
             print(f"  {name}")
     else:
-        print("No vision-capable models found.")
-        print("Install one with: ollama pull qwen3.5")
+        print("No Gemma 4 vision model found.")
+        print("Install one with: ollama pull gemma4")
 
     if other:
-        print("\nOther installed models (text-only, not usable with ask.py):")
+        print("\nOther installed models (not usable with this skill — need gemma4):")
         for name in other:
             print(f"  {name}")
 
