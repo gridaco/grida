@@ -2926,6 +2926,7 @@ export namespace grida.program.nodes {
         case "iframe":
         case "image":
         case "line":
+        case "markdown_embed":
         case "richtext":
         case "tspan":
         case "vector":
