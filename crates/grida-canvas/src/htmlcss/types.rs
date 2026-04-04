@@ -64,11 +64,11 @@ pub enum BorderStyle {
     Outset,
 }
 
-/// CSS `box-sizing` property.
+/// CSS `box-sizing` property. Initial value: `content-box` per spec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BoxSizing {
-    ContentBox,
     #[default]
+    ContentBox,
     BorderBox,
 }
 

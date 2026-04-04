@@ -192,12 +192,6 @@ fn text_measure_func(
         };
     }
 
-    let max_width = match available_space.width {
-        AvailableSpace::Definite(w) => known_dimensions.width.unwrap_or(w),
-        AvailableSpace::MinContent => 0.0,
-        AvailableSpace::MaxContent => 100_000.0,
-    };
-
     // Build Paragraph with placeholders for inline box spacing
     // (Chromium: LineBreaker processes kOpenTag/kText/kCloseTag)
     let ps = ParagraphStyle::new();
@@ -213,11 +207,9 @@ fn text_measure_func(
             InlineRunItem::OpenBox { inline_size, .. }
             | InlineRunItem::CloseBox { inline_size } => {
                 if *inline_size > 0.0 {
-                    // Inject a placeholder that consumes inline space
-                    // (Chromium: position_ += item_result->inline_size)
                     builder.add_placeholder(&skia_safe::textlayout::PlaceholderStyle::new(
                         *inline_size,
-                        0.01, // near-zero height — aligned to baseline
+                        0.01,
                         skia_safe::textlayout::PlaceholderAlignment::Baseline,
                         skia_safe::textlayout::TextBaseline::Alphabetic,
                         0.0,
@@ -227,12 +219,26 @@ fn text_measure_func(
         }
     }
     let mut para = builder.build();
-    para.layout(max_width);
 
-    // Ceil intrinsic width to prevent subpixel-induced wrapping
-    let intrinsic_w = para.max_intrinsic_width().ceil();
+    // Layout at large width first to get intrinsic measurements
+    para.layout(100_000.0);
+    let max_intrinsic = para.max_intrinsic_width().ceil();
+    let min_intrinsic = para.min_intrinsic_width().ceil();
+
+    // Determine layout width from available space
+    let layout_width = match available_space.width {
+        AvailableSpace::Definite(w) => known_dimensions.width.unwrap_or(w),
+        AvailableSpace::MinContent => min_intrinsic,
+        AvailableSpace::MaxContent => max_intrinsic,
+    };
+
+    // Re-layout at actual width for correct line breaking and height
+    para.layout(layout_width);
+
     taffy::Size {
-        width: known_dimensions.width.unwrap_or(intrinsic_w.min(max_width)),
+        width: known_dimensions
+            .width
+            .unwrap_or(max_intrinsic.min(layout_width)),
         height: known_dimensions.height.unwrap_or(para.height()),
     }
 }

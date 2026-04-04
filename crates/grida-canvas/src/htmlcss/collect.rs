@@ -297,18 +297,11 @@ fn collect_inline_items(el: &StyledElement, items: &mut Vec<InlineRunItem>) {
                 collect_inline_items(child_el, items);
             }
             StyledNode::InlineGroup(group) => {
+                // Preserve child run styling — don't overwrite with parent's
+                // font/color. Nested inline elements (e.g. <strong><em>text</em></strong>)
+                // need to keep each run's specific styling intact.
                 for item in &group.items {
-                    match item {
-                        InlineRunItem::Text(run) => {
-                            items.push(InlineRunItem::Text(TextRun {
-                                text: run.text.clone(),
-                                font: el.font.clone(),
-                                color: el.color,
-                                decoration: None,
-                            }));
-                        }
-                        other => items.push(other.clone()),
-                    }
+                    items.push(item.clone());
                 }
             }
         }
@@ -692,6 +685,8 @@ fn extract_size(
         GenericSize::LengthPercentage(lp) => {
             if let Some(len) = lp.0.to_length() {
                 CssLength::Px(len.px())
+            } else if let Some(pct) = lp.0.to_percentage() {
+                CssLength::Percent(pct.0)
             } else {
                 CssLength::Auto
             }
@@ -710,6 +705,8 @@ fn extract_max_size(
         GenericMaxSize::LengthPercentage(lp) => {
             if let Some(len) = lp.0.to_length() {
                 CssLength::Px(len.px())
+            } else if let Some(pct) = lp.0.to_percentage() {
+                CssLength::Percent(pct.0)
             } else {
                 CssLength::Auto
             }
