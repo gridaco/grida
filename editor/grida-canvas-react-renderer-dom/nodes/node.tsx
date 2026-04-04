@@ -218,6 +218,7 @@ const fillings = {
   component: "background",
   iframe: "background",
   richtext: "color",
+  markdown_embed: "background",
   image: "background",
   video: "background",
   rectangle: "none",

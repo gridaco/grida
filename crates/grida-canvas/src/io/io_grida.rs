@@ -894,6 +894,8 @@ pub enum JSONNode {
     BooleanOperation(JSONBooleanOperationNode),
     #[serde(rename = "image")]
     Image(JSONImageNode),
+    #[serde(rename = "markdown_embed")]
+    MarkdownEmbed(JSONMarkdownEmbedNode),
     #[serde(rename = "scene")]
     Scene(JSONSceneNode),
     Unknown(JSONUnknownNodeProperties),
@@ -916,6 +918,7 @@ impl JSONNode {
             JSONNode::TextSpan(n) => n.base.name.as_deref(),
             JSONNode::BooleanOperation(n) => n.base.name.as_deref(),
             JSONNode::Image(n) => n.base.name.as_deref(),
+            JSONNode::MarkdownEmbed(n) => n.base.name.as_deref(),
             JSONNode::Scene(n) => Some(&n.name),
             JSONNode::Unknown(n) => n.name.as_deref(),
         }
@@ -1241,6 +1244,15 @@ pub struct JSONEllipseNode {
 pub struct JSONRectangleNode {
     #[serde(flatten)]
     pub base: JSONUnknownNodeProperties,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JSONMarkdownEmbedNode {
+    #[serde(flatten)]
+    pub base: JSONUnknownNodeProperties,
+
+    #[serde(default)]
+    pub markdown: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1650,6 +1662,54 @@ impl From<JSONRectangleNode> for Node {
                 node.base.fe_liquid_glass,
                 node.base.fe_noises,
             ),
+        })
+    }
+}
+
+impl From<JSONMarkdownEmbedNode> for Node {
+    fn from(node: JSONMarkdownEmbedNode) -> Self {
+        let transform = AffineTransform::from_box_center(
+            node.base.layout_inset_left.unwrap_or(0.0),
+            node.base.layout_inset_top.unwrap_or(0.0),
+            node.base.width.length(0.0),
+            node.base.height.length(0.0),
+            node.base.rotation,
+        );
+
+        Node::MarkdownEmbed(MarkdownEmbedNodeRec {
+            active: node.base.active,
+            opacity: node.base.opacity,
+            blend_mode: node.base.blend_mode.into(),
+            mask: node.base.mask.map(|m| m.into()),
+            effects: merge_effects(
+                node.base.fe_shadows,
+                node.base.fe_blur,
+                node.base.fe_backdrop_blur,
+                node.base.fe_liquid_glass,
+                node.base.fe_noises,
+            ),
+            transform,
+            size: Size {
+                width: node.base.width.length(0.0),
+                height: node.base.height.length(0.0),
+            },
+            corner_radius: merge_corner_radius(
+                node.base.corner_radius,
+                node.base.rectangular_corner_radius_top_left,
+                node.base.rectangular_corner_radius_top_right,
+                node.base.rectangular_corner_radius_bottom_right,
+                node.base.rectangular_corner_radius_bottom_left,
+            ),
+            markdown: node.markdown,
+            fills: merge_paints(node.base.fill, node.base.fill_paints),
+            layout_child: Some(LayoutChildStyle {
+                layout_positioning: node
+                    .base
+                    .layout_positioning
+                    .map(|position| position.into())
+                    .unwrap_or_default(),
+                layout_grow: 0.0,
+            }),
         })
     }
 }
@@ -2089,6 +2149,7 @@ impl From<JSONNode> for Node {
             JSONNode::Line(line) => line.into(),
             JSONNode::BooleanOperation(boolean) => boolean.into(),
             JSONNode::Image(image) => image.into(),
+            JSONNode::MarkdownEmbed(md) => md.into(),
             JSONNode::Unknown(unknown) => Node::Error(ErrorNodeRec {
                 active: unknown.active,
                 transform: AffineTransform::identity(),

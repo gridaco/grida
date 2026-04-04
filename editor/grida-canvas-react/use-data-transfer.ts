@@ -122,6 +122,27 @@ export function useInsertFile() {
     [instance]
   );
 
+  const insertMarkdown = useCallback(
+    async (
+      name: string,
+      markdown: string,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const [x, y] = instance.camera.clientPointToCanvasPoint(
+        position ? [position.clientX, position.clientY] : [0, 0]
+      );
+
+      const node = instance.commands.createMarkdownEmbedNode(markdown);
+      node.$.name = name;
+      node.$.layout_inset_left = x;
+      node.$.layout_inset_top = y;
+    },
+    [instance]
+  );
+
   const insertFromFile = useCallback(
     (
       type: io.clipboard.ValidFileType,
@@ -149,12 +170,21 @@ export function useInsertFile() {
         const name = file.name.split(".")[0];
         insertImage(name, file, position);
         return;
+      } else if (type === "text/markdown") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const markdown = (e.target?.result as string) ?? "";
+          const name = file.name.split(".md")[0] || file.name;
+          insertMarkdown(name, markdown, position);
+        };
+        reader.readAsText(file);
+        return;
       }
     },
-    [insertImage, insertSVG]
+    [insertImage, insertSVG, insertMarkdown]
   );
 
-  return { insertImage, insertSVG, insertFromFile };
+  return { insertImage, insertSVG, insertMarkdown, insertFromFile };
 }
 
 /**
@@ -407,7 +437,9 @@ export function useDataTransferEventTarget() {
             case "image/gif":
             case "image/jpeg":
             case "image/png":
-            case "image/svg+xml": {
+            case "image/svg+xml":
+            case "image/webp":
+            case "text/markdown": {
               insertFromFile(item.type, item.file, position);
               return true;
             }

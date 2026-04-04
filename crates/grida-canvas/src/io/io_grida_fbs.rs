@@ -55,9 +55,10 @@ use crate::node::{
     schema::{
         AttributedTextNodeRec, BooleanPathOperationNodeRec, ContainerNodeRec, EllipseNodeRec,
         GroupNodeRec, InitialContainerNodeRec, LayerEffects, LayoutChildStyle,
-        LayoutContainerStyle, LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec, Node,
-        PathNodeRec, RectangleNodeRec, RegularPolygonNodeRec, RegularStarPolygonNodeRec, Scene,
-        Size, StrokeStyle, TextSpanNodeRec, TrayNodeRec, VectorNodeRec,
+        LayoutContainerStyle, LayoutDimensionStyle, LayoutPositioningBasis, LineNodeRec,
+        MarkdownEmbedNodeRec, Node, PathNodeRec, RectangleNodeRec, RegularPolygonNodeRec,
+        RegularStarPolygonNodeRec, Scene, Size, StrokeStyle, TextSpanNodeRec, TrayNodeRec,
+        VectorNodeRec,
     },
 };
 use crate::vectornetwork::{
@@ -372,6 +373,13 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                         slot,
                         node_as_boolean_operation_node,
                         decode_boolean_operation_node
+                    );
+                }
+                fbs::Node::MarkdownEmbedNode => {
+                    decode_layer_node!(
+                        slot,
+                        node_as_markdown_embed_node,
+                        decode_markdown_embed_node
                     );
                 }
                 fbs::Node::UnknownNode | fbs::Node::NONE | _ => {}
@@ -2040,6 +2048,42 @@ fn decode_text_span_node(
         blend_mode: lc.blend_mode,
         mask: lc.mask,
         effects: lc.effects.clone(),
+    })
+}
+
+fn decode_markdown_embed_node(
+    lc: &LayerCommon,
+    layer: &fbs::LayerTrait<'_>,
+    mn: &fbs::MarkdownEmbedNode<'_>,
+) -> Node {
+    let sl = decode_shape_layout(layer, lc.rotation_cos_sin);
+    let props = mn.properties();
+
+    let markdown = props
+        .as_ref()
+        .and_then(|p| p.markdown())
+        .unwrap_or("")
+        .to_owned();
+
+    let fills = props
+        .as_ref()
+        .map(|p| decode_paints_vec(p.fill_paints()))
+        .unwrap_or_else(|| Paints::new(Vec::<Paint>::new()));
+
+    let corner_radius = decode_corner_radius(props.as_ref().and_then(|p| p.corner_radius()));
+
+    Node::MarkdownEmbed(MarkdownEmbedNodeRec {
+        active: lc.active,
+        opacity: lc.opacity,
+        blend_mode: lc.blend_mode,
+        effects: lc.effects.clone(),
+        mask: lc.mask,
+        transform: sl.transform,
+        size: sl.size,
+        corner_radius,
+        markdown,
+        fills,
+        layout_child: lc.layout_child.clone(),
     })
 }
 

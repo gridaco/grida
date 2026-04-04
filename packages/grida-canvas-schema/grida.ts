@@ -1227,6 +1227,7 @@ export namespace grida.program.nodes {
     | ImageNode
     | VideoNode
     | ContainerNode
+    | MarkdownEmbedNode
     | HTMLIFrameNode
     | HTMLRichTextNode
     | BitmapNode
@@ -1247,6 +1248,7 @@ export namespace grida.program.nodes {
     | ComputedImageNode
     | ComputedVideoNode
     | ComputedContainerNode
+    | ComputedMarkdownEmbedNode
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
     | ComputedVectorNode
@@ -1267,6 +1269,7 @@ export namespace grida.program.nodes {
       Partial<ComputedBitmapNode> &
       Partial<ComputedVideoNode> &
       Partial<ComputedContainerNode> &
+      Partial<ComputedMarkdownEmbedNode> &
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
       Partial<ComputedVectorNode> &
@@ -1296,6 +1299,7 @@ export namespace grida.program.nodes {
       Partial<ImageNode> &
       Partial<VideoNode> &
       Partial<ContainerNode> &
+      Partial<MarkdownEmbedNode> &
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
       Partial<VectorNode> &
@@ -1383,6 +1387,9 @@ export namespace grida.program.nodes {
     | ImageNodePrototype
     | VideoNodePrototype
     | ContainerNodePrototype
+    | __TPrototypeNode<
+        Omit<Partial<MarkdownEmbedNode>, __base_scene_node_properties>
+      >
     | __TPrototypeNode<
         Omit<Partial<HTMLIFrameNode>, __base_scene_node_properties>
       >
@@ -2365,6 +2372,38 @@ export namespace grida.program.nodes {
     { src: string }
   > {
     readonly type: "image";
+  }
+
+  /**
+   * [MarkdownEmbed]
+   *
+   * A render-only node that stores GitHub Flavored Markdown (GFM) source text
+   * and renders it directly on the canvas via a Skia-backed markdown painter.
+   *
+   * Unlike {@link TextSpanNode} or {@link AttributedTextNode}, the markdown
+   * source is not broken into an editable tree of spans — the node is treated
+   * as a single opaque block of rendered content.
+   */
+  export interface MarkdownEmbedNode
+    extends
+      i.IBaseNode,
+      i.ISceneNode,
+      i.ILayerTrait,
+      i.ILayoutChildTrait,
+      i.ICornerRadius,
+      i.IRectangularShapeTrait,
+      i.IFill<cg.Paint> {
+    readonly type: "markdown_embed";
+    /** GFM markdown source text. */
+    markdown: string;
+  }
+
+  export interface ComputedMarkdownEmbedNode extends __ReplaceSubset<
+    MarkdownEmbedNode,
+    {},
+    {}
+  > {
+    readonly type: "markdown_embed";
   }
 
   /**
