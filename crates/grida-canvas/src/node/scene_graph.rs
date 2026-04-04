@@ -299,6 +299,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             schema_transform: n.transform,
             schema_width: n.size.width,
             schema_height: n.size.height,
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: GeoNodeKind::Leaf,
             render_bounds_inflation: compute_inflation_uniform(
                 0.0,
