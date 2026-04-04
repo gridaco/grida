@@ -325,6 +325,34 @@ npx @grida/refig ./design.fig --node "1:23" --format png
 pnpm dlx @grida/refig ./design.fig --export-all
 ```
 
+### Convert (Figma → `.grida` / `.grida1`)
+
+The `convert` subcommand converts Figma files to Grida format **without rendering**. Useful for archiving, piping into other tools, or pre-converting for the embed viewer.
+
+```sh
+# Convert .fig to .grida archive (FlatBuffers + embedded images)
+refig convert ./design.fig -o ./design.grida
+
+# Convert REST JSON to .grida archive
+refig convert ./figma-response.json -o ./design.grida
+
+# Convert to .grida1 (JSON snapshot — human-readable, no images)
+refig convert ./design.fig -o ./design.grida1
+
+# With images directory (REST JSON only)
+refig convert ./figma-response.json --images ./downloaded-images -o ./design.grida
+
+# Preserve original Figma node IDs in the output
+refig convert ./design.fig --preserve-figma-ids -o ./design.grida
+```
+
+Output format is inferred from the `--out` extension:
+
+| Extension | Format      | Description                                        |
+| --------- | ----------- | -------------------------------------------------- |
+| `.grida`  | FlatBuffers | Binary archive (ZIP with FlatBuffers + images)     |
+| `.grida1` | JSON        | JSON snapshot (human-readable, no embedded images) |
+
 ### Quick test via `figma_archive.py` (REST API → `document.json` + `images/`)
 
 If you want an end-to-end test from a real Figma file using the REST API, you can generate a local “project directory” that refig can consume directly.
