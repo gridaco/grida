@@ -253,7 +253,7 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             ),
             rotation: 0.0,
         },
-        Node::Markdown(n) => NodeGeoData {
+        Node::MarkdownEmbed(n) => NodeGeoData {
             schema_transform: n.transform,
             schema_width: n.size.width,
             schema_height: n.size.height,

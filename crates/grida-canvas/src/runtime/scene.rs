@@ -2711,7 +2711,7 @@ impl Renderer {
                 crate::painter::layer::PainterPictureLayer::Shape(s) => &s.base,
                 crate::painter::layer::PainterPictureLayer::Text(t) => &t.base,
                 crate::painter::layer::PainterPictureLayer::Vector(v) => &v.base,
-                crate::painter::layer::PainterPictureLayer::Markdown(m) => &m.base,
+                crate::painter::layer::PainterPictureLayer::MarkdownEmbed(m) => &m.base,
                 crate::painter::layer::PainterPictureLayer::HtmlEmbed(h) => &h.base,
             };
             let node_opacity = base.opacity;

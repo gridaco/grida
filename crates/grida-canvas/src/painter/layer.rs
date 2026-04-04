@@ -74,7 +74,7 @@ pub enum PainterPictureLayer {
     Shape(PainterPictureShapeLayer),
     Text(PainterPictureTextLayer),
     Vector(PainterPictureVectorLayer),
-    Markdown(PainterPictureMarkdownLayer),
+    MarkdownEmbed(PainterPictureMarkdownEmbedLayer),
     HtmlEmbed(PainterPictureHtmlEmbedLayer),
 }
 
@@ -93,7 +93,7 @@ impl PainterPictureLayer {
             PainterPictureLayer::Shape(s) => s.effects.is_empty(),
             PainterPictureLayer::Text(t) => t.effects.is_empty(),
             PainterPictureLayer::Vector(v) => v.effects.is_empty(),
-            PainterPictureLayer::Markdown(m) => m.effects.is_empty(),
+            PainterPictureLayer::MarkdownEmbed(m) => m.effects.is_empty(),
             PainterPictureLayer::HtmlEmbed(h) => h.effects.is_empty(),
         }
     }
@@ -167,7 +167,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => &layer.base.id,
             PainterPictureLayer::Text(layer) => &layer.base.id,
             PainterPictureLayer::Vector(layer) => &layer.base.id,
-            PainterPictureLayer::Markdown(layer) => &layer.base.id,
+            PainterPictureLayer::MarkdownEmbed(layer) => &layer.base.id,
             PainterPictureLayer::HtmlEmbed(layer) => &layer.base.id,
         }
     }
@@ -177,7 +177,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => layer.base.z_index,
             PainterPictureLayer::Text(layer) => layer.base.z_index,
             PainterPictureLayer::Vector(layer) => layer.base.z_index,
-            PainterPictureLayer::Markdown(layer) => layer.base.z_index,
+            PainterPictureLayer::MarkdownEmbed(layer) => layer.base.z_index,
             PainterPictureLayer::HtmlEmbed(layer) => layer.base.z_index,
         }
     }
@@ -187,7 +187,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => layer.base.transform,
             PainterPictureLayer::Text(layer) => layer.base.transform,
             PainterPictureLayer::Vector(layer) => layer.base.transform,
-            PainterPictureLayer::Markdown(layer) => layer.base.transform,
+            PainterPictureLayer::MarkdownEmbed(layer) => layer.base.transform,
             PainterPictureLayer::HtmlEmbed(layer) => layer.base.transform,
         }
     }
@@ -197,7 +197,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Shape(layer) => &layer.shape,
             PainterPictureLayer::Vector(layer) => &layer.shape,
             PainterPictureLayer::Text(layer) => &layer.shape,
-            PainterPictureLayer::Markdown(layer) => &layer.shape,
+            PainterPictureLayer::MarkdownEmbed(layer) => &layer.shape,
             PainterPictureLayer::HtmlEmbed(layer) => &layer.shape,
         }
     }
@@ -299,12 +299,12 @@ pub struct PainterPictureVectorLayer {
     pub marker_end_shape: StrokeMarkerPreset,
 }
 
-/// A painter layer for Markdown content rendered directly to a Skia Picture.
+/// A painter layer for Markdown content rendered via the `htmlcss` pipeline.
 ///
-/// The markdown source is carried here so the painter can call
-/// `render_markdown_picture()` at draw time and cache the result.
+/// The markdown source is carried here so the painter can convert it to
+/// HTML+CSS via `htmlcss::markdown_to_styled_html()` and render at draw time.
 #[derive(Debug, Clone)]
-pub struct PainterPictureMarkdownLayer {
+pub struct PainterPictureMarkdownEmbedLayer {
     pub base: PainterPictureLayerBase,
     pub effects: LayerEffects,
     pub shape: PainterShape,
@@ -1585,7 +1585,7 @@ impl LayerList {
                     mask: None,
                 }
             }
-            Node::Markdown(n) => {
+            Node::MarkdownEmbed(n) => {
                 let bounds = scene_cache
                     .geometry()
                     .get_world_bounds(id)
@@ -1593,7 +1593,7 @@ impl LayerList {
                 let shape = build_shape(node, &bounds);
                 let fills = Self::filter_visible_paints(&n.fills);
 
-                let layer = PainterPictureLayer::Markdown(PainterPictureMarkdownLayer {
+                let layer = PainterPictureLayer::MarkdownEmbed(PainterPictureMarkdownEmbedLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
                         z_index: out.len(),

@@ -98,7 +98,7 @@ fn has_expensive_effects(layer: &PainterPictureLayer) -> bool {
         PainterPictureLayer::Shape(shape) => &shape.effects,
         PainterPictureLayer::Text(text) => &text.effects,
         PainterPictureLayer::Vector(vec) => &vec.effects,
-        PainterPictureLayer::Markdown(md) => &md.effects,
+        PainterPictureLayer::MarkdownEmbed(md) => &md.effects,
         PainterPictureLayer::HtmlEmbed(h) => &h.effects,
     };
     effects.has_expensive_effects()
@@ -112,7 +112,7 @@ fn has_context_dependent_effects(layer: &PainterPictureLayer) -> bool {
         PainterPictureLayer::Shape(shape) => &shape.effects,
         PainterPictureLayer::Text(text) => &text.effects,
         PainterPictureLayer::Vector(vec) => &vec.effects,
-        PainterPictureLayer::Markdown(md) => &md.effects,
+        PainterPictureLayer::MarkdownEmbed(md) => &md.effects,
         PainterPictureLayer::HtmlEmbed(h) => &h.effects,
     };
     effects.backdrop_blur.as_ref().is_some_and(|b| b.active)

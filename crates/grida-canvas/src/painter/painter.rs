@@ -2087,7 +2087,7 @@ impl<'a> Painter<'a> {
                     });
                 });
             }
-            PainterPictureLayer::Markdown(md_layer) => {
+            PainterPictureLayer::MarkdownEmbed(md_layer) => {
                 let effects = &md_layer.effects;
                 let opacity = md_layer.base.opacity;
                 let shape = &md_layer.shape;
@@ -2109,22 +2109,50 @@ impl<'a> Painter<'a> {
                                         self.draw_fills(shape, &md_layer.fills);
                                     }
 
-                                    // 2. Render markdown content as a Picture
-                                    let picture = super::markdown::render_markdown_picture(
+                                    // 2. Convert markdown → HTML+CSS, render via htmlcss pipeline
+                                    let styled_html = crate::htmlcss::markdown_to_styled_html(
                                         &md_layer.markdown,
+                                    );
+                                    match crate::htmlcss::render(
+                                        &styled_html,
                                         md_layer.width,
+                                        md_layer.height,
                                         self.fonts,
-                                    );
-
-                                    // Clip to node bounds and draw the picture
-                                    self.canvas.save();
-                                    self.canvas.clip_rect(
-                                        Rect::from_xywh(0.0, 0.0, md_layer.width, md_layer.height),
-                                        skia_safe::ClipOp::Intersect,
-                                        true,
-                                    );
-                                    self.canvas.draw_picture(&picture, None, None);
-                                    self.canvas.restore();
+                                    ) {
+                                        Ok(picture) => {
+                                            let cull = picture.cull_rect();
+                                            self.canvas.save();
+                                            self.canvas.clip_rect(
+                                                Rect::from_xywh(
+                                                    0.0,
+                                                    0.0,
+                                                    cull.width(),
+                                                    cull.height(),
+                                                ),
+                                                skia_safe::ClipOp::Intersect,
+                                                true,
+                                            );
+                                            self.canvas.draw_picture(&picture, None, None);
+                                            self.canvas.restore();
+                                        }
+                                        Err(_) => {
+                                            // Render error fallback: gray rectangle
+                                            let mut paint = SkPaint::default();
+                                            paint.set_color(skia_safe::Color::from_rgb(
+                                                200, 200, 200,
+                                            ));
+                                            paint.set_style(skia_safe::PaintStyle::Fill);
+                                            self.canvas.draw_rect(
+                                                Rect::from_xywh(
+                                                    0.0,
+                                                    0.0,
+                                                    md_layer.width,
+                                                    md_layer.height,
+                                                ),
+                                                &paint,
+                                            );
+                                        }
+                                    }
                                 };
 
                                 if opacity >= 1.0 && effects.is_empty() {
@@ -2332,7 +2360,7 @@ impl<'a> Painter<'a> {
                 });
                 self.canvas.restore();
             }
-            PainterPictureLayer::Markdown(md_layer) => {
+            PainterPictureLayer::MarkdownEmbed(md_layer) => {
                 self.canvas.save();
                 self.canvas
                     .concat(&sk::sk_matrix(md_layer.base.transform.matrix));

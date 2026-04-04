@@ -465,7 +465,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::TextSpan(_) => "tspan",
         Node::AttributedText(_) => "attributed_text",
         Node::Error(_) => "error",
-        Node::Markdown(_) => "markdown",
+        Node::MarkdownEmbed(_) => "markdown",
         Node::HTMLEmbed(_) => "html_embed",
     }
 }
