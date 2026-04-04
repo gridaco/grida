@@ -25,7 +25,7 @@ All nodes share the same base rectangle: `fillGeometry` bounds `[0, 0]` to `[20,
 
 ### `strokeAlign` is a compositing instruction, not a geometry modifier
 
-Both `fillGeometry` and `strokeGeometry` are returned as **independent, alignment-unaware shapes**. The `strokeGeometry` is always a CENTER-style expansion of the stroke outline. The `fillGeometry` is always the unmodified fill shape. Neither changes based on `strokeAlign`.
+Both `fillGeometry` and `strokeGeometry` are returned as **independent shapes**. The `fillGeometry` is always the unmodified fill shape. The `strokeGeometry` expansion factor differs by alignment (CENTER = `sw` band, INSIDE/OUTSIDE = `2×sw` band), but the same geometry is returned for both INSIDE and OUTSIDE — `strokeAlign` does not modify the geometry beyond this.
 
 The `strokeAlign` property tells the consumer how to **composite** the two shapes (paint order + clipping), not how to modify them.
 

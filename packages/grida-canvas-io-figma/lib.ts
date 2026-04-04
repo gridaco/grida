@@ -535,8 +535,13 @@ export namespace iofigma {
               }
               break;
             case "H":
-              // H/V cannot survive non-diagonal 2×2; promote to L
-              // For diagonal transforms (flips), H stays H
+              // H only encodes an x-coordinate. For diagonal transforms
+              // (flips: b≈0, c≈0) it stays as H. For non-diagonal
+              // transforms (rotations, skews) H must be promoted to L,
+              // which requires tracking the current point — not yet
+              // implemented. Figma's geometry=paths output typically
+              // does not use H/V commands, so this is low-risk.
+              // TODO: promote H→L for non-diagonal transforms
               if (Math.abs(b) < 1e-9 && Math.abs(c) < 1e-9) {
                 for (let i = 0; i < g.nums.length; i++) {
                   g.nums[i] = a * g.nums[i];
@@ -545,6 +550,8 @@ export namespace iofigma {
               }
               break;
             case "V":
+              // Same limitation as H — see comment above.
+              // TODO: promote V→L for non-diagonal transforms
               if (Math.abs(b) < 1e-9 && Math.abs(c) < 1e-9) {
                 for (let i = 0; i < g.nums.length; i++) {
                   g.nums[i] = d * g.nums[i];
@@ -2181,9 +2188,25 @@ export namespace iofigma {
             const pNeedsBake = !pIsIdentity2x2;
 
             if (pNeedsBake) {
-              // Compose the parent's 2×2 into each child's relativeTransform
+              // Compose the parent's 2×2 into each child's relativeTransform.
+              // Children's new translations land in the grandparent's
+              // coordinate space. We then subtract the container's AABB
+              // origin so children are local to the new container.
               const pw = (currentNode as any).size?.x ?? 0;
               const ph = (currentNode as any).size?.y ?? 0;
+
+              // Compute AABB first — needed to rebase children.
+              const corners = [
+                [ptx, pty],
+                [pa * pw + ptx, pb * pw + pty],
+                [pc * ph + ptx, pd * ph + pty],
+                [pa * pw + pc * ph + ptx, pb * pw + pd * ph + pty],
+              ];
+              const aabbX = Math.min(...corners.map((p) => p[0]));
+              const aabbY = Math.min(...corners.map((p) => p[1]));
+              const aabbW = Math.max(...corners.map((p) => p[0])) - aabbX;
+              const aabbH = Math.max(...corners.map((p) => p[1])) - aabbY;
+
               for (const child of currentNode.children) {
                 const crt = (child as any).relativeTransform;
                 if (!crt) continue;
@@ -2198,25 +2221,21 @@ export namespace iofigma {
                 const nc = pa * cc + pc * cd;
                 const nb = pb * ca + pd * cb;
                 const nd = pb * cc + pd * cd;
-                // New translation: P_2x2 * C_t + P_t
-                const ntx = pa * ctx2 + pc * cty + ptx;
-                const nty = pb * ctx2 + pd * cty + pty;
+                // New translation in grandparent space, rebased to
+                // container-local by subtracting the AABB origin.
+                const ntx = pa * ctx2 + pc * cty + ptx - aabbX;
+                const nty = pb * ctx2 + pd * cty + pty - aabbY;
                 (child as any).relativeTransform = [
                   [na, nc, ntx],
                   [nb, nd, nty],
                 ];
               }
-              // Fix the container to identity transform (AABB position)
-              const corners = [
-                [ptx, pty],
-                [pa * pw + ptx, pb * pw + pty],
-                [pc * ph + ptx, pd * ph + pty],
-                [pa * pw + pc * ph + ptx, pb * pw + pd * ph + pty],
-              ];
-              const aabbX = Math.min(...corners.map((p) => p[0]));
-              const aabbY = Math.min(...corners.map((p) => p[1]));
+
+              // Reset the container to the AABB with no rotation.
               (processedNode as any).layout_inset_left = aabbX;
               (processedNode as any).layout_inset_top = aabbY;
+              (processedNode as any).layout_target_width = aabbW;
+              (processedNode as any).layout_target_height = aabbH;
               (processedNode as any).rotation = 0;
             }
           }

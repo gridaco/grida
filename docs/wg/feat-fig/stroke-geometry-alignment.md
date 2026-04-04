@@ -17,9 +17,9 @@ This is not a bug. It is consistent once you treat fill and stroke as two indepe
 A node's visual output is composed from two independent shapes:
 
 1. **Fill shape** (`fillGeometry`) — the filled area of the node
-2. **Stroke shape** (`strokeGeometry`) — the expanded stroke outline (always a CENTER expansion of width `sw`)
+2. **Stroke shape** (`strokeGeometry`) — the expanded stroke outline
 
-These two shapes never change based on `strokeAlign`. The alignment property controls **how they are composited**:
+Neither shape changes based on `strokeAlign`. The alignment property controls **how they are composited**:
 
 | `strokeAlign` | What it actually means                                                                                                          |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -27,7 +27,7 @@ These two shapes never change based on `strokeAlign`. The alignment property con
 | `OUTSIDE`     | Draw stroke first, then draw fill on top. The fill covers the inward half of the stroke, leaving only the outward half visible. |
 | `INSIDE`      | Draw fill, then draw stroke clipped to the fill shape. The clip removes the outward half, leaving only the inward half visible. |
 
-The geometry itself is always the same CENTER expansion. `strokeAlign` is a compositing instruction, not a geometry modifier.
+The `strokeGeometry` expansion factor differs by alignment — CENTER produces a band of width `sw` (extending `sw/2` per side), while INSIDE and OUTSIDE produce a band of width `2×sw` (extending `sw` per side). But in all cases, `strokeAlign` is a compositing instruction, not a geometry modifier — the same `strokeGeometry` is returned for both INSIDE and OUTSIDE.
 
 ## Why This Looks Wrong at First
 
@@ -71,7 +71,7 @@ Source: `fixtures/test-figma/rest-api/L0/stroke.json` (from `fixtures/test-fig/L
 
 ### `OUTSIDE` — paint order swap
 
-```
+```text
 1. Draw strokeGeometry (extends sw beyond fill on each side)
 2. Draw fillGeometry on top (covers the inward sw portion)
 Result: only the outward sw band remains visible
@@ -81,7 +81,7 @@ No clipping needed — just reorder.
 
 ### `INSIDE` — clip to fill
 
-```
+```text
 1. Draw fillGeometry
 2. Set clip path = fillGeometry
 3. Draw strokeGeometry within clip
@@ -92,7 +92,7 @@ Requires clip path support.
 
 ### `CENTER` — as-is
 
-```
+```text
 1. Draw fillGeometry
 2. Draw strokeGeometry on top
 Result: correct as-is (band is sw/2 each way, naturally centered)
