@@ -1760,69 +1760,82 @@ export namespace iofigma {
         }
 
         /**
-         * Detect a specific Figma BOOLEAN_OPERATION pattern where the
-         * `strokeGeometry` must be skipped to avoid double-rendering.
+         * Resolve how fill and stroke geometry children should be ordered
+         * and whether stroke geometry should be included at all.
          *
-         * ## Background
+         * ## Why this exists
          *
-         * When a BOOLEAN_OPERATION (typically UNION) has **both** `fills`
-         * and `strokes` set, and its children contribute stroke-based
-         * shapes to the union, Figma bakes the children's stroke outlines
-         * into the boolean result's `fillGeometry`. The `fillGeometry`
-         * path then uses winding-rule cutouts to produce the correct
-         * hollow outline appearance (border + divider with transparent
-         * interior panels).
+         * The Figma REST API `geometry=paths` returns `fillGeometry` and
+         * `strokeGeometry` as **independent, alignment-unaware shapes**.
+         * The `strokeAlign` property is a **compositing instruction** —
+         * it controls paint order and clipping, not the geometry itself.
          *
-         * In this case, `strokeGeometry` represents an *additional*
-         * expanded stroke around the entire union shape. Rendering it as
-         * a filled path on top of `fillGeometry` covers the fill's
-         * internal winding structure, producing a solid black blob instead
-         * of the intended outline-with-panels.
+         * The `strokeGeometry` is always a CENTER-style stroke expansion.
+         * To produce the correct visual for non-CENTER alignments, the
+         * consumer must composite fill and stroke in a specific order.
          *
-         * ## Detection
+         * ## Compositing rules
          *
-         * | Condition | Required |
-         * |-----------|----------|
-         * | Node is `BOOLEAN_OPERATION` | yes |
-         * | Node has effective `fills` (non-empty) | yes |
-         * | Node has effective `strokes` (non-empty) | yes |
-         * | Node has both `fillGeometry` and `strokeGeometry` | yes |
-         * | `fillGeometry` was successfully processed (fillChildIds > 0) | yes |
+         * | `strokeAlign` | Child order           | Clipping          | Status          |
+         * |---------------|-----------------------|-------------------|-----------------|
+         * | `CENTER`      | fill first, stroke    | none              | **Implemented** |
+         * | `OUTSIDE`     | stroke first, fill    | none              | **Implemented** |
+         * | `INSIDE`      | fill first, stroke    | clip to fill      | **Not yet** (see TODO) |
          *
-         * When all conditions are met, `strokeGeometry` is redundant —
-         * the `fillGeometry` already contains the complete boolean result
-         * including stroke contributions from children.
+         * For OUTSIDE, drawing stroke first then fill on top works because
+         * the fill shape exactly covers the inward half of the too-wide
+         * stroke band, leaving only the outward half visible. This is the
+         * same principle as CSS `paint-order: stroke fill`.
+         *
+         * ## Known limitation: INSIDE stroke
+         *
+         * INSIDE strokes require clipping `strokeGeometry` to the
+         * `fillGeometry` shape to remove the outward half of the stroke
+         * band. This requires SVG path boolean intersection, which is not
+         * yet implemented. INSIDE strokes are currently **skipped**.
+         *
+         * TODO: Implement INSIDE stroke support. Options:
+         * - TS-side SVG path clipping (complex, needs a library)
+         * - Emit clip metadata and let the Rust renderer clip via Skia
+         *   `Path::op()` (requires schema addition)
          *
          * ## Tracking
          *
-         * This is a Figma-specific behavior observed in icons like the
-         * Radix "Panel Left/Right/Bottom" family. If future evidence
-         * shows cases where BOOLEAN_OPERATION `strokeGeometry` must be
-         * rendered alongside `fillGeometry`, this function should be
-         * revisited. Grep for `shouldSkipBooleanOperationStrokeGeometry`
-         * to find all references.
+         * See `docs/wg/feat-fig/stroke-geometry-alignment.md` for the
+         * full analysis with measurements.
+         * Grep: `resolveStrokeGeometryCompositing`
          */
-        function shouldSkipBooleanOperationStrokeGeometry(
+        function resolveStrokeGeometryCompositing(
           node: InputNode & figrest.HasGeometryTrait,
-          fillChildIds: string[]
-        ): boolean {
-          if (!("type" in node) || (node as any).type !== "BOOLEAN_OPERATION")
-            return false;
+          fillChildIds: string[],
+          strokeChildIds: string[]
+        ): string[] {
+          if (strokeChildIds.length === 0) {
+            return [...fillChildIds];
+          }
 
-          const hasFills = Array.isArray(node.fills) && node.fills.length > 0;
-          const hasStrokes =
-            Array.isArray(node.strokes) && node.strokes.length > 0;
-          const hasFillGeometry = (node.fillGeometry?.length ?? 0) > 0;
-          const hasStrokeGeometry = (node.strokeGeometry?.length ?? 0) > 0;
-          const fillWasProcessed = fillChildIds.length > 0;
+          const align = node.strokeAlign ?? "CENTER";
 
-          return (
-            hasFills &&
-            hasStrokes &&
-            hasFillGeometry &&
-            hasStrokeGeometry &&
-            fillWasProcessed
-          );
+          switch (align) {
+            // CENTER: geometry is correct as-is. Fill first, stroke on top.
+            case "CENTER":
+              return [...fillChildIds, ...strokeChildIds];
+
+            // OUTSIDE: stroke first, fill on top. The fill covers the
+            // inward half of the stroke band, leaving only the outward
+            // half visible.
+            case "OUTSIDE":
+              return [...strokeChildIds, ...fillChildIds];
+
+            // INSIDE: requires clipping stroke to fill bounds.
+            // Not yet implemented — skip stroke geometry.
+            // See TODO in doc comment above.
+            case "INSIDE":
+              return [...fillChildIds]; // stroke dropped (known limitation)
+
+            default:
+              return [...fillChildIds, ...strokeChildIds];
+          }
         }
 
         /**
@@ -1900,21 +1913,37 @@ export namespace iofigma {
             pathTransform
           );
 
-          const skipStrokeGeometry = shouldSkipBooleanOperationStrokeGeometry(
+          const strokeChildIds = processStrokeGeometries(
             node,
-            fillChildIds
+            groupNode.id,
+            nodeTypeName,
+            pathTransform
           );
 
-          const strokeChildIds = skipStrokeGeometry
-            ? []
-            : processStrokeGeometries(
-                node,
-                groupNode.id,
-                nodeTypeName,
-                pathTransform
-              );
+          const composited = resolveStrokeGeometryCompositing(
+            node,
+            fillChildIds,
+            strokeChildIds
+          );
 
-          const allChildIds = [...fillChildIds, ...strokeChildIds];
+          // Deactivate stroke nodes excluded by compositing resolution
+          // (e.g. INSIDE strokes skipped, BOOLEAN_OPERATION strokes).
+          // Nodes stay in the tree to keep the graph structure valid,
+          // but won't render.
+          const compositedSet = new Set(composited);
+          for (const id of strokeChildIds) {
+            if (!compositedSet.has(id)) {
+              (nodes[id] as any).active = false;
+            }
+          }
+
+          // All children (including deactivated ones) must be linked in
+          // the graph to avoid orphaned nodes. Use the composited order
+          // for active nodes, append deactivated ones at the end.
+          const deactivated = strokeChildIds.filter(
+            (id) => !compositedSet.has(id)
+          );
+          const allChildIds = [...composited, ...deactivated];
 
           if (allChildIds.length > 0) {
             graph[groupNode.id] = allChildIds;
