@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lists</title>
+    <style>
+      body {
+        background: #fff;
+        color: #222;
+        font-family: system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        padding: 32px;
+        margin: 0;
+      }
+
+      h2 {
+        font-size: 20px;
+        margin: 24px 0 8px 0;
+      }
+
+      .custom-bullet {
+        list-style-type: square;
+      }
+
+      .no-bullet {
+        list-style-type: none;
+      }
+
+      .inside {
+        list-style-position: inside;
+      }
+
+      .alpha {
+        list-style-type: lower-alpha;
+      }
+
+      .roman {
+        list-style-type: upper-roman;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Unordered list</h2>
+    <ul>
+      <li>Alpha</li>
+      <li>Bravo</li>
+      <li>Charlie</li>
+    </ul>
+
+    <h2>Ordered list</h2>
+    <ol>
+      <li>First</li>
+      <li>Second</li>
+      <li>Third</li>
+    </ol>
+
+    <h2>Nested lists</h2>
+    <ul>
+      <li>Outer one
+        <ul>
+          <li>Inner alpha</li>
+          <li>Inner bravo</li>
+        </ul>
+      </li>
+      <li>Outer two
+        <ol>
+          <li>Numbered inner</li>
+          <li>Numbered inner</li>
+        </ol>
+      </li>
+    </ul>
+
+    <h2>List with inline content</h2>
+    <ul>
+      <li>Item with <strong>bold</strong> and <code>code</code></li>
+      <li>Item with <a href="#">link</a> and <em>emphasis</em></li>
+    </ul>
+
+    <h2>Ordered start and type</h2>
+    <ol start="5">
+      <li>Five</li>
+      <li>Six</li>
+      <li>Seven</li>
+    </ol>
+
+    <h2>Custom bullets</h2>
+    <ul class="custom-bullet">
+      <li>Square bullet</li>
+      <li>Square bullet</li>
+    </ul>
+
+    <h2>No bullets</h2>
+    <ul class="no-bullet">
+      <li>No marker</li>
+      <li>No marker</li>
+    </ul>
+
+    <h2>Inside position</h2>
+    <ul class="inside">
+      <li>Marker is inside the content flow and wraps with the text if the line is long enough to demonstrate wrapping behavior</li>
+      <li>Short item</li>
+    </ul>
+
+    <h2>Lower-alpha</h2>
+    <ol class="alpha">
+      <li>Alpha item</li>
+      <li>Bravo item</li>
+      <li>Charlie item</li>
+    </ol>
+
+    <h2>Upper-roman</h2>
+    <ol class="roman">
+      <li>Roman one</li>
+      <li>Roman two</li>
+      <li>Roman three</li>
+    </ol>
+  </body>
+</html>

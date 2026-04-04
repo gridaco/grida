@@ -693,6 +693,9 @@ impl<'a> NodePainter<'a> {
             Node::Markdown(_) => {
                 // TODO: implement Markdown debug rendering
             }
+            Node::HTMLEmbed(_) => {
+                // TODO: implement HTMLEmbed debug rendering
+            }
         }
     }
 }

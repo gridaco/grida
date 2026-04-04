@@ -1,0 +1,202 @@
+---
+title: "HTML+CSS Embed Renderer"
+format: md
+tags:
+  - internal
+  - wg
+  - feat-2d
+  - htmlcss
+---
+
+# HTML+CSS Embed Renderer
+
+Renders HTML+CSS to a Skia Picture for opaque embedding on the canvas
+(HTMLEmbedNode).
+
+**Source:** `crates/grida-canvas/src/htmlcss/`
+
+---
+
+## Architecture
+
+Three-phase pipeline inspired by Chromium's Style → Layout → Paint separation.
+All Skia object construction is deferred to phase 3 because Stylo's global
+DOM slot corrupts Skia objects built during `borrow_data()` traversal.
+
+```
+Phase 1: Collect (collect.rs)     Phase 2: Layout (layout.rs)     Phase 3: Paint (paint.rs)
+┌──────────────────────┐   tree   ┌──────────────────────┐  tree  ┌──────────────────────┐
+│ csscascade (Stylo)   │ ──────►  │ Taffy (block/flex/   │ ────►  │ Skia PictureRecorder │
+│ ComputedValues →     │ Styled   │ grid layout)         │ Layout │ Canvas draw ops      │
+│ StyledElement tree   │ Element  │ + MeasureFunc for    │ Box    │ Paragraph, Paint,    │
+│ (plain Rust, no Skia)│          │ text (Skia Para)     │        │ RRect, Shader        │
+└──────────────────────┘          └──────────────────────┘        └──────────────────────┘
+```
+
+**Module structure:**
+
+| File         | Purpose                                                              |
+| ------------ | -------------------------------------------------------------------- |
+| `mod.rs`     | Public API: `render()`, `measure_content_height()`                   |
+| `types.rs`   | CSS-specific enums (Display, Position, Overflow, FlexDirection, ...) |
+| `style.rs`   | StyledElement IR, reusing cg primitives where aligned                |
+| `collect.rs` | Stylo DOM → StyledElement tree (no Skia objects)                     |
+| `layout.rs`  | StyledElement → Taffy → LayoutBox tree (positioned)                  |
+| `paint.rs`   | LayoutBox → Skia Picture (backgrounds, borders, text, gradients)     |
+
+---
+
+## CG type reuse
+
+Types from `cg::prelude` reused where they 100% align with CSS semantics:
+
+| cg type               | CSS property                          |
+| --------------------- | ------------------------------------- |
+| `CGColor`             | color, background-color, border-color |
+| `EdgeInsets`          | padding (resolved px)                 |
+| `BlendMode`           | mix-blend-mode                        |
+| `TextAlign`           | text-align                            |
+| `FontWeight`          | font-weight                           |
+| `TextTransform`       | text-transform                        |
+| `TextDecorationStyle` | text-decoration-style                 |
+
+---
+
+## CSS Property Support
+
+**Status key:** ✅ supported | ⚠️ partial | ❌ not yet
+
+### Display & Layout
+
+| CSS Property            | Status | Notes                                             |
+| ----------------------- | ------ | ------------------------------------------------- |
+| `display: block`        | ✅     | Via Taffy `Display::Block` with margin collapsing |
+| `display: inline`       | ✅     | Merged into parent's Paragraph as InlineRunItem   |
+| `display: none`         | ✅     | Subtree skipped                                   |
+| `display: flex`         | ✅     | Via Taffy — direction, wrap, align, justify, gap  |
+| `display: grid`         | ✅     | Via Taffy `Display::Grid`                         |
+| `display: list-item`    | ✅     | Marker text generated (bullet/number)             |
+| `display: table`        | ⚠️     | Falls back to block flow (no column grid)         |
+| `display: inline-block` | ⚠️     | Treated as inline                                 |
+
+### Box Model
+
+| CSS Property               | Status | Notes                                     |
+| -------------------------- | ------ | ----------------------------------------- |
+| `width`, `height`          | ✅     | px and auto                               |
+| `min-width`, `max-width`   | ✅     | Via Taffy                                 |
+| `padding` (all sides)      | ✅     | px values                                 |
+| `margin` (all sides)       | ✅     | px, auto; collapsing via Taffy block flow |
+| `border-width/color/style` | ✅     | All sides; solid/dashed/dotted            |
+| `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)    |
+| `box-sizing`               | ✅     | Via Taffy                                 |
+
+### Background
+
+| CSS Property              | Status | Notes                               |
+| ------------------------- | ------ | ----------------------------------- |
+| `background-color`        | ✅     | Solid color with border-radius      |
+| `linear-gradient()`       | ✅     | All directions + angles, multi-stop |
+| `radial-gradient()`       | ✅     | Circle/ellipse                      |
+| `conic-gradient()`        | ✅     | Sweep gradient                      |
+| Multi-layer backgrounds   | ✅     | Stacked gradient + solid layers     |
+| `background-image: url()` | ❌     |                                     |
+
+### Text & Font
+
+| CSS Property                     | Status | Notes                                                       |
+| -------------------------------- | ------ | ----------------------------------------------------------- |
+| `color`                          | ✅     | Inherited                                                   |
+| `font-size`                      | ✅     | Computed px                                                 |
+| `font-weight`                    | ✅     | 100–900                                                     |
+| `font-style` (italic)            | ✅     |                                                             |
+| `font-family`                    | ✅     | Generic families mapped to platform names                   |
+| `line-height`                    | ✅     | normal, number, length                                      |
+| `letter-spacing`, `word-spacing` | ✅     |                                                             |
+| `text-align`                     | ✅     | left, right, center, justify                                |
+| `text-transform`                 | ✅     | uppercase, lowercase, capitalize                            |
+| `text-decoration`                | ✅     | underline, line-through, overline (bitfield — simultaneous) |
+| `white-space`                    | ✅     | normal, pre, pre-wrap, pre-line, nowrap                     |
+
+### Inline Elements
+
+| Feature                            | Status | Notes                                                              |
+| ---------------------------------- | ------ | ------------------------------------------------------------------ |
+| `<strong>`, `<em>`, `<b>`, `<i>`   | ✅     | Bold/italic via font properties                                    |
+| `<u>`, `<ins>`                     | ✅     | Underline decoration                                               |
+| `<s>`, `<del>`, `<strike>`         | ✅     | Line-through decoration                                            |
+| `<small>`                          | ✅     | Smaller font size                                                  |
+| `<code>`, `<kbd>`, `<mark>`        | ✅     | Background, border, border-radius, padding via InlineBoxDecoration |
+| Inline box padding as layout space | ✅     | Skia placeholders at OpenBox/CloseBox boundaries                   |
+| Text wrapping with inline boxes    | ✅     | Taffy MeasureFunc with Skia Paragraph                              |
+
+### Lists
+
+| Feature                        | Status | Notes                                         |
+| ------------------------------ | ------ | --------------------------------------------- |
+| `<ul>` with disc/circle/square | ✅     | Marker text prepended to list item content    |
+| `<ol>` with decimal numbering  | ✅     | Auto-incrementing counter                     |
+| `lower-alpha`, `upper-alpha`   | ✅     |                                               |
+| `lower-roman`, `upper-roman`   | ❌     | Stylo servo-mode limitation (servo/stylo#349) |
+| `list-style-type: none`        | ✅     |                                               |
+| Nested lists                   | ✅     | Independent counters per list                 |
+
+### Visual Effects
+
+| CSS Property         | Status | Notes                               |
+| -------------------- | ------ | ----------------------------------- |
+| `opacity`            | ✅     | Via canvas save_layer               |
+| `visibility`         | ✅     | hidden/collapse skips painting      |
+| `overflow`           | ✅     | hidden/clip via canvas clip_rect    |
+| `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius |
+| `mix-blend-mode`     | ✅     | All CSS blend modes                 |
+
+### Positioning
+
+| CSS Property         | Status | Notes                               |
+| -------------------- | ------ | ----------------------------------- |
+| `position: static`   | ✅     | Default                             |
+| `position: relative` | ✅     | Via Taffy                           |
+| `position: absolute` | ✅     | Via Taffy                           |
+| `z-index`            | ⚠️     | Stored but not used for paint order |
+
+### Not Yet Supported
+
+| Category          | Properties                                                          |
+| ----------------- | ------------------------------------------------------------------- |
+| Background images | `background-image: url()`, `background-position`, `background-size` |
+| Transform         | `transform`, `transform-origin`                                     |
+| Box shadow inset  | `box-shadow: inset`                                                 |
+| Table layout      | `display: table-row`, `table-cell` (proper grid)                    |
+| Float             | `float`, `clear`                                                    |
+| Filter            | `filter`, `backdrop-filter`                                         |
+| Clip/Mask         | `clip-path`, `mask`                                                 |
+| Outline           | `outline`                                                           |
+| Text              | `text-indent`, `text-overflow`, `vertical-align` (sub/super)        |
+
+---
+
+## Key Design Decisions
+
+### Subpixel layout
+
+Taffy rounding is disabled (`taffy.disable_rounding()`) to match Chromium's
+subpixel layout precision. Text intrinsic width is ceiled to prevent
+subpixel-induced wrapping.
+
+### Inline box model
+
+Follows Chromium's `kOpenTag`/`kCloseTag` model. `InlineRunItem::OpenBox`
+and `CloseBox` inject Skia placeholders that consume inline space matching
+`padding + border` width. Decoration rects are painted using
+`Paragraph::get_rects_for_range()`.
+
+### Root margin stripping
+
+`<html>` and `<body>` margins are zeroed in the collector since the embed
+container provides its own bounds. Author padding is preserved.
+
+### Whitespace collapsing
+
+Inter-element whitespace (newlines/spaces between block elements) is detected
+and dropped during inline group flushing to prevent empty 24px-tall blocks.

@@ -318,6 +318,20 @@ pub fn build_shape(node: &Node, bounds: &Rectangle) -> PainterShape {
                 PainterShape::from_rect(rect)
             }
         }
+        Node::HTMLEmbed(n) => {
+            let r = n.corner_radius;
+            if !r.is_zero() {
+                let rrect = build_rrect(&RRectShape {
+                    width: n.size.width,
+                    height: n.size.height,
+                    corner_radius: n.corner_radius,
+                });
+                PainterShape::from_rrect(rrect)
+            } else {
+                let rect = Rect::from_xywh(0.0, 0.0, n.size.width, n.size.height);
+                PainterShape::from_rect(rect)
+            }
+        }
         // Non-shape nodes (Group, BooleanOperation, InitialContainer, TextSpan)
         _ => PainterShape::from_rect(Rect::new(0.0, 0.0, 0.0, 0.0)),
     }

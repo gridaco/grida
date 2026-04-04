@@ -241,6 +241,7 @@ fn classify_node(node: &Node) -> &'static str {
         Node::Tray(_) => "tray",
         Node::Error(_) => "error",
         Node::Markdown(_) => "markdown",
+        Node::HTMLEmbed(_) => "html_embed",
     }
 }
 

@@ -90,6 +90,7 @@ pub fn estimate_node_cost(layer: &PainterPictureLayer, is_cache_hit: bool) -> f6
         PainterPictureLayer::Text(t) => (&t.effects, &t.base),
         PainterPictureLayer::Vector(v) => (&v.effects, &v.base),
         PainterPictureLayer::Markdown(m) => (&m.effects, &m.base),
+        PainterPictureLayer::HtmlEmbed(h) => (&h.effects, &h.base),
     };
 
     // Blur

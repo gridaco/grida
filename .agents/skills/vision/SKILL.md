@@ -5,7 +5,7 @@ description: >
   into the main agent context. Use when you need to describe a screenshot,
   check whether rendered content is present, detect overlapping elements, or
   ask any visual question about a PNG/JPEG/WebP file. Requires Ollama running
-  locally with a vision-capable model (qwen3.5, gemma3, llava, etc.).
+  locally with the Gemma 4 multimodal model (`gemma4` on Ollama).
   Script: .agents/skills/vision/scripts/ask.py.
   Trigger phrases: "describe image", "what does this screenshot show",
   "does the canvas contain content", "check screenshot visually",
@@ -56,10 +56,10 @@ uv run $SCRIPT path/to/image.png \
 uv run $SCRIPT canvas.png \
   --prompt "Does this canvas contain any designed content, or is it empty?"
 
-# use a specific model
-uv run $SCRIPT image.png --model gemma3
+# optional: pin a specific Gemma 4 tag (default is any installed gemma4)
+uv run $SCRIPT image.png --model gemma4:e4b
 
-# list available vision-capable models
+# list installed Gemma 4 vision models
 uv run $SCRIPT --list-models
 ```
 
@@ -74,14 +74,12 @@ and fails immediately if it cannot reach it.
 # start Ollama (if not already running)
 ollama serve
 
-# install a vision model (first time, pick one)
-ollama pull qwen3.5        # recommended — best low-cost vision as of 2026-03
-ollama pull gemma3         # alternative
-ollama pull llava          # widely available fallback
+# install Gemma 4 (multimodal — required for this skill)
+ollama pull gemma4
 ```
 
-The script **does not install models**. If no vision model is available it
-prints the list of installed models and a `pull` suggestion, then exits.
+The script **does not install models**. If Gemma 4 is not installed it prints
+the list of installed models and a `pull` suggestion, then exits.
 
 **`uv` is required** to run the script (handles dependency installation
 automatically). No `requirements.txt` or manual `pip install` needed.
@@ -90,20 +88,14 @@ automatically). No `requirements.txt` or manual `pip install` needed.
 
 ## Model Selection
 
-When `--model` is not specified the script picks the first installed model
-from this preference list (updated periodically):
+This skill uses **only** [Gemma 4](https://ollama.com/library/gemma4) on
+Ollama (`gemma4` and tags such as `gemma4:latest`, `gemma4:e4b`). Other
+multimodal models are ignored so agents do not silently fall back to a
+different family.
 
-| Priority | Model             | Notes                                    |
-| -------- | ----------------- | ---------------------------------------- |
-| 1        | `qwen3.5`         | Best low-cost vision model as of 2026-03 |
-| 2        | `qwen2.5vl`       | Previous generation, still strong        |
-| 3        | `gemma3`          | Strong alternative, multimodal           |
-| 4        | `llama3.2-vision` | Meta vision variant                      |
-| 5        | `llava`           | Widely installed fallback                |
-
-A model is considered vision-capable when its name contains: `qwen`, `gemma3`,
-`vl`, `vision`, `llava`, `moondream`, `minicpm-v`, or similar fragments.
-Non-vision text models are filtered out automatically.
+When `--model` is omitted, the script picks any installed `gemma4` tag (for
+example `gemma4:latest`). Use `--model gemma4:e4b` (or another tag) to pin a
+specific variant.
 
 ---
 
@@ -120,13 +112,14 @@ uv run $SCRIPT --storage   # just storage
 ```
 
 Tip: on machines with ≤8 GB RAM, large vision models may cause swapping or
-OOM. Consider using a smaller model variant or skipping the query.
+OOM. Consider a smaller Gemma 4 variant (for example `gemma4:e2b`) or skip
+the query.
 
 ---
 
 ## Behavior
 
-- **Fails fast** if Ollama is unreachable or no vision model is installed.
+- **Fails fast** if Ollama is unreachable or Gemma 4 is not installed.
   Exit code is non-zero; the error message includes a `hint` or `pull` command.
 - **Sequential only** — Ollama is a single-worker process. Never call `ask.py`
   in parallel (e.g. two concurrent tool calls). Queue calls one at a time.
@@ -164,8 +157,8 @@ uv run $SCRIPT crates/grida-canvas/goldens/progressive_blur.png \
 | Symptom                          | Cause                            | Fix                                       |
 | -------------------------------- | -------------------------------- | ----------------------------------------- |
 | `cannot reach Ollama`            | Ollama not running               | `ollama serve`                            |
-| `no vision-capable models found` | Only text models installed       | `ollama pull qwen3.5`                     |
+| `no Gemma 4 vision model found`  | Gemma 4 not installed            | `ollama pull gemma4`                      |
 | `model 'X' is not available`     | Model name typo or not installed | `--list-models` to see what's installed   |
-| Slow response                    | Large model on CPU               | Use a smaller variant (e.g. `qwen3.5:3b`) |
+| Slow response                    | Large model on CPU               | Try a smaller tag (e.g. `gemma4:e2b`)     |
 | Vague or wrong answer            | Generic prompt                   | Write a more specific `--prompt`          |
 | `'ollama' package not found`     | Not using `uv run`               | Run with `uv run ask.py` instead          |
