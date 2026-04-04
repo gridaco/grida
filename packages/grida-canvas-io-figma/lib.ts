@@ -1739,6 +1739,75 @@ export namespace iofigma {
         }
 
         /**
+         * Detect a specific Figma BOOLEAN_OPERATION pattern where the
+         * `strokeGeometry` must be skipped to avoid double-rendering.
+         *
+         * ## Background
+         *
+         * When a BOOLEAN_OPERATION (typically UNION) has **both** `fills`
+         * and `strokes` set, and its children contribute stroke-based
+         * shapes to the union, Figma bakes the children's stroke outlines
+         * into the boolean result's `fillGeometry`. The `fillGeometry`
+         * path then uses winding-rule cutouts to produce the correct
+         * hollow outline appearance (border + divider with transparent
+         * interior panels).
+         *
+         * In this case, `strokeGeometry` represents an *additional*
+         * expanded stroke around the entire union shape. Rendering it as
+         * a filled path on top of `fillGeometry` covers the fill's
+         * internal winding structure, producing a solid black blob instead
+         * of the intended outline-with-panels.
+         *
+         * ## Detection
+         *
+         * | Condition | Required |
+         * |-----------|----------|
+         * | Node is `BOOLEAN_OPERATION` | yes |
+         * | Node has effective `fills` (non-empty) | yes |
+         * | Node has effective `strokes` (non-empty) | yes |
+         * | Node has both `fillGeometry` and `strokeGeometry` | yes |
+         * | `fillGeometry` was successfully processed (fillChildIds > 0) | yes |
+         *
+         * When all conditions are met, `strokeGeometry` is redundant —
+         * the `fillGeometry` already contains the complete boolean result
+         * including stroke contributions from children.
+         *
+         * ## Tracking
+         *
+         * This is a Figma-specific behavior observed in icons like the
+         * Radix "Panel Left/Right/Bottom" family. If future evidence
+         * shows cases where BOOLEAN_OPERATION `strokeGeometry` must be
+         * rendered alongside `fillGeometry`, this function should be
+         * revisited. Grep for `shouldSkipBooleanOperationStrokeGeometry`
+         * to find all references.
+         */
+        function shouldSkipBooleanOperationStrokeGeometry(
+          node: InputNode & figrest.HasGeometryTrait,
+          fillChildIds: string[]
+        ): boolean {
+          if (!("type" in node) || (node as any).type !== "BOOLEAN_OPERATION")
+            return false;
+
+          const hasFills =
+            Array.isArray(node.fills) && node.fills.length > 0;
+          const hasStrokes =
+            Array.isArray(node.strokes) && node.strokes.length > 0;
+          const hasFillGeometry =
+            (node.fillGeometry?.length ?? 0) > 0;
+          const hasStrokeGeometry =
+            (node.strokeGeometry?.length ?? 0) > 0;
+          const fillWasProcessed = fillChildIds.length > 0;
+
+          return (
+            hasFills &&
+            hasStrokes &&
+            hasFillGeometry &&
+            hasStrokeGeometry &&
+            fillWasProcessed
+          );
+        }
+
+        /**
          * Processes nodes with HasGeometryTrait from REST API (with geometry=paths parameter).
          * Converts fill/stroke geometries to child VectorNodes under a GroupNode.
          * Applies to VECTOR, STAR, REGULAR_POLYGON, BOOLEAN_OPERATION, and other shape nodes.
@@ -1814,12 +1883,18 @@ export namespace iofigma {
             nodeTypeName,
             pathTransform
           );
-          const strokeChildIds = processStrokeGeometries(
-            node,
-            groupNode.id,
-            nodeTypeName,
-            pathTransform
-          );
+
+          const skipStrokeGeometry =
+            shouldSkipBooleanOperationStrokeGeometry(node, fillChildIds);
+
+          const strokeChildIds = skipStrokeGeometry
+            ? []
+            : processStrokeGeometries(
+                node,
+                groupNode.id,
+                nodeTypeName,
+                pathTransform
+              );
 
           const allChildIds = [...fillChildIds, ...strokeChildIds];
 
