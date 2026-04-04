@@ -277,7 +277,10 @@ code block
         let pic = render(&html, 600.0, 300.0, &fonts);
         assert!(pic.is_ok(), "Mixed markdown content should render");
         let h = pic.unwrap().cull_rect().height();
-        assert!(h > 50.0, "Mixed content should have substantial height, got {h}");
+        assert!(
+            h > 50.0,
+            "Mixed content should have substantial height, got {h}"
+        );
     }
 
     #[test]

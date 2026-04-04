@@ -12,5 +12,4 @@
 /// Grida-flavored Markdown CSS (light theme).
 ///
 /// Targets `.markdown-body` to scope styles and avoid leaking to other HTML.
-pub static GITHUB_MARKDOWN_CSS: &str =
-    include_str!("../../assets/css/grida-markdown.css");
+pub static GITHUB_MARKDOWN_CSS: &str = include_str!("../../assets/css/grida-markdown.css");

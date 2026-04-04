@@ -2110,9 +2110,8 @@ impl<'a> Painter<'a> {
                                     }
 
                                     // 2. Convert markdown → HTML+CSS, render via htmlcss pipeline
-                                    let styled_html = crate::htmlcss::markdown_to_styled_html(
-                                        &md_layer.markdown,
-                                    );
+                                    let styled_html =
+                                        crate::htmlcss::markdown_to_styled_html(&md_layer.markdown);
                                     match crate::htmlcss::render(
                                         &styled_html,
                                         md_layer.width,
