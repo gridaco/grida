@@ -89,77 +89,58 @@
   </head>
   <body>
     <article>
-      <h1>Getting Started with <code>grida-canvas</code></h1>
+      <h1>Heading with <code>inline code</code></h1>
 
       <p>
-        The <strong>Grida Canvas</strong> engine is a high-performance rendering
-        backend built in <em>Rust</em>. It powers the
-        <a href="#">interactive editor</a> and supports both
-        <strong>DOM-based</strong> and <strong>Skia-based</strong> output.
+        A paragraph with <strong>bold</strong>, <em>italic</em>, and
+        <a href="#">link</a> text. Also <strong>bold <em>nested italic</em></strong>
+        and plain text after.
       </p>
 
-      <h2>Installation</h2>
+      <h2>Code and keyboard</h2>
 
       <p>
-        Run <code>cargo add grida-canvas</code> to add the crate to your
-        project. Make sure you have <strong>Rust 2024 edition</strong> or later
-        installed. See the <a href="#">setup guide</a> for platform-specific
-        instructions.
+        Use <code>foo(x, y)</code> to call the function. Wrap with
+        <code>bar()</code> if needed.
       </p>
-
-      <pre>
-cargo add grida-canvas
-cargo build --release</pre
-      >
-
-      <h2>Key Concepts</h2>
-
-      <p>
-        The engine uses a <em>scene graph</em> model where each node carries its
-        own <strong>layout</strong>, <strong>paint</strong>, and
-        <strong>effect</strong> properties. Nodes are organized into a tree and
-        rendered via the <code>Renderer</code> struct.
-      </p>
-
-      <p>
-        For <em>inline text</em>, the engine supports
-        <strong>AttributedText</strong> — a single text node with
-        <em>per-run styling</em>. This means you can have <strong>bold</strong>,
-        <em>italic</em>, <span style="color: #f87171">colored</span>,
-        <u>underlined</u>, and <code>monospace</code> text all within one
-        paragraph, just like this one.
-      </p>
-
-      <blockquote>
-        Design is not just what it looks like and feels like. Design is how it
-        works.
-      </blockquote>
-
-      <h2>Keyboard Shortcuts</h2>
 
       <p>
         Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> to undo,
         <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to redo. Use
-        <kbd>Space</kbd> to pan the canvas.
+        <kbd>Space</kbd> to pan.
       </p>
 
-      <h2>Known Limitations</h2>
+      <pre>
+alpha bravo charlie
+delta echo foxtrot</pre>
+
+      <h2>Highlight and decoration</h2>
 
       <p>
-        Elements like <code>code</code>, <mark>mark</mark>, and
-        <kbd>kbd</kbd> have <em>visual properties</em> (background color,
-        borders) that go beyond pure text styling. These are
-        <strong>not fully representable</strong> as inline runs — they require
-        box rendering. The current import pipeline handles the
-        <s>text styling</s> portion but drops the background and border
-        decorations.
+        This is <mark>highlighted</mark> text. And this has
+        <s>strikethrough</s> and <u>underline</u> decoration.
       </p>
 
       <p>
-        Similarly, <strong>negative margins</strong> and
-        <strong>margin collapse</strong> are not supported. See the
-        <a href="#">CSS property mapping</a> document for the full compatibility
-        table.
+        Mixed inline boxes: <code>abc</code>, <mark>def</mark>, and
+        <kbd>ghi</kbd> in one line.
+      </p>
+
+      <blockquote>
+        A blockquote with <em>italic</em> and <strong>bold</strong> inside.
+      </blockquote>
+
+      <h2>Wrapping behavior</h2>
+
+      <p>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
+        eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
+        ad minim veniam, quis nostrud exercitation ullamco laboris.
+      </p>
+
+      <p>
+        Short with <strong>bold</strong> and <em>italic</em> and
+        <code>code</code> and <kbd>key</kbd> and <mark>mark</mark> end.
       </p>
     </article>
   </body>

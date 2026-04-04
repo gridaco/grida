@@ -105,6 +105,8 @@ h6 { margin-block: 2.33em; }
 dd { margin-inline-start: 40px; }
 blockquote, figure { margin-inline: 40px; }
 ul, ol, menu { margin-block: 1em; padding-inline-start: 40px; }
+ul, menu { list-style-type: disc; }
+ol { list-style-type: decimal; }
 
 /* ---- headings ---- */
 h1 { font-size: 2em; font-weight: bold; }

@@ -398,4 +398,24 @@ impl NodeFactory {
             layout_child: None,
         }
     }
+
+    /// Creates a new HTML embed node with default values
+    pub fn create_html_embed_node(&self) -> HTMLEmbedNodeRec {
+        HTMLEmbedNodeRec {
+            active: true,
+            opacity: Self::DEFAULT_OPACITY,
+            blend_mode: LayerBlendMode::default(),
+            effects: LayerEffects::default(),
+            mask: None,
+            transform: AffineTransform::identity(),
+            size: Size {
+                width: 800.0,
+                height: 600.0,
+            },
+            corner_radius: RectangularCornerRadius::zero(),
+            html: String::new(),
+            fills: Paints::new([Self::default_solid_paint(Self::DEFAULT_COLOR)]),
+            layout_child: None,
+        }
+    }
 }

@@ -75,6 +75,7 @@ pub enum PainterPictureLayer {
     Text(PainterPictureTextLayer),
     Vector(PainterPictureVectorLayer),
     Markdown(PainterPictureMarkdownLayer),
+    HtmlEmbed(PainterPictureHtmlEmbedLayer),
 }
 
 impl PainterPictureLayer {
@@ -93,6 +94,7 @@ impl PainterPictureLayer {
             PainterPictureLayer::Text(t) => t.effects.is_empty(),
             PainterPictureLayer::Vector(v) => v.effects.is_empty(),
             PainterPictureLayer::Markdown(m) => m.effects.is_empty(),
+            PainterPictureLayer::HtmlEmbed(h) => h.effects.is_empty(),
         }
     }
 }
@@ -166,6 +168,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Text(layer) => &layer.base.id,
             PainterPictureLayer::Vector(layer) => &layer.base.id,
             PainterPictureLayer::Markdown(layer) => &layer.base.id,
+            PainterPictureLayer::HtmlEmbed(layer) => &layer.base.id,
         }
     }
 
@@ -175,6 +178,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Text(layer) => layer.base.z_index,
             PainterPictureLayer::Vector(layer) => layer.base.z_index,
             PainterPictureLayer::Markdown(layer) => layer.base.z_index,
+            PainterPictureLayer::HtmlEmbed(layer) => layer.base.z_index,
         }
     }
 
@@ -184,6 +188,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Text(layer) => layer.base.transform,
             PainterPictureLayer::Vector(layer) => layer.base.transform,
             PainterPictureLayer::Markdown(layer) => layer.base.transform,
+            PainterPictureLayer::HtmlEmbed(layer) => layer.base.transform,
         }
     }
 
@@ -193,6 +198,7 @@ impl Layer for PainterPictureLayer {
             PainterPictureLayer::Vector(layer) => &layer.shape,
             PainterPictureLayer::Text(layer) => &layer.shape,
             PainterPictureLayer::Markdown(layer) => &layer.shape,
+            PainterPictureLayer::HtmlEmbed(layer) => &layer.shape,
         }
     }
 }
@@ -306,6 +312,25 @@ pub struct PainterPictureMarkdownLayer {
     pub fills: Paints,
     /// GFM markdown source text.
     pub markdown: String,
+    /// Layout width for text wrapping.
+    pub width: f32,
+    /// Layout height for clipping.
+    pub height: f32,
+}
+
+/// A painter layer for HTML+CSS content rendered directly to a Skia Picture.
+///
+/// The HTML source is carried here so the painter can call
+/// `htmlcss::render()` at draw time and cache the result.
+#[derive(Debug, Clone)]
+pub struct PainterPictureHtmlEmbedLayer {
+    pub base: PainterPictureLayerBase,
+    pub effects: LayerEffects,
+    pub shape: PainterShape,
+    /// Background fills for the HTML embed container.
+    pub fills: Paints,
+    /// Raw HTML+CSS source text.
+    pub html: String,
     /// Layout width for text wrapping.
     pub width: f32,
     /// Layout height for clipping.
@@ -1581,6 +1606,39 @@ impl LayerList {
                     effects: Self::filter_active_effects(&n.effects),
                     fills,
                     markdown: n.markdown.clone(),
+                    width: n.size.width,
+                    height: n.size.height,
+                });
+                out.push(LayerEntry {
+                    id: id.clone(),
+                    layer: layer.clone(),
+                });
+                FlattenResult {
+                    commands: vec![PainterRenderCommand::Draw(layer)],
+                    mask: n.mask,
+                }
+            }
+            Node::HTMLEmbed(n) => {
+                let bounds = scene_cache
+                    .geometry()
+                    .get_world_bounds(id)
+                    .expect("Geometry must exist");
+                let shape = build_shape(node, &bounds);
+                let fills = Self::filter_visible_paints(&n.fills);
+
+                let layer = PainterPictureLayer::HtmlEmbed(PainterPictureHtmlEmbedLayer {
+                    base: PainterPictureLayerBase {
+                        id: id.clone(),
+                        z_index: out.len(),
+                        opacity: parent_opacity * n.opacity,
+                        blend_mode: n.blend_mode,
+                        transform,
+                        clip_path: Self::compute_clip_path(id, graph, scene_cache),
+                    },
+                    shape,
+                    effects: Self::filter_active_effects(&n.effects),
+                    fills,
+                    html: n.html.clone(),
                     width: n.size.width,
                     height: n.size.height,
                 });

@@ -329,10 +329,69 @@ fn scene_from_html_path(path: &Path) -> Result<Scene> {
         name: path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "HTML".to_string()),
+            .unwrap_or_else(|| "HTML (Convert)".to_string()),
         graph,
         background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
     })
+}
+
+fn scene_from_html_embed_path(path: &Path) -> Result<Scene> {
+    use cg::cg::prelude::CGColor;
+    use cg::node::factory::NodeFactory;
+    use cg::node::scene_graph::{Parent, SceneGraph};
+    use cg::node::schema::Node;
+
+    let html_source = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+
+    let width = 800.0f32;
+    let temp_fonts = {
+        use cg::resources::ByteStore;
+        use cg::runtime::font_repository::FontRepository;
+        let mut repo =
+            FontRepository::new(std::sync::Arc::new(std::sync::Mutex::new(ByteStore::new())));
+        repo.enable_system_fallback();
+        repo
+    };
+    let height =
+        cg::htmlcss::measure_content_height(&html_source, width, &temp_fonts).unwrap_or(600.0);
+
+    let nf = NodeFactory::new();
+    let mut node = nf.create_html_embed_node();
+    node.html = html_source;
+    node.size = cg::node::schema::Size { width, height };
+
+    let mut graph = SceneGraph::new();
+    graph.append_child(Node::HTMLEmbed(node), Parent::Root);
+
+    Ok(Scene {
+        name: path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "HTML (Embed)".to_string()),
+        graph,
+        background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
+    })
+}
+
+/// Show a dialog asking the user to choose between Embed and Convert for HTML files.
+/// Returns true for Embed, false for Convert.
+fn ask_html_import_mode() -> bool {
+    use rfd::MessageButtons;
+    use rfd::MessageDialog;
+    use rfd::MessageDialogResult;
+
+    let result = MessageDialog::new()
+        .set_title("HTML Import Mode")
+        .set_description("How would you like to import this HTML file?\n\n\u{2022} Embed \u{2014} Render as opaque picture (CSS-accurate, non-editable)\n\u{2022} Convert \u{2014} Convert to editable Grida IR nodes (lossy CSS)")
+        .set_buttons(MessageButtons::OkCancelCustom("Embed".to_string(), "Convert".to_string()))
+        .show();
+
+    match result {
+        MessageDialogResult::Ok => true,
+        MessageDialogResult::Custom(s) if s == "Embed" => true,
+        _ => false,
+    }
 }
 
 fn scene_from_markdown_path(path: &Path) -> Result<Scene> {
@@ -434,7 +493,13 @@ async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
     match ext.as_str() {
         "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
         "svg" => scene_from_svg_path(path).map(|s| vec![s]),
-        "html" | "htm" => scene_from_html_path(path).map(|s| vec![s]),
+        "html" | "htm" => {
+            if ask_html_import_mode() {
+                scene_from_html_embed_path(path).map(|s| vec![s])
+            } else {
+                scene_from_html_path(path).map(|s| vec![s])
+            }
+        }
         "md" | "markdown" => scene_from_markdown_path(path).map(|s| vec![s]),
         // Raster images are handled separately in start_master_drop_task.
         other => Err(anyhow::anyhow!(
