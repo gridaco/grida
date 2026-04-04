@@ -95,6 +95,7 @@ function RefigMarketing() {
             "Offline rendering from .fig files",
             "REST API JSON input",
             "Deterministic, CI-friendly exports",
+            "Rich text (attributed text) support",
           ].map((text) => (
             <li key={text}>{text}</li>
           ))}
@@ -125,6 +126,26 @@ npx @grida/refig ./design.fig --node "1:23" --out ./out.png
 # Export everything with Figma export presets
 npx @grida/refig ./design.fig --export-all --out ./exports`}</code>
         </pre>
+      </section>
+
+      <section aria-labelledby="refig-embed-heading">
+        <h2 id="refig-embed-heading">Need a real-time viewer instead?</h2>
+        <p>
+          If you need an <strong>interactive, embeddable Figma viewer</strong>{" "}
+          rather than headless rendering, check out the{" "}
+          <strong>Embed Viewer</strong> (<code>/embed/v1/figma</code>). It
+          renders <code>.fig</code> and REST JSON in the browser as a read-only
+          viewer via iframe, with events using original Figma node IDs — great
+          for live previews, design handoff, and embedding designs in your app.
+        </p>
+        <div className="not-prose flex flex-wrap gap-2 pt-1">
+          <Link
+            href="/docs/canvas/sdk/embed"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
+          >
+            Embed SDK docs
+          </Link>
+        </div>
       </section>
 
       <section>

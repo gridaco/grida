@@ -307,6 +307,13 @@ During a document load/reset, `selection-change` and `scene-change` events are *
 
 Images are loaded lazily -- the renderer reports which image refs it needs as it encounters them during rendering. The host resolves and provides bytes on demand. Only visible images are requested.
 
+## Need headless rendering instead?
+
+If you need to render Figma designs to **PNG, JPEG, WebP, PDF, or SVG** in Node.js or CI (no browser required), check out **`@grida/refig`** — a headless Figma renderer with CLI and library API. Great for deterministic exports, offline rendering from `.fig`, and high-throughput asset pipelines.
+
+- **refig docs**: [https://grida.co/docs/packages/@grida/refig](https://grida.co/docs/packages/@grida/refig)
+- **npm**: [`@grida/refig`](https://www.npmjs.com/package/@grida/refig)
+
 ## Choosing an endpoint
 
 | Use case                                               | Endpoint          | Why                                           |

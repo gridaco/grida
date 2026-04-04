@@ -19,6 +19,7 @@ Refig aims to render designs as faithfully as possible to the original. See [Kno
 - [x] **Bring-your-own-font** — supply custom font files for designs that use non-default typefaces
 - [x] Batch export with **`--export-all`** (renders nodes with Figma export presets)
 - [x] WASM + Skia-backed renderer via `@grida/canvas-wasm`
+- [x] **Rich text** (attributed text) — mixed styles (bold, italic, color, size) within a single text node
 
 ## Use cases
 
@@ -416,9 +417,13 @@ For **`.fig`** input, images are embedded in the file; no extra images directory
 
 ## Known limitations
 
-- **Rich text** — Text with mixed styles (e.g. bold and italic in the same paragraph) is not yet supported.
+- **Bullet lists** — Figma bullet/numbered lists are rendered by faux-ing the list markers rather than using native list semantics. Visual output is close but may not be pixel-perfect for all list styles.
 - **Image transformation** — Complex image transforms from Figma designs are not yet properly aligned. Known issue; will fix.
 - **Emoji** — Rendered with Noto Color Emoji instead of Figma's platform emoji (Apple Color Emoji / Segoe UI Emoji). Output differs by design.
+
+## See also
+
+- **Embed Viewer (`/embed/v1/figma`)** — Need a real-time, interactive Figma viewer instead of headless rendering? Grida hosts a Figma-specific embed endpoint that renders `.fig` and REST JSON in the browser as a read-only viewer (iframe). Events use original Figma node IDs. Great for live previews, design handoff, and embedding designs in your app. [Embed SDK docs](https://grida.co/docs/canvas/sdk/embed)
 
 ## Not planned
 

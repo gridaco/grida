@@ -11,6 +11,7 @@ export const packages = [
       "Offline rendering from .fig files",
       "REST API JSON input",
       "Deterministic, CI-friendly exports",
+      "Rich text (attributed text) support",
     ],
   },
   {

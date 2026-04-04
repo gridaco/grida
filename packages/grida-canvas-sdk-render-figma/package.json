@@ -1,6 +1,6 @@
 {
   "name": "@grida/refig",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": false,
   "description": "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG",
   "keywords": [
