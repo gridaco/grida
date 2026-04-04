@@ -2534,9 +2534,7 @@ fn encode_node<'a, A: flatbuffers::Allocator + 'a>(
         Node::AttributedText(r) => {
             encode_attributed_text_node(fbb, r, node_id, parent_id, position)
         }
-        Node::MarkdownEmbed(r) => {
-            encode_markdown_embed_node(fbb, r, node_id, parent_id, position)
-        }
+        Node::MarkdownEmbed(r) => encode_markdown_embed_node(fbb, r, node_id, parent_id, position),
         // Fallback: encode as UnknownNode
         _ => {
             let sys = encode_system_node_trait(fbb, node_id, "", true, false);
