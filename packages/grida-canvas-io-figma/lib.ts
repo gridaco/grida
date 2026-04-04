@@ -431,6 +431,244 @@ export namespace iofigma {
 
     export namespace factory {
       /**
+       * Apply a 2×2 affine transform to all coordinates in an SVG path string,
+       * then translate so the bounding box starts at (0, 0).
+       *
+       * Used to bake non-representable transforms (flips, skews) into path data
+       * when the Grida node model can only store (x, y, rotation).
+       *
+       * @param pathData - SVG path d attribute string
+       * @param a - relativeTransform[0][0]
+       * @param c - relativeTransform[0][1]
+       * @param b - relativeTransform[1][0]
+       * @param d - relativeTransform[1][1]
+       * @returns Transformed path and the offset applied, or null if transform is
+       *   identity (or near-identity pure rotation, which the caller handles via rotation).
+       */
+      function transformSvgPath(
+        pathData: string,
+        a: number,
+        c: number,
+        b: number,
+        d: number
+      ): { path: string; width: number; height: number } | null {
+        // Identity check — no transform needed
+        const isIdentity =
+          Math.abs(a - 1) < 1e-6 &&
+          Math.abs(d - 1) < 1e-6 &&
+          Math.abs(b) < 1e-6 &&
+          Math.abs(c) < 1e-6;
+        if (isIdentity) return null;
+
+        const det = a * d - b * c;
+
+        // Parse path: extract command groups
+        const cmdRegex = /([MLHVCSQTAZmlhvcsqtaz])/g;
+        const numRegex =
+          /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
+
+        type CmdGroup = { cmd: string; nums: number[] };
+        const groups: CmdGroup[] = [];
+        let lastIdx = 0;
+        let m: RegExpExecArray | null;
+
+        // Split into (command, numbers[]) pairs
+        const cmds: { cmd: string; pos: number }[] = [];
+        while ((m = cmdRegex.exec(pathData)) !== null) {
+          cmds.push({ cmd: m[0], pos: m.index });
+        }
+
+        let numI = 0;
+        const allNums: { val: number; pos: number }[] = [];
+        while ((m = numRegex.exec(pathData)) !== null) {
+          allNums.push({ val: parseFloat(m[0]), pos: m.index });
+        }
+
+        for (let ci = 0; ci < cmds.length; ci++) {
+          const nextPos =
+            ci + 1 < cmds.length ? cmds[ci + 1].pos : pathData.length;
+          const nums: number[] = [];
+          while (numI < allNums.length && allNums[numI].pos < nextPos) {
+            nums.push(allNums[numI].val);
+            numI++;
+          }
+          groups.push({ cmd: cmds[ci].cmd, nums });
+        }
+
+        const xf = (x: number, y: number): [number, number] => [
+          a * x + c * y,
+          b * x + d * y,
+        ];
+
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        const track = (x: number, y: number) => {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        };
+
+        // Transform absolute coordinate pairs in each command
+        for (const g of groups) {
+          const isRel =
+            g.cmd === g.cmd.toLowerCase() &&
+            g.cmd !== "z" &&
+            g.cmd !== "Z";
+          const cu = g.cmd.toUpperCase();
+
+          switch (cu) {
+            case "M":
+            case "L":
+            case "T":
+              for (let i = 0; i + 1 < g.nums.length; i += 2) {
+                const [nx, ny] = xf(g.nums[i], g.nums[i + 1]);
+                g.nums[i] = nx;
+                g.nums[i + 1] = ny;
+                if (!isRel) track(nx, ny);
+              }
+              break;
+            case "H":
+              // H/V cannot survive non-diagonal 2×2; promote to L
+              // For diagonal transforms (flips), H stays H
+              if (Math.abs(b) < 1e-9 && Math.abs(c) < 1e-9) {
+                for (let i = 0; i < g.nums.length; i++) {
+                  g.nums[i] = a * g.nums[i];
+                  if (!isRel) track(g.nums[i], 0);
+                }
+              }
+              break;
+            case "V":
+              if (Math.abs(b) < 1e-9 && Math.abs(c) < 1e-9) {
+                for (let i = 0; i < g.nums.length; i++) {
+                  g.nums[i] = d * g.nums[i];
+                  if (!isRel) track(0, g.nums[i]);
+                }
+              }
+              break;
+            case "C":
+              for (let i = 0; i + 5 < g.nums.length; i += 6) {
+                const [x1, y1] = xf(g.nums[i], g.nums[i + 1]);
+                const [x2, y2] = xf(g.nums[i + 2], g.nums[i + 3]);
+                const [x3, y3] = xf(g.nums[i + 4], g.nums[i + 5]);
+                g.nums[i] = x1;
+                g.nums[i + 1] = y1;
+                g.nums[i + 2] = x2;
+                g.nums[i + 3] = y2;
+                g.nums[i + 4] = x3;
+                g.nums[i + 5] = y3;
+                if (!isRel) {
+                  track(x1, y1);
+                  track(x2, y2);
+                  track(x3, y3);
+                }
+              }
+              break;
+            case "S":
+            case "Q":
+              for (let i = 0; i + 3 < g.nums.length; i += 4) {
+                const [x1, y1] = xf(g.nums[i], g.nums[i + 1]);
+                const [x2, y2] = xf(g.nums[i + 2], g.nums[i + 3]);
+                g.nums[i] = x1;
+                g.nums[i + 1] = y1;
+                g.nums[i + 2] = x2;
+                g.nums[i + 3] = y2;
+                if (!isRel) {
+                  track(x1, y1);
+                  track(x2, y2);
+                }
+              }
+              break;
+            case "A":
+              for (let i = 0; i + 6 < g.nums.length; i += 7) {
+                const [nx, ny] = xf(g.nums[i + 5], g.nums[i + 6]);
+                g.nums[i + 5] = nx;
+                g.nums[i + 6] = ny;
+                // Flip sweep flag when determinant is negative
+                if (det < 0)
+                  g.nums[i + 4] = g.nums[i + 4] === 0 ? 1 : 0;
+                if (!isRel) track(nx, ny);
+              }
+              break;
+            case "Z":
+              break;
+          }
+        }
+
+        // Offset so min corner is at (0, 0)
+        const ox = isFinite(minX) ? minX : 0;
+        const oy = isFinite(minY) ? minY : 0;
+
+        for (const g of groups) {
+          const isRel =
+            g.cmd === g.cmd.toLowerCase() &&
+            g.cmd !== "z" &&
+            g.cmd !== "Z";
+          if (isRel) continue;
+          const cu = g.cmd.toUpperCase();
+          switch (cu) {
+            case "M":
+            case "L":
+            case "T":
+              for (let i = 0; i + 1 < g.nums.length; i += 2) {
+                g.nums[i] -= ox;
+                g.nums[i + 1] -= oy;
+              }
+              break;
+            case "H":
+              for (let i = 0; i < g.nums.length; i++) g.nums[i] -= ox;
+              break;
+            case "V":
+              for (let i = 0; i < g.nums.length; i++) g.nums[i] -= oy;
+              break;
+            case "C":
+              for (let i = 0; i + 5 < g.nums.length; i += 6) {
+                g.nums[i] -= ox;
+                g.nums[i + 1] -= oy;
+                g.nums[i + 2] -= ox;
+                g.nums[i + 3] -= oy;
+                g.nums[i + 4] -= ox;
+                g.nums[i + 5] -= oy;
+              }
+              break;
+            case "S":
+            case "Q":
+              for (let i = 0; i + 3 < g.nums.length; i += 4) {
+                g.nums[i] -= ox;
+                g.nums[i + 1] -= oy;
+                g.nums[i + 2] -= ox;
+                g.nums[i + 3] -= oy;
+              }
+              break;
+            case "A":
+              for (let i = 0; i + 6 < g.nums.length; i += 7) {
+                g.nums[i + 5] -= ox;
+                g.nums[i + 6] -= oy;
+              }
+              break;
+          }
+        }
+
+        const path = groups
+          .map((g) => {
+            if (g.cmd.toUpperCase() === "Z") return g.cmd;
+            return (
+              g.cmd +
+              g.nums.map((n) => String(Number(n.toFixed(6)))).join(" ")
+            );
+          })
+          .join("");
+
+        return {
+          path,
+          width: isFinite(maxX - minX) ? maxX - minX : 0,
+          height: isFinite(maxY - minY) ? maxY - minY : 0,
+        };
+      }
+
+      /**
        * Result of converting Figma REST document to Grida format.
        *
        * - **document**: The packed scene document for insert.
@@ -714,6 +952,11 @@ export namespace iofigma {
           name: node.name,
           active: node.visible ?? true,
           locked: node.locked ?? false,
+          // Figma REST API `rotation` is in radians. Store as-is; the Rust
+          // side handles the unit per node type (Container uses radians
+          // directly via AffineTransform::new; other node types with
+          // prefer_path_for_geometry bake the transform into path data and
+          // set rotation=0).
           rotation: node.rotation ?? 0,
           opacity: node.opacity ?? 1,
           blend_mode: map.layerBlendModeMap[node.blendMode],
@@ -1372,7 +1615,13 @@ export namespace iofigma {
         function processFillGeometries(
           node: InputNode & figrest.HasGeometryTrait,
           parentGridaId: string,
-          nodeTypeName: string
+          nodeTypeName: string,
+          pathTransform?: {
+            a: number;
+            c: number;
+            b: number;
+            d: number;
+          }
         ): string[] {
           if (!node.fillGeometry?.length) return [];
 
@@ -1385,9 +1634,22 @@ export namespace iofigma {
             // Resolve per-path fill overrides from fillOverrideTable.
             const effectiveFills = resolveFillOverride(geometry, node);
 
+            // Pre-transform path data if the node has a non-rotational transform
+            let pathData = geometry.path ?? "";
+            if (pathTransform && pathData) {
+              const result = transformSvgPath(
+                pathData,
+                pathTransform.a,
+                pathTransform.c,
+                pathTransform.b,
+                pathTransform.d
+              );
+              if (result) pathData = result.path;
+            }
+
             const childNode = context.prefer_path_for_geometry
               ? createPathNodeFromPath(
-                  geometry.path ?? "",
+                  pathData,
                   geometry,
                   node,
                   childId,
@@ -1421,7 +1683,13 @@ export namespace iofigma {
         function processStrokeGeometries(
           node: InputNode & figrest.HasGeometryTrait,
           parentGridaId: string,
-          nodeTypeName: string
+          nodeTypeName: string,
+          pathTransform?: {
+            a: number;
+            c: number;
+            b: number;
+            d: number;
+          }
         ): string[] {
           if (!node.strokeGeometry?.length) return [];
 
@@ -1431,9 +1699,21 @@ export namespace iofigma {
             const childId = `${parentGridaId}_stroke_${idx}`;
             const name = `${node.name || nodeTypeName} Stroke ${idx + 1}`;
 
+            let pathData = geometry.path ?? "";
+            if (pathTransform && pathData) {
+              const result = transformSvgPath(
+                pathData,
+                pathTransform.a,
+                pathTransform.c,
+                pathTransform.b,
+                pathTransform.d
+              );
+              if (result) pathData = result.path;
+            }
+
             const childNode = context.prefer_path_for_geometry
               ? createPathNodeFromPath(
-                  geometry.path ?? "",
+                  pathData,
                   geometry,
                   node,
                   childId,
@@ -1461,7 +1741,13 @@ export namespace iofigma {
         /**
          * Processes nodes with HasGeometryTrait from REST API (with geometry=paths parameter).
          * Converts fill/stroke geometries to child VectorNodes under a GroupNode.
-         * Applies to VECTOR, STAR, REGULAR_POLYGON, and other shape nodes.
+         * Applies to VECTOR, STAR, REGULAR_POLYGON, BOOLEAN_OPERATION, and other shape nodes.
+         *
+         * When the node's relativeTransform contains a non-rotational component
+         * (flip or skew), the 2×2 part is baked into the SVG path data and the
+         * group node's position is derived from absoluteBoundingBox instead.
+         * This is necessary because the Grida node model only supports
+         * (x, y, rotation) and cannot represent flips.
          */
         function processNodeWithGeometryTrait(
           node: InputNode & figrest.HasGeometryTrait,
@@ -1470,15 +1756,69 @@ export namespace iofigma {
           const nodeTypeName =
             "type" in node ? node.type.replace("_", " ") : "Shape";
 
+          // Detect non-rotational transforms (flips/skews) that need to be
+          // baked into the path data because the Grida node model only stores
+          // (x, y, rotation).
+          let pathTransform:
+            | { a: number; c: number; b: number; d: number }
+            | undefined;
+
+          if (
+            context.prefer_path_for_geometry &&
+            node.relativeTransform != null
+          ) {
+            const rt = node.relativeTransform;
+            const a = rt[0][0],
+              c = rt[0][1],
+              b = rt[1][0],
+              dd = rt[1][1];
+            const result = transformSvgPath("M0 0", a, c, b, dd);
+            if (result !== null) {
+              // Non-rotational 2×2 — need to bake into paths
+              pathTransform = { a, c, b, d: dd };
+
+              // Compute the AABB of the transformed local rect in parent
+              // space. The four corners of the local rect (0,0,w,h)
+              // transformed by the 2×2 + translation:
+              const tx = rt[0][2],
+                ty = rt[1][2];
+              const w = node.size?.x ?? 0,
+                h = node.size?.y ?? 0;
+              const corners = [
+                [tx, ty],
+                [a * w + tx, b * w + ty],
+                [c * h + tx, dd * h + ty],
+                [a * w + c * h + tx, b * w + dd * h + ty],
+              ];
+              const aabbX = Math.min(...corners.map((p) => p[0]));
+              const aabbY = Math.min(...corners.map((p) => p[1]));
+              const aabbW =
+                Math.max(...corners.map((p) => p[0])) - aabbX;
+              const aabbH =
+                Math.max(...corners.map((p) => p[1])) - aabbY;
+
+              // Override the group's position to the AABB top-left
+              // (relative to parent) with no rotation, since the 2×2
+              // transform is now baked into the path data.
+              (groupNode as any).layout_inset_left = aabbX;
+              (groupNode as any).layout_inset_top = aabbY;
+              (groupNode as any).rotation = 0;
+              (groupNode as any).layout_target_width = aabbW;
+              (groupNode as any).layout_target_height = aabbH;
+            }
+          }
+
           const fillChildIds = processFillGeometries(
             node,
             groupNode.id,
-            nodeTypeName
+            nodeTypeName,
+            pathTransform
           );
           const strokeChildIds = processStrokeGeometries(
             node,
             groupNode.id,
-            nodeTypeName
+            nodeTypeName,
+            pathTransform
           );
 
           const allChildIds = [...fillChildIds, ...strokeChildIds];
@@ -1530,14 +1870,96 @@ export namespace iofigma {
 
           attachGeometryChildrenIfPresent(currentNode, processedNode);
 
+          // For BOOLEAN_OPERATION nodes converted to groups with geometry,
+          // skip processing children — the boolean result is already baked
+          // into fillGeometry/strokeGeometry and the children are just the
+          // construction inputs (not visible in the final output).
+          const isBoolGeometryGroup =
+            "type" in currentNode &&
+            (currentNode as any).type === "BOOLEAN_OPERATION" &&
+            processedNode.type === "group";
+
+          // When a container (FRAME/INSTANCE/COMPONENT) has a non-rotational
+          // transform (flip/skew) and prefer_path_for_geometry is enabled,
+          // propagate the 2×2 part into children's relativeTransforms and
+          // fix the container to use the AABB position with no rotation.
+          // This ensures that child geometry baking picks up the flip.
+          if (
+            context.prefer_path_for_geometry &&
+            processedNode.type === "container" &&
+            "children" in currentNode &&
+            currentNode.children?.length &&
+            (currentNode as any).relativeTransform != null
+          ) {
+            const prt = (currentNode as any).relativeTransform;
+            const pa = prt[0][0], pc = prt[0][1];
+            const pb = prt[1][0], pd = prt[1][1];
+            const ptx = prt[0][2], pty = prt[1][2];
+            const pIsIdentity2x2 =
+              Math.abs(pa - 1) < 1e-6 && Math.abs(pd - 1) < 1e-6 &&
+              Math.abs(pb) < 1e-6 && Math.abs(pc) < 1e-6;
+            // Propagate ALL non-identity 2×2 transforms (rotations, flips,
+            // skews) into children. The Grida container model stores
+            // (position, rotation_degrees) and reconstructs via
+            // from_box_center, which uses a different convention than
+            // Figma's relativeTransform. Baking into children avoids the
+            // mismatch entirely.
+            const pNeedsBake = !pIsIdentity2x2;
+
+            if (pNeedsBake) {
+              // Compose the parent's 2×2 into each child's relativeTransform
+              const pw = (currentNode as any).size?.x ?? 0;
+              const ph = (currentNode as any).size?.y ?? 0;
+              for (const child of currentNode.children) {
+                const crt = (child as any).relativeTransform;
+                if (!crt) continue;
+                const ca = crt[0][0], cc = crt[0][1], ctx2 = crt[0][2];
+                const cb = crt[1][0], cd = crt[1][1], cty = crt[1][2];
+                // New 2×2: P_2x2 * C_2x2
+                const na = pa * ca + pc * cb;
+                const nc = pa * cc + pc * cd;
+                const nb = pb * ca + pd * cb;
+                const nd = pb * cc + pd * cd;
+                // New translation: P_2x2 * C_t + P_t
+                const ntx = pa * ctx2 + pc * cty + ptx;
+                const nty = pb * ctx2 + pd * cty + pty;
+                (child as any).relativeTransform = [[na, nc, ntx], [nb, nd, nty]];
+              }
+              // Fix the container to identity transform (AABB position)
+              const corners = [
+                [ptx, pty],
+                [pa * pw + ptx, pb * pw + pty],
+                [pc * ph + ptx, pd * ph + pty],
+                [pa * pw + pc * ph + ptx, pb * pw + pd * ph + pty],
+              ];
+              const aabbX = Math.min(...corners.map(p => p[0]));
+              const aabbY = Math.min(...corners.map(p => p[1]));
+              (processedNode as any).layout_inset_left = aabbX;
+              (processedNode as any).layout_inset_top = aabbY;
+              (processedNode as any).rotation = 0;
+            }
+          }
+
           // If the node has children, process them recursively
-          if ("children" in currentNode && currentNode.children?.length) {
-            graph[processedNode.id] = currentNode.children
+          if (
+            !isBoolGeometryGroup &&
+            "children" in currentNode &&
+            currentNode.children?.length
+          ) {
+            const childIds = currentNode.children
               .map((c) => {
                 return processNode(c, currentNode as FigmaParentNode);
               }) // Process each child
               .filter((child) => child !== undefined) // Remove undefined nodes
               .map((child) => child!.id); // Map to IDs
+
+            // Merge with any geometry children already added by
+            // attachGeometryChildrenIfPresent (e.g. VECTOR fill paths +
+            // its existing child structure).
+            const existing = graph[processedNode.id];
+            graph[processedNode.id] = existing
+              ? [...existing, ...childIds]
+              : childIds;
           }
 
           return processedNode;
@@ -1899,20 +2321,45 @@ export namespace iofigma {
               font_kerning: true,
             };
           }
-          case "RECTANGLE": {
-            return {
-              id: gridaId,
-              ...base_node_trait(node),
-              ...positioning_trait(node, parent),
-              ...fills_trait(node.fills, context, imageRefsUsed),
-              ...stroke_trait(node, context, imageRefsUsed),
-              ...rectangular_stroke_width_trait(node),
-              ...corner_radius_trait(node),
-              ...effects_trait(node.effects),
-              type: "rectangle",
-            } satisfies grida.program.nodes.RectangleNode;
-          }
+          case "RECTANGLE":
           case "ELLIPSE": {
+            // When prefer_path_for_geometry is enabled and the node has
+            // geometry paths with a non-identity relativeTransform, convert
+            // to a GroupNode so processNodeWithGeometryTrait will bake the
+            // transform into the path data. This avoids the radians/degrees
+            // mismatch in from_box_center for rotated/flipped leaf nodes.
+            const shapeHasGeometry =
+              context.prefer_path_for_geometry === true &&
+              ((node.fillGeometry?.length ?? 0) > 0 ||
+                (node.strokeGeometry?.length ?? 0) > 0);
+            const shapeRt = node.relativeTransform;
+            const shapeHasTransform =
+              shapeRt != null &&
+              (Math.abs(shapeRt[0][0] - 1) > 1e-6 ||
+                Math.abs(shapeRt[1][1] - 1) > 1e-6 ||
+                Math.abs(shapeRt[0][1]) > 1e-6 ||
+                Math.abs(shapeRt[1][0]) > 1e-6);
+            if (shapeHasGeometry && shapeHasTransform) {
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...positioning_trait(node, parent),
+                type: "group",
+              } satisfies grida.program.nodes.GroupNode;
+            }
+            if (node.type === "RECTANGLE") {
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...positioning_trait(node, parent),
+                ...fills_trait(node.fills, context, imageRefsUsed),
+                ...stroke_trait(node, context, imageRefsUsed),
+                ...rectangular_stroke_width_trait(node),
+                ...corner_radius_trait(node),
+                ...effects_trait(node.effects),
+                type: "rectangle",
+              } satisfies grida.program.nodes.RectangleNode;
+            }
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1925,6 +2372,22 @@ export namespace iofigma {
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {
+            // When geometry=paths is available and prefer_path_for_geometry is
+            // set, the boolean result is already baked into fillGeometry /
+            // strokeGeometry — emit a GroupNode so
+            // attachGeometryChildrenIfPresent will attach the path children.
+            const boolHasGeometry =
+              context.prefer_path_for_geometry === true &&
+              ((node.fillGeometry?.length ?? 0) > 0 ||
+                (node.strokeGeometry?.length ?? 0) > 0);
+            if (boolHasGeometry) {
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...positioning_trait(node, parent),
+                type: "group",
+              } satisfies grida.program.nodes.GroupNode;
+            }
             return {
               id: gridaId,
               ...base_node_trait(node),
