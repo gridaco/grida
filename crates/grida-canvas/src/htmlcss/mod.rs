@@ -67,12 +67,18 @@ mod tests {
     use crate::resources::ByteStore;
     use std::sync::{Arc, Mutex};
 
+    /// Stylo uses a process-global DOM slot that is not thread-safe.
+    /// All htmlcss tests must be serialized to avoid concurrent access.
+    /// We also share this with the `html` module's tests via crate-level visibility.
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
     fn test_fonts() -> FontRepository {
         FontRepository::new(Arc::new(Mutex::new(ByteStore::new())))
     }
 
     #[test]
     fn test_render_empty() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let pic = render("", 400.0, 300.0, &fonts);
         assert!(pic.is_ok());
@@ -80,6 +86,7 @@ mod tests {
 
     #[test]
     fn test_render_heading() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let pic = render("<h1>Hello</h1>", 400.0, 300.0, &fonts).unwrap();
         assert!(pic.cull_rect().width() > 0.0);
@@ -87,6 +94,7 @@ mod tests {
 
     #[test]
     fn test_render_with_style_block() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let pic = render(
             "<style>h1 { color: blue }</style><h1>Blue</h1>",
@@ -99,6 +107,7 @@ mod tests {
 
     #[test]
     fn test_render_table() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let pic = render(
             "<table><tr><td>A</td><td>B</td></tr></table>",
@@ -111,6 +120,7 @@ mod tests {
 
     #[test]
     fn test_render_flex() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="display:flex;gap:10px"><div>A</div><div>B</div></div>"#,
@@ -123,6 +133,7 @@ mod tests {
 
     #[test]
     fn test_render_opacity() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="opacity:0.5"><p>Semi-transparent</p></div>"#,
@@ -192,6 +203,7 @@ mod tests {
 
     #[test]
     fn test_measure_height() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let h = measure_content_height("<p>Hello</p>", 400.0, &fonts).unwrap();
         assert!(h > 0.0, "Content height should be positive, got {h}");
@@ -199,6 +211,7 @@ mod tests {
 
     #[test]
     fn test_head_hidden() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
         let pic = render(
             r#"<html><head><style>p{color:red}</style></head><body><p>V</p></body></html>"#,
