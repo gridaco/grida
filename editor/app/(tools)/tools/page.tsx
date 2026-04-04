@@ -8,6 +8,7 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Link from "next/link";
 import {
+  BoxIcon,
   CodeIcon,
   FigmaIcon,
   FrameIcon,
@@ -31,6 +32,8 @@ export const metadata: Metadata = {
     "phone number formatter",
     "image playground",
     "ai tools",
+    "affine transform visualizer",
+    "matrix visualizer",
   ],
   openGraph: {
     title: "Grida Tools | Free Developer & Design Tools",
@@ -87,6 +90,13 @@ const categories: { name: string; tools: Tool[] }[] = [
         description: "Format phone numbers to E.164 format.",
         link: "/tools/e164",
         icon: CodeIcon,
+      },
+      {
+        title: "Affine Transform Visualizer",
+        description:
+          "Interactive 2D affine transformation visualizer with matrix decomposition.",
+        link: "/tools/affine-transform",
+        icon: BoxIcon,
       },
     ],
   },

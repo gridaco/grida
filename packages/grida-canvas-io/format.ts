@@ -3780,6 +3780,73 @@ export namespace format {
       }
 
       /**
+       * Encodes a single FeNoise to a FlatBuffers FeNoiseEffect table.
+       */
+      function encodeFeNoise(
+        builder: Builder,
+        noise: cg.FeNoise
+      ): flatbuffers.Offset {
+        // Create NoiseEffectColors table
+        let coloringOffset: flatbuffers.Offset;
+        if (noise.mode === "mono") {
+          const color =
+            noise.color || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
+          const monoColorOffset = structs.rgba32f(builder, color);
+          fbs.NoiseEffectColors.startNoiseEffectColors(builder);
+          fbs.NoiseEffectColors.addKind(
+            builder,
+            fbs.NoiseEffectColorsKind.Mono
+          );
+          fbs.NoiseEffectColors.addMonoColor(builder, monoColorOffset);
+          coloringOffset =
+            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+        } else if (noise.mode === "duo") {
+          const color1 =
+            noise.color1 || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
+          const color2 =
+            noise.color2 || ({ r: 1, g: 1, b: 1, a: 1 } as cg.RGBA32F);
+          const duoColor1Offset = structs.rgba32f(builder, color1);
+          const duoColor2Offset = structs.rgba32f(builder, color2);
+          fbs.NoiseEffectColors.startNoiseEffectColors(builder);
+          fbs.NoiseEffectColors.addKind(
+            builder,
+            fbs.NoiseEffectColorsKind.Duo
+          );
+          fbs.NoiseEffectColors.addDuoColor1(builder, duoColor1Offset);
+          fbs.NoiseEffectColors.addDuoColor2(builder, duoColor2Offset);
+          coloringOffset =
+            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+        } else {
+          // Multi
+          fbs.NoiseEffectColors.startNoiseEffectColors(builder);
+          fbs.NoiseEffectColors.addKind(
+            builder,
+            fbs.NoiseEffectColorsKind.Multi
+          );
+          fbs.NoiseEffectColors.addMultiOpacity(
+            builder,
+            noise.opacity ?? 1.0
+          );
+          coloringOffset =
+            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+        }
+
+        // Create FeNoiseEffect table
+        fbs.FeNoiseEffect.startFeNoiseEffect(builder);
+        fbs.FeNoiseEffect.addNoiseSize(builder, noise.noise_size);
+        fbs.FeNoiseEffect.addDensity(builder, noise.density);
+        fbs.FeNoiseEffect.addNumOctaves(builder, noise.num_octaves ?? 3);
+        fbs.FeNoiseEffect.addSeed(builder, noise.seed ?? 0);
+        fbs.FeNoiseEffect.addColoring(builder, coloringOffset);
+        fbs.FeNoiseEffect.addActive(builder, noise.active ?? true);
+        fbs.FeNoiseEffect.addBlendMode(
+          builder,
+          styling.encode.blendMode(noise.blend_mode ?? "normal")
+        );
+        return fbs.FeNoiseEffect.endFeNoiseEffect(builder);
+      }
+
+      /**
        * Encodes FeNoise array to FlatBuffers FeNoiseEffect table array.
        */
       function encodeFeNoises(
@@ -3787,76 +3854,13 @@ export namespace format {
         noises: cg.FeNoise[]
       ): flatbuffers.Offset | undefined {
         if (noises.length === 0) return undefined;
-        fbs.LayerEffects.startFeNoisesVector(builder, noises.length);
+        // Create all FeNoiseEffect table offsets first, then create the vector.
+        // Tables MUST NOT be created inside a startVector/endVector block.
+        const noiseOffsets: flatbuffers.Offset[] = [];
         for (let i = noises.length - 1; i >= 0; i--) {
-          const noise = noises[i]!;
-          let coloringKind: fbs.NoiseEffectColorsKind;
-          let monoColorR = 0,
-            monoColorG = 0,
-            monoColorB = 0,
-            monoColorA = 1;
-          let duoColor1R = 0,
-            duoColor1G = 0,
-            duoColor1B = 0,
-            duoColor1A = 1;
-          let duoColor2R = 1,
-            duoColor2G = 1,
-            duoColor2B = 1,
-            duoColor2A = 1;
-          let multiOpacity = 1.0;
-
-          // Create NoiseEffectColors table
-          let coloringOffset: flatbuffers.Offset;
-          if (noise.mode === "mono") {
-            coloringKind = fbs.NoiseEffectColorsKind.Mono;
-            const color =
-              noise.color || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
-            const monoColorOffset = structs.rgba32f(builder, color);
-            fbs.NoiseEffectColors.startNoiseEffectColors(builder);
-            fbs.NoiseEffectColors.addKind(builder, coloringKind);
-            fbs.NoiseEffectColors.addMonoColor(builder, monoColorOffset);
-            coloringOffset =
-              fbs.NoiseEffectColors.endNoiseEffectColors(builder);
-          } else if (noise.mode === "duo") {
-            coloringKind = fbs.NoiseEffectColorsKind.Duo;
-            const color1 =
-              noise.color1 || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
-            const color2 =
-              noise.color2 || ({ r: 1, g: 1, b: 1, a: 1 } as cg.RGBA32F);
-            const duoColor1Offset = structs.rgba32f(builder, color1);
-            const duoColor2Offset = structs.rgba32f(builder, color2);
-            fbs.NoiseEffectColors.startNoiseEffectColors(builder);
-            fbs.NoiseEffectColors.addKind(builder, coloringKind);
-            fbs.NoiseEffectColors.addDuoColor1(builder, duoColor1Offset);
-            fbs.NoiseEffectColors.addDuoColor2(builder, duoColor2Offset);
-            coloringOffset =
-              fbs.NoiseEffectColors.endNoiseEffectColors(builder);
-          } else {
-            // Multi
-            coloringKind = fbs.NoiseEffectColorsKind.Multi;
-            multiOpacity = noise.opacity ?? 1.0;
-            fbs.NoiseEffectColors.startNoiseEffectColors(builder);
-            fbs.NoiseEffectColors.addKind(builder, coloringKind);
-            fbs.NoiseEffectColors.addMultiOpacity(builder, multiOpacity);
-            coloringOffset =
-              fbs.NoiseEffectColors.endNoiseEffectColors(builder);
-          }
-
-          // Create FeNoiseEffect table
-          fbs.FeNoiseEffect.startFeNoiseEffect(builder);
-          fbs.FeNoiseEffect.addNoiseSize(builder, noise.noise_size);
-          fbs.FeNoiseEffect.addDensity(builder, noise.density);
-          fbs.FeNoiseEffect.addNumOctaves(builder, noise.num_octaves ?? 3);
-          fbs.FeNoiseEffect.addSeed(builder, noise.seed ?? 0);
-          fbs.FeNoiseEffect.addColoring(builder, coloringOffset);
-          fbs.FeNoiseEffect.addActive(builder, noise.active ?? true);
-          fbs.FeNoiseEffect.addBlendMode(
-            builder,
-            styling.encode.blendMode(noise.blend_mode ?? "normal")
-          );
-          fbs.FeNoiseEffect.endFeNoiseEffect(builder);
+          noiseOffsets.push(encodeFeNoise(builder, noises[i]!));
         }
-        return builder.endVector();
+        return fbs.LayerEffects.createFeNoisesVector(builder, noiseOffsets);
       }
 
       /**

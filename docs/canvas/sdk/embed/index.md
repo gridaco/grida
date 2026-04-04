@@ -7,12 +7,63 @@ format: md
 
 Embed the Grida Canvas viewer in any web page via an iframe and control it programmatically.
 
+## Endpoints
+
+Grida provides two embed endpoints, plus a debug harness:
+
+| Endpoint          | Purpose                                     | Node ID contract         |
+| ----------------- | ------------------------------------------- | ------------------------ |
+| `/embed/v1/`      | General-purpose viewer — any supported file | Grida-internal IDs       |
+| `/embed/v1/figma` | Figma-specific viewer                       | Original Figma IDs       |
+| `/embed/v1/debug` | Debug harness (mode picker + message log)   | Depends on selected mode |
+
+### `/embed/v1/` — General-purpose embed
+
+The recommended default. Accepts any file that Grida supports: `.grida`, `.grida1`, `.fig`, `.json`, `.json.gz`, `.zip`.
+
+Node IDs in events (`selection-change`, `scene-change`, etc.) use Grida-internal IDs. Use this when embedding a design for viewing and you don't need Figma-specific ID mapping.
+
+```html
+<iframe
+  id="grida"
+  src="https://grida.co/embed/v1/?file=https://example.com/design.grida"
+  width="800"
+  height="600"
+  style="border: none"
+></iframe>
+```
+
+### `/embed/v1/figma` — Figma-specific embed
+
+Accepts the same file formats as the general embed, but emits Figma-specific events: node IDs in `selection-change`, `scene-change`, and `pong` events are transformed back to original Figma node IDs (e.g. `"42:17"`).
+
+Use this when the host needs to work with Figma's ID contract — for example, to correlate selected nodes with Figma API data or custom ID mappings.
+
+```html
+<iframe
+  id="grida"
+  src="https://grida.co/embed/v1/figma?file=https://example.com/design.fig"
+  width="800"
+  height="600"
+  style="border: none"
+></iframe>
+```
+
+### `/embed/v1/debug` — Debug harness
+
+Interactive debug page for testing either endpoint. Provides:
+
+- **Mode picker** — switch between general and Figma modes
+- **Load controls** — load files via `?file=` URL or `grida:load` postMessage
+- **Command panel** — send ping, fit, select, scene switch
+- **Message log** — real-time display of all postMessage traffic
+
 ## Quick start
 
 ```html
 <iframe
   id="grida"
-  src="https://grida.co/embed/v1/refig?file=https://example.com/design.fig"
+  src="https://grida.co/embed/v1/?file=https://example.com/design.grida"
   width="800"
   height="600"
   style="border: none"
@@ -40,14 +91,15 @@ Embed the Grida Canvas viewer in any web page via an iframe and control it progr
 ## Iframe URL
 
 ```
-https://grida.co/embed/v1/refig
+https://grida.co/embed/v1/
+https://grida.co/embed/v1/figma
 ```
 
 ### Query parameters
 
-| Parameter | Required | Description                                                                                                                        |
-| --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `file`    | No       | URL to a `.fig`, `.json`, `.json.gz`, or `.zip` file. If omitted, the viewer starts empty and expects a `load()` call via the SDK. |
+| Parameter | Required | Description                                                                                                                                             |
+| --------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`    | No       | URL to a `.grida`, `.grida1`, `.fig`, `.json`, `.json.gz`, or `.zip` file. If omitted, the viewer starts empty and expects a `load()` call via the SDK. |
 
 The `file` URL must be CORS-accessible from the embed origin. For files that cannot satisfy CORS (e.g. localhost during development), use `load()` instead.
 
@@ -70,14 +122,14 @@ Commands sent before `ready` are queued and flushed automatically.
 Load a file into the viewer. Can be called multiple times to replace the document. Bypasses CORS -- the host reads the file and sends the raw bytes via postMessage.
 
 ```ts
-const buf = await fetch("/design.fig").then((r) => r.arrayBuffer());
-embed.load(buf, "fig");
+const buf = await fetch("/design.grida").then((r) => r.arrayBuffer());
+embed.load(buf, "grida");
 ```
 
-| Parameter | Type                                    | Description        |
-| --------- | --------------------------------------- | ------------------ |
-| `data`    | `ArrayBuffer \| Uint8Array \| Blob`     | Raw file contents. |
-| `format`  | `"fig" \| "json" \| "json.gz" \| "zip"` | File format.       |
+| Parameter | Type                                                           | Description        |
+| --------- | -------------------------------------------------------------- | ------------------ |
+| `data`    | `ArrayBuffer \| Uint8Array \| Blob`                            | Raw file contents. |
+| `format`  | `"grida" \| "grida1" \| "fig" \| "json" \| "json.gz" \| "zip"` | File format.       |
 
 #### `select(nodeIds, mode?)`
 
@@ -91,6 +143,8 @@ embed.select([]); // clear selection
 | --------- | ------------------------------ | --------- | ------------------------------------------------- |
 | `nodeIds` | `string[]`                     |           | Node IDs to select. Empty array clears selection. |
 | `mode`    | `"reset" \| "add" \| "toggle"` | `"reset"` | How to combine with existing selection.           |
+
+> **Note:** When using `/embed/v1/figma`, pass Figma node IDs (e.g. `"42:17"`). When using `/embed/v1/`, pass Grida-internal node IDs.
 
 #### `loadScene(sceneId)`
 
@@ -175,6 +229,8 @@ Fired when the selection changes (user interaction or programmatic).
 ```ts
 embed.on("selection-change", ({ selection }) => {
   // selection: string[] (node IDs)
+  // /embed/v1/figma: Figma IDs like "42:17"
+  // /embed/v1/:       Grida-internal IDs
 });
 ```
 
@@ -251,29 +307,52 @@ During a document load/reset, `selection-change` and `scene-change` events are *
 
 Images are loaded lazily -- the renderer reports which image refs it needs as it encounters them during rendering. The host resolves and provides bytes on demand. Only visible images are requested.
 
+## Need headless rendering instead?
+
+If you need to render Figma designs to **PNG, JPEG, WebP, PDF, or SVG** in Node.js or CI (no browser required), check out **`@grida/refig`** — a headless Figma renderer with CLI and library API. Great for deterministic exports, offline rendering from `.fig`, and high-throughput asset pipelines.
+
+- **refig docs**: [https://grida.co/docs/packages/@grida/refig](https://grida.co/docs/packages/@grida/refig)
+- **npm**: [`@grida/refig`](https://www.npmjs.com/package/@grida/refig)
+
+## Choosing an endpoint
+
+| Use case                                               | Endpoint          | Why                                           |
+| ------------------------------------------------------ | ----------------- | --------------------------------------------- |
+| Embed any Grida design                                 | `/embed/v1/`      | Format-agnostic, Grida-native IDs             |
+| Embed a Figma file with Figma-compatible events        | `/embed/v1/figma` | Events use original Figma node IDs            |
+| Customer-facing Figma render with programmatic control | `/embed/v1/figma` | Figma ID contract for selection/scene mapping |
+| Debug / test any embed                                 | `/embed/v1/debug` | Mode picker, message inspector                |
+
 ## Local development
 
 ```html
-<iframe id="grida" src="https://grida.co/embed/v1/refig"></iframe>
+<iframe id="grida" src="https://grida.co/embed/v1/"></iframe>
 
 <script type="module">
   import { GridaEmbed } from "@grida/embed";
 
   const embed = new GridaEmbed(document.getElementById("grida"));
 
-  const buf = await fetch("/design.fig").then((r) => r.arrayBuffer());
-  embed.load(buf, "fig");
+  // Load a .grida file
+  const buf = await fetch("/design.grida").then((r) => r.arrayBuffer());
+  embed.load(buf, "grida");
+
+  // Or load a .fig file (works on both endpoints)
+  const figBuf = await fetch("/design.fig").then((r) => r.arrayBuffer());
+  embed.load(figBuf, "fig");
 </script>
 ```
 
 ## Supported file formats
 
-| Format          | Extension  | Description                                  |
-| --------------- | ---------- | -------------------------------------------- |
-| Figma binary    | `.fig`     | Exported `.fig` file from Figma              |
-| Figma REST JSON | `.json`    | Response from Figma `GET /v1/files/:key` API |
-| Compressed JSON | `.json.gz` | Gzip-compressed Figma REST JSON              |
-| Grida archive   | `.zip`     | Grida `.grida` archive (ZIP)                 |
+| Format          | Extension  | Description                                  | Supported by                    |
+| --------------- | ---------- | -------------------------------------------- | ------------------------------- |
+| Grida archive   | `.grida`   | Native Grida archive (ZIP with FlatBuffers)  | `/embed/v1/`, `/embed/v1/figma` |
+| Grida snapshot  | `.grida1`  | Grida JSON snapshot                          | `/embed/v1/`, `/embed/v1/figma` |
+| Figma binary    | `.fig`     | Exported `.fig` file from Figma              | `/embed/v1/`, `/embed/v1/figma` |
+| Figma REST JSON | `.json`    | Response from Figma `GET /v1/files/:key` API | `/embed/v1/`, `/embed/v1/figma` |
+| Compressed JSON | `.json.gz` | Gzip-compressed Figma REST JSON              | `/embed/v1/`, `/embed/v1/figma` |
+| Figma archive   | `.zip`     | Figma REST archive (ZIP)                     | `/embed/v1/`, `/embed/v1/figma` |
 
 ## Protocol reference
 
@@ -281,14 +360,14 @@ The SDK communicates via `window.postMessage`. All messages have a `type` field 
 
 ### Host to iframe (commands)
 
-| Message type           | Payload                                                                |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `grida:load`           | `{ data: ArrayBuffer, format: "fig" \| "json" \| "json.gz" \| "zip" }` |
-| `grida:select`         | `{ nodeIds: string[], mode?: "reset" \| "add" \| "toggle" }`           |
-| `grida:load-scene`     | `{ sceneId: string }`                                                  |
-| `grida:fit`            | `{ selector?: string, animate?: boolean }`                             |
-| `grida:ping`           | (none)                                                                 |
-| `grida:images-resolve` | `{ images: Record<string, ArrayBuffer> }`                              |
+| Message type           | Payload                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| `grida:load`           | `{ data: ArrayBuffer, format: "grida" \| "grida1" \| "fig" \| "json" \| "json.gz" \| "zip" }` |
+| `grida:select`         | `{ nodeIds: string[], mode?: "reset" \| "add" \| "toggle" }`                                  |
+| `grida:load-scene`     | `{ sceneId: string }`                                                                         |
+| `grida:fit`            | `{ selector?: string, animate?: boolean }`                                                    |
+| `grida:ping`           | (none)                                                                                        |
+| `grida:images-resolve` | `{ images: Record<string, ArrayBuffer> }`                                                     |
 
 ### Iframe to host (events)
 

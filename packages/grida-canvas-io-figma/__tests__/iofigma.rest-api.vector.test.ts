@@ -277,7 +277,12 @@ describe("iofigma.restful.factory.document", () => {
       const invalidVectorNetwork = {
         vertices: [{ position: { x: 0, y: 0 } }],
         segments: [
-          { start: 0, end: 99, startTangent: { x: 0, y: 0 }, endTangent: { x: 0, y: 0 } },
+          {
+            start: 0,
+            end: 99,
+            startTangent: { x: 0, y: 0 },
+            endTangent: { x: 0, y: 0 },
+          },
         ],
         regions: [{ loops: [[0]], windingRule: "NONZERO" as const }],
       };
@@ -309,9 +314,12 @@ describe("iofigma.restful.factory.document", () => {
         strokeAlign: "INSIDE",
         effects: [],
         cornerRadius: 0,
-        fillGeometry: [{ path: "M0 0 L10 0 L5 10 Z", windingRule: "NONZERO" as const }],
+        fillGeometry: [
+          { path: "M0 0 L10 0 L5 10 Z", windingRule: "NONZERO" as const },
+        ],
         strokeGeometry: [],
-        vectorNetwork: invalidVectorNetwork as iofigma.__ir.VectorNetwork_restapi_volatile20260217,
+        vectorNetwork:
+          invalidVectorNetwork as iofigma.__ir.VectorNetwork_restapi_volatile20260217,
       };
 
       const context: iofigma.restful.factory.FactoryContext = {
@@ -332,43 +340,43 @@ describe("iofigma.restful.factory.document", () => {
     });
 
     it("should convert fillGeometry/strokeGeometry to Path nodes when prefer_path_for_geometry is true", () => {
-      const vectorNodeWithGeometry: figrest.VectorNode & figrest.HasGeometryTrait =
-        {
-          id: "vec-path-pref",
-          name: "Vector path prefer",
-          type: "VECTOR",
-          blendMode: "PASS_THROUGH",
-          absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
-          absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
-          constraints: { vertical: "TOP", horizontal: "LEFT" },
-          scrollBehavior: "FIXED",
-          fills: [
-            {
-              type: "SOLID",
-              color: { r: 1, g: 0, b: 0, a: 1 },
-              visible: true,
-              blendMode: "NORMAL",
-            },
-          ],
-          strokes: [
-            {
-              type: "SOLID",
-              color: { r: 0, g: 0, b: 1, a: 1 },
-              visible: true,
-              blendMode: "NORMAL",
-            },
-          ],
-          strokeWeight: 2,
-          strokeAlign: "INSIDE",
-          effects: [],
-          cornerRadius: 0,
-          fillGeometry: [
-            { path: "M0 0 L100 0 L100 100 L0 100 Z", windingRule: "NONZERO" },
-          ],
-          strokeGeometry: [
-            { path: "M10 10 L90 10 L90 90 L10 90 Z", windingRule: "NONZERO" },
-          ],
-        };
+      const vectorNodeWithGeometry: figrest.VectorNode &
+        figrest.HasGeometryTrait = {
+        id: "vec-path-pref",
+        name: "Vector path prefer",
+        type: "VECTOR",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        scrollBehavior: "FIXED",
+        fills: [
+          {
+            type: "SOLID",
+            color: { r: 1, g: 0, b: 0, a: 1 },
+            visible: true,
+            blendMode: "NORMAL",
+          },
+        ],
+        strokes: [
+          {
+            type: "SOLID",
+            color: { r: 0, g: 0, b: 1, a: 1 },
+            visible: true,
+            blendMode: "NORMAL",
+          },
+        ],
+        strokeWeight: 2,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+        fillGeometry: [
+          { path: "M0 0 L100 0 L100 100 L0 100 Z", windingRule: "NONZERO" },
+        ],
+        strokeGeometry: [
+          { path: "M10 10 L90 10 L90 90 L10 90 Z", windingRule: "NONZERO" },
+        ],
+      };
 
       const context: iofigma.restful.factory.FactoryContext = {
         gradient_id_generator: () => `gradient_${Math.random()}`,
@@ -396,11 +404,22 @@ describe("iofigma.restful.factory.document", () => {
         .map((id: string) => gridaDocument.nodes[id])
         .filter(Boolean) as grida.program.nodes.Node[];
 
+      // The fixture has strokeAlign=INSIDE, so the group should contain:
+      //   1. fill path node(s)
+      //   2. a BooleanPathOperationNode(intersection) clipping stroke to fill
       const pathChildren = childNodes.filter(
         (n): n is grida.program.nodes.PathNode => n.type === "path"
       );
+      const boolChildren = childNodes.filter(
+        (n) => n.type === "boolean"
+      ) as grida.program.nodes.BooleanPathOperationNode[];
+
       expect(pathChildren.length).toBeGreaterThan(0);
-      expect(pathChildren.length).toBe(childNodes.length);
+      expect(boolChildren.length).toBe(1);
+      expect(boolChildren[0].op).toBe("intersection");
+      expect(pathChildren.length + boolChildren.length).toBe(
+        childNodes.length
+      );
 
       pathChildren.forEach((child) => {
         expect(child.type).toBe("path");
@@ -408,6 +427,16 @@ describe("iofigma.restful.factory.document", () => {
         expect(child.data.length).toBeGreaterThan(0);
         expect("vector_network" in child).toBe(false);
       });
+
+      // Verify the boolean node has children (fill clone + stroke)
+      const boolNodeChildren =
+        gridaDocument.links[boolChildren[0].id];
+      expect(boolNodeChildren).toBeDefined();
+      expect(boolNodeChildren!.length).toBe(2);
+
+      // The boolean node should have stroke color applied as fill
+      expect(boolChildren[0].fill_paints).toBeDefined();
+      expect(boolChildren[0].fill_paints!.length).toBeGreaterThan(0);
     });
   });
 
@@ -510,6 +539,210 @@ describe("iofigma.restful.factory.document", () => {
       expect((imagePaint as { src?: string })!.src).toBe(
         "system://images/checker-16-strip-L98L92.png"
       );
+    });
+  });
+
+  describe("fillOverrideTable", () => {
+    /** Helper: build a minimal VECTOR node with fillGeometry and fillOverrideTable. */
+    function makeVectorNode(opts: {
+      fills: figrest.Paint[];
+      fillGeometry: figrest.Path[];
+      fillOverrideTable?: { [key: string]: figrest.PaintOverride | null };
+    }): figrest.VectorNode {
+      return {
+        id: "1:1",
+        name: "vec",
+        type: "VECTOR",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 10, height: 10 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        scrollBehavior: "FIXED",
+        size: { x: 10, y: 10 },
+        relativeTransform: [
+          [1, 0, 0],
+          [0, 1, 0],
+        ],
+        fills: opts.fills,
+        strokes: [],
+        strokeWeight: 0,
+        strokeAlign: "INSIDE",
+        effects: [],
+        fillGeometry: opts.fillGeometry,
+        strokeGeometry: [],
+        fillOverrideTable: opts.fillOverrideTable,
+      } as unknown as figrest.VectorNode;
+    }
+
+    const solidBlack: figrest.Paint = {
+      type: "SOLID",
+      color: { r: 0, g: 0, b: 0, a: 1 },
+      visible: true,
+      blendMode: "NORMAL",
+    };
+    const solidRed: figrest.Paint = {
+      type: "SOLID",
+      color: { r: 1, g: 0, b: 0, a: 1 },
+      visible: true,
+      blendMode: "NORMAL",
+    };
+
+    const pathA = "M0 0L10 0L10 10L0 10Z";
+    const pathB = "M2 2L8 2L8 8L2 8Z";
+
+    function convert(node: figrest.VectorNode) {
+      const ctx: iofigma.restful.factory.FactoryContext = {
+        gradient_id_generator: () => "g1",
+        prefer_path_for_geometry: true,
+        preserve_figma_ids: true,
+      };
+      return iofigma.restful.factory.document(node as any, {}, ctx);
+    }
+
+    it("no fillOverrideTable — all paths get node-level fills", () => {
+      const node = makeVectorNode({
+        fills: [solidBlack],
+        fillGeometry: [
+          { path: pathA, windingRule: "NONZERO" },
+          { path: pathB, windingRule: "NONZERO" },
+        ],
+      });
+      const { document: doc } = convert(node);
+      const paths = Object.values(doc.nodes).filter(
+        (n): n is grida.program.nodes.PathNode => n.type === "path"
+      );
+      expect(paths).toHaveLength(2);
+      paths.forEach((p) => {
+        expect(p.fill_paints).toBeDefined();
+        expect(p.fill_paints!.length).toBe(1);
+      });
+    });
+
+    it("overrideID with { fills: [] } — path gets no fill", () => {
+      const node = makeVectorNode({
+        fills: [solidBlack],
+        fillGeometry: [
+          { path: pathA, windingRule: "NONZERO", overrideID: 1 },
+          { path: pathB, windingRule: "NONZERO" },
+        ],
+        fillOverrideTable: { "1": { fills: [] } },
+      });
+      const { document: doc } = convert(node);
+      const paths = Object.values(doc.nodes).filter(
+        (n): n is grida.program.nodes.PathNode => n.type === "path"
+      );
+      expect(paths).toHaveLength(2);
+
+      // Path with overrideID=1 → fills: [] → no fill_paints
+      const overriddenPath = paths.find((p) => p.name.includes("Fill 1"));
+      expect(overriddenPath).toBeDefined();
+      expect(overriddenPath!.fill_paints).toBeUndefined();
+
+      // Path without overrideID → node-level fills
+      const normalPath = paths.find((p) => p.name.includes("Fill 2"));
+      expect(normalPath).toBeDefined();
+      expect(normalPath!.fill_paints).toBeDefined();
+      expect(normalPath!.fill_paints!.length).toBe(1);
+    });
+
+    it("overrideID with { fills: [red] } — path gets override fills", () => {
+      const node = makeVectorNode({
+        fills: [solidBlack],
+        fillGeometry: [
+          { path: pathA, windingRule: "NONZERO", overrideID: 2 },
+          { path: pathB, windingRule: "NONZERO" },
+        ],
+        fillOverrideTable: { "2": { fills: [solidRed] } },
+      });
+      const { document: doc } = convert(node);
+      const paths = Object.values(doc.nodes).filter(
+        (n): n is grida.program.nodes.PathNode => n.type === "path"
+      );
+      expect(paths).toHaveLength(2);
+
+      // Path with overrideID=2 → red fill
+      const overriddenPath = paths.find((p) => p.name.includes("Fill 1"));
+      expect(overriddenPath).toBeDefined();
+      expect(overriddenPath!.fill_paints).toBeDefined();
+      expect(overriddenPath!.fill_paints!.length).toBe(1);
+      const paint = overriddenPath!.fill_paints![0] as any;
+      expect(paint.type).toBe("solid");
+      // Grida schema uses 0.0-1.0 float color (r=1.0 means fully red)
+      expect(paint.color.r).toBeGreaterThan(0.5);
+      expect(paint.color.g).toBeLessThan(0.1);
+
+      // Path without overrideID → black fill
+      const normalPath = paths.find((p) => p.name.includes("Fill 2"));
+      expect(normalPath).toBeDefined();
+      expect(normalPath!.fill_paints).toBeDefined();
+      const normalPaint = normalPath!.fill_paints![0] as any;
+      expect(normalPaint.color.r).toBeLessThan(0.1);
+    });
+
+    it("overrideID with null table entry — falls back to node fills", () => {
+      const node = makeVectorNode({
+        fills: [solidBlack],
+        fillGeometry: [{ path: pathA, windingRule: "NONZERO", overrideID: 1 }],
+        fillOverrideTable: { "1": null },
+      });
+      const { document: doc } = convert(node);
+      const paths = Object.values(doc.nodes).filter(
+        (n): n is grida.program.nodes.PathNode => n.type === "path"
+      );
+      expect(paths).toHaveLength(1);
+      expect(paths[0].fill_paints).toBeDefined();
+      expect(paths[0].fill_paints!.length).toBe(1);
+    });
+
+    it("overrideID with missing table key — falls back to node fills", () => {
+      const node = makeVectorNode({
+        fills: [solidBlack],
+        fillGeometry: [{ path: pathA, windingRule: "NONZERO", overrideID: 99 }],
+        fillOverrideTable: { "1": { fills: [] } },
+      });
+      const { document: doc } = convert(node);
+      const paths = Object.values(doc.nodes).filter(
+        (n): n is grida.program.nodes.PathNode => n.type === "path"
+      );
+      expect(paths).toHaveLength(1);
+      // overrideID=99 not in table → fallback to node fills
+      expect(paths[0].fill_paints).toBeDefined();
+      expect(paths[0].fill_paints!.length).toBe(1);
+    });
+
+    it("mixed: multiple paths with different overrides", () => {
+      const node = makeVectorNode({
+        fills: [solidBlack],
+        fillGeometry: [
+          { path: pathA, windingRule: "NONZERO", overrideID: 1 },
+          { path: pathB, windingRule: "NONZERO", overrideID: 2 },
+          { path: "M0 0L5 5Z", windingRule: "NONZERO" },
+        ],
+        fillOverrideTable: {
+          "1": { fills: [] },
+          "2": { fills: [solidRed] },
+        },
+      });
+      const { document: doc } = convert(node);
+      const paths = Object.values(doc.nodes).filter(
+        (n): n is grida.program.nodes.PathNode => n.type === "path"
+      );
+      expect(paths).toHaveLength(3);
+
+      const fill1 = paths.find((p) => p.name.includes("Fill 1"))!;
+      const fill2 = paths.find((p) => p.name.includes("Fill 2"))!;
+      const fill3 = paths.find((p) => p.name.includes("Fill 3"))!;
+
+      // Fill 1: overrideID=1 → empty fills → no fill_paints
+      expect(fill1.fill_paints).toBeUndefined();
+
+      // Fill 2: overrideID=2 → red fill
+      expect(fill2.fill_paints).toBeDefined();
+      expect((fill2.fill_paints![0] as any).color.r).toBeGreaterThan(0.5);
+
+      // Fill 3: no overrideID → node-level black fill
+      expect(fill3.fill_paints).toBeDefined();
+      expect((fill3.fill_paints![0] as any).color.r).toBeLessThan(0.1);
     });
   });
 });

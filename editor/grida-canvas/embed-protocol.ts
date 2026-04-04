@@ -25,7 +25,7 @@ export type EmbedCommand =
       /** Raw file contents. */
       data: ArrayBuffer;
       /** File format. */
-      format: "fig" | "json" | "json.gz" | "zip";
+      format: "fig" | "json" | "json.gz" | "zip" | "grida" | "grida1";
     }
   | {
       /** Request a state snapshot. Iframe replies with `grida:pong`. */

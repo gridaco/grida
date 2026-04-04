@@ -1941,3 +1941,53 @@ fn gen_attributed_text_basic() {
     );
     assert_roundtrip_scene(&scene, "s1", "attributed_text_basic");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Fixture round-trip: load .grida files from fixtures/test-grida/
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn fixtures_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/test-grida")
+}
+
+/// All .grida fixtures decode and round-trip with consistent scene IDs.
+#[test]
+fn fixture_roundtrip_all_grida_files() {
+    let dir = fixtures_dir();
+    let entries = std::fs::read_dir(&dir).expect("fixtures dir should exist");
+
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.extension().map(|e| e == "grida").unwrap_or(false) {
+            let name = path.file_name().unwrap().to_str().unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+
+            let result = cg::io::io_grida_file::decode_with_id_map(&bytes)
+                .unwrap_or_else(|e| panic!("{name}: decode failed: {e:?}"));
+
+            assert_eq!(
+                result.scene_ids.len(),
+                result.scenes.len(),
+                "{name}: scene_ids and scenes count mismatch"
+            );
+
+            // Build loaded_scenes the same way application.rs does and verify
+            // every scene_id is findable.
+            let loaded: Vec<(String, _)> = result
+                .scene_ids
+                .iter()
+                .zip(result.scenes.into_iter())
+                .map(|(id, s)| (id.clone(), s))
+                .collect();
+
+            for sid in &result.scene_ids {
+                assert!(
+                    loaded.iter().any(|(id, _)| id == sid),
+                    "{name}: scene '{sid}' not found in loaded_scenes (available: {:?})",
+                    loaded.iter().map(|(id, _)| id).collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+}
