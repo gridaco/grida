@@ -1787,17 +1787,17 @@ export namespace iofigma {
          * stroke band, leaving only the outward half visible. This is the
          * same principle as CSS `paint-order: stroke fill`.
          *
-         * ## Known limitation: INSIDE stroke
+         * ## INSIDE stroke — boolean intersection
          *
          * INSIDE strokes require clipping `strokeGeometry` to the
          * `fillGeometry` shape to remove the outward half of the stroke
-         * band. This requires SVG path boolean intersection, which is not
-         * yet implemented. INSIDE strokes are currently **skipped**.
+         * band. This is modeled as a `BooleanPathOperationNode` with
+         * `op: "intersection"` wrapping the fill and stroke geometry.
+         * The Rust renderer evaluates this via Skia `Path::op(Intersect)`.
          *
-         * TODO: Implement INSIDE stroke support. Options:
-         * - TS-side SVG path clipping (complex, needs a library)
-         * - Emit clip metadata and let the Rust renderer clip via Skia
-         *   `Path::op()` (requires schema addition)
+         * When INSIDE is detected, this function returns
+         * `{ type: "inside", fillChildIds, strokeChildIds }` so the
+         * caller can create the boolean wrapper node.
          *
          * ## Tracking
          *
@@ -1809,9 +1809,15 @@ export namespace iofigma {
           node: InputNode & figrest.HasGeometryTrait,
           fillChildIds: string[],
           strokeChildIds: string[]
-        ): string[] {
+        ):
+          | { type: "ordered"; childIds: string[] }
+          | {
+              type: "inside";
+              fillChildIds: string[];
+              strokeChildIds: string[];
+            } {
           if (strokeChildIds.length === 0) {
-            return [...fillChildIds];
+            return { type: "ordered", childIds: [...fillChildIds] };
           }
 
           const align = node.strokeAlign ?? "CENTER";
@@ -1819,22 +1825,36 @@ export namespace iofigma {
           switch (align) {
             // CENTER: geometry is correct as-is. Fill first, stroke on top.
             case "CENTER":
-              return [...fillChildIds, ...strokeChildIds];
+              return {
+                type: "ordered",
+                childIds: [...fillChildIds, ...strokeChildIds],
+              };
 
             // OUTSIDE: stroke first, fill on top. The fill covers the
             // inward half of the stroke band, leaving only the outward
             // half visible.
             case "OUTSIDE":
-              return [...strokeChildIds, ...fillChildIds];
+              return {
+                type: "ordered",
+                childIds: [...strokeChildIds, ...fillChildIds],
+              };
 
-            // INSIDE: requires clipping stroke to fill bounds.
-            // Not yet implemented — skip stroke geometry.
-            // See TODO in doc comment above.
+            // INSIDE: wrap fill + stroke in a boolean intersection.
+            // The fill defines the clip mask; the stroke is the clipped
+            // content. The Rust renderer evaluates this via
+            // Skia Path::op(Intersect).
             case "INSIDE":
-              return [...fillChildIds]; // stroke dropped (known limitation)
+              return {
+                type: "inside",
+                fillChildIds: [...fillChildIds],
+                strokeChildIds: [...strokeChildIds],
+              };
 
             default:
-              return [...fillChildIds, ...strokeChildIds];
+              return {
+                type: "ordered",
+                childIds: [...fillChildIds, ...strokeChildIds],
+              };
           }
         }
 
@@ -1926,27 +1946,154 @@ export namespace iofigma {
             strokeChildIds
           );
 
-          // Deactivate stroke nodes excluded by compositing resolution
-          // (e.g. INSIDE strokes skipped, BOOLEAN_OPERATION strokes).
-          // Nodes stay in the tree to keep the graph structure valid,
-          // but won't render.
-          const compositedSet = new Set(composited);
-          for (const id of strokeChildIds) {
-            if (!compositedSet.has(id)) {
-              (nodes[id] as any).active = false;
+          if (composited.type === "inside") {
+            // INSIDE stroke: clip stroke geometry to fill boundary
+            // using BooleanPathOperationNode(intersection).
+            //
+            // The Rust renderer's boolean_operation_path() applies the
+            // node's `op` to children[1..] against children[0]. So for
+            // `op: intersection`, children = [A, B] gives A ∩ B.
+            //
+            // When there are multiple fill or stroke geometry paths,
+            // we must first union them into single operands, otherwise
+            // intersection is applied pairwise across all children:
+            //   [f0, f1, s0] with op=intersect → f0 ∩ f1 ∩ s0 (wrong)
+            //   vs. (f0 ∪ f1) ∩ (s0)                           (correct)
+            //
+            // Structure (general case):
+            //   GroupNode (the geometry group)
+            //     ├─ fill children (visible — render the shape fill)
+            //     └─ BooleanOp(intersection)
+            //          ├─ BooleanOp(union) { fill_clones }  — clip mask
+            //          └─ BooleanOp(union) { stroke_children } — clipped
+            //
+            // Simplified when single fill / single stroke (no union
+            // wrappers needed — direct children of the intersection).
+
+            const { width, height } = getParentBounds(node);
+            const boolNodeId = `${groupNode.id}_inside_stroke_bool`;
+
+            // Helper: create a BooleanPathOperationNode shell
+            const makeBoolShell = (
+              id: string,
+              name: string,
+              op: "union" | "intersection"
+            ): grida.program.nodes.BooleanPathOperationNode => ({
+              id,
+              name,
+              active: true,
+              locked: false,
+              opacity: 1,
+              rotation: 0,
+              layout_positioning: "absolute",
+              layout_inset_left: 0,
+              layout_inset_top: 0,
+              layout_target_width: width,
+              layout_target_height: height,
+              stroke_width: 0,
+              stroke_cap: "butt",
+              stroke_join: "miter",
+              type: "boolean",
+              op,
+            });
+
+            // Clone fill paths for the boolean node (they define the
+            // clip boundary; originals outside render the actual fill).
+            const cloneFillChildren = (): string[] => {
+              const ids: string[] = [];
+              for (const origFillId of composited.fillChildIds) {
+                const origNode = nodes[origFillId];
+                if (!origNode) continue;
+                const cloneId = `${boolNodeId}_clip_${origFillId}`;
+                nodes[cloneId] = {
+                  ...origNode,
+                  id: cloneId,
+                  name: `${origNode.name} (clip)`,
+                } as any;
+                ids.push(cloneId);
+              }
+              return ids;
+            };
+
+            const fillCloneIds = cloneFillChildren();
+
+            // Build the two operands for the intersection.
+            // If an operand has multiple paths, wrap in union first.
+            let fillOperandId: string;
+            if (fillCloneIds.length === 1) {
+              fillOperandId = fillCloneIds[0];
+            } else {
+              fillOperandId = `${boolNodeId}_fill_union`;
+              nodes[fillOperandId] = makeBoolShell(
+                fillOperandId,
+                "Fill Union (clip)",
+                "union"
+              );
+              graph[fillOperandId] = fillCloneIds;
             }
-          }
 
-          // All children (including deactivated ones) must be linked in
-          // the graph to avoid orphaned nodes. Use the composited order
-          // for active nodes, append deactivated ones at the end.
-          const deactivated = strokeChildIds.filter(
-            (id) => !compositedSet.has(id)
-          );
-          const allChildIds = [...composited, ...deactivated];
+            let strokeOperandId: string;
+            if (composited.strokeChildIds.length === 1) {
+              strokeOperandId = composited.strokeChildIds[0];
+            } else {
+              strokeOperandId = `${boolNodeId}_stroke_union`;
+              nodes[strokeOperandId] = makeBoolShell(
+                strokeOperandId,
+                "Stroke Union",
+                "union"
+              );
+              graph[strokeOperandId] = [...composited.strokeChildIds];
+            }
 
-          if (allChildIds.length > 0) {
-            graph[groupNode.id] = allChildIds;
+            // The boolean intersection produces the clipped stroke
+            // band as a path. The renderer paints this path using the
+            // *boolean node's own* fills (not children's paints).
+            // Apply the original stroke color as fill on the boolean
+            // node so the clipped stroke band is visible.
+            const strokeAsFill = fills_trait(
+              node.strokes ?? [],
+              context,
+              imageRefsUsed
+            );
+
+            const boolNode: grida.program.nodes.BooleanPathOperationNode = {
+              ...makeBoolShell(boolNodeId, "Inside Stroke", "intersection"),
+              ...strokeAsFill,
+            };
+
+            nodes[boolNodeId] = boolNode;
+            graph[boolNodeId] = [fillOperandId, strokeOperandId];
+
+            // Group children: original fill paths + the boolean node
+            const allChildIds = [...composited.fillChildIds, boolNodeId];
+            if (allChildIds.length > 0) {
+              graph[groupNode.id] = allChildIds;
+            }
+          } else {
+            // CENTER / OUTSIDE / default: simple ordered children.
+            const orderedIds = composited.childIds;
+            const orderedSet = new Set(orderedIds);
+
+            // Deactivate stroke nodes excluded by compositing resolution.
+            // Nodes stay in the tree to keep the graph structure valid,
+            // but won't render.
+            for (const id of strokeChildIds) {
+              if (!orderedSet.has(id)) {
+                (nodes[id] as any).active = false;
+              }
+            }
+
+            // All children (including deactivated ones) must be linked in
+            // the graph to avoid orphaned nodes. Use the composited order
+            // for active nodes, append deactivated ones at the end.
+            const deactivated = strokeChildIds.filter(
+              (id) => !orderedSet.has(id)
+            );
+            const allChildIds = [...orderedIds, ...deactivated];
+
+            if (allChildIds.length > 0) {
+              graph[groupNode.id] = allChildIds;
+            }
           }
         }
 

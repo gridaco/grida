@@ -100,11 +100,11 @@ Result: correct as-is (band is sw/2 each way, naturally centered)
 
 ## Current Implementation Status
 
-| `strokeAlign` | Status                  | Notes                      |
-| ------------- | ----------------------- | -------------------------- |
-| `CENTER`      | **Implemented**         | Render as-is               |
-| `OUTSIDE`     | **Not yet implemented** | Requires paint order swap  |
-| `INSIDE`      | **Not yet implemented** | Requires clip path support |
+| `strokeAlign` | Status          | Notes                                                   |
+| ------------- | --------------- | ------------------------------------------------------- |
+| `CENTER`      | **Implemented** | Render as-is                                            |
+| `OUTSIDE`     | **Implemented** | Paint order swap (stroke first, fill on top)            |
+| `INSIDE`      | **Implemented** | Boolean intersection (fill ∩ stroke) via BooleanOp node |
 
 ## Test Fixtures
 
