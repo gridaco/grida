@@ -2886,7 +2886,10 @@ pub struct MarkdownEmbedNodeRec {
     pub mask: Option<LayerMaskType>,
 
     pub transform: AffineTransform,
-    pub size: Size,
+    /// Explicit width in pixels, or `None` for auto (content-driven).
+    pub width: Option<f32>,
+    /// Explicit height in pixels, or `None` for auto (content-driven).
+    pub height: Option<f32>,
     pub corner_radius: RectangularCornerRadius,
 
     /// The GitHub Flavored Markdown source text.
@@ -2914,8 +2917,8 @@ impl NodeRectMixin for MarkdownEmbedNodeRec {
         Rectangle {
             x: 0.0,
             y: 0.0,
-            width: self.size.width,
-            height: self.size.height,
+            width: self.width.unwrap_or(0.0),
+            height: self.height.unwrap_or(0.0),
         }
     }
 }

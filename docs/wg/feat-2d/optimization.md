@@ -877,10 +877,10 @@ missing the cheapest possible camera-change path.
        value quantizes to min/max.
 
     Measured on 01-135k.perf.grida (135K nodes):
-    | Scenario              | Before p95 | After p95 | Before MAX | After MAX |
+    | Scenario | Before p95 | After p95 | Before MAX | After MAX |
     |---|---|---|---|---|
-    | zoom_slow_around_fit  | 54,062 µs  | 6 µs      | 60,282 µs  | 119 µs    |
-    | zoom_slow_high        | 6 µs       | 5 µs      | 3,848 µs   | 44 µs     |
+    | zoom_slow_around_fit | 54,062 µs | 6 µs | 60,282 µs | 119 µs |
+    | zoom_slow_high | 6 µs | 5 µs | 3,848 µs | 44 µs |
 
 23. **Settle & Refine (shared)**
 
@@ -1209,24 +1209,101 @@ expensive full redraws.
 
     **Measured impact (Apple M2 Pro, GPU benchmark, 01-135k 135K nodes):**
 
-    | Scenario | Metric | Before | After | Delta |
-    | -------- | ------ | ------ | ----- | ----- |
-    | rt_pan_fast_fit | p50 frame | 111 µs | 76 µs | **-32%** |
-    | rt_pan_fast_fit | p95 frame | 263 µs | 153 µs | **-42%** |
-    | rt_pan_slow_fit | settle | 2,323 µs | 1,836 µs | **-21%** |
-    | pan_settle_slow_fit | avg | 87 µs | 59 µs | **-32%** |
-    | pan_settle_slow_fit | settle | 1,034 µs | 709 µs | **-31%** |
+    | Scenario            | Metric    | Before   | After    | Delta    |
+    | ------------------- | --------- | -------- | -------- | -------- |
+    | rt_pan_fast_fit     | p50 frame | 111 µs   | 76 µs    | **-32%** |
+    | rt_pan_fast_fit     | p95 frame | 263 µs   | 153 µs   | **-42%** |
+    | rt_pan_slow_fit     | settle    | 2,323 µs | 1,836 µs | **-21%** |
+    | pan_settle_slow_fit | avg       | 87 µs    | 59 µs    | **-32%** |
+    | pan_settle_slow_fit | settle    | 1,034 µs | 709 µs   | **-31%** |
 
     **Criterion (CPU raster, 2000-node scene, statistically rigorous):**
 
-    | Scene | Change | p-value |
-    | ----- | ------ | ------- |
-    | large_baseline/pan | **-14.0%** | < 0.01 |
-    | large_baseline/pan_zoomed_in | -5.4% | 0.02 |
-    | large_compositing/pan | -4.2% | 0.02 |
+    | Scene                        | Change     | p-value |
+    | ---------------------------- | ---------- | ------- |
+    | large_baseline/pan           | **-14.0%** | < 0.01  |
+    | large_baseline/pan_zoomed_in | -5.4%      | 0.02    |
+    | large_compositing/pan        | -4.2%      | 0.02    |
 
     Implementation: `PictureCache.generation` in `cache/picture.rs`,
     `Renderer.last_prefill_*` tracking in `runtime/scene.rs`.
+
+49. **Eager Render at High Zoom (Zoom-Based Image Cache Gate)** ✅ IMPLEMENTED
+
+    At zoom >= 50% (`EAGER_RENDER_ZOOM_THRESHOLD = 0.5`), the pan and zoom
+    image caches are bypassed entirely. Every frame is a full-quality draw
+    instead of a scaled/offset blit from a cached GPU texture.
+
+    **Why:** At zoom >= 50%, the viewport shows a small portion of the
+    scene. The number of visible nodes is typically low enough that a full
+    draw completes well within the 16ms frame budget. The image caches
+    (pan blit, zoom blit) exist to avoid expensive full draws on large
+    scenes, but at high zoom they solve a problem that doesn't exist —
+    while introducing a quality tradeoff (blurry stretched content during
+    gestures until settle fires).
+
+    **What does NOT change:**
+    - Compositor/atlas cache (per-node effect caching) remains active —
+      effects are expensive regardless of zoom level and don't degrade
+      visual quality
+    - Cache invalidation logic still runs (harmless on `None` caches)
+    - `blit_content_cache()` self-gates (returns `false` when no pan cache)
+
+    **Expected impact:**
+    - At zoom >= 50%: no visual quality dip during pan/zoom gestures
+      (always full quality). Slight increase in frame time vs cache-hit
+      frames, but within budget for the reduced node count.
+    - At zoom < 50%: no change — all caching behavior is preserved.
+    - The 50% threshold was chosen because it's roughly the crossover
+      point where full draws become cheap enough (fewer visible nodes)
+      that the caching overhead provides no benefit.
+
+    Implementation: `FrameRenderStrategy` in `runtime/frame_strategy.rs`,
+    threshold constant `EAGER_RENDER_ZOOM_THRESHOLD`, computed once per
+    frame via `Renderer::frame_strategy()` and consulted at each decision
+    point in `runtime/scene.rs`.
+
+50. **Centralized Frame Render Strategy** ✅ IMPLEMENTED
+
+    All per-frame rendering policy decisions are centralized in a single
+    `FrameRenderStrategy` struct (`runtime/frame_strategy.rs`), computed
+    once per frame from the current renderer state. Call sites in the
+    rendering pipeline read boolean fields instead of re-deriving
+    conditions from raw config, zoom level, backend type, and cache state.
+
+    **Motivation:** Before this, policy conditions (zoom thresholds,
+    backend checks, config flag combinations) were scattered across 6+
+    locations in `scene.rs`. Adding a new gate (e.g. item 49) required
+    touching every location. With the strategy struct, new policy gates
+    are added in one place (`FrameRenderStrategy::compute()`) and
+    consumed everywhere via a single field read.
+
+    **Fields (4 — each genuinely independent):**
+
+    | Field                  | Controls                             | False when                          |
+    | ---------------------- | ------------------------------------ | ----------------------------------- |
+    | `use_image_caches`     | Pan/zoom blit fast paths             | raster, eager-render, stable        |
+    | `capture_image_caches` | GPU snapshot capture after full draw | raster, eager-render                |
+    | `use_compositor`       | Per-node compositor layer caching    | raster, config off                  |
+    | `can_defer_plan`       | Lazy R-tree query (plan deferral)    | caches disabled, no cache populated |
+
+    `use_image_caches` and `capture_image_caches` differ on stable frames:
+    stable frames never _use_ a cached blit (quality requirement) but still
+    _capture_ so the next unstable frame has a fresh cache.
+
+    **Inputs to `compute()`:**
+    `zoom`, `is_gpu`, `stable`, `camera_change`, `config`,
+    `has_pan_cache`, `has_zoom_cache`.
+
+    **Adding a new policy gate:**
+    1. Add a field to `FrameRenderStrategy`
+    2. Compute it in `compute()` from the relevant inputs
+    3. Use the field at the call site(s) in `scene.rs`
+
+    Implementation: `runtime/frame_strategy.rs`, `Renderer::frame_strategy()`
+    helper in `runtime/scene.rs`. Strategy is computed once and passed through
+    the pipeline — `render_frame()` receives it as a parameter to avoid
+    recomputation on cache-miss fallthrough.
 
 ---
 

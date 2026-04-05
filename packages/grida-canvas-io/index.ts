@@ -295,7 +295,21 @@ export namespace io {
     export function filetype(
       file: File
     ): [true, ValidFileType] | [false, string] {
-      const type = file.type || file.name.split(".").pop() || file.name;
+      // Always check extension — browsers often report inconsistent MIME
+      // types for markdown (text/plain, application/octet-stream, empty).
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const mime = (file.type || "").toLowerCase();
+      if (
+        mime === "text/markdown" ||
+        mime === "text/x-markdown" ||
+        ext === "md" ||
+        ext === "markdown" ||
+        ext === "mdown" ||
+        ext === "mkd"
+      ) {
+        return [true, "text/markdown" as const];
+      }
+      const type = file.type || ext || file.name;
       if (type === "image/svg+xml") {
         return [true, "image/svg+xml" as const];
       } else if (type === "image/png") {
@@ -320,7 +334,8 @@ export namespace io {
       | "image/png"
       | "image/jpeg"
       | "image/gif"
-      | "image/webp";
+      | "image/webp"
+      | "text/markdown";
 
     export type DecodedItem =
       | {
@@ -329,7 +344,8 @@ export namespace io {
             | "image/png"
             | "image/jpeg"
             | "image/gif"
-            | "image/webp";
+            | "image/webp"
+            | "text/markdown";
           file: File;
         }
       | { type: "text"; text: string }

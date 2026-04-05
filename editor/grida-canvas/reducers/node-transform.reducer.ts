@@ -192,8 +192,12 @@ export default function updateNodeTransform(
         _draft.layout_inset_top = cmath.quantize(scaled.y, 1);
       }
 
-      // For text nodes, use ceil to ensure we don't cut off content
-      if (draft.type === "tspan") {
+      // For content-driven nodes (text, markdown), use ceil to ensure
+      // we don't cut off content.
+      const isContentDriven =
+        draft.type === "tspan" || draft.type === "markdown";
+
+      if (isContentDriven) {
         _draft.layout_target_width = Math.ceil(Math.max(scaled.width, 0));
       } else {
         _draft.layout_target_width = cmath.quantize(
@@ -206,10 +210,9 @@ export default function updateNodeTransform(
         _draft.layout_target_height = 0;
       } else {
         const preserveAutoHeight =
-          draft.type === "tspan" && !heightWasNumber && movement[1] === 0;
+          isContentDriven && !heightWasNumber && movement[1] === 0;
         if (!preserveAutoHeight) {
-          // For text nodes, use ceil to ensure we don't cut off content
-          if (draft.type === "tspan") {
+          if (isContentDriven) {
             _draft.layout_target_height = Math.ceil(Math.max(scaled.height, 0));
           } else {
             _draft.layout_target_height = cmath.quantize(

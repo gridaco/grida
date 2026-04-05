@@ -1593,6 +1593,9 @@ impl LayerList {
                 let shape = build_shape(node, &bounds);
                 let fills = Self::filter_visible_paints(&n.fills);
 
+                // Use resolved bounds for width/height so auto-sizing is
+                // reflected correctly (the geometry cache already ran
+                // markdown measurement when schema height is None).
                 let layer = PainterPictureLayer::MarkdownEmbed(PainterPictureMarkdownEmbedLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -1606,8 +1609,8 @@ impl LayerList {
                     effects: Self::filter_active_effects(&n.effects),
                     fills,
                     markdown: n.markdown.clone(),
-                    width: n.size.width,
-                    height: n.size.height,
+                    width: bounds.width,
+                    height: bounds.height,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),
