@@ -8,6 +8,11 @@
 import type { ExportSetting } from "@figma/rest-api-spec";
 import { createCanvas, type Canvas, type types } from "@grida/canvas-wasm";
 import { iofigma } from "@grida/io-figma";
+import {
+  restJsonToGridaDocument,
+  figFileToGridaDocument,
+  type GridaDocumentResult,
+} from "@grida/io-figma/fig2grida-core";
 import grida from "@grida/schema";
 import {
   ensureFigmaDefaultFonts,
@@ -192,29 +197,13 @@ export class FigmaDocument {
     rootNodeId?: string,
     images?: Record<string, Uint8Array>
   ): ResolvedScene {
-    const result = restJsonToSceneJson(
-      this.payload as FigmaJsonDocument,
+    const result = restJsonToGridaDocument(this.payload as FigmaJsonDocument, {
+      images,
       rootNodeId,
-      images
-    );
-    if (images && Object.keys(images).length > 0) {
-      const imagesToRegister: Record<string, Uint8Array> = {};
-      for (const ref of result.imageRefsUsed) {
-        if (ref in images) {
-          imagesToRegister[ref] = images[ref];
-        }
-      }
-      return {
-        sceneJson: result.sceneJson,
-        images: imagesToRegister,
-        imageRefsUsed: result.imageRefsUsed,
-      };
-    }
-    return {
-      sceneJson: result.sceneJson,
-      images: {},
-      imageRefsUsed: result.imageRefsUsed,
-    };
+      preserve_figma_ids: true,
+      placeholder_for_missing_images: false,
+    });
+    return gridaDocumentResultToResolvedScene(result);
   }
 
   /** @internal */
@@ -222,7 +211,12 @@ export class FigmaDocument {
     if (!this._figFile) {
       this._figFile = iofigma.kiwi.parseFile(this.payload as Uint8Array);
     }
-    return figFileToSceneJson(this._figFile, rootNodeId);
+    const result = figFileToGridaDocument(this._figFile, {
+      rootNodeId,
+      preserve_figma_ids: true,
+      placeholder_for_missing_images: false,
+    });
+    return gridaDocumentResultToResolvedScene(result);
   }
 
   /**
@@ -242,7 +236,13 @@ export class FigmaDocument {
   listFontFamilies(rootNodeId?: string): string[] {
     if (rootNodeId != null && rootNodeId !== "") {
       const resolved = this._resolve(rootNodeId);
-      return this._collectFontFamiliesFromSceneJson(resolved.sceneJson);
+      const parsed = JSON.parse(resolved.sceneJson) as {
+        document?: grida.program.document.Document;
+      };
+      if (parsed?.document) {
+        return this._collectFontFamiliesFromDocument(parsed.document);
+      }
+      return [];
     }
 
     if (this.sourceType === "rest-api-json") {
@@ -258,26 +258,23 @@ export class FigmaDocument {
     const pages = figFile.pages;
     if (!pages?.length) return [];
 
-    const sortedPages = [...pages].sort((a, b) =>
-      a.sortkey.localeCompare(b.sortkey)
-    );
     const families = new Set<string>();
-    for (let i = 0; i < sortedPages.length; i++) {
-      const resolved = figFileToSceneJson(figFile, undefined, i);
-      for (const f of this._collectFontFamiliesFromSceneJson(
-        resolved.sceneJson
-      )) {
+    for (let i = 0; i < pages.length; i++) {
+      const result = figFileToGridaDocument(figFile, {
+        pageIndex: i,
+        preserve_figma_ids: true,
+      });
+      for (const f of this._collectFontFamiliesFromDocument(result.document)) {
         families.add(f);
       }
     }
     return Array.from(families);
   }
 
-  private _collectFontFamiliesFromSceneJson(sceneJson: string): string[] {
-    const parsed = JSON.parse(sceneJson) as {
-      document?: { nodes?: Record<string, { font_family?: string }> };
-    };
-    const nodes = parsed?.document?.nodes;
+  private _collectFontFamiliesFromDocument(
+    doc: grida.program.document.Document
+  ): string[] {
+    const nodes = doc.nodes;
     if (!nodes || typeof nodes !== "object") return [];
     const families = new Set<string>();
     for (const node of Object.values(nodes)) {
@@ -486,79 +483,8 @@ function collectFontFamiliesFromRestDocument(
   return Array.from(families);
 }
 
-/**
- * Find a node by id in the Figma REST document tree (walks all pages and descendants).
- */
-function findNodeInRestDocument(
-  json: FigmaJsonDocument,
-  nodeId: string
-): RestNode | undefined {
-  const doc = json as { document?: { children?: RestNode[] } };
-  const pages = doc?.document?.children;
-  if (!pages?.length) return undefined;
-
-  function walk(nodes: RestNode[]): RestNode | undefined {
-    for (const node of nodes) {
-      if (String(node.id) === nodeId) return node;
-      const children = node.children as RestNode[] | undefined;
-      if (children?.length) {
-        const found = walk(children);
-        if (found) return found;
-      }
-    }
-    return undefined;
-  }
-
-  for (const page of pages) {
-    const pageChildren = page.children as RestNode[] | undefined;
-    if (pageChildren?.length) {
-      const found = walk(pageChildren);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Find the FigPage that contains a node by id (for page-scoped scene loading).
- */
-function findPageContainingNode(
-  figFile: { pages?: Array<{ rootNodes?: unknown[] }> },
-  nodeId: string
-):
-  | { name: string; canvas: unknown; rootNodes: unknown[]; sortkey: string }
-  | undefined {
-  const pages = figFile.pages;
-  if (!pages?.length) return undefined;
-
-  function walk(nodes: RestNode[]): boolean {
-    for (const node of nodes) {
-      if (String(node.id) === nodeId) return true;
-      const children = node.children as RestNode[] | undefined;
-      if (children?.length && walk(children)) return true;
-    }
-    return false;
-  }
-
-  for (const page of pages) {
-    const rootNodes = (page.rootNodes ?? []) as RestNode[];
-    if (rootNodes.length && walk(rootNodes)) {
-      return page as {
-        name: string;
-        canvas: unknown;
-        rootNodes: unknown[];
-        sortkey: string;
-      };
-    }
-  }
-  return undefined;
-}
-
-/** Result of REST JSON conversion with optional image refs used. */
-interface RestConversionResult {
-  sceneJson: string;
-  imageRefsUsed: string[];
-}
+// Node-finding helpers (findNodeInRestJson, findPageContainingNode) live in
+// @grida/io-figma/fig2grida-core; used internally by the Document functions.
 
 /**
  * Resolved scene: Grida IR ready for canvas load.
@@ -571,134 +497,19 @@ interface ResolvedScene {
 }
 
 /**
- * Convert a Figma REST API document JSON -> Grida snapshot JSON string.
- * When rootNodeId is provided, that node is used as the single root (and keeps that id).
+ * Convert a {@link GridaDocumentResult} to a {@link ResolvedScene} by
+ * serializing the document to JSON.
  */
-function restJsonToSceneJson(
-  json: FigmaJsonDocument,
-  rootNodeId?: string,
-  images?: Record<string, Uint8Array>
-): RestConversionResult {
-  const doc = json as {
-    document?: { children?: Array<Record<string, unknown>> };
-  };
-  const pages = doc?.document?.children;
-  if (!pages || pages.length === 0) {
-    throw new Error("FigmaDocument: REST JSON has no document pages");
-  }
-
-  const page = pages[0] as {
-    name?: string;
-    children?: Array<Record<string, unknown>>;
-  };
-  const rootNodes = page.children ?? [];
-  if (rootNodes.length === 0) {
-    throw new Error("FigmaDocument: first page has no root nodes");
-  }
-
-  let counter = 0;
-  const baseGradientGen = () => `grad-${++counter}`;
-
-  const resolveImageSrc =
-    images &&
-    (Object.keys(images).length > 0
-      ? (ref: string) => (ref in images ? `res://images/${ref}` : null)
-      : undefined);
-
-  const buildContext = (
-    overrides: Partial<iofigma.restful.factory.FactoryContext>
-  ): iofigma.restful.factory.FactoryContext => ({
-    gradient_id_generator: baseGradientGen,
-    prefer_path_for_geometry: true,
-    ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
-    ...overrides,
-  });
-
-  if (rootNodeId != null && rootNodeId !== "") {
-    const node = findNodeInRestDocument(json, rootNodeId);
-    if (!node) {
-      throw new Error(
-        `FigmaDocument: node with id "${rootNodeId}" not found in document`
-      );
-    }
-    let rootIdUsed = false;
-    const context = buildContext({
-      node_id_generator: () => {
-        if (!rootIdUsed) {
-          rootIdUsed = true;
-          return rootNodeId;
-        }
-        return `refig-${++counter}`;
-      },
-    });
-    const { document: packed, imageRefsUsed } =
-      iofigma.restful.factory.document(node as any, {}, context);
-    const fullDoc =
-      grida.program.nodes.factory.packed_scene_document_to_full_document(
-        packed
-      );
-    return {
-      sceneJson: JSON.stringify({
-        version: grida.program.document.SCHEMA_VERSION,
-        document: fullDoc,
-      }),
-      imageRefsUsed,
-    };
-  }
-
-  const context = buildContext({
-    node_id_generator: () => `refig-${++counter}`,
-  });
-
-  const individualResults = rootNodes.map((rootNode) =>
-    iofigma.restful.factory.document(rootNode as any, {}, context)
-  );
-
-  const imageRefsUsed = new Set<string>();
-  for (const r of individualResults) {
-    r.imageRefsUsed.forEach((ref: string) => imageRefsUsed.add(ref));
-  }
-
-  let packed: grida.program.document.IPackedSceneDocument;
-  if (individualResults.length === 1) {
-    packed = individualResults[0].document;
-  } else {
-    packed = {
-      bitmaps: {},
-      images: {},
-      nodes: {},
-      links: {},
-      properties: {},
-      scene: {
-        type: "scene",
-        id: "main",
-        name: page.name ?? "Page 1",
-        children_refs: [],
-        guides: [],
-        edges: [],
-        constraints: { children: "multiple" },
-      },
-    };
-    for (const result of individualResults) {
-      const d = result.document;
-      Object.assign(packed.nodes, d.nodes);
-      Object.assign(packed.links, d.links);
-      Object.assign(packed.images, d.images);
-      Object.assign(packed.bitmaps, d.bitmaps);
-      Object.assign(packed.properties, d.properties);
-      packed.scene.children_refs.push(...d.scene.children_refs);
-    }
-  }
-
-  const fullDoc =
-    grida.program.nodes.factory.packed_scene_document_to_full_document(packed);
-
+function gridaDocumentResultToResolvedScene(
+  result: GridaDocumentResult
+): ResolvedScene {
   return {
     sceneJson: JSON.stringify({
       version: grida.program.document.SCHEMA_VERSION,
-      document: fullDoc,
+      document: result.document,
     }),
-    imageRefsUsed: Array.from(imageRefsUsed),
+    images: result.assets,
+    imageRefsUsed: result.imageRefsUsed,
   };
 }
 
@@ -752,77 +563,6 @@ export function figFileToRestLikeDocument(figFile: {
       name: "Document",
       children: canvasNodes,
     },
-  };
-}
-
-/**
- * Convert parsed FigFile -> Grida snapshot JSON + images.
- * When rootNodeId is provided, loads only the page containing that node.
- * When pageIndex is provided (and rootNodeId is not), loads that page by index.
- */
-function figFileToSceneJson(
-  figFile: FigFileDocument,
-  rootNodeId?: string,
-  pageIndex?: number
-): ResolvedScene {
-  const pages = figFile.pages;
-  if (!pages || pages.length === 0) {
-    throw new Error("FigmaDocument: .fig file has no pages");
-  }
-
-  const sortedPages = [...pages].sort((a, b) =>
-    a.sortkey.localeCompare(b.sortkey)
-  );
-
-  let page: (typeof sortedPages)[0];
-  if (rootNodeId != null && rootNodeId !== "") {
-    const pageWithNode = findPageContainingNode(figFile, rootNodeId);
-    if (!pageWithNode) {
-      throw new Error(
-        `FigmaDocument: node with id "${rootNodeId}" not found in .fig`
-      );
-    }
-    page = pageWithNode as (typeof sortedPages)[0];
-  } else if (
-    pageIndex != null &&
-    pageIndex >= 0 &&
-    pageIndex < sortedPages.length
-  ) {
-    page = sortedPages[pageIndex]!;
-  } else {
-    page = sortedPages[0]!;
-  }
-
-  const imagesMap = iofigma.kiwi.extractImages(figFile.zip_files);
-  const images: Record<string, Uint8Array> = {};
-  imagesMap.forEach((bytes, ref) => {
-    images[ref] = bytes;
-  });
-
-  const resolveImageSrc =
-    imagesMap.size > 0
-      ? (ref: string) => (imagesMap.has(ref) ? `res://images/${ref}` : null)
-      : undefined;
-
-  let counter = 0;
-  const context: iofigma.restful.factory.FactoryContext = {
-    node_id_generator: () => `refig-${++counter}`,
-    gradient_id_generator: () => `grad-${++counter}`,
-    preserve_figma_ids: true,
-    prefer_path_for_geometry: true,
-    ...(resolveImageSrc && { resolve_image_src: resolveImageSrc }),
-  };
-
-  const { document: packed } = iofigma.kiwi.convertPageToScene(page, context);
-  const fullDoc =
-    grida.program.nodes.factory.packed_scene_document_to_full_document(packed);
-
-  return {
-    sceneJson: JSON.stringify({
-      version: grida.program.document.SCHEMA_VERSION,
-      document: fullDoc,
-    }),
-    images,
   };
 }
 

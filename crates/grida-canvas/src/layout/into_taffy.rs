@@ -570,13 +570,20 @@ impl From<&crate::node::schema::PathNodeRec> for Style {
 /// Convert MarkdownEmbedNodeRec to Taffy Style
 impl From<&crate::node::schema::MarkdownEmbedNodeRec> for Style {
     fn from(node: &crate::node::schema::MarkdownEmbedNodeRec) -> Self {
-        let style = Style {
-            size: Size {
-                width: Dimension::length(node.size.width),
-                height: Dimension::length(node.size.height),
-            },
-            ..grida_style_default()
+        let mut style = grida_style_default();
+
+        // Width: use explicit value or auto
+        style.size.width = match node.width {
+            Some(w) => Dimension::length(w),
+            None => Dimension::auto(),
         };
+
+        // Height: use explicit value or auto (content-driven via measurement)
+        style.size.height = match node.height {
+            Some(h) => Dimension::length(h),
+            None => Dimension::auto(),
+        };
+
         apply_layout_child(style, &node.layout_child, node.transform)
     }
 }

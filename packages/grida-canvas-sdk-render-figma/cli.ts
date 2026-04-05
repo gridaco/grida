@@ -27,6 +27,12 @@ import {
 } from "./lib";
 import Typr from "@grida/fonts/typr";
 import { iofigma } from "@grida/io-figma";
+import {
+  fig2grida,
+  figBytesToGridaDocument,
+  restJsonToGridaDocument,
+} from "@grida/io-figma/fig2grida-core";
+import grida from "@grida/schema";
 
 const FORMAT_SET = new Set<string>(["png", "jpeg", "webp", "pdf", "svg"]);
 
@@ -220,8 +226,7 @@ async function runExportAll(
 
   if (isFig) {
     const stat = statSync(documentPath);
-    const useStreaming =
-      stat.size >= LARGE_FILE_THRESHOLD;
+    const useStreaming = stat.size >= LARGE_FILE_THRESHOLD;
 
     let figFile: ReturnType<typeof iofigma.kiwi.parseFile>;
     if (useStreaming) {
@@ -333,9 +338,7 @@ async function runSingleNode(
       const figFile = await iofigma.kiwi.parseFileFromStream(stream);
       document = new FigmaDocument(figFile);
     } else {
-      document = new FigmaDocument(
-        new Uint8Array(readFileSync(documentPath))
-      );
+      document = new FigmaDocument(new Uint8Array(readFileSync(documentPath)));
     }
   }
 
@@ -371,12 +374,125 @@ async function runSingleNode(
   }
 }
 
+// ---------------------------------------------------------------------------
+// convert command — Figma → .grida / .grida1 (no rendering)
+// ---------------------------------------------------------------------------
+
+async function runConvert(
+  inputPath: string,
+  outPath: string,
+  opts: {
+    imagesDir?: string;
+    preserveFigmaIds?: boolean;
+  }
+): Promise<void> {
+  const lower = outPath.toLowerCase();
+  const isGrida1 = lower.endsWith(".grida1");
+  const isGrida =
+    lower.endsWith(".grida") || (!isGrida1 && !lower.endsWith(".grida1"));
+
+  const { documentPath, imagesDir, isRestJson } = resolveInput(
+    inputPath,
+    opts.imagesDir,
+    undefined
+  );
+
+  if (isGrida1) {
+    // JSON snapshot output — use in-memory API, then JSON.stringify
+    let result;
+    if (isRestJson) {
+      const json = JSON.parse(readFileSync(documentPath, "utf8"));
+      result = restJsonToGridaDocument(json, {
+        images: imagesDir ? readImagesFromDir(imagesDir) : undefined,
+        preserve_figma_ids: opts.preserveFigmaIds,
+      });
+    } else {
+      const bytes = new Uint8Array(readFileSync(documentPath));
+      result = figBytesToGridaDocument(bytes, {
+        preserve_figma_ids: opts.preserveFigmaIds,
+      });
+    }
+
+    const snapshot = {
+      version: grida.program.document.SCHEMA_VERSION,
+      document: result.document,
+    };
+    mkdirSync(path.dirname(outPath), { recursive: true });
+    writeFileSync(outPath, JSON.stringify(snapshot));
+    const nodeCount = Object.keys(result.document.nodes).length;
+    process.stdout.write(
+      `wrote ${outPath} (.grida1 snapshot, ${nodeCount} nodes, ${result.pageNames.length} page(s))\n`
+    );
+  } else {
+    // .grida archive output — use fig2grida
+    let input: Uint8Array | object;
+    if (isRestJson) {
+      input = JSON.parse(readFileSync(documentPath, "utf8"));
+    } else {
+      input = new Uint8Array(readFileSync(documentPath));
+    }
+
+    const archiveResult = fig2grida(input, {
+      preserve_figma_ids: opts.preserveFigmaIds,
+    });
+
+    mkdirSync(path.dirname(outPath), { recursive: true });
+    writeFileSync(outPath, Buffer.from(archiveResult.bytes));
+    process.stdout.write(
+      `wrote ${outPath} (.grida archive, ${archiveResult.nodeCount} nodes, ${archiveResult.pageNames.length} page(s), ${archiveResult.imageCount} image(s))\n`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
 async function main(): Promise<void> {
   program
     .name("refig")
     .description(
       "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG"
+    );
+
+  // --- convert subcommand ---
+  program
+    .command("convert")
+    .description(
+      "Convert a Figma file to .grida (FlatBuffers archive) or .grida1 (JSON snapshot) without rendering"
     )
+    .argument(
+      "<input>",
+      "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/)"
+    )
+    .requiredOption(
+      "-o, --out <path>",
+      "Output file path (.grida or .grida1 — format inferred from extension)"
+    )
+    .option(
+      "--images <dir>",
+      "Directory of image files for REST API document (optional)"
+    )
+    .option(
+      "--preserve-figma-ids",
+      "Keep original Figma node IDs in the output (default: false)"
+    )
+    .action(
+      async (
+        input: string,
+        options: Record<string, string | boolean | undefined>
+      ) => {
+        const outPath = path.resolve(String(options.out).trim());
+        await runConvert(input.trim(), outPath, {
+          imagesDir:
+            typeof options.images === "string" ? options.images : undefined,
+          preserveFigmaIds: options.preserveFigmaIds === true,
+        });
+      }
+    );
+
+  // --- default render command (no subcommand name) ---
+  program
     .argument(
       "<input>",
       "Path to .fig, JSON file (REST API response), or directory containing document.json (and optionally images/, fonts/)"

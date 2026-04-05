@@ -64,6 +64,7 @@ pub enum GeoNodeKind {
     Container,
     BooleanOperation,
     TextSpan,
+    MarkdownEmbed,
     Leaf,
 }
 
@@ -133,6 +134,16 @@ pub struct NodeGeoData {
     pub schema_width: f32,
     /// Schema height.
     pub schema_height: f32,
+    /// Content origin X offset within the node's local coordinate space.
+    ///
+    /// For most leaf nodes this is `0.0` because their content starts at the
+    /// transform origin. For Path, Polygon, and Vector nodes the shape data
+    /// may be offset from the origin (e.g. an SVG path starting at `M4 10`),
+    /// so the tight bounding box has a non-zero `x`. This value is that
+    /// offset — needed to compute correct world-space bounding boxes.
+    pub content_origin_x: f32,
+    /// Content origin Y offset (see `content_origin_x`).
+    pub content_origin_y: f32,
     /// What kind of node (determines DFS behavior).
     pub kind: GeoNodeKind,
     /// Pre-computed per-side render bounds inflation from stroke + effects.
@@ -153,6 +164,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             schema_transform: n.transform.unwrap_or_default(),
             schema_width: 0.0,
             schema_height: 0.0,
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: GeoNodeKind::Group,
             render_bounds_inflation: RenderBoundsInflation::ZERO, // union of children
             rotation: 0.0,
@@ -160,7 +173,9 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
         Node::Tray(n) => {
             let fallback_x = n.position.x().unwrap_or(0.0);
             let fallback_y = n.position.y().unwrap_or(0.0);
-            let schema_transform = AffineTransform::new(fallback_x, fallback_y, n.rotation);
+            // n.rotation is in degrees; AffineTransform::new expects radians.
+            let schema_transform =
+                AffineTransform::new(fallback_x, fallback_y, n.rotation.to_radians());
 
             let render_bounds_inflation = if let Some(rect_stroke) = n.rectangular_stroke_width() {
                 compute_inflation_rectangular(
@@ -180,6 +195,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
                 schema_transform,
                 schema_width: n.layout_dimensions.layout_target_width.unwrap_or(0.0),
                 schema_height: n.layout_dimensions.layout_target_height.unwrap_or(0.0),
+                content_origin_x: 0.0,
+                content_origin_y: 0.0,
                 kind: GeoNodeKind::Tray,
                 render_bounds_inflation,
                 rotation: n.rotation,
@@ -189,6 +206,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             schema_transform: AffineTransform::identity(),
             schema_width: 0.0,
             schema_height: 0.0,
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: GeoNodeKind::InitialContainer,
             render_bounds_inflation: RenderBoundsInflation::ZERO,
             rotation: 0.0,
@@ -197,6 +216,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             schema_transform: n.transform.unwrap_or_default(),
             schema_width: 0.0,
             schema_height: 0.0,
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: GeoNodeKind::BooleanOperation,
             render_bounds_inflation: compute_inflation_uniform(
                 n.stroke_width.value_or_zero(),
@@ -208,7 +229,9 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
         Node::Container(n) => {
             let fallback_x = n.position.x().unwrap_or(0.0);
             let fallback_y = n.position.y().unwrap_or(0.0);
-            let schema_transform = AffineTransform::new(fallback_x, fallback_y, n.rotation);
+            // n.rotation is in degrees; AffineTransform::new expects radians.
+            let schema_transform =
+                AffineTransform::new(fallback_x, fallback_y, n.rotation.to_radians());
 
             let render_bounds_inflation = if let Some(rect_stroke) = n.rectangular_stroke_width() {
                 compute_inflation_rectangular(&rect_stroke, n.stroke_style.stroke_align, &n.effects)
@@ -224,6 +247,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
                 schema_transform,
                 schema_width: n.layout_dimensions.layout_target_width.unwrap_or(0.0),
                 schema_height: n.layout_dimensions.layout_target_height.unwrap_or(0.0),
+                content_origin_x: 0.0,
+                content_origin_y: 0.0,
                 kind: GeoNodeKind::Container,
                 render_bounds_inflation,
                 rotation: n.rotation,
@@ -233,6 +258,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             schema_transform: n.transform,
             schema_width: n.width.unwrap_or(0.0),
             schema_height: n.height.unwrap_or(0.0),
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: GeoNodeKind::TextSpan,
             render_bounds_inflation: compute_inflation_uniform(
                 n.stroke_width,
@@ -245,6 +272,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             schema_transform: n.transform,
             schema_width: n.width.unwrap_or(0.0),
             schema_height: n.height.unwrap_or(0.0),
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: GeoNodeKind::TextSpan,
             render_bounds_inflation: compute_inflation_uniform(
                 n.stroke_width,
@@ -255,9 +284,11 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
         },
         Node::MarkdownEmbed(n) => NodeGeoData {
             schema_transform: n.transform,
-            schema_width: n.size.width,
-            schema_height: n.size.height,
-            kind: GeoNodeKind::Leaf,
+            schema_width: n.width.unwrap_or(0.0),
+            schema_height: n.height.unwrap_or(0.0),
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
+            kind: GeoNodeKind::MarkdownEmbed,
             render_bounds_inflation: compute_inflation_uniform(
                 0.0,
                 StrokeAlign::Center,
@@ -269,6 +300,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
             schema_transform: n.transform,
             schema_width: n.size.width,
             schema_height: n.size.height,
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: GeoNodeKind::Leaf,
             render_bounds_inflation: compute_inflation_uniform(
                 0.0,
@@ -280,28 +313,31 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
         _ => {
             // Leaf nodes: Rectangle, Ellipse, Image, RegularPolygon,
             // RegularStarPolygon, Line, Polygon, Path, Vector, Error.
-            let (schema_transform, schema_width, schema_height) = match node {
-                Node::Rectangle(n) => (n.transform, n.size.width, n.size.height),
-                Node::Ellipse(n) => (n.transform, n.size.width, n.size.height),
-                Node::Image(n) => (n.transform, n.size.width, n.size.height),
-                Node::RegularPolygon(n) => (n.transform, n.size.width, n.size.height),
-                Node::RegularStarPolygon(n) => (n.transform, n.size.width, n.size.height),
-                Node::Line(n) => (n.transform, n.size.width, 0.0),
-                Node::Polygon(n) => {
-                    let rect = n.rect();
-                    (n.transform, rect.width, rect.height)
-                }
-                Node::Path(n) => {
-                    let rect = n.rect();
-                    (n.transform, rect.width, rect.height)
-                }
-                Node::Vector(n) => {
-                    let rect = n.network.bounds();
-                    (n.transform, rect.width, rect.height)
-                }
-                Node::Error(n) => (n.transform, n.size.width, n.size.height),
-                _ => unreachable!("Non-leaf variants handled above"),
-            };
+            let (schema_transform, schema_width, schema_height, content_origin_x, content_origin_y) =
+                match node {
+                    Node::Rectangle(n) => (n.transform, n.size.width, n.size.height, 0.0, 0.0),
+                    Node::Ellipse(n) => (n.transform, n.size.width, n.size.height, 0.0, 0.0),
+                    Node::Image(n) => (n.transform, n.size.width, n.size.height, 0.0, 0.0),
+                    Node::RegularPolygon(n) => (n.transform, n.size.width, n.size.height, 0.0, 0.0),
+                    Node::RegularStarPolygon(n) => {
+                        (n.transform, n.size.width, n.size.height, 0.0, 0.0)
+                    }
+                    Node::Line(n) => (n.transform, n.size.width, 0.0, 0.0, 0.0),
+                    Node::Polygon(n) => {
+                        let rect = n.rect();
+                        (n.transform, rect.width, rect.height, rect.x, rect.y)
+                    }
+                    Node::Path(n) => {
+                        let rect = n.rect();
+                        (n.transform, rect.width, rect.height, rect.x, rect.y)
+                    }
+                    Node::Vector(n) => {
+                        let rect = n.network.bounds();
+                        (n.transform, rect.width, rect.height, rect.x, rect.y)
+                    }
+                    Node::Error(n) => (n.transform, n.size.width, n.size.height, 0.0, 0.0),
+                    _ => unreachable!("Non-leaf variants handled above"),
+                };
 
             let render_bounds_inflation = extract_leaf_inflation(node);
 
@@ -309,6 +345,8 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
                 schema_transform,
                 schema_width,
                 schema_height,
+                content_origin_x,
+                content_origin_y,
                 kind: GeoNodeKind::Leaf,
                 render_bounds_inflation,
                 rotation: 0.0,

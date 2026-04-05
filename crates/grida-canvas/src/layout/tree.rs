@@ -12,6 +12,7 @@ use taffy::prelude::*;
 pub(crate) enum LayoutNodeContext {
     Text(TextMeasureContext),
     AttributedText(AttributedTextMeasureContext),
+    Markdown(MarkdownMeasureContext),
 }
 
 /// Measurement inputs for text nodes.
@@ -35,6 +36,15 @@ pub(crate) struct AttributedTextMeasureContext {
     pub text_align: TextAlign,
     pub max_lines: Option<usize>,
     pub ellipsis: Option<String>,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+}
+
+/// Measurement inputs for markdown embed nodes.
+#[derive(Clone)]
+pub(crate) struct MarkdownMeasureContext {
+    /// The pre-computed styled HTML (from `markdown_to_styled_html`).
+    pub styled_html: String,
     pub width: Option<f32>,
     pub height: Option<f32>,
 }
@@ -156,6 +166,30 @@ impl LayoutTree {
         Ok(taffy_id)
     }
 
+    /// Create a markdown embed leaf node with measurement context.
+    pub(crate) fn new_markdown_leaf(
+        &mut self,
+        scene_node_id: NodeId,
+        style: Style,
+        context: MarkdownMeasureContext,
+    ) -> Result<taffy::NodeId, taffy::TaffyError> {
+        let taffy_id = self
+            .taffy
+            .new_leaf_with_context(style, LayoutNodeContext::Markdown(context))?;
+        #[cfg(test)]
+        if let Some(old_taffy_id) = self.scene_to_taffy.get(&scene_node_id).copied() {
+            self.taffy_to_scene.remove(&old_taffy_id);
+        }
+        self.scene_to_taffy.insert(scene_node_id, taffy_id);
+        #[cfg(test)]
+        {
+            if let Some(old_scene_id) = self.taffy_to_scene.insert(taffy_id, scene_node_id) {
+                self.scene_to_taffy.remove(&old_scene_id);
+            }
+        }
+        Ok(taffy_id)
+    }
+
     /// Create a container node with children
     ///
     /// Maps the scene node ID to a taffy node ID and returns it
@@ -231,6 +265,25 @@ impl LayoutTree {
                         let width = width_constraint.unwrap_or(measurements.max_width);
                         let measured_height = ctx.height.unwrap_or(measurements.height);
                         let height = known_dimensions.height.unwrap_or(measured_height);
+
+                        Size {
+                            width: width.max(1.0),
+                            height: height.max(1.0),
+                        }
+                    } else if let Some(LayoutNodeContext::Markdown(ctx)) = node_context {
+                        let width = known_dimensions.width.or(ctx.width).unwrap_or(400.0); // fallback width for measurement
+
+                        let measured_height = crate::htmlcss::measure_content_height(
+                            &ctx.styled_html,
+                            width,
+                            provider.fonts,
+                        )
+                        .unwrap_or(0.0);
+
+                        let height = known_dimensions
+                            .height
+                            .or(ctx.height)
+                            .unwrap_or(measured_height);
 
                         Size {
                             width: width.max(1.0),

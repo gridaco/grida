@@ -844,6 +844,36 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
+  public createMarkdownNode(
+    markdown = ""
+  ): NodeProxy<grida.program.nodes.MarkdownNode> {
+    const id = this.idgen.next();
+    this.insert(
+      {
+        id: id,
+        prototype: {
+          type: "markdown",
+          _$id: id,
+          markdown: markdown,
+          layout_target_width: 800,
+          layout_target_height: "auto",
+          layout_positioning: "absolute",
+          layout_inset_left: 0,
+          layout_inset_top: 0,
+          corner_radius: 0,
+          fill: {
+            type: "solid",
+            color: kolor.colorformats.RGBA32F.WHITE,
+            active: true,
+          },
+        },
+      },
+      this.mstate.scene_id ?? null
+    );
+
+    return this.getNodeById(id);
+  }
+
   public createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode> {
     const id = this.idgen.next();
     // Use explicit scene-level target for programmatic rectangle node creation

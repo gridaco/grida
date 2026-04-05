@@ -1,6 +1,6 @@
 {
   "name": "@grida/refig",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": false,
   "description": "Headless Figma renderer — render .fig and REST API JSON to PNG/JPEG/WebP/PDF/SVG",
   "keywords": [
@@ -62,7 +62,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@grida/canvas-wasm": "0.90.0-canary.9",
+    "@grida/canvas-wasm": "0.91.0-canary.17",
     "commander": "^12.1.0"
   },
   "devDependencies": {

@@ -50,6 +50,7 @@ export default function initialNode(
     | "container"
     | "iframe"
     | "richtext"
+    | "markdown"
     | "image"
     | "video"
     | "ellipse"
@@ -185,6 +186,21 @@ export default function initialNode(
         html: __richtext_html,
         ...seed,
       } satisfies grida.program.nodes.HTMLRichTextNode;
+    }
+    case "markdown": {
+      return {
+        ...base,
+        ...layer,
+        ...layout_child,
+        type: "markdown",
+        corner_radius: 0,
+        layout_target_width: 800,
+        layout_target_height: "auto",
+        fill: constraints.fill === "fill_paints" ? undefined : white,
+        fill_paints: constraints.fill === "fill_paints" ? [white] : undefined,
+        markdown: "# Markdown\n\nEdit me.",
+        ...seed,
+      } satisfies grida.program.nodes.MarkdownNode;
     }
     case "image": {
       return {

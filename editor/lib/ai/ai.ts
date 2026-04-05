@@ -1,12 +1,28 @@
-import { openai } from "@ai-sdk/openai";
-import { replicate } from "@ai-sdk/replicate";
 import type { ImageModel } from "ai";
 import Replicate from "replicate";
+import { gateway } from "./models";
 
 export namespace ai {
-  const grida_ai_credit_in_usd = 0.0016;
+  /**
+   * Convert a USD cost to mills (thousandths of a dollar).
+   *
+   * The Upstash rate limiter requires integer tokens. We use mills as the
+   * budget unit so that 1000 mills = $1.00. All model cards store
+   * {@link cost_usd}; this helper converts to the integer unit consumed
+   * by the rate limiter.
+   */
+  export function toMills(cost_usd: number): number {
+    return Math.ceil(cost_usd * 1000);
+  }
 
-  export type Provider = "openai" | "replicate";
+  /**
+   * Format mills as a dollar string (e.g. 780 → "$0.78").
+   */
+  export function millsToUSD(mills: number): string {
+    return `$${(mills / 1000).toFixed(2)}`;
+  }
+
+  export type Provider = "gateway";
   export type Vendor =
     | "openai"
     | "recraft-ai"
@@ -290,10 +306,8 @@ export namespace ai {
       url: string;
       /** Internal model classification role/category */
       category: ImageToolModelCategory;
-      /** Average price per image in USD */
-      avg_ppi: number;
-      /** Average credits (margined) */
-      avg_credits: number;
+      /** Cost per invocation in USD (flat rate from provider). */
+      cost_usd: number;
     };
 
     /**
@@ -305,86 +319,61 @@ export namespace ai {
         label: "Recraft Remove Background",
         url: "https://replicate.com/recraft-ai/recraft-remove-background",
         category: "image/tool/remove-background",
-        avg_ppi: 0.01,
-        avg_credits: 7,
+        cost_usd: 0.01,
       },
       "851-labs/background-remover": {
         id: "851-labs/background-remover",
         label: "851 Labs Background Remover",
         url: "https://replicate.com/851-labs/background-remover",
         category: "image/tool/remove-background",
-        avg_ppi: 0.00048,
-        avg_credits: 1,
+        cost_usd: 0.00048,
       },
       "bria/remove-background": {
         id: "bria/remove-background",
         label: "Bria Remove Background",
         url: "https://replicate.com/bria/remove-background",
         category: "image/tool/remove-background",
-        avg_ppi: 0.018,
-        avg_credits: 12,
+        cost_usd: 0.018,
       },
       "nightmareai/real-esrgan": {
         id: "nightmareai/real-esrgan",
         label: "Real-ESRGAN",
         url: "https://replicate.com/nightmareai/real-esrgan",
         category: "image/tool/upscale",
-        avg_ppi: 0.002,
-        avg_credits: 2,
+        cost_usd: 0.002,
       },
     } as const;
   }
 
   export namespace image {
-    export type ProviderModel =
-      | {
-          provider: "openai";
-          modelId: OpenAIImageModelId;
-        }
-      | {
-          provider: "replicate";
-          modelId: ReplicateImageModelId;
-        };
+    /**
+     * @deprecated Use `ImageModelId` directly — all models now route through
+     * the Vercel AI Gateway.
+     */
+    export type ProviderModel = {
+      provider: "gateway";
+      modelId: ImageModelId;
+    };
 
-    export type OpenAIImageModelId =
-      | "dall-e-2"
-      | "dall-e-3"
-      | "gpt-image-1"
-      | "gpt-image-1.5"
+    /**
+     * Gateway image model IDs.
+     *
+     * All image generation models are routed through the Vercel AI Gateway
+     * using the `provider/model` format.
+     */
+    export type ImageModelId =
+      // OpenAI
+      | "openai/gpt-image-1.5"
+      | "openai/gpt-image-1-mini"
+      // Google (multimodal LLMs with image output)
+      | "google/gemini-3.1-flash-image-preview"
+      | "google/gemini-3-pro-image"
+      // Black Forest Labs
+      | "bfl/flux-2-pro"
+      | "bfl/flux-kontext-max"
+      | "bfl/flux-kontext-pro"
+      | "bfl/flux-pro-1.1"
       | (string & {});
-
-    export type ReplicateImageModelId =
-      | "black-forest-labs/flux-kontext-max"
-      | "black-forest-labs/flux-1.1-pro"
-      | "black-forest-labs/flux-1.1-pro-ultra"
-      | "black-forest-labs/flux-dev"
-      | "black-forest-labs/flux-pro"
-      | "black-forest-labs/flux-schnell"
-      | "bytedance/sdxl-lightning-4step"
-      | "fofr/aura-flow"
-      | "fofr/latent-consistency-model"
-      | "fofr/realvisxl-v3-multi-controlnet-lora"
-      | "fofr/sdxl-emoji"
-      | "fofr/sdxl-multi-controlnet-lora"
-      | "ideogram-ai/ideogram-v2"
-      | "ideogram-ai/ideogram-v2-turbo"
-      | "lucataco/dreamshaper-xl-turbo"
-      | "lucataco/open-dalle-v1.1"
-      | "lucataco/realvisxl-v2.0"
-      | "lucataco/realvisxl2-lcm"
-      | "luma/photon"
-      | "luma/photon-flash"
-      | "nvidia/sana"
-      | "playgroundai/playground-v2.5-1024px-aesthetic"
-      | "recraft-ai/recraft-v3"
-      | "recraft-ai/recraft-v3-svg"
-      | "stability-ai/stable-diffusion-3.5-large"
-      | "stability-ai/stable-diffusion-3.5-large-turbo"
-      | "stability-ai/stable-diffusion-3.5-medium"
-      | "tstramer/material-diffusion"
-      | (string & {});
-
-    export type ImageModelId = OpenAIImageModelId | ReplicateImageModelId;
 
     export type AspectRatioString = `${number}:${number}`;
 
@@ -394,14 +383,63 @@ export namespace ai {
 
     export type SpeedLabel = "fastest" | "fast" | "medium" | "slow" | "slowest";
 
+    // ── Pricing ───────────────────────────────────────────────────────
+
+    /**
+     * Per-image pricing with quality × size tiers (e.g. OpenAI).
+     *
+     * Values from the provider's official pricing page.
+     */
+    export type PerImageTieredPricing = {
+      type: "per_image_tiered";
+      /** USD per image, keyed by `"quality/WxH"` (e.g. `"medium/1024x1024"`). */
+      tiers: Record<string, number>;
+    };
+
+    /**
+     * Flat per-image pricing (e.g. BFL Flux models).
+     */
+    export type PerImageFlatPricing = {
+      type: "per_image_flat";
+      /** USD per image. */
+      usd: number;
+    };
+
+    /**
+     * Per-token pricing (e.g. Google Gemini image models).
+     *
+     * Values are USD per **1 million** tokens, matching the convention
+     * in `lib/ai/models.ts`.
+     */
+    export type PerTokenPricing = {
+      type: "per_token";
+      /** USD per 1M input tokens. */
+      input: number;
+      /** USD per 1M output tokens. */
+      output: number;
+    };
+
+    /**
+     * Discriminated union of all image-model pricing schemes.
+     *
+     * Each variant stores the **real** provider pricing — no averages
+     * or estimates.
+     */
+    export type ImageModelPricing =
+      | PerImageTieredPricing
+      | PerImageFlatPricing
+      | PerTokenPricing;
+
+    // ── Card types ────────────────────────────────────────────────────
+
     export type ImageModelCardCompact = {
       id: ImageModelId;
       label: string;
       deprecated: boolean;
       short_description: string;
       speed_label: SpeedLabel;
-      avg_ppi: number;
-      avg_credit: number;
+      /** Real provider pricing data. */
+      pricing: ImageModelPricing;
     };
 
     export type ImageModelCard = {
@@ -419,8 +457,18 @@ export namespace ai {
       min_height: number;
       max_height: number;
       sizes: SizeSpec[] | null;
-      avg_ppi: number;
-      avg_credit: number;
+      /** Real provider pricing data. */
+      pricing: ImageModelPricing;
+      /**
+       * Average cost per invocation in USD, used by the rate limiter.
+       *
+       * For flat per-image models this equals the exact price; for
+       * tiered models it is the mid-tier (medium quality, default size);
+       * for per-token models it is a rough estimate.
+       *
+       * @internal Not displayed to users.
+       */
+      avg_cost_usd: number;
       default: {
         width: number;
         height: number;
@@ -435,68 +483,23 @@ export namespace ai {
         deprecated: card.deprecated,
         short_description: card.short_description,
         speed_label: card.speed_label,
-        avg_ppi: card.avg_ppi,
-        avg_credit: card.avg_credit,
+        pricing: card.pricing,
       };
     };
 
-    type RecraftV3Style =
-      | "any"
-      | "realistic_image"
-      | "digital_illustration"
-      | "digital_illustration/pixel_art"
-      | "digital_illustration/hand_drawn"
-      | "digital_illustration/grain"
-      | "digital_illustration/infantile_sketch"
-      | "digital_illustration/2d_art_poster"
-      | "digital_illustration/handmade_3d"
-      | "digital_illustration/hand_drawn_outline"
-      | "digital_illustration/engraving_color"
-      | "digital_illustration/2d_art_poster_2"
-      | "realistic_image/b_and_w"
-      | "realistic_image/hard_flash"
-      | "realistic_image/hdr"
-      | "realistic_image/natural_light"
-      | "realistic_image/studio_portrait"
-      | "realistic_image/enterprise"
-      | "realistic_image/motion_blur";
-
     export const models: Partial<Record<ImageModelId, ImageModelCard>> = {
-      "gpt-image-1": {
-        id: "gpt-image-1",
-        label: "GPT Image",
-        deprecated: true,
-        short_description: "State-of-the-art image generation model",
-        vendor: "openai",
-        provider: "openai",
-        speed_label: "slowest",
-        speed_max: "1m",
-        styles: null,
-        sizes: [
-          [1024, 1024, "1:1"],
-          [1024, 1536, "2:3"],
-          [1536, 1024, "3:2"],
-        ],
-        min_width: 1024,
-        max_width: 1536,
-        min_height: 1024,
-        max_height: 1536,
-        avg_ppi: 0.0975,
-        avg_credit: 62,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
-      },
-      "gpt-image-1.5": {
-        id: "gpt-image-1.5",
+      // -----------------------------------------------------------------
+      // OpenAI
+      // -----------------------------------------------------------------
+      // https://developers.openai.com/api/docs/models/gpt-image-1.5
+      "openai/gpt-image-1.5": {
+        id: "openai/gpt-image-1.5",
         label: "GPT Image 1.5",
         deprecated: false,
         short_description:
-          "Successor to GPT Image 1 - State-of-the-art image generation model",
+          "State-of-the-art image generation with better instruction following",
         vendor: "openai",
-        provider: "openai",
+        provider: "gateway",
         speed_label: "medium",
         speed_max: "1m",
         styles: null,
@@ -509,107 +512,209 @@ export namespace ai {
         max_width: 1536,
         min_height: 1024,
         max_height: 1536,
-        avg_ppi: 0.0257,
-        avg_credit: 50,
+        // https://developers.openai.com/api/docs/models/gpt-image-1.5
+        pricing: {
+          type: "per_image_tiered",
+          tiers: {
+            "low/1024x1024": 0.009,
+            "low/1024x1536": 0.013,
+            "low/1536x1024": 0.013,
+            "medium/1024x1024": 0.034,
+            "medium/1024x1536": 0.05,
+            "medium/1536x1024": 0.05,
+            "high/1024x1024": 0.133,
+            "high/1024x1536": 0.2,
+            "high/1536x1024": 0.2,
+          },
+        },
+        avg_cost_usd: 0.034, // medium/1024x1024
         default: {
           width: 1024,
           height: 1024,
           aspect_ratio: "1:1",
         },
       },
-      "recraft-ai/recraft-v3": {
-        id: "recraft-ai/recraft-v3",
-        label: "Recraft V3",
-        deprecated: true,
-        short_description:
-          "Recraft V3 (code-named red_panda) is a text-to-image model with the ability to generate long texts, and images in a wide list of styles. As of today, it is SOTA in image generation, proven by the Text-to-Image Benchmark by Artificial Analysis",
-        vendor: "recraft-ai",
-        provider: "replicate",
+      // https://developers.openai.com/api/docs/models/gpt-image-1-mini
+      "openai/gpt-image-1-mini": {
+        id: "openai/gpt-image-1-mini",
+        label: "GPT Image Mini",
+        deprecated: false,
+        short_description: "Cost-efficient image generation model",
+        vendor: "openai",
+        provider: "gateway",
         speed_label: "slow",
-        speed_max: "30s",
-        styles: [
-          "any",
-          "realistic_image",
-          "digital_illustration",
-          "digital_illustration/pixel_art",
-          "digital_illustration/hand_drawn",
-          "digital_illustration/grain",
-          "digital_illustration/infantile_sketch",
-          "digital_illustration/2d_art_poster",
-          "digital_illustration/handmade_3d",
-          "digital_illustration/hand_drawn_outline",
-          "digital_illustration/engraving_color",
-          "digital_illustration/2d_art_poster_2",
-          "realistic_image/b_and_w",
-          "realistic_image/hard_flash",
-          "realistic_image/hdr",
-          "realistic_image/natural_light",
-          "realistic_image/studio_portrait",
-          "realistic_image/enterprise",
-          "realistic_image/motion_blur",
-        ] as RecraftV3Style[],
+        speed_max: "1m",
+        styles: null,
         sizes: [
           [1024, 1024, "1:1"],
-          [1365, 1024, "4:3"],
-          [1024, 1365, "3:4"],
-          [1536, 1024, "3:2"],
           [1024, 1536, "2:3"],
-          [1820, 1024, "16:9"],
-          [1024, 1820, "9:16"],
-          [1024, 2048, "1:2"],
-          [2048, 1024, "2:1"],
-          [1434, 1024, "7:5"],
-          [1024, 1434, "5:7"],
-          [1024, 1280, "4:5"],
-          [1280, 1024, "5:4"],
-          [1024, 1707, "3:5"],
-          [1707, 1024, "5:3"],
+          [1536, 1024, "3:2"],
         ],
         min_width: 1024,
-        max_width: 1820,
+        max_width: 1536,
         min_height: 1024,
-        max_height: 1820,
-        avg_ppi: 0.04,
-        avg_credit: 25,
+        max_height: 1536,
+        // https://developers.openai.com/api/docs/models/gpt-image-1-mini
+        pricing: {
+          type: "per_image_tiered",
+          tiers: {
+            "low/1024x1024": 0.005,
+            "low/1024x1536": 0.006,
+            "low/1536x1024": 0.006,
+            "medium/1024x1024": 0.011,
+            "medium/1024x1536": 0.015,
+            "medium/1536x1024": 0.015,
+            "high/1024x1024": 0.036,
+            "high/1024x1536": 0.052,
+            "high/1536x1024": 0.052,
+          },
+        },
+        avg_cost_usd: 0.011, // medium/1024x1024
         default: {
           width: 1024,
           height: 1024,
           aspect_ratio: "1:1",
         },
       },
-      // https://replicate.com/black-forest-labs/flux-kontext-max/api/schema
-      "black-forest-labs/flux-kontext-max": {
-        id: "black-forest-labs/flux-kontext-max",
+      // -----------------------------------------------------------------
+      // Google (multimodal LLMs with native image output)
+      // -----------------------------------------------------------------
+      // python .tools/model_info.py --image gemini-3.1-flash-image
+      // Vercel gateway pricing: $0.50/MTok input, $3.00/MTok output
+      "google/gemini-3.1-flash-image-preview": {
+        id: "google/gemini-3.1-flash-image-preview",
+        label: "Gemini 3.1 Flash Image",
+        deprecated: false,
+        short_description:
+          "Fast, efficient multimodal model with native image generation",
+        vendor: "google",
+        provider: "gateway",
+        speed_label: "fast",
+        speed_max: "15s",
+        styles: null,
+        sizes: null,
+        min_width: 0,
+        max_width: 1536,
+        min_height: 0,
+        max_height: 1536,
+        pricing: { type: "per_token", input: 0.5, output: 3.0 },
+        avg_cost_usd: 0.004, // conservative per-image estimate for budget
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // python .tools/model_info.py --image gemini-3-pro-image
+      // Vercel gateway pricing: $2.00/MTok input, $12.00/MTok output
+      "google/gemini-3-pro-image": {
+        id: "google/gemini-3-pro-image",
+        label: "Gemini 3 Pro Image",
+        deprecated: false,
+        short_description:
+          "High-quality multimodal model with native image generation",
+        vendor: "google",
+        provider: "gateway",
+        speed_label: "medium",
+        speed_max: "30s",
+        styles: null,
+        sizes: null,
+        min_width: 0,
+        max_width: 1536,
+        min_height: 0,
+        max_height: 1536,
+        pricing: { type: "per_token", input: 2.0, output: 12.0 },
+        avg_cost_usd: 0.015, // conservative per-image estimate for budget
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
+      // Black Forest Labs (via Vercel AI Gateway)
+      // -----------------------------------------------------------------
+      // https://vercel.com/docs/ai-gateway/capabilities/image-generation/ai-sdk
+      // https://docs.bfl.ml/pricing
+      "bfl/flux-2-pro": {
+        id: "bfl/flux-2-pro",
+        label: "Flux 2 Pro",
+        deprecated: false,
+        short_description:
+          "Latest Flux model with best-in-class image quality and prompt adherence",
+        vendor: "black-forest-labs",
+        provider: "gateway",
+        speed_label: "medium",
+        speed_max: "30s",
+        styles: null,
+        sizes: null,
+        min_width: 256,
+        max_width: 1440,
+        min_height: 256,
+        max_height: 1440,
+        pricing: { type: "per_image_flat", usd: 0.06 },
+        avg_cost_usd: 0.06,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      "bfl/flux-kontext-max": {
+        id: "bfl/flux-kontext-max",
         label: "Flux Kontext Max",
         deprecated: false,
         short_description:
-          "The fastest image generation model tailored for local development and personal use",
+          "Highest quality Flux model for context-aware image generation and editing",
         vendor: "black-forest-labs",
-        provider: "replicate",
-        speed_label: "fastest",
-        speed_max: "10s",
+        provider: "gateway",
+        speed_label: "slow",
+        speed_max: "30s",
         styles: null,
         sizes: null,
         min_width: 0,
         min_height: 0,
         max_width: 1820,
         max_height: 1820,
-        avg_ppi: 0.08,
-        avg_credit: 50,
+        pricing: { type: "per_image_flat", usd: 0.08 },
+        avg_cost_usd: 0.08,
         default: {
           width: 1024,
           height: 1024,
           aspect_ratio: "1:1",
         },
       },
-      "black-forest-labs/flux-1.1-pro": {
-        id: "black-forest-labs/flux-1.1-pro",
+      "bfl/flux-kontext-pro": {
+        id: "bfl/flux-kontext-pro",
+        label: "Flux Kontext Pro",
+        deprecated: false,
+        short_description: "Fast context-aware image generation and editing",
+        vendor: "black-forest-labs",
+        provider: "gateway",
+        speed_label: "medium",
+        speed_max: "20s",
+        styles: null,
+        sizes: null,
+        min_width: 0,
+        min_height: 0,
+        max_width: 1820,
+        max_height: 1820,
+        pricing: { type: "per_image_flat", usd: 0.05 },
+        avg_cost_usd: 0.05,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      "bfl/flux-pro-1.1": {
+        id: "bfl/flux-pro-1.1",
         label: "Flux Pro 1.1",
         deprecated: false,
         short_description:
-          "Faster, better FLUX Pro. Text-to-image model with excellent image quality, prompt adherence, and output diversity.",
+          "Faster, better FLUX Pro. Text-to-image model with excellent image quality and output diversity.",
         vendor: "black-forest-labs",
-        provider: "replicate",
+        provider: "gateway",
         speed_label: "slow",
         speed_max: "30s",
         styles: null,
@@ -618,45 +723,8 @@ export namespace ai {
         max_width: 1440,
         min_height: 256,
         max_height: 1440,
-        avg_ppi: 0.04,
-        avg_credit: 25,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
-      },
-      "black-forest-labs/flux-schnell": {
-        id: "black-forest-labs/flux-schnell",
-        label: "Flux Schnell",
-        deprecated: true,
-        short_description:
-          "The fastest image generation model tailored for local development and personal use",
-        vendor: "black-forest-labs",
-        provider: "replicate",
-        speed_label: "fastest",
-        speed_max: "3s",
-        styles: null,
-        // flux-schnell does not take wxh, but aspect ratio (the w/h is based on 1mp request)
-        sizes: [
-          [1024, 1024, "1:1"],
-          [1344, 768, "16:9"],
-          [1536, 640, "21:9"],
-          [1216, 832, "3:2"],
-          [832, 1216, "2:3"],
-          [896, 1088, "4:5"],
-          [1088, 896, "5:4"],
-          [896, 1152, "3:4"],
-          [1152, 896, "4:3"],
-          [768, 1344, "9:16"],
-          [640, 1536, "9:21"],
-        ],
-        min_width: 320,
-        max_width: 1536,
-        min_height: 320,
-        max_height: 1536,
-        avg_ppi: 0.003,
-        avg_credit: 2,
+        pricing: { type: "per_image_flat", usd: 0.04 },
+        avg_cost_usd: 0.04,
         default: {
           width: 1024,
           height: 1024,
@@ -668,8 +736,12 @@ export namespace ai {
     export const image_model_ids = Object.keys(models) as ImageModelId[];
 
     /**
-     * @param model - the model identifier
-     * @returns {ImageModel} to be piped into api
+     * Resolve a model identifier to an AI SDK `ImageModel` routed through
+     * the Vercel AI Gateway.
+     *
+     * @param model - gateway model ID string (e.g. `"openai/gpt-image-1.5"`)
+     *   or a legacy `ProviderModel` object.
+     * @returns `{ card, model }` or `null` when the ID is unknown.
      */
     export function getSDKImageModel(
       model: ai.image.ProviderModel | ai.image.ImageModelId | string
@@ -679,44 +751,25 @@ export namespace ai {
     } | null {
       if (!model) return null;
 
-      if (typeof model === "string") {
-        let card: ai.image.ImageModelCard | null = null;
-        // select card
-        {
-          if (model.includes("/")) {
-            card = ai.image.models[model] ?? null;
-          } else {
-            // if no provider is specified, search id with input
-            const searches = Object.values(ai.image.models).filter((card) =>
-              card!.id.includes(model)
-            );
-            if (searches.length === 1) {
-              card = searches[0]!;
-            }
-          }
-        }
+      const modelId = typeof model === "string" ? model : model.modelId;
 
-        if (!card) return null;
-        switch (card.provider) {
-          case "openai":
-            return { model: openai.image(card.id), card };
-          case "replicate":
-            return { model: replicate.image(card.id), card };
-          default:
-            return null;
-        }
+      let card: ai.image.ImageModelCard | null = null;
+
+      if (modelId.includes("/")) {
+        card = ai.image.models[modelId] ?? null;
       } else {
-        const card = ai.image.models[model.modelId];
-        if (!card) return null;
-        switch (model.provider) {
-          case "openai":
-            return { model: openai.image(model.modelId), card };
-          case "replicate":
-            return { model: replicate.image(model.modelId), card };
-          default:
-            return null;
+        // bare name lookup — search for a card whose ID ends with the input
+        const searches = Object.values(ai.image.models).filter((c) =>
+          c!.id.includes(modelId)
+        );
+        if (searches.length === 1) {
+          card = searches[0]!;
         }
       }
+
+      if (!card) return null;
+
+      return { model: gateway.image(card.id), card };
     }
   }
 }

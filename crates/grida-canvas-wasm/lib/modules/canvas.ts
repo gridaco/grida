@@ -12,6 +12,13 @@ const ApplicationCommandID = {
   Pan: 4,
   SelectAll: 5,
   DeselectAll: 6,
+  SelectChildren: 7,
+  SelectParent: 8,
+  SelectNextSibling: 9,
+  SelectPreviousSibling: 10,
+  ZoomToFit: 13,
+  ZoomToSelection: 14,
+  ZoomTo100: 15,
 } as const;
 
 // Surface response bitmask (matches Rust pack_surface_response)
@@ -766,6 +773,82 @@ export class Scene {
     this.module._command(this.appptr, ApplicationCommandID.DeselectAll, 0, 0);
   }
 
+  /**
+   * Navigate selection to direct children of the current selection (Enter).
+   */
+  selectChildren() {
+    this._assertAlive();
+    this.module._command(
+      this.appptr,
+      ApplicationCommandID.SelectChildren,
+      0,
+      0
+    );
+  }
+
+  /**
+   * Navigate selection to parent of the current selection (Shift+Enter).
+   */
+  selectParent() {
+    this._assertAlive();
+    this.module._command(this.appptr, ApplicationCommandID.SelectParent, 0, 0);
+  }
+
+  /**
+   * Navigate selection to next sibling, wrapping around (Tab).
+   */
+  selectNextSibling() {
+    this._assertAlive();
+    this.module._command(
+      this.appptr,
+      ApplicationCommandID.SelectNextSibling,
+      0,
+      0
+    );
+  }
+
+  /**
+   * Navigate selection to previous sibling, wrapping around (Shift+Tab).
+   */
+  selectPreviousSibling() {
+    this._assertAlive();
+    this.module._command(
+      this.appptr,
+      ApplicationCommandID.SelectPreviousSibling,
+      0,
+      0
+    );
+  }
+
+  /**
+   * Zoom the viewport to fit all content (Shift+1).
+   */
+  zoomToFit() {
+    this._assertAlive();
+    this.module._command(this.appptr, ApplicationCommandID.ZoomToFit, 0, 0);
+  }
+
+  /**
+   * Zoom the viewport to fit the current selection (Shift+2).
+   */
+  zoomToSelection() {
+    this._assertAlive();
+    this.module._command(
+      this.appptr,
+      ApplicationCommandID.ZoomToSelection,
+      0,
+      0
+    );
+  }
+
+  /**
+   * Reset viewport zoom to 100% (Shift+0).
+   */
+  zoomTo100() {
+    this._assertAlive();
+    this.module._command(this.appptr, ApplicationCommandID.ZoomTo100, 0, 0);
+  }
+
   highlightStrokes(opts?: {
     nodes?: string[];
     style?: { strokeWidth?: number; stroke?: string };
@@ -1184,7 +1267,12 @@ const PAINT_TYPE_MAP: Record<string, string> = {
 /**
  * Convert a CGColor from Rust u8 array `[r, g, b, a]` to JS RGBA32F object.
  */
-function convertColor(c: number[]): { r: number; g: number; b: number; a: number } {
+function convertColor(c: number[]): {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+} {
   return { r: c[0] / 255, g: c[1] / 255, b: c[2] / 255, a: c[3] / 255 };
 }
 

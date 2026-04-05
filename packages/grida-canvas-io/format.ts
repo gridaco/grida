@@ -390,6 +390,7 @@ export namespace format {
       ["boolean", fbs.NodeType.BooleanOperation],
       ["polygon", fbs.NodeType.RegularPolygon],
       ["star", fbs.NodeType.RegularStarPolygon],
+      ["markdown", fbs.NodeType.MarkdownEmbed],
     ]);
 
     export const NODE_TYPE_DECODE = new Map<
@@ -408,6 +409,7 @@ export namespace format {
       [fbs.NodeType.BooleanOperation, "boolean"],
       [fbs.NodeType.RegularPolygon, "polygon"],
       [fbs.NodeType.RegularStarPolygon, "star"],
+      [fbs.NodeType.MarkdownEmbed, "markdown"],
     ]);
 
     // BasicShapeNodeType enum mappings (maps TS node types to BasicShapeNodeType enum)
@@ -1911,6 +1913,60 @@ export namespace format {
             fbs.TextSpanNode.addProperties(builder, propertiesOffset);
             nodeOffset = fbs.TextSpanNode.endTextSpanNode(builder);
             nodeType = fbs.Node.TextSpanNode;
+            break;
+          }
+          case "markdown": {
+            const mdNode = node as grida.program.nodes.MarkdownNode;
+
+            const fillPaintsFiltered = paints(mdNode, "fill");
+            const fillPaintsOffset = format.paint.encode.fillPaints(
+              builder,
+              fillPaintsFiltered,
+              fbs.MarkdownEmbedNodeProperties.createFillPaintsVector
+            );
+            const markdownOffset = builder.createString(mdNode.markdown ?? "");
+            const mdCornerUniform = mdNode.corner_radius;
+            const cornerRadiusOffset =
+              format.shape.encode.rectangularCornerRadiusTrait(builder, {
+                rectangular_corner_radius_top_left:
+                  mdNode.rectangular_corner_radius_top_left ?? mdCornerUniform,
+                rectangular_corner_radius_top_right:
+                  mdNode.rectangular_corner_radius_top_right ?? mdCornerUniform,
+                rectangular_corner_radius_bottom_left:
+                  mdNode.rectangular_corner_radius_bottom_left ??
+                  mdCornerUniform,
+                rectangular_corner_radius_bottom_right:
+                  mdNode.rectangular_corner_radius_bottom_right ??
+                  mdCornerUniform,
+                corner_smoothing: mdNode.corner_smoothing,
+              });
+
+            fbs.MarkdownEmbedNodeProperties.startMarkdownEmbedNodeProperties(
+              builder
+            );
+            fbs.MarkdownEmbedNodeProperties.addFillPaints(
+              builder,
+              fillPaintsOffset
+            );
+            fbs.MarkdownEmbedNodeProperties.addMarkdown(
+              builder,
+              markdownOffset
+            );
+            fbs.MarkdownEmbedNodeProperties.addCornerRadius(
+              builder,
+              cornerRadiusOffset
+            );
+            const propertiesOffset =
+              fbs.MarkdownEmbedNodeProperties.endMarkdownEmbedNodeProperties(
+                builder
+              );
+
+            fbs.MarkdownEmbedNode.startMarkdownEmbedNode(builder);
+            fbs.MarkdownEmbedNode.addNode(builder, systemNodeTraitOffset);
+            fbs.MarkdownEmbedNode.addLayer(builder, layerOffset);
+            fbs.MarkdownEmbedNode.addProperties(builder, propertiesOffset);
+            nodeOffset = fbs.MarkdownEmbedNode.endMarkdownEmbedNode(builder);
+            nodeType = fbs.Node.MarkdownEmbedNode;
             break;
           }
           case "text": {
@@ -3780,6 +3836,73 @@ export namespace format {
       }
 
       /**
+       * Encodes a single FeNoise to a FlatBuffers FeNoiseEffect table.
+       */
+      function encodeFeNoise(
+        builder: Builder,
+        noise: cg.FeNoise
+      ): flatbuffers.Offset {
+        // Create NoiseEffectColors table
+        let coloringOffset: flatbuffers.Offset;
+        if (noise.mode === "mono") {
+          const color =
+            noise.color || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
+          const monoColorOffset = structs.rgba32f(builder, color);
+          fbs.NoiseEffectColors.startNoiseEffectColors(builder);
+          fbs.NoiseEffectColors.addKind(
+            builder,
+            fbs.NoiseEffectColorsKind.Mono
+          );
+          fbs.NoiseEffectColors.addMonoColor(builder, monoColorOffset);
+          coloringOffset =
+            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+        } else if (noise.mode === "duo") {
+          const color1 =
+            noise.color1 || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
+          const color2 =
+            noise.color2 || ({ r: 1, g: 1, b: 1, a: 1 } as cg.RGBA32F);
+          const duoColor1Offset = structs.rgba32f(builder, color1);
+          const duoColor2Offset = structs.rgba32f(builder, color2);
+          fbs.NoiseEffectColors.startNoiseEffectColors(builder);
+          fbs.NoiseEffectColors.addKind(
+            builder,
+            fbs.NoiseEffectColorsKind.Duo
+          );
+          fbs.NoiseEffectColors.addDuoColor1(builder, duoColor1Offset);
+          fbs.NoiseEffectColors.addDuoColor2(builder, duoColor2Offset);
+          coloringOffset =
+            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+        } else {
+          // Multi
+          fbs.NoiseEffectColors.startNoiseEffectColors(builder);
+          fbs.NoiseEffectColors.addKind(
+            builder,
+            fbs.NoiseEffectColorsKind.Multi
+          );
+          fbs.NoiseEffectColors.addMultiOpacity(
+            builder,
+            noise.opacity ?? 1.0
+          );
+          coloringOffset =
+            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+        }
+
+        // Create FeNoiseEffect table
+        fbs.FeNoiseEffect.startFeNoiseEffect(builder);
+        fbs.FeNoiseEffect.addNoiseSize(builder, noise.noise_size);
+        fbs.FeNoiseEffect.addDensity(builder, noise.density);
+        fbs.FeNoiseEffect.addNumOctaves(builder, noise.num_octaves ?? 3);
+        fbs.FeNoiseEffect.addSeed(builder, noise.seed ?? 0);
+        fbs.FeNoiseEffect.addColoring(builder, coloringOffset);
+        fbs.FeNoiseEffect.addActive(builder, noise.active ?? true);
+        fbs.FeNoiseEffect.addBlendMode(
+          builder,
+          styling.encode.blendMode(noise.blend_mode ?? "normal")
+        );
+        return fbs.FeNoiseEffect.endFeNoiseEffect(builder);
+      }
+
+      /**
        * Encodes FeNoise array to FlatBuffers FeNoiseEffect table array.
        */
       function encodeFeNoises(
@@ -3787,76 +3910,13 @@ export namespace format {
         noises: cg.FeNoise[]
       ): flatbuffers.Offset | undefined {
         if (noises.length === 0) return undefined;
-        fbs.LayerEffects.startFeNoisesVector(builder, noises.length);
+        // Create all FeNoiseEffect table offsets first, then create the vector.
+        // Tables MUST NOT be created inside a startVector/endVector block.
+        const noiseOffsets: flatbuffers.Offset[] = [];
         for (let i = noises.length - 1; i >= 0; i--) {
-          const noise = noises[i]!;
-          let coloringKind: fbs.NoiseEffectColorsKind;
-          let monoColorR = 0,
-            monoColorG = 0,
-            monoColorB = 0,
-            monoColorA = 1;
-          let duoColor1R = 0,
-            duoColor1G = 0,
-            duoColor1B = 0,
-            duoColor1A = 1;
-          let duoColor2R = 1,
-            duoColor2G = 1,
-            duoColor2B = 1,
-            duoColor2A = 1;
-          let multiOpacity = 1.0;
-
-          // Create NoiseEffectColors table
-          let coloringOffset: flatbuffers.Offset;
-          if (noise.mode === "mono") {
-            coloringKind = fbs.NoiseEffectColorsKind.Mono;
-            const color =
-              noise.color || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
-            const monoColorOffset = structs.rgba32f(builder, color);
-            fbs.NoiseEffectColors.startNoiseEffectColors(builder);
-            fbs.NoiseEffectColors.addKind(builder, coloringKind);
-            fbs.NoiseEffectColors.addMonoColor(builder, monoColorOffset);
-            coloringOffset =
-              fbs.NoiseEffectColors.endNoiseEffectColors(builder);
-          } else if (noise.mode === "duo") {
-            coloringKind = fbs.NoiseEffectColorsKind.Duo;
-            const color1 =
-              noise.color1 || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
-            const color2 =
-              noise.color2 || ({ r: 1, g: 1, b: 1, a: 1 } as cg.RGBA32F);
-            const duoColor1Offset = structs.rgba32f(builder, color1);
-            const duoColor2Offset = structs.rgba32f(builder, color2);
-            fbs.NoiseEffectColors.startNoiseEffectColors(builder);
-            fbs.NoiseEffectColors.addKind(builder, coloringKind);
-            fbs.NoiseEffectColors.addDuoColor1(builder, duoColor1Offset);
-            fbs.NoiseEffectColors.addDuoColor2(builder, duoColor2Offset);
-            coloringOffset =
-              fbs.NoiseEffectColors.endNoiseEffectColors(builder);
-          } else {
-            // Multi
-            coloringKind = fbs.NoiseEffectColorsKind.Multi;
-            multiOpacity = noise.opacity ?? 1.0;
-            fbs.NoiseEffectColors.startNoiseEffectColors(builder);
-            fbs.NoiseEffectColors.addKind(builder, coloringKind);
-            fbs.NoiseEffectColors.addMultiOpacity(builder, multiOpacity);
-            coloringOffset =
-              fbs.NoiseEffectColors.endNoiseEffectColors(builder);
-          }
-
-          // Create FeNoiseEffect table
-          fbs.FeNoiseEffect.startFeNoiseEffect(builder);
-          fbs.FeNoiseEffect.addNoiseSize(builder, noise.noise_size);
-          fbs.FeNoiseEffect.addDensity(builder, noise.density);
-          fbs.FeNoiseEffect.addNumOctaves(builder, noise.num_octaves ?? 3);
-          fbs.FeNoiseEffect.addSeed(builder, noise.seed ?? 0);
-          fbs.FeNoiseEffect.addColoring(builder, coloringOffset);
-          fbs.FeNoiseEffect.addActive(builder, noise.active ?? true);
-          fbs.FeNoiseEffect.addBlendMode(
-            builder,
-            styling.encode.blendMode(noise.blend_mode ?? "normal")
-          );
-          fbs.FeNoiseEffect.endFeNoiseEffect(builder);
+          noiseOffsets.push(encodeFeNoise(builder, noises[i]!));
         }
-        return builder.endVector();
+        return fbs.LayerEffects.createFeNoisesVector(builder, noiseOffsets);
       }
 
       /**
@@ -5806,6 +5866,56 @@ export namespace format {
         }
 
         /**
+         * Decodes MarkdownNode (FBS: MarkdownEmbedNode).
+         */
+        export function markdownEmbed(
+          n: fbs.MarkdownEmbedNode,
+          id: string,
+          systemNode: fbs.SystemNodeTrait,
+          layer: fbs.LayerTrait | null,
+          opacity: number,
+          layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
+          effects?: grida.program.nodes.i.IEffects
+        ): grida.program.nodes.MarkdownNode {
+          const props = n.properties();
+          const fillPaints = props
+            ? format.paint.decode.fillPaints(props)
+            : undefined;
+          const cornerRadiusProps =
+            format.shape.decode.rectangularCornerRadiusTrait(
+              props?.cornerRadius() ?? null
+            );
+
+          const baseName = systemNode.name() ?? "markdown";
+          const baseActive = systemNode.active() ?? true;
+          const baseLocked = systemNode.locked() ?? false;
+
+          return {
+            type: "markdown",
+            id,
+            name: baseName,
+            active: baseActive,
+            locked: baseLocked,
+            opacity,
+            z_index: 0,
+            markdown: props?.markdown() ?? "",
+            ...(fillPaints ? { fill_paints: fillPaints } : {}),
+            rectangular_corner_radius_top_left:
+              cornerRadiusProps.rectangular_corner_radius_top_left,
+            rectangular_corner_radius_top_right:
+              cornerRadiusProps.rectangular_corner_radius_top_right,
+            rectangular_corner_radius_bottom_left:
+              cornerRadiusProps.rectangular_corner_radius_bottom_left,
+            rectangular_corner_radius_bottom_right:
+              cornerRadiusProps.rectangular_corner_radius_bottom_right,
+            corner_smoothing: cornerRadiusProps.corner_smoothing,
+            ...layoutFields,
+            rotation: layoutFields.rotation ?? 0,
+            ...(effects || {}),
+          } satisfies grida.program.nodes.MarkdownNode;
+        }
+
+        /**
          * Decodes AttributedTextNode.
          */
         export function attributedText(
@@ -6477,6 +6587,17 @@ export namespace format {
             case fbs.Node.AttributedTextNode:
               nodes[id] = nodeTypes.attributedText(
                 typedNode as fbs.AttributedTextNode,
+                id,
+                systemNode,
+                layer,
+                opacity,
+                layoutFields,
+                decodedEffects
+              );
+              break;
+            case fbs.Node.MarkdownEmbedNode:
+              nodes[id] = nodeTypes.markdownEmbed(
+                typedNode as fbs.MarkdownEmbedNode,
                 id,
                 systemNode,
                 layer,

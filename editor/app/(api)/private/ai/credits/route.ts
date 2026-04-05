@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { ai_credit_remaining } from "../ratelimit";
+import { ai_budget_remaining } from "../ratelimit";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -9,7 +9,7 @@ export async function GET() {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const data = await ai_credit_remaining({ user_id: u.data.user.id });
+  const data = await ai_budget_remaining({ user_id: u.data.user.id });
   return NextResponse.json(
     {
       data,

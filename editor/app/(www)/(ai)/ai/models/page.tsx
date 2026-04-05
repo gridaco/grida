@@ -8,144 +8,211 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { InfoCircledIcon } from "@radix-ui/react-icons";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import type { ai as AITypes } from "@/lib/ai/ai";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import { BlackForestLabsLogo } from "@/components/logos/blackforestlabs";
 import { OpenAILogo } from "@/components/logos/openai";
 import { AnthropicLogo } from "@/components/logos/anthropic";
+import { Google as GoogleLogo } from "@/components/logos/google";
+
 export const metadata: Metadata = {
   title: "AI Models",
-  description: "Explore the AI models on Grida",
+  description: "Explore the AI models available on Grida",
 };
 
-const Logos = {
-  ["black-forest-labs"]: BlackForestLabsLogo,
-  ["openai"]: OpenAILogo,
-  ["anthropic"]: AnthropicLogo,
-} as const;
+const Logos: Partial<Record<string, React.FC<{ className?: string }>>> = {
+  "black-forest-labs": BlackForestLabsLogo,
+  openai: OpenAILogo,
+  anthropic: AnthropicLogo,
+  google: GoogleLogo,
+};
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function groupByVendor(
+  models: Partial<Record<string, AITypes.image.ImageModelCard>>
+) {
+  const groups = new Map<string, AITypes.image.ImageModelCard[]>();
+  for (const model of Object.values(models)) {
+    if (!model) continue;
+    const list = groups.get(model.vendor) ?? [];
+    list.push(model);
+    groups.set(model.vendor, list);
+  }
+  return groups;
+}
+
+function vendorLabel(vendor: string) {
+  return vendor
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function dimLabel(model: AITypes.image.ImageModelCard) {
+  if (model.sizes) {
+    return model.sizes.map(([w, h, r]) => `${w}x${h} (${r})`).join(", ");
+  }
+  if (model.max_width > 0) {
+    return `Up to ${model.max_width}x${model.max_height}`;
+  }
+  return "Flexible";
+}
+
+// ── Pricing components ──────────────────────────────────────────────────────
+
+function PricingBadge({
+  pricing,
+}: {
+  pricing: AITypes.image.ImageModelPricing;
+}) {
+  switch (pricing.type) {
+    case "per_image_flat":
+      return (
+        <span className="font-mono text-sm">${pricing.usd.toFixed(3)}/img</span>
+      );
+    case "per_image_tiered": {
+      const prices = Object.values(pricing.tiers);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      return (
+        <span className="font-mono text-sm">
+          ${min.toFixed(3)}–${max.toFixed(3)}/img
+        </span>
+      );
+    }
+    case "per_token":
+      return (
+        <span className="font-mono text-sm">
+          ${pricing.input.toFixed(2)}/${pricing.output.toFixed(2)} per 1M tok
+        </span>
+      );
+  }
+}
+
+function PricingDetail({
+  pricing,
+}: {
+  pricing: AITypes.image.ImageModelPricing;
+}) {
+  switch (pricing.type) {
+    case "per_image_flat":
+      return (
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-mono font-semibold tracking-tight">
+            ${pricing.usd.toFixed(3)}
+          </span>
+          <span className="text-sm text-muted-foreground">per image</span>
+        </div>
+      );
+    case "per_image_tiered": {
+      const entries = Object.entries(pricing.tiers);
+      const qualities = new Map<string, [string, number][]>();
+      for (const [key, price] of entries) {
+        const [quality, size] = key.split("/");
+        const list = qualities.get(quality) ?? [];
+        list.push([size, price]);
+        qualities.set(quality, list);
+      }
+      return (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-20 px-0">Quality</TableHead>
+              <TableHead className="px-0">Size</TableHead>
+              <TableHead className="text-right px-0">Price</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[...qualities.entries()].map(([quality, sizes]) =>
+              sizes.map(([size, price], i) => (
+                <TableRow key={`${quality}/${size}`} className="border-0">
+                  <TableCell className="py-1 px-0 capitalize text-muted-foreground">
+                    {i === 0 ? quality : ""}
+                  </TableCell>
+                  <TableCell className="py-1 px-0 font-mono text-xs text-muted-foreground">
+                    {size}
+                  </TableCell>
+                  <TableCell className="py-1 px-0 text-right font-mono">
+                    ${price.toFixed(3)}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      );
+    }
+    case "per_token":
+      return (
+        <div className="space-y-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-mono font-semibold tracking-tight">
+              ${pricing.output.toFixed(2)}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              per 1M output tokens
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Input: ${pricing.input.toFixed(2)} / 1M tokens
+          </p>
+        </div>
+      );
+  }
+}
+
+// ── Card ─────────────────────────────────────────────────────────────────────
 
 function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
-  const Logo =
-    model.vendor in Logos ? Logos[model.vendor as keyof typeof Logos] : null;
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 backdrop-blur-sm border-muted relative hover:z-50 flex flex-col">
-      <CardHeader className="space-y-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl flex items-center gap-2">
-            {Logo && <Logo className="size-5" />}
-            <span>{model.label}</span>
+    <Card className="flex flex-col bg-card/50 border-muted overflow-hidden">
+      <CardHeader className="pb-3 h-20">
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-base font-semibold">
+            {model.label}
           </CardTitle>
           <Badge
-            variant="secondary"
-            className="capitalize bg-muted/50 hover:bg-muted/80 transition-colors"
+            variant="outline"
+            className="shrink-0 capitalize text-xs font-normal"
           >
-            {model.vendor.replace(/-/g, " ")}
+            {model.speed_label} &middot; ~{model.speed_max}
           </Badge>
         </div>
-        <CardDescription className="text-base line-clamp-2">
+        <CardDescription className="text-sm line-clamp-2 overflow-hidden text-ellipsis">
           {model.short_description}
         </CardDescription>
       </CardHeader>
-      <CardContent className="h-full flex flex-col justify-between gap-6">
-        <div className="space-y-6">
-          {/* Speed Info */}
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="capitalize bg-background/50">
-              {model.speed_label}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              ~{model.speed_max}
+      <Separator />
+      <CardContent className="flex-1 flex flex-col gap-4 pt-4">
+        {/* Pricing */}
+        <PricingDetail pricing={model.pricing} />
+
+        {/* Specs */}
+        <div className="mt-auto space-y-2 text-xs text-muted-foreground">
+          <div className="flex justify-between">
+            <span>Dimensions</span>
+            <span className="font-mono text-foreground">
+              {model.sizes
+                ? `${model.sizes.length} presets`
+                : model.max_width > 0
+                  ? `up to ${model.max_width}x${model.max_height}`
+                  : "Flexible"}
             </span>
           </div>
-
-          {/* Sizes */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium text-muted-foreground">
-                Supported Sizes
-              </h4>
-              {model.sizes ? (
-                <HoverCard>
-                  <HoverCardTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                    >
-                      {model.sizes.length} sizes
-                      <InfoCircledIcon className="ml-1 size-4" />
-                    </Button>
-                  </HoverCardTrigger>
-                  <HoverCardContent className="w-80" sideOffset={5}>
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Available Sizes</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {model.sizes.map(
-                          ([width, height, ratio]: AITypes.image.SizeSpec) => (
-                            <Badge
-                              key={ratio}
-                              variant="outline"
-                              className="bg-background/50"
-                            >
-                              {width}x{height}
-                            </Badge>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </HoverCardContent>
-                </HoverCard>
-              ) : (
-                <span className="text-sm text-muted-foreground">
-                  Flexible dimensions
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Styles */}
-          {model.styles && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-muted-foreground">
-                Available Styles
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {model.styles.slice(0, 3).map((style: string) => (
-                  <Badge
-                    key={style}
-                    variant="secondary"
-                    className="capitalize bg-muted/50 hover:bg-muted/80 transition-colors"
-                  >
-                    {style.replace(/_/g, " ")}
-                  </Badge>
-                ))}
-                {model.styles.length > 3 && (
-                  <Badge
-                    variant="secondary"
-                    className="bg-muted/50 hover:bg-muted/80 transition-colors"
-                  >
-                    +{model.styles.length - 3} more
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-        {/* Credit Info */}
-        <div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">
-              Average Credit
-            </span>
-            <span className="font-medium text-lg">{model.avg_credit}</span>
+          <div className="flex justify-between">
+            <span>Model ID</span>
+            <code className="text-foreground">{model.id}</code>
           </div>
         </div>
       </CardContent>
@@ -153,37 +220,100 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
   );
 }
 
+// ── Page ─────────────────────────────────────────────────────────────────────
+
 export default function AIModelsCatalogPage() {
-  const models = ai.image.models;
+  const grouped = groupByVendor(ai.image.models);
 
   return (
     <main className="min-h-screen">
       <Header className="relative top-0 z-50" />
-      {/* Hero Section */}
-      <div className="container px-4 py-16 text-left">
-        <h1 className="text-2xl font-bold tracking-tight mb-4">
-          AI Models on Grida
-        </h1>
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Explore our curated collection of state-of-the-art AI image generation
-          models, each offering unique capabilities and creative possibilities.
+
+      {/* Hero */}
+      <div className="container px-4 pt-16 pb-10">
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Image Models</h1>
+        <p className="text-base text-muted-foreground max-w-xl">
+          Image generation models available on Grida. Pricing is sourced
+          directly from each provider.
         </p>
       </div>
 
-      {/* Models Grid */}
-      <div className="container mx-auto px-4 pb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {Object.values(models)
-            .filter(
-              (model): model is AITypes.image.ImageModelCard =>
-                model !== undefined
-            )
-            .map((model) => (
-              <ModelCard key={model.id} model={model} />
-            ))}
+      {/* Comparison table */}
+      <div className="container mx-auto px-4 pb-12">
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="w-[260px]">Model</TableHead>
+                <TableHead>Pricing</TableHead>
+                <TableHead className="hidden md:table-cell">Speed</TableHead>
+                <TableHead className="hidden lg:table-cell">
+                  Dimensions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...grouped.entries()].map(([vendor, models]) => {
+                const Logo = Logos[vendor];
+                return models.map((model, i) => (
+                  <TableRow key={model.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {Logo && <Logo className="size-4 shrink-0" />}
+                        <div>
+                          <div className="font-medium">{model.label}</div>
+                          <code className="text-xs text-muted-foreground">
+                            {model.id}
+                          </code>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <PricingBadge pricing={model.pricing} />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge
+                        variant="outline"
+                        className="capitalize font-normal text-xs"
+                      >
+                        {model.speed_label}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ~{model.speed_max}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                      {dimLabel(model)}
+                    </TableCell>
+                  </TableRow>
+                ));
+              })}
+            </TableBody>
+          </Table>
         </div>
       </div>
-      <div className="h-80" />
+
+      <Separator />
+
+      {/* Detail cards by vendor */}
+      {[...grouped.entries()].map(([vendor, models]) => {
+        const Logo = Logos[vendor];
+        return (
+          <section key={vendor} className="container mx-auto px-4 py-12">
+            <div className="flex items-center gap-3 mb-6">
+              {Logo && <Logo className="size-6" />}
+              <h2 className="text-xl font-semibold">{vendorLabel(vendor)}</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {models.map((model) => (
+                <ModelCard key={model.id} model={model} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+
+      <div className="h-40" />
       <Footer />
     </main>
   );

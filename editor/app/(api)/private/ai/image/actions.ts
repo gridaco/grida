@@ -1,7 +1,7 @@
 "use server";
 
 import { createLibraryClient } from "@/lib/supabase/server";
-import { ai_credit_limit } from "../ratelimit";
+import { ai_budget_deduct } from "../ratelimit";
 import { Env } from "@/env";
 import ai from "@/lib/ai";
 
@@ -16,11 +16,11 @@ type AuthRateLimitError = {
 
 /**
  * Validates authentication and rate limits for AI image operations
- * @param credits - Number of credits required for the operation
+ * @param cost_mills - Cost in mills (thousandths of USD) for the operation
  * @returns Error response if auth/rate limit fails, null if OK
  */
 async function validateAuthAndRateLimit(
-  credits: number
+  cost_mills: number
 ): Promise<AuthRateLimitError | null> {
   if (Env.web.IS_LOCALDEV_SUPERUSER) {
     return null; // Skip auth/rate limit for local dev superuser
@@ -39,7 +39,7 @@ async function validateAuthAndRateLimit(
   }
 
   // Check rate limit
-  const rate = await ai_credit_limit(credits);
+  const rate = await ai_budget_deduct(cost_mills);
   if (!rate) {
     return {
       success: false,
@@ -91,8 +91,8 @@ export async function upscaleImage(
   }
 
   // Validate auth & rate limit
-  const credits = ai.image_tools.models["nightmareai/real-esrgan"].avg_credits;
-  const authError = await validateAuthAndRateLimit(credits);
+  const cost_mills = ai.toMills(ai.image_tools.models["nightmareai/real-esrgan"].cost_usd);
+  const authError = await validateAuthAndRateLimit(cost_mills);
   if (authError) {
     return authError;
   }
@@ -150,8 +150,8 @@ export async function removeBackgroundImage(
 
   // Validate auth & rate limit
   const modelId = ai.server.methods.MODEL_ID_RECRAFT_REMOVE_BACKGROUND;
-  const credits = ai.image_tools.models[modelId].avg_credits;
-  const authError = await validateAuthAndRateLimit(credits);
+  const cost_mills = ai.toMills(ai.image_tools.models[modelId].cost_usd);
+  const authError = await validateAuthAndRateLimit(cost_mills);
   if (authError) {
     return authError;
   }

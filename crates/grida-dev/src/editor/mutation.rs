@@ -121,7 +121,9 @@ fn node_size_mut(node: &mut Node) -> Option<&mut Size> {
         Node::Line(n) => Some(&mut n.size),
         Node::Image(n) => Some(&mut n.size),
         Node::Error(n) => Some(&mut n.size),
-        Node::MarkdownEmbed(n) => Some(&mut n.size),
+        // MarkdownEmbed uses Option<f32> width/height (like TextSpan),
+        // handled directly in resize_node.
+        Node::MarkdownEmbed(_) => None,
         Node::HTMLEmbed(n) => Some(&mut n.size),
         _ => None,
     }
@@ -193,6 +195,16 @@ fn resize_node(scene: &mut Scene, id: &NodeId, width: Option<f32>, height: Optio
                 }
             }
             Node::AttributedText(n) => {
+                if let Some(w) = width {
+                    n.width = Some(w);
+                    changed = true;
+                }
+                if let Some(h) = height {
+                    n.height = Some(h);
+                    changed = true;
+                }
+            }
+            Node::MarkdownEmbed(n) => {
                 if let Some(w) = width {
                     n.width = Some(w);
                     changed = true;

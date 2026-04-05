@@ -105,3 +105,27 @@ When you need to invalidate old files (field renumbering, semantic changes, remo
 Format: `MAJOR.MINOR.PATCH-prerelease+build` (e.g. `"0.91.0-beta+20260311"`).
 
 See `format/AGENTS.md` for the full review checklist.
+
+## Debugging FlatBuffers Issues
+
+### Verifying bytes
+
+Use `flatbuffers::root::<fbs::GridaFile>(&bytes)` (not `root_unchecked`) in a Rust test to run the FlatBuffers verifier. It reports the exact field chain with the bad offset.
+
+```rust
+use cg::io::generated::grida::grida as fbs;
+let result = flatbuffers::root::<fbs::GridaFile>(&bytes);
+```
+
+Note: the TS FlatBuffers decoder is more lenient than Rust — a TS-side round-trip may pass even when the bytes are structurally invalid. Always verify with the Rust verifier.
+
+### Inspecting .grida files
+
+```sh
+cargo run --example tool_io_grida -- path/to/file.grida --list-scenes
+cargo run --example tool_io_grida -- path/to/file.grida --scene 0 --verbose
+```
+
+### Cross-boundary tests
+
+`crates/grida-canvas-wasm/lib/__test__/bench-load-scene.test.ts` includes tests that TS-encode → WASM-decode `.grida` fixtures. These catch issues that only surface across the TS→Rust boundary.
