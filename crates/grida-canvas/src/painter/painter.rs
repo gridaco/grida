@@ -79,7 +79,9 @@ impl VisibilitySet {
 /// stable and cached; visibility culling is a per-frame draw-time concern.
 pub struct ViewportCull {
     /// Bitset of visible leaf NodeIds from R-tree intersection query.
-    visible_leaves: VisibilitySet,
+    /// `None` when every leaf in the scene is visible — the bitset is then
+    /// unnecessary and [`is_leaf_visible`] short-circuits to `true`.
+    visible_leaves: Option<VisibilitySet>,
     /// World-space viewport rectangle. Stored for future use when
     /// RenderSurface bounds include effect inflation.
     #[allow(dead_code)]
@@ -92,10 +94,27 @@ impl ViewportCull {
     /// Extracts visible NodeIds from the plan's region indices (live-drawn
     /// nodes) and promoted IDs (compositor-cached nodes), then builds the
     /// compact bitset.
+    ///
+    /// When every leaf in the scene is visible (count of visible IDs matches
+    /// the total layer count), returns an "all-visible" cull that skips the
+    /// O(N) bitset construction. On large fit-zoom scenes (100K+ nodes),
+    /// this eliminates ~1ms of per-frame allocation + bit-setting work.
     pub fn from_plan(
         plan: &crate::runtime::scene::FramePlan,
         layers: &super::layer::LayerList,
     ) -> Self {
+        // Count visible IDs to detect the all-visible fast path. Regions hold
+        // the live-drawn indices; promoted IDs are disjoint from live regions
+        // (see `draw_layers_with_scene_cache_skip` construction path).
+        let live_count: usize = plan.regions.iter().map(|(_, idx)| idx.len()).sum();
+        let visible_count = live_count + plan.promoted.len();
+        if visible_count >= layers.layers.len() {
+            return Self {
+                visible_leaves: None,
+                viewport: plan.viewport,
+            };
+        }
+
         let visible_leaves = VisibilitySet::from_ids(
             plan.regions
                 .iter()
@@ -107,7 +126,7 @@ impl ViewportCull {
                 .chain(plan.promoted.iter().copied()),
         );
         Self {
-            visible_leaves,
+            visible_leaves: Some(visible_leaves),
             viewport: plan.viewport,
         }
     }
@@ -115,7 +134,10 @@ impl ViewportCull {
     /// Returns `true` if the leaf node is visible (in the R-tree result set).
     #[inline]
     pub fn is_leaf_visible(&self, id: &NodeId) -> bool {
-        self.visible_leaves.contains(id)
+        match &self.visible_leaves {
+            Some(set) => set.contains(id),
+            None => true,
+        }
     }
 }
 
