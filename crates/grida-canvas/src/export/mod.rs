@@ -63,14 +63,30 @@ impl ExportSize {
                 width: self.width * scale,
                 height: self.height * scale,
             },
-            ExportConstraints::ScaleToWidth(width) => Self {
-                width: *width as f32,
-                height: self.height * *width as f32 / self.width,
-            },
-            ExportConstraints::ScaleToHeight(height) => Self {
-                width: self.width * *height as f32 / self.height,
-                height: *height as f32,
-            },
+            ExportConstraints::ScaleToWidth(width) => {
+                let target_w = *width as f32;
+                let target_h = if self.width > 0.0 {
+                    self.height * target_w / self.width
+                } else {
+                    0.0
+                };
+                Self {
+                    width: target_w,
+                    height: target_h,
+                }
+            }
+            ExportConstraints::ScaleToHeight(height) => {
+                let target_h = *height as f32;
+                let target_w = if self.height > 0.0 {
+                    self.width * target_h / self.height
+                } else {
+                    0.0
+                };
+                Self {
+                    width: target_w,
+                    height: target_h,
+                }
+            }
         }
     }
 }

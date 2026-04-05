@@ -37,10 +37,15 @@ export async function ai_budget_remaining({
  * @param cost_mills - integer cost in mills (`Math.ceil(cost_usd * 1000)`)
  */
 export async function ai_budget_deduct(cost_mills: number) {
+  if (!Number.isFinite(cost_mills) || cost_mills <= 0) {
+    throw new Error("cost_mills must be a positive finite number");
+  }
+
   const client = await createClient();
 
   const { data: userdata, error: auth_err } = await client.auth.getUser();
   if (auth_err) throw new Error(auth_err.message);
+  if (!userdata.user) throw new Error("Unauthorized");
   const user_id = userdata.user.id;
 
   const { success, limit, reset, remaining } = await ratelimit.limit(

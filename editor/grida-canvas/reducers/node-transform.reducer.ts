@@ -244,8 +244,11 @@ export default function updateNodeTransform(
       if (_draft.layout_inset_bottom) _draft.layout_inset_bottom -= dy;
 
       // size
-      // For text nodes, use ceil to ensure we don't cut off content
-      if (draft.type === "tspan") {
+      // For content-driven nodes (text, markdown), use ceil to ensure
+      // we don't cut off content — mirrors the `scale` path above.
+      const isContentDrivenResize =
+        draft.type === "tspan" || draft.type === "markdown";
+      if (isContentDrivenResize) {
         _draft.layout_target_width = Math.ceil(Math.max(currentWidth + dx, 0));
       } else {
         _draft.layout_target_width = cmath.quantize(
@@ -257,8 +260,7 @@ export default function updateNodeTransform(
       if (draft.type === "line") {
         _draft.layout_target_height = 0;
       } else {
-        // For text nodes, use ceil to ensure we don't cut off content
-        if (draft.type === "tspan") {
+        if (isContentDrivenResize) {
           _draft.layout_target_height = Math.ceil(
             Math.max(currentHeight + dy, 0)
           );

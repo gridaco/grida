@@ -132,8 +132,22 @@ export class EmbedBridge {
     return this.transformId ? this.transformId(id) : id;
   }
 
-  /** Map an array of node IDs through the optional transform (deduplicated). */
+  /**
+   * Map an array of node IDs through the optional transform.
+   * Preserves order and length (no deduplication) — callers like
+   * `getNodeIdPath` rely on positional semantics.
+   */
   private mapIds(ids: string[]): string[] {
+    if (!this.transformId) return ids;
+    return ids.map(this.transformId);
+  }
+
+  /**
+   * Map an array of node IDs through the optional transform, deduplicating
+   * the result. Use for selection arrays where multiple internal IDs may map
+   * to the same external ID.
+   */
+  private mapIdsUnique(ids: string[]): string[] {
     if (!this.transformId) return ids;
     return [...new Set(ids.map(this.transformId))];
   }
@@ -178,7 +192,7 @@ export class EmbedBridge {
       this.prevSelection = state.selection;
       this.post({
         type: "grida:selection-change",
-        selection: this.mapIds(state.selection),
+        selection: this.mapIdsUnique(state.selection),
       });
     }
 
@@ -232,7 +246,7 @@ export class EmbedBridge {
           sceneId: this.ed.state.scene_id
             ? this.mapId(this.ed.state.scene_id)
             : undefined,
-          selection: this.mapIds(this.ed.state.selection),
+          selection: this.mapIdsUnique(this.ed.state.selection),
         });
         break;
       case "grida:images-resolve": {

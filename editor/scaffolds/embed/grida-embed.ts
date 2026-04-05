@@ -201,12 +201,18 @@ export class GridaEmbed {
   exportNode(
     nodeId: string,
     format: EmbedExportAs,
-    requestId?: string
+    requestId?: string,
+    timeoutMs = 30_000
   ): Promise<ArrayBuffer | null> {
     const rid = requestId ?? this.generateRequestId();
-    return new Promise<ArrayBuffer | null>((resolve) => {
+    return new Promise<ArrayBuffer | null>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        unsub();
+        reject(new Error(`exportNode timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
       const unsub = this.on("export-result", (evt) => {
         if (evt.requestId !== rid) return;
+        clearTimeout(timer);
         unsub();
         resolve(evt.data);
       });
@@ -226,12 +232,18 @@ export class GridaEmbed {
    */
   getNodeIdPath(
     nodeId: string,
-    requestId?: string
+    requestId?: string,
+    timeoutMs = 10_000
   ): Promise<string[] | null> {
     const rid = requestId ?? this.generateRequestId();
-    return new Promise<string[] | null>((resolve) => {
+    return new Promise<string[] | null>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        unsub();
+        reject(new Error(`getNodeIdPath timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
       const unsub = this.on("node-id-path-result", (evt) => {
         if (evt.requestId !== rid) return;
+        clearTimeout(timer);
         unsub();
         resolve(evt.path);
       });
