@@ -3,9 +3,9 @@ import grida from "@grida/schema";
 import queryattributes from "./utils/attributes";
 
 /**
- * DOM fallback renderer for MarkdownEmbedNode.
+ * DOM fallback renderer for MarkdownNode.
  *
- * The canonical rendering path for MarkdownEmbedNode is the Rust/Skia canvas
+ * The canonical rendering path for MarkdownNode is the Rust/Skia canvas
  * backend (via MarkdownPainter). This component exists so the DOM renderer
  * doesn't throw "Unknown node type" when a markdown embed ends up in a
  * DOM-rendered subtree (e.g. previews, tests). It renders the raw markdown
@@ -15,7 +15,7 @@ export const MarkdownEmbedWidget = ({
   markdown,
   style,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.MarkdownEmbedNode>) => {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.MarkdownNode>) => {
   const text = typeof markdown === "string" ? markdown : "";
 
   return (
@@ -36,4 +36,4 @@ export const MarkdownEmbedWidget = ({
   );
 };
 
-MarkdownEmbedWidget.type = "markdown_embed";
+MarkdownEmbedWidget.type = "markdown";

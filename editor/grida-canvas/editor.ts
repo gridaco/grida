@@ -844,19 +844,19 @@ class EditorDocumentStore
     return this.getNodeById(id);
   }
 
-  public createMarkdownEmbedNode(
+  public createMarkdownNode(
     markdown = ""
-  ): NodeProxy<grida.program.nodes.MarkdownEmbedNode> {
+  ): NodeProxy<grida.program.nodes.MarkdownNode> {
     const id = this.idgen.next();
     this.insert(
       {
         id: id,
         prototype: {
-          type: "markdown_embed",
+          type: "markdown",
           _$id: id,
           markdown: markdown,
-          layout_target_width: 400,
-          layout_target_height: 300,
+          layout_target_width: 800,
+          layout_target_height: "auto",
           layout_positioning: "absolute",
           layout_inset_left: 0,
           layout_inset_top: 0,

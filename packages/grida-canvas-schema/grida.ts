@@ -1227,7 +1227,7 @@ export namespace grida.program.nodes {
     | ImageNode
     | VideoNode
     | ContainerNode
-    | MarkdownEmbedNode
+    | MarkdownNode
     | HTMLIFrameNode
     | HTMLRichTextNode
     | BitmapNode
@@ -1248,7 +1248,7 @@ export namespace grida.program.nodes {
     | ComputedImageNode
     | ComputedVideoNode
     | ComputedContainerNode
-    | ComputedMarkdownEmbedNode
+    | ComputedMarkdownNode
     | ComputedHTMLIFrameNode
     | ComputedHTMLRichTextNode
     | ComputedVectorNode
@@ -1269,7 +1269,7 @@ export namespace grida.program.nodes {
       Partial<ComputedBitmapNode> &
       Partial<ComputedVideoNode> &
       Partial<ComputedContainerNode> &
-      Partial<ComputedMarkdownEmbedNode> &
+      Partial<ComputedMarkdownNode> &
       Partial<ComputedHTMLIFrameNode> &
       Partial<ComputedHTMLRichTextNode> &
       Partial<ComputedVectorNode> &
@@ -1299,7 +1299,7 @@ export namespace grida.program.nodes {
       Partial<ImageNode> &
       Partial<VideoNode> &
       Partial<ContainerNode> &
-      Partial<MarkdownEmbedNode> &
+      Partial<MarkdownNode> &
       Partial<HTMLIFrameNode> &
       Partial<HTMLRichTextNode> &
       Partial<VectorNode> &
@@ -1388,7 +1388,7 @@ export namespace grida.program.nodes {
     | VideoNodePrototype
     | ContainerNodePrototype
     | __TPrototypeNode<
-        Omit<Partial<MarkdownEmbedNode>, __base_scene_node_properties>
+        Omit<Partial<MarkdownNode>, __base_scene_node_properties>
       >
     | __TPrototypeNode<
         Omit<Partial<HTMLIFrameNode>, __base_scene_node_properties>
@@ -2375,7 +2375,7 @@ export namespace grida.program.nodes {
   }
 
   /**
-   * [MarkdownEmbed]
+   * [Markdown]
    *
    * A render-only node that stores GitHub Flavored Markdown (GFM) source text
    * and renders it directly on the canvas via a Skia-backed markdown painter.
@@ -2384,7 +2384,7 @@ export namespace grida.program.nodes {
    * source is not broken into an editable tree of spans — the node is treated
    * as a single opaque block of rendered content.
    */
-  export interface MarkdownEmbedNode
+  export interface MarkdownNode
     extends
       i.IBaseNode,
       i.ISceneNode,
@@ -2393,17 +2393,17 @@ export namespace grida.program.nodes {
       i.ICornerRadius,
       i.IRectangularShapeTrait,
       i.IFill<cg.Paint> {
-    readonly type: "markdown_embed";
+    readonly type: "markdown";
     /** GFM markdown source text. */
     markdown: string;
   }
 
-  export interface ComputedMarkdownEmbedNode extends __ReplaceSubset<
-    MarkdownEmbedNode,
+  export interface ComputedMarkdownNode extends __ReplaceSubset<
+    MarkdownNode,
     {},
     {}
   > {
-    readonly type: "markdown_embed";
+    readonly type: "markdown";
   }
 
   /**
@@ -2926,7 +2926,7 @@ export namespace grida.program.nodes {
         case "iframe":
         case "image":
         case "line":
-        case "markdown_embed":
+        case "markdown":
         case "richtext":
         case "tspan":
         case "vector":

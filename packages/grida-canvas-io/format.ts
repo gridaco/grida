@@ -390,7 +390,7 @@ export namespace format {
       ["boolean", fbs.NodeType.BooleanOperation],
       ["polygon", fbs.NodeType.RegularPolygon],
       ["star", fbs.NodeType.RegularStarPolygon],
-      ["markdown_embed", fbs.NodeType.MarkdownEmbed],
+      ["markdown", fbs.NodeType.MarkdownEmbed],
     ]);
 
     export const NODE_TYPE_DECODE = new Map<
@@ -409,7 +409,7 @@ export namespace format {
       [fbs.NodeType.BooleanOperation, "boolean"],
       [fbs.NodeType.RegularPolygon, "polygon"],
       [fbs.NodeType.RegularStarPolygon, "star"],
-      [fbs.NodeType.MarkdownEmbed, "markdown_embed"],
+      [fbs.NodeType.MarkdownEmbed, "markdown"],
     ]);
 
     // BasicShapeNodeType enum mappings (maps TS node types to BasicShapeNodeType enum)
@@ -1915,8 +1915,8 @@ export namespace format {
             nodeType = fbs.Node.TextSpanNode;
             break;
           }
-          case "markdown_embed": {
-            const mdNode = node as grida.program.nodes.MarkdownEmbedNode;
+          case "markdown": {
+            const mdNode = node as grida.program.nodes.MarkdownNode;
 
             const fillPaintsFiltered = paints(mdNode, "fill");
             const fillPaintsOffset = format.paint.encode.fillPaints(
@@ -5866,7 +5866,7 @@ export namespace format {
         }
 
         /**
-         * Decodes MarkdownEmbedNode.
+         * Decodes MarkdownNode (FBS: MarkdownEmbedNode).
          */
         export function markdownEmbed(
           n: fbs.MarkdownEmbedNode,
@@ -5876,7 +5876,7 @@ export namespace format {
           opacity: number,
           layoutFields: ReturnType<typeof format.layout.decode.nodeLayout>,
           effects?: grida.program.nodes.i.IEffects
-        ): grida.program.nodes.MarkdownEmbedNode {
+        ): grida.program.nodes.MarkdownNode {
           const props = n.properties();
           const fillPaints = props
             ? format.paint.decode.fillPaints(props)
@@ -5891,7 +5891,7 @@ export namespace format {
           const baseLocked = systemNode.locked() ?? false;
 
           return {
-            type: "markdown_embed",
+            type: "markdown",
             id,
             name: baseName,
             active: baseActive,
@@ -5912,7 +5912,7 @@ export namespace format {
             ...layoutFields,
             rotation: layoutFields.rotation ?? 0,
             ...(effects || {}),
-          } satisfies grida.program.nodes.MarkdownEmbedNode;
+          } satisfies grida.program.nodes.MarkdownNode;
         }
 
         /**

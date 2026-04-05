@@ -3230,9 +3230,9 @@ export namespace editor.api {
       image: grida.program.document.ImageRef
     ): NodeProxy<grida.program.nodes.ImageNode>;
     createTextNode(text: string): NodeProxy<grida.program.nodes.TextSpanNode>;
-    createMarkdownEmbedNode(
+    createMarkdownNode(
       markdown?: string
-    ): NodeProxy<grida.program.nodes.MarkdownEmbedNode>;
+    ): NodeProxy<grida.program.nodes.MarkdownNode>;
     createRectangleNode(): NodeProxy<grida.program.nodes.RectangleNode>;
 
     /**

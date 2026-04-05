@@ -31,7 +31,7 @@ export namespace ReactNodeRenderers {
   export const image = ImageWidget;
   export const video = VideoWidget;
   export const richtext = RichTextWidget;
-  export const markdown_embed = MarkdownEmbedWidget;
+  export const markdown = MarkdownEmbedWidget;
   export const bitmap = BitmapWidget;
   // export const icon = IconWidget;
   // export const Theme = ThemeWidget;

@@ -135,7 +135,7 @@ export function useInsertFile() {
         position ? [position.clientX, position.clientY] : [0, 0]
       );
 
-      const node = instance.commands.createMarkdownEmbedNode(markdown);
+      const node = instance.commands.createMarkdownNode(markdown);
       node.$.name = name;
       node.$.layout_inset_left = x;
       node.$.layout_inset_top = y;

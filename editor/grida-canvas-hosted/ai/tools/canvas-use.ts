@@ -395,7 +395,7 @@ export namespace canvas_use {
       }
     ): Promise<ToolCallOutput<{ node_id: string }>> {
       try {
-        const node = editor.commands.createMarkdownEmbedNode(params.markdown);
+        const node = editor.commands.createMarkdownNode(params.markdown);
         return {
           state: "output-available",
           output: {

@@ -17,6 +17,7 @@ import {
   GroupIcon,
   Half2Icon,
   LayersIcon,
+  ReaderIcon,
 } from "@radix-ui/react-icons";
 import { SquaresUniteIcon } from "lucide-react";
 
@@ -36,6 +37,8 @@ export function NodeTypeIcon({
       return <GlobeIcon className={className} />;
     case "richtext":
       return <TextIcon className={className} />;
+    case "markdown":
+      return <ReaderIcon className={className} />;
     case "video":
       return <VideoIcon className={className} />;
     case "template_instance":
