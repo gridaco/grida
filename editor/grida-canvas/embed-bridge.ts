@@ -1,6 +1,21 @@
 import type { Editor } from "./editor";
-import type { EmbedCommand, EmbedSceneInfo } from "./embed-protocol";
+import type {
+  EmbedCommand,
+  EmbedExportAs,
+  EmbedSceneInfo,
+} from "./embed-protocol";
 import { isEmbedCommand } from "./embed-protocol";
+import type { types } from "@grida/canvas-wasm";
+
+/**
+ * Convert protocol export format to the WASM `types.ExportAs` representation.
+ * The types are structurally identical but kept separate so the protocol file
+ * stays dependency-free.
+ */
+function toWasmExportAs(fmt: EmbedExportAs): types.ExportAs {
+  // The shapes are identical — this cast is safe.
+  return fmt as unknown as types.ExportAs;
+}
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -117,8 +132,22 @@ export class EmbedBridge {
     return this.transformId ? this.transformId(id) : id;
   }
 
-  /** Map an array of node IDs through the optional transform (deduplicated). */
+  /**
+   * Map an array of node IDs through the optional transform.
+   * Preserves order and length (no deduplication) — callers like
+   * `getNodeIdPath` rely on positional semantics.
+   */
   private mapIds(ids: string[]): string[] {
+    if (!this.transformId) return ids;
+    return ids.map(this.transformId);
+  }
+
+  /**
+   * Map an array of node IDs through the optional transform, deduplicating
+   * the result. Use for selection arrays where multiple internal IDs may map
+   * to the same external ID.
+   */
+  private mapIdsUnique(ids: string[]): string[] {
     if (!this.transformId) return ids;
     return [...new Set(ids.map(this.transformId))];
   }
@@ -163,7 +192,7 @@ export class EmbedBridge {
       this.prevSelection = state.selection;
       this.post({
         type: "grida:selection-change",
-        selection: this.mapIds(state.selection),
+        selection: this.mapIdsUnique(state.selection),
       });
     }
 
@@ -217,7 +246,7 @@ export class EmbedBridge {
           sceneId: this.ed.state.scene_id
             ? this.mapId(this.ed.state.scene_id)
             : undefined,
-          selection: this.mapIds(this.ed.state.selection),
+          selection: this.mapIdsUnique(this.ed.state.selection),
         });
         break;
       case "grida:images-resolve": {
@@ -228,6 +257,63 @@ export class EmbedBridge {
         }
         break;
       }
+      case "grida:export": {
+        const surface = this.ed.wasmScene;
+        if (!surface) {
+          this.post({
+            type: "grida:export-result",
+            requestId: cmd.requestId,
+            data: null,
+            format: cmd.format.format,
+          });
+          break;
+        }
+        try {
+          const result = surface.exportNodeAs(
+            cmd.nodeId,
+            toWasmExportAs(cmd.format)
+          );
+          const buf = result.data.buffer.slice(
+            result.data.byteOffset,
+            result.data.byteOffset + result.data.byteLength
+          ) as ArrayBuffer;
+          this.post(
+            {
+              type: "grida:export-result",
+              requestId: cmd.requestId,
+              data: buf,
+              format: cmd.format.format,
+            },
+            [buf]
+          );
+        } catch {
+          this.post({
+            type: "grida:export-result",
+            requestId: cmd.requestId,
+            data: null,
+            format: cmd.format.format,
+          });
+        }
+        break;
+      }
+      case "grida:get-node-id-path": {
+        const surface = this.ed.wasmScene;
+        if (!surface) {
+          this.post({
+            type: "grida:node-id-path-result",
+            requestId: cmd.requestId,
+            path: null,
+          });
+          break;
+        }
+        const path = surface.getNodeIdPath(cmd.nodeId);
+        this.post({
+          type: "grida:node-id-path-result",
+          requestId: cmd.requestId,
+          path: path ? this.mapIds(path) : null,
+        });
+        break;
+      }
     }
   }
 
@@ -235,7 +321,14 @@ export class EmbedBridge {
   // Transport
   // ---------------------------------------------------------------------------
 
-  private post(event: Record<string, unknown>): void {
-    window.parent.postMessage(event, "*");
+  private post(
+    event: Record<string, unknown>,
+    transfer?: Transferable[]
+  ): void {
+    if (transfer && transfer.length > 0) {
+      window.parent.postMessage(event, "*", transfer);
+    } else {
+      window.parent.postMessage(event, "*");
+    }
   }
 }

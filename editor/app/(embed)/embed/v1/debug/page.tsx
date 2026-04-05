@@ -29,6 +29,27 @@ function formatTime(ts: number) {
   } as Intl.DateTimeFormatOptions);
 }
 
+const EXPORT_FORMATS = ["PNG", "JPEG", "WEBP", "BMP", "PDF", "SVG"] as const;
+type ExportFormat = (typeof EXPORT_FORMATS)[number];
+
+const MIME_TYPES: Record<string, string> = {
+  PNG: "image/png",
+  JPEG: "image/jpeg",
+  WEBP: "image/webp",
+  BMP: "image/bmp",
+  PDF: "application/pdf",
+  SVG: "image/svg+xml",
+};
+
+const FILE_EXTS: Record<string, string> = {
+  PNG: "png",
+  JPEG: "jpg",
+  WEBP: "webp",
+  BMP: "bmp",
+  PDF: "pdf",
+  SVG: "svg",
+};
+
 export default function EmbedDebugPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -40,6 +61,20 @@ export default function EmbedDebugPage() {
   const [currentScene, setCurrentScene] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  // Export state
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("PNG");
+  const [exportScale, setExportScale] = useState("2");
+  const [exporting, setExporting] = useState(false);
+
+  // Node ID path state
+  const [lastNodeIdPath, setLastNodeIdPath] = useState<string[] | null>(null);
+  const [nodeIdPathQuerying, setNodeIdPathQuerying] = useState(false);
+
+  // Request ID counter
+  const nextRequestIdRef = useRef(0);
+  const pendingExportRef = useRef<string | null>(null);
+  const pendingNodeIdPathRef = useRef<string | null>(null);
 
   const addLog = useCallback(
     (dir: "in" | "out", type: string, data: unknown) => {
@@ -69,6 +104,7 @@ export default function EmbedDebugPage() {
             break;
           case "grida:selection-change":
             setSelection(e.data.selection ?? []);
+            setLastNodeIdPath(null);
             break;
           case "grida:scene-change":
             setCurrentScene(e.data.sceneId ?? null);
@@ -78,6 +114,39 @@ export default function EmbedDebugPage() {
             setScenes(e.data.scenes ?? []);
             setSelection(e.data.selection ?? []);
             setCurrentScene(e.data.sceneId ?? null);
+            break;
+          case "grida:export-result":
+            if (
+              pendingExportRef.current &&
+              e.data.requestId === pendingExportRef.current
+            ) {
+              pendingExportRef.current = null;
+              setExporting(false);
+              if (e.data.data) {
+                const fmt = (e.data.format as string) ?? "PNG";
+                const blob = new Blob([e.data.data], {
+                  type: MIME_TYPES[fmt] ?? "application/octet-stream",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `export.${FILE_EXTS[fmt] ?? "bin"}`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              }
+            }
+            break;
+          case "grida:node-id-path-result":
+            if (
+              pendingNodeIdPathRef.current &&
+              e.data.requestId === pendingNodeIdPathRef.current
+            ) {
+              pendingNodeIdPathRef.current = null;
+              setNodeIdPathQuerying(false);
+              setLastNodeIdPath(e.data.path ?? null);
+            }
             break;
         }
       }
@@ -375,9 +444,6 @@ export default function EmbedDebugPage() {
             <h3 className="mb-1 text-xs font-semibold text-foreground">
               Current State
             </h3>
-            <p className="mb-2 text-[11px] text-muted-foreground">
-              Live snapshot of the embed&apos;s internal state.
-            </p>
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Mode</span>
@@ -392,17 +458,116 @@ export default function EmbedDebugPage() {
                 <span className="font-mono">{currentScene ?? "—"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Scenes</span>
+                <span className="text-muted-foreground">Scenes</span>
                 <span className="font-mono">{scenes.length}</span>
               </div>
-              <div>
-                <span className="text-muted-foreground">Selected Nodes</span>
-                <span className="ml-2 font-mono text-[11px]">
-                  {selection.length > 0 ? selection.join(", ") : "None"}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Selection</span>
+                <span className="font-mono">
+                  {selection.length > 0 ? selection.length : "—"}
                 </span>
               </div>
             </div>
           </section>
+
+          {/* Selection inspector — shown when exactly 1 node selected */}
+          {selection.length === 1 && (
+            <section>
+              <h3 className="mb-1 text-xs font-semibold text-foreground">
+                Selected Node
+              </h3>
+              <span className="mb-2 block font-mono text-[11px] text-muted-foreground">
+                {selection[0]}
+              </span>
+              <div className="flex flex-col gap-2">
+                {/* Export */}
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={exportFormat}
+                    onChange={(e) =>
+                      setExportFormat(e.target.value as ExportFormat)
+                    }
+                    className="h-7 rounded-md border bg-background px-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    {EXPORT_FORMATS.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                  {exportFormat !== "PDF" && exportFormat !== "SVG" && (
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="10"
+                      step="0.5"
+                      value={exportScale}
+                      onChange={(e) => setExportScale(e.target.value)}
+                      className="h-7 w-14 rounded-md border bg-background px-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                      title="Scale"
+                    />
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    disabled={!ready || exporting}
+                    onClick={() => {
+                      const rid = `__dbg_export_${++nextRequestIdRef.current}`;
+                      pendingExportRef.current = rid;
+                      setExporting(true);
+                      const isPdfOrSvg =
+                        exportFormat === "PDF" || exportFormat === "SVG";
+                      const format = isPdfOrSvg
+                        ? { format: exportFormat }
+                        : {
+                            format: exportFormat,
+                            constraints: {
+                              type: "scale" as const,
+                              value: parseFloat(exportScale) || 1,
+                            },
+                          };
+                      postCommand({
+                        type: "grida:export",
+                        requestId: rid,
+                        nodeId: selection[0],
+                        format,
+                      });
+                    }}
+                  >
+                    {exporting ? "..." : "Export"}
+                  </Button>
+                </div>
+                {/* Node ID Path */}
+                <div className="flex flex-col gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-fit px-2 text-[11px]"
+                    disabled={!ready || nodeIdPathQuerying}
+                    onClick={() => {
+                      const rid = `__dbg_path_${++nextRequestIdRef.current}`;
+                      pendingNodeIdPathRef.current = rid;
+                      setNodeIdPathQuerying(true);
+                      setLastNodeIdPath(null);
+                      postCommand({
+                        type: "grida:get-node-id-path",
+                        requestId: rid,
+                        nodeId: selection[0],
+                      });
+                    }}
+                  >
+                    {nodeIdPathQuerying ? "..." : "Get Path"}
+                  </Button>
+                  {lastNodeIdPath !== null && (
+                    <div className="font-mono text-[11px] text-muted-foreground">
+                      {lastNodeIdPath.join(" > ")}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
         </aside>
 
         {/* Center: iframe */}

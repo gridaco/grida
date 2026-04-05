@@ -7,7 +7,7 @@ import {
   ChatBoxSubmit,
   ChatBoxTextArea,
 } from "@/components/chat";
-import { CommandIcon } from "lucide-react";
+
 import {
   Tooltip,
   TooltipContent,
@@ -105,7 +105,7 @@ function CanvasConsumer() {
   const credits = useCredits();
   const editor = useCurrentEditor();
   const [prompt, setPrompt] = useState("");
-  const model = useImageModelConfig("black-forest-labs/flux-schnell");
+  const model = useImageModelConfig("openai/gpt-image-1-mini");
   const { generate, key, loading, image, start, end } = useGenerateImage();
 
   const onCommit = (value: { text: string }) => {
@@ -206,7 +206,7 @@ function SidebarRight() {
   );
 }
 
-function Credits({
+function BudgetBadge({
   credits,
   className,
 }: {
@@ -222,15 +222,12 @@ function Credits({
             className
           )}
         >
-          <CommandIcon className="size-3" />
-          <span className="text-sm font-mono">
-            {credits.remaining?.toString()}
-          </span>
+          <span className="text-sm font-mono">{credits.remainingUSD}</span>
         </div>
       </TooltipTrigger>
       <TooltipContent side="top" align="start">
         <div className="text-sm font-mono">
-          {credits.remaining?.toString()} free credits remaining
+          {credits.remainingUSD} free budget remaining
         </div>
       </TooltipContent>
     </Tooltip>
@@ -319,10 +316,6 @@ function Chat({
               <SelectItem key={m.id} value={m.id}>
                 <div className="w-full flex items-center justify-between gap-2">
                   {m.label}
-                  <Badge className="flex items-center gap-1" variant="outline">
-                    <CommandIcon className="size-3" />
-                    {m.avg_credit}
-                  </Badge>
                   <Badge variant="outline">~{m.speed_max}</Badge>
                 </div>
               </SelectItem>
@@ -334,7 +327,7 @@ function Chat({
         <ChatBoxTextArea />
         <ChatBoxFooter>
           <div className="flex-1" />
-          {credits && <Credits credits={credits} className="mr-2" />}
+          {credits && <BudgetBadge credits={credits} className="mr-2" />}
           <ChatBoxSubmit />
         </ChatBoxFooter>
       </ChatBox>

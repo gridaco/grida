@@ -57,6 +57,9 @@ enum Command {
     /// Measure `load_scene()` per-stage timings (layout, geometry, effects, layers).
     /// Identifies cold-start bottlenecks without GPU rendering.
     LoadBench(bench::LoadBenchArgs),
+    /// Benchmark static image export (PNG/JPEG) for specific nodes.
+    /// Measures per-stage timings and supports pixel-exact comparison.
+    ExportBench(bench::ExportBenchArgs),
 }
 
 #[tokio::main]
@@ -69,6 +72,7 @@ async fn main() -> Result<()> {
         Some(Command::SvgToGrida(args)) => run_svg_to_grida(args),
         Some(Command::BenchReport(args)) => bench::run_bench_report(args, loader).await?,
         Some(Command::LoadBench(args)) => bench::run_load_bench(args, loader).await?,
+        Some(Command::ExportBench(args)) => bench::run_export_bench(args, loader).await?,
         None => run_interactive(cli.file, cli.system_fonts).await?,
     }
     Ok(())
@@ -403,23 +407,11 @@ fn scene_from_markdown_embed_path(path: &Path) -> Result<Scene> {
     let md_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
 
-    let width = 800.0f32;
-    let temp_fonts = {
-        use cg::resources::ByteStore;
-        use cg::runtime::font_repository::FontRepository;
-        let mut repo =
-            FontRepository::new(std::sync::Arc::new(std::sync::Mutex::new(ByteStore::new())));
-        repo.enable_system_fallback();
-        repo
-    };
-    let styled_html = cg::htmlcss::markdown_to_styled_html(&md_source);
-    let height =
-        cg::htmlcss::measure_content_height(&styled_html, width, &temp_fonts).unwrap_or(600.0);
-
     let nf = NodeFactory::new();
     let mut node = nf.create_markdown_embed_node();
     node.markdown = md_source;
-    node.size = cg::node::schema::Size { width, height };
+    node.width = Some(800.0);
+    node.height = None; // auto-height: resolved at layout/geometry time
 
     let mut graph = SceneGraph::new();
     graph.append_child(Node::MarkdownEmbed(node), Parent::Root);

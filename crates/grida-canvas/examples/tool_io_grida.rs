@@ -209,6 +209,7 @@ fn classify_json_node(node: &io_grida::JSONNode) -> &'static str {
         io_grida::JSONNode::TextSpan(_) => "tspan",
         io_grida::JSONNode::BooleanOperation(_) => "boolean",
         io_grida::JSONNode::Image(_) => "image",
+        io_grida::JSONNode::MarkdownEmbed(_) => "markdown_embed",
         io_grida::JSONNode::Scene(_) => "scene",
         io_grida::JSONNode::Unknown(_) => "unknown",
     }

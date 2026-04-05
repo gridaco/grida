@@ -26,6 +26,7 @@
 import type {
   EmbedCommand,
   EmbedEvent,
+  EmbedExportAs,
   EmbedSceneInfo,
 } from "@/grida-canvas/embed-protocol";
 
@@ -45,6 +46,15 @@ type EmbedEventMap = {
     sceneId: string | undefined;
     selection: string[];
   };
+  "export-result": {
+    requestId: string;
+    data: ArrayBuffer | null;
+    format: string;
+  };
+  "node-id-path-result": {
+    requestId: string;
+    path: string[] | null;
+  };
 };
 
 type EmbedEventType = keyof EmbedEventMap;
@@ -57,6 +67,8 @@ const EVENT_TYPE_MAP: Record<EmbedEventType, EmbedEvent["type"]> = {
   "scene-change": "grida:scene-change",
   "images-needed": "grida:images-needed",
   pong: "grida:pong",
+  "export-result": "grida:export-result",
+  "node-id-path-result": "grida:node-id-path-result",
 };
 
 // ---------------------------------------------------------------------------
@@ -69,6 +81,7 @@ export class GridaEmbed {
   private ready = false;
   private queue: EmbedCommand[] = [];
   private handleMessage: (e: MessageEvent) => void;
+  private nextRequestId = 0;
 
   constructor(iframe: HTMLIFrameElement) {
     this.iframe = iframe;
@@ -174,6 +187,74 @@ export class GridaEmbed {
     this.send({ type: "grida:load", data: buf, format });
   }
 
+  /**
+   * Export a single node as an image, PDF, or SVG.
+   *
+   * Returns the raw exported bytes, or `null` if the node was not found or
+   * the export failed.
+   *
+   * @param nodeId - The node to export.
+   * @param format - Export format descriptor (PNG, JPEG, WEBP, BMP, PDF, SVG).
+   * @param requestId - Optional caller-chosen ID for correlating the response.
+   *                    Auto-generated when omitted.
+   */
+  exportNode(
+    nodeId: string,
+    format: EmbedExportAs,
+    requestId?: string,
+    timeoutMs = 30_000
+  ): Promise<ArrayBuffer | null> {
+    const rid = requestId ?? this.generateRequestId();
+    return new Promise<ArrayBuffer | null>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        unsub();
+        reject(new Error(`exportNode timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      const unsub = this.on("export-result", (evt) => {
+        if (evt.requestId !== rid) return;
+        clearTimeout(timer);
+        unsub();
+        resolve(evt.data);
+      });
+      this.send({ type: "grida:export", requestId: rid, nodeId, format });
+    });
+  }
+
+  /**
+   * Get the structural ancestry path from the scene root to a node.
+   *
+   * Returns an array `[root, ..., parent, nodeId]`, or `null` if the node
+   * does not exist in the current scene.
+   *
+   * @param nodeId - The target node.
+   * @param requestId - Optional caller-chosen ID for correlating the response.
+   *                    Auto-generated when omitted.
+   */
+  getNodeIdPath(
+    nodeId: string,
+    requestId?: string,
+    timeoutMs = 10_000
+  ): Promise<string[] | null> {
+    const rid = requestId ?? this.generateRequestId();
+    return new Promise<string[] | null>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        unsub();
+        reject(new Error(`getNodeIdPath timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      const unsub = this.on("node-id-path-result", (evt) => {
+        if (evt.requestId !== rid) return;
+        clearTimeout(timer);
+        unsub();
+        resolve(evt.path);
+      });
+      this.send({
+        type: "grida:get-node-id-path",
+        requestId: rid,
+        nodeId,
+      });
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Events
   // -------------------------------------------------------------------------
@@ -204,6 +285,10 @@ export class GridaEmbed {
   // -------------------------------------------------------------------------
   // Internal
   // -------------------------------------------------------------------------
+
+  private generateRequestId(): string {
+    return `__embed_${++this.nextRequestId}`;
+  }
 
   private send(cmd: EmbedCommand): void {
     if (!this.ready) {

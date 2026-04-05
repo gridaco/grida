@@ -200,6 +200,63 @@ embed.on("pong", ({ ready, scenes, sceneId, selection }) => {
 });
 ```
 
+#### `exportNode(nodeId, format, requestId?)`
+
+Export a single node as an image, PDF, or SVG. Returns a Promise that resolves with the raw exported bytes, or `null` if the node was not found or the export failed.
+
+```ts
+const pngBytes = await embed.exportNode("1:23", {
+  format: "PNG",
+  constraints: { type: "scale", value: 2 },
+});
+
+if (pngBytes) {
+  const blob = new Blob([pngBytes], { type: "image/png" });
+  const url = URL.createObjectURL(blob);
+  // use url...
+}
+```
+
+| Parameter   | Type             | Description                                                              |
+| ----------- | ---------------- | ------------------------------------------------------------------------ |
+| `nodeId`    | `string`         | The node to export.                                                      |
+| `format`    | `EmbedExportAs`  | Export format descriptor (see below).                                    |
+| `requestId` | `string` (opt.)  | Caller-chosen ID for correlating the response. Auto-generated if omitted.|
+
+**`EmbedExportAs` format variants:**
+
+| Format | Required fields                           | Optional            |
+| ------ | ----------------------------------------- | ------------------- |
+| PNG    | `{ format: "PNG", constraints }`          |                     |
+| JPEG   | `{ format: "JPEG", constraints }`         | `quality` (0--100)  |
+| WEBP   | `{ format: "WEBP", constraints }`         | `quality` (0--100)  |
+| BMP    | `{ format: "BMP", constraints }`          |                     |
+| PDF    | `{ format: "PDF" }`                       |                     |
+| SVG    | `{ format: "SVG" }`                       |                     |
+
+**`constraints` options:**
+
+| Type                  | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `{ type: "none" }`              | Export at native resolution.          |
+| `{ type: "scale", value: 2 }`  | Scale by the given factor (e.g. 2x). |
+| `{ type: "scale-to-fit-width", value: 1024 }`  | Scale to fit the given width (px).  |
+| `{ type: "scale-to-fit-height", value: 768 }`  | Scale to fit the given height (px). |
+
+#### `getNodeIdPath(nodeId, requestId?)`
+
+Get the structural ancestry path from the scene root to a node. Returns a Promise that resolves with `[root, ..., parent, nodeId]`, or `null` if the node does not exist.
+
+```ts
+const path = await embed.getNodeIdPath("1:23");
+// e.g. ["0:1", "1:2", "1:23"]
+```
+
+| Parameter   | Type             | Description                                                              |
+| ----------- | ---------------- | ------------------------------------------------------------------------ |
+| `nodeId`    | `string`         | The target node.                                                         |
+| `requestId` | `string` (opt.)  | Caller-chosen ID for correlating the response. Auto-generated if omitted.|
+
 ### Events
 
 All events follow `.on(name, callback)` and return an unsubscribe function.
@@ -270,6 +327,29 @@ embed.on("pong", ({ ready, scenes, sceneId, selection }) => {
 });
 ```
 
+#### `export-result`
+
+Reply to an `exportNode()` call (or raw `grida:export` command). Contains the exported bytes and the request correlation ID.
+
+```ts
+embed.on("export-result", ({ requestId, data, format }) => {
+  // requestId: string (matches the request)
+  // data: ArrayBuffer | null
+  // format: string (e.g. "PNG", "SVG")
+});
+```
+
+#### `node-id-path-result`
+
+Reply to a `getNodeIdPath()` call (or raw `grida:get-node-id-path` command). Contains the ancestry path and the request correlation ID.
+
+```ts
+embed.on("node-id-path-result", ({ requestId, path }) => {
+  // requestId: string (matches the request)
+  // path: string[] | null (e.g. ["0:1", "1:2", "1:23"])
+});
+```
+
 ### `dispose()`
 
 Removes all listeners. Call when the embed is no longer needed.
@@ -294,6 +374,9 @@ grida:document-load      (document parsed, scenes available)
   |
   +-- user interacts ------> grida:selection-change
   +-- user interacts ------> grida:scene-change
+  |
+  +-- host requests -------> grida:export -----------> grida:export-result
+  +-- host requests -------> grida:get-node-id-path -> grida:node-id-path-result
   |
   v
 grida:load command       (host loads a new file)
@@ -360,22 +443,26 @@ The SDK communicates via `window.postMessage`. All messages have a `type` field 
 
 ### Host to iframe (commands)
 
-| Message type           | Payload                                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| `grida:load`           | `{ data: ArrayBuffer, format: "grida" \| "grida1" \| "fig" \| "json" \| "json.gz" \| "zip" }` |
-| `grida:select`         | `{ nodeIds: string[], mode?: "reset" \| "add" \| "toggle" }`                                  |
-| `grida:load-scene`     | `{ sceneId: string }`                                                                         |
-| `grida:fit`            | `{ selector?: string, animate?: boolean }`                                                    |
-| `grida:ping`           | (none)                                                                                        |
-| `grida:images-resolve` | `{ images: Record<string, ArrayBuffer> }`                                                     |
+| Message type               | Payload                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------- |
+| `grida:load`               | `{ data: ArrayBuffer, format: "grida" \| "grida1" \| "fig" \| "json" \| "json.gz" \| "zip" }` |
+| `grida:select`             | `{ nodeIds: string[], mode?: "reset" \| "add" \| "toggle" }`                                  |
+| `grida:load-scene`         | `{ sceneId: string }`                                                                         |
+| `grida:fit`                | `{ selector?: string, animate?: boolean }`                                                    |
+| `grida:ping`               | (none)                                                                                        |
+| `grida:images-resolve`     | `{ images: Record<string, ArrayBuffer> }`                                                     |
+| `grida:export`             | `{ requestId: string, nodeId: string, format: EmbedExportAs }`                                |
+| `grida:get-node-id-path`   | `{ requestId: string, nodeId: string }`                                                       |
 
 ### Iframe to host (events)
 
-| Message type             | Payload                                                                                                 | When                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `grida:ready`            | (none)                                                                                                  | Once, canvas mounted                                |
-| `grida:document-load`    | `{ scenes: Array<{ id: string, name: string }> }`                                                       | Each document load, after state is settled          |
-| `grida:selection-change` | `{ selection: string[] }`                                                                               | Selection changes (suppressed during document load) |
-| `grida:scene-change`     | `{ sceneId: string }`                                                                                   | Scene changes (suppressed during document load)     |
-| `grida:images-needed`    | `{ refs: string[] }`                                                                                    | Renderer needs image bytes (lazy, deduplicated)     |
-| `grida:pong`             | `{ ready: boolean, scenes: Array<{ id: string, name: string }>, sceneId: string, selection: string[] }` | Reply to `grida:ping`                               |
+| Message type                  | Payload                                                                                                 | When                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `grida:ready`                 | (none)                                                                                                  | Once, canvas mounted                                |
+| `grida:document-load`         | `{ scenes: Array<{ id: string, name: string }> }`                                                       | Each document load, after state is settled          |
+| `grida:selection-change`      | `{ selection: string[] }`                                                                               | Selection changes (suppressed during document load) |
+| `grida:scene-change`          | `{ sceneId: string }`                                                                                   | Scene changes (suppressed during document load)     |
+| `grida:images-needed`         | `{ refs: string[] }`                                                                                    | Renderer needs image bytes (lazy, deduplicated)     |
+| `grida:pong`                  | `{ ready: boolean, scenes: Array<{ id: string, name: string }>, sceneId: string, selection: string[] }` | Reply to `grida:ping`                               |
+| `grida:export-result`         | `{ requestId: string, data: ArrayBuffer \| null, format: string }`                                      | Reply to `grida:export`                             |
+| `grida:node-id-path-result`   | `{ requestId: string, path: string[] \| null }`                                                         | Reply to `grida:get-node-id-path`                   |
