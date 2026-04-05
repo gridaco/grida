@@ -64,6 +64,7 @@ pub enum GeoNodeKind {
     Container,
     BooleanOperation,
     TextSpan,
+    MarkdownEmbed,
     Leaf,
 }
 
@@ -283,11 +284,11 @@ pub fn extract_geo_data(node: &Node) -> NodeGeoData {
         },
         Node::MarkdownEmbed(n) => NodeGeoData {
             schema_transform: n.transform,
-            schema_width: n.size.width,
-            schema_height: n.size.height,
+            schema_width: n.width.unwrap_or(0.0),
+            schema_height: n.height.unwrap_or(0.0),
             content_origin_x: 0.0,
             content_origin_y: 0.0,
-            kind: GeoNodeKind::Leaf,
+            kind: GeoNodeKind::MarkdownEmbed,
             render_bounds_inflation: compute_inflation_uniform(
                 0.0,
                 StrokeAlign::Center,

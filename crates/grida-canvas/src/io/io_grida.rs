@@ -894,7 +894,7 @@ pub enum JSONNode {
     BooleanOperation(JSONBooleanOperationNode),
     #[serde(rename = "image")]
     Image(JSONImageNode),
-    #[serde(rename = "markdown_embed")]
+    #[serde(rename = "markdown", alias = "markdown_embed")]
     MarkdownEmbed(JSONMarkdownEmbedNode),
     #[serde(rename = "scene")]
     Scene(JSONSceneNode),
@@ -1689,9 +1689,13 @@ impl From<JSONMarkdownEmbedNode> for Node {
                 node.base.fe_noises,
             ),
             transform,
-            size: Size {
-                width: node.base.width.length(0.0),
-                height: node.base.height.length(0.0),
+            width: match &node.base.width {
+                CSSDimension::Auto => None,
+                CSSDimension::LengthPX(v) => Some(*v),
+            },
+            height: match &node.base.height {
+                CSSDimension::Auto => None,
+                CSSDimension::LengthPX(v) => Some(*v),
             },
             corner_radius: merge_corner_radius(
                 node.base.corner_radius,

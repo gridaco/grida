@@ -2079,7 +2079,8 @@ fn decode_markdown_embed_node(
         effects: lc.effects.clone(),
         mask: lc.mask,
         transform: sl.transform,
-        size: sl.size,
+        width: sl.width,
+        height: sl.height,
         corner_radius,
         markdown,
         fills,
@@ -4507,14 +4508,7 @@ fn encode_markdown_embed_node<'a, A: flatbuffers::Allocator + 'a>(
     let plt = affine_to_rotation_transform(&r.transform);
 
     let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
-    let layout = encode_shape_layout(
-        fbb,
-        x,
-        y,
-        Some(r.size.width),
-        Some(r.size.height),
-        &r.layout_child,
-    );
+    let layout = encode_shape_layout(fbb, x, y, r.width, r.height, &r.layout_child);
     let layer = encode_layer_trait(
         fbb,
         &LayerTraitInput {
