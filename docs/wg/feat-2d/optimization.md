@@ -1305,6 +1305,28 @@ expensive full redraws.
     the pipeline — `render_frame()` receives it as a parameter to avoid
     recomputation on cache-miss fallthrough.
 
+51. **Quantized DPR Snapping** (future)
+
+    **What:** round the effective raster DPR
+    (`device_dpr × interaction_scale × zoom`) to a small set of discrete
+    buckets (e.g. 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0) during active
+    interaction. Cache invalidation and raster-scale decisions key off
+    the **snapped** DPR, while the final blit uses the **continuous**
+    camera transform so the user still sees smooth zoom. Stable frames
+    drop the snap and raster at exact DPR for full fidelity. Boundary
+    hysteresis prevents thrash when raw DPR sits near a bucket edge.
+
+    **Why:** continuous zoom produces a unique effective DPR every frame,
+    which currently triggers per-frame `mark_all_stale()` on the
+    compositor cache, pan-cache invalidation, and atlas churn. On WASM
+    this O(N) invalidation loop is amplified 10–30× vs native and cannot
+    be offloaded to a worker thread. Snapping converts the cost from
+    _per-frame_ to _per-bucket-crossing_ (roughly once every 200–400 ms
+    at typical zoom velocity), letting cached GPU textures survive the
+    gesture instead of being nuked each frame. Visual quality loss is
+    bounded by the largest bucket ratio (~±12.5%) and is imperceptible
+    on in-flight gestures for static content.
+
 ---
 
 This list is designed to evolve the renderer from single-threaded mode to
