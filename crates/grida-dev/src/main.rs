@@ -57,6 +57,9 @@ enum Command {
     /// Measure `load_scene()` per-stage timings (layout, geometry, effects, layers).
     /// Identifies cold-start bottlenecks without GPU rendering.
     LoadBench(bench::LoadBenchArgs),
+    /// Benchmark static image export (PNG/JPEG) for specific nodes.
+    /// Measures per-stage timings and supports pixel-exact comparison.
+    ExportBench(bench::ExportBenchArgs),
 }
 
 #[tokio::main]
@@ -69,6 +72,7 @@ async fn main() -> Result<()> {
         Some(Command::SvgToGrida(args)) => run_svg_to_grida(args),
         Some(Command::BenchReport(args)) => bench::run_bench_report(args, loader).await?,
         Some(Command::LoadBench(args)) => bench::run_load_bench(args, loader).await?,
+        Some(Command::ExportBench(args)) => bench::run_export_bench(args, loader).await?,
         None => run_interactive(cli.file, cli.system_fonts).await?,
     }
     Ok(())

@@ -53,7 +53,7 @@ pub struct ExportSize {
 }
 
 impl ExportSize {
-    fn apply_constraints(&self, constraints: &ExportConstraints) -> Self {
+    pub fn apply_constraints(&self, constraints: &ExportConstraints) -> Self {
         match constraints {
             ExportConstraints::None => Self {
                 width: self.width,

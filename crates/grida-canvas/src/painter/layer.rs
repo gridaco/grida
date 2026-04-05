@@ -500,6 +500,13 @@ impl LayerList {
     }
 
     /// Build a layer list starting from a node subtree using a scene cache.
+    ///
+    /// `opacity` is the starting parent opacity for the subtree root.
+    /// For export, pass `1.0` — ancestor opacity is not propagated, so the
+    /// node renders in isolation with only its own opacity. This matches
+    /// standard design tool export semantics.
+    /// For compositing within a live scene, pass the accumulated ancestor
+    /// opacity so the subtree blends correctly in context.
     pub fn from_node(
         id: &NodeId,
         graph: &SceneGraph,

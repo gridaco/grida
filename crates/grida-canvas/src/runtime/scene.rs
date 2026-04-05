@@ -2570,6 +2570,78 @@ impl Renderer {
         let _ = self.draw_nocache(canvas, &frame, background, width, height);
     }
 
+    /// Export a single node as a raster image.
+    ///
+    /// Renders only the target node's subtree onto a temporary raster surface,
+    /// using the live `SceneCache` for geometry, effects, and paragraph/path
+    /// data. Cost is O(subtree) — independent of total scene size.
+    ///
+    /// The caller computes `export_rect` (world-space bounds from the geometry
+    /// cache) and `export_size` (pixel dimensions after applying constraints).
+    ///
+    /// Returns `None` if the scene is not loaded or the surface cannot be created.
+    pub fn export_node_image(
+        &self,
+        node_id: &NodeId,
+        export_rect: math2::Rectangle,
+        export_size: (f32, f32),
+    ) -> Option<Image> {
+        let scene = self.scene.as_ref()?;
+        let (out_w, out_h) = export_size;
+        let pixel_w = out_w as i32;
+        let pixel_h = out_h as i32;
+        if pixel_w <= 0 || pixel_h <= 0 {
+            return None;
+        }
+
+        // Create a temporary raster surface at the target resolution.
+        let mut surface = surfaces::raster_n32_premul((pixel_w, pixel_h))?;
+        let canvas = surface.canvas();
+
+        // Set up camera: same logic as export_as_image.rs
+        let mut camera = Camera2D::new_from_bounds(export_rect);
+        let scale = if export_rect.width > 0.0 {
+            out_w / export_rect.width
+        } else {
+            1.0
+        };
+        camera.set_size(Size {
+            width: out_w,
+            height: out_h,
+        });
+        camera.set_zoom(scale);
+
+        // Clear and apply camera transform
+        canvas.clear(Color::TRANSPARENT);
+        canvas.save();
+        canvas.concat(&sk::sk_matrix(camera.view_matrix().matrix));
+
+        // Build a LayerList for only the target subtree (O(subtree), not O(N)).
+        //
+        // opacity = 1.0: ancestor opacity is intentionally NOT propagated.
+        // The node is exported in isolation — only its own opacity applies.
+        // This matches standard design tool export behavior (Figma, Sketch):
+        // a rectangle at opacity 1.0 inside a group at opacity 0.5 exports
+        // at full opacity, not 50%.
+        let cache = &self.scene_cache;
+        let subtree_layers =
+            crate::painter::layer::LayerList::from_node(node_id, &scene.graph, cache, 1.0);
+
+        // Draw using the existing warm scene cache (pictures, paragraphs, paths).
+        let painter = Painter::new_with_scene_cache(
+            canvas,
+            &self.fonts,
+            &self.images,
+            cache,
+            RenderPolicy::default(),
+        );
+        painter.draw_layer_list(&subtree_layers);
+
+        canvas.restore();
+
+        Some(surface.image_snapshot())
+    }
+
     /// Capture (or re-capture) layer images for promoted nodes.
     ///
     /// Called every frame when layer compositing is enabled (GPU only).
