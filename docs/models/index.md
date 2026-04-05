@@ -1,16 +1,17 @@
 ---
 slug: pricing
+format: md
 ---
 
 # Models & Pricing
 
 Grida uses AI models across the editor for text generation, image generation, and image processing. This page documents the available models, their capabilities, and pricing.
 
-## Credits
+All models are routed through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).
 
-Grida uses a **credit** system for AI operations. 1 credit = $0.0016 USD.
+## Budget
 
-Credits provide a unified billing unit across all AI features regardless of the underlying model or provider.
+Free users receive a **$1.00 monthly budget** (rolling 30-day window). Each AI operation deducts the model's cost from the budget.
 
 ## Text Models
 
@@ -27,74 +28,108 @@ Models are organized into **tiers** based on capability and cost:
 
 ### Current Models
 
-| Tier   | Model                                         | Context Window | Max Output | Input (per 1M tokens) | Output (per 1M tokens) |
-| ------ | --------------------------------------------- | -------------- | ---------- | --------------------- | ---------------------- |
-| `nano` | GPT-5 Nano (`openai/gpt-5-nano`)              | 400K           | 128K       | $0.05                 | $0.40                  |
-| `mini` | GPT-5 Mini (`openai/gpt-5-mini`)              | 400K           | 128K       | $0.25                 | $2.00                  |
-| `pro`  | Claude Sonnet 4 (`anthropic/claude-sonnet-4`) | 200K           | 64K        | $3.00                 | $15.00                 |
-| `max`  | Claude Opus 4 (`anthropic/claude-opus-4`)     | 200K           | 32K        | $15.00                | $75.00                 |
+| Tier   | Model                                             | Context | Max Output | Input (per 1M) | Output (per 1M) |
+| ------ | ------------------------------------------------- | ------- | ---------- | -------------- | --------------- |
+| `nano` | GPT-5.4 Nano (`openai/gpt-5.4-nano`)              | 400K    | 128K       | $0.20          | $1.25           |
+| `mini` | GPT-5.4 Mini (`openai/gpt-5.4-mini`)              | 400K    | 128K       | $0.75          | $4.50           |
+| `pro`  | Claude Sonnet 4.6 (`anthropic/claude-sonnet-4.6`) | 1M      | 128K       | $3.00          | $15.00          |
+| `max`  | Claude Opus 4.6 (`anthropic/claude-opus-4.6`)     | 1M      | 128K       | $5.00          | $25.00          |
 
 All text models support **multimodal** inputs (text + images).
 
 ### Cache Pricing
 
-The `pro` and `max` tiers support prompt caching, which reduces cost for repeated context:
+All tiers support prompt caching, which reduces cost for repeated context:
 
-| Tier  | Cache Read (per 1M tokens) | Cache Write (per 1M tokens) |
-| ----- | -------------------------- | --------------------------- |
-| `pro` | $0.30                      | $3.75                       |
-| `max` | $1.50                      | $18.75                      |
+| Tier   | Cache Read (per 1M) | Cache Write (per 1M) |
+| ------ | ------------------- | -------------------- |
+| `nano` | $0.02               | —                    |
+| `mini` | $0.075              | —                    |
+| `pro`  | $0.30               | $3.75                |
+| `max`  | $0.50               | $6.25                |
 
 ## Image Generation Models
 
-Image models power the image generation features in the editor. Pricing is per image.
+Image models power the image generation features in the editor. Pricing varies by provider — some charge per image (flat or tiered by quality/size), others charge per token.
 
-| Model                                                   | Provider  | Speed   | Avg. Cost/Image | Credits | Status     |
-| ------------------------------------------------------- | --------- | ------- | --------------- | ------- | ---------- |
-| GPT Image 1.5 (`gpt-image-1.5`)                         | OpenAI    | Medium  | $0.026          | 50      | Active     |
-| Flux Kontext Max (`black-forest-labs/flux-kontext-max`) | Replicate | Fastest | $0.080          | 50      | Active     |
-| Flux Pro 1.1 (`black-forest-labs/flux-1.1-pro`)         | Replicate | Slow    | $0.040          | 25      | Active     |
-| GPT Image 1 (`gpt-image-1`)                             | OpenAI    | Slowest | $0.098          | 62      | Deprecated |
-| Recraft V3 (`recraft-ai/recraft-v3`)                    | Replicate | Slow    | $0.040          | 25      | Deprecated |
-| Flux Schnell (`black-forest-labs/flux-schnell`)         | Replicate | Fastest | $0.003          | 2       | Deprecated |
+### OpenAI
+
+Per-image pricing, tiered by quality and output size.
+
+**GPT Image 1.5** (`openai/gpt-image-1.5`)
+
+| Quality | 1024x1024 | 1024x1536 | 1536x1024 |
+| ------- | --------- | --------- | --------- |
+| Low     | $0.009    | $0.013    | $0.013    |
+| Medium  | $0.034    | $0.050    | $0.050    |
+| High    | $0.133    | $0.200    | $0.200    |
+
+**GPT Image Mini** (`openai/gpt-image-1-mini`)
+
+| Quality | 1024x1024 | 1024x1536 | 1536x1024 |
+| ------- | --------- | --------- | --------- |
+| Low     | $0.005    | $0.006    | $0.006    |
+| Medium  | $0.011    | $0.015    | $0.015    |
+| High    | $0.036    | $0.052    | $0.052    |
+
+### Google
+
+Per-token pricing (same model as text, with image output).
+
+| Model                                                            | Input (per 1M) | Output (per 1M) |
+| ---------------------------------------------------------------- | -------------- | --------------- |
+| Gemini 3.1 Flash Image (`google/gemini-3.1-flash-image-preview`) | $0.50          | $3.00           |
+| Gemini 3 Pro Image (`google/gemini-3-pro-image`)                 | $2.00          | $12.00          |
+
+### Black Forest Labs
+
+Flat per-image pricing.
+
+| Model                                     | Price/Image |
+| ----------------------------------------- | ----------- |
+| Flux 2 Pro (`bfl/flux-2-pro`)             | $0.060      |
+| Flux Kontext Max (`bfl/flux-kontext-max`) | $0.080      |
+| Flux Kontext Pro (`bfl/flux-kontext-pro`) | $0.050      |
+| Flux Pro 1.1 (`bfl/flux-pro-1.1`)         | $0.040      |
 
 ### Image Sizes
 
-Each model supports different output sizes. Default output is 1024x1024 (1:1).
-
-| Model            | Min Size  | Max Size  | Supported Aspect Ratios |
-| ---------------- | --------- | --------- | ----------------------- |
-| GPT Image 1.5    | 1024x1024 | 1536x1536 | 1:1, 2:3, 3:2           |
-| Flux Kontext Max | —         | 1820x1820 | Any (freeform)          |
-| Flux Pro 1.1     | 256x256   | 1440x1440 | Any (freeform)          |
+| Model              | Min Size  | Max Size  | Aspect Ratios |
+| ------------------ | --------- | --------- | ------------- |
+| GPT Image 1.5      | 1024x1024 | 1536x1536 | 1:1, 2:3, 3:2 |
+| GPT Image Mini     | 1024x1024 | 1536x1536 | 1:1, 2:3, 3:2 |
+| Gemini Flash Image | —         | 1536x1536 | Flexible      |
+| Gemini Pro Image   | —         | 1536x1536 | Flexible      |
+| Flux 2 Pro         | 256x256   | 1440x1440 | Flexible      |
+| Flux Kontext Max   | —         | 1820x1820 | Flexible      |
+| Flux Kontext Pro   | —         | 1820x1820 | Flexible      |
+| Flux Pro 1.1       | 256x256   | 1440x1440 | Flexible      |
 
 ## Image Tools
 
-Image tools provide processing capabilities like upscaling and background removal.
+Image tools provide processing capabilities like upscaling and background removal. These run on [Replicate](https://replicate.com).
 
 ### Background Removal
 
-| Model                                                              | Provider  | Avg. Cost/Image | Credits |
-| ------------------------------------------------------------------ | --------- | --------------- | ------- |
-| 851 Labs Background Remover (`851-labs/background-remover`)        | Replicate | $0.00048        | 1       |
-| Recraft Remove Background (`recraft-ai/recraft-remove-background`) | Replicate | $0.010          | 7       |
-| Bria Remove Background (`bria/remove-background`)                  | Replicate | $0.018          | 12      |
+| Model                                                              | Cost/Image |
+| ------------------------------------------------------------------ | ---------- |
+| 851 Labs Background Remover (`851-labs/background-remover`)        | $0.00048   |
+| Recraft Remove Background (`recraft-ai/recraft-remove-background`) | $0.010     |
+| Bria Remove Background (`bria/remove-background`)                  | $0.018     |
 
 ### Upscale
 
-| Model                                   | Provider  | Avg. Cost/Image | Credits |
-| --------------------------------------- | --------- | --------------- | ------- |
-| Real-ESRGAN (`nightmareai/real-esrgan`) | Replicate | $0.002          | 2       |
+| Model                                   | Cost/Image |
+| --------------------------------------- | ---------- |
+| Real-ESRGAN (`nightmareai/real-esrgan`) | $0.002     |
 
 ## Tier Selection Guide
 
-Choose the right tier for your use case:
-
-- **`nano`** — Best for high-volume, low-complexity tasks where cost efficiency matters. Titles, summaries, simple extraction.
+- **`nano`** — Best for high-volume, low-complexity tasks. Titles, summaries, simple extraction.
 - **`mini`** — Good balance of capability and cost. Suitable for most interactive agent tasks.
-- **`pro`** — Higher quality reasoning and generation. Use when output quality matters more than cost.
-- **`max`** — Maximum capability for the most demanding tasks. Complex multi-step reasoning, large codebases, nuanced analysis.
+- **`pro`** — Higher quality reasoning and generation. Use when output quality matters.
+- **`max`** — Maximum capability for demanding tasks. Complex multi-step reasoning, nuanced analysis.
 
 ---
 
-_Pricing data sourced from [models.dev](https://models.dev). Prices reflect direct provider pricing and may change when models are updated._
+_Pricing sourced from provider documentation. Prices reflect direct provider pricing and may change when models are updated._

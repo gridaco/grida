@@ -129,7 +129,7 @@ export namespace canvas_use {
         aspect_ratio,
         width,
         height,
-        model_id = "black-forest-labs/flux-schnell",
+        model_id = "openai/gpt-image-1-mini",
       }) => {
         try {
           // TODO: dev only - this will only work on local dev

@@ -1,0 +1,1 @@
+../../../../.tools/model_info.py
