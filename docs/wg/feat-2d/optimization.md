@@ -877,10 +877,10 @@ missing the cheapest possible camera-change path.
        value quantizes to min/max.
 
     Measured on 01-135k.perf.grida (135K nodes):
-    | Scenario              | Before p95 | After p95 | Before MAX | After MAX |
+    | Scenario | Before p95 | After p95 | Before MAX | After MAX |
     |---|---|---|---|---|
-    | zoom_slow_around_fit  | 54,062 µs  | 6 µs      | 60,282 µs  | 119 µs    |
-    | zoom_slow_high        | 6 µs       | 5 µs      | 3,848 µs   | 44 µs     |
+    | zoom_slow_around_fit | 54,062 µs | 6 µs | 60,282 µs | 119 µs |
+    | zoom_slow_high | 6 µs | 5 µs | 3,848 µs | 44 µs |
 
 23. **Settle & Refine (shared)**
 
@@ -1209,24 +1209,46 @@ expensive full redraws.
 
     **Measured impact (Apple M2 Pro, GPU benchmark, 01-135k 135K nodes):**
 
-    | Scenario | Metric | Before | After | Delta |
-    | -------- | ------ | ------ | ----- | ----- |
-    | rt_pan_fast_fit | p50 frame | 111 µs | 76 µs | **-32%** |
-    | rt_pan_fast_fit | p95 frame | 263 µs | 153 µs | **-42%** |
-    | rt_pan_slow_fit | settle | 2,323 µs | 1,836 µs | **-21%** |
-    | pan_settle_slow_fit | avg | 87 µs | 59 µs | **-32%** |
-    | pan_settle_slow_fit | settle | 1,034 µs | 709 µs | **-31%** |
+    | Scenario            | Metric    | Before   | After    | Delta    |
+    | ------------------- | --------- | -------- | -------- | -------- |
+    | rt_pan_fast_fit     | p50 frame | 111 µs   | 76 µs    | **-32%** |
+    | rt_pan_fast_fit     | p95 frame | 263 µs   | 153 µs   | **-42%** |
+    | rt_pan_slow_fit     | settle    | 2,323 µs | 1,836 µs | **-21%** |
+    | pan_settle_slow_fit | avg       | 87 µs    | 59 µs    | **-32%** |
+    | pan_settle_slow_fit | settle    | 1,034 µs | 709 µs   | **-31%** |
 
     **Criterion (CPU raster, 2000-node scene, statistically rigorous):**
 
-    | Scene | Change | p-value |
-    | ----- | ------ | ------- |
-    | large_baseline/pan | **-14.0%** | < 0.01 |
-    | large_baseline/pan_zoomed_in | -5.4% | 0.02 |
-    | large_compositing/pan | -4.2% | 0.02 |
+    | Scene                        | Change     | p-value |
+    | ---------------------------- | ---------- | ------- |
+    | large_baseline/pan           | **-14.0%** | < 0.01  |
+    | large_baseline/pan_zoomed_in | -5.4%      | 0.02    |
+    | large_compositing/pan        | -4.2%      | 0.02    |
 
     Implementation: `PictureCache.generation` in `cache/picture.rs`,
     `Renderer.last_prefill_*` tracking in `runtime/scene.rs`.
+
+49. **Quantized DPR Snapping** (future)
+
+    **What:** round the effective raster DPR
+    (`device_dpr × interaction_scale × zoom`) to a small set of discrete
+    buckets (e.g. 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0) during active
+    interaction. Cache invalidation and raster-scale decisions key off
+    the **snapped** DPR, while the final blit uses the **continuous**
+    camera transform so the user still sees smooth zoom. Stable frames
+    drop the snap and raster at exact DPR for full fidelity. Boundary
+    hysteresis prevents thrash when raw DPR sits near a bucket edge.
+
+    **Why:** continuous zoom produces a unique effective DPR every frame,
+    which currently triggers per-frame `mark_all_stale()` on the
+    compositor cache, pan-cache invalidation, and atlas churn. On WASM
+    this O(N) invalidation loop is amplified 10–30× vs native and cannot
+    be offloaded to a worker thread. Snapping converts the cost from
+    _per-frame_ to _per-bucket-crossing_ (roughly once every 200–400 ms
+    at typical zoom velocity), letting cached GPU textures survive the
+    gesture instead of being nuked each frame. Visual quality loss is
+    bounded by the largest bucket ratio (~±12.5%) and is imperceptible
+    on in-flight gestures for static content.
 
 ---
 
