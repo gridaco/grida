@@ -23,6 +23,11 @@ import {
 } from "./backends";
 import { DOMPropertiesQueryProvider } from "./backends/dom-content";
 import { domapi } from "./backends/dom";
+import { HeadlessViewportApi } from "./backends/headless";
+import {
+  NoopPropertiesQueryProvider,
+  NoopGeometryQueryInterfaceProvider,
+} from "./backends/noop";
 import { dq } from "@/grida-canvas/query";
 import {
   resolveInsertTargetParent,
@@ -83,7 +88,7 @@ function resolveWithEditorInstance<T>(
 export class Camera implements editor.api.ICameraActions {
   constructor(
     readonly editor: Editor,
-    readonly viewport: domapi.DOMViewportApi
+    readonly viewport: editor.api.IViewportApi
   ) {
     //
   }
@@ -273,7 +278,7 @@ export class Camera implements editor.api.ICameraActions {
    * @returns viewport relative point
    */
   public pointerEventToViewportPoint = (
-    pointer_event: PointerEvent | MouseEvent
+    pointer_event: editor.api.events.IPointerEvent
   ) => {
     const { clientX, clientY } = pointer_event;
 
@@ -2855,16 +2860,32 @@ export class Editor
     ui = {},
     backend,
     viewportElement,
+    viewportApi,
     geometry,
     initialState,
     interfaces = {},
+    properties_query,
     onCreate,
     onMount,
+    __skipWarmup,
   }: {
     logger?: (...args: any[]) => void;
     ui?: editor.ui.UIUXProviders;
     backend: editor.EditorContentRenderingBackend;
-    viewportElement: string | HTMLElement;
+    /**
+     * DOM viewport element (string ID or HTMLElement).
+     * Mutually exclusive with `viewportApi`. For browser use.
+     *
+     * TODO: Refactor `viewportElement` and `viewportApi` into a discriminated
+     * union type to make mutual exclusivity a compile-time guarantee instead
+     * of a runtime check.
+     */
+    viewportElement?: string | HTMLElement;
+    /**
+     * Pre-constructed viewport API.
+     * Mutually exclusive with `viewportElement`. For headless / test use.
+     */
+    viewportApi?: editor.api.IViewportApi;
     geometry:
       | editor.api.IDocumentGeometryInterfaceProvider
       | ((editor: Editor) => editor.api.IDocumentGeometryInterfaceProvider);
@@ -2879,11 +2900,32 @@ export class Editor
       svg?: WithEditorInstance<editor.api.IDocumentSVGInterfaceProvider>;
       markdown?: WithEditorInstance<editor.api.IDocumentMarkdownInterfaceProvider>;
     };
+    /**
+     * Custom properties query provider.
+     * When omitted in headless mode, a noop provider is used.
+     * When omitted in browser mode, DOMPropertiesQueryProvider is used.
+     */
+    properties_query?: editor.api.IDocumentPropertiesQueryProvider;
+    /**
+     * @internal Skip warmup (font list fetch). Used by headless factory.
+     */
+    __skipWarmup?: boolean;
   }) {
     this.logger = logger;
     this.onMount = onMount;
     this.backend = backend;
-    this.camera = new Camera(this, new domapi.DOMViewportApi(viewportElement));
+
+    // Resolve viewport: prefer explicit API, fall back to DOM wrapper
+    if (!viewportApi && viewportElement == null) {
+      throw new Error(
+        "Editor requires either viewportElement or viewportApi"
+      );
+    }
+    const resolvedViewport: editor.api.IViewportApi = viewportApi
+      ? viewportApi
+      : new domapi.DOMViewportApi(viewportElement!);
+    this.camera = new Camera(this, resolvedViewport);
+
     this.doc = new EditorDocumentStore(
       grida.id.noop.generator, // test only
       // // TODO: resolve from server
@@ -2908,7 +2950,8 @@ export class Editor
 
     this._m_geometry =
       typeof geometry === "function" ? geometry(this) : geometry;
-    this._m_properties_query = new DOMPropertiesQueryProvider(this);
+    this._m_properties_query =
+      properties_query ?? new DOMPropertiesQueryProvider(this);
 
     if (interfaces?.exporter) {
       this._m_exporter = resolveWithEditorInstance(this, interfaces.exporter);
@@ -2942,11 +2985,56 @@ export class Editor
 
     this._fontManager = new DocumentFontManager(this);
 
-    this._do_legacy_warmup();
+    if (!__skipWarmup) {
+      this._do_legacy_warmup();
+    }
     this.commands = this.doc;
     onCreate?.(this);
 
     this.log("editor instantiated");
+  }
+
+  /**
+   * Create a headless Editor instance that runs in Node.js / Vitest
+   * without any browser globals (window, document, navigator, DOM types).
+   *
+   * The headless editor supports the full action->reduce->state pipeline,
+   * subscriptions, undo/redo, and all pure-logic operations. It does NOT
+   * support WASM rendering, font network loading, or image dimension
+   * detection via DOM `Image`.
+   *
+   * @example
+   * ```ts
+   * const ed = Editor.createHeadless({
+   *   document: { nodes: { main: { ... } }, ... },
+   *   editable: true,
+   * });
+   * ed.doc.select(["node-1"]);
+   * expect(ed.state.selection).toContain("node-1");
+   * ed.dispose();
+   * ```
+   */
+  static createHeadless(
+    initialState: editor.state.IEditorStateInit,
+    options?: {
+      viewport?: { width: number; height: number };
+      logger?: (...args: any[]) => void;
+    }
+  ): Editor {
+    const viewport = new HeadlessViewportApi(
+      options?.viewport?.width ?? 1920,
+      options?.viewport?.height ?? 1080
+    );
+
+    return new Editor({
+      backend: "canvas",
+      viewportApi: viewport,
+      geometry: new NoopGeometryQueryInterfaceProvider(),
+      properties_query: new NoopPropertiesQueryProvider(),
+      initialState,
+      logger: options?.logger ?? (() => {}),
+      __skipWarmup: true,
+    });
   }
 
   /**
@@ -3758,7 +3846,7 @@ export class Editor
   // #region IDocumentGeometryQuery implementation
 
   public getNodeIdsFromPointerEvent(
-    event: PointerEvent | MouseEvent
+    event: editor.api.events.IPointerEvent
   ): string[] {
     return this.geometryProvider.getNodeIdsFromPointerEvent(event);
   }
@@ -4551,8 +4639,8 @@ export class EditorSurface
    *
    * This ensures the editor is in a consistent, predictable state when the user returns.
    */
-  public onblur(event: FocusEvent): void {
-    if (event.defaultPrevented) return;
+  public onblur(event?: editor.api.events.IFocusEvent): void {
+    if (event?.defaultPrevented) return;
 
     // Clear stuck title bar hover state
     // This handles edge case where pointerLeave never fires (e.g., tab switch, window blur)
@@ -4837,7 +4925,10 @@ export class EditorSurface
   // #region IEventTargetActions implementation
 
   private _throttled_pointer_move_with_raycast = editor.throttle(
-    (event: PointerEvent, position: { x: number; y: number }) => {
+    (
+      event: editor.api.events.IPointerEvent,
+      position: { x: number; y: number }
+    ) => {
       // this is throttled - as it is expensive
       const ids = this._editor.getNodeIdsFromPointerEvent(event);
       this._editor.doc.dispatch({
@@ -4850,7 +4941,7 @@ export class EditorSurface
     this.__pointer_move_throttle_ms
   );
 
-  surfacePointerDown(event: PointerEvent) {
+  surfacePointerDown(event: editor.api.events.IPointerEvent) {
     const ids = this._editor.getNodeIdsFromPointerEvent(event);
 
     this._editor.doc.dispatch({
@@ -4860,13 +4951,13 @@ export class EditorSurface
     });
   }
 
-  surfacePointerUp(event: PointerEvent) {
+  surfacePointerUp(event: editor.api.events.IPointerEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-pointer-up",
     });
   }
 
-  surfacePointerMove(event: PointerEvent) {
+  surfacePointerMove(event: editor.api.events.IPointerEvent) {
     const position = this.camera.pointerEventToViewportPoint(event);
 
     this._editor.doc.dispatch({
@@ -4878,7 +4969,7 @@ export class EditorSurface
     this._throttled_pointer_move_with_raycast(event, position);
   }
 
-  surfaceClick(event: MouseEvent) {
+  surfaceClick(event: editor.api.events.IPointerEvent) {
     const ids = this._editor.getNodeIdsFromPointerEvent(event);
 
     this._editor.doc.dispatch({
@@ -4888,13 +4979,16 @@ export class EditorSurface
     });
   }
 
-  surfaceDoubleClick(event: MouseEvent) {
+  surfaceDoubleClick(event: editor.api.events.IPointerEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-double-click",
     });
   }
 
-  surfaceMultipleSelectionOverlayClick(group: string[], event: MouseEvent) {
+  surfaceMultipleSelectionOverlayClick(
+    group: string[],
+    event: editor.api.events.IPointerEvent
+  ) {
     const ids = this._editor.getNodeIdsFromPointerEvent(event);
     this._editor.doc.dispatch({
       type: "event-target/event/multiple-selection-overlay/on-click",
@@ -4904,14 +4998,14 @@ export class EditorSurface
     });
   }
 
-  surfaceDragStart(event: PointerEvent) {
+  surfaceDragStart(event: editor.api.events.IPointerEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-drag-start",
       shiftKey: event.shiftKey,
     });
   }
 
-  surfaceDragEnd(event: PointerEvent) {
+  surfaceDragEnd(event: editor.api.events.IPointerEvent) {
     const { marquee } = this._editor.doc.state;
     if (marquee) {
       // test area in canvas space
@@ -5115,7 +5209,17 @@ export class EditorSurface
       constraints: { type: "scale", value: 1 },
     });
     const blob = new Blob([data as BlobPart], { type: "image/png" });
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    const item = new ClipboardItem({ "image/png": blob });
+    if (this.ui.clipboard) {
+      await this.ui.clipboard.write([item]);
+    } else if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard?.write
+    ) {
+      await navigator.clipboard.write([item]);
+    } else {
+      return false;
+    }
     return true;
   }
 
@@ -6056,14 +6160,9 @@ export class EditorSurface
    * />
    * ```
    */
-  public explicitlyOverrideInputUndoRedo(event: {
-    key: string;
-    metaKey: boolean;
-    ctrlKey: boolean;
-    shiftKey: boolean;
-    preventDefault: () => void;
-    stopPropagation: () => void;
-  }): boolean {
+  public explicitlyOverrideInputUndoRedo(
+    event: editor.api.events.IKeyboardEvent
+  ): boolean {
     // Check if this is Cmd+Z (undo) or Cmd+Shift+Z (redo)
     const isCmdOrCtrl = event.metaKey || event.ctrlKey;
     const isZKey = event.key === "z" || event.key === "Z";
