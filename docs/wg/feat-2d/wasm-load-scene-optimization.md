@@ -8,7 +8,7 @@ format: md
 
 ## Problem
 
-`Renderer::load_scene()` for a 136k-node Figma-imported scene (yrr-main.grida) takes ~10s in WASM vs ~800ms native — a 13× overhead far beyond the normal 2-3× WASM/native ratio.
+`Renderer::load_scene()` for a 136k-node Figma-imported scene takes ~10s in WASM vs ~800ms native — a 13× overhead far beyond the normal 2-3× WASM/native ratio.
 
 ## Current Measurements (WASM-on-Node)
 
@@ -132,7 +132,7 @@ npx vitest run __test__/bench-load-scene.test.ts
 Native benchmarks:
 
 ```sh
-cargo run -p grida-dev --release -- load-bench fixtures/local/perf/local/yrr-main.grida --iterations 3
+cargo run -p grida-dev --release -- load-bench fixtures/local/perf/local/<your-fixture>.grida --iterations 3
 ```
 
 Build WASM (from repo root):
@@ -156,7 +156,7 @@ just --justfile crates/grida-canvas-wasm/justfile build
 2. `cargo check -p cg -p grida-canvas-wasm -p grida-dev` — all crates compile
 3. Native benchmark: should not regress (target: `<800ms`)
 4. WASM-on-Node benchmark: geometry stage should drop from ~4s to `<1s`
-5. Visual: load yrr-main in browser debug embed, verify text renders correctly and pan/zoom/settle work
+5. Visual: load the fixture in browser debug embed, verify text renders correctly and pan/zoom/settle work
 
 ---
 
@@ -175,7 +175,7 @@ just --justfile crates/grida-canvas-wasm/justfile build
 
 All 330 tests pass. No API changes. Single file modified.
 
-### Benchmark Results (yrr-main.grida, 136K nodes)
+### Benchmark Results (136K-node scene)
 
 **Native (release, 3-iteration average):**
 

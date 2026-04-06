@@ -123,6 +123,16 @@ path = "examples/skia_bench/skia_bench_primitives.rs"
 required-features = ["native-gl-context"]
 
 [[example]]
+name = "skia_bench_rrect_vs_rect"
+path = "examples/skia_bench/skia_bench_rrect_vs_rect.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_text_lod"
+path = "examples/skia_bench/skia_bench_text_lod.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
 name = "skia_bench_effects"
 path = "examples/skia_bench/skia_bench_effects.rs"
 required-features = ["native-gl-context"]

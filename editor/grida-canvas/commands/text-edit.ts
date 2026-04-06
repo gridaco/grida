@@ -7,6 +7,7 @@
  */
 
 import type { TextEditCommand } from "@grida/canvas-wasm";
+import type { editor } from "..";
 
 const IS_MAC =
   typeof navigator !== "undefined" &&
@@ -18,7 +19,7 @@ const IS_MAC =
  * command (e.g. it's a modifier-only press or an unrecognized key).
  */
 export function keyEventToTextEditCommand(
-  e: KeyboardEvent
+  e: editor.api.events.IKeyboardEvent
 ): TextEditCommand | null {
   const mod = IS_MAC ? e.metaKey : e.ctrlKey;
   const shift = e.shiftKey;

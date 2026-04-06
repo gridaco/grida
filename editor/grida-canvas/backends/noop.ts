@@ -14,10 +14,7 @@ export class NoopGeometryQueryInterfaceProvider
   getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
     return null;
   }
-  getNodeIdsFromPointerEvent(event: {
-    clientX: number;
-    clientY: number;
-  }): string[] {
+  getNodeIdsFromPointerEvent(event: editor.api.events.IPointerEvent): string[] {
     return [];
   }
 }
@@ -40,5 +37,20 @@ export class NoopDefaultExportInterfaceProvider
     _config?: editor.api.ExportConfigOf<F>
   ): Promise<F extends "SVG" ? string : Uint8Array> {
     throw new Error("Not implemented");
+  }
+}
+
+/**
+ * No-op properties query provider for headless / test use.
+ */
+export class NoopPropertiesQueryProvider
+  implements editor.api.IDocumentPropertiesQueryProvider
+{
+  queryPaintGroups(
+    _ids: string[],
+    _target: "fill" | "stroke",
+    _options?: { recursive?: boolean; limit?: number }
+  ): editor.api.PaintGroup[] {
+    return [];
   }
 }

@@ -1,4 +1,5 @@
 import cmath from "@grida/cmath";
+import type { editor } from "..";
 
 import assert from "assert";
 
@@ -17,7 +18,7 @@ export namespace domapi {
     export const EDITOR_CONTENT_ELEMENT_ID = "grida-canvas-sdk-editor-content";
   }
 
-  export class DOMViewportApi {
+  export class DOMViewportApi implements editor.api.IViewportApi {
     constructor(
       readonly element: string | HTMLElement = k.VIEWPORT_ELEMENT_ID
     ) {

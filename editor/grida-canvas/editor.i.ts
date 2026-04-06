@@ -2563,10 +2563,10 @@ export namespace editor.api {
   export interface IDocumentGeometryInterfaceProvider {
     /**
      * returns a list of node ids that are intersecting with the pointer event
-     * @param event window event
+     * @param event window event (or any object satisfying IPointerEventData)
      * @returns
      */
-    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+    getNodeIdsFromPointerEvent(event: events.IPointerEvent): string[];
 
     /**
      * returns a list of node ids that are intersecting with the point in canvas space
@@ -2808,6 +2808,86 @@ export namespace editor.api {
 
   //
 
+  /**
+   * Abstraction over the viewport measurement surface.
+   *
+   * Browser callers use `DOMViewportApi` (backed by `getBoundingClientRect`);
+   * headless / test callers use `HeadlessViewportApi` with fixed dimensions.
+   */
+  export interface IViewportApi {
+    readonly offset: cmath.Vector2;
+    readonly rect: {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      width: number;
+      height: number;
+      x: number;
+      y: number;
+    };
+    readonly size: { width: number; height: number };
+  }
+
+  /**
+   * Platform-neutral event data types consumed by the editor.
+   *
+   * These are intentionally *not* DOM types — they carry only the fields
+   * the editor actually reads. Browser DOM events (`PointerEvent`,
+   * `MouseEvent`, `KeyboardEvent`, `FocusEvent`) structurally satisfy
+   * these interfaces via duck typing, so browser call-sites need zero
+   * changes.
+   */
+  export namespace events {
+    /**
+     * Base modifier-key state shared by all event IR types.
+     */
+    export interface IModifiers {
+      shiftKey: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      altKey: boolean;
+    }
+
+    /**
+     * Minimal pointer/mouse event data.
+     *
+     * TODO: Consider adding `pointerId` and `pointerType` if surface
+     * methods ever need to distinguish pen vs touch vs mouse input.
+     */
+    export interface IPointerEvent extends IModifiers {
+      clientX: number;
+      clientY: number;
+      button: number;
+    }
+
+    /**
+     * Minimal keyboard event data.
+     */
+    export interface IKeyboardEvent extends IModifiers {
+      key: string;
+      preventDefault: () => void;
+      stopPropagation: () => void;
+    }
+
+    /**
+     * Minimal focus/blur event data.
+     * In headless tests, call `onblur()` with no arguments or `{}`.
+     */
+    export interface IFocusEvent {
+      defaultPrevented?: boolean;
+    }
+  }
+
+  // Re-export at api level for backwards compat & convenience.
+  // Existing code using `editor.api.IPointerEventData` keeps working.
+  /** @deprecated Use `editor.api.events.IPointerEvent` */
+  export type IPointerEventData = events.IPointerEvent;
+  /** @deprecated Use `editor.api.events.IKeyboardEvent` */
+  export type IKeyboardEventData = events.IKeyboardEvent;
+  /** @deprecated Use `editor.api.events.IFocusEvent` */
+  export type IFocusEventData = events.IFocusEvent;
+
   export interface IDocumentGeometryQuery {
     /**
      * returns a list of node ids that are intersecting with the point in canvas space
@@ -2817,10 +2897,10 @@ export namespace editor.api {
     getNodeIdsFromPoint(point: cmath.Vector2): string[];
     /**
      * returns a list of node ids that are intersecting with the pointer event
-     * @param event window event
+     * @param event window event (or any object satisfying IPointerEventData)
      * @returns
      */
-    getNodeIdsFromPointerEvent(event: PointerEvent | MouseEvent): string[];
+    getNodeIdsFromPointerEvent(event: events.IPointerEvent): string[];
     /**
      * returns a list of node ids that are intersecting with the envelope in canvas space
      * @param envelope canvas space envelope
@@ -4455,7 +4535,8 @@ export namespace editor.api {
      * - Resets all surface configurations (raycast targeting, measurement, modifiers)
      * - Resets tool to cursor (safe default)
      *
-     * The callback signature matches `window.addEventListener("blur", callback)`.
+     * The callback signature is compatible with `window.addEventListener("blur", callback)`
+     * because browser `FocusEvent` structurally satisfies `IFocusEventData`.
      *
      * @example
      * ```typescript
@@ -4464,7 +4545,7 @@ export namespace editor.api {
      * window.removeEventListener("blur", editor.surface.onblur);
      * ```
      */
-    onblur(event: FocusEvent): void;
+    onblur(event?: events.IFocusEvent): void;
     //
   }
 

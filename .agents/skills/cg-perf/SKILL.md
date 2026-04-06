@@ -157,7 +157,7 @@ cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --over
 The overlay cost is opt-in because it is a devtools feature, not user
 content. Overlay cost scales with visible labeled nodes — viewport
 culling skips off-screen labels, so zoomed-in views are nearly free.
-At fit-zoom on large scenes (yrr-main, 437 labels visible), overlay
+At fit-zoom on large scenes (e.g. 500 labels visible), overlay
 adds ~1.8ms per frame (paragraph layout dominates). At typical editing
 zoom, the cost drops to ~190µs or less.
 
@@ -552,7 +552,7 @@ after content `flush()` and requires a second GPU flush. The overlay
 cost is dominated by Skia paragraph creation (one per visible label) —
 viewport culling skips off-screen labels, and style objects are hoisted
 out of the per-label loop. On scenes with many labeled nodes at
-fit-zoom (e.g. yrr-main with 437 labels), the overlay adds ~1.8ms per
+fit-zoom (e.g. 500 visible labels), the overlay adds ~1.8ms per
 frame. At typical editing zoom, most labels are culled and cost drops
 to ~190µs. Standard benchmarks exclude overlay by default — use
 `--overlay` to include it. If the app feels slower after adding new
@@ -627,7 +627,7 @@ WASM-on-Node benchmark:
 # Build WASM first
 just --justfile crates/grida-canvas-wasm/justfile build
 
-# Run benchmark (requires fixtures/local/perf/local/yrr-main.grida for 136k test)
+# Run benchmark (requires a large .grida fixture in fixtures/local/perf/local/)
 cd crates/grida-canvas-wasm && npx vitest run __test__/bench-load-scene.test.ts
 ```
 
