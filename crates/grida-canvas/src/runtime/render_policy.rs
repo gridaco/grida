@@ -102,6 +102,9 @@ pub struct RenderPolicy {
     /// Quality level for expensive GPU effects (blur, shadow, noise).
     /// `Full` for stable frames, `Reduced` for interactive frames.
     pub effect_quality: EffectQuality,
+    /// When true, all paint operations use `set_anti_alias(false)`.
+    /// For benchmarking AA cost at different zoom levels.
+    pub force_no_aa: bool,
 }
 
 impl RenderPolicy {
@@ -115,6 +118,7 @@ impl RenderPolicy {
         compositing: CompositingPolicy::Enabled,
         ignore_clips_content: false,
         effect_quality: EffectQuality::Full,
+        force_no_aa: false,
     };
 
     /// Convenience preset used by the editor feature \"Show outlines\".
@@ -128,7 +132,13 @@ impl RenderPolicy {
         // Wireframe is primarily used for inspection; by default, ignore clips.
         ignore_clips_content: true,
         effect_quality: EffectQuality::Full,
+        force_no_aa: false,
     };
+
+    #[inline]
+    pub fn anti_alias(&self) -> bool {
+        !self.force_no_aa
+    }
 
     /// Return a copy of this policy with reduced effect quality.
     /// Used for unstable (interactive) frames.
@@ -159,6 +169,7 @@ impl RenderPolicy {
             }
         ) && self.compositing == CompositingPolicy::Enabled
             && !self.ignore_clips_content
+            && !self.force_no_aa
     }
 
     /// True only for the default renderer behavior (full fills/strokes + effects + compositing).
@@ -291,6 +302,7 @@ pub const FLAG_RENDER_OUTLINES_ALWAYS: RenderPolicyFlags = 1 << 2;
 pub const FLAG_EFFECTS_ENABLED: RenderPolicyFlags = 1 << 3;
 pub const FLAG_COMPOSITING_ENABLED: RenderPolicyFlags = 1 << 4;
 pub const FLAG_IGNORE_CLIPS_CONTENT: RenderPolicyFlags = 1 << 5;
+pub const FLAG_FORCE_NO_AA: RenderPolicyFlags = 1 << 6;
 
 impl RenderPolicy {
     /// Build a policy from flags.
@@ -312,6 +324,7 @@ impl RenderPolicy {
         };
 
         let ignore_clips_content = (flags & FLAG_IGNORE_CLIPS_CONTENT) != 0;
+        let force_no_aa = (flags & FLAG_FORCE_NO_AA) != 0;
 
         if (flags & FLAG_RENDER_OUTLINES_ALWAYS) != 0 {
             // Outline style is currently encoded in the preset; can be expanded later.
@@ -319,6 +332,7 @@ impl RenderPolicy {
             p.effects = effects;
             p.compositing = compositing;
             p.ignore_clips_content = ignore_clips_content;
+            p.force_no_aa = force_no_aa;
             return p;
         }
 
@@ -331,6 +345,7 @@ impl RenderPolicy {
             compositing,
             ignore_clips_content,
             effect_quality: EffectQuality::Full,
+            force_no_aa,
         }
     }
 
@@ -345,6 +360,9 @@ impl RenderPolicy {
         }
         if self.ignore_clips_content {
             flags |= FLAG_IGNORE_CLIPS_CONTENT;
+        }
+        if self.force_no_aa {
+            flags |= FLAG_FORCE_NO_AA;
         }
 
         match self.content {

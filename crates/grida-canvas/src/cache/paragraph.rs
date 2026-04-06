@@ -476,7 +476,7 @@ impl ParagraphCache {
         // Build the paragraph with paint applied (for rendering)
         let fill_paint = if !fills.is_empty() {
             // Use sk_paint_stack for all paint types (solid, gradient, image, multiple fills)
-            paint::sk_paint_stack(fills, layout_size, images)
+            paint::sk_paint_stack(fills, layout_size, images, true)
         } else {
             None
         };

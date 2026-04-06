@@ -1125,7 +1125,7 @@ impl Renderer {
 
                     // GPU flush.
                     let mid_flush_start = Instant::now();
-                    Self::gpu_flush(surface);
+                    self.gpu_flush(surface);
                     let mid_flush_duration = mid_flush_start.elapsed();
                     let frame_duration = start.elapsed();
 
@@ -1291,7 +1291,7 @@ impl Renderer {
                     canvas.draw_image(&cache.image, (dx, dy), None);
 
                     let mid_flush_start = Instant::now();
-                    Self::gpu_flush(surface);
+                    self.gpu_flush(surface);
                     let mid_flush_duration = mid_flush_start.elapsed();
 
                     // Do NOT recapture — keep the original capture intact.
@@ -1400,7 +1400,7 @@ impl Renderer {
 
         // Mid-frame GPU flush: isolate draw vs compositor GPU work.
         let mid_flush_start = Instant::now();
-        Self::gpu_flush(surface);
+        self.gpu_flush(surface);
         let mid_flush_duration = mid_flush_start.elapsed();
 
         // Capture composited frame for image caches.
@@ -1453,7 +1453,7 @@ impl Renderer {
 
         // Final GPU flush.
         let flush_start = Instant::now();
-        Self::gpu_flush(surface);
+        self.gpu_flush(surface);
         let flush_duration = flush_start.elapsed();
 
         FrameFlushStats {
@@ -1515,7 +1515,7 @@ impl Renderer {
         canvas.restore();
 
         let mid_flush_start = Instant::now();
-        Self::gpu_flush(surface);
+        self.gpu_flush(surface);
         let mid_flush_duration = mid_flush_start.elapsed();
         let frame_duration = start.elapsed();
 
@@ -1523,12 +1523,22 @@ impl Renderer {
     }
 
     #[inline]
-    fn gpu_flush(surface: &mut Surface) {
+    /// Submit pending GPU work. When `config.sync_gpu` is enabled,
+    /// blocks until the GPU finishes for accurate per-stage timing.
+    fn gpu_flush(&self, surface: &mut Surface) {
         if let Some(mut gr_context) = surface.recording_context() {
             if let Some(mut direct_context) = gr_context.as_direct_context() {
-                direct_context.flush_and_submit();
+                if self.config.sync_gpu {
+                    direct_context.flush_submit_and_sync_cpu();
+                } else {
+                    direct_context.flush_and_submit();
+                }
             }
         }
+    }
+
+    pub fn set_sync_gpu(&mut self, sync: bool) {
+        self.config.sync_gpu = sync;
     }
 
     /// Submit any pending overlay draws to the GPU.
@@ -1539,7 +1549,7 @@ impl Renderer {
     /// selection outlines, frame title badges, and the size meter.
     pub fn flush_overlay(&mut self) {
         let surface = unsafe { &mut *self.backend.get_surface() };
-        Self::gpu_flush(surface);
+        self.gpu_flush(surface);
     }
 
     /// Invoke the request redraw callback.
@@ -1807,7 +1817,7 @@ impl Renderer {
             }
         }
         canvas.draw_image(&cache.image, (dx, dy), None);
-        Self::gpu_flush(surface);
+        self.gpu_flush(surface);
         true
     }
 
