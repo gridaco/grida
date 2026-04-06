@@ -515,6 +515,9 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Font properties (inherited)
     el.font = extract_font(style);
 
+    // Box shadow
+    el.box_shadow = extract_box_shadow(style);
+
     // Blend mode
     el.blend_mode = extract_blend_mode(style);
 
@@ -943,6 +946,30 @@ fn auto_distribute_stops(raw: &mut [(Option<f32>, CGColor)]) {
         }
         i = end + 1;
     }
+}
+
+fn extract_box_shadow(style: &ComputedValues) -> Vec<BoxShadow> {
+    let shadows = style.clone_box_shadow();
+    shadows
+        .0
+        .iter()
+        .map(|s| {
+            let color = s
+                .base
+                .color
+                .as_absolute()
+                .map(|a| abs_color_to_cg(a))
+                .unwrap_or(CGColor::BLACK);
+            BoxShadow {
+                offset_x: s.base.horizontal.px(),
+                offset_y: s.base.vertical.px(),
+                blur: s.base.blur.0.px(),
+                spread: s.spread.px(),
+                color,
+                inset: s.inset,
+            }
+        })
+        .collect()
 }
 
 // ─── Grid property extraction ───────────────────────────────────────

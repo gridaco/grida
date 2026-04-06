@@ -371,15 +371,90 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
     }
 }
 
-fn paint_box_shadow_inset(_canvas: &Canvas, style: &StyledElement, _w: f32, _h: f32) {
+/// Paint inset box-shadows (Chromium: BoxPainterBase::PaintInsetBoxShadow).
+///
+/// Inset shadows render *inside* the element by clipping to the box bounds,
+/// then drawing a hollow rect (the box outline expanded outward) with a blur
+/// mask so that only the soft inner edge is visible.
+fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
     for shadow in &style.box_shadow {
         if !shadow.inset {
             continue;
         }
-        // TODO: inset box shadows require clipping to the box bounds
-        // and drawing the shadow inside. This is more complex than outer
-        // shadows and requires a save/clip/draw/restore pattern.
-        let _ = shadow;
+
+        let box_rect = Rect::from_xywh(0.0, 0.0, w, h);
+
+        // Clip to the box so shadow cannot bleed outside
+        canvas.save();
+        let r = &style.border_radius;
+        if r.is_zero() {
+            canvas.clip_rect(box_rect, ClipOp::Intersect, true);
+        } else {
+            let mut clip_rrect = skia_safe::RRect::new();
+            clip_rrect.set_rect_radii(box_rect, &r.to_skia_radii());
+            canvas.clip_rrect(clip_rrect, ClipOp::Intersect, true);
+        }
+
+        let mut paint = Paint::default();
+        paint.set_color(Color::from_argb(
+            shadow.color.a,
+            shadow.color.r,
+            shadow.color.g,
+            shadow.color.b,
+        ));
+        paint.set_anti_alias(true);
+        paint.set_style(PaintStyle::Fill);
+        if shadow.blur > 0.0 {
+            paint.set_mask_filter(skia_safe::MaskFilter::blur(
+                skia_safe::BlurStyle::Normal,
+                shadow.blur / 2.0,
+                false,
+            ));
+        }
+
+        // Draw a large rect with a hole cut out, shifted by offset + spread.
+        // The blur on the outer edge of the hole creates the inset shadow.
+        let spread = shadow.spread;
+        let inner_rect = Rect::from_xywh(
+            shadow.offset_x + spread,
+            shadow.offset_y + spread,
+            w - spread * 2.0,
+            h - spread * 2.0,
+        );
+
+        // Outer rect large enough that its edges are outside the clip region
+        let expansion = shadow.blur * 2.0 + shadow.spread.abs() + 100.0;
+        let outer_rect = Rect::from_xywh(
+            -expansion + shadow.offset_x,
+            -expansion + shadow.offset_y,
+            w + expansion * 2.0,
+            h + expansion * 2.0,
+        );
+
+        // Build a path: outer rect minus inner rect (creates a frame).
+        // EvenOdd fill makes the inner rect a hole.
+        let mut builder =
+            skia_safe::PathBuilder::new_with_fill_type(skia_safe::PathFillType::EvenOdd);
+        builder.add_rect(outer_rect, None, None);
+        if r.is_zero() {
+            builder.add_rect(inner_rect, None, None);
+        } else {
+            // Shrink corner radii by spread for the inner cutout
+            let shrink = spread.max(0.0);
+            let inner_radii = [
+                skia_safe::Point::new((r.tl_x - shrink).max(0.0), (r.tl_y - shrink).max(0.0)),
+                skia_safe::Point::new((r.tr_x - shrink).max(0.0), (r.tr_y - shrink).max(0.0)),
+                skia_safe::Point::new((r.br_x - shrink).max(0.0), (r.br_y - shrink).max(0.0)),
+                skia_safe::Point::new((r.bl_x - shrink).max(0.0), (r.bl_y - shrink).max(0.0)),
+            ];
+            let mut inner_rrect = skia_safe::RRect::new();
+            inner_rrect.set_rect_radii(inner_rect, &inner_radii);
+            builder.add_rrect(&inner_rrect, None, None);
+        }
+        let path = builder.detach();
+
+        canvas.draw_path(&path, &paint);
+        canvas.restore();
     }
 }
 

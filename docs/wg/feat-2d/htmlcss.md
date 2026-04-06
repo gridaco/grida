@@ -269,6 +269,8 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `visibility`         | ✅     | hidden/collapse skips painting      |
 | `overflow`           | ✅     | hidden/clip via canvas clip_rect    |
 | `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius |
+| `box-shadow` (inset) | ✅     | clip + EvenOdd frame via PathBuilder |
+| `box-shadow` (multi) | ✅     | Multiple shadows stacked            |
 | `mix-blend-mode`     | ✅     | All CSS blend modes                 |
 
 ### Positioning
@@ -335,9 +337,9 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 | CSS Property         | Status | Notes                               |
 | -------------------- | ------ | ----------------------------------- |
-| `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius |
-| `box-shadow: inset`  | ❌     |                                     |
-| Multiple shadows     | ❌     | Only first shadow painted           |
+| `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius  |
+| `box-shadow: inset`  | ✅     | clip + EvenOdd frame via PathBuilder |
+| Multiple shadows     | ✅     | All shadows stacked in order         |
 
 ### Positioning (extended)
 

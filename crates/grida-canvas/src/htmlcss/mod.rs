@@ -301,6 +301,76 @@ mod tests {
     }
 
     #[test]
+    fn test_render_box_shadow_outer() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="width:100px;height:80px;box-shadow:4px 4px 8px rgba(0,0,0,0.5)">shadow</div>"#,
+            300.0,
+            200.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
+    #[test]
+    fn test_render_box_shadow_inset() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="width:100px;height:80px;box-shadow:inset 0 2px 8px rgba(0,0,0,0.6)">inset</div>"#,
+            300.0,
+            200.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
+    #[test]
+    fn test_render_box_shadow_combined() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="width:100px;height:80px;box-shadow:0 4px 12px rgba(0,0,0,0.4),inset 0 1px 4px rgba(0,0,0,0.1)">both</div>"#,
+            300.0,
+            200.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
+    /// Verify box-shadow properties are collected from Stylo.
+    #[test]
+    fn test_box_shadow_collection() {
+        let _guard = TEST_LOCK.lock().unwrap();
+
+        let html = r#"<div style="box-shadow:4px 6px 8px 2px rgba(0,0,0,0.5)">shadow</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+
+        fn find_shadow_el(el: &style::StyledElement) -> Option<&style::StyledElement> {
+            if !el.box_shadow.is_empty() {
+                return Some(el);
+            }
+            for child in &el.children {
+                if let style::StyledNode::Element(child_el) = child {
+                    if let Some(found) = find_shadow_el(child_el) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+        let el = find_shadow_el(&root).expect("Should find element with box-shadow");
+        assert_eq!(el.box_shadow.len(), 1);
+        let s = &el.box_shadow[0];
+        assert!((s.offset_x - 4.0).abs() < 0.01);
+        assert!((s.offset_y - 6.0).abs() < 0.01);
+        assert!((s.blur - 8.0).abs() < 0.01);
+        assert!((s.spread - 2.0).abs() < 0.01);
+        assert!(!s.inset);
+    }
+
+    #[test]
     fn test_render_opacity() {
         let _guard = TEST_LOCK.lock().unwrap();
         let fonts = test_fonts();
