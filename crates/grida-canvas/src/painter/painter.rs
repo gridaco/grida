@@ -347,7 +347,7 @@ impl<'a> Painter<'a> {
         draw_content();
 
         let mut p = SkPaint::default();
-        p.set_anti_alias(true);
+        p.set_anti_alias(self.policy.anti_alias());
         p.set_blend_mode(skia_safe::BlendMode::DstIn);
         p.set_shader(mask_shader);
         self.canvas.draw_rect(bounds, &p);
@@ -730,7 +730,7 @@ impl<'a> Painter<'a> {
 
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::drop_shadow_image_filter(shadow));
-        paint.set_anti_alias(true);
+        paint.set_anti_alias(self.policy.anti_alias());
         self.canvas
             .save_layer(&SaveLayerRec::default().bounds(&bounds).paint(&paint));
         self.canvas.translate((0.0, y_offset));
@@ -761,7 +761,7 @@ impl<'a> Painter<'a> {
 
         let mut paint = SkPaint::default();
         paint.set_image_filter(shadow::inner_shadow_image_filter(shadow));
-        paint.set_anti_alias(true);
+        paint.set_anti_alias(self.policy.anti_alias());
         self.canvas
             .save_layer(&SaveLayerRec::default().bounds(&bounds).paint(&paint));
         self.canvas.translate((0.0, y_offset));
@@ -984,6 +984,7 @@ impl<'a> Painter<'a> {
             fills,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             shape.draw_on_canvas(self.canvas, &paint);
         }
@@ -1003,6 +1004,7 @@ impl<'a> Painter<'a> {
             fills,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             self.draw_shape_at_offset(shape, &paint, tx, ty);
         }
@@ -1025,6 +1027,7 @@ impl<'a> Painter<'a> {
             fills,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             self.draw_shape_at_offset(shape, &paint, tx, ty);
@@ -1093,6 +1096,7 @@ impl<'a> Painter<'a> {
             fills,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             shape.draw_on_canvas(self.canvas, &paint);
@@ -1119,6 +1123,7 @@ impl<'a> Painter<'a> {
             fills,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             self.canvas.draw_path(path, &paint);
@@ -1164,6 +1169,7 @@ impl<'a> Painter<'a> {
             strokes,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             self.canvas.draw_path(stroke_path, &paint);
         }
@@ -1185,6 +1191,7 @@ impl<'a> Painter<'a> {
             strokes,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             self.canvas.draw_path(stroke_path, &paint);
@@ -1207,6 +1214,7 @@ impl<'a> Painter<'a> {
             strokes,
             (shape.rect.width(), shape.rect.height()),
             self.images,
+            self.policy.anti_alias(),
         ) {
             crate::shape::marker::draw_endpoint_decorations(
                 self.canvas,
@@ -2083,6 +2091,7 @@ impl<'a> Painter<'a> {
                                                 &vector_layer.strokes,
                                                 (shape.rect.width(), shape.rect.height()),
                                                 self.images,
+                                                self.policy.anti_alias(),
                                             ) {
                                                 crate::shape::marker::draw_endpoint_decorations(
                                                     self.canvas,
@@ -2275,7 +2284,7 @@ impl<'a> Painter<'a> {
         paint.set_color(color);
         paint.set_style(skia_safe::paint::Style::Stroke);
         paint.set_stroke_width(style.width);
-        paint.set_anti_alias(true);
+        paint.set_anti_alias(self.policy.anti_alias());
         paint
     }
 
@@ -2650,7 +2659,7 @@ impl<'a> Painter<'a> {
                                 let inner_filter = shadow::inner_shadow_image_filter(is);
                                 let mut shadow_paint = SkPaint::default();
                                 shadow_paint.set_image_filter(inner_filter);
-                                shadow_paint.set_anti_alias(true);
+                                shadow_paint.set_anti_alias(self.policy.anti_alias());
                                 canvas.save();
                                 canvas.clip_rect(bounds, None, true);
                                 canvas.draw_rect(bounds, &shadow_paint);

@@ -1287,7 +1287,7 @@ fn run_zoom_pass_forced_stable(
             z = next_z;
         }
         renderer.camera.set_zoom(z);
-        // BUG REPRODUCTION: always pass stable=true, same as redraw() does
+        // No-cache baseline: always pass stable=true (forces full draw every frame)
         if let Some((total, q, d, mf, c, f)) = measure_frame(renderer, true, overlay.as_mut()) {
             frame_times.push(total);
             queue_us_acc.push(q);
@@ -1757,25 +1757,25 @@ fn run_scenarios(
 
     let forced_stable_scenarios = vec![
         ForcedStableZoomScenario {
-            name: "BUG_zoom_stable_slow_fit",
+            name: "baseline_nocache_zoom_slow_fit",
             step: 0.005,
             z_min: fs_lo,
             z_max: fs_hi,
         },
         ForcedStableZoomScenario {
-            name: "BUG_zoom_stable_fast_fit",
+            name: "baseline_nocache_zoom_fast_fit",
             step: 0.05,
             z_min: fs_lo,
             z_max: fs_hi,
         },
         ForcedStableZoomScenario {
-            name: "BUG_zoom_stable_slow_high",
+            name: "baseline_nocache_zoom_slow_high",
             step: 0.01,
             z_min: fs_zoomed_in * 0.5,
             z_max: fs_zoomed_in,
         },
         ForcedStableZoomScenario {
-            name: "BUG_zoom_stable_fast_high",
+            name: "baseline_nocache_zoom_fast_high",
             step: 0.1,
             z_min: fs_zoomed_in * 0.5,
             z_max: fs_zoomed_in,
@@ -1791,7 +1791,7 @@ fn run_scenarios(
             run_zoom_pass_forced_stable(renderer, frames, fss.step, fss.z_min, fss.z_max, ov());
         results.push(ScenarioResult {
             name: fss.name.to_string(),
-            kind: "zoom_forced_stable".to_string(),
+            kind: "baseline_nocache_zoom".to_string(),
             params: ScenarioParams {
                 speed: Some(fss.step),
                 zoom: None,
@@ -2248,6 +2248,12 @@ pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> R
     gpu.print_gl_info();
 
     let mut renderer = gpu.create_renderer();
+    if args.no_aa {
+        let mut policy = cg::runtime::render_policy::RenderPolicy::STANDARD;
+        policy.force_no_aa = true;
+        renderer.set_render_policy(policy);
+    }
+    renderer.set_sync_gpu(true);
     renderer.load_scene(scene);
     renderer.fit_camera_to_scene();
 
@@ -2259,9 +2265,13 @@ pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> R
         fit_zoom, cam_rect.width, cam_rect.height,
     );
     println!(
-        "Viewport: {}x{}, frames: {}\n",
-        args.width, args.height, args.frames
+        "Viewport: {}x{}, frames: {}{}",
+        args.width,
+        args.height,
+        args.frames,
+        if args.no_aa { "  [NO-AA]" } else { "" },
     );
+    println!();
 
     warmup(&mut renderer);
 
@@ -2419,6 +2429,7 @@ pub async fn run_bench_report(
             };
 
             let mut renderer = gpu.create_renderer();
+            renderer.set_sync_gpu(true);
             renderer.load_scene(scene);
             renderer.fit_camera_to_scene();
             let fit_zoom = renderer.camera.get_zoom();

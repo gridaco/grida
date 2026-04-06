@@ -29,6 +29,10 @@ pub struct BenchArgs {
     /// Measures the combined cost of content rendering + overlay drawing.
     #[arg(long = "overlay", default_value_t = false)]
     pub overlay: bool,
+    /// Disable anti-aliasing on all paint operations.
+    /// For A/B measurement of AA cost at different zoom levels.
+    #[arg(long = "no-aa", default_value_t = false)]
+    pub no_aa: bool,
 }
 
 #[derive(Args, Debug)]

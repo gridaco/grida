@@ -48,6 +48,12 @@ pub struct RuntimeRendererConfig {
     /// Use this for documents where all positioning is absolute (e.g. SVG). Eliminates the layout phase entirely,
     /// which is the dominant cost in `load_scene` for large documents.
     pub skip_layout: bool,
+    /// When true, GPU flush calls block until the GPU finishes all
+    /// submitted work. Makes per-stage timing in `FrameFlushStats`
+    /// reflect actual GPU cost instead of command submission time.
+    ///
+    /// **Only enable in benchmarks.** Stalls the CPU/GPU pipeline.
+    pub sync_gpu: bool,
 }
 
 impl Default for RuntimeRendererConfig {
@@ -60,6 +66,7 @@ impl Default for RuntimeRendererConfig {
             pixel_preview_strategy: PixelPreviewStrategy::Stable,
             render_policy: Default::default(),
             skip_layout: false,
+            sync_gpu: false,
         }
     }
 }

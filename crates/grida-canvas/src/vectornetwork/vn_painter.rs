@@ -259,12 +259,12 @@ impl<'a> VNPainter<'a> {
         let size = (bounds.width(), bounds.height());
 
         if let Some(images) = self.images {
-            if let Some(mut paint) = paint::sk_paint_stack(paints, size, images) {
+            if let Some(mut paint) = paint::sk_paint_stack(paints, size, images, true) {
                 paint.set_style(PaintStyle::Fill);
                 self.canvas.draw_path(path, &paint);
             }
         } else {
-            if let Some(mut paint) = paint::sk_paint_stack_without_images(paints, size) {
+            if let Some(mut paint) = paint::sk_paint_stack_without_images(paints, size, true) {
                 paint.set_style(PaintStyle::Fill);
                 self.canvas.draw_path(path, &paint);
             }

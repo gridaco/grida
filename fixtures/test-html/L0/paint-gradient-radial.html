@@ -5,17 +5,18 @@
     <title>Paint: Radial Gradient</title>
     <style>
       body {
-        background: #030712;
-        color: #e2e8f0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        padding: 24px;
       }
 
       .label {
         font-size: 11px;
-        color: #94a3b8;
-        padding-bottom: 6px;
+        color: #666;
+        padding-bottom: 4px;
       }
 
       .grid {
@@ -28,7 +29,6 @@
       .rect {
         width: 180px;
         height: 180px;
-        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -37,22 +37,16 @@
       }
 
       .simple {
-        background: radial-gradient(circle, #6366f1, #030712);
+        background: radial-gradient(circle, #f00, #000);
       }
       .multi-stop {
-        background: radial-gradient(
-          circle,
-          #f59e0b,
-          #ef4444 40%,
-          #6366f1 80%,
-          #030712
-        );
+        background: radial-gradient(circle, #f00, #0f0 40%, #00f 80%, #000);
       }
       .stacked {
-        background-color: #1e293b;
+        background-color: #000;
         background-image: radial-gradient(
           circle,
-          rgba(99, 102, 241, 0.8),
+          rgba(255, 0, 0, 0.8),
           transparent 70%
         );
       }

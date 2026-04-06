@@ -2,10 +2,10 @@ use super::{gradient, image};
 use crate::{cg::prelude::*, runtime::image_repository::ImageRepository};
 use skia_safe::{self, shaders, Color, Shader};
 
-pub fn sk_solid_paint(paint: impl Into<SolidPaint>) -> skia_safe::Paint {
+pub fn sk_solid_paint(paint: impl Into<SolidPaint>, aa: bool) -> skia_safe::Paint {
     let p: SolidPaint = paint.into();
     let mut skia_paint = skia_safe::Paint::default();
-    skia_paint.set_anti_alias(true);
+    skia_paint.set_anti_alias(aa);
     let CGColor { r, g, b, a } = p.color;
     let final_alpha = (a as f32 * p.opacity()) as u8;
     skia_paint.set_color(skia_safe::Color::from_argb(final_alpha, r, g, b));
@@ -28,6 +28,7 @@ pub fn sk_paint_stack(
     paints: &[Paint],
     size: (f32, f32),
     images: &ImageRepository,
+    aa: bool,
 ) -> Option<skia_safe::Paint> {
     // Fast path: single solid fill — set color directly on the paint,
     // avoiding shader object allocation and giving Skia's GPU backend
@@ -37,7 +38,7 @@ pub fn sk_paint_stack(
             let CGColor { r, g, b, a } = solid.color;
             let final_alpha = (a as f32 * solid.opacity()).round() as u8;
             let mut paint = skia_safe::Paint::default();
-            paint.set_anti_alias(true);
+            paint.set_anti_alias(aa);
             paint.set_color(Color::from_argb(final_alpha, r, g, b));
             paint.set_blend_mode(solid.blend_mode.into());
             return Some(paint);
@@ -63,7 +64,7 @@ pub fn sk_paint_stack(
         }
     }
     let mut paint = skia_safe::Paint::default();
-    paint.set_anti_alias(true);
+    paint.set_anti_alias(aa);
     paint.set_shader(shader);
     // Apply the base paint's blend mode at the paint level so the first
     // fill can blend with the canvas/background, matching editor semantics.
@@ -86,6 +87,7 @@ pub fn sk_paint_stack(
 pub fn sk_paint_stack_without_images(
     paints: &[Paint],
     size: (f32, f32),
+    aa: bool,
 ) -> Option<skia_safe::Paint> {
     // Fast path: single solid fill — direct color, no shader allocation.
     if paints.len() == 1 {
@@ -93,7 +95,7 @@ pub fn sk_paint_stack_without_images(
             let CGColor { r, g, b, a } = solid.color;
             let final_alpha = (a as f32 * solid.opacity()).round() as u8;
             let mut paint = skia_safe::Paint::default();
-            paint.set_anti_alias(true);
+            paint.set_anti_alias(aa);
             paint.set_color(Color::from_argb(final_alpha, r, g, b));
             paint.set_blend_mode(solid.blend_mode.into());
             return Some(paint);
@@ -112,7 +114,7 @@ pub fn sk_paint_stack_without_images(
         }
     }
     let mut paint = skia_safe::Paint::default();
-    paint.set_anti_alias(true);
+    paint.set_anti_alias(aa);
     paint.set_shader(shader);
     // Apply the base paint's blend mode at the paint level so the first
     // fill can blend with the canvas/background, matching editor semantics.
