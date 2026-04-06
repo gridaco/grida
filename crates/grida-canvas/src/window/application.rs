@@ -503,6 +503,16 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported> {
         let internal_id = self.user_id_to_internal(id)?;
+
+        // Image exports reuse the live renderer's warm SceneCache directly.
+        // This renders only the target subtree — no scene clone, no layout
+        // rebuild, no O(N) traversal. The warm cache is always consistent
+        // with the scene (atomically rebuilt on load_scene).
+        if format.is_format_image() {
+            return self.export_node_as_image(&internal_id, format);
+        }
+
+        // PDF/SVG: still use the throwaway-renderer path (separate backend).
         if let Some(scene) = self.renderer.scene.as_ref() {
             return export_node_as(
                 scene,
@@ -513,7 +523,7 @@ impl ApplicationApi for UnknownTargetApplication {
                 format,
             );
         }
-        return None;
+        None
     }
 
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
@@ -755,6 +765,52 @@ impl ApplicationApi for UnknownTargetApplication {
 }
 
 impl UnknownTargetApplication {
+    /// Export a node as a raster image (PNG/JPEG/WEBP/BMP).
+    ///
+    /// Renders only the target subtree using the live renderer's warm
+    /// `SceneCache`. This is safe because:
+    /// - The cache is atomically rebuilt on every `load_scene` call
+    /// - World transforms, clip paths, and effect tree are read from the
+    ///   shared geometry cache (correct for any node)
+    /// - Ancestor opacity is intentionally NOT propagated (standard export
+    ///   behavior — the node is exported as if it were the root)
+    /// - The Painter is stateless; no inter-node state leaks
+    fn export_node_as_image(&self, node_id: &NodeId, format: ExportAs) -> Option<Exported> {
+        use crate::export::{ExportAsImage, ExportSize};
+        use skia_safe::EncodedImageFormat;
+
+        let constraints = format.get_constraints();
+        let geometry = &self.renderer.get_cache().geometry;
+        let rect = geometry.get_render_bounds(node_id)?;
+
+        let size = ExportSize {
+            width: rect.width,
+            height: rect.height,
+        };
+        let size = size.apply_constraints(constraints);
+
+        let image = self
+            .renderer
+            .export_node_image(node_id, rect, (size.width, size.height))?;
+
+        // Encode
+        let img_format: ExportAsImage = format.try_into().ok()?;
+        let skfmt: EncodedImageFormat = img_format.clone().into();
+        let quality = match &img_format {
+            ExportAsImage::JPEG(cfg) => cfg.quality,
+            ExportAsImage::WEBP(cfg) => cfg.quality,
+            _ => None,
+        };
+        let data = image.encode(None, skfmt, quality)?;
+
+        match img_format {
+            ExportAsImage::PNG(_) => Some(Exported::PNG(data.to_vec())),
+            ExportAsImage::JPEG(_) => Some(Exported::JPEG(data.to_vec())),
+            ExportAsImage::WEBP(_) => Some(Exported::WEBP(data.to_vec())),
+            ExportAsImage::BMP(_) => Some(Exported::BMP(data.to_vec())),
+        }
+    }
+
     /// Returns image refs that were needed during the last render but not found.
     /// Only returns refs not yet reported in a previous call.
     pub fn drain_missing_images(&mut self) -> Vec<String> {

@@ -842,7 +842,7 @@ missing the cheapest possible camera-change path.
       when the camera is actively changing, otherwise every interaction
       frame nukes the zoom cache and forces a full O(N) draw.
 
-    **Measured impact (01-135k.perf.grida, 136K nodes, 100 frames):**
+    **Measured impact (136K-node scene, 100 frames):**
 
     | Scenario             | Before µs (fps) | After µs (fps) | Speedup   |
     | -------------------- | --------------- | -------------- | --------- |
@@ -1305,6 +1305,28 @@ expensive full redraws.
     the pipeline — `render_frame()` receives it as a parameter to avoid
     recomputation on cache-miss fallthrough.
 
+51. **Quantized DPR Snapping** (future)
+
+    **What:** round the effective raster DPR
+    (`device_dpr × interaction_scale × zoom`) to a small set of discrete
+    buckets (e.g. 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0) during active
+    interaction. Cache invalidation and raster-scale decisions key off
+    the **snapped** DPR, while the final blit uses the **continuous**
+    camera transform so the user still sees smooth zoom. Stable frames
+    drop the snap and raster at exact DPR for full fidelity. Boundary
+    hysteresis prevents thrash when raw DPR sits near a bucket edge.
+
+    **Why:** continuous zoom produces a unique effective DPR every frame,
+    which currently triggers per-frame `mark_all_stale()` on the
+    compositor cache, pan-cache invalidation, and atlas churn. On WASM
+    this O(N) invalidation loop is amplified 10–30× vs native and cannot
+    be offloaded to a worker thread. Snapping converts the cost from
+    _per-frame_ to _per-bucket-crossing_ (roughly once every 200–400 ms
+    at typical zoom velocity), letting cached GPU textures survive the
+    gesture instead of being nuked each frame. Visual quality loss is
+    bounded by the largest bucket ratio (~±12.5%) and is imperceptible
+    on in-flight gestures for static content.
+
 ## LOD (Level-of-Detail) at Low Zoom
 
 The following items describe zoom-aware LOD strategies for reducing
@@ -1330,7 +1352,7 @@ probes in `examples/skia_bench/` for per-primitive validation data.
   primitive" rules need per-backend validation.** Modern analytic-AA
   GPU shaders may already handle sub-pixel inputs efficiently.
 
-51. **Subpixel LOD Culling** (A1)
+52. **Subpixel LOD Culling** (A1)
 
     Drop leaf nodes from the frame plan when both projected dimensions
     fall below a threshold (e.g. 0.5 px). At fit-zoom on the 136K-node
@@ -1348,7 +1370,7 @@ probes in `examples/skia_bench/` for per-primitive validation data.
     query, using per-layer bounds stored in a parallel
     `Vec<Option<AABB>>` for O(1) lookup.
 
-52. **Text LOD (H1 cull + H2 greek)**
+53. **Text LOD (H1 cull + H2 greek)**
 
     Two-stage policy driven by projected font size (`font_max · z`).
 
@@ -1362,7 +1384,7 @@ probes in `examples/skia_bench/` for per-primitive validation data.
       during zoom without per-glyph GPU work.
 
     Pure culling makes text pop in/out during zoom — jarring. Greeking
-    preserves the visual footprint. Combined with item 51, measured
+    preserves the visual footprint. Combined with item 52, measured
     11–17% total frame-time reduction on the 136K fixture at fit-zoom.
 
     Thresholds match standard editor greek bands (Figma ~4–6 px).

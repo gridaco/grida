@@ -425,7 +425,14 @@ export function useDataTransferEventTarget() {
         }
       }
 
-      // 3. Handle SVG text, images, or plain text
+      // 3. Prefer markdown over plain text (clipboards may expose both)
+      const markdownItem = items.find((i) => i.type === "text/markdown");
+      if (markdownItem && markdownItem.type === "text/markdown") {
+        insertFromFile(markdownItem.type, markdownItem.file, position);
+        return true;
+      }
+
+      // 4. Handle SVG text, images, or plain text
       for (const item of items) {
         try {
           switch (item.type) {
@@ -441,8 +448,7 @@ export function useDataTransferEventTarget() {
             case "image/jpeg":
             case "image/png":
             case "image/svg+xml":
-            case "image/webp":
-            case "text/markdown": {
+            case "image/webp": {
               insertFromFile(item.type, item.file, position);
               return true;
             }

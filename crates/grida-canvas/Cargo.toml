@@ -100,6 +100,10 @@ harness = false
 name = "bench_load_scene"
 harness = false
 
+[[bench]]
+name = "bench_export"
+harness = false
+
 [[example]]
 name = "headless_gpu"
 required-features = ["native-gl-context"]

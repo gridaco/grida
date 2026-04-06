@@ -1,3 +1,4 @@
+import type { FC } from "react";
 import { type Metadata } from "next";
 import ai from "@/lib/ai";
 import {
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
   description: "Explore the AI models available on Grida",
 };
 
-const Logos: Partial<Record<string, React.FC<{ className?: string }>>> = {
+const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
   "black-forest-labs": BlackForestLabsLogo,
   openai: OpenAILogo,
   anthropic: AnthropicLogo,
@@ -52,15 +53,26 @@ function groupByVendor(
   return groups;
 }
 
+const VendorLabels: Record<string, string> = {
+  "black-forest-labs": "Black Forest Labs",
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  google: "Google",
+  "recraft-ai": "Recraft AI",
+};
+
 function vendorLabel(vendor: string) {
-  return vendor
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  return (
+    VendorLabels[vendor] ??
+    vendor
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ")
+  );
 }
 
 function dimLabel(model: AITypes.image.ImageModelCard) {
-  if (model.sizes) {
+  if (model.sizes?.length) {
     return model.sizes.map(([w, h, r]) => `${w}x${h} (${r})`).join(", ");
   }
   if (model.max_width > 0) {
@@ -203,7 +215,7 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
           <div className="flex justify-between">
             <span>Dimensions</span>
             <span className="font-mono text-foreground">
-              {model.sizes
+              {model.sizes?.length
                 ? `${model.sizes.length} presets`
                 : model.max_width > 0
                   ? `up to ${model.max_width}x${model.max_height}`

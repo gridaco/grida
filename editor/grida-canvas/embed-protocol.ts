@@ -132,7 +132,7 @@ export type EmbedEvent =
       /** Exported bytes. `null` if the node was not found or export failed. */
       data: ArrayBuffer | null;
       /** The format that was actually produced (e.g. "PNG", "SVG"). */
-      format: string;
+      format: EmbedExportAs["format"];
     }
   | {
       /** Reply to `grida:get-node-id-path`. */
