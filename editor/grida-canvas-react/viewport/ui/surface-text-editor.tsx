@@ -314,6 +314,12 @@ function WasmTextEditorRelay({ node_id }: { node_id: string }) {
       // When the session has nothing left, fall through to document-level
       // undo/redo so the user can undo their way out of content edit mode
       // (see test/canvas-input-history-undo-cem.md).
+      //
+      // TODO(@grida/history): Register the WASM text session as a
+      // HistoryProvider with a prepare() hook. This would enable a unified
+      // undo stack where the document-level history knows about the text
+      // session's internal state. Currently, the cascading dispatch here
+      // works but the two undo stacks are invisible to each other.
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         e.stopPropagation();

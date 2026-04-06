@@ -46,7 +46,7 @@ import { LengthPercentageControl } from "./controls/length-percentage";
 import { WidthHeightControl } from "./controls/width-height";
 import { LayoutControl } from "./controls/layout";
 import { MaxlengthControl } from "./controls/maxlength";
-import { BlendModeDropdown } from "./controls/blend-mode";
+import { BlendModeDropdownWithPreview } from "./controls/blend-mode";
 import {
   useComputedNode,
   useCurrentEditor,
@@ -378,7 +378,7 @@ function ModeMixedNodeProperties({
         <PropertySectionHeaderItem>
           <PropertySectionHeaderLabel>Appearance</PropertySectionHeaderLabel>
           <PropertySectionHeaderActions>
-            <BlendModeDropdown
+            <BlendModeDropdownWithPreview
               type="layer"
               value={blend_mode?.value}
               onValueChange={(value) => {
@@ -644,7 +644,7 @@ function ModeNodeProperties({
         <PropertySectionHeaderItem>
           <PropertySectionHeaderLabel>Appearance</PropertySectionHeaderLabel>
           <PropertySectionHeaderActions>
-            <BlendModeDropdown
+            <BlendModeDropdownWithPreview
               type="layer"
               value={blend_mode}
               onValueChange={actions.blend_mode}

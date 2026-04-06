@@ -22,7 +22,7 @@ describe("History", () => {
       expect(h.undo()).toBe(false);
     });
 
-    it("undo succeeds after commit", () => {
+    it("undo succeeds after commit", async () => {
       const h = new HistoryImpl();
       const c = { value: 0 };
       const tx = h.begin("test");
@@ -31,8 +31,9 @@ describe("History", () => {
       tx.push(d);
       tx.commit();
       expect(c.value).toBe(10);
-      expect(h.undo()).resolves ? void 0 : void 0; // may be sync or async
-      // For sync providers, undo is sync
+      const result = await h.undo();
+      expect(result).toBe(true);
+      expect(c.value).toBe(0);
     });
   });
 

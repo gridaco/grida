@@ -2,15 +2,22 @@
   "compilerOptions": {
     "target": "es2020",
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "strict": true,
     "noImplicitAny": true,
     "skipLibCheck": true,
     "declaration": true,
-    "outDir": "dist",
-    "types": ["vitest/globals", "node"]
+    "types": [
+      "vitest/globals",
+      "node"
+    ]
   },
-  "include": ["src"],
-  "exclude": ["dist", "__tests__"]
+  "include": [
+    "src",
+    "__tests__"
+  ],
+  "exclude": [
+    "dist"
+  ]
 }

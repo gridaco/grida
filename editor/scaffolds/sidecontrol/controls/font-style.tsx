@@ -1,9 +1,10 @@
 import React, { useMemo } from "react";
-import { PropertyEnum, EnumItem } from "../ui";
+import { PropertyEnumV2, EnumItem } from "../ui";
 import { useCurrentFontFamily } from "./context/font";
 import { editor } from "@/grida-canvas";
+import { usePropertyPreview } from "@/grida-canvas-react/hooks/use-property-change";
 
-function placeholder(description?: {
+function placeholderText(description?: {
   fontVariations?: Record<string, number>;
   fontWeight?: number;
 }) {
@@ -15,33 +16,7 @@ function placeholder(description?: {
   return `${weight}${more}`;
 }
 
-/**
- * Font Style (Variation Instance) Control Component
- *
- * This component is a font-pre-defined style picker designed specifically for usage with:
- * - OpenType STAT Axis names
- * - fvar.instances
- *
- * While this may look similar to font-weight.tsx, this component is explicitly designed
- * for handling font style variations through OpenType font features rather than generic
- * font weight controls.
- *
- * IMPORTANT: This component requires a proper font parser to function correctly.
- * The component itself does not provide font parsing functionality - it is purely
- * a UI wrapper around font parsing results. You must integrate this with a font
- * parser that can extract STAT axis information and fvar instances from OpenType fonts.
- *
- * Usage:
- * - Handle style selection changes through the provided callbacks
- * - Ensure your font parser provides the necessary data structure this component expects
- * - The component is purely driven by the font context and will automatically deselect
- *   when the current font variations don't match any instance exactly
- */
-export function FontStyleControl({
-  onValueChange,
-}: {
-  onValueChange?: (key: editor.font_spec.FontStyleKey) => void;
-}) {
+function useFontStyleOptions() {
   const f = useCurrentFontFamily();
 
   const { styles, currentStyleKey, description } =
@@ -53,20 +28,16 @@ export function FontStyleControl({
           description: { fontVariations: {}, fontWeight: 400 },
         };
 
-  // Group styles by italic variants and sort by weight
   const options: EnumItem<string>[][] = useMemo(() => {
-    const options: EnumItem<string>[][] = [];
-    // Separate styles into italic and non-italic groups
+    const result: EnumItem<string>[][] = [];
     const g_romans = styles.filter((style) => !style.fontStyleItalic);
     const g_italics = styles.filter((style) => style.fontStyleItalic);
 
-    // Sort each group by weight (ascending)
     const sortByWeight = (a: (typeof styles)[0], b: (typeof styles)[0]) =>
       a.fontWeight - b.fontWeight;
 
-    // Add regular styles group if there are any
     if (g_romans.length > 0) {
-      options.push(
+      result.push(
         g_romans.sort(sortByWeight).map((v) => ({
           value: editor.font_spec.fontStyleKey.key2str(v),
           label: v.fontStyleName,
@@ -74,37 +45,54 @@ export function FontStyleControl({
       );
     }
 
-    // Add italic styles group if there are any
     if (g_italics.length > 0) {
-      options.push(
+      result.push(
         g_italics.sort(sortByWeight).map((v) => ({
           value: editor.font_spec.fontStyleKey.key2str(v),
           label: v.fontStyleName,
         }))
       );
     }
-    return options;
+    return result;
   }, [styles]);
 
   const value = currentStyleKey
     ? editor.font_spec.fontStyleKey.key2str(currentStyleKey)
     : "";
-  const disabled = styles.length === 0;
+
+  return { options, value, description };
+}
+
+/**
+ * Font Style Control with history preview.
+ *
+ * Uses PropertyEnumV2 with onValueSeeked → usePropertyPreview.
+ * The checkmark stays on the committed value while hovering.
+ * Canvas previews the hovered style live. Reverts on mouse-leave.
+ */
+export function FontStyleControl({
+  onValueChange,
+}: {
+  onValueChange?: (key: editor.font_spec.FontStyleKey) => void;
+}) {
+  const { options, value, description } = useFontStyleOptions();
+
+  const preview = usePropertyPreview<string>("font-style", (v) => {
+    const key = editor.font_spec.fontStyleKey.str2key(v);
+    if (key) onValueChange?.(key);
+  });
 
   return (
-    <PropertyEnum
-      value={value}
-      placeholder={placeholder(description)}
+    <PropertyEnumV2
+      value={(preview.committedValue ?? value) as any}
+      placeholder={placeholderText(description)}
       enum={options}
-      disabled={disabled}
-      onValueChange={(value) => {
-        const key = editor.font_spec.fontStyleKey.str2key(value);
-        if (key) {
-          onValueChange?.(key);
-        } else {
-          console.error("invalid font style key", value);
-        }
+      onOpenChange={(open) => {
+        if (open) preview.onOpen(value);
+        else preview.onClose();
       }}
+      onValueSeeked={preview.onSeek}
+      onValueChange={preview.onCommit}
     />
   );
 }

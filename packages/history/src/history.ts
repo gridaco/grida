@@ -197,7 +197,7 @@ export class HistoryImpl implements History {
     return p;
   }
 
-  private async _doUndo(): Promise<boolean> {
+  private _doUndo(): boolean | Promise<boolean> {
     // Invariant 2: blocked while transaction is open
     if (this._hasOpenTransaction()) {
       return false;
@@ -210,17 +210,27 @@ export class HistoryImpl implements History {
     if (!tx) return false;
 
     // Prepare providers
-    const prepared = await this._prepareProviders(tx);
+    const prepareResult = this._prepareProviders(tx);
+
+    if (prepareResult instanceof Promise) {
+      return prepareResult.then((prepared) =>
+        this._finishUndo(tx, prepared)
+      );
+    }
+
+    return this._finishUndo(tx, prepareResult);
+  }
+
+  private _finishUndo(
+    tx: CommittedTransaction,
+    prepared: Disposable | null
+  ): boolean {
     if (!prepared) {
-      // popUndo moved tx to future — move it back to past
       this._stack.undoPopUndo(tx);
       return false;
     }
 
-    // Execute deltas in reverse
     const success = this._revertDeltas(tx);
-
-    // Cleanup prepare disposables
     prepared.dispose();
 
     if (success) {
@@ -231,7 +241,7 @@ export class HistoryImpl implements History {
     return success;
   }
 
-  private async _doRedo(): Promise<boolean> {
+  private _doRedo(): boolean | Promise<boolean> {
     if (this._hasOpenTransaction()) {
       return false;
     }
@@ -241,15 +251,27 @@ export class HistoryImpl implements History {
     const tx = this._stack.popRedo();
     if (!tx) return false;
 
-    const prepared = await this._prepareProviders(tx);
+    const prepareResult = this._prepareProviders(tx);
+
+    if (prepareResult instanceof Promise) {
+      return prepareResult.then((prepared) =>
+        this._finishRedo(tx, prepared)
+      );
+    }
+
+    return this._finishRedo(tx, prepareResult);
+  }
+
+  private _finishRedo(
+    tx: CommittedTransaction,
+    prepared: Disposable | null
+  ): boolean {
     if (!prepared) {
-      // popRedo moved tx to past — move it back to future
       this._stack.undoPopRedo(tx);
       return false;
     }
 
     const success = this._applyDeltas(tx);
-
     prepared.dispose();
 
     if (success) {
@@ -273,9 +295,9 @@ export class HistoryImpl implements History {
     }
   }
 
-  private async _prepareProviders(
+  private _prepareProviders(
     tx: CommittedTransaction
-  ): Promise<Disposable | null> {
+  ): Disposable | null | Promise<Disposable | null> {
     // Collect unique provider IDs
     const providerIds = new Set<string>();
     for (const d of tx.deltas) {
@@ -283,6 +305,7 @@ export class HistoryImpl implements History {
     }
 
     const disposables: Disposable[] = [];
+    const promises: Promise<Disposable>[] = [];
 
     try {
       for (const pid of providerIds) {
@@ -290,27 +313,43 @@ export class HistoryImpl implements History {
         if (provider?.prepare) {
           const result = provider.prepare();
           if (result instanceof Promise) {
-            disposables.push(await result);
+            promises.push(result);
           } else {
             disposables.push(result);
           }
         }
       }
     } catch {
-      // Cleanup any already-prepared
       for (const d of disposables) {
         d.dispose();
       }
       return null;
     }
 
-    return {
+    const makeDisposable = (all: Disposable[]): Disposable => ({
       dispose: () => {
-        for (const d of disposables) {
+        for (const d of all) {
           d.dispose();
         }
       },
-    };
+    });
+
+    // Sync fast path: no async providers
+    if (promises.length === 0) {
+      return makeDisposable(disposables);
+    }
+
+    // Async path: wait for all promises
+    return Promise.all(promises)
+      .then((asyncDisposables) => {
+        return makeDisposable([...disposables, ...asyncDisposables]);
+      })
+      .catch(() => {
+        for (const d of disposables) {
+          d.dispose();
+        }
+        return null;
+      });
   }
 
   private _revertDeltas(tx: CommittedTransaction): boolean {
