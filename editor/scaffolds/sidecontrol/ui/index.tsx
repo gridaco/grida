@@ -8,13 +8,6 @@ import {
   SelectSeparator,
   SelectValue,
 } from "@/components/ui-editor/select";
-import {
-  Combobox,
-  ComboboxContent,
-  ComboboxList,
-  ComboboxItem,
-  ComboboxValue,
-} from "@/components/ui/combobox";
 import { Combobox as ComboboxPrimitive } from "@base-ui/react";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +18,7 @@ import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import grida from "@grida/schema";
-import { ChevronDownIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 
 /**
  * @deprecated use PropertyRow instead
@@ -407,6 +400,9 @@ export function PropertyEnum<T extends string>({
  *
  * This enables live-preview patterns (e.g. blend mode, font style) directly
  * in the property panel without manual DropdownMenu wiring.
+ *
+ * Supports both flat (`EnumItem<T>[]`) and grouped (`EnumItem<T>[][]`) data,
+ * rendering separators between groups — matching `PropertyEnum` behavior.
  */
 export function PropertyEnumV2<T extends string>({
   enum: enums,
@@ -442,68 +438,68 @@ export function PropertyEnumV2<T extends string>({
     ? (enums as EnumItem<T>[][]).flat()
     : (enums as EnumItem<T>[]);
 
-  // Build combobox-compatible items: { value: T, label: string, ... }
   type ComboboxItemData = {
     itemValue: T;
     label: string;
     icon?: React.ReactNode;
     disabled?: boolean;
-    group?: string;
   };
 
-  const items: ComboboxItemData[] = allEnums.map((e) => ({
+  const toItemData = (e: EnumItem<T>): ComboboxItemData => ({
     itemValue: enumValue(e),
     label: enumLabel(e),
     icon: typeof e !== "string" ? e.icon : undefined,
     disabled: typeof e !== "string" ? e.disabled : false,
-    group: typeof e !== "string" ? e.group : undefined,
-  }));
+  });
 
-  const hasIcon = items.some((i) => i.icon);
+  const allItems: ComboboxItemData[] = allEnums.map(toItemData);
+  const hasIcon = allItems.some((i) => i.icon);
 
-  // For grouped rendering, build a group structure
   const groups: ComboboxItemData[][] = isGrouped
-    ? (enums as EnumItem<T>[][]).map((group) =>
-        group.map((e) => ({
-          itemValue: enumValue(e),
-          label: enumLabel(e),
-          icon: typeof e !== "string" ? e.icon : undefined,
-          disabled: typeof e !== "string" ? e.disabled : false,
-          group: typeof e !== "string" ? e.group : undefined,
-        }))
-      )
-    : [items];
+    ? (enums as EnumItem<T>[][]).map((group) => group.map(toItemData))
+    : [allItems];
 
-  const selectedItem =
-    !mixed && value !== undefined
-      ? items.find((i) => i.itemValue === value)
-      : undefined;
-
-  // Find the full item data for the current value
   const comboboxValue =
     !mixed && value !== undefined
-      ? (items.find((i) => i.itemValue === value) ?? null)
+      ? (allItems.find((i) => i.itemValue === value) ?? null)
       : null;
 
+  const renderItem = (item: ComboboxItemData) => (
+    <ComboboxPrimitive.Item
+      key={item.itemValue}
+      value={item}
+      disabled={item.disabled}
+      className={cn(
+        "data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1 pr-8 pl-2 text-xs outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+      )}
+    >
+      <ComboboxPrimitive.ItemIndicator className="pointer-events-none absolute right-2 flex size-3.5 items-center justify-center">
+        <CheckIcon className="size-4" />
+      </ComboboxPrimitive.ItemIndicator>
+      {hasIcon && item.icon && <>{item.icon}</>}
+      {item.label}
+    </ComboboxPrimitive.Item>
+  );
+
   return (
-    <Combobox
+    <ComboboxPrimitive.Root
       value={comboboxValue}
-      onValueChange={(v) => {
+      onValueChange={(v: unknown) => {
         const item = v as ComboboxItemData | null;
         if (item) onValueChange?.(item.itemValue);
       }}
-      onItemHighlighted={(v) => {
+      onItemHighlighted={(v: unknown) => {
         const item = v as ComboboxItemData | undefined;
         onValueSeeked?.(item?.itemValue);
       }}
-      onOpenChange={(open) => {
+      onOpenChange={(open: boolean) => {
         onOpenChange?.(open);
         if (!open) onValueSeeked?.(undefined);
       }}
-      items={items}
+      items={allItems}
       filter={null}
-      itemToStringLabel={(item) => (item as ComboboxItemData).label}
-      isItemEqualToValue={(a, b) =>
+      itemToStringLabel={(item: unknown) => (item as ComboboxItemData).label}
+      isItemEqualToValue={(a: unknown, b: unknown) =>
         (a as ComboboxItemData).itemValue === (b as ComboboxItemData).itemValue
       }
     >
@@ -521,25 +517,44 @@ export function PropertyEnumV2<T extends string>({
             allEnums.find((e) => enumValue(e) === value)
           )
         ) : (
-          <ComboboxValue placeholder={mixed ? "mixed" : placeholder} />
+          <ComboboxPrimitive.Value
+            placeholder={mixed ? "mixed" : placeholder}
+          />
         )}
         <ChevronDownIcon className="size-3 shrink-0 opacity-50" />
       </ComboboxPrimitive.Trigger>
-      <ComboboxContent>
-        <ComboboxList>
-          {(item: ComboboxItemData) => (
-            <ComboboxItem
-              key={item.itemValue}
-              value={item}
-              disabled={item.disabled}
-            >
-              {hasIcon && item.icon && <>{item.icon}</>}
-              {item.label}
-            </ComboboxItem>
-          )}
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
+      <ComboboxPrimitive.Portal>
+        <ComboboxPrimitive.Positioner
+          side="bottom"
+          sideOffset={4}
+          align="start"
+          className="isolate z-50"
+        >
+          <ComboboxPrimitive.Popup
+            className={cn(
+              "bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+              "relative max-h-[min(--spacing(96),var(--available-height))] min-w-[8rem] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md"
+            )}
+          >
+            <ComboboxPrimitive.List className="scroll-py-1 p-1">
+              {isGrouped
+                ? groups.flatMap((group, gi) => [
+                    ...(gi > 0
+                      ? [
+                          <ComboboxPrimitive.Separator
+                            key={`sep-${gi}`}
+                            className="bg-border pointer-events-none -mx-1 my-1 h-px"
+                          />,
+                        ]
+                      : []),
+                    ...group.map(renderItem),
+                  ])
+                : allItems.map(renderItem)}
+            </ComboboxPrimitive.List>
+          </ComboboxPrimitive.Popup>
+        </ComboboxPrimitive.Positioner>
+      </ComboboxPrimitive.Portal>
+    </ComboboxPrimitive.Root>
   );
 }
 
