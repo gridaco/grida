@@ -40,6 +40,12 @@ export default function UIComponentsIndexPage() {
       href: "/ui/components/tree",
       description: "Hierarchical tree view with drag-and-drop and multi-select",
     },
+    {
+      name: "Property Controls",
+      href: "/ui/components/property",
+      description:
+        "PropertyEnumV2 — combobox-based select with onValueSeeked for live-preview",
+    },
   ];
 
   const forms = [

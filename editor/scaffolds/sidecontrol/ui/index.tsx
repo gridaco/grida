@@ -8,6 +8,14 @@ import {
   SelectSeparator,
   SelectValue,
 } from "@/components/ui-editor/select";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxValue,
+} from "@/components/ui/combobox";
+import { Combobox as ComboboxPrimitive } from "@base-ui/react";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
@@ -17,6 +25,7 @@ import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import grida from "@grida/schema";
+import { ChevronDownIcon } from "lucide-react";
 
 /**
  * @deprecated use PropertyRow instead
@@ -386,6 +395,151 @@ export function PropertyEnum<T extends string>({
             })}
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * PropertyEnumV2 — Combobox-based property enum with highlight (seek) support.
+ *
+ * Successor to `PropertyEnum`. Uses Base UI Combobox (with `filter={null}`)
+ * to behave as a select dropdown while exposing `onValueSeeked` —
+ * fired when the user hovers or keyboard-navigates to an item before committing.
+ *
+ * This enables live-preview patterns (e.g. blend mode, font style) directly
+ * in the property panel without manual DropdownMenu wiring.
+ */
+export function PropertyEnumV2<T extends string>({
+  enum: enums,
+  placeholder,
+  value,
+  tabIndex,
+  className,
+  renderTriggerValue,
+  onValueChange,
+  onValueSeeked,
+  onOpenChange,
+}: {
+  enum: EnumItem<T>[] | EnumItem<T>[][];
+  value?: TMixed<T>;
+  placeholder?: string;
+  onValueChange?: (value: T) => void;
+  /** Fired when hovered / keyboard-navigated to an item (before commit) */
+  onValueSeeked?: (value: T | undefined) => void;
+  /** Fired when the dropdown opens / closes */
+  onOpenChange?: (open: boolean) => void;
+  tabIndex?: number;
+  className?: string;
+  /** When set, renders only this in the trigger instead of label (e.g. icon only). */
+  renderTriggerValue?: (
+    value: T,
+    selectedItem: EnumItem<T> | undefined
+  ) => React.ReactNode;
+}) {
+  const mixed = value === grida.mixed;
+
+  const isGrouped = Array.isArray(enums[0]);
+  const allEnums = isGrouped
+    ? (enums as EnumItem<T>[][]).flat()
+    : (enums as EnumItem<T>[]);
+
+  // Build combobox-compatible items: { value: T, label: string, ... }
+  type ComboboxItemData = {
+    itemValue: T;
+    label: string;
+    icon?: React.ReactNode;
+    disabled?: boolean;
+    group?: string;
+  };
+
+  const items: ComboboxItemData[] = allEnums.map((e) => ({
+    itemValue: enumValue(e),
+    label: enumLabel(e),
+    icon: typeof e !== "string" ? e.icon : undefined,
+    disabled: typeof e !== "string" ? e.disabled : false,
+    group: typeof e !== "string" ? e.group : undefined,
+  }));
+
+  const hasIcon = items.some((i) => i.icon);
+
+  // For grouped rendering, build a group structure
+  const groups: ComboboxItemData[][] = isGrouped
+    ? (enums as EnumItem<T>[][]).map((group) =>
+        group.map((e) => ({
+          itemValue: enumValue(e),
+          label: enumLabel(e),
+          icon: typeof e !== "string" ? e.icon : undefined,
+          disabled: typeof e !== "string" ? e.disabled : false,
+          group: typeof e !== "string" ? e.group : undefined,
+        }))
+      )
+    : [items];
+
+  const selectedItem =
+    !mixed && value !== undefined
+      ? items.find((i) => i.itemValue === value)
+      : undefined;
+
+  // Find the full item data for the current value
+  const comboboxValue =
+    !mixed && value !== undefined
+      ? (items.find((i) => i.itemValue === value) ?? null)
+      : null;
+
+  return (
+    <Combobox
+      value={comboboxValue}
+      onValueChange={(v) => {
+        const item = v as ComboboxItemData | null;
+        if (item) onValueChange?.(item.itemValue);
+      }}
+      onItemHighlighted={(v) => {
+        const item = v as ComboboxItemData | undefined;
+        onValueSeeked?.(item?.itemValue);
+      }}
+      onOpenChange={(open) => {
+        onOpenChange?.(open);
+        if (!open) onValueSeeked?.(undefined);
+      }}
+      items={items}
+      filter={null}
+      itemToStringLabel={(item) => (item as ComboboxItemData).label}
+      isItemEqualToValue={(a, b) =>
+        (a as ComboboxItemData).itemValue === (b as ComboboxItemData).itemValue
+      }
+    >
+      <ComboboxPrimitive.Trigger
+        tabIndex={tabIndex}
+        className={cn(
+          WorkbenchUI.inputVariants({ size: "xs" }),
+          "flex items-center justify-between gap-1",
+          className
+        )}
+      >
+        {renderTriggerValue && !mixed && value !== undefined ? (
+          renderTriggerValue(
+            value,
+            allEnums.find((e) => enumValue(e) === value)
+          )
+        ) : (
+          <ComboboxValue placeholder={mixed ? "mixed" : placeholder} />
+        )}
+        <ChevronDownIcon className="size-3 shrink-0 opacity-50" />
+      </ComboboxPrimitive.Trigger>
+      <ComboboxContent>
+        <ComboboxList>
+          {(item: ComboboxItemData) => (
+            <ComboboxItem
+              key={item.itemValue}
+              value={item}
+              disabled={item.disabled}
+            >
+              {hasIcon && item.icon && <>{item.icon}</>}
+              {item.label}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
 
