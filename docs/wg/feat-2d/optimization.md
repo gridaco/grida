@@ -1327,6 +1327,75 @@ expensive full redraws.
     bounded by the largest bucket ratio (~±12.5%) and is imperceptible
     on in-flight gestures for static content.
 
+## LOD (Level-of-Detail) at Low Zoom
+
+The following items describe zoom-aware LOD strategies for reducing
+per-frame work when the camera is zoomed out. They are **designed and
+measured** but not yet shipped — see `docs/wg/feat-2d/lod-properties.md`
+for the full property catalog across all node types, and the Skia cost
+probes in `examples/skia_bench/` for per-primitive validation data.
+
+### Key validation findings
+
+- **RRect → Rect collapse (B1):** On Apple M2 Metal, Skia's analytic
+  rrect shader is **faster** than `drawRect` at sub-pixel radii
+  (0.72–0.84× rect cost). The replacement would regress performance.
+  Needs per-backend re-measurement before implementing.
+  Probe: `examples/skia_bench/skia_bench_rrect_vs_rect.rs`.
+
+- **Text paragraph.paint() cost:** 2.4–6× more expensive than a single
+  `drawRect` across all font sizes (0.8 µs/node at 0.25–12 px,
+  2.1 µs/node at 48 px). Greeking or culling text is a clear win.
+  Probe: `examples/skia_bench/skia_bench_text_lod.rs`.
+
+- **Principle: "skip work" LOD rules are safe; "replace with cheaper
+  primitive" rules need per-backend validation.** Modern analytic-AA
+  GPU shaders may already handle sub-pixel inputs efficiently.
+
+52. **Subpixel LOD Culling** (A1)
+
+    Drop leaf nodes from the frame plan when both projected dimensions
+    fall below a threshold (e.g. 0.5 px). At fit-zoom on the 136K-node
+    fixture, ~38% of visible leaves have both dimensions below 0.5 px
+    at zoom 0.02. Culling them reduces `draw_us` by 6–18% and GPU
+    `mid_flush_us` by up to 24%.
+
+    Decision: `w·z < ε && h·z < ε` — both axes must be subpixel.
+    Thin shapes (large in one axis) survive. Gated by `zoom < 1.0`.
+
+    Mirrors Chromium's `MinimumContentsScale` (`cc/layers/
+    picture_layer_impl.cc`).
+
+    Design: filter `indices` in `Renderer::frame()` after R-tree
+    query, using per-layer bounds stored in a parallel
+    `Vec<Option<AABB>>` for O(1) lookup.
+
+53. **Text LOD (H1 cull + H2 greek)**
+
+    Two-stage policy driven by projected font size (`font_max · z`).
+
+    - **H1 cull** (`font·z < 1 px`): remove text layer from frame
+      plan. Glyphs at this size cannot render a readable shape.
+    - **H2 greek** (`1 ≤ font·z < 6 px`): at draw time, replace the
+      paragraph paint with one `drawRect` per visual line, using line
+      positions from the cached `ParagraphCache` entry. Bars shrink
+      toward x-height, respect alignment and ragged edges, capped at
+      12 bars per layer to bound dispatch cost. Preserves text shape
+      during zoom without per-glyph GPU work.
+
+    Pure culling makes text pop in/out during zoom — jarring. Greeking
+    preserves the visual footprint. Combined with item 52, measured
+    11–17% total frame-time reduction on the 136K fixture at fit-zoom.
+
+    Thresholds match standard editor greek bands (Figma ~4–6 px).
+
+    Design: H1 filter in `frame()` using per-layer max font size
+    stored in `Vec<Option<f32>>`. H2 greek dispatch in
+    `Painter::draw_render_commands()` via a `TextGreekPolicy` that
+    carries `zoom` and `greek_threshold_px`. Color sampled from the
+    first solid fill; fallback to a single bounds-rect when paragraph
+    metrics aren't cached.
+
 ---
 
 This list is designed to evolve the renderer from single-threaded mode to
