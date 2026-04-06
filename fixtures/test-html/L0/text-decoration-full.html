@@ -5,16 +5,17 @@
     <title>Text: Decoration (Color, Style)</title>
     <style>
       body {
-        background: #030712;
-        color: #e2e8f0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        padding: 24px;
       }
 
       .label {
         font-size: 11px;
-        color: #94a3b8;
+        color: #666;
         padding-bottom: 4px;
       }
 
@@ -28,19 +29,19 @@
       /* decoration-color */
       .color-red {
         text-decoration: underline;
-        text-decoration-color: #ef4444;
+        text-decoration-color: #f00;
       }
       .color-blue {
         text-decoration: underline;
-        text-decoration-color: #3b82f6;
+        text-decoration-color: #00f;
       }
       .color-green {
         text-decoration: line-through;
-        text-decoration-color: #22c55e;
+        text-decoration-color: #0a0;
       }
       .color-rgba {
         text-decoration: underline;
-        text-decoration-color: rgba(99, 102, 241, 0.5);
+        text-decoration-color: rgba(0, 0, 255, 0.5);
       }
 
       /* decoration-style */
@@ -68,7 +69,7 @@
       /* combined: color + style */
       .combined {
         text-decoration: underline;
-        text-decoration-color: #f59e0b;
+        text-decoration-color: #f00;
         text-decoration-style: wavy;
       }
     </style>
@@ -117,7 +118,7 @@
 
       <!-- combined -->
       <div>
-        <div class="label">color + style combined (amber wavy)</div>
+        <div class="label">color + style combined (red wavy)</div>
         <div class="combined">Combined decoration</div>
       </div>
     </div>

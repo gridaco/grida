@@ -5,17 +5,18 @@
     <title>Layout: Flex Row</title>
     <style>
       body {
-        background: #030712;
-        color: #e2e8f0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        padding: 24px;
       }
 
       .label {
-        font-size: 12px;
-        color: #94a3b8;
-        padding-bottom: 8px;
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
       }
 
       .section {
@@ -30,7 +31,7 @@
         justify-content: space-between;
         gap: 12px;
         padding: 16px;
-        background: #0f172a;
+        background: #eee;
         border-radius: 8px;
       }
 
@@ -41,7 +42,7 @@
         flex-wrap: wrap;
         gap: 8px;
         padding: 16px;
-        background: #0f172a;
+        background: #eee;
         border-radius: 8px;
       }
 
@@ -51,7 +52,7 @@
         flex-direction: row;
         gap: 12px;
         padding: 16px;
-        background: #0f172a;
+        background: #eee;
         border-radius: 8px;
       }
 
@@ -82,19 +83,21 @@
       }
 
       .c1 {
-        background: #6366f1;
+        background: #f00;
       }
       .c2 {
-        background: #8b5cf6;
+        background: #0f0;
+        color: #000;
       }
       .c3 {
-        background: #a855f7;
+        background: #00f;
       }
       .c4 {
-        background: #d946ef;
+        background: #000;
       }
       .c5 {
-        background: #ec4899;
+        background: #ccc;
+        color: #000;
       }
 
       .tall {
@@ -138,8 +141,8 @@
       <div class="label">flex-grow on middle child</div>
       <div class="row-grow">
         <div class="box c1">Fixed</div>
-        <div class="box c2 grow">Grows</div>
-        <div class="box c3">Fixed</div>
+        <div class="box c3 grow">Grows</div>
+        <div class="box c1">Fixed</div>
       </div>
     </div>
   </body>

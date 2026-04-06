@@ -5,16 +5,17 @@
     <title>Mixed: Inline Style Override</title>
     <style>
       body {
-        background: #030712;
-        color: #e2e8f0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        padding: 24px;
       }
 
       .label {
         font-size: 11px;
-        color: #94a3b8;
+        color: #666;
         padding-bottom: 4px;
       }
 
@@ -25,8 +26,8 @@
       }
 
       .base {
-        background: #1e293b;
-        color: #e2e8f0;
+        background: #eee;
+        color: #000;
         font-size: 14px;
         padding: 12px 16px;
         border-radius: 6px;
@@ -49,15 +50,15 @@
 
       <div>
         <div class="label">inline color override</div>
-        <div class="base" style="color: #f59e0b">
-          color: #f59e0b via style=""
+        <div class="base" style="color: #f00">
+          color: #f00 via style=""
         </div>
       </div>
 
       <div>
         <div class="label">inline background override</div>
-        <div class="base" style="background: #6366f1">
-          background: #6366f1 via style=""
+        <div class="base" style="background: #000; color: #fff">
+          background: #000 via style=""
         </div>
       </div>
 
@@ -74,8 +75,8 @@
           class="base"
           style="
             font-size: 18px;
-            color: #22c55e;
-            background: #0f172a;
+            color: #00f;
+            background: #ccc;
             padding: 20px;
             border-radius: 12px;
           "
