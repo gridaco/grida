@@ -5,17 +5,18 @@
     <title>Paint: Linear Gradient</title>
     <style>
       body {
-        background: #030712;
-        color: #e2e8f0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        padding: 24px;
       }
 
       .label {
         font-size: 11px;
-        color: #94a3b8;
-        padding-bottom: 6px;
+        color: #666;
+        padding-bottom: 4px;
       }
 
       .grid {
@@ -28,7 +29,6 @@
       .rect {
         width: 180px;
         height: 120px;
-        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -37,28 +37,28 @@
       }
 
       .to-right {
-        background-image: linear-gradient(to right, #6366f1, #ec4899);
+        background-image: linear-gradient(to right, #f00, #00f);
       }
       .to-bottom {
-        background-image: linear-gradient(to bottom, #22c55e, #0ea5e9);
+        background-image: linear-gradient(to bottom, #0f0, #00f);
       }
       .angle135 {
-        background-image: linear-gradient(135deg, #f59e0b, #ef4444);
+        background-image: linear-gradient(135deg, #f00, #0f0);
       }
       .to-bl {
-        background-image: linear-gradient(to bottom left, #8b5cf6, #06b6d4);
+        background-image: linear-gradient(to bottom left, #00f, #f00);
       }
       .multi-stop {
         background-image: linear-gradient(
           to right,
-          #ef4444,
-          #f59e0b 30%,
-          #22c55e 60%,
-          #3b82f6
+          #f00,
+          #0f0 30%,
+          #00f 60%,
+          #000
         );
       }
       .to-top {
-        background-image: linear-gradient(to top, #1e293b, #6366f1);
+        background-image: linear-gradient(to top, #000, #f00);
       }
     </style>
   </head>
