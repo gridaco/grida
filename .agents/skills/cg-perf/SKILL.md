@@ -123,19 +123,19 @@ reports `min/p50/p95/p99/MAX` plus per-stage breakdown and settle cost.
 
 **Scenario types in the expanded matrix:**
 
-| Kind              | Scenarios                                           | What it tests                                                                                                      |
-| ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `pan`             | slow/fast × fit/zoomed                              | Linear back-and-forth panning                                                                                      |
-| `circle_pan`      | small/large radius × fit/zoomed                     | Circular trackpad gesture (unpredictable edges)                                                                    |
-| `zigzag`          | fast (continuous) / slow (with pauses) × fit/zoomed | Diagonal reading pattern with direction changes                                                                    |
-| `zoom`            | slow/fast × around-fit/high                         | Zoom oscillation at different levels                                                                               |
-| `pan_with_settle` | slow/fast × fit/zoomed                              | Pan with settle frames interleaved every 12 frames                                                                 |
-| `zoom_with_settle`| slow/fast × fit/high                                | Zoom with settle frames interleaved every 12 frames — captures cache-cold spike after settle nukes zoom cache      |
-| `zoom_forced_stable` | slow/fast × fit/high (BUG prefix)                | Forces `stable=true` on every zoom frame — reproduces the `redraw()` bug for A/B comparison                        |
-| `realtime`        | fast/slow × fit/zoomed                              | **Real-time event loop simulation** with sleep, 240Hz tick thread, and settle countdown matching the native viewer |
-| `frameloop`       | 16/50/80/120/200/300/500ms interval                 | **Real FrameLoop path** — the only bench that captures stable-frame jank during panning (see below)                |
-| `frameloop_zoom`  | 16/50/80/120/200/500ms interval                     | **Real FrameLoop path for zoom** — captures stable-frame intrusion during zoom gestures                            |
-| `resize`          | alternating viewport sizes                          | `--resize` flag. Measures `resize()` + `redraw()` cost per cycle (layout rebuild + cache invalidation + repaint)   |
+| Kind                    | Scenarios                                           | What it tests                                                                                                      |
+| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pan`                   | slow/fast × fit/zoomed                              | Linear back-and-forth panning                                                                                      |
+| `circle_pan`            | small/large radius × fit/zoomed                     | Circular trackpad gesture (unpredictable edges)                                                                    |
+| `zigzag`                | fast (continuous) / slow (with pauses) × fit/zoomed | Diagonal reading pattern with direction changes                                                                    |
+| `zoom`                  | slow/fast × around-fit/high                         | Zoom oscillation at different levels                                                                               |
+| `pan_with_settle`       | slow/fast × fit/zoomed                              | Pan with settle frames interleaved every 12 frames                                                                 |
+| `zoom_with_settle`      | slow/fast × fit/high                                | Zoom with settle frames interleaved every 12 frames — captures cache-cold spike after settle nukes zoom cache      |
+| `baseline_nocache_zoom` | slow/fast × fit/high                                | Forces `stable=true` on every zoom frame — no-cache baseline measuring raw full-draw cost for A/B comparison       |
+| `realtime`              | fast/slow × fit/zoomed                              | **Real-time event loop simulation** with sleep, 240Hz tick thread, and settle countdown matching the native viewer |
+| `frameloop`             | 16/50/80/120/200/300/500ms interval                 | **Real FrameLoop path** — the only bench that captures stable-frame jank during panning (see below)                |
+| `frameloop_zoom`        | 16/50/80/120/200/500ms interval                     | **Real FrameLoop path for zoom** — captures stable-frame intrusion during zoom gestures                            |
+| `resize`                | alternating viewport sizes                          | `--resize` flag. Measures `resize()` + `redraw()` cost per cycle (layout rebuild + cache invalidation + repaint)   |
 
 **SurfaceUI overlay measurement (`--overlay`):**
 
