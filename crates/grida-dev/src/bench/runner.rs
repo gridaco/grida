@@ -2248,6 +2248,12 @@ pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> R
     gpu.print_gl_info();
 
     let mut renderer = gpu.create_renderer();
+    if args.no_aa {
+        let mut policy = cg::runtime::render_policy::RenderPolicy::STANDARD;
+        policy.force_no_aa = true;
+        renderer.set_render_policy(policy);
+    }
+    renderer.set_sync_gpu(true);
     renderer.load_scene(scene);
     renderer.fit_camera_to_scene();
 
@@ -2259,9 +2265,13 @@ pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> R
         fit_zoom, cam_rect.width, cam_rect.height,
     );
     println!(
-        "Viewport: {}x{}, frames: {}\n",
-        args.width, args.height, args.frames
+        "Viewport: {}x{}, frames: {}{}",
+        args.width,
+        args.height,
+        args.frames,
+        if args.no_aa { "  [NO-AA]" } else { "" },
     );
+    println!();
 
     warmup(&mut renderer);
 
@@ -2419,6 +2429,7 @@ pub async fn run_bench_report(
             };
 
             let mut renderer = gpu.create_renderer();
+            renderer.set_sync_gpu(true);
             renderer.load_scene(scene);
             renderer.fit_camera_to_scene();
             let fit_zoom = renderer.camera.get_zoom();

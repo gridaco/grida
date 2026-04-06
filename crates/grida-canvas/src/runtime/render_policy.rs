@@ -102,6 +102,9 @@ pub struct RenderPolicy {
     /// Quality level for expensive GPU effects (blur, shadow, noise).
     /// `Full` for stable frames, `Reduced` for interactive frames.
     pub effect_quality: EffectQuality,
+    /// When true, all paint operations use `set_anti_alias(false)`.
+    /// For benchmarking AA cost at different zoom levels.
+    pub force_no_aa: bool,
 }
 
 impl RenderPolicy {
@@ -115,6 +118,7 @@ impl RenderPolicy {
         compositing: CompositingPolicy::Enabled,
         ignore_clips_content: false,
         effect_quality: EffectQuality::Full,
+        force_no_aa: false,
     };
 
     /// Convenience preset used by the editor feature \"Show outlines\".
@@ -128,7 +132,13 @@ impl RenderPolicy {
         // Wireframe is primarily used for inspection; by default, ignore clips.
         ignore_clips_content: true,
         effect_quality: EffectQuality::Full,
+        force_no_aa: false,
     };
+
+    #[inline]
+    pub fn anti_alias(&self) -> bool {
+        !self.force_no_aa
+    }
 
     /// Return a copy of this policy with reduced effect quality.
     /// Used for unstable (interactive) frames.
@@ -159,6 +169,7 @@ impl RenderPolicy {
             }
         ) && self.compositing == CompositingPolicy::Enabled
             && !self.ignore_clips_content
+            && !self.force_no_aa
     }
 
     /// True only for the default renderer behavior (full fills/strokes + effects + compositing).
@@ -331,6 +342,7 @@ impl RenderPolicy {
             compositing,
             ignore_clips_content,
             effect_quality: EffectQuality::Full,
+            force_no_aa: false,
         }
     }
 

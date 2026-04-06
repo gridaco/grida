@@ -41,9 +41,9 @@ fn resolve_fill_paint(
     images: Option<&ImageRepository>,
 ) -> Option<skia_safe::Paint> {
     if let Some(images) = images {
-        paint_util::sk_paint_stack(fills, size, images)
+        paint_util::sk_paint_stack(fills, size, images, true)
     } else {
-        paint_util::sk_paint_stack_without_images(fills, size)
+        paint_util::sk_paint_stack_without_images(fills, size, true)
     }
 }
 

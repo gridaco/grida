@@ -371,7 +371,7 @@ fn draw_stacked(
     // Paint order semantics:
     // - `fills` is bottom → top. We pass as-is to the stacker, which composes
     //   each subsequent paint on top of the accumulated background.
-    if let Some(paint) = paint::sk_paint_stack(fills, size_tuple, images) {
+    if let Some(paint) = paint::sk_paint_stack(fills, size_tuple, images, true) {
         canvas.draw_path(&path, &paint);
     }
 

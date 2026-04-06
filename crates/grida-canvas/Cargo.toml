@@ -113,6 +113,11 @@ required-features = ["native-gl-context"]
 # Run: cargo run -p cg --example skia_bench_<name> --features native-gl-context --release
 
 [[example]]
+name = "skia_bench_subpixel"
+path = "examples/skia_bench/skia_bench_subpixel.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
 name = "skia_bench_primitives"
 path = "examples/skia_bench/skia_bench_primitives.rs"
 required-features = ["native-gl-context"]
