@@ -302,6 +302,7 @@ pub const FLAG_RENDER_OUTLINES_ALWAYS: RenderPolicyFlags = 1 << 2;
 pub const FLAG_EFFECTS_ENABLED: RenderPolicyFlags = 1 << 3;
 pub const FLAG_COMPOSITING_ENABLED: RenderPolicyFlags = 1 << 4;
 pub const FLAG_IGNORE_CLIPS_CONTENT: RenderPolicyFlags = 1 << 5;
+pub const FLAG_FORCE_NO_AA: RenderPolicyFlags = 1 << 6;
 
 impl RenderPolicy {
     /// Build a policy from flags.
@@ -323,6 +324,7 @@ impl RenderPolicy {
         };
 
         let ignore_clips_content = (flags & FLAG_IGNORE_CLIPS_CONTENT) != 0;
+        let force_no_aa = (flags & FLAG_FORCE_NO_AA) != 0;
 
         if (flags & FLAG_RENDER_OUTLINES_ALWAYS) != 0 {
             // Outline style is currently encoded in the preset; can be expanded later.
@@ -330,6 +332,7 @@ impl RenderPolicy {
             p.effects = effects;
             p.compositing = compositing;
             p.ignore_clips_content = ignore_clips_content;
+            p.force_no_aa = force_no_aa;
             return p;
         }
 
@@ -342,7 +345,7 @@ impl RenderPolicy {
             compositing,
             ignore_clips_content,
             effect_quality: EffectQuality::Full,
-            force_no_aa: false,
+            force_no_aa,
         }
     }
 
@@ -357,6 +360,9 @@ impl RenderPolicy {
         }
         if self.ignore_clips_content {
             flags |= FLAG_IGNORE_CLIPS_CONTENT;
+        }
+        if self.force_no_aa {
+            flags |= FLAG_FORCE_NO_AA;
         }
 
         match self.content {
