@@ -333,4 +333,4 @@ breakdowns without any additional instrumentation.
 - WASM-on-Node bench: `crates/grida-canvas-wasm/lib/__test__/bench-load-scene.test.ts`
 - Run: `cd crates/grida-canvas-wasm && npx vitest run __test__/bench-load-scene.test.ts`
 - Reuses build artifacts from `crates/grida-canvas-wasm/lib/bin/`
-- Requires fixture: `fixtures/local/perf/local/yrr-main.grida` (136k-node scene)
+- Requires a local `.grida` fixture with a large node count (e.g. 136k nodes) placed in `fixtures/local/perf/local/`

@@ -842,7 +842,7 @@ missing the cheapest possible camera-change path.
       when the camera is actively changing, otherwise every interaction
       frame nukes the zoom cache and forces a full O(N) draw.
 
-    **Measured impact (yrr-main.grida, 136K nodes, 100 frames):**
+    **Measured impact (136K-node scene, 100 frames):**
 
     | Scenario             | Before µs (fps) | After µs (fps) | Speedup   |
     | -------------------- | --------------- | -------------- | --------- |
