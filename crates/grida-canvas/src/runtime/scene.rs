@@ -466,7 +466,7 @@ impl Renderer {
                     // and stable frames — the first frame records the picture,
                     // and the settle frame finds it immediately.
                     //
-                    // On yrr-main (135K nodes, 0 effects), this eliminates ~800 us
+                    // On a 135K-node scene with 0 effects, this eliminates ~800 us
                     // of LayerEntry clones + SkPicture recordings on every settle.
                     let effective_key = if can_unify && entry.layer.effects_empty() {
                         0
