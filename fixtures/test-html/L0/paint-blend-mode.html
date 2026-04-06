@@ -5,17 +5,18 @@
     <title>Paint: Mix Blend Mode</title>
     <style>
       body {
-        background: #030712;
-        color: #e2e8f0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        padding: 24px;
       }
 
       .label {
         font-size: 11px;
-        color: #94a3b8;
-        padding-bottom: 6px;
+        color: #666;
+        padding-bottom: 4px;
       }
 
       .grid {
@@ -28,8 +29,7 @@
       .cell {
         width: 120px;
         height: 120px;
-        background: #6366f1;
-        border-radius: 8px;
+        background: #00f;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -38,8 +38,7 @@
       .inner {
         width: 80px;
         height: 80px;
-        background: #ef4444;
-        border-radius: 6px;
+        background: #f00;
       }
 
       .normal .inner { mix-blend-mode: normal; }

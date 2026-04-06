@@ -19,6 +19,7 @@ Refig aims to render designs as faithfully as possible to the original. See [Kno
 - [x] **Bring-your-own-font** — supply custom font files for designs that use non-default typefaces
 - [x] Batch export with **`--export-all`** (renders nodes with Figma export presets)
 - [x] WASM + Skia-backed renderer via `@grida/canvas-wasm`
+- [x] **Rich text** (attributed text) — mixed styles (bold, italic, color, size) within a single text node
 
 ## Use cases
 
@@ -324,6 +325,34 @@ npx @grida/refig ./design.fig --node "1:23" --format png
 pnpm dlx @grida/refig ./design.fig --export-all
 ```
 
+### Convert (Figma → `.grida` / `.grida1`)
+
+The `convert` subcommand converts Figma files to Grida format **without rendering**. Useful for archiving, piping into other tools, or pre-converting for the embed viewer.
+
+```sh
+# Convert .fig to .grida archive (FlatBuffers + embedded images)
+refig convert ./design.fig -o ./design.grida
+
+# Convert REST JSON to .grida archive
+refig convert ./figma-response.json -o ./design.grida
+
+# Convert to .grida1 (JSON snapshot — human-readable, no images)
+refig convert ./design.fig -o ./design.grida1
+
+# With images directory (REST JSON only)
+refig convert ./figma-response.json --images ./downloaded-images -o ./design.grida
+
+# Preserve original Figma node IDs in the output
+refig convert ./design.fig --preserve-figma-ids -o ./design.grida
+```
+
+Output format is inferred from the `--out` extension:
+
+| Extension | Format      | Description                                        |
+| --------- | ----------- | -------------------------------------------------- |
+| `.grida`  | FlatBuffers | Binary archive (ZIP with FlatBuffers + images)     |
+| `.grida1` | JSON        | JSON snapshot (human-readable, no embedded images) |
+
 ### Quick test via `figma_archive.py` (REST API → `document.json` + `images/`)
 
 If you want an end-to-end test from a real Figma file using the REST API, you can generate a local “project directory” that refig can consume directly.
@@ -416,9 +445,13 @@ For **`.fig`** input, images are embedded in the file; no extra images directory
 
 ## Known limitations
 
-- **Rich text** — Text with mixed styles (e.g. bold and italic in the same paragraph) is not yet supported.
+- **Bullet lists** — Figma bullet/numbered lists are rendered by faux-ing the list markers rather than using native list semantics. Visual output is close but may not be pixel-perfect for all list styles.
 - **Image transformation** — Complex image transforms from Figma designs are not yet properly aligned. Known issue; will fix.
 - **Emoji** — Rendered with Noto Color Emoji instead of Figma's platform emoji (Apple Color Emoji / Segoe UI Emoji). Output differs by design.
+
+## See also
+
+- **Embed Viewer (`/embed/v1/figma`)** — Need a real-time, interactive Figma viewer instead of headless rendering? Grida hosts a Figma-specific embed endpoint that renders `.fig` and REST JSON in the browser as a read-only viewer (iframe). Events use original Figma node IDs. Great for live previews, design handoff, and embedding designs in your app. [Embed SDK docs](https://grida.co/docs/canvas/sdk/embed)
 
 ## Not planned
 

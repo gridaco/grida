@@ -40,6 +40,11 @@ struct GeoInput {
     transform: AffineTransform,
     width: f32,
     height: f32,
+    /// Content origin offset within the node's local space.
+    /// Non-zero for Path, Polygon, and Vector nodes whose shape data
+    /// is offset from the transform origin.
+    content_origin_x: f32,
+    content_origin_y: f32,
     kind: GeoNodeKind,
     render_bounds_inflation: RenderBoundsInflation,
 }
@@ -470,10 +475,10 @@ impl GeometryCache {
                 bounds
             }
 
-            GeoNodeKind::Leaf => {
+            GeoNodeKind::MarkdownEmbed | GeoNodeKind::Leaf => {
                 let local_bounds = Rectangle {
-                    x: 0.0,
-                    y: 0.0,
+                    x: geo.content_origin_x,
+                    y: geo.content_origin_y,
                     width: geo.width,
                     height: geo.height,
                 };
@@ -552,13 +557,17 @@ impl GeometryCache {
 /// Build a `GeoInput` directly from schema data, bypassing any layout result.
 fn geo_input_from_schema(geo: &NodeGeoData) -> GeoInput {
     GeoInput {
+        // geo.rotation is in degrees (from Container/Tray); convert to
+        // radians for AffineTransform::new which expects radians.
         transform: AffineTransform::new(
             geo.schema_transform.x(),
             geo.schema_transform.y(),
-            geo.rotation,
+            geo.rotation.to_radians(),
         ),
         width: geo.schema_width,
         height: geo.schema_height,
+        content_origin_x: geo.content_origin_x,
+        content_origin_y: geo.content_origin_y,
         kind: geo.kind,
         render_bounds_inflation: geo.render_bounds_inflation,
     }
@@ -586,6 +595,8 @@ fn resolve_layout(
             transform: geo.schema_transform,
             width: geo.schema_width,
             height: geo.schema_height,
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: geo.kind,
             render_bounds_inflation: geo.render_bounds_inflation,
         },
@@ -593,15 +604,24 @@ fn resolve_layout(
             transform: geo.schema_transform,
             width: viewport_size.width,
             height: viewport_size.height,
+            content_origin_x: 0.0,
+            content_origin_y: 0.0,
             kind: geo.kind,
             render_bounds_inflation: geo.render_bounds_inflation,
         },
         GeoNodeKind::Container => {
             if let Some(computed) = layout_result.and_then(|r| r.get(id)) {
                 GeoInput {
-                    transform: AffineTransform::new(computed.x, computed.y, geo.rotation),
+                    // geo.rotation is in degrees; convert to radians.
+                    transform: AffineTransform::new(
+                        computed.x,
+                        computed.y,
+                        geo.rotation.to_radians(),
+                    ),
                     width: computed.width,
                     height: computed.height,
+                    content_origin_x: 0.0,
+                    content_origin_y: 0.0,
                     kind: geo.kind,
                     render_bounds_inflation: geo.render_bounds_inflation,
                 }
@@ -684,6 +704,58 @@ fn resolve_layout(
                 transform: local_transform,
                 width,
                 height,
+                content_origin_x: 0.0,
+                content_origin_y: 0.0,
+                kind: geo.kind,
+                render_bounds_inflation: geo.render_bounds_inflation,
+            }
+        }
+        GeoNodeKind::MarkdownEmbed => {
+            let layout = layout_result.and_then(|r| r.get(id));
+            const MIN_SIZE: f32 = 1.0;
+
+            let parent_is_layout_container = parent_id
+                .as_ref()
+                .and_then(|pid| is_layout_container.get(pid).copied())
+                .unwrap_or(false);
+
+            let (local_transform, width, height) = if let Some(l) = layout {
+                let width = l.width.max(MIN_SIZE);
+                let height = l.height.max(MIN_SIZE);
+                let transform = if parent_is_layout_container {
+                    AffineTransform::new(l.x, l.y, geo.schema_transform.rotation())
+                } else {
+                    geo.schema_transform
+                };
+                (transform, width, height)
+            } else {
+                // Fallback: measure markdown content height when layout is missing.
+                if let Ok(Node::MarkdownEmbed(n)) = graph.get_node(id) {
+                    let width = n.width.unwrap_or(400.0).max(MIN_SIZE);
+                    let height = if let Some(h) = n.height {
+                        h.max(MIN_SIZE)
+                    } else {
+                        let styled_html = crate::htmlcss::markdown_to_styled_html(&n.markdown);
+                        crate::htmlcss::measure_content_height(&styled_html, width, fonts)
+                            .unwrap_or(0.0)
+                            .max(MIN_SIZE)
+                    };
+                    (geo.schema_transform, width, height)
+                } else {
+                    (
+                        geo.schema_transform,
+                        geo.schema_width.max(MIN_SIZE),
+                        geo.schema_height.max(MIN_SIZE),
+                    )
+                }
+            };
+
+            GeoInput {
+                transform: local_transform,
+                width,
+                height,
+                content_origin_x: 0.0,
+                content_origin_y: 0.0,
                 kind: geo.kind,
                 render_bounds_inflation: geo.render_bounds_inflation,
             }
@@ -727,6 +799,8 @@ fn resolve_layout(
                 transform: local_transform,
                 width,
                 height,
+                content_origin_x: geo.content_origin_x,
+                content_origin_y: geo.content_origin_y,
                 kind: geo.kind,
                 render_bounds_inflation: geo.render_bounds_inflation,
             }

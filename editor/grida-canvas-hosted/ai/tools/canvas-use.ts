@@ -129,7 +129,7 @@ export namespace canvas_use {
         aspect_ratio,
         width,
         height,
-        model_id = "black-forest-labs/flux-schnell",
+        model_id = "openai/gpt-image-1-mini",
       }) => {
         try {
           // TODO: dev only - this will only work on local dev
@@ -250,7 +250,7 @@ export namespace canvas_use {
     export const make_from_markdown = tool({
       title: "Create Node from Markdown",
       description:
-        "Create a node from a markdown string with new text node. Return the ID of the created node.",
+        "Create a styled markdown embed node from a GFM markdown string. Renders headings, lists, code blocks, tables, etc. with GitHub markdown styling. Return the ID of the created node.",
       inputSchema: z.object({
         markdown: z
           .string()
@@ -395,8 +395,7 @@ export namespace canvas_use {
       }
     ): Promise<ToolCallOutput<{ node_id: string }>> {
       try {
-        // TODO: markdown formatting is not supported yet. just plain txt for now.
-        const node = editor.commands.createTextNode(params.markdown);
+        const node = editor.commands.createMarkdownNode(params.markdown);
         return {
           state: "output-available",
           output: {

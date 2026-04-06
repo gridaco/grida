@@ -288,3 +288,214 @@ describe("REST API TEXT → AttributedTextNode", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Faux-list integration tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a minimal Figma REST FRAME containing a TEXT child with list metadata.
+ * Accepts optional `characterStyleOverrides` / `styleOverrideTable` for rich text,
+ * and an optional context override to test the `disable_faux_list` flag.
+ */
+function makeTextNodeWithLists(
+  characters: string,
+  lineTypes: ("NONE" | "ORDERED" | "UNORDERED")[],
+  lineIndentations: number[],
+  opts?: {
+    characterStyleOverrides?: number[];
+    styleOverrideTable?: Record<string, Partial<figrest.TypeStyle>>;
+    ctx?: iofigma.restful.factory.FactoryContext;
+  }
+): { doc: grida.program.document.IPackedSceneDocument } {
+  const textNode = {
+    id: "2:1",
+    name: "Text",
+    type: "TEXT",
+    scrollBehavior: "SCROLLS",
+    blendMode: "PASS_THROUGH",
+    absoluteBoundingBox: { x: 0, y: 0, width: 200, height: 100 },
+    absoluteRenderBounds: { x: 0, y: 0, width: 200, height: 100 },
+    constraints: { vertical: "TOP", horizontal: "LEFT" },
+    fills: [{ type: "SOLID", color: { r: 0, g: 0, b: 0, a: 1 } }],
+    strokes: [],
+    strokeWeight: 1,
+    strokeAlign: "INSIDE",
+    effects: [],
+    exportSettings: [],
+    interactions: [],
+    characters,
+    style: {
+      fontFamily: "Inter",
+      fontPostScriptName: "Inter-Regular",
+      fontWeight: 400,
+      fontSize: 14,
+      textAlignHorizontal: "LEFT",
+      textAlignVertical: "TOP",
+      letterSpacing: 0,
+      lineHeightPx: 20,
+      lineHeightPercent: 100,
+      lineHeightPercentFontSize: 100,
+      lineHeightUnit: "INTRINSIC_%",
+      textAutoResize: "WIDTH_AND_HEIGHT",
+      textDecoration: "NONE",
+      textCase: "ORIGINAL",
+    } as figrest.TypeStyle,
+    characterStyleOverrides: opts?.characterStyleOverrides ?? [],
+    styleOverrideTable: (opts?.styleOverrideTable ?? {}) as Record<
+      string,
+      figrest.TypeStyle
+    >,
+    lineTypes,
+    lineIndentations,
+    size: { x: 200, y: 100 },
+    relativeTransform: [
+      [1, 0, 10],
+      [0, 1, 20],
+    ],
+  } as unknown as figrest.TextNode;
+
+  const frameNode: figrest.FrameNode = {
+    id: "1:1",
+    name: "Frame",
+    type: "FRAME",
+    scrollBehavior: "SCROLLS",
+    blendMode: "PASS_THROUGH",
+    clipsContent: true,
+    absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 300 },
+    absoluteRenderBounds: { x: 0, y: 0, width: 400, height: 300 },
+    constraints: { vertical: "TOP", horizontal: "LEFT" },
+    fills: [],
+    strokes: [],
+    strokeWeight: 1,
+    strokeAlign: "INSIDE",
+    effects: [],
+    exportSettings: [],
+    interactions: [],
+    background: [],
+    backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+    children: [textNode as unknown as figrest.SubcanvasNode],
+    size: { x: 400, y: 300 },
+    relativeTransform: [
+      [1, 0, 0],
+      [0, 1, 0],
+    ],
+  } as figrest.FrameNode;
+
+  const { document: doc } = iofigma.restful.factory.document(
+    frameNode,
+    {},
+    opts?.ctx ?? context
+  );
+
+  return { doc };
+}
+
+function findTspanNode(
+  doc: grida.program.document.IDocumentDefinition
+): grida.program.nodes.TextSpanNode | undefined {
+  return Object.values(doc.nodes).find(
+    (n): n is grida.program.nodes.TextSpanNode => n.type === "tspan"
+  );
+}
+
+describe("REST API TEXT — faux-list integration", () => {
+  it("rewrites tspan text with bullet prefixes for unordered list", () => {
+    const { doc } = makeTextNodeWithLists(
+      "Apple\nBanana\nCherry",
+      ["UNORDERED", "UNORDERED", "UNORDERED"],
+      [0, 0, 0]
+    );
+
+    const tspan = findTspanNode(doc);
+    expect(tspan).toBeDefined();
+    expect(tspan!.text).toBe("• Apple\n• Banana\n• Cherry");
+  });
+
+  it("rewrites attributed text with bullet prefixes and shifts runs", () => {
+    // "AB\nCD" with per-char overrides: A=1,B=1,\n=0,C=2,D=2
+    const { doc } = makeTextNodeWithLists(
+      "AB\nCD",
+      ["UNORDERED", "UNORDERED"],
+      [0, 0],
+      {
+        characterStyleOverrides: [1, 1, 0, 2, 2],
+        styleOverrideTable: {
+          "1": { fontWeight: 700 },
+          "2": { fontWeight: 300 },
+        },
+      }
+    );
+
+    const attrib = findAttribNode(doc);
+    expect(attrib).toBeDefined();
+    // "• " (2 chars) prepended to each line → "• AB\n• CD"
+    expect(attrib!.text).toBe("• AB\n• CD");
+
+    // Runs should cover the full rewritten text.
+    const totalLen = "• AB\n• CD".length; // 9
+    const coveredChars = new Set<number>();
+    for (const run of attrib!.styled_runs) {
+      for (let i = run.start; i < run.end; i++) coveredChars.add(i);
+    }
+    expect(coveredChars.size).toBe(totalLen);
+  });
+
+  it("does not transform text when disable_faux_list is true", () => {
+    const disabledCtx: iofigma.restful.factory.FactoryContext = {
+      ...context,
+      disable_faux_list: true,
+    };
+
+    const { doc } = makeTextNodeWithLists(
+      "Apple\nBanana",
+      ["UNORDERED", "UNORDERED"],
+      [0, 0],
+      { ctx: disabledCtx }
+    );
+
+    const tspan = findTspanNode(doc);
+    expect(tspan).toBeDefined();
+    // Raw text preserved — no bullets.
+    expect(tspan!.text).toBe("Apple\nBanana");
+  });
+
+  it("passes through text unchanged when all lineTypes are NONE", () => {
+    const { doc } = makeTextNodeWithLists(
+      "Hello\nWorld",
+      ["NONE", "NONE"],
+      [0, 0]
+    );
+
+    const tspan = findTspanNode(doc);
+    expect(tspan).toBeDefined();
+    expect(tspan!.text).toBe("Hello\nWorld");
+  });
+
+  it("applies indentation for nested lists", () => {
+    const { doc } = makeTextNodeWithLists(
+      "Top\nNested",
+      ["UNORDERED", "UNORDERED"],
+      [0, 1]
+    );
+
+    const tspan = findTspanNode(doc);
+    expect(tspan).toBeDefined();
+    const text = tspan!.text as string;
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("• Top");
+    expect(lines[1]).toBe("    • Nested"); // 4-space indent
+  });
+
+  it("numbers ordered list items", () => {
+    const { doc } = makeTextNodeWithLists(
+      "A\nB\nC",
+      ["ORDERED", "ORDERED", "ORDERED"],
+      [0, 0, 0]
+    );
+
+    const tspan = findTspanNode(doc);
+    expect(tspan).toBeDefined();
+    expect(tspan!.text).toBe("1. A\n2. B\n3. C");
+  });
+});

@@ -34,8 +34,10 @@
  * - **Rich text**: `characterStyleOverrides` and `styleOverrideTable` are always empty.
  *   Kiwi has `textData.characterStyleIDs` and `textData.styleOverrideTable` (NodeChange[]).
  *   Full support would require per-run font resolution and building the REST override map.
- * - **lineTypes / lineIndentations**: Always `[]`. Should derive from `textData.lines`
- *   (lineType: PLAIN→NONE, ORDERED, UNORDERED; indentationLevel).
+ * - **lineTypes / lineIndentations**: Now derived from `textData.lines`
+ *   (lineType: PLAIN→NONE, ORDERED_LIST→ORDERED, UNORDERED_LIST→UNORDERED; indentationLevel).
+ *   Faux-list rendering (faux-list.ts) converts these into inline bullet/number prefixes
+ *   since Grida has no native list model.
  * - **fontVariant***: `fontVariantCommonLigatures`, etc. are not mapped.
  * - **textTracking vs letterSpacing**: Only letterSpacing is used; clarify canonical source.
  */
@@ -54,6 +56,11 @@ import {
   readFigFileFromStream,
   type ParsedFigmaArchive,
 } from "./fig-kiwi";
+import {
+  applyFauxList,
+  shiftCharOverrides,
+  type FigmaLineType,
+} from "./faux-list";
 
 const _GRIDA_SYSTEM_EMBEDDED_CHECKER =
   "system://images/checker-16-strip-L98L92.png";
@@ -431,6 +438,244 @@ export namespace iofigma {
 
     export namespace factory {
       /**
+       * Apply a 2×2 affine transform to all coordinates in an SVG path string,
+       * then translate so the bounding box starts at (0, 0).
+       *
+       * Used to bake non-representable transforms (flips, skews) into path data
+       * when the Grida node model can only store (x, y, rotation).
+       *
+       * @param pathData - SVG path d attribute string
+       * @param a - relativeTransform[0][0]
+       * @param c - relativeTransform[0][1]
+       * @param b - relativeTransform[1][0]
+       * @param d - relativeTransform[1][1]
+       * @returns Transformed path and the offset applied, or null if transform is
+       *   identity (or near-identity pure rotation, which the caller handles via rotation).
+       */
+      function transformSvgPath(
+        pathData: string,
+        a: number,
+        c: number,
+        b: number,
+        d: number
+      ): { path: string; width: number; height: number } | null {
+        // Identity check — no transform needed
+        const isIdentity =
+          Math.abs(a - 1) < 1e-6 &&
+          Math.abs(d - 1) < 1e-6 &&
+          Math.abs(b) < 1e-6 &&
+          Math.abs(c) < 1e-6;
+        if (isIdentity) return null;
+
+        const det = a * d - b * c;
+
+        // Parse path: extract command groups
+        const cmdRegex = /([MLHVCSQTAZmlhvcsqtaz])/g;
+        const numRegex = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
+
+        type CmdGroup = { cmd: string; nums: number[] };
+        const groups: CmdGroup[] = [];
+        let lastIdx = 0;
+        let m: RegExpExecArray | null;
+
+        // Split into (command, numbers[]) pairs
+        const cmds: { cmd: string; pos: number }[] = [];
+        while ((m = cmdRegex.exec(pathData)) !== null) {
+          cmds.push({ cmd: m[0], pos: m.index });
+        }
+
+        let numI = 0;
+        const allNums: { val: number; pos: number }[] = [];
+        while ((m = numRegex.exec(pathData)) !== null) {
+          allNums.push({ val: parseFloat(m[0]), pos: m.index });
+        }
+
+        for (let ci = 0; ci < cmds.length; ci++) {
+          const nextPos =
+            ci + 1 < cmds.length ? cmds[ci + 1].pos : pathData.length;
+          const nums: number[] = [];
+          while (numI < allNums.length && allNums[numI].pos < nextPos) {
+            nums.push(allNums[numI].val);
+            numI++;
+          }
+          groups.push({ cmd: cmds[ci].cmd, nums });
+        }
+
+        const xf = (x: number, y: number): [number, number] => [
+          a * x + c * y,
+          b * x + d * y,
+        ];
+
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        const track = (x: number, y: number) => {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        };
+
+        // Transform absolute coordinate pairs in each command
+        for (const g of groups) {
+          const isRel =
+            g.cmd === g.cmd.toLowerCase() && g.cmd !== "z" && g.cmd !== "Z";
+          const cu = g.cmd.toUpperCase();
+
+          switch (cu) {
+            case "M":
+            case "L":
+            case "T":
+              for (let i = 0; i + 1 < g.nums.length; i += 2) {
+                const [nx, ny] = xf(g.nums[i], g.nums[i + 1]);
+                g.nums[i] = nx;
+                g.nums[i + 1] = ny;
+                if (!isRel) track(nx, ny);
+              }
+              break;
+            case "H":
+              // H only encodes an x-coordinate. For diagonal transforms
+              // (flips: b≈0, c≈0) it stays as H. For non-diagonal
+              // transforms (rotations, skews) H must be promoted to L,
+              // which requires tracking the current point — not yet
+              // implemented. Figma's geometry=paths output typically
+              // does not use H/V commands, so this is low-risk.
+              // TODO: promote H→L for non-diagonal transforms
+              if (Math.abs(b) < 1e-9 && Math.abs(c) < 1e-9) {
+                for (let i = 0; i < g.nums.length; i++) {
+                  g.nums[i] = a * g.nums[i];
+                  if (!isRel) track(g.nums[i], 0);
+                }
+              }
+              break;
+            case "V":
+              // Same limitation as H — see comment above.
+              // TODO: promote V→L for non-diagonal transforms
+              if (Math.abs(b) < 1e-9 && Math.abs(c) < 1e-9) {
+                for (let i = 0; i < g.nums.length; i++) {
+                  g.nums[i] = d * g.nums[i];
+                  if (!isRel) track(0, g.nums[i]);
+                }
+              }
+              break;
+            case "C":
+              for (let i = 0; i + 5 < g.nums.length; i += 6) {
+                const [x1, y1] = xf(g.nums[i], g.nums[i + 1]);
+                const [x2, y2] = xf(g.nums[i + 2], g.nums[i + 3]);
+                const [x3, y3] = xf(g.nums[i + 4], g.nums[i + 5]);
+                g.nums[i] = x1;
+                g.nums[i + 1] = y1;
+                g.nums[i + 2] = x2;
+                g.nums[i + 3] = y2;
+                g.nums[i + 4] = x3;
+                g.nums[i + 5] = y3;
+                if (!isRel) {
+                  track(x1, y1);
+                  track(x2, y2);
+                  track(x3, y3);
+                }
+              }
+              break;
+            case "S":
+            case "Q":
+              for (let i = 0; i + 3 < g.nums.length; i += 4) {
+                const [x1, y1] = xf(g.nums[i], g.nums[i + 1]);
+                const [x2, y2] = xf(g.nums[i + 2], g.nums[i + 3]);
+                g.nums[i] = x1;
+                g.nums[i + 1] = y1;
+                g.nums[i + 2] = x2;
+                g.nums[i + 3] = y2;
+                if (!isRel) {
+                  track(x1, y1);
+                  track(x2, y2);
+                }
+              }
+              break;
+            case "A":
+              for (let i = 0; i + 6 < g.nums.length; i += 7) {
+                const [nx, ny] = xf(g.nums[i + 5], g.nums[i + 6]);
+                g.nums[i + 5] = nx;
+                g.nums[i + 6] = ny;
+                // Flip sweep flag when determinant is negative
+                if (det < 0) g.nums[i + 4] = g.nums[i + 4] === 0 ? 1 : 0;
+                if (!isRel) track(nx, ny);
+              }
+              break;
+            case "Z":
+              break;
+          }
+        }
+
+        // Offset so min corner is at (0, 0)
+        const ox = isFinite(minX) ? minX : 0;
+        const oy = isFinite(minY) ? minY : 0;
+
+        for (const g of groups) {
+          const isRel =
+            g.cmd === g.cmd.toLowerCase() && g.cmd !== "z" && g.cmd !== "Z";
+          if (isRel) continue;
+          const cu = g.cmd.toUpperCase();
+          switch (cu) {
+            case "M":
+            case "L":
+            case "T":
+              for (let i = 0; i + 1 < g.nums.length; i += 2) {
+                g.nums[i] -= ox;
+                g.nums[i + 1] -= oy;
+              }
+              break;
+            case "H":
+              for (let i = 0; i < g.nums.length; i++) g.nums[i] -= ox;
+              break;
+            case "V":
+              for (let i = 0; i < g.nums.length; i++) g.nums[i] -= oy;
+              break;
+            case "C":
+              for (let i = 0; i + 5 < g.nums.length; i += 6) {
+                g.nums[i] -= ox;
+                g.nums[i + 1] -= oy;
+                g.nums[i + 2] -= ox;
+                g.nums[i + 3] -= oy;
+                g.nums[i + 4] -= ox;
+                g.nums[i + 5] -= oy;
+              }
+              break;
+            case "S":
+            case "Q":
+              for (let i = 0; i + 3 < g.nums.length; i += 4) {
+                g.nums[i] -= ox;
+                g.nums[i + 1] -= oy;
+                g.nums[i + 2] -= ox;
+                g.nums[i + 3] -= oy;
+              }
+              break;
+            case "A":
+              for (let i = 0; i + 6 < g.nums.length; i += 7) {
+                g.nums[i + 5] -= ox;
+                g.nums[i + 6] -= oy;
+              }
+              break;
+          }
+        }
+
+        const path = groups
+          .map((g) => {
+            if (g.cmd.toUpperCase() === "Z") return g.cmd;
+            return (
+              g.cmd + g.nums.map((n) => String(Number(n.toFixed(6)))).join(" ")
+            );
+          })
+          .join("");
+
+        return {
+          path,
+          width: isFinite(maxX - minX) ? maxX - minX : 0,
+          height: isFinite(maxY - minY) ? maxY - minY : 0,
+        };
+      }
+
+      /**
        * Result of converting Figma REST document to Grida format.
        *
        * - **document**: The packed scene document for insert.
@@ -512,6 +757,27 @@ export namespace iofigma {
          * @default false
          */
         prefer_fixed_text_sizing?: boolean;
+
+        /**
+         * When true, disable faux-list rendering for TEXT nodes.
+         *
+         * By default (`false`), Figma list metadata (`lineTypes`,
+         * `lineIndentations`) is converted into inline bullet/number
+         * prefixes and whitespace indentation baked into the text string.
+         * This is a **lossy, one-shot approximation** — the faux
+         * formatting is only correct at import time. Subsequent text
+         * edits (reflow, line insertion/deletion, copy-paste) will NOT
+         * update the synthetic bullets or numbering because there is no
+         * underlying list model to drive them.
+         *
+         * Set to `true` to skip this transform entirely and preserve the
+         * raw text as Figma stores it (without visible bullets/numbers).
+         *
+         * TODO: Remove this flag once Grida has native list support.
+         *
+         * @default false
+         */
+        disable_faux_list?: boolean;
 
         // -- Shared buffers (performance) --
         // When provided, factory.document() writes directly into these
@@ -714,6 +980,11 @@ export namespace iofigma {
           name: node.name,
           active: node.visible ?? true,
           locked: node.locked ?? false,
+          // Figma REST API `rotation` is in radians. Store as-is; the Rust
+          // side handles the unit per node type (Container uses radians
+          // directly via AffineTransform::new; other node types with
+          // prefer_path_for_geometry bake the transform into path data and
+          // set rotation=0).
           rotation: node.rotation ?? 0,
           opacity: node.opacity ?? 1,
           blend_mode: map.layerBlendModeMap[node.blendMode],
@@ -1167,7 +1438,9 @@ export namespace iofigma {
             useStroke: boolean;
             /** Stroke geometry is an outlined path: apply stroke color as fill, no stroke. */
             strokeAsFill?: boolean;
-          }
+          },
+          /** Per-path fill override (resolved from fillOverrideTable). Defaults to parentNode.fills. */
+          fillOverrides?: figrest.Paint[]
         ): grida.program.nodes.VectorNode | null {
           if (!pathData) return null;
 
@@ -1177,6 +1450,7 @@ export namespace iofigma {
 
             // Use parent node bounds instead of computing bbox from path; Figma path data aligns with node coordinate space.
             const strokeAsFill = options.strokeAsFill === true;
+            const effectiveFills = fillOverrides ?? parentNode.fills;
             return {
               id: childId,
               ...base_node_trait({
@@ -1215,7 +1489,7 @@ export namespace iofigma {
                   }
                 : {
                     ...(options.useFill
-                      ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                      ? fills_trait(effectiveFills, context, imageRefsUsed)
                       : {}),
                     ...(options.useStroke
                       ? stroke_trait(parentNode, context, imageRefsUsed)
@@ -1259,13 +1533,16 @@ export namespace iofigma {
             useFill: boolean;
             useStroke: boolean;
             strokeAsFill?: boolean;
-          }
+          },
+          /** Per-path fill override (resolved from fillOverrideTable). Defaults to parentNode.fills. */
+          fillOverrides?: figrest.Paint[]
         ): grida.program.nodes.PathNode | null {
           if (!pathData) return null;
 
           try {
             const { width, height } = getParentBounds(parentNode);
             const strokeAsFill = options.strokeAsFill === true;
+            const effectiveFills = fillOverrides ?? parentNode.fills;
             return {
               id: childId,
               ...base_node_trait({
@@ -1304,7 +1581,7 @@ export namespace iofigma {
                   }
                 : {
                     ...(options.useFill
-                      ? fills_trait(parentNode.fills, context, imageRefsUsed)
+                      ? fills_trait(effectiveFills, context, imageRefsUsed)
                       : {}),
                     ...(options.useStroke
                       ? stroke_trait(parentNode, context, imageRefsUsed)
@@ -1330,13 +1607,49 @@ export namespace iofigma {
         }
 
         /**
+         * Resolves the effective fills for a fillGeometry path, accounting
+         * for per-region fill overrides via `fillOverrideTable`.
+         *
+         * Lookup rules (from the Figma REST API spec):
+         * - Path has no `overrideID`           → use node-level `fills`
+         * - `fillOverrideTable[id]` is `null`  → use node-level `fills`
+         * - `fillOverrideTable[id]` is absent  → use node-level `fills`
+         * - `fillOverrideTable[id].fills` exists → use those fills instead
+         */
+        function resolveFillOverride(
+          geometry: figrest.Path,
+          node: InputNode & figrest.HasGeometryTrait
+        ): figrest.Paint[] {
+          if (geometry.overrideID == null) return node.fills;
+
+          const table = node.fillOverrideTable;
+          if (!table) return node.fills;
+
+          const key = String(geometry.overrideID);
+          if (!(key in table)) return node.fills;
+
+          const override = table[key];
+          if (override == null) return node.fills;
+
+          // PaintOverride.fills is the per-region fill array.
+          // An empty array means explicitly no fill (transparent).
+          return override.fills ?? node.fills;
+        }
+
+        /**
          * Processes fill geometries from a node with HasGeometryTrait.
          * Returns array of child node IDs that were successfully created.
          */
         function processFillGeometries(
           node: InputNode & figrest.HasGeometryTrait,
           parentGridaId: string,
-          nodeTypeName: string
+          nodeTypeName: string,
+          pathTransform?: {
+            a: number;
+            c: number;
+            b: number;
+            d: number;
+          }
         ): string[] {
           if (!node.fillGeometry?.length) return [];
 
@@ -1346,14 +1659,31 @@ export namespace iofigma {
             const childId = `${parentGridaId}_fill_${idx}`;
             const name = `${node.name || nodeTypeName} Fill ${idx + 1}`;
 
+            // Resolve per-path fill overrides from fillOverrideTable.
+            const effectiveFills = resolveFillOverride(geometry, node);
+
+            // Pre-transform path data if the node has a non-rotational transform
+            let pathData = geometry.path ?? "";
+            if (pathTransform && pathData) {
+              const result = transformSvgPath(
+                pathData,
+                pathTransform.a,
+                pathTransform.c,
+                pathTransform.b,
+                pathTransform.d
+              );
+              if (result) pathData = result.path;
+            }
+
             const childNode = context.prefer_path_for_geometry
               ? createPathNodeFromPath(
-                  geometry.path ?? "",
+                  pathData,
                   geometry,
                   node,
                   childId,
                   name,
-                  { useFill: true, useStroke: false }
+                  { useFill: true, useStroke: false },
+                  effectiveFills
                 )
               : createVectorNodeFromPath(
                   geometry.path ?? "",
@@ -1361,7 +1691,8 @@ export namespace iofigma {
                   node,
                   childId,
                   name,
-                  { useFill: true, useStroke: false }
+                  { useFill: true, useStroke: false },
+                  effectiveFills
                 );
 
             if (childNode) {
@@ -1380,7 +1711,13 @@ export namespace iofigma {
         function processStrokeGeometries(
           node: InputNode & figrest.HasGeometryTrait,
           parentGridaId: string,
-          nodeTypeName: string
+          nodeTypeName: string,
+          pathTransform?: {
+            a: number;
+            c: number;
+            b: number;
+            d: number;
+          }
         ): string[] {
           if (!node.strokeGeometry?.length) return [];
 
@@ -1390,9 +1727,21 @@ export namespace iofigma {
             const childId = `${parentGridaId}_stroke_${idx}`;
             const name = `${node.name || nodeTypeName} Stroke ${idx + 1}`;
 
+            let pathData = geometry.path ?? "";
+            if (pathTransform && pathData) {
+              const result = transformSvgPath(
+                pathData,
+                pathTransform.a,
+                pathTransform.c,
+                pathTransform.b,
+                pathTransform.d
+              );
+              if (result) pathData = result.path;
+            }
+
             const childNode = context.prefer_path_for_geometry
               ? createPathNodeFromPath(
-                  geometry.path ?? "",
+                  pathData,
                   geometry,
                   node,
                   childId,
@@ -1418,9 +1767,114 @@ export namespace iofigma {
         }
 
         /**
+         * Resolve how fill and stroke geometry children should be ordered
+         * and whether stroke geometry should be included at all.
+         *
+         * ## Why this exists
+         *
+         * The Figma REST API `geometry=paths` returns `fillGeometry` and
+         * `strokeGeometry` as **independent, alignment-unaware shapes**.
+         * The `strokeAlign` property is a **compositing instruction** —
+         * it controls paint order and clipping, not the geometry itself.
+         *
+         * The `strokeGeometry` is always a CENTER-style stroke expansion.
+         * To produce the correct visual for non-CENTER alignments, the
+         * consumer must composite fill and stroke in a specific order.
+         *
+         * ## Compositing rules
+         *
+         * | `strokeAlign` | Child order           | Clipping          | Status          |
+         * |---------------|-----------------------|-------------------|-----------------|
+         * | `CENTER`      | fill first, stroke    | none              | **Implemented** |
+         * | `OUTSIDE`     | stroke first, fill    | none              | **Implemented** |
+         * | `INSIDE`      | fill first, stroke    | clip to fill      | **Not yet** (see TODO) |
+         *
+         * For OUTSIDE, drawing stroke first then fill on top works because
+         * the fill shape exactly covers the inward half of the too-wide
+         * stroke band, leaving only the outward half visible. This is the
+         * same principle as CSS `paint-order: stroke fill`.
+         *
+         * ## INSIDE stroke — boolean intersection
+         *
+         * INSIDE strokes require clipping `strokeGeometry` to the
+         * `fillGeometry` shape to remove the outward half of the stroke
+         * band. This is modeled as a `BooleanPathOperationNode` with
+         * `op: "intersection"` wrapping the fill and stroke geometry.
+         * The Rust renderer evaluates this via Skia `Path::op(Intersect)`.
+         *
+         * When INSIDE is detected, this function returns
+         * `{ type: "inside", fillChildIds, strokeChildIds }` so the
+         * caller can create the boolean wrapper node.
+         *
+         * ## Tracking
+         *
+         * See `docs/wg/feat-fig/stroke-geometry-alignment.md` for the
+         * full analysis with measurements.
+         * Grep: `resolveStrokeGeometryCompositing`
+         */
+        function resolveStrokeGeometryCompositing(
+          node: InputNode & figrest.HasGeometryTrait,
+          fillChildIds: string[],
+          strokeChildIds: string[]
+        ):
+          | { type: "ordered"; childIds: string[] }
+          | {
+              type: "inside";
+              fillChildIds: string[];
+              strokeChildIds: string[];
+            } {
+          if (strokeChildIds.length === 0) {
+            return { type: "ordered", childIds: [...fillChildIds] };
+          }
+
+          const align = node.strokeAlign ?? "CENTER";
+
+          switch (align) {
+            // CENTER: geometry is correct as-is. Fill first, stroke on top.
+            case "CENTER":
+              return {
+                type: "ordered",
+                childIds: [...fillChildIds, ...strokeChildIds],
+              };
+
+            // OUTSIDE: stroke first, fill on top. The fill covers the
+            // inward half of the stroke band, leaving only the outward
+            // half visible.
+            case "OUTSIDE":
+              return {
+                type: "ordered",
+                childIds: [...strokeChildIds, ...fillChildIds],
+              };
+
+            // INSIDE: wrap fill + stroke in a boolean intersection.
+            // The fill defines the clip mask; the stroke is the clipped
+            // content. The Rust renderer evaluates this via
+            // Skia Path::op(Intersect).
+            case "INSIDE":
+              return {
+                type: "inside",
+                fillChildIds: [...fillChildIds],
+                strokeChildIds: [...strokeChildIds],
+              };
+
+            default:
+              return {
+                type: "ordered",
+                childIds: [...fillChildIds, ...strokeChildIds],
+              };
+          }
+        }
+
+        /**
          * Processes nodes with HasGeometryTrait from REST API (with geometry=paths parameter).
          * Converts fill/stroke geometries to child VectorNodes under a GroupNode.
-         * Applies to VECTOR, STAR, REGULAR_POLYGON, and other shape nodes.
+         * Applies to VECTOR, STAR, REGULAR_POLYGON, BOOLEAN_OPERATION, and other shape nodes.
+         *
+         * When the node's relativeTransform contains a non-rotational component
+         * (flip or skew), the 2×2 part is baked into the SVG path data and the
+         * group node's position is derived from absoluteBoundingBox instead.
+         * This is necessary because the Grida node model only supports
+         * (x, y, rotation) and cannot represent flips.
          */
         function processNodeWithGeometryTrait(
           node: InputNode & figrest.HasGeometryTrait,
@@ -1429,21 +1883,224 @@ export namespace iofigma {
           const nodeTypeName =
             "type" in node ? node.type.replace("_", " ") : "Shape";
 
+          // Detect non-rotational transforms (flips/skews) that need to be
+          // baked into the path data because the Grida node model only stores
+          // (x, y, rotation).
+          let pathTransform:
+            | { a: number; c: number; b: number; d: number }
+            | undefined;
+
+          if (
+            context.prefer_path_for_geometry &&
+            node.relativeTransform != null
+          ) {
+            const rt = node.relativeTransform;
+            const a = rt[0][0],
+              c = rt[0][1],
+              b = rt[1][0],
+              dd = rt[1][1];
+            const result = transformSvgPath("M0 0", a, c, b, dd);
+            if (result !== null) {
+              // Non-rotational 2×2 — need to bake into paths
+              pathTransform = { a, c, b, d: dd };
+
+              // Compute the AABB of the transformed local rect in parent
+              // space. The four corners of the local rect (0,0,w,h)
+              // transformed by the 2×2 + translation:
+              const tx = rt[0][2],
+                ty = rt[1][2];
+              const w = node.size?.x ?? 0,
+                h = node.size?.y ?? 0;
+              const corners = [
+                [tx, ty],
+                [a * w + tx, b * w + ty],
+                [c * h + tx, dd * h + ty],
+                [a * w + c * h + tx, b * w + dd * h + ty],
+              ];
+              const aabbX = Math.min(...corners.map((p) => p[0]));
+              const aabbY = Math.min(...corners.map((p) => p[1]));
+              const aabbW = Math.max(...corners.map((p) => p[0])) - aabbX;
+              const aabbH = Math.max(...corners.map((p) => p[1])) - aabbY;
+
+              // Override the group's position to the AABB top-left
+              // (relative to parent) with no rotation, since the 2×2
+              // transform is now baked into the path data.
+              (groupNode as any).layout_inset_left = aabbX;
+              (groupNode as any).layout_inset_top = aabbY;
+              (groupNode as any).rotation = 0;
+              (groupNode as any).layout_target_width = aabbW;
+              (groupNode as any).layout_target_height = aabbH;
+            }
+          }
+
           const fillChildIds = processFillGeometries(
             node,
             groupNode.id,
-            nodeTypeName
+            nodeTypeName,
+            pathTransform
           );
+
           const strokeChildIds = processStrokeGeometries(
             node,
             groupNode.id,
-            nodeTypeName
+            nodeTypeName,
+            pathTransform
           );
 
-          const allChildIds = [...fillChildIds, ...strokeChildIds];
+          const composited = resolveStrokeGeometryCompositing(
+            node,
+            fillChildIds,
+            strokeChildIds
+          );
 
-          if (allChildIds.length > 0) {
-            graph[groupNode.id] = allChildIds;
+          if (composited.type === "inside") {
+            // INSIDE stroke: clip stroke geometry to fill boundary
+            // using BooleanPathOperationNode(intersection).
+            //
+            // The Rust renderer's boolean_operation_path() applies the
+            // node's `op` to children[1..] against children[0]. So for
+            // `op: intersection`, children = [A, B] gives A ∩ B.
+            //
+            // When there are multiple fill or stroke geometry paths,
+            // we must first union them into single operands, otherwise
+            // intersection is applied pairwise across all children:
+            //   [f0, f1, s0] with op=intersect → f0 ∩ f1 ∩ s0 (wrong)
+            //   vs. (f0 ∪ f1) ∩ (s0)                           (correct)
+            //
+            // Structure (general case):
+            //   GroupNode (the geometry group)
+            //     ├─ fill children (visible — render the shape fill)
+            //     └─ BooleanOp(intersection)
+            //          ├─ BooleanOp(union) { fill_clones }  — clip mask
+            //          └─ BooleanOp(union) { stroke_children } — clipped
+            //
+            // Simplified when single fill / single stroke (no union
+            // wrappers needed — direct children of the intersection).
+
+            const { width, height } = getParentBounds(node);
+            const boolNodeId = `${groupNode.id}_inside_stroke_bool`;
+
+            // Helper: create a BooleanPathOperationNode shell
+            const makeBoolShell = (
+              id: string,
+              name: string,
+              op: "union" | "intersection"
+            ): grida.program.nodes.BooleanPathOperationNode => ({
+              id,
+              name,
+              active: true,
+              locked: false,
+              opacity: 1,
+              rotation: 0,
+              layout_positioning: "absolute",
+              layout_inset_left: 0,
+              layout_inset_top: 0,
+              layout_target_width: width,
+              layout_target_height: height,
+              stroke_width: 0,
+              stroke_cap: "butt",
+              stroke_join: "miter",
+              type: "boolean",
+              op,
+            });
+
+            // Clone fill paths for the boolean node (they define the
+            // clip boundary; originals outside render the actual fill).
+            const cloneFillChildren = (): string[] => {
+              const ids: string[] = [];
+              for (const origFillId of composited.fillChildIds) {
+                const origNode = nodes[origFillId];
+                if (!origNode) continue;
+                const cloneId = `${boolNodeId}_clip_${origFillId}`;
+                nodes[cloneId] = {
+                  ...origNode,
+                  id: cloneId,
+                  name: `${origNode.name} (clip)`,
+                } as any;
+                ids.push(cloneId);
+              }
+              return ids;
+            };
+
+            const fillCloneIds = cloneFillChildren();
+
+            // Build the two operands for the intersection.
+            // If an operand has multiple paths, wrap in union first.
+            let fillOperandId: string;
+            if (fillCloneIds.length === 1) {
+              fillOperandId = fillCloneIds[0];
+            } else {
+              fillOperandId = `${boolNodeId}_fill_union`;
+              nodes[fillOperandId] = makeBoolShell(
+                fillOperandId,
+                "Fill Union (clip)",
+                "union"
+              );
+              graph[fillOperandId] = fillCloneIds;
+            }
+
+            let strokeOperandId: string;
+            if (composited.strokeChildIds.length === 1) {
+              strokeOperandId = composited.strokeChildIds[0];
+            } else {
+              strokeOperandId = `${boolNodeId}_stroke_union`;
+              nodes[strokeOperandId] = makeBoolShell(
+                strokeOperandId,
+                "Stroke Union",
+                "union"
+              );
+              graph[strokeOperandId] = [...composited.strokeChildIds];
+            }
+
+            // The boolean intersection produces the clipped stroke
+            // band as a path. The renderer paints this path using the
+            // *boolean node's own* fills (not children's paints).
+            // Apply the original stroke color as fill on the boolean
+            // node so the clipped stroke band is visible.
+            const strokeAsFill = fills_trait(
+              node.strokes ?? [],
+              context,
+              imageRefsUsed
+            );
+
+            const boolNode: grida.program.nodes.BooleanPathOperationNode = {
+              ...makeBoolShell(boolNodeId, "Inside Stroke", "intersection"),
+              ...strokeAsFill,
+            };
+
+            nodes[boolNodeId] = boolNode;
+            graph[boolNodeId] = [fillOperandId, strokeOperandId];
+
+            // Group children: original fill paths + the boolean node
+            const allChildIds = [...composited.fillChildIds, boolNodeId];
+            if (allChildIds.length > 0) {
+              graph[groupNode.id] = allChildIds;
+            }
+          } else {
+            // CENTER / OUTSIDE / default: simple ordered children.
+            const orderedIds = composited.childIds;
+            const orderedSet = new Set(orderedIds);
+
+            // Deactivate stroke nodes excluded by compositing resolution.
+            // Nodes stay in the tree to keep the graph structure valid,
+            // but won't render.
+            for (const id of strokeChildIds) {
+              if (!orderedSet.has(id)) {
+                (nodes[id] as any).active = false;
+              }
+            }
+
+            // All children (including deactivated ones) must be linked in
+            // the graph to avoid orphaned nodes. Use the composited order
+            // for active nodes, append deactivated ones at the end.
+            const deactivated = strokeChildIds.filter(
+              (id) => !orderedSet.has(id)
+            );
+            const allChildIds = [...orderedIds, ...deactivated];
+
+            if (allChildIds.length > 0) {
+              graph[groupNode.id] = allChildIds;
+            }
           }
         }
 
@@ -1489,14 +2146,120 @@ export namespace iofigma {
 
           attachGeometryChildrenIfPresent(currentNode, processedNode);
 
+          // For BOOLEAN_OPERATION nodes converted to groups with geometry,
+          // skip processing children — the boolean result is already baked
+          // into fillGeometry/strokeGeometry and the children are just the
+          // construction inputs (not visible in the final output).
+          const isBoolGeometryGroup =
+            "type" in currentNode &&
+            (currentNode as any).type === "BOOLEAN_OPERATION" &&
+            processedNode.type === "group";
+
+          // When a container (FRAME/INSTANCE/COMPONENT) has a non-rotational
+          // transform (flip/skew) and prefer_path_for_geometry is enabled,
+          // propagate the 2×2 part into children's relativeTransforms and
+          // fix the container to use the AABB position with no rotation.
+          // This ensures that child geometry baking picks up the flip.
+          if (
+            context.prefer_path_for_geometry &&
+            processedNode.type === "container" &&
+            "children" in currentNode &&
+            currentNode.children?.length &&
+            (currentNode as any).relativeTransform != null
+          ) {
+            const prt = (currentNode as any).relativeTransform;
+            const pa = prt[0][0],
+              pc = prt[0][1];
+            const pb = prt[1][0],
+              pd = prt[1][1];
+            const ptx = prt[0][2],
+              pty = prt[1][2];
+            const pIsIdentity2x2 =
+              Math.abs(pa - 1) < 1e-6 &&
+              Math.abs(pd - 1) < 1e-6 &&
+              Math.abs(pb) < 1e-6 &&
+              Math.abs(pc) < 1e-6;
+            // Propagate ALL non-identity 2×2 transforms (rotations, flips,
+            // skews) into children. The Grida container model stores
+            // (position, rotation_degrees) and reconstructs via
+            // from_box_center, which uses a different convention than
+            // Figma's relativeTransform. Baking into children avoids the
+            // mismatch entirely.
+            const pNeedsBake = !pIsIdentity2x2;
+
+            if (pNeedsBake) {
+              // Compose the parent's 2×2 into each child's relativeTransform.
+              // Children's new translations land in the grandparent's
+              // coordinate space. We then subtract the container's AABB
+              // origin so children are local to the new container.
+              const pw = (currentNode as any).size?.x ?? 0;
+              const ph = (currentNode as any).size?.y ?? 0;
+
+              // Compute AABB first — needed to rebase children.
+              const corners = [
+                [ptx, pty],
+                [pa * pw + ptx, pb * pw + pty],
+                [pc * ph + ptx, pd * ph + pty],
+                [pa * pw + pc * ph + ptx, pb * pw + pd * ph + pty],
+              ];
+              const aabbX = Math.min(...corners.map((p) => p[0]));
+              const aabbY = Math.min(...corners.map((p) => p[1]));
+              const aabbW = Math.max(...corners.map((p) => p[0])) - aabbX;
+              const aabbH = Math.max(...corners.map((p) => p[1])) - aabbY;
+
+              for (const child of currentNode.children) {
+                const crt = (child as any).relativeTransform;
+                if (!crt) continue;
+                const ca = crt[0][0],
+                  cc = crt[0][1],
+                  ctx2 = crt[0][2];
+                const cb = crt[1][0],
+                  cd = crt[1][1],
+                  cty = crt[1][2];
+                // New 2×2: P_2x2 * C_2x2
+                const na = pa * ca + pc * cb;
+                const nc = pa * cc + pc * cd;
+                const nb = pb * ca + pd * cb;
+                const nd = pb * cc + pd * cd;
+                // New translation in grandparent space, rebased to
+                // container-local by subtracting the AABB origin.
+                const ntx = pa * ctx2 + pc * cty + ptx - aabbX;
+                const nty = pb * ctx2 + pd * cty + pty - aabbY;
+                (child as any).relativeTransform = [
+                  [na, nc, ntx],
+                  [nb, nd, nty],
+                ];
+              }
+
+              // Reset the container to the AABB with no rotation.
+              (processedNode as any).layout_inset_left = aabbX;
+              (processedNode as any).layout_inset_top = aabbY;
+              (processedNode as any).layout_target_width = aabbW;
+              (processedNode as any).layout_target_height = aabbH;
+              (processedNode as any).rotation = 0;
+            }
+          }
+
           // If the node has children, process them recursively
-          if ("children" in currentNode && currentNode.children?.length) {
-            graph[processedNode.id] = currentNode.children
+          if (
+            !isBoolGeometryGroup &&
+            "children" in currentNode &&
+            currentNode.children?.length
+          ) {
+            const childIds = currentNode.children
               .map((c) => {
                 return processNode(c, currentNode as FigmaParentNode);
               }) // Process each child
               .filter((child) => child !== undefined) // Remove undefined nodes
               .map((child) => child!.id); // Map to IDs
+
+            // Merge with any geometry children already added by
+            // attachGeometryChildrenIfPresent (e.g. VECTOR fill paths +
+            // its existing child structure).
+            const existing = graph[processedNode.id];
+            graph[processedNode.id] = existing
+              ? [...existing, ...childIds]
+              : childIds;
           }
 
           return processedNode;
@@ -1713,8 +2476,8 @@ export namespace iofigma {
             ): grida.program.nodes.i.ITextStyle => ({
               font_family: (style.fontFamily as string) ?? "Inter",
               font_size: (style.fontSize as number) ?? DEFAULT_FONT_SIZE,
-              font_weight:
-                ((style.fontWeight as cg.NFontWeight) ?? 400) as cg.NFontWeight,
+              font_weight: ((style.fontWeight as cg.NFontWeight) ??
+                400) as cg.NFontWeight,
               font_kerning: true,
               text_decoration_line: style.textDecoration
                 ? (map.textDecorationMap[
@@ -1750,24 +2513,59 @@ export namespace iofigma {
               charOverrides.some((id: number) => id !== 0) &&
               overrideTable;
 
+            // ── Faux list transform (see faux-list.ts) ──────────────
+            // Reads `lineTypes` / `lineIndentations` from the REST node
+            // and rewrites the text + style indices to fake list appearance.
+            // This is a one-shot approximation — only correct at import
+            // time. Text edits after import will NOT update the synthetic
+            // bullets/numbering. Disable via `disable_faux_list: true`.
+            const restLineTypes = (node as { lineTypes?: FigmaLineType[] })
+              .lineTypes;
+            const restLineIndentations = (
+              node as { lineIndentations?: number[] }
+            ).lineIndentations;
+            const fauxResult =
+              !context.disable_faux_list &&
+              node.characters &&
+              restLineTypes?.length
+                ? applyFauxList({
+                    text: node.characters,
+                    lineTypes: restLineTypes,
+                    lineIndentations: restLineIndentations ?? [],
+                  })
+                : null;
+            // ─────────────────────────────────────────────────────────
+
             if (hasRichText && node.characters) {
               // Build styled runs from characterStyleOverrides.
               //
               // Figma's `characterStyleOverrides` array may be shorter than
               // `characters` — positions beyond the array use the base style
               // (id 0). We treat out-of-bounds indices as id 0 (base style).
-              const characters = node.characters;
+
+              // When faux-list is active, work with the shifted charOverrides
+              // so that styled runs are built against the rewritten text.
+              const origCharacters = node.characters;
+              const characters = fauxResult?.text ?? origCharacters;
+              const effectiveOverrides = fauxResult
+                ? shiftCharOverrides(
+                    charOverrides,
+                    origCharacters,
+                    fauxResult.prefixLengths
+                  )
+                : charOverrides;
+
               const runs: grida.program.nodes.StyledTextRun[] = [];
               let runStart = 0;
-              let currentId = charOverrides[0] ?? 0;
+              let currentId = effectiveOverrides[0] ?? 0;
 
               for (let i = 1; i <= characters.length; i++) {
                 // Characters beyond the charOverrides array use base style (0).
                 const nextId =
                   i < characters.length
-                    ? (i < charOverrides.length
-                        ? (charOverrides[i] ?? 0)
-                        : 0)
+                    ? i < effectiveOverrides.length
+                      ? (effectiveOverrides[i] ?? 0)
+                      : 0
                     : -1; // sentinel: forces final run to be emitted
                 if (nextId !== currentId) {
                   // Emit run [runStart, i)
@@ -1789,9 +2587,7 @@ export namespace iofigma {
                   ).fills;
                   const runFillPaints = overrideFills
                     ? overrideFills
-                        .map((p) =>
-                          convertPaint(p, context, imageRefsUsed)
-                        )
+                        .map((p) => convertPaint(p, context, imageRefsUsed))
                         .filter((p): p is cg.Paint => p !== undefined)
                     : undefined;
 
@@ -1836,7 +2632,7 @@ export namespace iofigma {
               ...style_trait({}),
               ...effects_trait(node.effects),
               type: "tspan",
-              text: node.characters,
+              text: fauxResult?.text ?? node.characters,
               ...textLayoutProps,
               text_align: textAlignValue,
               text_align_vertical: textAlignVerticalValue,
@@ -1860,20 +2656,45 @@ export namespace iofigma {
               font_kerning: true,
             };
           }
-          case "RECTANGLE": {
-            return {
-              id: gridaId,
-              ...base_node_trait(node),
-              ...positioning_trait(node, parent),
-              ...fills_trait(node.fills, context, imageRefsUsed),
-              ...stroke_trait(node, context, imageRefsUsed),
-              ...rectangular_stroke_width_trait(node),
-              ...corner_radius_trait(node),
-              ...effects_trait(node.effects),
-              type: "rectangle",
-            } satisfies grida.program.nodes.RectangleNode;
-          }
+          case "RECTANGLE":
           case "ELLIPSE": {
+            // When prefer_path_for_geometry is enabled and the node has
+            // geometry paths with a non-identity relativeTransform, convert
+            // to a GroupNode so processNodeWithGeometryTrait will bake the
+            // transform into the path data. This avoids the radians/degrees
+            // mismatch in from_box_center for rotated/flipped leaf nodes.
+            const shapeHasGeometry =
+              context.prefer_path_for_geometry === true &&
+              ((node.fillGeometry?.length ?? 0) > 0 ||
+                (node.strokeGeometry?.length ?? 0) > 0);
+            const shapeRt = node.relativeTransform;
+            const shapeHasTransform =
+              shapeRt != null &&
+              (Math.abs(shapeRt[0][0] - 1) > 1e-6 ||
+                Math.abs(shapeRt[1][1] - 1) > 1e-6 ||
+                Math.abs(shapeRt[0][1]) > 1e-6 ||
+                Math.abs(shapeRt[1][0]) > 1e-6);
+            if (shapeHasGeometry && shapeHasTransform) {
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...positioning_trait(node, parent),
+                type: "group",
+              } satisfies grida.program.nodes.GroupNode;
+            }
+            if (node.type === "RECTANGLE") {
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...positioning_trait(node, parent),
+                ...fills_trait(node.fills, context, imageRefsUsed),
+                ...stroke_trait(node, context, imageRefsUsed),
+                ...rectangular_stroke_width_trait(node),
+                ...corner_radius_trait(node),
+                ...effects_trait(node.effects),
+                type: "rectangle",
+              } satisfies grida.program.nodes.RectangleNode;
+            }
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -1886,6 +2707,22 @@ export namespace iofigma {
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {
+            // When geometry=paths is available and prefer_path_for_geometry is
+            // set, the boolean result is already baked into fillGeometry /
+            // strokeGeometry — emit a GroupNode so
+            // attachGeometryChildrenIfPresent will attach the path children.
+            const boolHasGeometry =
+              context.prefer_path_for_geometry === true &&
+              ((node.fillGeometry?.length ?? 0) > 0 ||
+                (node.strokeGeometry?.length ?? 0) > 0);
+            if (boolHasGeometry) {
+              return {
+                id: gridaId,
+                ...base_node_trait(node),
+                ...positioning_trait(node, parent),
+                type: "group",
+              } satisfies grida.program.nodes.GroupNode;
+            }
             return {
               id: gridaId,
               ...base_node_trait(node),
@@ -2630,9 +3467,7 @@ export namespace iofigma {
                 ? nc.letterSpacing.value
                 : (nc.letterSpacing?.value ?? 0),
           lineHeightPx:
-            nc.lineHeight?.units === "PIXELS"
-              ? nc.lineHeight.value
-              : undefined,
+            nc.lineHeight?.units === "PIXELS" ? nc.lineHeight.value : undefined,
           lineHeightPercent:
             nc.lineHeight?.units === "PERCENT"
               ? nc.lineHeight.value
@@ -2641,9 +3476,7 @@ export namespace iofigma {
             nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
           textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
           textCase:
-            nc.textCase === "ORIGINAL"
-              ? undefined
-              : (nc.textCase ?? undefined),
+            nc.textCase === "ORIGINAL" ? undefined : (nc.textCase ?? undefined),
           textDecoration: nc.textDecoration ?? "NONE",
         };
       }
@@ -2659,10 +3492,7 @@ export namespace iofigma {
         const charStyleIDs = nc.textData?.characterStyleIDs;
         const kiwiOverrideTable = nc.textData?.styleOverrideTable;
         let characterStyleOverrides: number[] = [];
-        const styleOverrideTable: Record<
-          string,
-          Record<string, unknown>
-        > = {};
+        const styleOverrideTable: Record<string, Record<string, unknown>> = {};
 
         if (
           charStyleIDs?.length &&
@@ -2674,7 +3504,10 @@ export namespace iofigma {
           // Kiwi ID 0 means "base style" (no override). Non-zero IDs are
           // matched by the `styleID` field inside each override entry — the
           // array index does NOT necessarily equal `id - 1`.
-          const kiwiOverrideByStyleID = new Map<number, (typeof kiwiOverrideTable)[number]>();
+          const kiwiOverrideByStyleID = new Map<
+            number,
+            (typeof kiwiOverrideTable)[number]
+          >();
           for (const entry of kiwiOverrideTable) {
             if (entry.styleID !== undefined) {
               kiwiOverrideByStyleID.set(entry.styleID, entry);
@@ -2694,8 +3527,7 @@ export namespace iofigma {
                 fontMetaData,
                 overrideNc.fontName
               );
-              if (fm?.fontWeight !== undefined)
-                o.fontWeight = fm.fontWeight;
+              if (fm?.fontWeight !== undefined) o.fontWeight = fm.fontWeight;
               if (fm?.fontStyle === "ITALIC") o.italic = true;
             }
             if (overrideNc.fontName?.postscript)
@@ -2704,11 +3536,15 @@ export namespace iofigma {
               o.fontSize = overrideNc.fontSize;
             if (overrideNc.textDecoration !== undefined)
               o.textDecoration = overrideNc.textDecoration;
-            if (overrideNc.textCase !== undefined && overrideNc.textCase !== "ORIGINAL")
+            if (
+              overrideNc.textCase !== undefined &&
+              overrideNc.textCase !== "ORIGINAL"
+            )
               o.textCase = overrideNc.textCase;
             if (overrideNc.letterSpacing !== undefined) {
               const ls = overrideNc.letterSpacing;
-              const fs = overrideNc.fontSize ?? nc.fontSize ?? DEFAULT_FONT_SIZE;
+              const fs =
+                overrideNc.fontSize ?? nc.fontSize ?? DEFAULT_FONT_SIZE;
               o.letterSpacing =
                 ls.units === "PERCENT"
                   ? (ls.value / 100) * fs
@@ -2733,6 +3569,31 @@ export namespace iofigma {
           }
         }
 
+        // Derive lineTypes / lineIndentations from Kiwi textData.lines
+        // (previously hardcoded as [] — see faux-list.ts for why we need these).
+        // NOTE: Kiwi LineType also includes "BLOCKQUOTE" and "HEADER" which
+        // have no REST API equivalent and no Grida representation — they map
+        // to "NONE" here (silently dropped).
+        const kiwiLines = nc.textData?.lines;
+        const lineTypes: ("NONE" | "ORDERED" | "UNORDERED")[] = [];
+        const lineIndentations: number[] = [];
+        if (kiwiLines?.length) {
+          for (const ld of kiwiLines) {
+            switch (ld.lineType) {
+              case "ORDERED_LIST":
+                lineTypes.push("ORDERED");
+                break;
+              case "UNORDERED_LIST":
+                lineTypes.push("UNORDERED");
+                break;
+              default: // PLAIN, BLOCKQUOTE, HEADER → NONE
+                lineTypes.push("NONE");
+                break;
+            }
+            lineIndentations.push(ld.indentationLevel ?? 0);
+          }
+        }
+
         return {
           characters,
           fills: nc.fillPaints ? paints(nc.fillPaints) : [],
@@ -2744,8 +3605,8 @@ export namespace iofigma {
           style,
           characterStyleOverrides,
           styleOverrideTable,
-          lineTypes: [],
-          lineIndentations: [],
+          lineTypes,
+          lineIndentations,
         };
       }
 
@@ -2902,9 +3763,7 @@ export namespace iofigma {
        * Convert Kiwi SLIDE / INTERACTIVE_SLIDE_ELEMENT to X_SLIDE IR.
        * Reuses the same trait pipeline as frame().
        */
-      function slide(
-        nc: figkiwi.NodeChange
-      ): __ir.SlideNodeIR | undefined {
+      function slide(nc: figkiwi.NodeChange): __ir.SlideNodeIR | undefined {
         if (!nc.guid || !nc.name || !nc.size) return undefined;
         return {
           ...kiwi_is_layer_trait(nc, "FRAME"),

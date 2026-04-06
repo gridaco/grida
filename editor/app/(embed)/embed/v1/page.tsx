@@ -10,11 +10,39 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
-  useRefigEditor,
-  decodeSyntheticFigmaId,
-} from "@/scaffolds/embed/use-refig-editor";
+  useEmbedViewer,
+  type FileConverter,
+} from "@/scaffolds/embed/use-embed-viewer";
 import { RefigCanvas } from "@/scaffolds/embed/refig-shared";
 import { useEmbedBridge } from "@/grida-canvas-react/use-embed-bridge";
+import {
+  figBytesToGridaDocument,
+  restJsonToGridaDocument,
+} from "@grida/io-figma/fig2grida-core";
+
+/**
+ * File converter for the general-purpose embed.
+ *
+ * Unlike the Figma-specific embed, `preserve_figma_ids` is false —
+ * node IDs in events use Grida-internal IDs, not Figma IDs.
+ *
+ * Uses the in-memory API to avoid the pack/unpack round-trip through
+ * .grida archives.
+ */
+const generalConverter: FileConverter = (input) => {
+  if (input instanceof Uint8Array) {
+    return figBytesToGridaDocument(input, {
+      placeholder_for_missing_images: false,
+      preserve_figma_ids: false,
+    });
+  }
+  return restJsonToGridaDocument(input, {
+    placeholder_for_missing_images: false,
+    preserve_figma_ids: false,
+  });
+};
+
+const SUPPORTED_EXT_RE = /\.(grida|grida1|fig|json\.gz|json|zip)$/i;
 
 function parseFileParam(
   raw: string | null
@@ -42,29 +70,20 @@ function parseFileParam(
 
 /**
  * Extract a filename hint from the `Content-Disposition` header.
- * Handles both `filename="name.fig"` and `filename*=UTF-8''name.fig` forms.
  */
 function parseContentDispositionFilename(header: string | null): string | null {
   if (!header) return null;
-  // RFC 6266 filename*= (UTF-8 encoded, preferred)
   const starMatch = header.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
   if (starMatch) return decodeURIComponent(starMatch[1]);
-  // Plain filename=
   const plainMatch = header.match(/filename\s*=\s*"?([^";\s]+)"?/i);
   if (plainMatch) return plainMatch[1];
   return null;
 }
 
-const SUPPORTED_EXT_RE = /\.(fig|json\.gz|json|zip)$/i;
-
 /**
  * Infer a usable filename from a remote URL + response headers.
  *
- * Resolution order (first match wins):
- * 1. `Content-Disposition` header (handles signed/opaque URLs where the path is meaningless)
- * 2. URL pathname extension
- * 3. `Content-Type` / `Content-Encoding` header heuristics
- * 4. Fallback to `.fig` for octet-stream / empty content-type
+ * Falls back to `.grida` for unknown octet-stream (general-purpose default).
  */
 function inferFilenameForRemote(
   url: string,
@@ -72,13 +91,11 @@ function inferFilenameForRemote(
   contentDisposition: string | null = null,
   contentEncoding: string | null = null
 ): string | null {
-  // 1. Content-Disposition (most reliable for signed URLs)
   const cdName = parseContentDispositionFilename(contentDisposition);
   if (cdName && SUPPORTED_EXT_RE.test(cdName)) {
     return cdName;
   }
 
-  // 2. URL pathname
   let pathName: string;
   try {
     pathName = new URL(url).pathname;
@@ -90,12 +107,9 @@ function inferFilenameForRemote(
     return base;
   }
 
-  // 3. Content-Type / Content-Encoding heuristics
   const ct = (contentType || "").toLowerCase();
   const ce = (contentEncoding || "").toLowerCase();
 
-  // gzip-compressed JSON (Content-Type: application/json + Content-Encoding: gzip,
-  // or Content-Type: application/gzip with a JSON hint in the URL/disposition)
   if (
     ct.includes("application/gzip") ||
     ct.includes("application/x-gzip") ||
@@ -104,7 +118,6 @@ function inferFilenameForRemote(
   ) {
     return "remote.json.gz";
   }
-
   if (ct.includes("application/json") || ct.includes("text/json")) {
     return "remote.json";
   }
@@ -115,12 +128,12 @@ function inferFilenameForRemote(
     return "remote.zip";
   }
   if (ct.includes("application/octet-stream") || ct === "") {
-    return "remote.fig";
+    return "remote.grida";
   }
   return null;
 }
 
-function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
+function EmbedViewerInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
   const {
     editor: instance,
     fonts,
@@ -130,13 +143,10 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
     loadError,
     documentLoaded,
     onFile,
-  } = useRefigEditor();
+  } = useEmbedViewer({ converter: generalConverter });
 
-  useEmbedBridge(instance, {
-    canvasReady,
-    onFile,
-    __dangerously_transform_node_id: decodeSyntheticFigmaId,
-  });
+  // General-purpose embed: no ID transform
+  useEmbedBridge(instance, { canvasReady, onFile });
 
   const remoteFetchGen = useRef(0);
 
@@ -159,7 +169,7 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
         const inferred = inferFilenameForRemote(remoteFileUrl, ct, cd, ce);
         if (!inferred) {
           throw new Error(
-            "Could not infer a supported extension (.fig, .json, .json.gz, .zip) from the URL or Content-Type"
+            "Could not infer a supported extension (.grida, .grida1, .fig, .json, .json.gz, .zip) from the URL or Content-Type"
           );
         }
         const file = new File([buf], inferred, {
@@ -169,7 +179,7 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
         await onFile(file);
       } catch (e) {
         if (cancelled || gen !== remoteFetchGen.current) return;
-        console.error("[@grida/refig] remote fetch", e);
+        console.error("[@grida/embed] remote fetch", e);
       }
     })();
 
@@ -209,13 +219,12 @@ function RefigEmbedInner({ remoteFileUrl }: { remoteFileUrl?: string }) {
   );
 }
 
-function RefigEmbedContent() {
+function EmbedViewerContent() {
   const searchParams = useSearchParams();
   const raw = searchParams.get("file");
 
-  // `?file=` is optional — users can load files entirely via postMessage.
   if (!raw) {
-    return <RefigEmbedInner />;
+    return <EmbedViewerInner />;
   }
 
   const parsed = parseFileParam(raw);
@@ -230,10 +239,25 @@ function RefigEmbedContent() {
     );
   }
 
-  return <RefigEmbedInner remoteFileUrl={parsed.url} />;
+  return <EmbedViewerInner remoteFileUrl={parsed.url} />;
 }
 
-export default function RefigEmbedPage() {
+/**
+ * General-purpose embed viewer page (`/embed/v1/`).
+ *
+ * Supports all Grida-compatible file formats:
+ * - `.grida` — native Grida archive (ZIP with FlatBuffers document + assets)
+ * - `.grida1` — Grida JSON snapshot
+ * - `.fig` — Figma binary (converted via fig2grida)
+ * - `.json` / `.json.gz` / `.zip` — Figma REST formats
+ *
+ * Unlike `/embed/v1/figma`, this page does NOT apply Figma ID transforms.
+ * Node IDs in `selection-change` and other events use Grida-internal IDs.
+ *
+ * Use this endpoint when embedding any design file and you don't need
+ * Figma-specific ID mapping in the event contract.
+ */
+export default function EmbedPage() {
   return (
     <Suspense
       fallback={
@@ -242,7 +266,7 @@ export default function RefigEmbedPage() {
         </div>
       }
     >
-      <RefigEmbedContent />
+      <EmbedViewerContent />
     </Suspense>
   );
 }

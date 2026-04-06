@@ -277,6 +277,9 @@ enum NodeType : ubyte {
 
   // text
   TextSpan,
+
+  // embeds
+  MarkdownEmbed,
 }
 
 // TODO: remove this
@@ -1484,6 +1487,26 @@ table AttributedTextNode {
   properties:AttributedTextNodeProperties;
 }
 
+/// Properties for a Markdown embed node.
+table MarkdownEmbedNodeProperties {
+  /// Background fill paints for the markdown container.
+  fill_paints:[PaintStackItem];
+  /// The GitHub Flavored Markdown source text.
+  markdown:string;
+  /// Per-corner rectangular corner radius.
+  corner_radius:RectangularCornerRadiusTrait;
+}
+
+/// Node variant: Markdown embed (render-only).
+///
+/// Stores GFM markdown source and renders it directly to a Skia Picture
+/// at paint time. Not structurally editable — treated as a single text block.
+table MarkdownEmbedNode {
+  node:SystemNodeTrait (required);
+  layer:LayerTrait (required);
+  properties:MarkdownEmbedNodeProperties;
+}
+
 // -----------------------------------------------------------------------------
 // Node encoding model: union-per-variant (why this, not an "all-flat" Node table)
 // -----------------------------------------------------------------------------
@@ -1578,6 +1601,7 @@ union Node {
   PathNode, // SVG path data (render-only, no vector network)
   AttributedTextNode,
   TrayNode,
+  MarkdownEmbedNode, // GFM markdown rendered directly to a Skia Picture (render-only)
 }
 
 // -----------------------------------------------------------------------------

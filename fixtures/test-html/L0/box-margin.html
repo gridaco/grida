@@ -8,35 +8,36 @@
         box-sizing: border-box;
       }
       body {
-        background: #030712;
-        color: #e2e8f0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
         font-family: system-ui, sans-serif;
         font-size: 14px;
-        padding: 24px;
       }
 
       h1 {
         font-size: 20px;
-        color: #fff;
+        color: #000;
         margin-bottom: 32px;
       }
       h2 {
         font-size: 14px;
         margin-top: 40px;
         margin-bottom: 6px;
-        color: #94a3b8;
+        color: #666;
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
       p.desc {
         font-size: 12px;
-        color: #64748b;
+        color: #666;
         margin-bottom: 14px;
       }
 
       .demo {
-        background: #1e293b;
-        border: 1px solid #334155;
+        background: #eee;
+        border: 1px solid #ccc;
         border-radius: 8px;
         padding: 24px;
         margin-bottom: 14px;
@@ -48,12 +49,12 @@
         top: 8px;
         right: 12px;
         font-size: 11px;
-        color: #475569;
+        color: #666;
         font-family: monospace;
       }
 
       .box {
-        background: #6366f1;
+        background: #000;
         color: #fff;
         padding: 12px 16px;
         font-size: 12px;
@@ -61,15 +62,16 @@
       }
 
       .box-alt {
-        background: #a855f7;
+        background: #00f;
       }
       .box-green {
-        background: #059669;
+        background: #0f0;
+        color: #000;
       }
 
       .anno {
         font-size: 11px;
-        color: #f87171;
+        color: #f00;
         font-family: monospace;
         text-align: center;
         padding: 4px;
@@ -90,7 +92,7 @@
       }
 
       .collapse-container {
-        background: #0f172a;
+        background: #ccc;
       }
       .collapse-container .box {
         margin: 30px 0;
@@ -99,20 +101,20 @@
       .no-collapse-container {
         display: flex;
         flex-direction: column;
-        background: #0f172a;
+        background: #ccc;
       }
       .no-collapse-container .box {
         margin: 30px 0;
       }
 
       .inline-container {
-        background: #0f172a;
+        background: #ccc;
         line-height: 2;
         padding: 12px;
       }
       .inline-box {
         display: inline;
-        background: #6366f1;
+        background: #000;
         color: #fff;
         padding: 2px 6px;
         font-size: 12px;
@@ -121,7 +123,7 @@
       }
 
       .inline-box-alt {
-        background: #a855f7;
+        background: #00f;
       }
     </style>
   </head>
@@ -160,7 +162,7 @@
       overlapping the first box.
     </p>
     <div class="demo">
-      <div style="background: #0f172a; padding-top: 40px">
+      <div style="background: #ccc; padding-top: 40px">
         <div class="box">box A</div>
         <div
           class="box box-alt"
@@ -180,13 +182,13 @@
     <div class="side">
       <div class="demo">
         <div class="demo-label">margin: 0 auto</div>
-        <div style="background: #0f172a">
+        <div style="background: #ccc">
           <div class="box" style="width: 180px; margin: 0 auto">centered</div>
         </div>
       </div>
       <div class="demo">
         <div class="demo-label">margin-left: auto</div>
-        <div style="background: #0f172a">
+        <div style="background: #ccc">
           <div class="box box-alt" style="width: 180px; margin-left: auto">
             pushed right
           </div>
@@ -195,7 +197,7 @@
     </div>
     <div class="demo">
       <div class="demo-label">flex + margin-left: auto (spacer pattern)</div>
-      <div style="display: flex; background: #0f172a">
+      <div style="display: flex; background: #ccc">
         <div class="box">A</div>
         <div class="box box-alt" style="margin-left: auto">B (ml: auto)</div>
         <div class="box box-green" style="margin-left: auto">C (ml: auto)</div>
@@ -213,7 +215,7 @@
       <div class="demo" style="padding: 0">
         <div class="demo-label">margin: 24px</div>
         <div class="box" style="margin: 24px">
-          background: blue; margin: 24px;
+          background: black; margin: 24px;
         </div>
       </div>
       <div class="demo" style="padding: 0">
@@ -255,7 +257,7 @@
       </div>
       <div class="demo">
         <div class="demo-label">wrapper+padding (70px total)</div>
-        <div style="background: #0f172a">
+        <div style="background: #ccc">
           <div style="padding-bottom: 50px">
             <div class="box">wrapper pb: 50px</div>
           </div>
@@ -276,7 +278,7 @@
     <div class="side">
       <div class="demo">
         <div class="demo-label">collapsed (margin leaks)</div>
-        <div style="background: rgba(248, 113, 113, 0.15)">
+        <div style="background: rgba(255, 0, 0, 0.1)">
           <div class="box" style="margin-top: 30px">child mt: 30px</div>
         </div>
         <div class="anno">
@@ -285,7 +287,7 @@
       </div>
       <div class="demo">
         <div class="demo-label">padding prevents collapse</div>
-        <div style="background: rgba(248, 113, 113, 0.15); padding: 1px">
+        <div style="background: rgba(255, 0, 0, 0.1); padding: 1px">
           <div class="box" style="margin-top: 30px">child mt: 30px</div>
         </div>
         <div class="anno">↑ parent has padding: 1px — margin stays inside</div>

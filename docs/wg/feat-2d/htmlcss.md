@@ -104,19 +104,122 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Text & Font
 
-| CSS Property                     | Status | Notes                                                       |
-| -------------------------------- | ------ | ----------------------------------------------------------- |
-| `color`                          | ✅     | Inherited                                                   |
-| `font-size`                      | ✅     | Computed px                                                 |
-| `font-weight`                    | ✅     | 100–900                                                     |
-| `font-style` (italic)            | ✅     |                                                             |
-| `font-family`                    | ✅     | Generic families mapped to platform names                   |
-| `line-height`                    | ✅     | normal, number, length                                      |
-| `letter-spacing`, `word-spacing` | ✅     |                                                             |
-| `text-align`                     | ✅     | left, right, center, justify                                |
-| `text-transform`                 | ✅     | uppercase, lowercase, capitalize                            |
-| `text-decoration`                | ✅     | underline, line-through, overline (bitfield — simultaneous) |
-| `white-space`                    | ✅     | normal, pre, pre-wrap, pre-line, nowrap                     |
+#### Color & Inheritance
+
+| CSS Property | Status | Notes     |
+| ------------ | ------ | --------- |
+| `color`      | ✅     | Inherited |
+
+#### Font Properties
+
+| CSS Property                | Status | Notes                                     |
+| --------------------------- | ------ | ----------------------------------------- |
+| `font` (shorthand)          | ❌     |                                           |
+| `font-family`               | ✅     | Generic families mapped to platform names |
+| `font-size`                 | ✅     | Computed px                               |
+| `font-weight`               | ✅     | 100–900                                   |
+| `font-style`                | ✅     | italic                                    |
+| `font-stretch`              | ❌     |                                           |
+| `font-size-adjust`          | ❌     |                                           |
+| `font-kerning`              | ❌     |                                           |
+| `font-optical-sizing`       | ❌     |                                           |
+| `font-synthesis`            | ❌     | Shorthand                                 |
+| `font-synthesis-weight`     | ❌     |                                           |
+| `font-synthesis-style`      | ❌     |                                           |
+| `font-synthesis-small-caps` | ❌     |                                           |
+| `font-variant` (shorthand)  | ❌     |                                           |
+| `font-variant-ligatures`    | ❌     |                                           |
+| `font-variant-caps`         | ❌     |                                           |
+| `font-variant-numeric`      | ❌     |                                           |
+| `font-variant-east-asian`   | ❌     |                                           |
+| `font-variant-alternates`   | ❌     |                                           |
+| `font-variant-position`     | ❌     |                                           |
+| `font-variant-emoji`        | ❌     |                                           |
+| `font-feature-settings`     | ❌     |                                           |
+| `font-variation-settings`   | ❌     |                                           |
+| `font-language-override`    | ❌     |                                           |
+
+#### Text Layout
+
+| CSS Property                  | Status | Notes                                       |
+| ----------------------------- | ------ | ------------------------------------------- |
+| `line-height`                 | ✅     | normal, number, length                      |
+| `letter-spacing`              | ✅     |                                             |
+| `word-spacing`                | ✅     |                                             |
+| `text-align`                  | ✅     | left, right, center, justify                |
+| `text-align-last`             | ❌     |                                             |
+| `text-justify`                | ❌     |                                             |
+| `text-indent`                 | ❌     | Field defined in FontProps, not extracted   |
+| `text-transform`              | ✅     | uppercase, lowercase, capitalize            |
+| `white-space`                 | ✅     | normal, pre, pre-wrap, pre-line, nowrap     |
+| `word-break`                  | ❌     |                                             |
+| `overflow-wrap` / `word-wrap` | ❌     |                                             |
+| `line-break`                  | ❌     |                                             |
+| `hyphens`                     | ❌     |                                             |
+| `hyphenate-character`         | ❌     |                                             |
+| `hyphenate-limit-chars`       | ❌     |                                             |
+| `tab-size`                    | ❌     |                                             |
+| `text-overflow`               | ❌     | Enum defined (Clip/Ellipsis), not extracted |
+| `text-wrap`                   | ❌     |                                             |
+| `text-wrap-mode`              | ❌     |                                             |
+| `text-wrap-style`             | ❌     |                                             |
+| `hanging-punctuation`         | ❌     |                                             |
+| `text-spacing-trim`           | ❌     |                                             |
+
+#### Text Decoration
+
+| CSS Property                  | Status | Notes                                                       |
+| ----------------------------- | ------ | ----------------------------------------------------------- |
+| `text-decoration` (shorthand) | ✅     | underline, line-through, overline (bitfield — simultaneous) |
+| `text-decoration-line`        | ✅     |                                                             |
+| `text-decoration-style`       | ⚠️     | Field defined, not extracted from Stylo                     |
+| `text-decoration-color`       | ⚠️     | Field defined, not extracted from Stylo                     |
+| `text-decoration-thickness`   | ❌     |                                                             |
+| `text-decoration-skip-ink`    | ❌     |                                                             |
+| `text-underline-position`     | ❌     |                                                             |
+| `text-underline-offset`       | ❌     |                                                             |
+
+#### Text Emphasis
+
+| CSS Property             | Status | Notes |
+| ------------------------ | ------ | ----- |
+| `text-emphasis`          | ❌     |       |
+| `text-emphasis-style`    | ❌     |       |
+| `text-emphasis-color`    | ❌     |       |
+| `text-emphasis-position` | ❌     |       |
+
+#### Text Shadow
+
+| CSS Property  | Status | Notes              |
+| ------------- | ------ | ------------------ |
+| `text-shadow` | ❌     | Not in type schema |
+
+#### Writing Modes & BiDi
+
+| CSS Property           | Status | Notes |
+| ---------------------- | ------ | ----- |
+| `direction`            | ❌     |       |
+| `writing-mode`         | ❌     |       |
+| `unicode-bidi`         | ❌     |       |
+| `text-orientation`     | ❌     |       |
+| `text-combine-upright` | ❌     |       |
+
+#### Inline Layout & Alignment
+
+| CSS Property         | Status | Notes                       |
+| -------------------- | ------ | --------------------------- |
+| `vertical-align`     | ❌     | Enum defined, not extracted |
+| `dominant-baseline`  | ❌     |                             |
+| `alignment-baseline` | ❌     |                             |
+| `baseline-shift`     | ❌     |                             |
+| `initial-letter`     | ❌     |                             |
+
+#### Ruby
+
+| CSS Property    | Status | Notes |
+| --------------- | ------ | ----- |
+| `ruby-position` | ❌     |       |
+| `ruby-align`    | ❌     |       |
 
 ### Inline Elements
 
@@ -160,19 +263,180 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `position: absolute` | ✅     | Via Taffy                           |
 | `z-index`            | ⚠️     | Stored but not used for paint order |
 
-### Not Yet Supported
+### Grid Layout
 
-| Category          | Properties                                                          |
-| ----------------- | ------------------------------------------------------------------- |
-| Background images | `background-image: url()`, `background-position`, `background-size` |
-| Transform         | `transform`, `transform-origin`                                     |
-| Box shadow inset  | `box-shadow: inset`                                                 |
-| Table layout      | `display: table-row`, `table-cell` (proper grid)                    |
-| Float             | `float`, `clear`                                                    |
-| Filter            | `filter`, `backdrop-filter`                                         |
-| Clip/Mask         | `clip-path`, `mask`                                                 |
-| Outline           | `outline`                                                           |
-| Text              | `text-indent`, `text-overflow`, `vertical-align` (sub/super)        |
+| CSS Property                          | Status | Notes                                    |
+| ------------------------------------- | ------ | ---------------------------------------- |
+| `display: grid`                       | ⚠️     | Taffy `Display::Grid`, no grid props yet |
+| `grid-template-columns`               | ❌     |                                          |
+| `grid-template-rows`                  | ❌     |                                          |
+| `grid-template-areas`                 | ❌     |                                          |
+| `grid-auto-columns`, `grid-auto-rows` | ❌     |                                          |
+| `grid-auto-flow`                      | ❌     |                                          |
+| `grid-column`, `grid-row`             | ❌     |                                          |
+| `gap` (row-gap, column-gap)           | ✅     | Flex/grid gap via Taffy                  |
+
+### Flexbox (detail)
+
+| CSS Property      | Status | Notes     |
+| ----------------- | ------ | --------- |
+| `flex-direction`  | ✅     | Via Taffy |
+| `flex-wrap`       | ✅     | Via Taffy |
+| `align-items`     | ✅     | Via Taffy |
+| `align-self`      | ✅     | Via Taffy |
+| `align-content`   | ✅     | Via Taffy |
+| `justify-content` | ✅     | Via Taffy |
+| `justify-items`   | ❌     |           |
+| `justify-self`    | ❌     |           |
+| `flex-grow`       | ✅     | Via Taffy |
+| `flex-shrink`     | ✅     | Via Taffy |
+| `flex-basis`      | ✅     | Via Taffy |
+| `order`           | ❌     |           |
+
+### Sizing & Intrinsic Keywords
+
+| CSS Property                 | Status | Notes                            |
+| ---------------------------- | ------ | -------------------------------- |
+| `width`, `height` (%)        | ⚠️     | px and auto only; % not resolved |
+| `aspect-ratio`               | ❌     |                                  |
+| `min-content`, `max-content` | ❌     | Intrinsic sizing keywords        |
+| `fit-content`                | ❌     |                                  |
+
+### Background (extended)
+
+| CSS Property              | Status | Notes |
+| ------------------------- | ------ | ----- |
+| `background-position`     | ❌     |       |
+| `background-size`         | ❌     |       |
+| `background-repeat`       | ❌     |       |
+| `background-origin`       | ❌     |       |
+| `background-clip`         | ❌     |       |
+| `background-attachment`   | ❌     |       |
+| `background-image: url()` | ❌     |       |
+
+### Box Shadow (detail)
+
+| CSS Property         | Status | Notes                               |
+| -------------------- | ------ | ----------------------------------- |
+| `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius |
+| `box-shadow: inset`  | ❌     |                                     |
+| Multiple shadows     | ❌     | Only first shadow painted           |
+
+### Positioning (extended)
+
+| CSS Property                     | Status | Notes                                   |
+| -------------------------------- | ------ | --------------------------------------- |
+| `position: fixed`                | ❌     |                                         |
+| `position: sticky`               | ❌     |                                         |
+| `top`, `right`, `bottom`, `left` | ⚠️     | Stub in collect.rs, returns defaults    |
+| `z-index`                        | ⚠️     | Stored but not used for paint order     |
+| `float`                          | ❌     | Recognized in collect, no layout effect |
+| `clear`                          | ❌     | Recognized in collect, no layout effect |
+
+### Transform & 3D
+
+| CSS Property          | Status | Notes |
+| --------------------- | ------ | ----- |
+| `transform`           | ❌     |       |
+| `transform-origin`    | ❌     |       |
+| `perspective`         | ❌     |       |
+| `backface-visibility` | ❌     |       |
+
+### Filter & Effects
+
+| CSS Property      | Status | Notes |
+| ----------------- | ------ | ----- |
+| `filter`          | ❌     |       |
+| `backdrop-filter` | ❌     |       |
+| `clip-path`       | ❌     |       |
+| `mask`            | ❌     |       |
+| `mask-image`      | ❌     |       |
+
+### Outline
+
+| CSS Property     | Status | Notes |
+| ---------------- | ------ | ----- |
+| `outline`        | ❌     |       |
+| `outline-offset` | ❌     |       |
+
+### Table Layout
+
+| CSS Property          | Status | Notes                           |
+| --------------------- | ------ | ------------------------------- |
+| `display: table`      | ⚠️     | Falls back to block flow        |
+| `display: table-row`  | ⚠️     | Falls back to flex (faux-table) |
+| `display: table-cell` | ⚠️     | Falls back to flex item         |
+| `border-collapse`     | ❌     |                                 |
+| `border-spacing`      | ❌     |                                 |
+| `table-layout`        | ❌     |                                 |
+| `caption-side`        | ❌     |                                 |
+
+### Multi-column Layout
+
+| CSS Property   | Status | Notes                          |
+| -------------- | ------ | ------------------------------ |
+| `columns`      | ❌     |                                |
+| `column-count` | ❌     |                                |
+| `column-gap`   | ✅     | Via Taffy gap (flex/grid only) |
+| `column-rule`  | ❌     |                                |
+| `column-span`  | ❌     |                                |
+| `column-width` | ❌     |                                |
+
+### Generated Content & Counters
+
+| CSS Property               | Status | Notes                             |
+| -------------------------- | ------ | --------------------------------- |
+| `content` (::before/after) | ❌     | Pseudo-elements not supported     |
+| `counter-reset`            | ❌     | Internal counters for `<ol>` only |
+| `counter-increment`        | ❌     |                                   |
+| `quotes`                   | ❌     |                                   |
+
+### Interaction & UI
+
+| CSS Property     | Status | Notes                         |
+| ---------------- | ------ | ----------------------------- |
+| `cursor`         | ❌     | Not relevant for canvas embed |
+| `pointer-events` | ❌     | Not relevant for canvas embed |
+| `user-select`    | ❌     | Not relevant for canvas embed |
+| `resize`         | ❌     |                               |
+| `caret-color`    | ❌     |                               |
+
+### Animation & Transition
+
+| CSS Property | Status | Notes              |
+| ------------ | ------ | ------------------ |
+| `transition` | ❌     | Static render only |
+| `animation`  | ❌     | Static render only |
+
+### CSS Variables & Functions
+
+| Feature                     | Status | Notes                |
+| --------------------------- | ------ | -------------------- |
+| Custom properties           | ❌     | `var()` not resolved |
+| `calc()`                    | ⚠️     | Stylo resolves to px |
+| `clamp()`, `min()`, `max()` | ⚠️     | Stylo resolves to px |
+| `env()`                     | ❌     |                      |
+
+### Replaced Elements
+
+| CSS Property          | Status | Notes                     |
+| --------------------- | ------ | ------------------------- |
+| `object-fit`          | ❌     |                           |
+| `object-position`     | ❌     |                           |
+| `<img>` rendering     | ❌     | Images not loaded/painted |
+| `<svg>` inline        | ❌     |                           |
+| `<video>`, `<canvas>` | ❌     |                           |
+
+### Border (extended)
+
+| CSS Property           | Status | Notes                                   |
+| ---------------------- | ------ | --------------------------------------- |
+| `border-style: groove` | ❌     | Enum defined, paint falls back to solid |
+| `border-style: ridge`  | ❌     | Enum defined, paint falls back to solid |
+| `border-style: inset`  | ❌     | Enum defined, paint falls back to solid |
+| `border-style: outset` | ❌     | Enum defined, paint falls back to solid |
+| `border-style: double` | ❌     | Enum defined, paint falls back to solid |
+| `border-image`         | ❌     |                                         |
 
 ---
 

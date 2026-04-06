@@ -182,6 +182,7 @@ export function PlaygroundMenuContent({
           const images = res.images ?? {};
           const context: iofigma.restful.factory.FactoryContext = {
             gradient_id_generator: () => v4(),
+            prefer_path_for_geometry: true,
             resolve_image_src: (ref) =>
               ref in images ? `res://images/${ref}` : null,
           };

@@ -500,6 +500,13 @@ impl LayerList {
     }
 
     /// Build a layer list starting from a node subtree using a scene cache.
+    ///
+    /// `opacity` is the starting parent opacity for the subtree root.
+    /// For export, pass `1.0` — ancestor opacity is not propagated, so the
+    /// node renders in isolation with only its own opacity. This matches
+    /// standard design tool export semantics.
+    /// For compositing within a live scene, pass the accumulated ancestor
+    /// opacity so the subtree blends correctly in context.
     pub fn from_node(
         id: &NodeId,
         graph: &SceneGraph,
@@ -1593,6 +1600,9 @@ impl LayerList {
                 let shape = build_shape(node, &bounds);
                 let fills = Self::filter_visible_paints(&n.fills);
 
+                // Use resolved bounds for width/height so auto-sizing is
+                // reflected correctly (the geometry cache already ran
+                // markdown measurement when schema height is None).
                 let layer = PainterPictureLayer::MarkdownEmbed(PainterPictureMarkdownEmbedLayer {
                     base: PainterPictureLayerBase {
                         id: id.clone(),
@@ -1606,8 +1616,8 @@ impl LayerList {
                     effects: Self::filter_active_effects(&n.effects),
                     fills,
                     markdown: n.markdown.clone(),
-                    width: n.size.width,
-                    height: n.size.height,
+                    width: bounds.width,
+                    height: bounds.height,
                 });
                 out.push(LayerEntry {
                     id: id.clone(),

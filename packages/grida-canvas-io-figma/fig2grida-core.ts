@@ -1,31 +1,28 @@
 /**
  * @fileoverview fig2grida — browser-safe programmatic API
  *
- * `fig2grida` accepts any of the following inputs and produces a `.grida`
- * archive (Uint8Array):
+ * Three tiers of API:
  *
- * - **`.fig` bytes** — Figma's native binary format (Kiwi / ZIP).
- * - **REST archive ZIP** — A ZIP containing `document.json` (and optional
- *   `images/<hash>.*`) as produced by `.tools/figma_archive.py`.
- * - **REST JSON object** — The parsed result of `GET /v1/files/:key`.
- *
- * `restJsonToGridaDocument` is a lower-level helper that returns the in-memory
- * `Document` + assets without packing into a `.grida` ZIP.
+ * - **In-memory** (`figBytesToGridaDocument`, `restJsonToGridaDocument`) —
+ *   returns a `Document` + assets for clients that need the JS object directly
+ *   (e.g. refig headless renderer, embed viewer).
+ * - **Archive** (`fig2grida`) — wraps the in-memory API and packs the result
+ *   into a `.grida` ZIP archive for clients that need bytes (CLI, file saving).
+ * - **Primitives** (`iofigma.kiwi.*`, `iofigma.restful.*`) — for clients that
+ *   need per-node insertion (clipboard paste, playground import).
  *
  * Pure functions: no fs, no Node.js APIs.
  *
  * @example
  * ```ts
- * import { fig2grida } from "@grida/io-figma/fig2grida-core";
+ * import { fig2grida, figBytesToGridaDocument, restJsonToGridaDocument } from "@grida/io-figma/fig2grida-core";
  *
- * // From .fig bytes
- * const result = fig2grida(figBytes);
+ * // Archive (returns .grida ZIP bytes)
+ * const archive = fig2grida(figBytes);
  *
- * // From REST archive ZIP
- * const result = fig2grida(restArchiveZipBytes);
- *
- * // From parsed REST JSON
- * const result = fig2grida(parsedJson);
+ * // In-memory (returns Document + assets)
+ * const { document, assets } = figBytesToGridaDocument(figBytes);
+ * const { document, assets } = restJsonToGridaDocument(parsedJson);
  * ```
  */
 import { unzipSync, strFromU8 } from "fflate";
@@ -240,6 +237,33 @@ function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
   };
 }
 
+/**
+ * Pack a {@link GridaDocumentResult} into a `.grida` archive.
+ * Bridges the in-memory API to the archive API.
+ */
+function packGridaDocumentResult(result: GridaDocumentResult): Fig2GridaResult {
+  const archiveBytes = io.archive.pack(
+    result.document,
+    result.assets,
+    undefined,
+    undefined,
+    { level: 0, snapshot: false, skip_sort: true }
+  );
+
+  // Count non-scene nodes to match the original fig2grida nodeCount semantics.
+  let nodeCount = 0;
+  for (const node of Object.values(result.document.nodes)) {
+    if ((node as { type?: string }).type !== "scene") nodeCount++;
+  }
+
+  return {
+    bytes: archiveBytes,
+    pageNames: result.pageNames,
+    nodeCount,
+    imageCount: Object.keys(result.assets).length,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // fig2grida — unified entry point
 // ---------------------------------------------------------------------------
@@ -393,38 +417,8 @@ function fig2gridaFromFigBytes(
   input: Uint8Array,
   options?: Fig2GridaOptions
 ): Fig2GridaResult {
-  const figFile = iofigma.kiwi.parseFile(input);
-  const extractedImages = iofigma.kiwi.extractImages(figFile.zip_files);
-
-  let pages = [...figFile.pages].sort((a, b) =>
-    a.sortkey.localeCompare(b.sortkey)
-  );
-
-  if (options?.pages && options.pages.length > 0) {
-    pages = options.pages
-      .filter((i) => i >= 0 && i < pages.length)
-      .map((i) => pages[i]);
-  }
-
-  const pageResults: FigPageResult[] = [];
-  for (const page of pages) {
-    const placeholderForMissing =
-      options?.placeholder_for_missing_images !== false;
-    const result = iofigma.kiwi.convertPageToScene(page, {
-      resolve_image_src: (ref: string) =>
-        extractedImages.has(ref) ? `res://images/${ref}` : null,
-      gradient_id_generator: makeIdGenerator("grad"),
-      prefer_path_for_geometry: true,
-      placeholder_for_missing_images: placeholderForMissing,
-      preserve_figma_ids: options?.preserve_figma_ids,
-      prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
-    });
-    pageResults.push({ name: page.name, result });
-  }
-
-  return packMergedDocument(
-    mergeFigPages(pageResults, (ref) => extractedImages.get(ref))
-  );
+  const result = figBytesToGridaDocument(input, options);
+  return packGridaDocumentResult(result);
 }
 
 // ---------------------------------------------------------------------------
@@ -569,39 +563,59 @@ function fig2gridaFromRestJson(
   preserveFigmaIds?: boolean,
   preferFixedTextSizing?: boolean
 ): Fig2GridaResult {
-  return packMergedDocument(
-    restJsonToMergedDocument(
-      json,
-      images,
-      placeholderForMissing,
-      preserveFigmaIds,
-      preferFixedTextSizing
-    )
-  );
+  const result = restJsonToGridaDocument(json, {
+    images,
+    placeholder_for_missing_images: placeholderForMissing,
+    preserve_figma_ids: preserveFigmaIds,
+    prefer_fixed_text_sizing: preferFixedTextSizing,
+  });
+  return packGridaDocumentResult(result);
 }
 
 // ---------------------------------------------------------------------------
 // restJsonToGridaDocument — returns in-memory Document (no .grida packing)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Shared in-memory result type
+// ---------------------------------------------------------------------------
+
+export interface GridaDocumentResult {
+  document: grida.program.document.Document;
+  /** Raw image bytes keyed by hash (for `canvas.addImageWithId` / `editor.loadImages`) */
+  assets: Record<string, Uint8Array>;
+  /** Image ref hashes referenced by converted paints */
+  imageRefsUsed: string[];
+  /** Page names included in the output */
+  pageNames: string[];
+}
+
+// ---------------------------------------------------------------------------
+// restJsonToGridaDocument
+// ---------------------------------------------------------------------------
+
 export interface RestJsonToGridaOptions extends Pick<
   iofigma.restful.factory.FactoryContext,
-  "prefer_fixed_text_sizing"
+  | "prefer_fixed_text_sizing"
+  | "preserve_figma_ids"
+  | "placeholder_for_missing_images"
 > {
   /**
    * Image hashes from Figma `images` metadata to raw bytes. When provided,
    * resolves `IMAGE` paint refs to `res://images/<hash>`.
    */
   images?: Record<string, Uint8Array>;
+
+  /**
+   * When provided, scope conversion to a single node subtree. The node is
+   * looked up by walking all pages; the resulting document contains only
+   * that node and its descendants.
+   */
+  rootNodeId?: string;
 }
 
-export interface RestJsonToGridaResult {
-  document: grida.program.document.Document;
-  /** Raw image bytes keyed by hash (for `editor.loadImages`) */
-  assets: Record<string, Uint8Array>;
-  /** Image ref hashes referenced by converted paints */
-  imageRefsUsed: string[];
-}
+/** @deprecated Use {@link GridaDocumentResult} instead. */
+export type RestJsonToGridaResult = GridaDocumentResult;
 
 /**
  * Convert a Figma REST API file JSON (`document.children` = CANVAS pages)
@@ -613,14 +627,75 @@ export interface RestJsonToGridaResult {
 export function restJsonToGridaDocument(
   json: unknown,
   options?: RestJsonToGridaOptions
-): RestJsonToGridaResult {
+): GridaDocumentResult {
   _idCounter = 0;
   const images = options?.images;
+  const preserveFigmaIds = options?.preserve_figma_ids;
+  const placeholderForMissing =
+    options?.placeholder_for_missing_images !== false;
+  const rootNodeId = options?.rootNodeId;
+
+  // Single-node scoping: find the target node and convert just its subtree.
+  if (rootNodeId != null && rootNodeId !== "") {
+    const node = findNodeInRestJson(json, rootNodeId);
+    if (!node) {
+      throw new Error(
+        `restJsonToGridaDocument: node with id "${rootNodeId}" not found in document`
+      );
+    }
+
+    let rootIdUsed = false;
+    let counter = 0;
+    const context: iofigma.restful.factory.FactoryContext = {
+      gradient_id_generator: () => `grad-${++counter}`,
+      prefer_path_for_geometry: true,
+      placeholder_for_missing_images: placeholderForMissing,
+      preserve_figma_ids: preserveFigmaIds,
+      prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
+      node_id_generator: preserveFigmaIds
+        ? undefined
+        : () => {
+            if (!rootIdUsed) {
+              rootIdUsed = true;
+              return rootNodeId;
+            }
+            return `rest-import-${++counter}`;
+          },
+      ...(images &&
+        Object.keys(images).length > 0 && {
+          resolve_image_src: (ref: string) =>
+            ref in images ? `res://images/${ref}` : null,
+        }),
+    };
+
+    const { document: packed, imageRefsUsed } =
+      iofigma.restful.factory.document(node as any, {}, context);
+    const fullDoc =
+      grida.program.nodes.factory.packed_scene_document_to_full_document(
+        packed
+      );
+
+    const assets: Record<string, Uint8Array> = {};
+    if (images) {
+      for (const ref of imageRefsUsed) {
+        if (ref in images) assets[ref] = images[ref];
+      }
+    }
+
+    return {
+      document: fullDoc,
+      assets,
+      imageRefsUsed,
+      pageNames: ["Page 1"],
+    };
+  }
+
+  // Full-document conversion (all pages).
   const merged = restJsonToMergedDocument(
     json,
     images,
-    true,
-    undefined,
+    placeholderForMissing,
+    preserveFigmaIds,
     options?.prefer_fixed_text_sizing
   );
 
@@ -628,5 +703,193 @@ export function restJsonToGridaDocument(
     document: merged.document,
     assets: merged.imageRecord,
     imageRefsUsed: Array.from(merged.imageRefsUsed),
+    pageNames: merged.pageNames,
   };
+}
+
+// ---------------------------------------------------------------------------
+// figBytesToGridaDocument
+// ---------------------------------------------------------------------------
+
+export interface FigBytesToGridaOptions extends Pick<
+  iofigma.restful.factory.FactoryContext,
+  | "prefer_fixed_text_sizing"
+  | "preserve_figma_ids"
+  | "placeholder_for_missing_images"
+> {
+  /** Convert specific page indices only. */
+  pages?: number[];
+
+  /**
+   * When provided, scope conversion to the page containing this node.
+   * Only that page is converted.
+   */
+  rootNodeId?: string;
+
+  /**
+   * When provided (and `rootNodeId` is not), load only this page by index.
+   */
+  pageIndex?: number;
+}
+
+/** @deprecated Use {@link GridaDocumentResult} instead. */
+export type FigBytesToGridaResult = GridaDocumentResult;
+
+/**
+ * Convert `.fig` bytes (Figma's native binary format) into a single Grida
+ * `Document` with one scene per page.
+ *
+ * Returns the in-memory `Document` + assets without packing into a `.grida`
+ * ZIP archive.
+ */
+export function figBytesToGridaDocument(
+  input: Uint8Array,
+  options?: FigBytesToGridaOptions
+): GridaDocumentResult {
+  _idCounter = 0;
+  const figFile = iofigma.kiwi.parseFile(input);
+  return figFileToGridaDocument(figFile, options);
+}
+
+/**
+ * Convert a pre-parsed `FigFileDocument` into a Grida `Document`.
+ *
+ * Useful when you already hold the parse result (e.g. from
+ * `parseFileFromStream`) and want to avoid re-parsing.
+ */
+export function figFileToGridaDocument(
+  figFile: ReturnType<typeof iofigma.kiwi.parseFile>,
+  options?: FigBytesToGridaOptions
+): GridaDocumentResult {
+  const extractedImages = iofigma.kiwi.extractImages(figFile.zip_files);
+  const placeholderForMissing =
+    options?.placeholder_for_missing_images !== false;
+
+  const rootNodeId = options?.rootNodeId;
+  const pageIndex = options?.pageIndex;
+
+  let pages = [...figFile.pages].sort((a, b) =>
+    a.sortkey.localeCompare(b.sortkey)
+  );
+
+  // Scope to specific pages by index if requested (and not scoped by node).
+  if (rootNodeId == null || rootNodeId === "") {
+    if (pageIndex != null && pageIndex >= 0 && pageIndex < pages.length) {
+      pages = [pages[pageIndex]];
+    } else if (options?.pages && options.pages.length > 0) {
+      pages = options.pages
+        .filter((i) => i >= 0 && i < pages.length)
+        .map((i) => pages[i]);
+    }
+  } else {
+    // rootNodeId: find the page containing that node
+    const pageWithNode = findPageContainingNode(figFile, rootNodeId);
+    if (!pageWithNode) {
+      throw new Error(
+        `figBytesToGridaDocument: node with id "${rootNodeId}" not found in .fig`
+      );
+    }
+    pages = [pageWithNode as (typeof pages)[0]];
+  }
+
+  const pageResults: FigPageResult[] = [];
+  for (const page of pages) {
+    const result = iofigma.kiwi.convertPageToScene(page, {
+      resolve_image_src: (ref: string) =>
+        extractedImages.has(ref) ? `res://images/${ref}` : null,
+      gradient_id_generator: makeIdGenerator("grad"),
+      prefer_path_for_geometry: true,
+      placeholder_for_missing_images: placeholderForMissing,
+      preserve_figma_ids: options?.preserve_figma_ids,
+      prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
+    });
+    pageResults.push({ name: page.name, result });
+  }
+
+  const merged = mergeFigPages(pageResults, (ref) => extractedImages.get(ref));
+
+  return {
+    document: merged.document,
+    assets: merged.imageRecord,
+    imageRefsUsed: Array.from(merged.imageRefsUsed),
+    pageNames: merged.pageNames,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Node-finding helpers (used by rootNodeId scoping)
+// ---------------------------------------------------------------------------
+
+type RestNode = Record<string, unknown> & {
+  id?: string;
+  children?: RestNode[];
+};
+
+/**
+ * Find a node by id in a Figma REST JSON document tree (walks all pages and
+ * descendants).
+ */
+export function findNodeInRestJson(
+  json: unknown,
+  nodeId: string
+): RestNode | undefined {
+  const doc = json as { document?: { children?: RestNode[] } };
+  const pages = doc?.document?.children;
+  if (!pages?.length) return undefined;
+
+  function walk(nodes: RestNode[]): RestNode | undefined {
+    for (const node of nodes) {
+      if (String(node.id) === nodeId) return node;
+      const children = node.children as RestNode[] | undefined;
+      if (children?.length) {
+        const found = walk(children);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  }
+
+  for (const page of pages) {
+    const pageChildren = page.children as RestNode[] | undefined;
+    if (pageChildren?.length) {
+      const found = walk(pageChildren);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Find the FigPage that contains a node by id.
+ */
+export function findPageContainingNode(
+  figFile: { pages?: Array<{ rootNodes?: unknown[] }> },
+  nodeId: string
+):
+  | { name: string; canvas: unknown; rootNodes: unknown[]; sortkey: string }
+  | undefined {
+  const pages = figFile.pages;
+  if (!pages?.length) return undefined;
+
+  function walk(nodes: RestNode[]): boolean {
+    for (const node of nodes) {
+      if (String(node.id) === nodeId) return true;
+      const children = node.children as RestNode[] | undefined;
+      if (children?.length && walk(children)) return true;
+    }
+    return false;
+  }
+
+  for (const page of pages) {
+    const rootNodes = (page.rootNodes ?? []) as RestNode[];
+    if (rootNodes.length && walk(rootNodes)) {
+      return page as {
+        name: string;
+        canvas: unknown;
+        rootNodes: unknown[];
+        sortkey: string;
+      };
+    }
+  }
+  return undefined;
 }

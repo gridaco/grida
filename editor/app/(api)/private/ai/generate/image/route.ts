@@ -7,7 +7,7 @@ import {
 } from "ai";
 import { createLibraryClient, service_role } from "@/lib/supabase/server";
 import { v4 } from "uuid";
-import { ai_credit_limit } from "../../ratelimit";
+import { ai_budget_deduct } from "../../ratelimit";
 import mime from "mime-types";
 import imageSize from "image-size";
 import ai from "@/lib/ai";
@@ -66,7 +66,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "login required" }, { status: 401 });
     }
 
-    const rate = await ai_credit_limit(model.card.avg_credit);
+    // TODO: track real cost from generation response instead of avg_cost_usd.
+    // Per-image models: compute exact cost from request params (quality × size
+    // for tiered, flat rate for others). Per-token models: use
+    // generation.usage.outputTokens × pricing.output / 1M after the call.
+    const rate = await ai_budget_deduct(ai.toMills(model.card.avg_cost_usd));
     if (!rate) {
       return NextResponse.json(
         { message: "something went wrong" },

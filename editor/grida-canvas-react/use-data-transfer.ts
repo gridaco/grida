@@ -122,6 +122,27 @@ export function useInsertFile() {
     [instance]
   );
 
+  const insertMarkdown = useCallback(
+    async (
+      name: string,
+      markdown: string,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const [x, y] = instance.camera.clientPointToCanvasPoint(
+        position ? [position.clientX, position.clientY] : [0, 0]
+      );
+
+      const node = instance.commands.createMarkdownNode(markdown);
+      node.$.name = name;
+      node.$.layout_inset_left = x;
+      node.$.layout_inset_top = y;
+    },
+    [instance]
+  );
+
   const insertFromFile = useCallback(
     (
       type: io.clipboard.ValidFileType,
@@ -149,12 +170,24 @@ export function useInsertFile() {
         const name = file.name.split(".")[0];
         insertImage(name, file, position);
         return;
+      } else if (type === "text/markdown") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const markdown = (e.target?.result as string) ?? "";
+          // Strip a trailing .md / .markdown / .mdown / .mkd extension
+          // case-insensitively. Falls back to the full filename.
+          const name =
+            file.name.replace(/\.(md|markdown|mdown|mkd)$/i, "") || file.name;
+          insertMarkdown(name, markdown, position);
+        };
+        reader.readAsText(file);
+        return;
       }
     },
-    [insertImage, insertSVG]
+    [insertImage, insertSVG, insertMarkdown]
   );
 
-  return { insertImage, insertSVG, insertFromFile };
+  return { insertImage, insertSVG, insertMarkdown, insertFromFile };
 }
 
 /**
@@ -392,7 +425,14 @@ export function useDataTransferEventTarget() {
         }
       }
 
-      // 3. Handle SVG text, images, or plain text
+      // 3. Prefer markdown over plain text (clipboards may expose both)
+      const markdownItem = items.find((i) => i.type === "text/markdown");
+      if (markdownItem && markdownItem.type === "text/markdown") {
+        insertFromFile(markdownItem.type, markdownItem.file, position);
+        return true;
+      }
+
+      // 4. Handle SVG text, images, or plain text
       for (const item of items) {
         try {
           switch (item.type) {
@@ -407,7 +447,8 @@ export function useDataTransferEventTarget() {
             case "image/gif":
             case "image/jpeg":
             case "image/png":
-            case "image/svg+xml": {
+            case "image/svg+xml":
+            case "image/webp": {
               insertFromFile(item.type, item.file, position);
               return true;
             }

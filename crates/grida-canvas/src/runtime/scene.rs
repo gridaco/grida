@@ -4,6 +4,7 @@ use crate::painter::Painter;
 use crate::runtime::camera::CameraChangeKind;
 use crate::runtime::changes::{ChangeFlags, ChangeSet};
 use crate::runtime::counter::FrameCounter;
+use crate::runtime::frame_strategy::FrameRenderStrategy;
 use crate::runtime::render_policy::RenderPolicy;
 use crate::sk;
 use crate::{
@@ -388,6 +389,24 @@ impl Renderer {
             paint.set_color(color);
             canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &paint);
         }
+    }
+
+    /// Build a [`FrameRenderStrategy`] from the current renderer state.
+    ///
+    /// This is the **only** place that translates renderer state into
+    /// per-frame policy decisions. All call sites in the rendering pipeline
+    /// read the returned struct instead of re-deriving conditions from raw
+    /// config fields, zoom level, or backend type.
+    fn frame_strategy(&self, stable: bool, camera_change: CameraChangeKind) -> FrameRenderStrategy {
+        FrameRenderStrategy::compute(
+            self.camera.get_zoom(),
+            self.backend.is_gpu(),
+            stable,
+            camera_change,
+            &self.config,
+            self.pan_image_cache.is_some(),
+            self.zoom_image_cache.is_some(),
+        )
     }
 
     #[inline]
@@ -1061,6 +1080,8 @@ impl Renderer {
             PlanState::Deferred(d) => (d.stable, d.camera_change),
         };
 
+        let strategy = self.frame_strategy(stable, camera_change);
+
         let start = Instant::now();
         let scene_ptr = self.scene.as_ref().unwrap() as *const Scene;
         let surface = unsafe { &mut *self.backend.get_surface() };
@@ -1081,7 +1102,7 @@ impl Renderer {
         //
         // When the offset exceeds the viewport (no overlap with cached frame),
         // we fall through to a full redraw which captures a new snapshot.
-        if !stable && !camera_change.zoom_changed() && self.backend.is_gpu() {
+        if strategy.use_image_caches && !camera_change.zoom_changed() {
             if let Some(ref cache) = self.pan_image_cache {
                 let width = surface.width() as f32;
                 let height = surface.height() as f32;
@@ -1163,9 +1184,10 @@ impl Renderer {
         //   avoids a catastrophic full draw on large scenes)
         //
         // Exclude pan-only frames — pan has its own faster blit cache.
-        let use_zoom_cache = self.zoom_image_cache.is_some()
+        let use_zoom_cache = strategy.use_image_caches
+            && self.zoom_image_cache.is_some()
             && (camera_change.zoom_changed() || camera_change == CameraChangeKind::None);
-        if !stable && self.backend.is_gpu() && use_zoom_cache {
+        if use_zoom_cache {
             let zoom_cache_hit = self.try_zoom_cache_blit(
                 surface,
                 scene,
@@ -1235,10 +1257,10 @@ impl Renderer {
             ),
         };
 
-        self.render_frame(plan)
+        self.render_frame(plan, strategy)
     }
 
-    fn render_frame(&mut self, plan: FramePlan) -> FrameFlushStats {
+    fn render_frame(&mut self, plan: FramePlan, strategy: FrameRenderStrategy) -> FrameFlushStats {
         let start = Instant::now();
 
         let scene_ptr = self.scene.as_ref().unwrap() as *const Scene;
@@ -1253,7 +1275,7 @@ impl Renderer {
         // offset, blit the cached GPU texture instead of re-drawing all
         // nodes. This replaces O(N) draw commands + GPU rasterization with
         // a single texture blit.
-        if plan.camera_change == CameraChangeKind::PanOnly && self.backend.is_gpu() {
+        if strategy.use_image_caches && plan.camera_change == CameraChangeKind::PanOnly {
             if let Some(ref cache) = self.pan_image_cache {
                 let vm = self.camera.view_matrix();
                 let dx = vm.matrix[0][2] - cache.origin_tx;
@@ -1311,9 +1333,10 @@ impl Renderer {
         //   have a valid cache — blitting it avoids catastrophic full draws)
         //
         // Excludes pan-only frames — those use the dedicated pan cache.
-        let zoom_cache_usable = self.zoom_image_cache.is_some()
+        let zoom_cache_usable = strategy.use_image_caches
+            && self.zoom_image_cache.is_some()
             && (plan.camera_change.zoom_changed() || plan.camera_change == CameraChangeKind::None);
-        if !plan.stable && self.backend.is_gpu() && zoom_cache_usable {
+        if zoom_cache_usable {
             let zoom_cache_hit = self.try_zoom_cache_blit(surface, scene, &plan);
             if let Some((mid_flush_duration, frame_duration)) = zoom_cache_hit {
                 return FrameFlushStats {
@@ -1390,7 +1413,10 @@ impl Renderer {
         // Single snapshot: both caches need the same image on non-zoom
         // frames. image_snapshot() is copy-on-write but still allocates
         // a handle — sharing avoids the second allocation.
-        if self.backend.is_gpu() {
+        //
+        // Skipped when strategy says caches won't be consulted (e.g.
+        // eager-render at high zoom) — saves GPU readback overhead.
+        if strategy.capture_image_caches {
             let vm = self.camera.view_matrix();
             let image = surface.image_snapshot();
 
@@ -1414,15 +1440,11 @@ impl Renderer {
 
         // Compositor update (GPU-only).
         let compositor_start = Instant::now();
-        if self.backend.is_gpu() {
-            let effective = self.config.layer_compositing
-                && self.config.render_policy.allows_layer_compositing();
-            if effective {
-                if plan.stable {
-                    self.update_compositor_stable(surface, &plan.compositor_indices);
-                } else {
-                    self.update_compositor(surface, &plan.compositor_indices);
-                }
+        if strategy.use_compositor {
+            if plan.stable {
+                self.update_compositor_stable(surface, &plan.compositor_indices);
+            } else {
+                self.update_compositor(surface, &plan.compositor_indices);
             }
         }
         let compositor_duration = compositor_start.elapsed();
@@ -1671,20 +1693,9 @@ impl Renderer {
         let bounds = self.camera.rect();
         let zoom = self.camera.get_zoom();
 
-        let can_defer = !stable
-            && self.backend.is_gpu()
-            && (
-                // Pan cache will likely hit (pan-only or overlay-only with pan cache)
-                (camera_change == CameraChangeKind::PanOnly && self.pan_image_cache.is_some())
-                // Zoom cache will likely hit (zoom change or no-change with zoom cache)
-                || (camera_change.zoom_changed() && self.zoom_image_cache.is_some())
-                // No-change: prefer zoom cache (covers mid-zoom zero-delta frames),
-                // fall back to pan cache (covers overlay-only marquee/hover frames)
-                || (camera_change == CameraChangeKind::None
-                    && (self.zoom_image_cache.is_some() || self.pan_image_cache.is_some()))
-            );
+        let strategy = self.frame_strategy(stable, camera_change);
 
-        if can_defer {
+        if strategy.can_defer_plan {
             self.plan = Some(PlanState::Deferred(DeferredPlan {
                 bounds,
                 zoom,
@@ -1752,7 +1763,8 @@ impl Renderer {
         if self.scene.is_none() {
             return None;
         }
-        Some(self.render_frame(plan))
+        let strategy = self.frame_strategy(plan.stable, plan.camera_change);
+        Some(self.render_frame(plan, strategy))
     }
 
     /// Restore cached content for overlay-only frames.
@@ -2556,6 +2568,78 @@ impl Renderer {
         let frame = self.frame(self.camera.rect(), 1.0, true, CameraChangeKind::None);
         let background = self.scene.as_ref().and_then(|s| s.background_color);
         let _ = self.draw_nocache(canvas, &frame, background, width, height);
+    }
+
+    /// Export a single node as a raster image.
+    ///
+    /// Renders only the target node's subtree onto a temporary raster surface,
+    /// using the live `SceneCache` for geometry, effects, and paragraph/path
+    /// data. Cost is O(subtree) — independent of total scene size.
+    ///
+    /// The caller computes `export_rect` (world-space bounds from the geometry
+    /// cache) and `export_size` (pixel dimensions after applying constraints).
+    ///
+    /// Returns `None` if the scene is not loaded or the surface cannot be created.
+    pub fn export_node_image(
+        &self,
+        node_id: &NodeId,
+        export_rect: math2::Rectangle,
+        export_size: (f32, f32),
+    ) -> Option<Image> {
+        let scene = self.scene.as_ref()?;
+        let (out_w, out_h) = export_size;
+        let pixel_w = out_w as i32;
+        let pixel_h = out_h as i32;
+        if pixel_w <= 0 || pixel_h <= 0 {
+            return None;
+        }
+
+        // Create a temporary raster surface at the target resolution.
+        let mut surface = surfaces::raster_n32_premul((pixel_w, pixel_h))?;
+        let canvas = surface.canvas();
+
+        // Set up camera: same logic as export_as_image.rs
+        let mut camera = Camera2D::new_from_bounds(export_rect);
+        let scale = if export_rect.width > 0.0 {
+            out_w / export_rect.width
+        } else {
+            1.0
+        };
+        camera.set_size(Size {
+            width: out_w,
+            height: out_h,
+        });
+        camera.set_zoom(scale);
+
+        // Clear and apply camera transform
+        canvas.clear(Color::TRANSPARENT);
+        canvas.save();
+        canvas.concat(&sk::sk_matrix(camera.view_matrix().matrix));
+
+        // Build a LayerList for only the target subtree (O(subtree), not O(N)).
+        //
+        // opacity = 1.0: ancestor opacity is intentionally NOT propagated.
+        // The node is exported in isolation — only its own opacity applies.
+        // This matches standard design tool export behavior (Figma, Sketch):
+        // a rectangle at opacity 1.0 inside a group at opacity 0.5 exports
+        // at full opacity, not 50%.
+        let cache = &self.scene_cache;
+        let subtree_layers =
+            crate::painter::layer::LayerList::from_node(node_id, &scene.graph, cache, 1.0);
+
+        // Draw using the existing warm scene cache (pictures, paragraphs, paths).
+        let painter = Painter::new_with_scene_cache(
+            canvas,
+            &self.fonts,
+            &self.images,
+            cache,
+            RenderPolicy::default(),
+        );
+        painter.draw_layer_list(&subtree_layers);
+
+        canvas.restore();
+
+        Some(surface.image_snapshot())
     }
 
     /// Capture (or re-capture) layer images for promoted nodes.

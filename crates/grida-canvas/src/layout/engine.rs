@@ -60,7 +60,8 @@
 
 use crate::layout::cache::LayoutResult;
 use crate::layout::tree::{
-    AttributedTextMeasureContext, LayoutTree, TextMeasureContext, TextMeasureProvider,
+    AttributedTextMeasureContext, LayoutTree, MarkdownMeasureContext, TextMeasureContext,
+    TextMeasureProvider,
 };
 use crate::layout::ComputedLayout;
 use crate::node::scene_graph::SceneGraph;
@@ -219,7 +220,7 @@ impl LayoutEngine {
             Node::Rectangle(n) => (n.size.width, n.size.height),
             Node::Ellipse(n) => (n.size.width, n.size.height),
             Node::Image(n) => (n.size.width, n.size.height),
-            Node::MarkdownEmbed(n) => (n.size.width, n.size.height),
+            Node::MarkdownEmbed(n) => (n.width.unwrap_or(0.0), n.height.unwrap_or(0.0)),
             Node::HTMLEmbed(n) => (n.size.width, n.size.height),
             Node::Line(n) => (n.size.width, n.size.height),
             Node::Polygon(n) => {
@@ -423,6 +424,20 @@ impl LayoutEngine {
                 self.tree
                     .new_attributed_text_leaf(*node_id, style, ctx)
                     .ok()
+            }
+            Node::MarkdownEmbed(n) => {
+                // Only use measurement context when auto-sizing is needed
+                if n.width.is_none() || n.height.is_none() {
+                    let styled_html = crate::htmlcss::markdown_to_styled_html(&n.markdown);
+                    let ctx = MarkdownMeasureContext {
+                        styled_html,
+                        width: n.width,
+                        height: n.height,
+                    };
+                    self.tree.new_markdown_leaf(*node_id, style, ctx).ok()
+                } else {
+                    self.tree.new_leaf(*node_id, style).ok()
+                }
             }
             _ => self.tree.new_leaf(*node_id, style).ok(),
         }
@@ -2045,10 +2060,8 @@ mod tests {
 
         let mut md = nf.create_markdown_embed_node();
         md.markdown = "# Hello\nWorld".to_string();
-        md.size = Size {
-            width: 800.0,
-            height: 600.0,
-        };
+        md.width = Some(800.0);
+        md.height = Some(600.0);
         md.transform = AffineTransform::new(50.0, 100.0, 0.0);
         let md_id = graph.append_child(Node::MarkdownEmbed(md), Parent::Root);
 

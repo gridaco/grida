@@ -7,6 +7,21 @@ import { encodeModifiers, encodeButton } from "@grida/canvas-wasm";
 import type { Action } from "@/grida-canvas/action";
 
 /**
+ * Minimal camera interface for viewport zoom shortcuts.
+ * Keeps CanvasSurfaceUI decoupled from the full Editor instance.
+ */
+export interface SurfaceCamera {
+  fit(
+    selector: "<scene>" | "selection",
+    options?: {
+      margin?: number | [number, number, number, number];
+      animate?: boolean;
+    }
+  ): void;
+  scale(factor: number, origin: "center"): void;
+}
+
+/**
  * Handles DOM events and routes them directly to the WASM surface,
  * bypassing the React reducer/overlay pipeline entirely.
  *
@@ -20,6 +35,7 @@ export class CanvasSurfaceUI {
   private scene: Scene;
   private target: HTMLElement;
   private dispatch: (action: Action) => void;
+  private camera: SurfaceCamera;
   private abortController: AbortController;
   private dpr: number;
 
@@ -27,11 +43,13 @@ export class CanvasSurfaceUI {
     scene: Scene,
     target: HTMLElement,
     dispatch: (action: Action) => void,
+    camera: SurfaceCamera,
     dpr: number = 1
   ) {
     this.scene = scene;
     this.target = target;
     this.dispatch = dispatch;
+    this.camera = camera;
     this.dpr = dpr;
     this.abortController = new AbortController();
     this.bind();
@@ -86,6 +104,7 @@ export class CanvasSurfaceUI {
     if (cmdOrCtrl && e.key === "a") {
       e.preventDefault();
       this.scene.selectAll();
+      this.scene.redraw();
       this.syncSelection();
       return;
     }
@@ -93,8 +112,62 @@ export class CanvasSurfaceUI {
     // Escape → deselect all
     if (e.key === "Escape") {
       this.scene.deselectAll();
+      this.scene.redraw();
       this.syncSelection();
       return;
+    }
+
+    // Node navigation shortcuts (matches grida-dev native bindings)
+    // Tab → next sibling, Shift+Tab → previous sibling
+    if (e.key === "Tab") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        this.scene.selectPreviousSibling();
+      } else {
+        this.scene.selectNextSibling();
+      }
+      this.scene.redraw();
+      this.syncSelection();
+      return;
+    }
+
+    // Enter → select children, Shift+Enter → select parent
+    // TODO: On a leaf text node, Select(Children) falls through to
+    // try_enter_text_edit in Rust. The embed viewer has no text editing
+    // support (no IME forwarding, no text edit UI). Needs a Rust-side
+    // config flag to disable text edit entry from the command path.
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        this.scene.selectParent();
+      } else {
+        this.scene.selectChildren();
+      }
+      this.scene.redraw();
+      this.syncSelection();
+      return;
+    }
+
+    // Viewport zoom shortcuts (Shift + digit)
+    // Camera is JS-driven (state.transform → WASM syncTransform), so these
+    // must go through the JS camera API, not WASM _command().
+    // TODO: Camera should be owned by WASM with a callback to sync back to JS
+    // (following the same pattern as selection sync), eliminating this split.
+    if (e.shiftKey) {
+      switch (e.code) {
+        case "Digit1":
+          e.preventDefault();
+          this.camera.fit("<scene>", { margin: 64 });
+          return;
+        case "Digit2":
+          e.preventDefault();
+          this.camera.fit("selection", { margin: 64 });
+          return;
+        case "Digit0":
+          e.preventDefault();
+          this.camera.scale(1, "center");
+          return;
+      }
     }
   };
 

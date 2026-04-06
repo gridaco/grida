@@ -22,9 +22,13 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { Scene } from "../modules/canvas";
+import { io } from "../../../../packages/grida-canvas-io/index";
 
 /** Directory for local (gitignored) benchmark fixtures. */
 const LOCAL_FIXTURES_DIR = resolve(__dirname, "fixtures/local");
+
+/** Shared test fixtures (committed). */
+const SHARED_FIXTURES_DIR = resolve(__dirname, "../../../../fixtures/test-grida");
 
 let module: any;
 
@@ -147,5 +151,51 @@ describe("bench: load_scene (WASM-on-Node)", () => {
           "Place .grida files there to benchmark real scenes."
       );
     });
+  }
+});
+
+describe("cross-boundary: TS encode → WASM decode", () => {
+  /**
+   * Shared .grida fixtures: TS decodes → re-encodes → WASM loads → switchScene.
+   * Validates that the TS FlatBuffers encoder produces bytes the Rust decoder accepts.
+   */
+  const sharedFixtures = existsSync(SHARED_FIXTURES_DIR)
+    ? readdirSync(SHARED_FIXTURES_DIR)
+        .filter((f) => f.endsWith(".grida"))
+        .sort()
+    : [];
+
+  function createFile(name: string, bytes: Uint8Array): File {
+    const blob = new Blob([bytes as BlobPart], {
+      type: "application/octet-stream",
+    });
+    return new File([blob], name, { type: "application/octet-stream" });
+  }
+
+  for (const fixture of sharedFixtures) {
+    it(`${fixture}: TS re-encode → WASM loadSceneGrida → switchScene`, async () => {
+      const raw = new Uint8Array(
+        readFileSync(resolve(SHARED_FIXTURES_DIR, fixture))
+      );
+      const file = createFile(fixture, raw);
+      const loaded = await io.load(file);
+      if (loaded.document.scenes_ref.length === 0) return;
+
+      const sceneId = loaded.document.scenes_ref[0]!;
+      const reEncoded = io.GRID.encode(loaded.document);
+
+      const scene = createRasterScene();
+      scene.loadSceneGrida(reEncoded);
+
+      const wasmIds = scene.loadedSceneIds();
+      expect(wasmIds).toContain(sceneId);
+      expect(() => scene.switchScene(sceneId)).not.toThrow();
+
+      scene.dispose();
+    });
+  }
+
+  if (sharedFixtures.length === 0) {
+    it("no shared .grida fixtures found (skipped)", () => {});
   }
 });
