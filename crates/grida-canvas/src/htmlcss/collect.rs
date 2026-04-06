@@ -33,6 +33,12 @@ pub fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, String> 
 
     let _ = thread_state::initialize(ThreadState::LAYOUT);
 
+    // Enable CSS Grid support in Stylo's servo mode (one-time).
+    // Without this, `display: grid` is not parsed (gated behind a pref).
+    use std::sync::Once;
+    static GRID_PREF: Once = Once::new();
+    GRID_PREF.call_once(|| style_config::set_bool("layout.grid.enabled", true));
+
     let dom =
         DemoDom::parse_from_bytes(html.as_bytes()).map_err(|e| format!("HTML parse error: {e}"))?;
     let mut driver = CascadeDriver::new(&dom);
@@ -572,6 +578,21 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     el.flex_grow = style.clone_flex_grow().0;
     el.flex_shrink = style.clone_flex_shrink().0;
 
+    // Grid container
+    if el.display == types::Display::Grid {
+        el.grid_template_columns = extract_grid_template(&style.clone_grid_template_columns());
+        el.grid_template_rows = extract_grid_template(&style.clone_grid_template_rows());
+        el.grid_auto_columns = extract_implicit_tracks(&style.clone_grid_auto_columns());
+        el.grid_auto_rows = extract_implicit_tracks(&style.clone_grid_auto_rows());
+        el.grid_auto_flow = extract_grid_auto_flow(&style.clone_grid_auto_flow());
+    }
+
+    // Grid child
+    el.grid_column_start = extract_grid_placement(&style.clone_grid_column_start());
+    el.grid_column_end = extract_grid_placement(&style.clone_grid_column_end());
+    el.grid_row_start = extract_grid_placement(&style.clone_grid_row_start());
+    el.grid_row_end = extract_grid_placement(&style.clone_grid_row_end());
+
     el
 }
 
@@ -922,6 +943,132 @@ fn auto_distribute_stops(raw: &mut [(Option<f32>, CGColor)]) {
         }
         i = end + 1;
     }
+}
+
+// ─── Grid property extraction ───────────────────────────────────────
+
+/// Convert a Stylo `GridTemplateComponent` (computed) to our IR.
+///
+/// Stylo's computed grid-template uses `CSSInteger` (= `i32`) for repeat counts.
+fn extract_grid_template(
+    tpl: &style::values::generics::grid::GenericGridTemplateComponent<
+        style::values::computed::LengthPercentage,
+        i32,
+    >,
+) -> Vec<types::GridTemplateEntry> {
+    use style::values::generics::grid::GenericGridTemplateComponent;
+    match tpl {
+        GenericGridTemplateComponent::None | GenericGridTemplateComponent::Masonry => Vec::new(),
+        GenericGridTemplateComponent::Subgrid(_) => Vec::new(), // subgrid not supported
+        GenericGridTemplateComponent::TrackList(track_list) => {
+            use style::values::generics::grid::GenericTrackListValue;
+            let mut entries = Vec::new();
+            for value in track_list.values.iter() {
+                match value {
+                    GenericTrackListValue::TrackSize(ts) => {
+                        entries.push(types::GridTemplateEntry::Track(stylo_track_size(ts)));
+                    }
+                    GenericTrackListValue::TrackRepeat(rep) => {
+                        use style::values::generics::grid::RepeatCount;
+                        let count = match rep.count {
+                            RepeatCount::Number(n) => types::RepeatCount::Count(n as u16),
+                            RepeatCount::AutoFill => types::RepeatCount::AutoFill,
+                            RepeatCount::AutoFit => types::RepeatCount::AutoFit,
+                        };
+                        let tracks: Vec<types::TrackSize> = rep
+                            .track_sizes
+                            .iter()
+                            .map(|ts| stylo_track_size(ts))
+                            .collect();
+                        entries.push(types::GridTemplateEntry::Repeat(count, tracks));
+                    }
+                }
+            }
+            entries
+        }
+    }
+}
+
+/// Convert Stylo `ImplicitGridTracks` (grid-auto-columns/rows) to our IR.
+fn extract_implicit_tracks(
+    tracks: &style::values::generics::grid::GenericImplicitGridTracks<
+        style::values::generics::grid::GenericTrackSize<style::values::computed::LengthPercentage>,
+    >,
+) -> Vec<types::TrackSize> {
+    tracks.0.iter().map(|ts| stylo_track_size(ts)).collect()
+}
+
+/// Convert a single Stylo `TrackSize` to our IR.
+fn stylo_track_size(
+    ts: &style::values::generics::grid::GenericTrackSize<style::values::computed::LengthPercentage>,
+) -> types::TrackSize {
+    use style::values::generics::grid::GenericTrackSize;
+    match ts {
+        GenericTrackSize::Breadth(b) => types::TrackSize::Single(stylo_track_breadth(b)),
+        GenericTrackSize::Minmax(min_b, max_b) => {
+            types::TrackSize::MinMax(stylo_track_breadth(min_b), stylo_track_breadth(max_b))
+        }
+        GenericTrackSize::FitContent(b) => types::TrackSize::FitContent(stylo_track_breadth(b)),
+    }
+}
+
+/// Convert a single Stylo `TrackBreadth` to our IR.
+fn stylo_track_breadth(
+    b: &style::values::generics::grid::GenericTrackBreadth<
+        style::values::computed::LengthPercentage,
+    >,
+) -> types::TrackBreadth {
+    use style::values::generics::grid::GenericTrackBreadth;
+    match b {
+        GenericTrackBreadth::Breadth(lp) => {
+            if let Some(len) = lp.to_length() {
+                types::TrackBreadth::Px(len.px())
+            } else if let Some(pct) = lp.to_percentage() {
+                types::TrackBreadth::Percent(pct.0)
+            } else {
+                types::TrackBreadth::Auto
+            }
+        }
+        GenericTrackBreadth::Fr(fr) => types::TrackBreadth::Fr(*fr),
+        GenericTrackBreadth::Auto => types::TrackBreadth::Auto,
+        GenericTrackBreadth::MinContent => types::TrackBreadth::MinContent,
+        GenericTrackBreadth::MaxContent => types::TrackBreadth::MaxContent,
+    }
+}
+
+/// Convert Stylo `GridAutoFlow` to our IR.
+fn extract_grid_auto_flow(
+    flow: &style::values::specified::position::GridAutoFlow,
+) -> types::GridAutoFlow {
+    let is_column = flow.contains(style::values::specified::position::GridAutoFlow::COLUMN);
+    let is_dense = flow.contains(style::values::specified::position::GridAutoFlow::DENSE);
+    match (is_column, is_dense) {
+        (false, false) => types::GridAutoFlow::Row,
+        (false, true) => types::GridAutoFlow::RowDense,
+        (true, false) => types::GridAutoFlow::Column,
+        (true, true) => types::GridAutoFlow::ColumnDense,
+    }
+}
+
+/// Convert a Stylo `GridLine` (grid-column-start/end, grid-row-start/end) to our IR.
+///
+/// Stylo's computed grid-line uses `CSSInteger` (= `i32`) for line numbers.
+fn extract_grid_placement(
+    line: &style::values::generics::grid::GenericGridLine<i32>,
+) -> types::GridPlacement {
+    if line.is_auto() {
+        return types::GridPlacement::Auto;
+    }
+    if line.is_span {
+        let n = line.line_num.unsigned_abs() as u16;
+        return types::GridPlacement::Span(if n == 0 { 1 } else { n });
+    }
+    let num = line.line_num;
+    if num != 0 {
+        return types::GridPlacement::Line(num as i16);
+    }
+    // line_num == 0 with ident only → treat as auto (named lines not supported)
+    types::GridPlacement::Auto
 }
 
 fn extract_font(style: &ComputedValues) -> FontProps {

@@ -91,6 +91,19 @@ pub struct StyledElement {
     pub flex_basis: CssLength,
     pub align_self: Option<AlignItems>,
 
+    // ── Grid container (rare non-inherited) ──
+    pub grid_template_columns: Vec<GridTemplateEntry>,
+    pub grid_template_rows: Vec<GridTemplateEntry>,
+    pub grid_auto_columns: Vec<TrackSize>,
+    pub grid_auto_rows: Vec<TrackSize>,
+    pub grid_auto_flow: GridAutoFlow,
+
+    // ── Grid child (rare non-inherited) ──
+    pub grid_column_start: GridPlacement,
+    pub grid_column_end: GridPlacement,
+    pub grid_row_start: GridPlacement,
+    pub grid_row_end: GridPlacement,
+
     // ── Children ──
     pub children: Vec<StyledNode>,
 }
@@ -443,6 +456,15 @@ impl Default for StyledElement {
             flex_shrink: 1.0,
             flex_basis: CssLength::Auto,
             align_self: None,
+            grid_template_columns: Vec::new(),
+            grid_template_rows: Vec::new(),
+            grid_auto_columns: Vec::new(),
+            grid_auto_rows: Vec::new(),
+            grid_auto_flow: GridAutoFlow::default(),
+            grid_column_start: GridPlacement::default(),
+            grid_column_end: GridPlacement::default(),
+            grid_row_start: GridPlacement::default(),
+            grid_row_end: GridPlacement::default(),
             children: Vec::new(),
         }
     }

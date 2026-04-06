@@ -146,6 +146,160 @@ mod tests {
         assert!(pic.is_ok());
     }
 
+    /// Verify grid properties are collected and layout produces columns.
+    #[test]
+    fn test_grid_layout_columns() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+
+        let html = r#"<div style="display:grid;grid-template-columns:100px 100px 100px">
+            <div>A</div><div>B</div><div>C</div>
+        </div>"#;
+
+        // Check collection — walk down html>body>div to find the grid container
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        fn find_grid(el: &style::StyledElement) -> Option<&style::StyledElement> {
+            if el.display == types::Display::Grid {
+                return Some(el);
+            }
+            for child in &el.children {
+                if let style::StyledNode::Element(child_el) = child {
+                    if let Some(found) = find_grid(child_el) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+        let grid_el = find_grid(&root).expect("Should find a grid container in the tree");
+        assert!(
+            !grid_el.grid_template_columns.is_empty(),
+            "grid-template-columns should be collected",
+        );
+
+        // Check layout produces side-by-side boxes
+        let layout_root = layout::compute_layout(&root, 400.0, &fonts);
+        fn find_grid_layout<'a>(
+            lb: &'a layout::LayoutBox<'a>,
+        ) -> Option<&'a layout::LayoutBox<'a>> {
+            if lb.style.display == types::Display::Grid {
+                return Some(lb);
+            }
+            for child in &lb.children {
+                if let layout::LayoutNode::Box(child_box) = child {
+                    if let Some(found) = find_grid_layout(child_box) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+        let grid_layout = find_grid_layout(&layout_root).expect("Should find grid in layout");
+
+        // A, B, C should be in 3 columns at x=0, x=100, x=200
+        let xs: Vec<f32> = grid_layout
+            .children
+            .iter()
+            .filter_map(|c| match c {
+                layout::LayoutNode::Box(b) => Some(b.x),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(xs.len(), 3, "Expected 3 box children, got {}", xs.len());
+        assert!(
+            xs[1] > xs[0],
+            "Column 2 should be right of column 1 (x[1]={} > x[0]={})",
+            xs[1],
+            xs[0]
+        );
+        assert!(
+            xs[2] > xs[1],
+            "Column 3 should be right of column 2 (x[2]={} > x[1]={})",
+            xs[2],
+            xs[1]
+        );
+    }
+
+    #[test]
+    fn test_render_grid_basic() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="display:grid;grid-template-columns:100px 100px 100px;gap:8px">
+                <div>A</div><div>B</div><div>C</div>
+            </div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
+    #[test]
+    fn test_render_grid_fr() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="display:grid;grid-template-columns:1fr 2fr 1fr">
+                <div>1fr</div><div>2fr</div><div>1fr</div>
+            </div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
+    #[test]
+    fn test_render_grid_repeat() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+                <div>1</div><div>2</div><div>3</div><div>4</div>
+            </div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
+    #[test]
+    fn test_render_grid_span() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
+                <div style="grid-column:span 2">wide</div>
+                <div>1x1</div>
+                <div>1x1</div>
+            </div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
+    #[test]
+    fn test_render_grid_auto_flow_dense() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<div style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-flow:dense;gap:4px">
+                <div style="grid-column:span 2">wide</div>
+                <div>a</div>
+                <div>b</div>
+                <div style="grid-column:span 2">wide</div>
+            </div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok());
+    }
+
     #[test]
     fn test_render_opacity() {
         let _guard = TEST_LOCK.lock().unwrap();

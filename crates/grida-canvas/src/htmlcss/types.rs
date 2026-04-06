@@ -212,3 +212,75 @@ pub enum ListStylePosition {
     Outside,
     Inside,
 }
+
+// ─── CSS Grid types ─────────────────────────────────────────────────
+
+/// CSS `grid-auto-flow` property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GridAutoFlow {
+    #[default]
+    Row,
+    Column,
+    RowDense,
+    ColumnDense,
+}
+
+/// A single track sizing value — used in grid-template-columns/rows.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TrackBreadth {
+    /// Fixed length in px.
+    Px(f32),
+    /// Percentage (0.0–1.0).
+    Percent(f32),
+    /// Flexible `fr` unit.
+    Fr(f32),
+    /// `auto`
+    Auto,
+    /// `min-content`
+    MinContent,
+    /// `max-content`
+    MaxContent,
+}
+
+/// A track sizing function — `<track-size>` in CSS.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TrackSize {
+    /// A single breadth value (used for both min and max).
+    Single(TrackBreadth),
+    /// `minmax(min, max)`.
+    MinMax(TrackBreadth, TrackBreadth),
+    /// `fit-content(limit)`.
+    FitContent(TrackBreadth),
+}
+
+/// A `repeat()` count in grid-template-columns/rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RepeatCount {
+    /// `repeat(<integer>, ...)`
+    Count(u16),
+    /// `repeat(auto-fill, ...)`
+    AutoFill,
+    /// `repeat(auto-fit, ...)`
+    AutoFit,
+}
+
+/// A single component in a grid-template-columns/rows definition.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GridTemplateEntry {
+    /// A single track sizing function.
+    Track(TrackSize),
+    /// `repeat(count, tracks...)`.
+    Repeat(RepeatCount, Vec<TrackSize>),
+}
+
+/// CSS grid-column/row placement for an item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GridPlacement {
+    /// `auto`
+    #[default]
+    Auto,
+    /// A line number (1-based, can be negative).
+    Line(i16),
+    /// `span <n>`.
+    Span(u16),
+}
