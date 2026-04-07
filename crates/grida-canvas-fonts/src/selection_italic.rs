@@ -146,7 +146,7 @@ impl Default for ItalicSelectionParser {
 ///
 /// These types maintain compatibility with existing code while using the new
 /// Selection terminology internally.
-
+///
 /// Legacy alias for FontStyle to maintain compatibility.
 pub type ItalicKind = FontStyle;
 

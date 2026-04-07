@@ -372,7 +372,7 @@ fn parse_stat(face: &Face<'_>, data: &[u8]) -> StatData {
 
     let mut axes: Vec<StatAxis> = Vec::new();
     let mut tags: Vec<String> = Vec::new();
-    for record in table.axes.clone() {
+    for record in table.axes {
         let tag = tag_to_string(&record.tag.to_bytes());
         let name = lookup_name(face, record.name_id).unwrap_or_default();
         tags.push(tag.clone());

@@ -523,7 +523,7 @@ impl FontSelectionParser {
     pub fn has_italic_named_instances(&self, face: &FaceRecord) -> bool {
         // For Scenario 3-1, we MUST have italic-named instances in the name table
         // This is strict - we only check the main name table entries
-        self.extract_italic_instances(face).len() > 0
+        !self.extract_italic_instances(face).is_empty()
     }
 
     /// Extracts italic instances from the name table for Scenario 3-1 fonts.

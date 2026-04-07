@@ -172,7 +172,7 @@ impl UIFontParser {
         let mut face_records = Vec::new();
 
         for font_face in &font_faces {
-            let parser = Parser::new(&font_face.data)
+            let parser = Parser::new(font_face.data)
                 .map_err(|e| format!("Failed to parse font '{}': {}", font_face.face_id, e))?;
 
             let face_record = parser
@@ -325,12 +325,10 @@ impl UIFontParser {
             } else {
                 format!("{} {} Italic", weight_name, stretch_name)
             }
+        } else if weight_key == 400 && stretch_key == 5 {
+            "Regular".to_string()
         } else {
-            if weight_key == 400 && stretch_key == 5 {
-                "Regular".to_string()
-            } else {
-                format!("{} {}", weight_name, stretch_name)
-            }
+            format!("{} {}", weight_name, stretch_name)
         }
     }
 
@@ -418,7 +416,7 @@ impl UIFontParser {
         for parser in parsers {
             if parser.is_variable() {
                 let fvar_data = parser.fvar();
-                for (_, axis) in &fvar_data.axes {
+                for axis in fvar_data.axes.values() {
                     let entry = axis_map.entry(axis.tag.clone()).or_insert((
                         axis.name.clone(),
                         axis.min,
@@ -454,7 +452,7 @@ impl UIFontParser {
     ) -> Result<Vec<UIFontFaceInfo>, String> {
         let mut face_info = Vec::new();
 
-        for (_index, (parser, face_record)) in parsers.iter().zip(face_records.iter()).enumerate() {
+        for (parser, face_record) in parsers.iter().zip(face_records.iter()) {
             let features = parser.ffeatures();
 
             // Get face-specific axes and instances if this is a variable font
@@ -1219,7 +1217,7 @@ impl UIFontParser {
                             vf_recipe
                                 .axis_values
                                 .get("ital")
-                                .map_or(true, |&val| val == 0.0)
+                                .is_none_or(|&val| val == 0.0)
                         } else {
                             // No variable recipe - check the is_italic field
                             !recipe.is_italic
@@ -1260,16 +1258,16 @@ impl UIFontParser {
         // Calculate distances and create matches
         let mut matches: Vec<ItalicMatch> = roman_capabilities
             .into_iter()
-            .filter_map(|recipe| {
+            .map(|recipe| {
                 // Calculate distance between current style and this roman recipe
                 let (distance, axis_diffs) =
                     self.calculate_style_distance(&current_style, &recipe, &family_result.axes);
 
-                Some(ItalicMatch {
+                ItalicMatch {
                     recipe,
                     distance,
                     axis_diffs,
-                })
+                }
             })
             .collect();
 

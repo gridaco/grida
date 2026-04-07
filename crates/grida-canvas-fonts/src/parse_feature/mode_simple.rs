@@ -12,6 +12,12 @@ pub struct BuiltinFeatureParser {
     // No state needed for this parser
 }
 
+impl Default for BuiltinFeatureParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BuiltinFeatureParser {
     pub fn new() -> Self {
         Self {}
@@ -70,7 +76,7 @@ fn parse_gsub_features_builtin(
 
     // Iterate through features directly (similar to our chained approach)
     for i in 0..gsub_table.features.len() {
-        if let Some(feature) = gsub_table.features.get(i as u16) {
+        if let Some(feature) = gsub_table.features.get(i) {
             let tag = feature.tag.to_string();
             let name = utils::get_feature_name_from_name_table(
                 face,
@@ -172,7 +178,7 @@ fn parse_gpos_features_builtin(
 
     // Iterate through features directly
     for i in 0..gpos_table.features.len() {
-        if let Some(feature) = gpos_table.features.get(i as u16) {
+        if let Some(feature) = gpos_table.features.get(i) {
             let tag = feature.tag.to_string();
             let name = utils::get_feature_name_from_name_table(
                 face,

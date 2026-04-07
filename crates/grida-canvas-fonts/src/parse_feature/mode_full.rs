@@ -15,6 +15,12 @@ pub struct ComprehensiveFeatureParser {
     // No state needed for this parser
 }
 
+impl Default for ComprehensiveFeatureParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ComprehensiveFeatureParser {
     pub fn new() -> Self {
         Self {}
@@ -128,8 +134,8 @@ fn parse_gpos_features_with_context(
     // Check if any scripts have languages
     let mut has_language_systems = false;
     for i in 0..gpos_table.scripts.len() {
-        if let Some(script) = gpos_table.scripts.get(i as u16) {
-            if script.languages.len() > 0 {
+        if let Some(script) = gpos_table.scripts.get(i) {
+            if !script.languages.is_empty() {
                 has_language_systems = true;
                 break;
             }
@@ -139,7 +145,7 @@ fn parse_gpos_features_with_context(
     if has_language_systems {
         // Parse features through script/language hierarchy (like GSUB)
         for i in 0..gpos_table.scripts.len() {
-            if let Some(script) = gpos_table.scripts.get(i as u16) {
+            if let Some(script) = gpos_table.scripts.get(i) {
                 let script_tag = script.tag.to_string();
 
                 for language in script.languages {
@@ -184,7 +190,7 @@ fn parse_gpos_features_with_context(
     } else {
         // No language systems - parse features directly (like Inter font)
         for i in 0..gpos_table.features.len() {
-            if let Some(feature) = gpos_table.features.get(i as u16) {
+            if let Some(feature) = gpos_table.features.get(i) {
                 let tag = feature.tag.to_string();
                 let lookup_indices: Vec<u16> = feature.lookup_indices.into_iter().collect();
 
@@ -334,7 +340,7 @@ fn analyze_gpos_feature(
 /// This function processes OpenType coverage tables to extract glyph IDs
 /// and convert them to Unicode characters for feature analysis.
 fn extract_coverage_glyphs(coverage: &Coverage, glyph_set: &mut HashSet<String>) {
-    let glyph_ids = coverage_glyphs(coverage.clone());
+    let glyph_ids = coverage_glyphs(*coverage);
     for glyph_id in glyph_ids {
         glyph_set.insert(glyph_id.to_string());
     }
