@@ -12,13 +12,13 @@
 
 ---
 
-This is **bold** text. This is *italic* text. This is ***bold and italic*** text.
+This is **bold** text. This is _italic_ text. This is **_bold and italic_** text.
 
 This is ~~strikethrough~~ text. This is `inline code` within a paragraph.
 
 This is a [link to example](https://example.com) in text.
 
-Combining **bold with `code`** and *italic with ~~strikethrough~~*.
+Combining **bold with `code`** and _italic with ~~strikethrough~~_.
 
 ---
 
@@ -66,20 +66,20 @@ fn main() {
 
 > This is a longer blockquote that spans multiple sentences. It should wrap correctly within the available width and display the left border.
 
-> **Bold text** inside a blockquote with *italic* too.
+> **Bold text** inside a blockquote with _italic_ too.
 
 ---
 
 | Name  | Age | City     |
-|-------|-----|----------|
+| ----- | --- | -------- |
 | Alice | 30  | New York |
 | Bob   | 25  | London   |
 | Carol | 28  | Tokyo    |
 
-| Left   | Center | Right |
-|:-------|:------:|------:|
-| L1     | C1     | R1    |
-| L2     | C2     | R2    |
+| Left | Center | Right |
+| :--- | :----: | ----: |
+| L1   |   C1   |    R1 |
+| L2   |   C2   |    R2 |
 
 ---
 

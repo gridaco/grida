@@ -32,6 +32,7 @@ This directory contains **meaningful** `.grida` files used for **testing**.
   - `bench-blur-children-in-container` — 1 000 individually-blurred children in a plain container
   - `bench-opacity-fill-only` — 5 000 rects with fill only, opacity 0.1–0.9 (save_layer bottleneck)
   - `bench-opacity-fill-stroke` — 5 000 rects with fill + 2px stroke, opacity 0.1–0.9 (per-paint alpha target)
+
 ### Support expectations (important)
 
 - The Grida schema evolves rapidly; **tests should prefer replacing fixtures** with current ones rather than migrating old fixtures forever.
