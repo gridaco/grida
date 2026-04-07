@@ -46,7 +46,7 @@ impl SceneBuilder {
         let root_id = self.graph.append_child(Node::Container(root), Parent::Root);
 
         for child in &scene.svg.children {
-            self.append_child(child, Parent::NodeId(root_id.clone()))?;
+            self.append_child(child, Parent::NodeId(root_id))?;
         }
 
         Ok(self.graph)
@@ -72,7 +72,7 @@ impl SceneBuilder {
         node.transform = Some(group.transform.into());
 
         let group_id = self.graph.append_child(Node::Group(node), parent);
-        let parent = Parent::NodeId(group_id.clone());
+        let parent = Parent::NodeId(group_id);
 
         for child in &group.children {
             self.append_child(child, parent.clone())?;

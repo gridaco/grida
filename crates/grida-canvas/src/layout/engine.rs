@@ -79,6 +79,12 @@ pub struct LayoutEngine {
     result: LayoutResult,
 }
 
+impl Default for LayoutEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LayoutEngine {
     pub fn new() -> Self {
         Self {
@@ -403,8 +409,8 @@ impl LayoutEngine {
                     scene_node_id: *node_id,
                     text: n.text.clone(),
                     text_style: n.text_style.clone(),
-                    text_align: n.text_align.clone(),
-                    max_lines: n.max_lines.clone(),
+                    text_align: n.text_align,
+                    max_lines: n.max_lines,
                     ellipsis: n.ellipsis.clone(),
                     width: n.width,
                     height: n.height,
@@ -415,8 +421,8 @@ impl LayoutEngine {
                 let ctx = AttributedTextMeasureContext {
                     scene_node_id: *node_id,
                     attributed_string: n.attributed_string.clone(),
-                    text_align: n.text_align.clone(),
-                    max_lines: n.max_lines.clone(),
+                    text_align: n.text_align,
+                    max_lines: n.max_lines,
                     ellipsis: n.ellipsis.clone(),
                     width: n.width,
                     height: n.height,

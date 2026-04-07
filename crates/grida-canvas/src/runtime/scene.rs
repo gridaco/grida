@@ -82,7 +82,7 @@ pub type RequestRedrawCallback = Arc<dyn Fn()>;
 /// Passed through the entire init chain: TS → C ABI → Application → Renderer.
 /// Fields here are applied once during construction. Most can also be changed
 /// at runtime via individual setters on `Renderer` / `ApplicationApi`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct RendererOptions {
     /// When true, embedded fonts (Geist, GeistMono) will be registered.
     pub use_embedded_fonts: bool,
@@ -100,25 +100,10 @@ pub struct RendererOptions {
     pub config: super::config::RuntimeRendererConfig,
 }
 
-impl Default for RendererOptions {
-    fn default() -> Self {
-        Self {
-            use_embedded_fonts: false,
-            use_system_fonts: false,
-            config: Default::default(),
-        }
-    }
-}
-
 pub fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
     fn walk(id: &NodeId, graph: &SceneGraph, set: &mut HashSet<String>) {
-        if let Ok(node) = graph.get_node(id) {
-            match node {
-                Node::TextSpan(n) => {
-                    set.insert(n.text_style.font_family.clone());
-                }
-                _ => {}
-            }
+        if let Ok(Node::TextSpan(n)) = graph.get_node(id) {
+            set.insert(n.text_style.font_family.clone());
         }
         if let Some(children) = graph.get_children(id) {
             for child in children {
@@ -129,7 +114,7 @@ pub fn collect_scene_font_families(scene: &Scene) -> HashSet<String> {
 
     let mut set = HashSet::new();
     for id in scene.graph.roots() {
-        walk(&id, &scene.graph, &mut set);
+        walk(id, &scene.graph, &mut set);
     }
     set
 }
@@ -200,6 +185,7 @@ pub struct DrawResult {
     pub live_draw_count: usize,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum FrameFlushResult {
     OK(FrameFlushStats),
     NoPending,
@@ -779,11 +765,9 @@ impl Renderer {
                         update_commands(&mut group.content_commands, node_id, text, attributed);
                     }
                     PainterRenderCommand::RenderSurface(ref mut surface) => {
-                        if let Some(ref mut own_layer) = surface.own_layer {
-                            if let PainterPictureLayer::Text(ref mut tl) = own_layer {
-                                if tl.base.id == node_id {
-                                    update_text_layer(tl, text, attributed);
-                                }
+                        if let Some(PainterPictureLayer::Text(ref mut tl)) = surface.own_layer {
+                            if tl.base.id == node_id {
+                                update_text_layer(tl, text, attributed);
                             }
                         }
                         update_commands(&mut surface.children, node_id, text, attributed);
@@ -1383,9 +1367,9 @@ impl Renderer {
             None
         };
 
-        let mut canvas = surface.canvas();
+        let canvas = surface.canvas();
         let draw = self.draw(
-            &mut canvas,
+            canvas,
             &plan,
             scene.background_color,
             width,
@@ -1588,7 +1572,7 @@ impl Renderer {
             #[cfg(feature = "perf")]
             let _t_fonts_start = crate::sys::perf_now();
             let requested = collect_scene_font_families(scene);
-            self.fonts.set_requested_families(requested.into_iter());
+            self.fonts.set_requested_families(requested);
             #[cfg(feature = "perf")]
             let _t_fonts = crate::sys::perf_now();
 
@@ -1770,9 +1754,7 @@ impl Renderer {
     /// Unlike the legacy `flush()`, this does NOT consult `FrameCounter`
     /// — the caller (via `FrameLoop`) already decided to render.
     pub fn flush_with_plan(&mut self, plan: FramePlan) -> Option<FrameFlushStats> {
-        if self.scene.is_none() {
-            return None;
-        }
+        self.scene.as_ref()?;
         let strategy = self.frame_strategy(plan.stable, plan.camera_change);
         Some(self.render_frame(plan, strategy))
     }
@@ -2104,15 +2086,13 @@ impl Renderer {
             return Some(pic.clone());
         }
 
-        let Some(bounds) = self.scene_cache.geometry.get_render_bounds(&id) else {
-            return None;
-        };
+        let bounds = self.scene_cache.geometry.get_render_bounds(id)?;
         let pic = self.with_recording_with_policy(&bounds, policy, draw);
 
         if let Some(pic) = &pic {
             self.scene_cache
                 .picture
-                .set_node_picture_variant(id.clone(), variant_key, pic.clone());
+                .set_node_picture_variant(*id, variant_key, pic.clone());
         }
         pic
     }
@@ -2199,9 +2179,7 @@ impl Renderer {
                 .layers
                 .get(idx)
                 .and_then(|entry| self.scene_cache.geometry.get_render_bounds(&entry.id))
-                .map_or(true, |rb| {
-                    rb.width >= min_world_size || rb.height >= min_world_size
-                })
+                .is_none_or(|rb| rb.width >= min_world_size || rb.height >= min_world_size)
         };
 
         let indices = if all_visible {
@@ -2609,10 +2587,10 @@ impl Renderer {
 
         let width = surface.width() as f32;
         let height = surface.height() as f32;
-        let mut canvas = surface.canvas();
+        let canvas = surface.canvas();
         // Export/snapshot: not an interactive frame, so no camera change.
         let frame = self.frame(self.camera.rect(), 1.0, true, CameraChangeKind::None);
-        let _ = self.draw_nocache(&mut canvas, &frame, None, width, height);
+        let _ = self.draw_nocache(canvas, &frame, None, width, height);
 
         surface.image_snapshot()
     }

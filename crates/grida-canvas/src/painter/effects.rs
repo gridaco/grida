@@ -36,13 +36,12 @@ fn build_transform_matrix(width: f32, height: f32, rotation_degrees: f32) -> [[f
     // = T(cx, cy) * R(-angle) * T(-cx, -cy)
     //
     // So we build: T(cx, cy) * R(-angle) * T(-cx, -cy)
-    let matrix = [
+
+    [
         [cos_a, sin_a, cx - cx * cos_a - cy * sin_a],
         [-sin_a, cos_a, cy + cx * sin_a - cy * cos_a],
         [0.0, 0.0, 1.0],
-    ];
-
-    matrix
+    ]
 }
 
 // ============================================================================

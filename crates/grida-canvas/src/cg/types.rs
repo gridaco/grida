@@ -46,9 +46,9 @@ impl Default for CGPoint {
     }
 }
 
-impl Into<skia_safe::Point> for CGPoint {
-    fn into(self) -> skia_safe::Point {
-        skia_safe::Point::new(self.x, self.y)
+impl From<CGPoint> for skia_safe::Point {
+    fn from(val: CGPoint) -> Self {
+        skia_safe::Point::new(val.x, val.y)
     }
 }
 
@@ -84,13 +84,14 @@ impl Default for LayerMaskType {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Default)]
 pub enum ImageMaskType {
     /// Alpha channel masking.
     ///
     /// Uses the alpha channel of the mask to determine the opacity of the masked content.
     /// Areas with higher alpha values in the mask will show the content more opaquely.
     #[serde(rename = "alpha")]
+    #[default]
     Alpha,
     /// Luminance-based masking.
     ///
@@ -98,12 +99,6 @@ pub enum ImageMaskType {
     /// Brighter areas in the mask will show the content more opaquely, while darker areas will be more transparent.
     #[serde(rename = "luminance")]
     Luminance,
-}
-
-impl Default for ImageMaskType {
-    fn default() -> Self {
-        ImageMaskType::Alpha
-    }
 }
 
 /// Boolean path operation.
@@ -208,9 +203,11 @@ pub type ContainerClipFlag = bool;
 /// - `Blend(BlendMode::Normal)` ≈ `isolation: isolate` + normal compositing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(untagged)]
+#[derive(Default)]
 pub enum LayerBlendMode {
     /// Non-isolated group/layer; children/paints blend directly with the backdrop.
     #[serde(rename = "pass-through")]
+    #[default]
     PassThrough,
     /// Isolated layer composited with a specific blend mode.
     Blend(BlendMode),
@@ -223,18 +220,12 @@ impl From<BlendMode> for LayerBlendMode {
     }
 }
 
-impl Into<BlendMode> for LayerBlendMode {
-    fn into(self) -> BlendMode {
-        match self {
+impl From<LayerBlendMode> for BlendMode {
+    fn from(val: LayerBlendMode) -> Self {
+        match val {
             LayerBlendMode::PassThrough => BlendMode::Normal,
             LayerBlendMode::Blend(mode) => mode,
         }
-    }
-}
-
-impl Default for LayerBlendMode {
-    fn default() -> Self {
-        LayerBlendMode::PassThrough
     }
 }
 
@@ -244,10 +235,11 @@ impl Default for LayerBlendMode {
 /// - Skia: https://skia.org/docs/user/api/SkBlendMode_Reference/
 /// - Flutter: https://api.flutter.dev/flutter/dart-ui/BlendMode.html
 /// - Figma: https://help.figma.com/hc/en-us/articles/360039956994
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum BlendMode {
     // Skia: kSrcOver, CSS: normal
     #[serde(rename = "normal")]
+    #[default]
     Normal,
     // Skia: kMultiply
     #[serde(rename = "multiply")]
@@ -296,24 +288,13 @@ pub enum BlendMode {
     Luminosity,
 }
 
-impl Default for BlendMode {
-    fn default() -> Self {
-        BlendMode::Normal
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum FillRule {
     #[serde(rename = "nonzero")]
+    #[default]
     NonZero,
     #[serde(rename = "evenodd")]
     EvenOdd,
-}
-
-impl Default for FillRule {
-    fn default() -> Self {
-        FillRule::NonZero
-    }
 }
 
 /// Defines the shape of stroke endpoints (line caps).
@@ -392,10 +373,11 @@ impl Default for FillRule {
 ///
 /// - [`StrokeAlign`] - Controls stroke positioning relative to path
 /// - [`StrokeDashArray`] - Defines dash patterns for strokes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum StrokeCap {
     /// Flat edge perpendicular to the stroke direction (default)
     #[serde(rename = "butt", alias = "none")]
+    #[default]
     Butt,
     /// Semicircular cap extending beyond the endpoint
     #[serde(rename = "round")]
@@ -403,12 +385,6 @@ pub enum StrokeCap {
     /// Rectangular cap extending beyond the endpoint
     #[serde(rename = "square")]
     Square,
-}
-
-impl Default for StrokeCap {
-    fn default() -> Self {
-        StrokeCap::Butt
-    }
 }
 
 /// Built-in marker presets placed at stroke endpoints or vector vertices.
@@ -565,10 +541,11 @@ impl StrokeMarkerPreset {
 ///
 /// - [`StrokeCap`] - Controls stroke endpoints for open paths
 /// - [`StrokeAlign`] - Controls stroke positioning relative to path
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum StrokeJoin {
     /// Sharp pointed corner with miter limit fallback (default)
     #[serde(rename = "miter")]
+    #[default]
     Miter,
     /// Circular arc connecting path segments
     #[serde(rename = "round")]
@@ -576,12 +553,6 @@ pub enum StrokeJoin {
     /// Straight diagonal line connecting outer edges
     #[serde(rename = "bevel")]
     Bevel,
-}
-
-impl Default for StrokeJoin {
-    fn default() -> Self {
-        StrokeJoin::Miter
-    }
 }
 
 /// Miter limit for stroke joins.
@@ -669,9 +640,10 @@ impl From<f32> for StrokeMiterLimit {
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/painting/BorderSide/strokeAlign.html)  
 /// - [Figma](https://www.figma.com/plugin-docs/api/properties/nodes-strokealign/)
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum StrokeAlign {
     #[serde(rename = "inside")]
+    #[default]
     Inside,
     #[serde(rename = "center")]
     Center,
@@ -679,26 +651,15 @@ pub enum StrokeAlign {
     Outside,
 }
 
-impl Default for StrokeAlign {
-    fn default() -> Self {
-        StrokeAlign::Inside
-    }
-}
-
 /// Represents a single axis in 2D space.
 /// - [Flutter](https://api.flutter.dev/flutter/painting/Axis.html)
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Default)]
 pub enum Axis {
     #[serde(rename = "horizontal")]
+    #[default]
     Horizontal,
     #[serde(rename = "vertical")]
     Vertical,
-}
-
-impl Default for Axis {
-    fn default() -> Self {
-        Axis::Horizontal
-    }
 }
 
 /// Alignment of items along the main axis.
@@ -707,9 +668,10 @@ impl Default for Axis {
 /// - [MDN justify-content](https://developer.mozilla.org/en-US/docs/Web/CSS/justify-content)
 /// - [MDN Main Axis](https://developer.mozilla.org/en-US/docs/Glossary/Main_Axis)
 /// - [Flutter MainAxisAlignment](https://api.flutter.dev/flutter/rendering/MainAxisAlignment.html)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
 pub enum MainAxisAlignment {
     #[serde(rename = "start")]
+    #[default]
     Start,
     #[serde(rename = "end")]
     End,
@@ -725,21 +687,16 @@ pub enum MainAxisAlignment {
     Stretch,
 }
 
-impl Default for MainAxisAlignment {
-    fn default() -> Self {
-        MainAxisAlignment::Start
-    }
-}
-
 /// Alignment of items along the cross axis.
 ///
 /// See also:
 /// - [MDN align-items](https://developer.mozilla.org/en-US/docs/Web/CSS/align-items)
 /// - [MDN Cross Axis](https://developer.mozilla.org/en-US/docs/Glossary/Cross_Axis)
 /// - [Flutter CrossAxisAlignment](https://api.flutter.dev/flutter/rendering/CrossAxisAlignment.html)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
 pub enum CrossAxisAlignment {
     #[serde(rename = "start")]
+    #[default]
     Start,
     #[serde(rename = "end")]
     End,
@@ -747,12 +704,6 @@ pub enum CrossAxisAlignment {
     Center,
     #[serde(rename = "stretch")]
     Stretch,
-}
-
-impl Default for CrossAxisAlignment {
-    fn default() -> Self {
-        CrossAxisAlignment::Start
-    }
 }
 
 /// Represents **inset distances from the edges** of a rectangular box.
@@ -857,28 +808,18 @@ impl Default for EdgeInsets {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Default)]
 pub enum LayoutMode {
+    #[default]
     Normal,
     Flex,
 }
 
-impl Default for LayoutMode {
-    fn default() -> Self {
-        LayoutMode::Normal
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Default)]
 pub enum LayoutPositioning {
+    #[default]
     Auto,
     Absolute,
-}
-
-impl Default for LayoutPositioning {
-    fn default() -> Self {
-        LayoutPositioning::Auto
-    }
 }
 
 /// Constraint positioning specifier for constraints layout.
@@ -896,9 +837,10 @@ impl Default for LayoutPositioning {
 /// - [`End`](LayoutConstraintAnchor::End): Anchored to the bottom edge
 /// - [`Center`](LayoutConstraintAnchor::Center): Centered vertically
 /// - [`Stretch`](LayoutConstraintAnchor::Stretch): Anchored to both top and bottom edges
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Default)]
 pub enum LayoutConstraintAnchor {
     /// Start anchor (left for horizontal, top for vertical)
+    #[default]
     Start,
     /// End anchor (right for horizontal, bottom for vertical)
     End,
@@ -906,12 +848,6 @@ pub enum LayoutConstraintAnchor {
     Center,
     /// Stretch anchor (anchored to both edges of the axis)
     Stretch,
-}
-
-impl Default for LayoutConstraintAnchor {
-    fn default() -> Self {
-        LayoutConstraintAnchor::Start
-    }
 }
 
 /// Defines how a node is constrained relative to its parent container.
@@ -1022,20 +958,15 @@ impl Default for LayoutConstraints {
 /// * [Taffy FlexWrap](https://docs.rs/taffy/latest/taffy/style/enum.FlexWrap.html)
 /// * [`LayoutGap`] — spacing between items and lines
 /// * [`Axis`] — main axis direction
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Default)]
 pub enum LayoutWrap {
     /// Items wrap onto multiple lines as needed
     #[serde(rename = "wrap")]
     Wrap,
     /// All items are forced into a single line
     #[serde(rename = "nowrap")]
+    #[default]
     NoWrap,
-}
-
-impl Default for LayoutWrap {
-    fn default() -> Self {
-        LayoutWrap::NoWrap
-    }
 }
 
 /// Represents the **spacing between adjacent elements** in a flex layout container.
@@ -1200,18 +1131,18 @@ impl Radius {
     }
 }
 
-impl Into<CGPoint> for Radius {
-    fn into(self) -> CGPoint {
+impl From<Radius> for CGPoint {
+    fn from(val: Radius) -> Self {
         CGPoint {
-            x: self.rx,
-            y: self.ry,
+            x: val.rx,
+            y: val.ry,
         }
     }
 }
 
-impl Into<(f32, f32)> for Radius {
-    fn into(self) -> (f32, f32) {
-        (self.rx, self.ry)
+impl From<Radius> for (f32, f32) {
+    fn from(val: Radius) -> Self {
+        (val.rx, val.ry)
     }
 }
 
@@ -1316,9 +1247,10 @@ impl Default for CornerSmoothing {
 
 /// Text Transform (Text Case)
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-transform)
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq, Default)]
 pub enum TextTransform {
     #[serde(rename = "none")]
+    #[default]
     None,
     #[serde(rename = "uppercase")]
     Uppercase,
@@ -1328,21 +1260,16 @@ pub enum TextTransform {
     Capitalize,
 }
 
-impl Default for TextTransform {
-    fn default() -> Self {
-        TextTransform::None
-    }
-}
-
 /// Supported text decoration modes.
 ///
 /// Only `Underline` and `None` are supported in the current version.
 ///
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html)  
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration-line)
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq, Default)]
 pub enum TextDecorationLine {
     #[serde(rename = "none")]
+    #[default]
     None,
     #[serde(rename = "underline")]
     Underline,
@@ -1352,15 +1279,10 @@ pub enum TextDecorationLine {
     LineThrough,
 }
 
-impl Default for TextDecorationLine {
-    fn default() -> Self {
-        TextDecorationLine::None
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq, Default)]
 pub enum TextDecorationStyle {
     #[serde(rename = "solid")]
+    #[default]
     Solid,
     #[serde(rename = "double")]
     Double,
@@ -1370,12 +1292,6 @@ pub enum TextDecorationStyle {
     Dashed,
     #[serde(rename = "wavy")]
     Wavy,
-}
-
-impl Default for TextDecorationStyle {
-    fn default() -> Self {
-        TextDecorationStyle::Solid
-    }
 }
 
 pub trait FromWithContext<T, C> {
@@ -1472,18 +1388,16 @@ impl Default for TextDecoration {
 impl FromWithContext<TextDecorationRec, DecorationRecBuildContext> for TextDecoration {
     fn from_with_context(value: TextDecorationRec, ctx: &DecorationRecBuildContext) -> Self {
         let text_decoration_color = value.text_decoration_color.unwrap_or(ctx.color);
-        let text_decoration_style = value
-            .text_decoration_style
-            .unwrap_or(TextDecorationStyle::default());
+        let text_decoration_style = value.text_decoration_style.unwrap_or_default();
         let text_decoration_skip_ink = value.text_decoration_skip_ink.unwrap_or(true);
         let text_decoration_thickness = value.text_decoration_thickness.unwrap_or(1.0);
 
         Self {
             text_decoration_line: value.text_decoration_line,
-            text_decoration_color: text_decoration_color,
-            text_decoration_style: text_decoration_style,
-            text_decoration_skip_ink: text_decoration_skip_ink,
-            text_decoration_thickness: text_decoration_thickness,
+            text_decoration_color,
+            text_decoration_style,
+            text_decoration_skip_ink,
+            text_decoration_thickness,
         }
     }
 }
@@ -1494,9 +1408,10 @@ impl FromWithContext<TextDecorationRec, DecorationRecBuildContext> for TextDecor
 ///
 /// - [MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/text-align)  
 /// - [Flutter](https://api.flutter.dev/flutter/dart-ui/TextAlign.html)
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq, Default)]
 pub enum TextAlign {
     #[serde(rename = "left")]
+    #[default]
     Left,
     #[serde(rename = "right")]
     Right,
@@ -1504,12 +1419,6 @@ pub enum TextAlign {
     Center,
     #[serde(rename = "justify")]
     Justify,
-}
-
-impl Default for TextAlign {
-    fn default() -> Self {
-        TextAlign::Left
-    }
 }
 
 /// Supported vertical alignment values for text within its container height.
@@ -1577,7 +1486,7 @@ impl Default for TextAlign {
 ///
 /// This approach allows for flexible text positioning while maintaining compatibility
 /// with Skia's text layout engine limitations.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq, Default)]
 pub enum TextAlignVertical {
     /// Align text to the top of the container.
     ///
@@ -1585,6 +1494,7 @@ pub enum TextAlignVertical {
     /// When the container height is smaller than the text height,
     /// the bottom portion of the text will be clipped.
     #[serde(rename = "top")]
+    #[default]
     Top,
 
     /// Center text vertically within the container.
@@ -1602,12 +1512,6 @@ pub enum TextAlignVertical {
     /// the top portion of the text will be clipped.
     #[serde(rename = "bottom")]
     Bottom,
-}
-
-impl Default for TextAlignVertical {
-    fn default() -> Self {
-        TextAlignVertical::Top
-    }
 }
 
 /// Font weight value (1-1000).
@@ -1636,7 +1540,7 @@ impl FontWeight {
     /// Panics if the value is not between 1 and 1000.
     pub fn new(value: u32) -> Self {
         assert!(
-            value >= 1 && value <= 1000,
+            (1..=1000).contains(&value),
             "Font weight must be between 1 and 1000"
         );
         Self(value)
@@ -1680,35 +1584,25 @@ pub struct FontVariation {
     pub value: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum FontOpticalSizing {
     /// Auto mode will set the optical size to the font size.
     /// this is the default behavior.
+    #[default]
     Auto,
     None,
     Fixed(f32),
 }
 
-impl Default for FontOpticalSizing {
-    fn default() -> Self {
-        FontOpticalSizing::Auto
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum TextLineHeight {
     /// Normal (unset, no override)
+    #[default]
     Normal,
     /// px value
     Fixed(f32),
     /// multiplier factor
     Factor(f32),
-}
-
-impl Default for TextLineHeight {
-    fn default() -> Self {
-        TextLineHeight::Normal
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -2159,7 +2053,7 @@ impl Paint {
         if self.opacity() == 0.0 {
             return false;
         }
-        return true;
+        true
     }
 
     pub fn blend_mode(&self) -> BlendMode {
@@ -2991,7 +2885,7 @@ pub struct ImageTile {
 /// See also:
 /// - https://developer.mozilla.org/en-US/docs/Web/CSS/background-repeat
 /// - https://api.flutter.dev/flutter/painting/ImageRepeat.html
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ImageRepeat {
     /// Repeat the image horizontally (X axis) only.
     #[serde(rename = "repeat-x")]
@@ -3001,13 +2895,8 @@ pub enum ImageRepeat {
     RepeatY,
     /// Repeat the image in both directions.
     #[serde(rename = "repeat")]
+    #[default]
     Repeat,
-}
-
-impl Default for ImageRepeat {
-    fn default() -> Self {
-        ImageRepeat::Repeat
-    }
 }
 
 /// Defines how an image should be painted within its container.

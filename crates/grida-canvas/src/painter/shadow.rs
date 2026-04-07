@@ -19,8 +19,7 @@ pub fn drop_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
             filter = image_filters::blur((shadow.blur, shadow.blur), None, filter, None).unwrap();
         }
 
-        let filter = image_filters::offset((shadow.dx, shadow.dy), filter, None).unwrap();
-        filter
+        image_filters::offset((shadow.dx, shadow.dy), filter, None).unwrap()
     } else {
         // fast path using Skia's drop_shadow filter when no spread is applied
         let image_filter = image_filters::drop_shadow_only(
@@ -81,9 +80,8 @@ pub fn inner_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
     let blurred = image_filters::blur((shadow.blur, shadow.blur), None, filter, None).unwrap();
     let offset = image_filters::offset((shadow.dx, shadow.dy), blurred, None).unwrap();
     let masked = image_filters::blend(BlendMode::DstIn, offset, None, None).unwrap();
-    let inner_shadow = image_filters::merge([Some(masked)].into_iter(), None).unwrap();
 
-    inner_shadow
+    image_filters::merge([Some(masked)], None).unwrap()
 }
 
 /// Draw an inner shadow clipped to the given shape.

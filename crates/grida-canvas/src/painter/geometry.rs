@@ -52,7 +52,7 @@ impl PainterShape {
     /// Construct a rounded rectangle shape
     pub fn from_rrect(rrect: RRect) -> Self {
         Self {
-            rect: rrect.rect().clone(),
+            rect: *rrect.rect(),
             rect_shape: None,
             rrect: Some(rrect),
             oval: None,
@@ -72,7 +72,7 @@ impl PainterShape {
     /// Construct a path-based shape (bounding rect must be provided)
     pub fn from_path(path: Path) -> Self {
         Self {
-            rect: path.bounds().clone(),
+            rect: *path.bounds(),
             rect_shape: None,
             rrect: None,
             oval: None,

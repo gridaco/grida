@@ -79,7 +79,7 @@ pub fn query_paint_groups(
     let mut groups: Vec<PaintGroup> = Vec::new();
 
     let limit_reached = |groups: &Vec<PaintGroup>, limit: Option<usize>| -> bool {
-        limit.map_or(false, |l| groups.len() >= l)
+        limit.is_some_and(|l| groups.len() >= l)
     };
 
     if recursive {

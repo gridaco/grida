@@ -12,9 +12,9 @@ use crate::{
 use math2::Rectangle;
 use skia_safe::EncodedImageFormat;
 
-impl Into<EncodedImageFormat> for ExportAsImage {
-    fn into(self) -> EncodedImageFormat {
-        match self {
+impl From<ExportAsImage> for EncodedImageFormat {
+    fn from(val: ExportAsImage) -> Self {
+        match val {
             ExportAsImage::PNG(_) => EncodedImageFormat::PNG,
             ExportAsImage::JPEG(_) => EncodedImageFormat::JPEG,
             ExportAsImage::WEBP(_) => EncodedImageFormat::WEBP,
@@ -81,17 +81,14 @@ pub fn export_node_as_image(
         _ => None,
     };
 
-    let Some(data) = image.encode(None, skfmt, quality) else {
-        return None;
-    };
+    let data = image.encode(None, skfmt, quality)?;
 
     // Return the exported data
-    let exported = match format {
+
+    match format {
         ExportAsImage::PNG(_) => Some(Exported::PNG(data.to_vec())),
         ExportAsImage::JPEG(_) => Some(Exported::JPEG(data.to_vec())),
         ExportAsImage::WEBP(_) => Some(Exported::WEBP(data.to_vec())),
         ExportAsImage::BMP(_) => Some(Exported::BMP(data.to_vec())),
-    };
-
-    exported
+    }
 }

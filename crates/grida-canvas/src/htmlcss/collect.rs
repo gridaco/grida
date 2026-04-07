@@ -31,7 +31,7 @@ pub fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, String> 
     use csscascade::cascade::CascadeDriver;
     use style::thread_state::{self, ThreadState};
 
-    let _ = thread_state::initialize(ThreadState::LAYOUT);
+    thread_state::initialize(ThreadState::LAYOUT);
 
     // Enable CSS Grid support in Stylo's servo mode (one-time).
     // Without this, `display: grid` is not parsed (gated behind a pref).
@@ -46,7 +46,7 @@ pub fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, String> 
     driver.flush(document);
     let _styled_count = driver.style_document(document);
 
-    let root = document.root_element().map(|el| collect_element(el));
+    let root = document.root_element().map(collect_element);
     Ok(root)
 }
 
@@ -96,14 +96,14 @@ fn generate_marker_text<T: std::fmt::Debug>(lst: &T, ordinal: i32) -> Option<Str
         return Some(format!("{}. ", ordinal));
     }
     if debug.contains("LowerAlpha") {
-        if ordinal >= 1 && ordinal <= 26 {
+        if (1..=26).contains(&ordinal) {
             let ch = (b'a' + (ordinal - 1) as u8) as char;
             return Some(format!("{}. ", ch));
         }
         return Some(format!("{}. ", ordinal));
     }
     if debug.contains("UpperAlpha") {
-        if ordinal >= 1 && ordinal <= 26 {
+        if (1..=26).contains(&ordinal) {
             let ch = (b'A' + (ordinal - 1) as u8) as char;
             return Some(format!("{}. ", ch));
         }
@@ -667,7 +667,7 @@ fn extract_border(style: &ComputedValues) -> BorderBox {
     let extract_color = |color: &style::values::computed::Color| -> CGColor {
         color
             .as_absolute()
-            .map(|abs| abs_color_to_cg(abs))
+            .map(abs_color_to_cg)
             .unwrap_or(CGColor::BLACK)
     };
 
@@ -770,8 +770,8 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
 
     // 2. Background image layers (gradients on top)
     for image in bg.background_image.0.iter() {
-        match image {
-            GenericImage::Gradient(gradient) => match gradient.as_ref() {
+        if let GenericImage::Gradient(gradient) = image {
+            match gradient.as_ref() {
                 GenericGradient::Linear {
                     direction, items, ..
                 } => {
@@ -799,8 +799,7 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
                     }
                     layers.push(BackgroundLayer::ConicGradient(ConicGradient { stops }));
                 }
-            },
-            _ => {}
+            }
         }
     }
 
@@ -853,7 +852,7 @@ fn gradient_items_to_stops(
             GenericGradientItem::SimpleColorStop(color) => {
                 let c = color
                     .as_absolute()
-                    .map(|a| abs_color_to_cg(a))
+                    .map(abs_color_to_cg)
                     .unwrap_or(CGColor::TRANSPARENT);
                 raw.push((None, c));
             }
@@ -861,7 +860,7 @@ fn gradient_items_to_stops(
                 let offset = position.to_percentage().map(|p| p.0);
                 let c = color
                     .as_absolute()
-                    .map(|a| abs_color_to_cg(a))
+                    .map(abs_color_to_cg)
                     .unwrap_or(CGColor::TRANSPARENT);
                 raw.push((offset, c));
             }
@@ -893,7 +892,7 @@ fn conic_gradient_items_to_stops(
             GenericGradientItem::SimpleColorStop(color) => {
                 let c = color
                     .as_absolute()
-                    .map(|a| abs_color_to_cg(a))
+                    .map(abs_color_to_cg)
                     .unwrap_or(CGColor::TRANSPARENT);
                 raw.push((None, c));
             }
@@ -904,7 +903,7 @@ fn conic_gradient_items_to_stops(
                 };
                 let c = color
                     .as_absolute()
-                    .map(|a| abs_color_to_cg(a))
+                    .map(abs_color_to_cg)
                     .unwrap_or(CGColor::TRANSPARENT);
                 raw.push((offset, c));
             }
@@ -947,6 +946,7 @@ fn auto_distribute_stops(raw: &mut [(Option<f32>, CGColor)]) {
         let s = raw[start].0.unwrap();
         let e = raw[end].0.unwrap();
         let count = (end - start) as f32;
+        #[allow(clippy::needless_range_loop)]
         for j in (start + 1)..end {
             raw[j].0 = Some(s + (j - start) as f32 / count * (e - s));
         }
@@ -964,7 +964,7 @@ fn extract_box_shadow(style: &ComputedValues) -> Vec<BoxShadow> {
                 .base
                 .color
                 .as_absolute()
-                .map(|a| abs_color_to_cg(a))
+                .map(abs_color_to_cg)
                 .unwrap_or(CGColor::BLACK);
             BoxShadow {
                 offset_x: s.base.horizontal.px(),
@@ -1008,11 +1008,8 @@ fn extract_grid_template(
                             RepeatCount::AutoFill => types::RepeatCount::AutoFill,
                             RepeatCount::AutoFit => types::RepeatCount::AutoFit,
                         };
-                        let tracks: Vec<types::TrackSize> = rep
-                            .track_sizes
-                            .iter()
-                            .map(|ts| stylo_track_size(ts))
-                            .collect();
+                        let tracks: Vec<types::TrackSize> =
+                            rep.track_sizes.iter().map(stylo_track_size).collect();
                         entries.push(types::GridTemplateEntry::Repeat(count, tracks));
                     }
                 }
@@ -1028,7 +1025,7 @@ fn extract_implicit_tracks(
         style::values::generics::grid::GenericTrackSize<style::values::computed::LengthPercentage>,
     >,
 ) -> Vec<types::TrackSize> {
-    tracks.0.iter().map(|ts| stylo_track_size(ts)).collect()
+    tracks.0.iter().map(stylo_track_size).collect()
 }
 
 /// Convert a single Stylo `TrackSize` to our IR.
@@ -1108,13 +1105,7 @@ fn extract_font(style: &ComputedValues) -> FontProps {
     let font = style.get_font();
     let inherited_text = style.get_inherited_text();
 
-    let mut props = FontProps::default();
-
-    props.size = font.font_size.computed_size().px();
-    props.weight = FontWeight(font.font_weight.value() as u32);
-    props.italic = font.font_style == style::values::computed::FontStyle::ITALIC;
-
-    props.families = font
+    let families: Vec<String> = font
         .font_family
         .families
         .iter()
@@ -1127,21 +1118,34 @@ fn extract_font(style: &ComputedValues) -> FontProps {
         })
         .collect();
 
-    props.line_height = match &font.line_height {
+    let line_height = match &font.line_height {
         StyloLineHeight::Normal => LineHeight::Normal,
         StyloLineHeight::Number(n) => LineHeight::Number(n.0),
         StyloLineHeight::Length(len) => LineHeight::Px(len.0.px()),
     };
 
-    // Letter/word spacing
-    if let Some(len) = inherited_text.letter_spacing.0.to_length() {
-        props.letter_spacing = len.px();
-    }
-    props.word_spacing = inherited_text
+    let letter_spacing = inherited_text
+        .letter_spacing
+        .0
+        .to_length()
+        .map(|l| l.px())
+        .unwrap_or(0.0);
+    let word_spacing = inherited_text
         .word_spacing
         .to_length()
         .map(|l| l.px())
         .unwrap_or(0.0);
+
+    let mut props = FontProps {
+        size: font.font_size.computed_size().px(),
+        weight: FontWeight(font.font_weight.value() as u32),
+        italic: font.font_style == style::values::computed::FontStyle::ITALIC,
+        families,
+        line_height,
+        letter_spacing,
+        word_spacing,
+        ..Default::default()
+    };
 
     // Text align
     use style::values::specified::text::TextAlignKeyword;
@@ -1246,22 +1250,12 @@ fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
     let mut result = Vec::with_capacity(ops.len());
     for op in ops.iter() {
         let ir_op = match op {
-            TransformOperation::Matrix(mat) => TransformOp::Matrix([
-                mat.a as f32,
-                mat.b as f32,
-                mat.c as f32,
-                mat.d as f32,
-                mat.e as f32,
-                mat.f as f32,
-            ]),
-            TransformOperation::Matrix3D(mat) => TransformOp::Matrix([
-                mat.m11 as f32,
-                mat.m12 as f32,
-                mat.m21 as f32,
-                mat.m22 as f32,
-                mat.m41 as f32,
-                mat.m42 as f32,
-            ]),
+            TransformOperation::Matrix(mat) => {
+                TransformOp::Matrix([mat.a, mat.b, mat.c, mat.d, mat.e, mat.f])
+            }
+            TransformOperation::Matrix3D(mat) => {
+                TransformOp::Matrix([mat.m11, mat.m12, mat.m21, mat.m22, mat.m41, mat.m42])
+            }
             TransformOperation::Translate(tx, ty) | TransformOperation::Translate3D(tx, ty, _) => {
                 TransformOp::Translate(resolve_lp(tx), resolve_lp(ty))
             }
@@ -1272,18 +1266,16 @@ fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
                 TransformOp::Translate(LP::Px(0.0), resolve_lp(ty))
             }
             TransformOperation::Scale(sx, sy) | TransformOperation::Scale3D(sx, sy, _) => {
-                TransformOp::Scale(*sx as f32, *sy as f32)
+                TransformOp::Scale(*sx, *sy)
             }
-            TransformOperation::ScaleX(sx) => TransformOp::Scale(*sx as f32, 1.0),
-            TransformOperation::ScaleY(sy) => TransformOp::Scale(1.0, *sy as f32),
+            TransformOperation::ScaleX(sx) => TransformOp::Scale(*sx, 1.0),
+            TransformOperation::ScaleY(sy) => TransformOp::Scale(1.0, *sy),
             TransformOperation::Rotate(angle) | TransformOperation::RotateZ(angle) => {
-                TransformOp::Rotate(angle.radians() as f32)
+                TransformOp::Rotate(angle.radians())
             }
-            TransformOperation::Skew(ax, ay) => {
-                TransformOp::Skew(ax.radians() as f32, ay.radians() as f32)
-            }
-            TransformOperation::SkewX(ax) => TransformOp::Skew(ax.radians() as f32, 0.0),
-            TransformOperation::SkewY(ay) => TransformOp::Skew(0.0, ay.radians() as f32),
+            TransformOperation::Skew(ax, ay) => TransformOp::Skew(ax.radians(), ay.radians()),
+            TransformOperation::SkewX(ax) => TransformOp::Skew(ax.radians(), 0.0),
+            TransformOperation::SkewY(ay) => TransformOp::Skew(0.0, ay.radians()),
             // Z-only and 3D-only ops have no 2D effect
             _ => continue,
         };

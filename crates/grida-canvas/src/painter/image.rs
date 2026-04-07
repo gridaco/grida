@@ -108,8 +108,7 @@ pub fn image_paint_matrix(
         // For custom transforms, we handle the complete image-to-container mapping
         // directly without composing with BoxFit::Fill, which would create double transformation.
         ImagePaintFit::Transform(transform) => {
-            let matrix = calculate_raw_transform(transform, oriented_image_size, container_size);
-            matrix
+            calculate_raw_transform(transform, oriented_image_size, container_size)
         }
         ImagePaintFit::Tile(tile) => {
             // For tile mode, the scale controls how many tiles fit in the container

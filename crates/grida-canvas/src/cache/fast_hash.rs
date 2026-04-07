@@ -34,7 +34,7 @@ impl Hasher for NodeIdHasher {
     fn write_u64(&mut self, i: u64) {
         // FxHash: XOR-fold then multiply by a large odd constant.
         // This is the primary fast path for NodeId (u64) keys.
-        self.hash = self.hash ^ i;
+        self.hash ^= i;
         self.hash = self.hash.wrapping_mul(0x517cc1b727220a95);
     }
 

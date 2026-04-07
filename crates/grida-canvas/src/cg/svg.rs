@@ -296,9 +296,9 @@ fn scale(sx: f32, sy: f32) -> AffineTransform {
     AffineTransform::from_acebdf(sx, 0.0, 0.0, 0.0, sy, 0.0)
 }
 
-/// SVG Packed Scene is dedicated struct for archive / transport format of resolved SVG file.
-/// rules:
-/// - size efficient: table-like structure similar to ttf
+// SVG Packed Scene is dedicated struct for archive / transport format of resolved SVG file.
+// rules:
+//   - size efficient: table-like structure similar to ttf
 // pub struct SVGPackedScene {
 //   images
 //   paints
@@ -306,7 +306,6 @@ fn scale(sx: f32, sy: f32) -> AffineTransform {
 // }
 
 /// Intermediate Representation of an SVG node.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum IRSVGChildNode {
@@ -357,6 +356,7 @@ pub struct IRSVGTextNode {
 
 /// A positioned text chunk — either uniform (single style) or attributed
 /// (per-span style variation).
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IRSVGTextChunk {
     /// Single-style chunk → packs to `TextSpanNode`.

@@ -32,7 +32,7 @@ thread_local! {
 
     static FONT: Font = Font::new(crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES), 10.0);
 
-    static CACHE: RefCell<Option<Cache>> = RefCell::new(None);
+    static CACHE: RefCell<Option<Cache>> = const { RefCell::new(None) };
 }
 
 impl Ruler {

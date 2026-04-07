@@ -514,7 +514,7 @@ impl SurfaceUI {
                 continue;
             }
 
-            let label: &str = name.as_deref().unwrap_or_else(|| match variant {
+            let label: &str = name.as_deref().unwrap_or(match variant {
                 LabelVariant::Badge => "Tray",
                 LabelVariant::Plain => "Container",
             });

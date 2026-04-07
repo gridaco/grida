@@ -39,7 +39,7 @@ impl VectorPathCache {
         let path = skia_safe::path::Path::from_svg(data).expect("invalid SVG path");
         let rc = Rc::new(path);
         self.entries.insert(
-            id.clone(),
+            *id,
             VectorPathCacheEntry {
                 hash,
                 path: rc.clone(),
@@ -54,6 +54,10 @@ impl VectorPathCache {
 
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 
     pub fn get(&self, id: &NodeId) -> Option<&VectorPathCacheEntry> {

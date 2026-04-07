@@ -70,7 +70,7 @@ use crate::cg::types::ImageFilters;
 use skia_safe::{self as sk, color_filters, runtime_effect::RuntimeEffect, ColorMatrix, Data};
 
 /// Conversion functions between normalized and physical values
-
+///
 /// Convert normalized exposure value (-1.0 to 1.0) to physical value (0.25 to 4.0)
 fn normalized_to_physical_exposure(normalized: f32) -> f32 {
     // Map [-1.0, 1.0] to [0.25, 4.0] using exponential scaling

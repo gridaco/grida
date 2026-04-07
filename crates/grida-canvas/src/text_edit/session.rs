@@ -58,7 +58,7 @@
 //!
 //! - [x] Copy/Cut — HTML + plain text (via [`selected_html`](TextEditSession::selected_html))
 //! - [x] Paste — HTML with formatting, or plain text fallback
-//!       (via [`paste_attributed`](TextEditSession::paste_attributed))
+//!   (via [`paste_attributed`](TextEditSession::paste_attributed))
 //!
 //! ## Rendering (host responsibility, session provides data)
 //!
@@ -71,9 +71,9 @@
 //! ## History
 //!
 //! - [x] Undo/redo — snapshot-based with merge grouping
-//!       (consecutive typing, backspace, or delete are grouped; paste,
-//!       newline, and IME commit are discrete steps; style changes are
-//!       discrete steps; snapshots capture both text and style runs)
+//!   (consecutive typing, backspace, or delete are grouped; paste,
+//!   newline, and IME commit are discrete steps; style changes are
+//!   discrete steps; snapshots capture both text and style runs)
 //!
 //! ## Rich text (per-run styling via [`AttributedText`])
 //!

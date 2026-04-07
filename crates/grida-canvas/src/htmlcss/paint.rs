@@ -524,7 +524,7 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
             ];
             let mut inner_rrect = skia_safe::RRect::new();
             inner_rrect.set_rect_radii(inner_rect, &inner_radii);
-            builder.add_rrect(&inner_rrect, None, None);
+            builder.add_rrect(inner_rrect, None, None);
         }
         let path = builder.detach();
 

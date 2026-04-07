@@ -327,8 +327,7 @@ impl ParagraphCache {
 
         // Store in the appropriate cache
         if let Some(node_id) = id {
-            self.entries_measurement_by_id
-                .insert(node_id.clone(), entry);
+            self.entries_measurement_by_id.insert(*node_id, entry);
         } else if let Some(hash) = shape_key {
             self.entries_measurement_by_shapekey_unstable
                 .insert(hash, entry);
@@ -575,5 +574,9 @@ impl ParagraphCache {
 
     pub fn len(&self) -> usize {
         self.entries_measurement_by_id.len() + self.entries_measurement_by_shapekey_unstable.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }

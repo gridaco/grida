@@ -100,6 +100,7 @@ impl PainterPictureLayer {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum PainterRenderCommand {
     Draw(PainterPictureLayer),
     MaskGroup(PainterMaskGroup),
@@ -424,7 +425,7 @@ impl LayerList {
             shadows: Vec::new(),
             blur: None,
             backdrop_blur: effects.backdrop_blur.clone(),
-            glass: effects.glass.clone(),
+            glass: effects.glass,
             noises: effects.noises.clone(),
         };
         (surface, own)
@@ -491,7 +492,7 @@ impl LayerList {
     pub fn from_scene(scene: &Scene, scene_cache: &SceneCache) -> Self {
         let mut list = LayerList::default();
         for id in scene.graph.roots() {
-            let result = Self::flatten_node(&id, &scene.graph, scene_cache, 1.0, &mut list.layers);
+            let result = Self::flatten_node(id, &scene.graph, scene_cache, 1.0, &mut list.layers);
             list.commands.extend(result.commands);
         }
         // Build a LUT (id -> index) for picture caching and quick lookup
@@ -521,6 +522,10 @@ impl LayerList {
 
     pub fn len(&self) -> usize {
         self.layers.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.layers.is_empty()
     }
 
     /// Compute a fill path with the stroke region subtracted (PathOp::Difference).
@@ -626,7 +631,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity,
                         blend_mode: n.blend_mode,
@@ -645,7 +650,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
 
@@ -728,7 +733,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: inner_opacity,
                         blend_mode: inner_blend_mode,
@@ -747,7 +752,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
 
@@ -778,7 +783,7 @@ impl LayerList {
                         clip_path.map(|path| path.make_transform(&sk::sk_matrix(transform.matrix)));
 
                     let surface = PainterRenderSurface {
-                        id: id.clone(),
+                        id: *id,
                         bounds: render_bounds,
                         transform,
                         opacity,
@@ -847,7 +852,7 @@ impl LayerList {
 
                     let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                         base: PainterPictureLayerBase {
-                            id: id.clone(),
+                            id: *id,
                             z_index: out.len(),
                             opacity,
                             blend_mode: n.blend_mode,
@@ -866,7 +871,7 @@ impl LayerList {
                         non_overlapping_fill_path,
                     });
                     out.push(LayerEntry {
-                        id: id.clone(),
+                        id: *id,
                         layer: layer.clone(),
                     });
                     FlattenResult {
@@ -915,7 +920,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -934,7 +939,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -977,7 +982,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -996,7 +1001,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1039,7 +1044,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1058,7 +1063,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1101,7 +1106,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1120,7 +1125,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1163,7 +1168,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1182,7 +1187,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1235,7 +1240,7 @@ impl LayerList {
                 };
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1254,7 +1259,7 @@ impl LayerList {
                     non_overlapping_fill_path: None,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1293,7 +1298,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Text(PainterPictureTextLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1315,11 +1320,11 @@ impl LayerList {
                     text_style: n.text_style.clone(),
                     text_align: n.text_align,
                     text_align_vertical: n.text_align_vertical,
-                    id: id.clone(),
+                    id: *id,
                     attributed_string: None,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1362,7 +1367,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1381,7 +1386,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1397,7 +1402,7 @@ impl LayerList {
                 let shape = build_shape(node, &bounds);
                 let layer = PainterPictureLayer::Vector(PainterPictureVectorLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1421,7 +1426,7 @@ impl LayerList {
                     marker_end_shape: n.marker_end_shape,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1465,7 +1470,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1484,7 +1489,7 @@ impl LayerList {
                     non_overlapping_fill_path,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1523,7 +1528,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::Text(PainterPictureTextLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1545,11 +1550,11 @@ impl LayerList {
                     text_style: n.default_style.clone(),
                     text_align: n.text_align,
                     text_align_vertical: n.text_align_vertical,
-                    id: id.clone(),
+                    id: *id,
                     attributed_string: Some(n.attributed_string.clone()),
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1565,7 +1570,7 @@ impl LayerList {
                 let shape = build_shape(node, &bounds);
                 let layer = PainterPictureLayer::Shape(PainterPictureShapeLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: LayerBlendMode::PassThrough,
@@ -1584,7 +1589,7 @@ impl LayerList {
                     non_overlapping_fill_path: None,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1605,7 +1610,7 @@ impl LayerList {
                 // markdown measurement when schema height is None).
                 let layer = PainterPictureLayer::MarkdownEmbed(PainterPictureMarkdownEmbedLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1620,7 +1625,7 @@ impl LayerList {
                     height: bounds.height,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1638,7 +1643,7 @@ impl LayerList {
 
                 let layer = PainterPictureLayer::HtmlEmbed(PainterPictureHtmlEmbedLayer {
                     base: PainterPictureLayerBase {
-                        id: id.clone(),
+                        id: *id,
                         z_index: out.len(),
                         opacity: parent_opacity * n.opacity,
                         blend_mode: n.blend_mode,
@@ -1653,7 +1658,7 @@ impl LayerList {
                     height: n.size.height,
                 });
                 out.push(LayerEntry {
-                    id: id.clone(),
+                    id: *id,
                     layer: layer.clone(),
                 });
                 FlattenResult {
@@ -1692,7 +1697,7 @@ impl LayerList {
             }
         }
         // Flush remaining run (no mask above it)
-        out_commands.extend(run.into_iter());
+        out_commands.extend(run);
         out_commands
     }
 

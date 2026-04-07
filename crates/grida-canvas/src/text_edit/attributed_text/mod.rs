@@ -46,20 +46,15 @@ pub use crate::cg::types::{
 /// A dimension that can be `Normal` (unset), a fixed px value, or a factor.
 ///
 /// Used for `line_height`, `letter_spacing`, `word_spacing`.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum TextDimension {
     /// Normal / auto (no override).
+    #[default]
     Normal,
     /// Fixed value in layout-local points (px).
     Fixed(f32),
     /// Multiplier factor (1.0 = 100%).
     Factor(f32),
-}
-
-impl Default for TextDimension {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Per-run stroke representation for text.
@@ -71,17 +66,12 @@ pub struct TextStroke {
 }
 
 /// Paragraph direction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ParagraphDirection {
+    #[default]
     Ltr,
     Rtl,
     Auto,
-}
-
-impl Default for ParagraphDirection {
-    fn default() -> Self {
-        Self::Ltr
-    }
 }
 
 /// Hyperlink target on a text run.

@@ -70,9 +70,10 @@ use serde::{Deserialize, Serialize};
 /// # Default
 ///
 /// The default mode is [`Clamp`], matching Skia, Flutter, and SVG defaults.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum TileMode {
     #[serde(rename = "clamp")]
+    #[default]
     Clamp,
     #[serde(rename = "repeated", alias = "repeat")]
     Repeated,
@@ -80,10 +81,4 @@ pub enum TileMode {
     Mirror,
     #[serde(rename = "decal")]
     Decal,
-}
-
-impl Default for TileMode {
-    fn default() -> Self {
-        TileMode::Clamp
-    }
 }

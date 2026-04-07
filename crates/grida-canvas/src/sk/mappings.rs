@@ -35,10 +35,10 @@ impl From<TileMode> for skia_safe::TileMode {
     }
 }
 
-impl Into<skia_safe::Blender> for BlendMode {
-    fn into(self) -> skia_safe::Blender {
+impl From<BlendMode> for skia_safe::Blender {
+    fn from(val: BlendMode) -> Self {
         use skia_safe::BlendMode::*;
-        let sk_blend_mode = match self {
+        let sk_blend_mode = match val {
             BlendMode::Normal => SrcOver,
             BlendMode::Multiply => Multiply,
             BlendMode::Screen => Screen,
@@ -84,9 +84,9 @@ impl From<BlendMode> for skia_safe::BlendMode {
     }
 }
 
-impl Into<skia_safe::PaintCap> for StrokeCap {
-    fn into(self) -> skia_safe::PaintCap {
-        match self {
+impl From<StrokeCap> for skia_safe::PaintCap {
+    fn from(val: StrokeCap) -> Self {
+        match val {
             StrokeCap::Butt => skia_safe::PaintCap::Butt,
             StrokeCap::Round => skia_safe::PaintCap::Round,
             StrokeCap::Square => skia_safe::PaintCap::Square,
@@ -94,9 +94,9 @@ impl Into<skia_safe::PaintCap> for StrokeCap {
     }
 }
 
-impl Into<skia_safe::PaintJoin> for StrokeJoin {
-    fn into(self) -> skia_safe::PaintJoin {
-        match self {
+impl From<StrokeJoin> for skia_safe::PaintJoin {
+    fn from(val: StrokeJoin) -> Self {
+        match val {
             StrokeJoin::Miter => skia_safe::PaintJoin::Miter,
             StrokeJoin::Round => skia_safe::PaintJoin::Round,
             StrokeJoin::Bevel => skia_safe::PaintJoin::Bevel,

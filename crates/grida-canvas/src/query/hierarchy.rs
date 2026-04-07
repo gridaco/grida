@@ -348,10 +348,7 @@ fn select_adjacent_sibling(
 /// For root nodes, returns all roots.
 fn siblings_of(graph: &SceneGraph, id: &NodeId) -> Vec<NodeId> {
     match graph.get_parent(id) {
-        Some(parent) => graph
-            .get_children(&parent)
-            .map(|c| c.clone())
-            .unwrap_or_default(),
+        Some(parent) => graph.get_children(&parent).cloned().unwrap_or_default(),
         None => graph.roots().to_vec(),
     }
 }

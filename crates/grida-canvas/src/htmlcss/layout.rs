@@ -108,6 +108,7 @@ pub fn compute_content_height(
 
 // ─── Taffy tree construction ─────────────────────────────────────────
 
+#[allow(clippy::only_used_in_recursion)]
 fn build_taffy_node(
     taffy: &mut TaffyTree<TextMeasure>,
     el: &StyledElement,
@@ -474,7 +475,7 @@ fn grid_template_to_taffy(
                         types::RepeatCount::AutoFill => taffy::RepetitionCount::AutoFill,
                         types::RepeatCount::AutoFit => taffy::RepetitionCount::AutoFit,
                     },
-                    tracks: tracks.iter().map(|ts| track_size_to_taffy(ts)).collect(),
+                    tracks: tracks.iter().map(track_size_to_taffy).collect(),
                     line_names: Vec::new(),
                 })
             }
@@ -483,7 +484,7 @@ fn grid_template_to_taffy(
 }
 
 fn implicit_tracks_to_taffy(tracks: &[types::TrackSize]) -> Vec<taffy::TrackSizingFunction> {
-    tracks.iter().map(|ts| track_size_to_taffy(ts)).collect()
+    tracks.iter().map(track_size_to_taffy).collect()
 }
 
 fn grid_placement_to_taffy(p: types::GridPlacement) -> taffy::GridPlacement<String> {

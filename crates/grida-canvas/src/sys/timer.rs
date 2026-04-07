@@ -212,9 +212,9 @@ impl TimerMgr {
             last_execute_time: None,
         };
 
-        Debounce {
-            state: std::sync::Arc::new(std::sync::Mutex::new(state)),
-        }
+        #[allow(clippy::arc_with_non_send_sync)]
+        let state = std::sync::Arc::new(std::sync::Mutex::new(state));
+        Debounce { state }
     }
 
     /// Cancels a timer by its ID

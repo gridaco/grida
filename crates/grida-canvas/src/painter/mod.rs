@@ -1,3 +1,4 @@
+#[allow(clippy::module_inception)]
 mod painter;
 pub use painter::*;
 pub mod effects;

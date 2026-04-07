@@ -45,6 +45,12 @@ pub struct SceneCache {
     pub layer_index: RTree<IndexedLayer>,
 }
 
+impl Default for SceneCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SceneCache {
     /// Create a new empty cache with the given picture cache strategy.
     pub fn new() -> Self {

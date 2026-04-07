@@ -93,9 +93,10 @@
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum StrokeWidth {
     /// No stroke (all widths are 0)
+    #[default]
     None,
     /// Uniform stroke width for all sides
     Uniform(f32),
@@ -161,12 +162,6 @@ impl StrokeWidth {
 impl From<f32> for StrokeWidth {
     fn from(val: f32) -> Self {
         StrokeWidth::Uniform(val)
-    }
-}
-
-impl Default for StrokeWidth {
-    fn default() -> Self {
-        StrokeWidth::None
     }
 }
 
@@ -261,7 +256,7 @@ impl UnknownStrokeWidth {
         }
 
         // (3)
-        return None;
+        None
     }
 }
 

@@ -44,6 +44,7 @@ pub enum BoundsTarget<'a> {
 
 impl<'a> BoundsTarget<'a> {
     /// Parse from a string, recognizing `"<scene>"` as the scene target.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &'a str) -> Self {
         if s == "<scene>" {
             Self::Scene
@@ -179,14 +180,9 @@ pub enum HostEvent {
 /// platform-specific event loop.
 pub type HostEventCallback = Arc<dyn Fn(HostEvent) + Send + Sync + 'static>;
 
+#[derive(Default)]
 pub struct Clipboard {
     pub(crate) data: Option<Vec<u8>>,
-}
-
-impl Default for Clipboard {
-    fn default() -> Self {
-        Self { data: None }
-    }
 }
 
 impl Clipboard {
@@ -710,7 +706,7 @@ impl ApplicationApi for UnknownTargetApplication {
                 self.loaded_scenes = result
                     .scene_ids
                     .iter()
-                    .zip(result.scenes.into_iter())
+                    .zip(result.scenes)
                     .map(|(id, scene)| (id.clone(), scene))
                     .collect();
 
@@ -869,7 +865,7 @@ impl UnknownTargetApplication {
         &mut self,
         event: crate::surface::SurfaceEvent,
     ) -> crate::surface::SurfaceResponse {
-        let (hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
+        let (_hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
             let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
             let r = self
                 .surface
@@ -882,8 +878,6 @@ impl UnknownTargetApplication {
                 .dispatch(event, &ht, &NoHierarchy, &self.ui_hit_regions);
             (ht, r)
         };
-        drop(hit_tester);
-
         if response.needs_redraw {
             self.queue();
         }
@@ -1490,7 +1484,6 @@ impl UnknownTargetApplication {
     }
 
     /// Hit test the current cursor position and store the result.
-
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn resource_loaded(&mut self) {
         self.process_image_queue();
@@ -1612,17 +1605,17 @@ impl UnknownTargetApplication {
             let surface = self.state.surface_mut();
             let canvas = surface.canvas();
             if self.devtools_rendering_show_fps {
-                fps_overlay::FpsMeter::draw(&canvas, self.clock.hz() as f32);
+                fps_overlay::FpsMeter::draw(canvas, self.clock.hz() as f32);
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
-                    stats_overlay::StatsOverlay::draw(&canvas, s, &self.clock);
+                    stats_overlay::StatsOverlay::draw(canvas, s, &self.clock);
                 }
             }
 
             if !self.highlight_strokes.is_empty() {
                 stroke_overlay::StrokeOverlay::draw(
-                    &canvas,
+                    canvas,
                     &self.highlight_strokes,
                     &self.renderer.camera,
                     self.renderer.get_cache(),
@@ -1635,7 +1628,7 @@ impl UnknownTargetApplication {
             // zoom-independent caret width.
             if let Some(ref deco) = self.text_edit_decorations {
                 crate::devtools::text_edit_decoration_overlay::TextEditDecorationOverlay::draw(
-                    &canvas,
+                    canvas,
                     deco,
                     &self.renderer.camera,
                     self.renderer.get_cache(),
@@ -1643,7 +1636,7 @@ impl UnknownTargetApplication {
             }
             // Surface interaction overlays (hover, selection, marquee)
             surface_overlay::SurfaceOverlay::draw(
-                &canvas,
+                canvas,
                 &self.surface,
                 &self.renderer.camera,
                 self.renderer.get_cache(),
@@ -1652,7 +1645,7 @@ impl UnknownTargetApplication {
             );
             // Surface UI elements (size meter, frame titles, hit regions)
             crate::surface::ui::SurfaceUI::draw(
-                &canvas,
+                canvas,
                 &self.surface,
                 &self.renderer.camera,
                 self.renderer.get_cache(),
@@ -1662,7 +1655,7 @@ impl UnknownTargetApplication {
                 &self.renderer.fonts,
             );
             if self.devtools_rendering_show_ruler {
-                ruler_overlay::Ruler::draw(&canvas, &self.renderer.camera);
+                ruler_overlay::Ruler::draw(canvas, &self.renderer.camera);
             }
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {

@@ -46,26 +46,26 @@ pub enum Shape {
     RegularPolygon(RegularPolygonShape),
 }
 
-impl Into<skia_safe::Path> for &Shape {
-    fn into(self) -> skia_safe::Path {
-        match self {
+impl From<&Shape> for skia_safe::Path {
+    fn from(val: &Shape) -> Self {
+        match val {
             Shape::Rect(shape) => shape.into(),
-            Shape::RRect(shape) => build_rrect_path(&shape),
-            Shape::OrthogonalSmoothRRect(shape) => build_orthogonal_smooth_rrect_path(&shape),
-            Shape::SimplePolygon(shape) => build_simple_polygon_path(&shape),
-            Shape::Ellipse(shape) => build_ellipse_path(&shape),
-            Shape::EllipticalRingSector(shape) => build_ring_sector_path(&shape),
-            Shape::EllipticalSector(shape) => build_sector_path(&shape),
-            Shape::EllipticalRing(shape) => build_ring_path(&shape),
-            Shape::RegularStarPolygon(shape) => build_star_path(&shape),
-            Shape::RegularPolygon(shape) => build_regular_polygon_path(&shape),
+            Shape::RRect(shape) => build_rrect_path(shape),
+            Shape::OrthogonalSmoothRRect(shape) => build_orthogonal_smooth_rrect_path(shape),
+            Shape::SimplePolygon(shape) => build_simple_polygon_path(shape),
+            Shape::Ellipse(shape) => build_ellipse_path(shape),
+            Shape::EllipticalRingSector(shape) => build_ring_sector_path(shape),
+            Shape::EllipticalSector(shape) => build_sector_path(shape),
+            Shape::EllipticalRing(shape) => build_ring_path(shape),
+            Shape::RegularStarPolygon(shape) => build_star_path(shape),
+            Shape::RegularPolygon(shape) => build_regular_polygon_path(shape),
         }
     }
 }
 
-impl Into<VectorNetwork> for &Shape {
-    fn into(self) -> VectorNetwork {
-        match self {
+impl From<&Shape> for VectorNetwork {
+    fn from(val: &Shape) -> Self {
+        match val {
             Shape::Rect(shape) => build_rect_vector_network(shape),
             Shape::RRect(shape) => build_rrect_vector_network(shape),
             Shape::OrthogonalSmoothRRect(shape) => {

@@ -87,6 +87,12 @@ pub struct GeometryCache {
     entries: DenseNodeMap<GeometryEntry>,
 }
 
+impl Default for GeometryCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GeometryCache {
     pub fn new() -> Self {
         Self {
@@ -532,6 +538,10 @@ impl GeometryCache {
 
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 
     pub fn has(&self, id: &NodeId) -> bool {

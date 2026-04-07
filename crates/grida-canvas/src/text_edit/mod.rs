@@ -274,7 +274,7 @@ impl TextEditorState {
     }
 
     pub fn has_selection(&self) -> bool {
-        self.anchor.map_or(false, |a| a != self.cursor)
+        self.anchor.is_some_and(|a| a != self.cursor)
     }
 
     /// Whether the caret should be shown.
@@ -983,7 +983,7 @@ pub fn apply_command_mut(
     );
     debug_assert!(
         s.anchor
-            .map_or(true, |a| a <= s.text.len() && s.text.is_char_boundary(a)),
+            .is_none_or(|a| a <= s.text.len() && s.text.is_char_boundary(a)),
         "apply_command produced invalid anchor {:?} for text len {}",
         s.anchor,
         s.text.len(),

@@ -113,6 +113,7 @@ pub struct StyledElement {
 }
 
 /// A node in the styled tree.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum StyledNode {
     Element(StyledElement),

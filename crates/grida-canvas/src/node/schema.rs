@@ -9,7 +9,7 @@ use math2::transform::AffineTransform;
 // Re-export the ID types from the id module
 pub use crate::node::id::{NodeId, NodeIdGenerator, UserNodeId};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LayerEffects {
     /// single layer blur is supported per layer
     /// layer blur is applied after all other effects
@@ -188,42 +188,18 @@ impl LayerEffects {
     }
 }
 
-impl Default for LayerEffects {
-    fn default() -> Self {
-        Self {
-            blur: None,
-            backdrop_blur: None,
-            shadows: vec![],
-            glass: None,
-            noises: vec![],
-        }
-    }
-}
-
 /// common stroke style
 /// not used for special node types,
 /// - line
 /// - vector
 /// - text
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StrokeStyle {
     pub stroke_align: StrokeAlign,
     pub stroke_cap: StrokeCap,
     pub stroke_join: StrokeJoin,
     pub stroke_miter_limit: StrokeMiterLimit,
     pub stroke_dash_array: Option<StrokeDashArray>,
-}
-
-impl Default for StrokeStyle {
-    fn default() -> Self {
-        Self {
-            stroke_align: StrokeAlign::default(),
-            stroke_cap: StrokeCap::default(),
-            stroke_join: StrokeJoin::default(),
-            stroke_miter_limit: StrokeMiterLimit::default(),
-            stroke_dash_array: None,
-        }
-    }
 }
 
 impl StrokeStyle {
@@ -869,7 +845,7 @@ impl Default for LayoutPositioningBasis {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LayoutDimensionStyle {
     pub layout_target_width: Option<f32>,
     pub layout_target_height: Option<f32>,
@@ -878,20 +854,6 @@ pub struct LayoutDimensionStyle {
     pub layout_min_height: Option<f32>,
     pub layout_max_height: Option<f32>,
     pub layout_target_aspect_ratio: Option<(f32, f32)>,
-}
-
-impl Default for LayoutDimensionStyle {
-    fn default() -> Self {
-        Self {
-            layout_target_width: None,
-            layout_target_height: None,
-            layout_min_width: None,
-            layout_max_width: None,
-            layout_min_height: None,
-            layout_max_height: None,
-            layout_target_aspect_ratio: None,
-        }
-    }
 }
 
 /// Discriminant tag for the [`Node`] enum — lets hot loops dispatch on node
@@ -1779,12 +1741,12 @@ impl NodeShapeMixin for RectangleNodeRec {
                 corner_radius: self.corner_radius,
             });
         }
-        return Shape::OrthogonalSmoothRRect(OrthogonalSmoothRRectShape {
+        Shape::OrthogonalSmoothRRect(OrthogonalSmoothRRectShape {
             width: self.size.width,
             height: self.size.height,
             corner_radius: self.corner_radius,
             corner_smoothing: self.corner_smoothing,
-        });
+        })
     }
 
     fn to_path(&self) -> skia_safe::Path {
@@ -1995,7 +1957,7 @@ impl NodeShapeMixin for EllipseNodeRec {
                     height: h,
                     inner_radius_ratio: inner_ratio,
                     start_angle: self.start_angle,
-                    angle: angle,
+                    angle,
                     corner_radius: self.corner_radius.unwrap_or(0.0),
                 });
             }

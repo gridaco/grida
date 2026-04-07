@@ -382,7 +382,7 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                         decode_markdown_embed_node
                     );
                 }
-                fbs::Node::UnknownNode | fbs::Node::NONE | _ => {}
+                _ => {}
             }
         }
     }
@@ -405,7 +405,7 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         }
     }
     for children in children_by_parent.values_mut() {
-        children.sort_by(|a, b| a.1.cmp(&b.1));
+        children.sort_by(|a, b| a.1.cmp(b.1));
     }
 
     // Build internal_links from children_by_parent BEFORE consuming
@@ -646,9 +646,7 @@ fn decode_text_style_rec_fbs(ts: fbs::TextStyleRec<'_>) -> TextStyleRec {
         .unwrap_or(FontOpticalSizing::Auto);
     rec.text_decoration = ts.text_decoration().map(|td| TextDecorationRec {
         text_decoration_line: decode_text_decoration_line(td.text_decoration_line()),
-        text_decoration_color: td
-            .text_decoration_color()
-            .map(|c| decode_rgba32f_to_cg_color(c)),
+        text_decoration_color: td.text_decoration_color().map(decode_rgba32f_to_cg_color),
         text_decoration_style: Some(decode_text_decoration_style(td.text_decoration_style())),
         text_decoration_skip_ink: Some(td.text_decoration_skip_ink()),
         text_decoration_thickness: {
@@ -903,13 +901,10 @@ fn decode_paints_vec(
 /// Checks the `blur_type` discriminant first; falls back to Gaussian if
 /// the variant is unrecognised or the payload is missing.
 fn decode_fe_blur_from_layer(lb: &fbs::FeLayerBlur<'_>) -> FeBlur {
-    match lb.blur_type() {
-        fbs::FeBlur::FeProgressiveBlur => {
-            if let Some(p) = lb.blur_as_fe_progressive_blur() {
-                return decode_progressive_blur(&p);
-            }
+    if lb.blur_type() == fbs::FeBlur::FeProgressiveBlur {
+        if let Some(p) = lb.blur_as_fe_progressive_blur() {
+            return decode_progressive_blur(&p);
         }
-        _ => {}
     }
     // Default / Gaussian path
     FeBlur::Gaussian(FeGaussianBlur {
@@ -921,13 +916,10 @@ fn decode_fe_blur_from_layer(lb: &fbs::FeLayerBlur<'_>) -> FeBlur {
 }
 
 fn decode_fe_blur_from_backdrop(bb: &fbs::FeBackdropBlur<'_>) -> FeBlur {
-    match bb.blur_type() {
-        fbs::FeBlur::FeProgressiveBlur => {
-            if let Some(p) = bb.blur_as_fe_progressive_blur() {
-                return decode_progressive_blur(&p);
-            }
+    if bb.blur_type() == fbs::FeBlur::FeProgressiveBlur {
+        if let Some(p) = bb.blur_as_fe_progressive_blur() {
+            return decode_progressive_blur(&p);
         }
-        _ => {}
     }
     FeBlur::Gaussian(FeGaussianBlur {
         radius: bb
@@ -1105,7 +1097,7 @@ fn decode_stroke_style_from_fbs(ss: Option<fbs::StrokeStyle<'_>>) -> StrokeStyle
         stroke_miter_limit: StrokeMiterLimit(ss.stroke_miter_limit()),
         stroke_dash_array: ss
             .stroke_dash_array()
-            .filter(|v| v.len() > 0)
+            .filter(|v| !v.is_empty())
             .map(|v| StrokeDashArray((0..v.len()).map(|i| v.get(i)).collect())),
     }
 }
@@ -1468,7 +1460,7 @@ fn decode_vector_network(vnd: Option<fbs::VectorNetworkData<'_>>) -> VectorNetwo
         .regions()
         .map(|rs| {
             (0..rs.len())
-                .filter_map(|i| {
+                .map(|i| {
                     let region = rs.get(i);
                     let loops: Vec<VectorNetworkLoop> = region
                         .region_loops()
@@ -1492,11 +1484,11 @@ fn decode_vector_network(vnd: Option<fbs::VectorNetworkData<'_>>) -> VectorNetwo
                     let fills = region
                         .region_fill_paints()
                         .map(|p| decode_paints_vec(Some(p)));
-                    Some(VectorNetworkRegion {
+                    VectorNetworkRegion {
                         loops,
                         fill_rule,
                         fills,
-                    })
+                    }
                 })
                 .collect()
         })
@@ -1521,7 +1513,7 @@ fn decode_group_node(
     let (x, y) = layout.as_ref().map(decode_layout_xy).unwrap_or((0.0, 0.0));
 
     let transform = if let Some(plt) = layer.post_layout_transform() {
-        let mut t = decode_fbs_transform(&plt);
+        let mut t = decode_fbs_transform(plt);
         // The layout position (x, y) is stored separately; fold it into
         // the transform's translation component.
         t.matrix[0][2] = x;
@@ -1902,7 +1894,7 @@ fn decode_line_node(lc: &LayerCommon, layer: &fbs::LayerTrait<'_>, ln: &fbs::Lin
         .unwrap_or_default();
     let stroke_dash_array = sg.as_ref().and_then(|s| s.stroke_style()).and_then(|ss| {
         ss.stroke_dash_array()
-            .filter(|v| v.len() > 0)
+            .filter(|v| !v.is_empty())
             .map(|v| StrokeDashArray((0..v.len()).map(|i| v.get(i)).collect()))
     });
 
@@ -2308,6 +2300,7 @@ pub fn encode(
 /// Each entry is `(scene_id, scene, id_map, position_map)`.
 /// All scenes share the same flat `nodes` vector; each scene's nodes
 /// are prefixed with a scene-type NodeSlot that references `scene_id`.
+#[allow(clippy::type_complexity)]
 pub fn encode_multi(
     entries: &[(
         &str,
@@ -3727,10 +3720,7 @@ fn encode_group_node<'a, A: flatbuffers::Allocator + 'a>(
     // Groups carry the full affine transform (scale, skew, rotation) — not
     // just rotation like shape nodes. Encode the full matrix so SVG-imported
     // transforms (e.g. scale(0.8, 1.2)) survive the roundtrip.
-    let plt = r
-        .transform
-        .as_ref()
-        .map(|t| encode_affine_to_cg_transform(t));
+    let plt = r.transform.as_ref().map(encode_affine_to_cg_transform);
 
     let sys = encode_system_node_trait(fbb, node_id, "", r.active, false);
     let layout = encode_shape_layout(fbb, x, y, None, None, &None);
@@ -4210,7 +4200,7 @@ fn encode_text_style_rec<'a, A: flatbuffers::Allocator + 'a>(
         let color = td
             .text_decoration_color
             .as_ref()
-            .map(|c| encode_color_to_rgba32f(c));
+            .map(encode_color_to_rgba32f);
         fbs::TextDecorationRec::create(
             fbb,
             &fbs::TextDecorationRecArgs {

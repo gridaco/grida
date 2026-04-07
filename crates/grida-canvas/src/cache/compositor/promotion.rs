@@ -47,8 +47,8 @@ const MIN_SCREEN_AREA: f32 = 4.0 * 4.0;
 /// promoted.  Measured on M2 Pro with 400 visible simple rects:
 ///   - live draw: 3.2ms (400 rect fills)
 ///   - cached blit: 4.1ms + 0.4ms gpu_flush (400 texture blits)
-/// So for simple geometry, live draw wins.  Effects change the
-/// equation because a single shadow node can cost 100µs+ to paint.
+///     So for simple geometry, live draw wins.  Effects change the
+///     equation because a single shadow node can cost 100µs+ to paint.
 pub fn should_promote(
     layer: &PainterPictureLayer,
     _render_bounds: &Rectangle,

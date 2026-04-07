@@ -161,7 +161,7 @@ fn var_opsz(opsz: f32) -> skia_safe::font_arguments::variation_position::Coordin
 
 fn tag_from_str(tag: &str) -> skia_safe::FourByteTag {
     let bytes = tag.as_bytes();
-    let b0 = *bytes.get(0).unwrap_or(&b' ');
+    let b0 = *bytes.first().unwrap_or(&b' ');
     let b1 = *bytes.get(1).unwrap_or(&b' ');
     let b2 = *bytes.get(2).unwrap_or(&b' ');
     let b3 = *bytes.get(3).unwrap_or(&b' ');

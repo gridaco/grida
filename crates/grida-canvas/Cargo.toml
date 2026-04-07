@@ -188,3 +188,6 @@ required-features = ["native-gl-context"]
 [[example]]
 name = "tool_io_grida"
 
+[lints]
+workspace = true
+

@@ -15,6 +15,12 @@ pub struct VectorGeometryShape {
     pub corner_radius: f32,
 }
 
+impl Default for VectorGeometryShape {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VectorGeometryShape {
     pub fn new() -> Self {
         Self {

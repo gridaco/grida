@@ -7,9 +7,11 @@ use skia_safe::Path as SkPath;
 use usvg;
 
 pub fn into_tree(svg_source: &str) -> Result<usvg::Tree, usvg::Error> {
-    let mut options = usvg::Options::default();
-    options.font_family = geist::FAMILY.to_string(); // our builtin font
-    options.font_size = 16.0; // font-size default is 'medium' (16px) - based on browser spec
+    let mut options = usvg::Options {
+        font_family: geist::FAMILY.to_string(), // our builtin font
+        font_size: 16.0, // font-size default is 'medium' (16px) - based on browser spec
+        ..Default::default()
+    };
 
     // Register embedded font so usvg can layout <text> (it silently drops
     // text nodes when no font is available).

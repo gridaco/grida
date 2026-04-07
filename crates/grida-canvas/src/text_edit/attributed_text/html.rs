@@ -555,8 +555,7 @@ fn parse_css_color(val: &str) -> Option<CGColor> {
         }
     }
 
-    if val.starts_with('#') {
-        let hex = &val[1..];
+    if let Some(hex) = val.strip_prefix('#') {
         if hex.len() == 6 {
             let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
             let g = u8::from_str_radix(&hex[2..4], 16).ok()?;

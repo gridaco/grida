@@ -75,7 +75,7 @@ impl CameraChangeKind {
 ///
 /// # Fields
 /// - `transform`: The camera's transform in world space. Its translation corresponds to the
-///    world coordinate that appears at the center of the screen.
+///   world coordinate that appears at the center of the screen.
 /// - `size`: The logical size of the viewport in pixels (not affected by zoom).
 ///
 /// This shifts the camera's center to the screen center and transforms the scene accordingly.
@@ -175,7 +175,7 @@ impl Camera2D {
     }
 
     fn before_change(&mut self) {
-        self.prev_transform = self.transform.clone();
+        self.prev_transform = self.transform;
     }
 
     /// Sync the camera cache whenever the camera is changed.
@@ -493,7 +493,7 @@ impl Camera2D {
     /// processed (plan built, compositor invalidated, etc.) so that subsequent
     /// frames don't see stale deltas.
     pub fn consume_change(&mut self) {
-        self.prev_transform = self.transform.clone();
+        self.prev_transform = self.transform;
     }
 
     /// Classify the camera change that occurred between `prev_transform` and

@@ -10,9 +10,9 @@ pub struct RRectShape {
     pub corner_radius: RectangularCornerRadius,
 }
 
-impl Into<skia_safe::RRect> for &RRectShape {
-    fn into(self) -> skia_safe::RRect {
-        build_rrect(self)
+impl From<&RRectShape> for skia_safe::RRect {
+    fn from(val: &RRectShape) -> Self {
+        build_rrect(val)
     }
 }
 

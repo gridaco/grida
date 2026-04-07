@@ -263,11 +263,9 @@ impl<'a> VNPainter<'a> {
                 paint.set_style(PaintStyle::Fill);
                 self.canvas.draw_path(path, &paint);
             }
-        } else {
-            if let Some(mut paint) = paint::sk_paint_stack_without_images(paints, size, true) {
-                paint.set_style(PaintStyle::Fill);
-                self.canvas.draw_path(path, &paint);
-            }
+        } else if let Some(mut paint) = paint::sk_paint_stack_without_images(paints, size, true) {
+            paint.set_style(PaintStyle::Fill);
+            self.canvas.draw_path(path, &paint);
         }
     }
 }

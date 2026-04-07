@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(into = "[[f32; 3]; 2]", from = "[[f32; 3]; 2]")]
-
 pub struct CGTransform2D {
     pub m00: f32,
     pub m01: f32,

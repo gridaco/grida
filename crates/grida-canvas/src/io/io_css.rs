@@ -27,18 +27,13 @@ use crate::cg::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Default)]
 pub enum CSSPosition {
     #[serde(rename = "relative")]
+    #[default]
     Relative,
     #[serde(rename = "absolute")]
     Absolute,
-}
-
-impl Default for CSSPosition {
-    fn default() -> Self {
-        CSSPosition::Relative
-    }
 }
 
 impl From<CSSPosition> for LayoutPositioning {
@@ -137,20 +132,15 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Default)]
 pub enum CSSFontKerning {
     #[serde(rename = "auto")]
+    #[default]
     Auto,
     #[serde(rename = "normal")]
     Normal,
     #[serde(rename = "none")]
     None,
-}
-
-impl Default for CSSFontKerning {
-    fn default() -> Self {
-        CSSFontKerning::Auto
-    }
 }
 
 pub trait UserAgentAutoTaste {
@@ -168,11 +158,12 @@ impl UserAgentAutoTaste for CSSFontKerning {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Default)]
 pub enum CSSObjectFit {
     #[serde(rename = "cover")]
     Cover,
     #[serde(rename = "contain")]
+    #[default]
     Contain,
     #[serde(rename = "fill")]
     Fill,
@@ -181,12 +172,6 @@ pub enum CSSObjectFit {
     // not supported
     // #[serde(rename = "scale-down")]
     // ScaleDown,
-}
-
-impl Default for CSSObjectFit {
-    fn default() -> Self {
-        CSSObjectFit::Contain
-    }
 }
 
 #[cfg(test)]
