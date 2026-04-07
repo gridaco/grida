@@ -9,7 +9,7 @@ fn alloc_len_prefixed(bytes: &[u8]) -> *const u8 {
         return std::ptr::null();
     };
     let total = 4 + bytes.len();
-    let out = allocate(total) as *mut u8;
+    let out = allocate(total);
     let len_bytes = len_u32.to_le_bytes();
     unsafe {
         std::ptr::copy_nonoverlapping(len_bytes.as_ptr(), out, 4);
@@ -713,7 +713,7 @@ pub unsafe extern "C" fn get_image_bytes(
     if let (Some(app), Some(id)) = (app.as_mut(), __str_from_ptr_len(id_ptr, id_len)) {
         if let Some(bytes) = app.get_image_bytes(&id) {
             let len = bytes.len();
-            let out = allocate(len + 4) as *mut u8;
+            let out = allocate(len + 4);
             let len_bytes = (len as u32).to_le_bytes();
             std::ptr::copy_nonoverlapping(len_bytes.as_ptr(), out, 4);
             std::ptr::copy_nonoverlapping(bytes.as_ptr(), out.add(4), len);
@@ -994,7 +994,7 @@ pub unsafe extern "C" fn export_node_as(
 
         // Allocate memory for: [4 bytes for length] + [actual data]
         let total_size = 4 + data_len;
-        let out = allocate(total_size) as *mut u8;
+        let out = allocate(total_size);
 
         // Write the length as first 4 bytes (little-endian u32)
         let len_bytes = (data_len as u32).to_le_bytes();
