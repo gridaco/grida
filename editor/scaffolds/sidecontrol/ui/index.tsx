@@ -510,7 +510,7 @@ export function PropertyEnumV2<T extends string>({
         tabIndex={tabIndex}
         className={cn(
           WorkbenchUI.inputVariants({ size: "xs" }),
-          "flex items-center justify-between gap-1",
+          "flex items-center justify-between gap-1 min-w-0",
           className
         )}
       >
@@ -520,9 +520,11 @@ export function PropertyEnumV2<T extends string>({
             allEnums.find((e) => enumValue(e) === value)
           )
         ) : (
-          <ComboboxPrimitive.Value
-            placeholder={mixed ? "mixed" : placeholder}
-          />
+          <div className="text-ellipsis overflow-hidden whitespace-nowrap min-w-0">
+            <ComboboxPrimitive.Value
+              placeholder={mixed ? "mixed" : placeholder}
+            />
+          </div>
         )}
         <ChevronDownIcon className="size-3 shrink-0 opacity-50" />
       </ComboboxPrimitive.Trigger>
