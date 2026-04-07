@@ -1,8 +1,9 @@
 /**
  * @vitest-environment node
+ *
+ * History management tests with time-bucketed recording.
  */
-import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import { vi } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { Editor } from "@/grida-canvas/editor";
 import { createHeadlessEditor } from "@/grida-canvas/__tests__/utils";
 import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
@@ -11,9 +12,7 @@ import type grida from "@grida/schema";
 function createHistoryDocument(): grida.program.document.Document {
   return {
     scenes_ref: ["scene1"],
-    links: {
-      scene1: ["rect1", "rect2"],
-    },
+    links: { scene1: ["rect1", "rect2"] },
     nodes: {
       scene1: sceneNode("scene1", "Scene 1"),
       rect1: rectNode("rect1", { name: "Rectangle 1" }),
@@ -30,156 +29,129 @@ describe("History Management", () => {
   let ed: Editor;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     ed = createHeadlessEditor({ document: createHistoryDocument() });
   });
 
   afterEach(() => {
     ed.dispose();
+    vi.useRealTimers();
   });
 
   describe("Basic History Operations", () => {
     test("records and replays selection changes", () => {
-      // Initial state
       expect(ed.state.selection).toEqual([]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(0);
 
-      // Select first rectangle
       ed.doc.select(["rect1"]);
+      vi.advanceTimersByTime(500);
       expect(ed.state.selection).toEqual(["rect1"]);
       expect(ed.doc.historySnapshot.past).toHaveLength(1);
-      expect(ed.doc.historySnapshot.past[0].actionType).toBe("select");
-      expect(ed.doc.historySnapshot.past[0].patches).toHaveLength(1);
 
-      // Select second rectangle (should be merged with first — rapid selection)
       ed.doc.select(["rect2"]);
+      vi.advanceTimersByTime(500);
       expect(ed.state.selection).toEqual(["rect2"]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1); // Merged into single entry
+      expect(ed.doc.historySnapshot.past).toHaveLength(2);
 
-      // Undo to initial state (merged entries go back to initial state)
+      ed.doc.undo();
+      expect(ed.state.selection).toEqual(["rect1"]);
+
       ed.doc.undo();
       expect(ed.state.selection).toEqual([]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(0);
-      expect(ed.doc.historySnapshot.future).toHaveLength(1);
 
-      // Redo to final selection (merged entries go directly to final state)
+      ed.doc.redo();
+      expect(ed.state.selection).toEqual(["rect1"]);
+
       ed.doc.redo();
       expect(ed.state.selection).toEqual(["rect2"]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1);
-      expect(ed.doc.historySnapshot.future).toHaveLength(0);
     });
 
     test("records and replays node deletion", () => {
-      // Select and delete a node
       ed.doc.select(["rect2"]);
-      expect(ed.state.selection).toEqual(["rect2"]);
-
+      // select and delete are different action types — auto-flushes
       ed.doc.delete(["rect2"]);
-      expect(ed.state.document.nodes.rect2).toBeUndefined();
-      expect(ed.state.selection).toEqual([]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1); // select+delete merged
+      vi.advanceTimersByTime(500);
 
-      // Undo deletion (goes back to initial state)
+      expect(ed.state.document.nodes.rect2).toBeUndefined();
+      expect(ed.doc.historySnapshot.past).toHaveLength(2);
+
       ed.doc.undo();
       expect(ed.state.document.nodes.rect2).toBeDefined();
-      expect(ed.state.selection).toEqual([]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(0);
-      expect(ed.doc.historySnapshot.future).toHaveLength(1);
 
-      // Redo deletion (goes to final state)
-      ed.doc.redo();
-      expect(ed.state.document.nodes.rect2).toBeUndefined();
+      ed.doc.undo();
       expect(ed.state.selection).toEqual([]);
+    });
+
+    test("clears future when content action is recorded", () => {
+      // Content actions (not select/blur) should clear the redo stack
+      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "A" });
+      vi.advanceTimersByTime(500);
+
+      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "B" });
+      vi.advanceTimersByTime(500);
+
+      ed.doc.undo();
+      ed.doc.undo();
+      expect(ed.doc.historySnapshot.future).toHaveLength(2);
+
+      // Content action clears future
+      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "C" });
+      vi.advanceTimersByTime(500);
       expect(ed.doc.historySnapshot.past).toHaveLength(1);
       expect(ed.doc.historySnapshot.future).toHaveLength(0);
     });
 
-    test("clears future when new action is recorded", () => {
-      // Create some history (rapid selections will be merged)
-      ed.doc.select(["rect1"]);
-      ed.doc.select(["rect2"]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1); // merged
+    test("select does NOT clear future (clearsFuture: false)", () => {
+      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "A" });
+      vi.advanceTimersByTime(500);
 
-      // Undo once
       ed.doc.undo();
-      expect(ed.doc.historySnapshot.past).toHaveLength(0);
       expect(ed.doc.historySnapshot.future).toHaveLength(1);
 
-      // Record new action - should clear future
-      ed.doc.select(["rect1", "rect2"]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1); // new action
-      expect(ed.doc.historySnapshot.future).toHaveLength(0);
+      ed.doc.select(["rect1"]);
+      vi.advanceTimersByTime(500);
+
+      // Future preserved after select
+      expect(ed.doc.historySnapshot.future).toHaveLength(1);
     });
   });
 
-  describe("History Merging", () => {
-    test("merges rapid selection updates", () => {
-      const nowSpy = vi.spyOn(Date, "now");
-
-      // First selection
-      nowSpy.mockReturnValueOnce(1000);
+  describe("Time Bucketing", () => {
+    test("rapid same-type dispatches merge into one undo step", () => {
       ed.doc.select(["rect1"]);
-      expect(ed.state.selection).toEqual(["rect1"]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1);
-
-      // Second selection within merge window (100ms)
-      nowSpy.mockReturnValueOnce(1100);
-      nowSpy.mockReturnValueOnce(1100);
       ed.doc.select(["rect2"]);
+      // Both are "select" type — bucketed together
+      vi.advanceTimersByTime(500);
 
-      // Should be merged into single entry
       expect(ed.doc.historySnapshot.past).toHaveLength(1);
-      expect(ed.state.selection).toEqual(["rect2"]);
-      expect(ed.doc.historySnapshot.past[0].patches).toHaveLength(2);
 
-      // Undo should go to initial state
       ed.doc.undo();
       expect(ed.state.selection).toEqual([]);
-
-      // Redo should go to final state
-      ed.doc.redo();
-      expect(ed.state.selection).toEqual(["rect2"]);
-
-      nowSpy.mockRestore();
     });
 
-    test("does not merge actions after merge window", () => {
-      const nowSpy = vi.spyOn(Date, "now");
-
-      // First selection
-      nowSpy.mockReturnValueOnce(1000);
+    test("slow dispatches create separate steps", () => {
       ed.doc.select(["rect1"]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1);
+      vi.advanceTimersByTime(500);
 
-      // Second selection after merge window (> 300ms)
-      nowSpy.mockReturnValueOnce(1401);
-      nowSpy.mockReturnValueOnce(1401);
       ed.doc.select(["rect2"]);
+      vi.advanceTimersByTime(500);
 
-      // Should create separate entries (outside merge window)
       expect(ed.doc.historySnapshot.past).toHaveLength(2);
-      expect(ed.state.selection).toEqual(["rect2"]);
-
-      nowSpy.mockRestore();
     });
   });
 
   describe("History Manager State", () => {
     test("provides correct snapshot", () => {
-      // Initial snapshot
       expect(ed.doc.historySnapshot.past).toHaveLength(0);
       expect(ed.doc.historySnapshot.future).toHaveLength(0);
 
-      // After one action
       ed.doc.select(["rect1"]);
+      vi.advanceTimersByTime(500);
       expect(ed.doc.historySnapshot.past).toHaveLength(1);
-      expect(ed.doc.historySnapshot.future).toHaveLength(0);
 
-      // After undo
       ed.doc.undo();
       expect(ed.doc.historySnapshot.past).toHaveLength(0);
       expect(ed.doc.historySnapshot.future).toHaveLength(1);
 
-      // After redo
       ed.doc.redo();
       expect(ed.doc.historySnapshot.past).toHaveLength(1);
       expect(ed.doc.historySnapshot.future).toHaveLength(0);
@@ -188,38 +160,78 @@ describe("History Management", () => {
 
   describe("Complex Scenarios", () => {
     test("handles multiple operations with undo/redo", () => {
-      // Select, delete, select another
       ed.doc.select(["rect1"]);
-      ed.doc.delete(["rect1"]);
-      ed.doc.select(["rect2"]);
+      ed.doc.delete(["rect1"]); // different type — flushes select bucket
+      ed.doc.select(["rect2"]); // different type — flushes delete bucket
+      vi.advanceTimersByTime(500);
 
-      expect(ed.doc.historySnapshot.past).toHaveLength(1); // select+delete+select all merged
-      expect(ed.state.document.nodes.rect1).toBeUndefined();
-      expect(ed.state.selection).toEqual(["rect2"]);
+      expect(ed.doc.historySnapshot.past).toHaveLength(3);
 
-      // Undo all operations (goes back to initial state)
+      ed.doc.undo();
+      ed.doc.undo();
       ed.doc.undo();
       expect(ed.state.selection).toEqual([]);
       expect(ed.state.document.nodes.rect1).toBeDefined();
 
-      // Redo all operations (goes to final state)
+      ed.doc.redo();
+      ed.doc.redo();
       ed.doc.redo();
       expect(ed.state.document.nodes.rect1).toBeUndefined();
       expect(ed.state.selection).toEqual(["rect2"]);
     });
 
     test("handles blur action", () => {
-      // Select and then blur
       ed.doc.select(["rect1"]);
+      ed.doc.blur(); // different type — flushes select bucket
+      vi.advanceTimersByTime(500);
+
+      expect(ed.state.selection).toEqual([]);
+      expect(ed.doc.historySnapshot.past).toHaveLength(2);
+
+      ed.doc.undo();
       expect(ed.state.selection).toEqual(["rect1"]);
+    });
+  });
+
+  describe("clearsFuture: false (selection preserves redo)", () => {
+    test("edit → undo → select → redo restores the edit", () => {
+      // Make a content edit
+      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Edited" });
+      vi.advanceTimersByTime(500);
+      expect(ed.doc.historySnapshot.past).toHaveLength(1);
+
+      // Undo the edit
+      ed.doc.undo();
+      expect((ed.state.document.nodes.rect1 as any).name).toBe("Rectangle 1");
+      expect(ed.doc.historySnapshot.future).toHaveLength(1);
+
+      // Select something (uses clearsFuture: false)
+      ed.doc.select(["rect2"]);
+      vi.advanceTimersByTime(500);
+
+      // Redo should still be available
+      expect(ed.doc.historySnapshot.future).toHaveLength(1);
+
+      // Redo the edit
+      ed.doc.redo();
+      expect((ed.state.document.nodes.rect1 as any).name).toBe("Edited");
+    });
+
+    test("edit → undo → blur → redo restores the edit", () => {
+      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Edited" });
+      vi.advanceTimersByTime(500);
+
+      ed.doc.undo();
+      expect(ed.doc.historySnapshot.future).toHaveLength(1);
 
       ed.doc.blur();
-      expect(ed.state.selection).toEqual([]);
-      expect(ed.doc.historySnapshot.past).toHaveLength(1); // select+blur merged
+      vi.advanceTimersByTime(500);
 
-      // Undo blur (goes back to initial state)
-      ed.doc.undo();
-      expect(ed.state.selection).toEqual([]);
+      // Redo still available after blur
+      expect(ed.doc.historySnapshot.future).toHaveLength(1);
+
+      ed.doc.redo();
+      expect((ed.state.document.nodes.rect1 as any).name).toBe("Edited");
     });
   });
 });

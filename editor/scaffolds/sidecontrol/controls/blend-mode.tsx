@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { TMixed } from "./utils/types";
 import { enumEq, enumLabel, EnumItem, enumValue } from "../ui";
 import { BlendModeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons";
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui-editor/button";
+import { usePropertyPreview } from "@/grida-canvas-react/hooks/use-property-change";
 
 const items_blend_mode: EnumItem<cg.BlendMode>[] = [
   {
@@ -115,12 +116,30 @@ interface Props<T extends "paint" | "layer"> {
   onValueChange?: (
     value: T extends "paint" ? cg.BlendMode : cg.LayerBlendMode
   ) => void;
+  /**
+   * Called when the dropdown opens — start a preview session.
+   */
+  onPreviewStart?: () => void;
+  /**
+   * Called on hover — apply tentative value for preview.
+   */
+  onPreviewChange?: (
+    value: T extends "paint" ? cg.BlendMode : cg.LayerBlendMode
+  ) => void;
+  /**
+   * Called when dropdown closes — commit or discard the preview.
+   * @param committed true if a value was selected, false if closed without selection
+   */
+  onPreviewEnd?: (committed: boolean) => void;
 }
 
 export function BlendModeDropdown({
   type,
   value = type === "layer" ? "pass-through" : "normal",
   onValueChange,
+  onPreviewStart,
+  onPreviewChange,
+  onPreviewEnd,
 }: Props<"paint" | "layer">) {
   const isNonDefault =
     !!value && value !== (type === "layer" ? "pass-through" : "normal");
@@ -146,8 +165,20 @@ export function BlendModeDropdown({
     {} as Record<string, typeof items>
   );
 
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        onPreviewStart?.();
+      } else {
+        // Dropdown closed without explicit selection — discard preview
+        onPreviewEnd?.(false);
+      }
+    },
+    [onPreviewStart, onPreviewEnd]
+  );
+
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild tabIndex={-1}>
         <Button variant="ghost" size="icon">
           <BlendModeIcon active={isNonDefault} />
@@ -161,16 +192,15 @@ export function BlendModeDropdown({
               {groupItems.map((item, itemIndex) => (
                 <DropdownMenuCheckboxItem
                   key={`${groupKey}-${itemIndex}`}
-                  onSeeked={console.log}
                   checked={enumEq(typedValue as any, item)}
                   className="text-xs"
-                  // FIXME: temporary hack. we don't yet have preview system
                   onPointerEnter={() => {
-                    onValueChange?.(enumValue(item));
+                    onPreviewChange?.(enumValue(item));
                   }}
                   onCheckedChange={(checked) => {
                     if (checked) {
                       onValueChange?.(enumValue(item));
+                      onPreviewEnd?.(true);
                     }
                   }}
                 >
@@ -182,5 +212,48 @@ export function BlendModeDropdown({
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * BlendModeDropdown with history preview support.
+ * Uses `usePropertyPreview` hook — hover previews blend mode changes
+ * without polluting the undo stack.
+ */
+export function BlendModeDropdownWithPreview(
+  props: Omit<
+    Props<"paint" | "layer">,
+    "onPreviewStart" | "onPreviewChange" | "onPreviewEnd"
+  >
+) {
+  type BM = cg.BlendMode | cg.LayerBlendMode;
+  const preview = usePropertyPreview<BM>("blend-mode", (v) => {
+    props.onValueChange?.(v);
+  });
+
+  // While previewing, show checkmark on the committed value
+  const displayValue = preview.committedValue ?? props.value;
+
+  return (
+    <BlendModeDropdown
+      {...props}
+      value={displayValue}
+      onPreviewStart={() => {
+        const v = props.value;
+        const fallback = props.type === "layer" ? "pass-through" : "normal";
+        const committed = (v && typeof v === "string" ? v : fallback) as BM;
+        preview.onOpen(committed);
+      }}
+      onPreviewChange={(v) => {
+        preview.onSeek(v);
+      }}
+      onPreviewEnd={(committed) => {
+        if (committed) {
+          preview.onCommit();
+        } else {
+          preview.onClose();
+        }
+      }}
+    />
   );
 }

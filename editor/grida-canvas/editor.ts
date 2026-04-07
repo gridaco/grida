@@ -7,7 +7,10 @@ import type { TCanvasEventTargetDragGestureState } from "./action";
 import { animateTransformTo } from "./animation";
 import { EditorFollowPlugin } from "./plugins/follow";
 import { DocumentFontManager } from "./font-manager";
-import { DocumentHistoryManager } from "./history-manager";
+import {
+  EditorHistoryAdapter,
+  type DispatchRecording,
+} from "./editor-history-adapter";
 import init, { type Scene } from "@grida/canvas-wasm";
 import locateFile from "./backends/wasm-locate-file";
 import {
@@ -357,9 +360,9 @@ class EditorDocumentStore
     return this.mstate;
   }
 
-  private readonly historyManager = new DocumentHistoryManager();
+  private readonly _historyAdapter = new EditorHistoryAdapter();
   get historySnapshot() {
-    return this.historyManager.snapshot;
+    return this._historyAdapter.snapshot;
   }
 
   /**
@@ -399,6 +402,14 @@ class EditorDocumentStore
     private readonly logger?: (...args: any[]) => void
   ) {
     this.mstate = editor.state.init(initialState);
+
+    // Bind history adapter to store's mutable state
+    this._historyAdapter.bind(
+      () => this.mstate,
+      (s) => {
+        this.mstate = s;
+      }
+    );
   }
 
   // TODO: implement this
@@ -422,12 +433,17 @@ class EditorDocumentStore
   public undo() {
     if (this._locked) return;
 
-    const [nextState, patches] = this.historyManager.undo(this.mstate);
-    if (nextState === this.mstate) {
-      return;
+    // If a gesture is active, abort it first (revert to pre-gesture state),
+    // then proceed with the undo of the previous history entry.
+    if (this._historyAdapter.hasActiveGesture) {
+      this._historyAdapter.abortGesture();
+      this._tid++;
+      this.emit(undefined, []);
     }
 
-    this.mstate = nextState;
+    const patches = this._historyAdapter.undo();
+    if (!patches) return;
+
     this._tid++;
     this.emit(undefined, patches);
   }
@@ -435,20 +451,63 @@ class EditorDocumentStore
   public redo() {
     if (this._locked) return;
 
-    const [nextState, patches] = this.historyManager.redo(this.mstate);
-    if (nextState === this.mstate) {
-      return;
-    }
+    const patches = this._historyAdapter.redo();
+    if (!patches) return;
 
-    this.mstate = nextState;
     this._tid++;
     this.emit(undefined, patches);
+  }
+
+  get isGestureActive(): boolean {
+    return this._historyAdapter.hasActiveGesture;
+  }
+
+  // -- Preview (hover/tentative) -------------------------------------------
+
+  /**
+   * Start a preview session for hover-preview interactions.
+   */
+  public previewStart(label: string) {
+    this._historyAdapter.previewStart(label);
+  }
+
+  /**
+   * Apply a tentative change. The previous tentative change is reverted first.
+   * Call after dispatching the change (state is already updated).
+   */
+  public previewSet() {
+    this._historyAdapter.previewSet(this.mstate);
+  }
+
+  /**
+   * Commit the preview as a permanent undo step.
+   */
+  public previewCommit() {
+    this._historyAdapter.previewCommit();
+  }
+
+  /**
+   * Discard the preview, reverting to original state.
+   */
+  public previewDiscard() {
+    if (!this._historyAdapter.hasActivePreview) return;
+    this._historyAdapter.previewDiscard();
+    this._tid++;
+    this.emit(undefined, []);
+  }
+
+  get isPreviewActive(): boolean {
+    return this._historyAdapter.hasActivePreview;
   }
 
   private emit(action: Action | undefined, patches: editor.history.Patch[]) {
     this.listeners.forEach((l) => l(this, action, patches));
   }
 
+  // TODO(@grida/history): Migrate to dispatch(…, { recording: "silent" })
+  // for consistency with the recording mode system. Currently this bypasses
+  // dispatch entirely via the private apply() method, which is correct but
+  // uses a separate code path from all other state mutations.
   public applyDocumentPatches(patches: editor.history.Patch[]) {
     if (!patches.length) {
       return;
@@ -495,7 +554,18 @@ class EditorDocumentStore
     this.emit(undefined, []);
   }
 
-  public dispatch(action: Action | Action[], force: boolean = false) {
+  public dispatch(
+    action: Action | Action[],
+    opts?: {
+      force?: boolean;
+      recording?: DispatchRecording;
+      clearsFuture?: boolean;
+    }
+  ) {
+    const force = opts?.force ?? false;
+    const recording = opts?.recording ?? "record";
+    const clearsFuture = opts?.clearsFuture;
+
     if (this._locked && !force) return;
 
     const context: ReducerContext = {
@@ -522,17 +592,22 @@ class EditorDocumentStore
     let allPatches: editor.history.Patch[] = [];
 
     for (const action of actions) {
+      const beforeState = this.mstate;
       const [nextState, patches, inversePatches] = reducer(
         this.mstate,
         action,
         context
       );
       this.mstate = nextState;
-      this.historyManager.record({
-        actionType: action.type,
+      this._historyAdapter.record(
+        action.type,
+        beforeState,
+        nextState,
         patches,
         inversePatches,
-      });
+        recording,
+        clearsFuture
+      );
       lastAction = action;
       allPatches = allPatches.concat(patches);
     }
@@ -638,7 +713,7 @@ class EditorDocumentStore
       webfontlist: prev_webfontlist, // Preserve Google Fonts registry (editor-level, not document-level)
     };
 
-    this.historyManager.clear();
+    this._historyAdapter.clear();
     this._tid = 0;
     this.emit({ type: "document/reset", document_key }, []);
     return this._tid;
@@ -984,19 +1059,25 @@ class EditorDocumentStore
       return;
     }
 
-    this.dispatch({
-      type: "select",
-      selection,
-      mode,
-    });
+    this.dispatch(
+      {
+        type: "select",
+        selection,
+        mode,
+      },
+      { clearsFuture: false }
+    );
   }
 
   public blur(debug_label?: string) {
     if (debug_label) this.log("debug:blur", debug_label);
 
-    this.dispatch({
-      type: "blur",
-    });
+    this.dispatch(
+      {
+        type: "blur",
+      },
+      { clearsFuture: false }
+    );
   }
 
   public cut(target: "selection" | editor.NodeID) {
@@ -3423,10 +3504,17 @@ export class Editor
             return;
           }
 
-          // Patch-based sync for normal changes
-          // FIXME: Unstable — patch sync will fail on some operations (e.g. node deletion).
-          // Direct sync fallback should be kept until this is fully investigated.
-          if (!patches || patches.length === 0) return;
+          // Patch-based sync for normal changes.
+          // When patches are empty but document changed (e.g. gesture undo
+          // using snapshot restore), fall through to full sync.
+          if (!patches || patches.length === 0) {
+            syncDocument(
+              this._m_wasm_canvas_scene,
+              document,
+              this.doc.state.scene_id
+            );
+            return;
+          }
 
           const documentPatches = patches.filter(
             (patch) => patch.path[0] === "document"
@@ -3685,6 +3773,9 @@ export class Editor
     };
 
     this.images.set(rid, imageRef);
+    // TODO(@grida/history): This bypasses history via reduce(). Image
+    // registration is additive and currently safe, but should migrate to
+    // dispatch() so undo of image-referencing nodes stays consistent.
     this.doc.reduce((state) => {
       state.document.images[ref] = {
         url: rid,
@@ -3717,6 +3808,7 @@ export class Editor
     };
 
     this.images.set(url, ref);
+    // TODO(@grida/history): Same as above — bypasses history via reduce().
     this.doc.reduce((state) => {
       state.document.images[hash] = {
         url,
@@ -4999,40 +5091,51 @@ export class EditorSurface
   }
 
   surfaceDragStart(event: editor.api.events.IPointerEvent) {
-    this._editor.doc.dispatch({
-      type: "event-target/event/on-drag-start",
-      shiftKey: event.shiftKey,
-    });
+    this._editor.doc.dispatch(
+      {
+        type: "event-target/event/on-drag-start",
+        shiftKey: event.shiftKey,
+      },
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceDragEnd(event: editor.api.events.IPointerEvent) {
     const { marquee } = this._editor.doc.state;
     if (marquee) {
-      // test area in canvas space
       const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
 
       const contained =
         this._editor.geometryProvider.getNodeIdsFromEnvelope(area);
 
-      this._editor.doc.dispatch({
-        type: "event-target/event/on-drag-end",
-        node_ids_from_area: contained,
-        shiftKey: event.shiftKey,
-      });
+      this._editor.doc.dispatch(
+        {
+          type: "event-target/event/on-drag-end",
+          node_ids_from_area: contained,
+          shiftKey: event.shiftKey,
+        },
+        { recording: "end-gesture" }
+      );
 
       return;
     }
-    this._editor.doc.dispatch({
-      type: "event-target/event/on-drag-end",
-      shiftKey: event.shiftKey,
-    });
+    this._editor.doc.dispatch(
+      {
+        type: "event-target/event/on-drag-end",
+        shiftKey: event.shiftKey,
+      },
+      { recording: "end-gesture" }
+    );
   }
 
   surfaceDrag(event: TCanvasEventTargetDragGestureState) {
-    this._editor.doc.dispatch({
-      type: "event-target/event/on-drag",
-      event,
-    });
+    this._editor.doc.dispatch(
+      {
+        type: "event-target/event/on-drag",
+        event,
+      },
+      { recording: "silent" }
+    );
   }
 
   //
@@ -5040,64 +5143,67 @@ export class EditorSurface
   //
 
   surfaceStartGuideGesture(axis: cmath.Axis, idx: number | -1) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        idx: idx,
-        type: "guide",
-        axis,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { idx: idx, type: "guide", axis },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartScaleGesture(
     selection: string | string[],
     direction: cmath.CardinalDirection
   ) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "scale",
-        selection: Array.isArray(selection) ? selection : [selection],
-        direction,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: {
+          type: "scale",
+          selection: Array.isArray(selection) ? selection : [selection],
+          direction,
+        },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartSortGesture(selection: string | string[], node_id: string) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "sort",
-        selection: Array.isArray(selection) ? selection : [selection],
-        node_id,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: {
+          type: "sort",
+          selection: Array.isArray(selection) ? selection : [selection],
+          node_id,
+        },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartGapGesture(selection: string | string[], axis: "x" | "y") {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "gap",
-        selection: selection,
-        axis,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { type: "gap", selection, axis },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartPaddingGesture(
     node_id: string,
     side: "top" | "right" | "bottom" | "left"
   ) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "padding",
-        node_id,
-        side,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { type: "padding", node_id, side },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   // #region drag resize handle
@@ -5106,47 +5212,49 @@ export class EditorSurface
     anchor?: cmath.IntercardinalDirection,
     altKey?: boolean
   ) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "corner-radius",
-        node_id: selection,
-        anchor,
-        altKey: altKey ?? false,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: {
+          type: "corner-radius",
+          node_id: selection,
+          anchor,
+          altKey: altKey ?? false,
+        },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
   // #endregion drag resize handle
 
   surfaceStartRotateGesture(selection: string) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "rotate",
-        selection,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { type: "rotate", selection },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartTranslateVectorNetwork(node_id: string) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "translate-vector-controls",
-        node_id,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { type: "translate-vector-controls", node_id },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartTranslateVariableWidthStop(node_id: string, stop: number) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "translate-variable-width-stop",
-        node_id,
-        stop,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { type: "translate-variable-width-stop", node_id, stop },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartResizeVariableWidthStop(
@@ -5154,15 +5262,13 @@ export class EditorSurface
     stop: number,
     side: "left" | "right"
   ) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "resize-variable-width-stop",
-        node_id,
-        stop,
-        side,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { type: "resize-variable-width-stop", node_id, stop, side },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   surfaceStartCurveGesture(
@@ -5170,15 +5276,13 @@ export class EditorSurface
     segment: number,
     control: "ta" | "tb"
   ) {
-    this._editor.doc.dispatch({
-      type: "surface/gesture/start",
-      gesture: {
-        type: "curve",
-        node_id,
-        control,
-        segment,
+    this._editor.doc.dispatch(
+      {
+        type: "surface/gesture/start",
+        gesture: { type: "curve", node_id, control, segment },
       },
-    });
+      { recording: "begin-gesture" }
+    );
   }
 
   // #endregion IEventTargetActions implementation

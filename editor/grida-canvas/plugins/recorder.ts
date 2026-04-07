@@ -101,8 +101,11 @@ export class EditorRecorder {
 
       await new Promise((resolve) => setTimeout(resolve, delay));
 
-      requestAnimationFrame(() => {
-        this.editor.doc.dispatch(current.a, true);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          this.editor.doc.dispatch(current.a, { force: true });
+          resolve();
+        });
       });
     }
 

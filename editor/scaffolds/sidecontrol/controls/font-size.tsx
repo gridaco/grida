@@ -1,14 +1,10 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui-editor/select";
-import * as SelectPrimitive from "@radix-ui/react-select";
+import { PropertyEnumV2, EnumItem } from "../ui";
 import InputPropertyNumber from "../ui/number";
-import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/components/lib/utils";
 import type { editor } from "@/grida-canvas";
 import type { TMixed } from "./utils/types";
+import { usePropertyPreview } from "@/grida-canvas-react/hooks/use-property-change";
+import { useCallback, useMemo } from "react";
 
 export function FontSizeControl({
   value,
@@ -19,6 +15,27 @@ export function FontSizeControl({
   onValueChange?: (change: editor.api.NumberChange) => void;
   onValueCommit?: (change: editor.api.NumberChange) => void;
 }) {
+  const apply = useCallback(
+    (v: string) => {
+      const num = parseInt(v);
+      onValueCommit?.({ type: "set", value: num });
+    },
+    [onValueCommit]
+  );
+
+  const preview = usePropertyPreview<string>("font-size", apply);
+
+  const enumItems: EnumItem<string>[] = useMemo(
+    () =>
+      Object.entries(twsizes).map(([, preset]) => ({
+        value: String(preset["font-size"]),
+        label: String(preset["font-size"]),
+      })),
+    []
+  );
+
+  const stringValue = typeof value === "number" ? String(value) : undefined;
+
   return (
     <div className="relative flex-1">
       <InputPropertyNumber
@@ -36,30 +53,33 @@ export function FontSizeControl({
         )}
       />
       <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
-        <Select
-          value={String(value)}
-          onValueChange={(_v) => {
-            const value = parseInt(_v);
-            onValueChange?.({ type: "set", value });
-            onValueCommit?.({ type: "set", value });
+        <PropertyEnumV2
+          value={(preview.committedValue ?? stringValue) as any}
+          enum={enumItems}
+          className="border-none shadow-none bg-transparent h-6 w-6 min-w-0 p-0 justify-center"
+          renderTriggerValue={() => null}
+          renderItem={(v) => {
+            const preset = twsizesByValue[v];
+            return (
+              <>
+                {v}{" "}
+                {preset && (
+                  <span className="text-muted-foreground text-xs">
+                    {preset.name}
+                  </span>
+                )}
+              </>
+            );
           }}
-        >
-          <SelectPrimitive.SelectTrigger asChild>
-            <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50">
-              <ChevronDownIcon />
-            </button>
-          </SelectPrimitive.SelectTrigger>
-          <SelectContent align="end">
-            {Object.entries(twsizes).map(([key, value]) => (
-              <SelectItem key={key} value={String(value["font-size"])}>
-                {value["font-size"]}{" "}
-                <span className="text-muted-foreground text-xs">
-                  {value.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onOpenChange={(open) => {
+            if (open) preview.onOpen(stringValue ?? "16");
+            else preview.onClose();
+          }}
+          onValueSeeked={preview.onSeek}
+          onValueChange={(v) => {
+            preview.onCommit(v);
+          }}
+        />
       </div>
     </div>
   );
@@ -119,3 +139,7 @@ const twsizes = {
     name: "9xl",
   },
 };
+
+const twsizesByValue = Object.fromEntries(
+  Object.values(twsizes).map((p) => [String(p["font-size"]), p])
+);

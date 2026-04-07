@@ -36,9 +36,8 @@
     ".prettierrc": "jsonc",
     ".eslintignore": "ignore"
   },
-  "javascript.validate.enable": false,
-  "javascript.format.enable": false,
-  "typescript.format.enable": false,
+  "js/ts.validate.enabled": false,
+  "js/ts.format.enabled": false,
   "eslint.enable": true,
   "eslint.validate": [
     "javascript",
@@ -51,7 +50,13 @@
   "[markdown]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
+  "[html]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
   "[css]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[typescriptreact]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
 }

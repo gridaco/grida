@@ -1298,6 +1298,152 @@ describe("format roundtrip", () => {
         }
       );
     });
+
+    it("roundtrips font_style_italic", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Italic",
+          font_style_italic: true,
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_style_italic).toBe(true);
+        }
+      );
+    });
+
+    it("roundtrips font_style_italic false", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Regular",
+          font_style_italic: false,
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_style_italic).toBe(false);
+        }
+      );
+    });
+
+    it("roundtrips font_width", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Condensed",
+          font_width: 75,
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_width).toBe(75);
+        }
+      );
+    });
+
+    it("roundtrips font_optical_sizing none", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Optical",
+          font_optical_sizing: "none",
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_optical_sizing).toBe("none");
+        }
+      );
+    });
+
+    it("roundtrips font_optical_sizing fixed value", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Optical",
+          font_optical_sizing: 24,
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_optical_sizing).toBe(24);
+        }
+      );
+    });
+
+    it("roundtrips font_variations", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Variable",
+          font_variations: { wght: 600, wdth: 75 },
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_variations).toEqual({ wght: 600, wdth: 75 });
+        }
+      );
+    });
+
+    it("roundtrips Semi Bold style (all font style fields together)", () => {
+      const sceneId = "0-1";
+      const nodeId = "0-2";
+      const doc = createDocument(sceneId, {
+        [nodeId]: {
+          ...baseTextSpan(nodeId),
+          text: "Semi Bold",
+          font_weight: 600,
+          font_style_italic: false,
+          font_variations: { wght: 600 },
+          font_width: 100,
+        },
+      });
+      roundtripTest<grida.program.nodes.TextSpanNode>(
+        doc,
+        nodeId,
+        "tspan",
+        (node) => {
+          expect(node.font_weight).toBe(600);
+          expect(node.font_style_italic).toBe(false);
+          expect(node.font_variations).toEqual({ wght: 600 });
+          expect(node.font_width).toBe(100);
+        }
+      );
+    });
   });
 
   describe("additional node types", () => {
