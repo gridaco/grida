@@ -26,7 +26,9 @@ xmlwriter = "0.1"
 
 # parser
 data-url = "0.3" # for href parsing
-flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] } # SVGZ decoding
+flate2 = { version = "1.0", default-features = false, features = [
+  "rust_backend",
+] } # SVGZ decoding
 imagesize = "0.13" # raster images size detection
 kurbo = "0.12" # Bezier curves utils
 roxmltree = "0.20"

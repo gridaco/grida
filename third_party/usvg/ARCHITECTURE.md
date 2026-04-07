@@ -67,13 +67,11 @@ usvg/
 ### Key Components
 
 1. **XML Parsing Layer** (`roxmltree`)
-
    - Parses raw SVG XML into a DOM-like structure
    - Handles namespaces, attributes, and element hierarchy
    - Provides zero-copy string storage via `StringStorage`
 
 2. **Intermediate SVG Tree** (`svgtree::Document`)
-
    - Custom tree structure optimized for SVG
    - Stores attributes as strongly-typed `AId` (Attribute ID) enums
    - Resolves CSS and style attributes into presentation attributes
@@ -81,14 +79,12 @@ usvg/
    - **Key design**: Attributes stored separately from nodes (memory efficient)
 
 3. **Style Resolution Layer** (`parser::style.rs`, `parser::svgtree::parse.rs`)
-
    - Two-pass CSS collection
    - Selector matching via `simplecss`
    - Precedence handling (`!important`, specificity)
    - Inheritance resolution
 
 4. **Conversion Layer** (`parser::converter.rs`)
-
    - Converts `svgtree::Document` to `tree::Tree`
    - Resolves all references (`url(#id)`)
    - Converts shapes to paths
@@ -485,13 +481,11 @@ Let's trace through a complex example with cascading:
    - Returns complete `StyleSheet` object
 
 2. **Process `<g>` element**:
-
    - Copy `fill="orange"` attribute (presentation attribute)
    - Check CSS: No rules match (not a `rect`, no `highlight` class)
    - Result: `fill="orange"`
 
 3. **Process `<rect>` element**:
-
    - **Step 1**: Copy presentation attributes
      - `stroke="black"` → added
    - **Step 2**: Apply CSS rules (in document order)
@@ -502,6 +496,7 @@ Let's trace through a complex example with cascading:
          }
      }
      ```
+
      - Rule 1: `rect { fill: blue; }` → matches! → `fill="blue"`
      - Rule 2: `.highlight { fill: red !important; }` → matches! → `fill="red"` (important)
      - Rule 3: `rect { fill: green; }` → matches! → `fill="green"`
@@ -593,39 +588,33 @@ Input: SVG XML String
 ### Key Design Patterns
 
 1. **Two-Pass CSS Collection**
-
    - **First pass**: Scan entire document to collect all CSS rules
    - **Second pass**: Parse elements and apply complete stylesheet
    - This ensures all CSS is available when matching selectors
    - Works correctly with `<style>` tags anywhere in the document
 
 2. **Separation of Concerns**
-
    - XML parsing separate from SVG semantics
    - CSS resolution separate from attribute resolution
    - Style resolution separate from paint resolution
 
 3. **Strong Typing**
-
    - `EId` enum for element names (prevents typos)
    - `AId` enum for attribute names (faster lookups)
    - Type-safe attribute parsing via `FromValue` trait
 
 4. **Efficient Storage**
-
    - Attributes stored separately (shared across nodes)
    - String borrowing when possible (zero-copy)
    - HashMap for ID lookups (O(1) instead of O(n))
 
 5. **Correct CSS Handling**
-
    - Uses `simplecss` for proper CSS parsing
    - Handles selector matching correctly
    - Preserves `!important` flag
    - Applies rules in correct order
 
 6. **Comprehensive Inheritance**
-
    - Distinguishes inheritable vs non-inheritable attributes
    - Handles `inherit` keyword correctly
    - Walks ancestor chain efficiently
