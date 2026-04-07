@@ -82,18 +82,13 @@ mod tests {
     use crate::resources::ByteStore;
     use std::sync::{Arc, Mutex};
 
-    /// Stylo uses a process-global DOM slot that is not thread-safe.
-    /// All htmlcss tests must be serialized to avoid concurrent access.
-    /// We also share this with the `html` module's tests via crate-level visibility.
-    static TEST_LOCK: Mutex<()> = Mutex::new(());
-
     fn test_fonts() -> FontRepository {
         FontRepository::new(Arc::new(Mutex::new(ByteStore::new())))
     }
 
     #[test]
     fn test_render_empty() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render("", 400.0, 300.0, &fonts);
         assert!(pic.is_ok());
@@ -101,7 +96,7 @@ mod tests {
 
     #[test]
     fn test_render_heading() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render("<h1>Hello</h1>", 400.0, 300.0, &fonts).unwrap();
         assert!(pic.cull_rect().width() > 0.0);
@@ -109,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_render_with_style_block() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             "<style>h1 { color: blue }</style><h1>Blue</h1>",
@@ -122,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_render_table() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             "<table><tr><td>A</td><td>B</td></tr></table>",
@@ -135,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_render_flex() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="display:flex;gap:10px"><div>A</div><div>B</div></div>"#,
@@ -149,7 +144,7 @@ mod tests {
     /// Verify grid properties are collected and layout produces columns.
     #[test]
     fn test_grid_layout_columns() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
 
         let html = r#"<div style="display:grid;grid-template-columns:100px 100px 100px">
@@ -222,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_render_grid_basic() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="display:grid;grid-template-columns:100px 100px 100px;gap:8px">
@@ -237,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_render_grid_fr() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="display:grid;grid-template-columns:1fr 2fr 1fr">
@@ -252,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_render_grid_repeat() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
@@ -267,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_render_grid_span() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
@@ -284,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_render_grid_auto_flow_dense() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-flow:dense;gap:4px">
@@ -302,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_render_box_shadow_outer() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="width:100px;height:80px;box-shadow:4px 4px 8px rgba(0,0,0,0.5)">shadow</div>"#,
@@ -315,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_render_box_shadow_inset() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="width:100px;height:80px;box-shadow:inset 0 2px 8px rgba(0,0,0,0.6)">inset</div>"#,
@@ -328,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_render_box_shadow_combined() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="width:100px;height:80px;box-shadow:0 4px 12px rgba(0,0,0,0.4),inset 0 1px 4px rgba(0,0,0,0.1)">both</div>"#,
@@ -342,7 +337,7 @@ mod tests {
     /// Verify box-shadow properties are collected from Stylo.
     #[test]
     fn test_box_shadow_collection() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
 
         let html = r#"<div style="box-shadow:4px 6px 8px 2px rgba(0,0,0,0.5)">shadow</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
@@ -372,7 +367,7 @@ mod tests {
 
     #[test]
     fn test_render_opacity() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<div style="opacity:0.5"><p>Semi-transparent</p></div>"#,
@@ -442,7 +437,7 @@ mod tests {
 
     #[test]
     fn test_measure_height() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let h = measure_content_height("<p>Hello</p>", 400.0, &fonts).unwrap();
         assert!(h > 0.0, "Content height should be positive, got {h}");
@@ -450,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_head_hidden() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let pic = render(
             r#"<html><head><style>p{color:red}</style></head><body><p>V</p></body></html>"#,
@@ -467,7 +462,7 @@ mod tests {
 
     #[test]
     fn test_markdown_heading() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = markdown_to_styled_html("# Hello World");
         let pic = render(&html, 400.0, 300.0, &fonts);
@@ -477,7 +472,7 @@ mod tests {
 
     #[test]
     fn test_markdown_mixed_content() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let md = r#"# Title
 
@@ -509,7 +504,7 @@ code block
 
     #[test]
     fn test_markdown_table() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let md = r#"
 | Name  | Age | City     |
@@ -524,7 +519,7 @@ code block
 
     #[test]
     fn test_markdown_empty() {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = markdown_to_styled_html("");
         let pic = render(&html, 400.0, 300.0, &fonts);
