@@ -8,6 +8,8 @@
     "dev": "turbo run dev",
     "dev:editor": "turbo run dev --filter=./editor",
     "dev:packages": "turbo run dev --filter=./packages/*",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "generate": "turbo run generate",
     "lint": "turbo run lint",
     "publish-packages": "turbo run build lint test && changeset version && changeset publish",
@@ -17,7 +19,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.29.4",
     "@types/node": "^22",
-    "oxfmt": "^0.28.0",
+    "oxfmt": "^0.44.0",
     "tsup": "^8.5.0",
     "tsx": "^4",
     "turbo": "^2.8.9",
