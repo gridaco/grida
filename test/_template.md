@@ -14,7 +14,7 @@ covered_by: []
 
 ## Behavior
 
-Describe the expected behavior in natural language. Focus on *what* should happen and *why* — design rationale, invariants, and edge cases.
+Describe the expected behavior in natural language. Focus on _what_ should happen and _why_ — design rationale, invariants, and edge cases.
 
 ## Steps
 

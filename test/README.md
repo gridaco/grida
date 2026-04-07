@@ -26,15 +26,15 @@ Every file uses YAML frontmatter for machine-parseable metadata. See `_template.
 
 Key fields:
 
-| Field        | Description                                                    |
-| ------------ | -------------------------------------------------------------- |
-| `id`         | Stable unique ID: `TC-{MODULE}-{AREA}-{NNN}`                  |
-| `module`     | Top-level module: `canvas`, `forms`, `database`, `editor`, ... |
-| `area`       | Sub-domain within the module                                   |
-| `status`     | `untested` · `verified` · `regression` · `deprecated`         |
-| `severity`   | `low` · `medium` · `high` · `critical`                        |
-| `automatable`| Whether this can eventually become a code test                 |
-| `covered_by` | Paths to test files if partially automated                     |
+| Field         | Description                                                    |
+| ------------- | -------------------------------------------------------------- |
+| `id`          | Stable unique ID: `TC-{MODULE}-{AREA}-{NNN}`                   |
+| `module`      | Top-level module: `canvas`, `forms`, `database`, `editor`, ... |
+| `area`        | Sub-domain within the module                                   |
+| `status`      | `untested` · `verified` · `regression` · `deprecated`          |
+| `severity`    | `low` · `medium` · `high` · `critical`                         |
+| `automatable` | Whether this can eventually become a code test                 |
+| `covered_by`  | Paths to test files if partially automated                     |
 
 ## Workflow
 

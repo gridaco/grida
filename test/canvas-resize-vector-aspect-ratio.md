@@ -3,7 +3,15 @@ id: TC-CANVAS-RESIZE-001
 title: Vector Resize with Aspect Ratio Preservation
 module: canvas
 area: resize
-tags: [shift-key, vector-network, aspect-ratio, handles, edge-handles, corner-handles]
+tags:
+  [
+    shift-key,
+    vector-network,
+    aspect-ratio,
+    handles,
+    edge-handles,
+    corner-handles,
+  ]
 status: verified
 severity: high
 date: 2025-12-08
