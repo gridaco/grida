@@ -31,6 +31,62 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libexpat1-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libwayland-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxxf86vm-dev \
+            mesa-common-dev
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          components: clippy
+
+      - name: Cache cargo build outputs
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: clippy
+          cache-all-crates: true
+          cache-workspace-crates: true
+          cache-on-failure: true
+
+      - name: Run clippy
+        env:
+          FORCE_SKIA_BINARIES_DOWNLOAD: "1"
+        run: cargo clippy --no-deps --workspace --exclude grida-canvas-wasm -- -D warnings
+
   test:
     name: cargo test
     runs-on: ubuntu-latest
