@@ -411,6 +411,7 @@ export function PropertyEnumV2<T extends string>({
   tabIndex,
   className,
   renderTriggerValue,
+  renderItem,
   onValueChange,
   onValueSeeked,
   onOpenChange,
@@ -430,6 +431,8 @@ export function PropertyEnumV2<T extends string>({
     value: T,
     selectedItem: EnumItem<T> | undefined
   ) => React.ReactNode;
+  /** Custom renderer for each dropdown item. Receives the enum value. Falls back to the label. */
+  renderItem?: (value: T) => React.ReactNode;
 }) {
   const mixed = value === grida.mixed;
 
@@ -464,7 +467,7 @@ export function PropertyEnumV2<T extends string>({
       ? (allItems.find((i) => i.itemValue === value) ?? null)
       : null;
 
-  const renderItem = (item: ComboboxItemData) => (
+  const renderComboboxItem = (item: ComboboxItemData) => (
     <ComboboxPrimitive.Item
       key={item.itemValue}
       value={item}
@@ -477,7 +480,7 @@ export function PropertyEnumV2<T extends string>({
         <CheckIcon className="size-4" />
       </ComboboxPrimitive.ItemIndicator>
       {hasIcon && item.icon && <>{item.icon}</>}
-      {item.label}
+      {renderItem ? renderItem(item.itemValue) : item.label}
     </ComboboxPrimitive.Item>
   );
 
@@ -547,9 +550,9 @@ export function PropertyEnumV2<T extends string>({
                           />,
                         ]
                       : []),
-                    ...group.map(renderItem),
+                    ...group.map(renderComboboxItem),
                   ])
-                : allItems.map(renderItem)}
+                : allItems.map(renderComboboxItem)}
             </ComboboxPrimitive.List>
           </ComboboxPrimitive.Popup>
         </ComboboxPrimitive.Positioner>

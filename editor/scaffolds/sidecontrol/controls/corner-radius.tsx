@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import InputPropertyNumber from "../ui/number";
+import { PropertyEnumV2, EnumItem } from "../ui";
 import { WorkbenchUI } from "@/components/workbench";
 import cg from "@grida/cg";
 import {
@@ -8,17 +9,11 @@ import {
   CornerBottomRightIcon,
   CornerBottomLeftIcon,
   CornersIcon,
-  ChevronDownIcon,
 } from "@radix-ui/react-icons";
 import grida from "@grida/schema";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/components/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui-editor/select";
-import * as SelectPrimitive from "@radix-ui/react-select";
+import { usePropertyPreview } from "@/grida-canvas-react/hooks/use-property-change";
 
 /**
  * Tailwind CSS border-radius preset values (uniform shorthands only).
@@ -63,6 +58,17 @@ const twradius = {
     name: "4xl",
   },
 } as const;
+
+const radiusEnumItems: EnumItem<string>[] = Object.entries(twradius).map(
+  ([, preset]) => ({
+    value: String(preset["border-radius"]),
+    label: String(preset["border-radius"]),
+  })
+);
+
+const twradiusByValue = Object.fromEntries(
+  Object.values(twradius).map((p) => [String(p["border-radius"]), p])
+);
 
 function isUniform(value: grida.program.nodes.i.IRectangularCornerRadius) {
   const _tl = value.rectangular_corner_radius_top_left;
@@ -160,12 +166,16 @@ export function CornerRadius4Control({
     onValueCommit?.(newCorners as cg.CornerRadius4);
   };
 
-  const hasPreset = useMemo(() => {
-    if (mode !== "all" || uniformValue === undefined) return false;
-    return Object.values(twradius).some(
-      (preset) => preset["border-radius"] === uniformValue
-    );
-  }, [mode, uniformValue]);
+  const apply = useCallback(
+    (v: string) => {
+      onValueCommit?.(parseInt(v));
+    },
+    [onValueCommit]
+  );
+
+  const preview = usePropertyPreview<string>("corner-radius", apply);
+
+  const stringValue = String(uniformValue ?? 0);
 
   return (
     <div className="flex flex-col gap-2">
@@ -190,32 +200,34 @@ export function CornerRadius4Control({
           />
           {mode === "all" && (
             <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
-              <Select
-                value={hasPreset ? String(uniformValue) : undefined}
-                onValueChange={(_v) => {
-                  const value = parseInt(_v);
-                  handleUniformChange(value);
+              <PropertyEnumV2
+                value={(preview.committedValue ?? stringValue) as any}
+                enum={radiusEnumItems}
+                className="border-none shadow-none bg-transparent h-6 w-6 min-w-0 p-0 justify-center"
+                renderTriggerValue={() => null}
+                renderItem={(v) => {
+                  const preset = twradiusByValue[v];
+                  return (
+                    <>
+                      {v}{" "}
+                      {preset && (
+                        <span className="text-muted-foreground text-xs">
+                          {preset.name}
+                        </span>
+                      )}
+                    </>
+                  );
                 }}
-              >
-                <SelectPrimitive.SelectTrigger asChild>
-                  <button className="w-full text-muted-foreground flex items-center justify-center size-6 p-1 opacity-50">
-                    <ChevronDownIcon />
-                  </button>
-                </SelectPrimitive.SelectTrigger>
-                <SelectContent align="end">
-                  {Object.entries(twradius).map(([key, value]) => (
-                    <SelectItem
-                      key={key}
-                      value={String(value["border-radius"])}
-                    >
-                      {value["border-radius"]}{" "}
-                      <span className="text-muted-foreground text-xs">
-                        {value.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onOpenChange={(open) => {
+                  if (open) preview.onOpen(stringValue);
+                  else preview.onClose();
+                }}
+                onValueSeeked={preview.onSeek}
+                onValueChange={(v) => {
+                  onValueCommit?.(parseInt(v));
+                  preview.onCommit(v);
+                }}
+              />
             </div>
           )}
         </div>
