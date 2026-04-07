@@ -603,13 +603,6 @@ fn run_circle_pan_pass(
     )
 }
 
-/// Run a pan pass that interleaves settle (stable) frames at a fixed interval,
-/// simulating the native viewer's settle countdown behavior.
-///
-/// Every `settle_interval` interaction frames, a stable frame is inserted.
-/// ALL frames (interaction + settle) go into the same stats, so p50/p95/p99/MAX
-/// reflect what the user actually sees. `settle_us` holds the average cost of
-/// settle frames specifically.
 // ---------------------------------------------------------------------------
 // Real-time event loop simulation
 // ---------------------------------------------------------------------------
@@ -774,7 +767,7 @@ fn run_frameloop_pan_pass(
             next_scroll_ms += scroll_interval_ms;
             scroll_events_fired += 1;
 
-            if scroll_events_fired % 25 == 0 {
+            if scroll_events_fired.is_multiple_of(25) {
                 pan_direction = -pan_direction;
             }
         }

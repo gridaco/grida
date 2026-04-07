@@ -57,11 +57,11 @@ pub fn find_test_pairs_from_glob(
 ) -> Result<Vec<TestPair>> {
     // Determine the static (literal) root of the glob to compute correct relative paths
     let wc_idx = inputs_glob
-        .find(|c: char| matches!(c, '*' | '?' | '['))
+        .find(['*', '?', '['])
         .unwrap_or(inputs_glob.len());
     let prefix = &inputs_glob[..wc_idx];
     // Trim to directory boundary (drop any partial segment after the last separator)
-    let prefix_root = match prefix.rfind(|c: char| c == '/' || c == '\\') {
+    let prefix_root = match prefix.rfind(['/', '\\']) {
         Some(i) if i > 0 => &prefix[..i],
         Some(_) => "",
         None => prefix,
@@ -182,7 +182,7 @@ pub fn render_svg_to_png(
         .iter()
         .filter_map(|id| geometry.get_render_bounds(id))
         .reduce(|acc, rect| math2::rect::union(&[acc, rect]))
-        .unwrap_or_else(|| Rectangle {
+        .unwrap_or(Rectangle {
             x: 0.0,
             y: 0.0,
             width: 800.0,
