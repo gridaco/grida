@@ -1,0 +1,5 @@
+# Clippy configuration for the Grida workspace
+# https://doc.rust-lang.org/clippy/lint_configuration.html
+
+# Graphics/rendering functions legitimately accept many parameters
+too-many-arguments-threshold = 12

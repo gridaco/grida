@@ -12,6 +12,7 @@ check:
     pnpm fmt:check
     cargo check --all-targets --all-features
     cargo fmt --all -- --check
+    cargo clippy --no-deps -- -D warnings
 
 # Run tests
 test:
