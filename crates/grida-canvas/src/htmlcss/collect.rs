@@ -1262,8 +1262,7 @@ fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
                 mat.m41 as f32,
                 mat.m42 as f32,
             ]),
-            TransformOperation::Translate(tx, ty)
-            | TransformOperation::Translate3D(tx, ty, _) => {
+            TransformOperation::Translate(tx, ty) | TransformOperation::Translate3D(tx, ty, _) => {
                 TransformOp::Translate(resolve_lp(tx), resolve_lp(ty))
             }
             TransformOperation::TranslateX(tx) => {
@@ -1272,8 +1271,7 @@ fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
             TransformOperation::TranslateY(ty) => {
                 TransformOp::Translate(LP::Px(0.0), resolve_lp(ty))
             }
-            TransformOperation::Scale(sx, sy)
-            | TransformOperation::Scale3D(sx, sy, _) => {
+            TransformOperation::Scale(sx, sy) | TransformOperation::Scale3D(sx, sy, _) => {
                 TransformOp::Scale(*sx as f32, *sy as f32)
             }
             TransformOperation::ScaleX(sx) => TransformOp::Scale(*sx as f32, 1.0),

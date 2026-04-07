@@ -661,7 +661,11 @@ code block
         assert_eq!(el.transform.len(), 1);
         match &el.transform[0] {
             types::TransformOp::Translate(tx, ty) => {
-                assert_eq!(*tx, types::LengthPercentage::Percent(0.5), "tx should be 50%");
+                assert_eq!(
+                    *tx,
+                    types::LengthPercentage::Percent(0.5),
+                    "tx should be 50%"
+                );
                 assert_eq!(*ty, types::LengthPercentage::Px(0.0), "ty should be 0px");
             }
             other => panic!("Expected Translate, got {:?}", other),
@@ -704,14 +708,8 @@ code block
         let html = r#"<div style="transform:rotate(10deg);transform-origin:left top">T</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_with_transform(&root).expect("Should find transformed element");
-        assert_eq!(
-            el.transform_origin.x,
-            types::LengthPercentage::Percent(0.0)
-        );
-        assert_eq!(
-            el.transform_origin.y,
-            types::LengthPercentage::Percent(0.0)
-        );
+        assert_eq!(el.transform_origin.x, types::LengthPercentage::Percent(0.0));
+        assert_eq!(el.transform_origin.y, types::LengthPercentage::Percent(0.0));
     }
 
     // ── Render tests ──

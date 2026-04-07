@@ -181,7 +181,11 @@ fn resolve_transform(ops: &[types::TransformOp], w: f32, h: f32) -> Option<[f32;
         && (m[3] - 1.0).abs() < 1e-6
         && m[4].abs() < 1e-6
         && m[5].abs() < 1e-6;
-    if is_identity { None } else { Some(m) }
+    if is_identity {
+        None
+    } else {
+        Some(m)
+    }
 }
 
 /// Multiply two 2D affine matrices: result = a * b.
