@@ -1352,23 +1352,37 @@ probes in `examples/skia_bench/` for per-primitive validation data.
   primitive" rules need per-backend validation.** Modern analytic-AA
   GPU shaders may already handle sub-pixel inputs efficiently.
 
-52. **Subpixel LOD Culling** (A1)
+52. **Subpixel LOD Culling** (A1) ✅ IMPLEMENTED
 
     Drop leaf nodes from the frame plan when both projected dimensions
-    fall below a threshold (e.g. 0.5 px). At fit-zoom on the 136K-node
-    fixture, ~38% of visible leaves have both dimensions below 0.5 px
-    at zoom 0.02. Culling them reduces `draw_us` by 6–18% and GPU
-    `mid_flush_us` by up to 24%.
+    fall below a threshold (0.5 px). Pre-computes
+    `min_world_size = 0.5 / zoom` and filters indices during
+    `Renderer::frame()` using `absolute_render_bounds` from the
+    geometry cache (O(1) per node via `DenseNodeMap`).
 
     Decision: `w·z < ε && h·z < ε` — both axes must be subpixel.
     Thin shapes (large in one axis) survive. Gated by `zoom < 1.0`.
 
+    Applies to both the full-viewport fast path and the R-tree query
+    path. Culled nodes are absent from the ViewportCull bitset, so
+    `draw_render_commands` skips them with the existing ~1ns check.
+    Picture cache prefill, compositor updates, and GPU draw calls are
+    all eliminated for culled nodes.
+
     Mirrors Chromium's `MinimumContentsScale` (`cc/layers/
     picture_layer_impl.cc`).
 
-    Design: filter `indices` in `Renderer::frame()` after R-tree
-    query, using per-layer bounds stored in a parallel
-    `Vec<Option<AABB>>` for O(1) lookup.
+    **Measured impact (Apple M2 Pro, GPU benchmark, 01-135k 136K nodes):**
+
+    | Scenario | Metric | Before | After | Delta |
+    | -------- | ------ | ------ | ----- | ----- |
+    | baseline_nocache_fit | draw_us | 8,867 | 7,248 | **-18%** |
+    | baseline_nocache_fit | mid_flush_us | 44,442 | 42,642 | **-4%** |
+    | pan settle (fit) | settle_us | 74,520 | 65,659 | **-12%** |
+    | fl_16ms | MAX | 110,407 | 82,731 | **-25%** |
+    | fl_500ms | draw_us | 9,144 | 5,202 | **-43%** |
+
+    Implementation: `Renderer::frame()` in `runtime/scene.rs`.
 
 53. **Text LOD (H1 cull + H2 greek)**
 
