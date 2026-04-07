@@ -6,7 +6,6 @@ tags:
   - canvas
   - vector
   - rendering
-
 ---
 
 # Curve Decorations (2D)

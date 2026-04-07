@@ -43,6 +43,7 @@ usvg = { path = "../../third_party/usvg" }
 # html/css cascade (Stylo-based style resolution)
 csscascade = { path = "../csscascade" }
 stylo = { git = "https://github.com/gridaco/stylo" }
+style_config = { git = "https://github.com/gridaco/stylo", package = "stylo_config" }
 # markdown parsing
 # (+0.25mb wasm32-unknown-emscripten@opt-level=3)
 pulldown-cmark = "0.13.0"

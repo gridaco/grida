@@ -8,7 +8,6 @@ tags:
   - canvas
   - performance
   - rendering
-
 ---
 
 # Investigation: Viewport Culling & Camera Caching

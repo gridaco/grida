@@ -326,6 +326,30 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
         ..taffy::Style::default()
     };
 
+    // Grid container properties
+    if el.display == types::Display::Grid {
+        style.grid_template_columns = grid_template_to_taffy(&el.grid_template_columns);
+        style.grid_template_rows = grid_template_to_taffy(&el.grid_template_rows);
+        style.grid_auto_columns = implicit_tracks_to_taffy(&el.grid_auto_columns);
+        style.grid_auto_rows = implicit_tracks_to_taffy(&el.grid_auto_rows);
+        style.grid_auto_flow = match el.grid_auto_flow {
+            types::GridAutoFlow::Row => taffy::GridAutoFlow::Row,
+            types::GridAutoFlow::Column => taffy::GridAutoFlow::Column,
+            types::GridAutoFlow::RowDense => taffy::GridAutoFlow::RowDense,
+            types::GridAutoFlow::ColumnDense => taffy::GridAutoFlow::ColumnDense,
+        };
+    }
+
+    // Grid child placement
+    style.grid_column = taffy::Line {
+        start: grid_placement_to_taffy(el.grid_column_start),
+        end: grid_placement_to_taffy(el.grid_column_end),
+    };
+    style.grid_row = taffy::Line {
+        start: grid_placement_to_taffy(el.grid_row_start),
+        end: grid_placement_to_taffy(el.grid_row_end),
+    };
+
     // Faux-table: override display/flex for CSS table elements.
     // Try display-based override first, then tag-based fallback for
     // row-group wrappers (<thead>, <tbody>, <tfoot>).
@@ -380,6 +404,94 @@ fn map_overflow(ov: types::Overflow) -> taffy::Overflow {
         types::Overflow::Hidden | types::Overflow::Clip => taffy::Overflow::Clip,
         types::Overflow::Scroll => taffy::Overflow::Scroll,
         _ => taffy::Overflow::Visible,
+    }
+}
+
+// ─── Grid conversion helpers ────────────────────────────────────────
+
+fn track_breadth_to_taffy_min(b: types::TrackBreadth) -> taffy::MinTrackSizingFunction {
+    match b {
+        types::TrackBreadth::Px(px) => taffy::MinTrackSizingFunction::length(px),
+        types::TrackBreadth::Percent(pct) => taffy::MinTrackSizingFunction::percent(pct),
+        // fr is not valid for min track sizing — treat as auto
+        types::TrackBreadth::Fr(_) => taffy::MinTrackSizingFunction::auto(),
+        types::TrackBreadth::Auto => taffy::MinTrackSizingFunction::auto(),
+        types::TrackBreadth::MinContent => taffy::MinTrackSizingFunction::min_content(),
+        types::TrackBreadth::MaxContent => taffy::MinTrackSizingFunction::max_content(),
+    }
+}
+
+fn track_breadth_to_taffy_max(b: types::TrackBreadth) -> taffy::MaxTrackSizingFunction {
+    match b {
+        types::TrackBreadth::Px(px) => taffy::MaxTrackSizingFunction::length(px),
+        types::TrackBreadth::Percent(pct) => taffy::MaxTrackSizingFunction::percent(pct),
+        types::TrackBreadth::Fr(fr) => taffy::MaxTrackSizingFunction::fr(fr),
+        types::TrackBreadth::Auto => taffy::MaxTrackSizingFunction::auto(),
+        types::TrackBreadth::MinContent => taffy::MaxTrackSizingFunction::min_content(),
+        types::TrackBreadth::MaxContent => taffy::MaxTrackSizingFunction::max_content(),
+    }
+}
+
+fn track_size_to_taffy(ts: &types::TrackSize) -> taffy::TrackSizingFunction {
+    match ts {
+        types::TrackSize::Single(b) => taffy::MinMax {
+            min: track_breadth_to_taffy_min(*b),
+            max: track_breadth_to_taffy_max(*b),
+        },
+        types::TrackSize::MinMax(min_b, max_b) => taffy::MinMax {
+            min: track_breadth_to_taffy_min(*min_b),
+            max: track_breadth_to_taffy_max(*max_b),
+        },
+        types::TrackSize::FitContent(b) => {
+            let max = match b {
+                types::TrackBreadth::Px(px) => taffy::MaxTrackSizingFunction::fit_content_px(*px),
+                types::TrackBreadth::Percent(pct) => {
+                    taffy::MaxTrackSizingFunction::fit_content_percent(*pct)
+                }
+                _ => taffy::MaxTrackSizingFunction::auto(),
+            };
+            taffy::MinMax {
+                min: taffy::MinTrackSizingFunction::auto(),
+                max,
+            }
+        }
+    }
+}
+
+fn grid_template_to_taffy(
+    entries: &[types::GridTemplateEntry],
+) -> Vec<taffy::GridTemplateComponent<String>> {
+    entries
+        .iter()
+        .map(|entry| match entry {
+            types::GridTemplateEntry::Track(ts) => {
+                taffy::GridTemplateComponent::Single(track_size_to_taffy(ts))
+            }
+            types::GridTemplateEntry::Repeat(count, tracks) => {
+                taffy::GridTemplateComponent::Repeat(taffy::GridTemplateRepetition {
+                    count: match count {
+                        types::RepeatCount::Count(n) => taffy::RepetitionCount::Count(*n),
+                        types::RepeatCount::AutoFill => taffy::RepetitionCount::AutoFill,
+                        types::RepeatCount::AutoFit => taffy::RepetitionCount::AutoFit,
+                    },
+                    tracks: tracks.iter().map(|ts| track_size_to_taffy(ts)).collect(),
+                    line_names: Vec::new(),
+                })
+            }
+        })
+        .collect()
+}
+
+fn implicit_tracks_to_taffy(tracks: &[types::TrackSize]) -> Vec<taffy::TrackSizingFunction> {
+    tracks.iter().map(|ts| track_size_to_taffy(ts)).collect()
+}
+
+fn grid_placement_to_taffy(p: types::GridPlacement) -> taffy::GridPlacement<String> {
+    use taffy::style_helpers::TaffyGridLine;
+    match p {
+        types::GridPlacement::Auto => taffy::GridPlacement::Auto,
+        types::GridPlacement::Line(n) => taffy::GridPlacement::from_line_index(n),
+        types::GridPlacement::Span(n) => taffy::GridPlacement::Span(n),
     }
 }
 

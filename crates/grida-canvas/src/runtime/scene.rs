@@ -2131,7 +2131,7 @@ impl Renderer {
     fn frame(
         &self,
         bounds: rect::Rectangle,
-        _zoom: f32,
+        zoom: f32,
         stable: bool,
         camera_change: CameraChangeKind,
     ) -> FramePlan {
@@ -2142,6 +2142,26 @@ impl Renderer {
 
         let mut promoted_ids: Vec<NodeId> = Vec::new();
         let mut regions: Vec<(rect::Rectangle, Vec<usize>)> = Vec::new();
+
+        // Sub-pixel culling threshold: skip nodes whose largest projected
+        // screen dimension is below this value (in pixels). At low zoom
+        // levels (e.g. 0.02 fit-zoom on a 136K-node scene), most nodes
+        // project to sub-pixel size and generate GPU draw calls for
+        // invisible results. Culling them eliminates all downstream work:
+        // picture cache lookup, Skia draw_picture, and GPU commands.
+        //
+        // 0.5px is conservative — a node must be at least half a pixel
+        // in its larger dimension to be worth drawing. This matches
+        // Chromium's approach of skipping invisible content during
+        // compositing (cc/trees/layer_tree_host_impl.cc).
+        const SUBPIXEL_CULL_THRESHOLD: f32 = 0.5;
+        // Pre-compute the minimum world-space dimension that projects to
+        // the threshold. Avoids per-node multiplication by zoom.
+        let min_world_size = if zoom > 0.0 && zoom < 1.0 {
+            SUBPIXEL_CULL_THRESHOLD / zoom
+        } else {
+            0.0 // At zoom >= 1.0, all nodes are visible; skip culling.
+        };
 
         // Full-viewport fast path: when the camera viewport fully contains
         // the scene envelope (R-tree root AABB), ALL indexed layers are
@@ -2170,12 +2190,38 @@ impl Renderer {
                 }
             };
 
+        // Sub-pixel size predicate: returns true if the node at `idx` has
+        // at least one render-bounds dimension >= min_world_size. Nodes
+        // without bounds or without a layer entry are conservatively included.
+        let passes_size_cull = |idx: usize| -> bool {
+            self.scene_cache
+                .layers
+                .layers
+                .get(idx)
+                .and_then(|entry| self.scene_cache.geometry.get_render_bounds(&entry.id))
+                .map_or(true, |rb| {
+                    rb.width >= min_world_size || rb.height >= min_world_size
+                })
+        };
+
         let indices = if all_visible {
-            // All layers visible — sequential indices, already sorted.
-            (0..layer_count).collect::<Vec<_>>()
+            if min_world_size > 0.0 {
+                // All layers spatially visible, but many may be sub-pixel.
+                // Filter by projected screen size using the geometry cache
+                // (O(1) per node via DenseNodeMap).
+                (0..layer_count)
+                    .filter(|&idx| passes_size_cull(idx))
+                    .collect::<Vec<_>>()
+            } else {
+                // All layers visible, no size culling needed.
+                (0..layer_count).collect::<Vec<_>>()
+            }
         } else {
             // Partial visibility — R-tree spatial query.
             let mut queried = self.scene_cache.intersects(bounds);
+            if min_world_size > 0.0 {
+                queried.retain(|&idx| passes_size_cull(idx));
+            }
             // sort_unstable (pdqsort) is 2-3x faster than stable merge sort
             // for integer data because it avoids the O(n) merge buffer
             // allocation. Draw order correctness only requires sorted indices,
