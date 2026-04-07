@@ -284,3 +284,58 @@ pub enum GridPlacement {
     /// `span <n>`.
     Span(u16),
 }
+
+// ─── Transform types ────────────────────────────────────────────────
+
+/// A length-or-percentage value. Percentages are resolved against the
+/// element's box size at paint time.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LengthPercentage {
+    Px(f32),
+    /// Fraction of the reference dimension (0.0 = 0%, 1.0 = 100%).
+    Percent(f32),
+}
+
+impl LengthPercentage {
+    /// Resolve against a reference dimension (box width or height).
+    pub fn resolve(&self, reference: f32) -> f32 {
+        match self {
+            Self::Px(v) => *v,
+            Self::Percent(f) => f * reference,
+        }
+    }
+}
+
+/// A single CSS 2D transform operation, preserving unresolved percentage
+/// and length operands so they can be resolved at paint time when the
+/// element's box size is available.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TransformOp {
+    /// `matrix(a, b, c, d, tx, ty)` / `matrix3d(...)` projected to 2D.
+    Matrix([f32; 6]),
+    /// `translate(tx, ty)` / `translateX(tx)` / `translateY(ty)`.
+    Translate(LengthPercentage, LengthPercentage),
+    /// `scale(sx, sy)` / `scaleX(sx)` / `scaleY(sy)`.
+    Scale(f32, f32),
+    /// `rotate(angle)` — angle in radians.
+    Rotate(f32),
+    /// `skew(ax, ay)` — angles in radians.
+    Skew(f32, f32),
+}
+
+/// CSS `transform-origin`, preserving px vs % for each axis.
+/// CSS default is `50% 50%` (center).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TransformOrigin {
+    pub x: LengthPercentage,
+    pub y: LengthPercentage,
+}
+
+impl Default for TransformOrigin {
+    fn default() -> Self {
+        Self {
+            x: LengthPercentage::Percent(0.5),
+            y: LengthPercentage::Percent(0.5),
+        }
+    }
+}

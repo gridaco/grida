@@ -73,24 +73,25 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
     canvas.translate((x, y));
 
     // ── CSS transform (applied after positioning, around transform-origin) ──
-    // Bakes T(origin) * M * T(-origin) into a single matrix concat.
-    if let Some(m) = style.transform {
-        let (ox, oy) = match style.transform_origin {
-            Some((fx, fy)) => (fx * w, fy * h),
-            None => (w * 0.5, h * 0.5),
-        };
-        let matrix = skia_safe::Matrix::new_all(
-            m[0],
-            m[2],
-            m[4] + ox - m[0] * ox - m[2] * oy,
-            m[1],
-            m[3],
-            m[5] + oy - m[1] * ox - m[3] * oy,
-            0.0,
-            0.0,
-            1.0,
-        );
-        canvas.concat(&matrix);
+    // Resolve percentage/length operands now that box size (w, h) is known,
+    // then bake T(origin) * M * T(-origin) into a single matrix concat.
+    if !style.transform.is_empty() {
+        if let Some(m) = resolve_transform(&style.transform, w, h) {
+            let ox = style.transform_origin.x.resolve(w);
+            let oy = style.transform_origin.y.resolve(h);
+            let matrix = skia_safe::Matrix::new_all(
+                m[0],
+                m[2],
+                m[4] + ox - m[0] * ox - m[2] * oy,
+                m[1],
+                m[3],
+                m[5] + oy - m[1] * ox - m[3] * oy,
+                0.0,
+                0.0,
+                1.0,
+            );
+            canvas.concat(&matrix);
+        }
     }
 
     if needs_layer {
@@ -144,6 +145,55 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
         canvas.restore(); // layer
     }
     canvas.restore(); // translate
+}
+
+// ─── Transform resolution ───────────────────────────────────────────
+
+/// Resolve a list of `TransformOp` into a flattened 2D affine matrix,
+/// resolving percentage operands against the element's box size.
+/// Returns `None` if the result is identity (no visual effect).
+fn resolve_transform(ops: &[types::TransformOp], w: f32, h: f32) -> Option<[f32; 6]> {
+    // Matrix layout: [a, b, c, d, tx, ty]
+    // | a c tx |
+    // | b d ty |
+    // | 0 0  1 |
+    let mut m: [f32; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+
+    for op in ops {
+        let op_m = match op {
+            types::TransformOp::Matrix(mat) => *mat,
+            types::TransformOp::Translate(tx, ty) => {
+                [1.0, 0.0, 0.0, 1.0, tx.resolve(w), ty.resolve(h)]
+            }
+            types::TransformOp::Scale(sx, sy) => [*sx, 0.0, 0.0, *sy, 0.0, 0.0],
+            types::TransformOp::Rotate(rad) => {
+                let (sin, cos) = rad.sin_cos();
+                [cos, sin, -sin, cos, 0.0, 0.0]
+            }
+            types::TransformOp::Skew(ax, ay) => [1.0, ay.tan(), ax.tan(), 1.0, 0.0, 0.0],
+        };
+        m = mat_mul(m, op_m);
+    }
+
+    let is_identity = (m[0] - 1.0).abs() < 1e-6
+        && m[1].abs() < 1e-6
+        && m[2].abs() < 1e-6
+        && (m[3] - 1.0).abs() < 1e-6
+        && m[4].abs() < 1e-6
+        && m[5].abs() < 1e-6;
+    if is_identity { None } else { Some(m) }
+}
+
+/// Multiply two 2D affine matrices: result = a * b.
+fn mat_mul(a: [f32; 6], b: [f32; 6]) -> [f32; 6] {
+    [
+        a[0] * b[0] + a[2] * b[1],
+        a[1] * b[0] + a[3] * b[1],
+        a[0] * b[2] + a[2] * b[3],
+        a[1] * b[2] + a[3] * b[3],
+        a[0] * b[4] + a[2] * b[5] + a[4],
+        a[1] * b[4] + a[3] * b[5] + a[5],
+    ]
 }
 
 // ─── Background painting (Chromium: BoxPainterBase::PaintFillLayers) ──

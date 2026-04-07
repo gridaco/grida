@@ -526,70 +526,74 @@ code block
         assert!(pic.is_ok(), "Empty markdown should render");
     }
 
-    // ── Transform tests ──
+    // ── Transform collection tests ──
 
-    /// Verify translate transform is collected as a matrix.
+    /// Verify translate(px, px) is collected as TransformOp::Translate.
     #[test]
     fn test_transform_translate_collection() {
         let _guard = crate::stylo_test::lock();
         let html = r#"<div style="transform:translate(20px, 10px)">T</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_with_transform(&root).expect("Should find element with transform");
-        let m = el.transform.expect("Should have transform matrix");
-        // translate(20, 10) → [1, 0, 0, 1, 20, 10]
-        assert!((m[0] - 1.0).abs() < 0.01, "a should be 1, got {}", m[0]);
-        assert!((m[3] - 1.0).abs() < 0.01, "d should be 1, got {}", m[3]);
-        assert!((m[4] - 20.0).abs() < 0.01, "tx should be 20, got {}", m[4]);
-        assert!((m[5] - 10.0).abs() < 0.01, "ty should be 10, got {}", m[5]);
+        assert_eq!(el.transform.len(), 1);
+        match &el.transform[0] {
+            types::TransformOp::Translate(tx, ty) => {
+                assert_eq!(*tx, types::LengthPercentage::Px(20.0));
+                assert_eq!(*ty, types::LengthPercentage::Px(10.0));
+            }
+            other => panic!("Expected Translate, got {:?}", other),
+        }
     }
 
-    /// Verify rotate transform is collected.
+    /// Verify rotate is collected with radians.
     #[test]
     fn test_transform_rotate_collection() {
         let _guard = crate::stylo_test::lock();
         let html = r#"<div style="transform:rotate(90deg)">R</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_with_transform(&root).expect("Should find element with transform");
-        let m = el.transform.expect("Should have transform matrix");
-        // rotate(90deg) → [cos90, sin90, -sin90, cos90, 0, 0] ≈ [0, 1, -1, 0, 0, 0]
-        assert!(m[0].abs() < 0.01, "a should be ~0, got {}", m[0]);
-        assert!((m[1] - 1.0).abs() < 0.01, "b should be ~1, got {}", m[1]);
-        assert!((m[2] + 1.0).abs() < 0.01, "c should be ~-1, got {}", m[2]);
-        assert!(m[3].abs() < 0.01, "d should be ~0, got {}", m[3]);
+        assert_eq!(el.transform.len(), 1);
+        match &el.transform[0] {
+            types::TransformOp::Rotate(rad) => {
+                assert!(
+                    (rad - std::f32::consts::FRAC_PI_2).abs() < 0.01,
+                    "Expected ~PI/2, got {}",
+                    rad
+                );
+            }
+            other => panic!("Expected Rotate, got {:?}", other),
+        }
     }
 
-    /// Verify scale transform is collected.
+    /// Verify scale is collected.
     #[test]
     fn test_transform_scale_collection() {
         let _guard = crate::stylo_test::lock();
         let html = r#"<div style="transform:scale(2, 0.5)">S</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_with_transform(&root).expect("Should find element with transform");
-        let m = el.transform.expect("Should have transform matrix");
-        // scale(2, 0.5) → [2, 0, 0, 0.5, 0, 0]
-        assert!((m[0] - 2.0).abs() < 0.01, "a should be 2, got {}", m[0]);
-        assert!((m[3] - 0.5).abs() < 0.01, "d should be 0.5, got {}", m[3]);
+        assert_eq!(el.transform.len(), 1);
+        assert_eq!(el.transform[0], types::TransformOp::Scale(2.0, 0.5));
     }
 
-    /// Verify skewX transform is collected.
+    /// Verify skewX is collected.
     #[test]
     fn test_transform_skew_collection() {
         let _guard = crate::stylo_test::lock();
         let html = r#"<div style="transform:skewX(45deg)">K</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_with_transform(&root).expect("Should find element with transform");
-        let m = el.transform.expect("Should have transform matrix");
-        // skewX(45deg) → [1, 0, tan(45°), 1, 0, 0] = [1, 0, 1, 1, 0, 0]
-        assert!((m[0] - 1.0).abs() < 0.01);
-        assert!(
-            (m[2] - 1.0).abs() < 0.01,
-            "c should be ~1 (tan 45°), got {}",
-            m[2]
-        );
-        assert!((m[3] - 1.0).abs() < 0.01);
+        assert_eq!(el.transform.len(), 1);
+        match &el.transform[0] {
+            types::TransformOp::Skew(ax, ay) => {
+                assert!((ax - std::f32::consts::FRAC_PI_4).abs() < 0.01);
+                assert!(ay.abs() < 0.01);
+            }
+            other => panic!("Expected Skew, got {:?}", other),
+        }
     }
 
-    /// Verify combined transform: translate + rotate + scale.
+    /// Verify combined transform preserves all ops in order.
     #[test]
     fn test_transform_combined_collection() {
         let _guard = crate::stylo_test::lock();
@@ -597,56 +601,121 @@ code block
             r#"<div style="transform:translate(10px, 10px) rotate(30deg) scale(0.8)">C</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_with_transform(&root).expect("Should find element with transform");
-        let m = el.transform.expect("Should have transform matrix");
-        // Combined: should not be identity
-        assert!(
-            (m[0] - 1.0).abs() > 0.01 || (m[1]).abs() > 0.01,
-            "Combined transform should differ from identity"
-        );
-        // tx should be close to 10 (from the translate)
-        assert!((m[4] - 10.0).abs() < 0.01, "tx should be 10, got {}", m[4]);
-        assert!((m[5] - 10.0).abs() < 0.01, "ty should be 10, got {}", m[5]);
+        assert_eq!(el.transform.len(), 3, "Should have 3 ops");
+        assert!(matches!(el.transform[0], types::TransformOp::Translate(..)));
+        assert!(matches!(el.transform[1], types::TransformOp::Rotate(..)));
+        assert!(matches!(el.transform[2], types::TransformOp::Scale(..)));
     }
 
-    /// Verify CSS matrix() function is collected.
+    /// Verify CSS matrix() is collected as TransformOp::Matrix.
     #[test]
     fn test_transform_matrix_collection() {
         let _guard = crate::stylo_test::lock();
         let html = r#"<div style="transform:matrix(0.866, 0.5, -0.5, 0.866, 10, 20)">M</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_with_transform(&root).expect("Should find element with transform");
-        let m = el.transform.expect("Should have transform matrix");
-        assert!((m[0] - 0.866).abs() < 0.01, "a={}", m[0]);
-        assert!((m[1] - 0.5).abs() < 0.01, "b={}", m[1]);
-        assert!((m[2] + 0.5).abs() < 0.01, "c={}", m[2]);
-        assert!((m[3] - 0.866).abs() < 0.01, "d={}", m[3]);
-        assert!((m[4] - 10.0).abs() < 0.01, "tx={}", m[4]);
-        assert!((m[5] - 20.0).abs() < 0.01, "ty={}", m[5]);
+        assert_eq!(el.transform.len(), 1);
+        match &el.transform[0] {
+            types::TransformOp::Matrix(m) => {
+                assert!((m[0] - 0.866).abs() < 0.01);
+                assert!((m[1] - 0.5).abs() < 0.01);
+                assert!((m[2] + 0.5).abs() < 0.01);
+                assert!((m[3] - 0.866).abs() < 0.01);
+                assert!((m[4] - 10.0).abs() < 0.01);
+                assert!((m[5] - 20.0).abs() < 0.01);
+            }
+            other => panic!("Expected Matrix, got {:?}", other),
+        }
     }
 
-    /// Verify no transform yields None.
+    /// Verify no transform yields empty vec.
     #[test]
     fn test_transform_none() {
         let _guard = crate::stylo_test::lock();
         let html = r#"<div style="width:50px">no transform</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
-        // All elements should have transform = None
-        fn check_none(el: &style::StyledElement) {
+        fn check_empty(el: &style::StyledElement) {
             assert!(
-                el.transform.is_none(),
+                el.transform.is_empty(),
                 "tag={} should have no transform",
                 el.tag
             );
             for child in &el.children {
                 if let style::StyledNode::Element(c) = child {
-                    check_none(c);
+                    check_empty(c);
                 }
             }
         }
-        check_none(&root);
+        check_empty(&root);
     }
 
-    /// Render the transform-2d.html fixture without panicking.
+    // ── Percentage / px regression tests ──
+
+    /// translateX(50%) must preserve the percentage, not collapse to 0.
+    #[test]
+    fn test_transform_translate_percent() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:200px;height:100px;transform:translateX(50%)">T</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_with_transform(&root).expect("translateX(50%) should produce a transform");
+        assert_eq!(el.transform.len(), 1);
+        match &el.transform[0] {
+            types::TransformOp::Translate(tx, ty) => {
+                assert_eq!(*tx, types::LengthPercentage::Percent(0.5), "tx should be 50%");
+                assert_eq!(*ty, types::LengthPercentage::Px(0.0), "ty should be 0px");
+            }
+            other => panic!("Expected Translate, got {:?}", other),
+        }
+    }
+
+    /// translate(10px, 50%) must preserve mixed px/% operands.
+    #[test]
+    fn test_transform_translate_mixed() {
+        let _guard = crate::stylo_test::lock();
+        let html =
+            r#"<div style="width:200px;height:100px;transform:translate(10px, 50%)">T</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_with_transform(&root).expect("Should find element with transform");
+        assert_eq!(el.transform.len(), 1);
+        match &el.transform[0] {
+            types::TransformOp::Translate(tx, ty) => {
+                assert_eq!(*tx, types::LengthPercentage::Px(10.0));
+                assert_eq!(*ty, types::LengthPercentage::Percent(0.5));
+            }
+            other => panic!("Expected Translate, got {:?}", other),
+        }
+    }
+
+    /// transform-origin with absolute px values must be preserved.
+    #[test]
+    fn test_transform_origin_px() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:200px;height:100px;transform:rotate(45deg);transform-origin:10px 20px">T</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_with_transform(&root).expect("Should find transformed element");
+        assert_eq!(el.transform_origin.x, types::LengthPercentage::Px(10.0));
+        assert_eq!(el.transform_origin.y, types::LengthPercentage::Px(20.0));
+    }
+
+    /// transform-origin: left top → 0% 0%.
+    #[test]
+    fn test_transform_origin_keywords() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="transform:rotate(10deg);transform-origin:left top">T</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_with_transform(&root).expect("Should find transformed element");
+        assert_eq!(
+            el.transform_origin.x,
+            types::LengthPercentage::Percent(0.0)
+        );
+        assert_eq!(
+            el.transform_origin.y,
+            types::LengthPercentage::Percent(0.0)
+        );
+    }
+
+    // ── Render tests ──
+
     #[test]
     fn test_render_transform_2d_fixture() {
         let _guard = crate::stylo_test::lock();
@@ -656,7 +725,6 @@ code block
         assert!(pic.is_ok(), "transform-2d.html should render without error");
     }
 
-    /// Render transform with custom origin.
     #[test]
     fn test_render_transform_with_origin() {
         let _guard = crate::stylo_test::lock();
@@ -666,7 +734,6 @@ code block
         assert!(pic.is_ok());
     }
 
-    /// Render the transform-origin.html fixture without panicking.
     #[test]
     fn test_render_transform_origin_fixture() {
         let _guard = crate::stylo_test::lock();
@@ -679,7 +746,6 @@ code block
         );
     }
 
-    /// Render the transform-nested.html fixture without panicking.
     #[test]
     fn test_render_transform_nested_fixture() {
         let _guard = crate::stylo_test::lock();
@@ -692,9 +758,29 @@ code block
         );
     }
 
-    /// Helper: find first element with a non-None transform.
+    /// translateX(50%) on a 200px box must render (not silently ignored).
+    #[test]
+    fn test_render_transform_translate_percent() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let html = r#"<div style="width:200px;height:50px;background:#000;transform:translateX(50%)">T</div>"#;
+        let pic = render(html, 400.0, 300.0, &fonts);
+        assert!(pic.is_ok());
+    }
+
+    /// transform-origin: 10px 20px must render correctly.
+    #[test]
+    fn test_render_transform_origin_px() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let html = r#"<div style="width:100px;height:100px;background:#000;transform:rotate(45deg);transform-origin:10px 20px">T</div>"#;
+        let pic = render(html, 400.0, 300.0, &fonts);
+        assert!(pic.is_ok());
+    }
+
+    /// Helper: find first element with a non-empty transform list.
     fn find_with_transform(el: &style::StyledElement) -> Option<&style::StyledElement> {
-        if el.transform.is_some() {
+        if !el.transform.is_empty() {
             return Some(el);
         }
         for child in &el.children {
