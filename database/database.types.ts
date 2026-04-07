@@ -111,15 +111,24 @@ export type Database = MergeDeep<
         portal_preset: {
           // View mirrors the table 1:1; reference the table type and only
           // narrow the two JSONB columns from Json to their enforced shapes.
-          Row: Omit<DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Row"], "verification_email_template" | "portal_login_page"> & {
+          Row: Omit<
+            DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Row"],
+            "verification_email_template" | "portal_login_page"
+          > & {
             verification_email_template: PortalPresetVerificationEmailTemplate;
             portal_login_page: PortalPresetLoginPage;
           };
-          Insert: Omit<DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Insert"], "verification_email_template" | "portal_login_page"> & {
+          Insert: Omit<
+            DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Insert"],
+            "verification_email_template" | "portal_login_page"
+          > & {
             verification_email_template?: PortalPresetVerificationEmailTemplate;
             portal_login_page?: PortalPresetLoginPage;
           };
-          Update: Omit<DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Update"], "verification_email_template" | "portal_login_page"> & {
+          Update: Omit<
+            DatabaseGenerated["grida_ciam"]["Tables"]["portal_preset"]["Update"],
+            "verification_email_template" | "portal_login_page"
+          > & {
             verification_email_template?: PortalPresetVerificationEmailTemplate;
             portal_login_page?: PortalPresetLoginPage;
           };

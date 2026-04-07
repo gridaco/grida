@@ -27,7 +27,7 @@ schemas = [
   "grida_forms_secure",
   "grida_forms",
   "grida_storage",
-  "grida_west_referral"
+  "grida_west_referral",
 ]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
@@ -68,7 +68,7 @@ enabled = true
 sql_paths = ["./seed.sql"]
 
 [db.migrations]
-schema_paths = ["./schemas/*.sql",]
+schema_paths = ["./schemas/*.sql"]
 
 [realtime]
 enabled = true
@@ -110,7 +110,12 @@ enabled = true
 [storage.buckets.www]
 public = true
 file_size_limit = "5MiB"
-allowed_mime_types = ["image/*", "text/*", "application/xml", "application/json"]
+allowed_mime_types = [
+  "image/*",
+  "text/*",
+  "application/xml",
+  "application/json",
+]
 
 [storage.buckets.library]
 public = true
@@ -132,11 +137,11 @@ file_size_limit = "30MiB"
 
 [storage.buckets.storage]
 public = false
-objects_path="seed/buckets/storage"
+objects_path = "seed/buckets/storage"
 
 [storage.buckets.storage-public]
 public = true
-objects_path="seed/buckets/storage"
+objects_path = "seed/buckets/storage"
 
 [storage.buckets.grida-forms]
 public = true

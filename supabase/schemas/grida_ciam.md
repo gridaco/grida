@@ -22,11 +22,9 @@ It is **separate** from Supabase Auth’s `auth.users` on purpose.
 ## Core features (current + planned)
 
 - **CIAM**
-
   - Email-based login (OTP) → customer session → JWT → RLS.
 
 - **CRM**
-
   - Importing and managing customer data.
   - Tagging (current).
   - Metadata & custom attributes (planned).
@@ -79,18 +77,15 @@ As `grida_ciam` evolves, keep this section up to date, and add new sections belo
 ### Authentication flow (high level)
 
 1. **Create OTP challenge**
-
    - User provides email and project context.
    - We store a salted hash (never the OTP in plaintext).
    - We send the OTP via email.
 
 2. **Verify OTP → create customer session**
-
    - If valid and not expired, create a `grida_ciam.customer_session`.
    - Mark `public.customer.is_email_verified = true` and sync email on success.
 
 3. **Mint JWT**
-
    - Backend mints a JWT containing a session identifier (`sid`).
    - Client uses Supabase client `accessToken: async () => jwt`.
 

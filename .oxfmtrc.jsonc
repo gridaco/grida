@@ -13,5 +13,6 @@
     "bin",
     "*.clipboard.html",
     "worker-configuration.d.ts",
+    "database-generated.types.ts",
   ],
 }
