@@ -47,4 +47,6 @@ toml = "0.9.8"
 glob = "0.3.3"
 arboard = "3"
 rfd = "0.15"
-zip = { version = "8.2.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "8.2.0", default-features = false, features = [
+  "deflate-flate2",
+] }

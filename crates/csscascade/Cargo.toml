@@ -20,7 +20,7 @@ crate-type = ["rlib"]
 # css parsing
 # (+2.5mb wasm32-unknown-emscripten)
 # https://github.com/servo/stylo/issues/272 / The issue has been fixed upstream, yet not released. sticking to fork until the next release
-stylo = { git = "https://github.com/gridaco/stylo" } 
+stylo = { git = "https://github.com/gridaco/stylo" }
 selectors = { git = "https://github.com/gridaco/stylo", package = "selectors" }
 stylo_dom = { git = "https://github.com/gridaco/stylo", package = "stylo_dom" }
 stylo_atoms = { git = "https://github.com/gridaco/stylo", package = "stylo_atoms" }

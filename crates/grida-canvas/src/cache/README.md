@@ -18,24 +18,19 @@ The Geometry Cache exists to store and maintain computed geometric properties of
 ### Philosophy
 
 1. **Authoring is relative. Rendering is absolute.**
-
    - `local_transform` is the source of truth.
    - `world_transform` is cached and derived.
 
 2. **Flat is fast.**
-
    - The scene is a tree; the cache is a flat map.
 
 3. **Dirty flags are sacred.**
-
    - Only update what has changed.
 
 4. **Query is constant-time.**
-
    - `get_world_bounds(node_id)` is always O(1) after update.
 
 5. **No recursion at runtime.**
-
    - Updates are done top-down, in pre-sorted order or with explicit parent tracking.
 
 ### Core Data Structure

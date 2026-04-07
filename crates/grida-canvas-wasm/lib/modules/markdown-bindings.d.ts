@@ -23,4 +23,3 @@ export namespace markdown {
     _grida_markdown_to_html(markdown: CPtr): CPtr;
   }
 }
-

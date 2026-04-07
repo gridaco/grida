@@ -58,19 +58,19 @@ Based on React Native Skia glass shader examples and improved for physical accur
 The shader simulates viewing a curved glass surface from directly above (orthographic projection). The glass acts like a lens, displacing the backdrop based on:
 
 1. **Surface Curvature**: The `depth` parameter controls the height of the curved surface
-
    - Higher depth = more curved = steeper surface angles at edges
    - The surface shape is derived from the SDF, creating a smooth lens-like profile
 
 2. **Material Refraction**: The `refraction` parameter (0.0-1.0) maps to physical IOR (1.0-2.0)
-
    - IOR determines how much light bends when entering the glass
    - Higher IOR = more bending = more visible displacement
 
 3. **Displacement Calculation**:
+
    ```glsl
    displacement = refract_vec(IOR, surface_normal).xy × depth × scale_factor
    ```
+
    - The refraction vector's XY components determine the offset direction
    - Multiplied by depth for magnitude
    - Result: backdrop appears displaced/magnified at edges

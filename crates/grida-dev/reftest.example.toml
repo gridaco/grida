@@ -31,4 +31,4 @@ threshold = 0.0
 # When "alpha", scoring considers only pixels where either expected or actual alpha > 0.
 # This is useful for SVG tests with large transparent regions, as transparent pixels
 # won't skew the mismatch ratio.
-mask = "alpha"  # or "none"
+mask = "alpha" # or "none"

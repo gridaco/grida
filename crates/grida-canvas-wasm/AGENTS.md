@@ -23,6 +23,7 @@ We keep a **single package** that works in both browser and Node by ensuring the
   - Result: `dist/index.js` only imports `./grida-canvas-wasm`, and the actual glue stays as `dist/grida-canvas-wasm.js` (copied), so Turbopack never sees Node built-ins inside the bundled entry.
 
 ⚠️ Notes:
+
 - Simply setting `tsup.external` to `["node:fs", "node:path", ...]` is **not sufficient** here; bundling the glue can still produce Node built-in imports in `dist/index.js`, which breaks Turbopack.
 - If you change `lib/index.ts` to import `./bin/grida-canvas-wasm` directly (no wrapper + external), re-verify `pnpm --filter editor build` with Turbopack.
 
@@ -159,16 +160,13 @@ cargo build --release --target wasm32-unknown-emscripten
 ### Common Issues
 
 1. **"just: command not found"**
-
    - Install just: `cargo install just` or `brew install just`
 
 2. **"emcc: command not found"**
-
    - Ensure Emscripten SDK is installed and activated
    - Run `source ../../third_party/externals/emsdk/emsdk_env.sh`
 
 3. **"xlocale.h file not found"**
-
    - This should be automatically fixed by the build scripts
    - If it persists, check that the emsdk submodule is properly initialized
 

@@ -6,5 +6,11 @@
   "experimentalSortPackageJson": {
     "sortScripts": true,
   },
-  "ignorePatterns": ["third_party/externals", ".legacy", ".json5"],
+  "ignorePatterns": [
+    "third_party/externals",
+    ".legacy",
+    ".json5",
+    "bin",
+    "*.clipboard.html",
+  ],
 }

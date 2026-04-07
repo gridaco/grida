@@ -19,7 +19,8 @@ declare function createGridaCanvas(moduleArg?: {
 
 declare namespace createGridaCanvas {
   interface GridaCanvasWasmBindings
-    extends emscripten.emscripten_EXPORTED_RUNTIME_METHODS,
+    extends
+      emscripten.emscripten_EXPORTED_RUNTIME_METHODS,
       canvas.CanvasModule,
       fonts.FontsModule,
       markdown.MarkdownModule,

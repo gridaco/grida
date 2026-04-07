@@ -40,7 +40,6 @@ Stylo is far lighter than it sounds—our wasm bundles are roughly ~1.5 MB wit
 ### Separation of Concerns
 
 - **csscascade does NOT:**
-
   - Parse HTML/SVG (bring your own parser)
   - Perform layout (block, inline, flex, grid)
   - Paint or rasterize
@@ -151,7 +150,6 @@ csscascade/
 csscascade follows the same two-pass pattern as usvg:
 
 1. **First Pass**: Collect all CSS from `<style>` tags and external sources
-
    - Walk entire DOM tree
    - Extract CSS from all `<style>` elements
    - Parse into stylesheet
@@ -236,7 +234,6 @@ Since the style is computed and normalized, the next stages can be:
 ### External Dependencies
 
 1. **Stylo (Servo CSS engine)**
-
    - Provides parsing, selector matching, cascade, computed values, and shorthand expansion.
    - Bundles `cssparser`, `selectors`, etc., so we inherit Servo-quality behavior without re-implementing anything.
    - Compiles cleanly for `wasm32-unknown-emscripten`, matching our runtime needs.
@@ -264,28 +261,22 @@ Since the style is computed and normalized, the next stages can be:
 ### Internal Components
 
 1. **DOM Trait System** (`dom/`)
-
    - Defines the minimal DOM interface and implements `selectors::Element` so Stylo can match selectors against arbitrary DOM providers (html5ever, roxmltree, markdown ASTs, etc.).
 
 2. **Stylesheet Collection** (`stylesheets/`)
-
    - Discovers inline/external CSS, resolves URLs, and hands raw CSS + metadata (origin, media) to Stylo while preserving document order.
 
 3. **Stylo Bridge** (`stylo_bridge/`)
-
    - Owns Stylo `Device`, `SharedRwLock`, `DocumentStyleSheet`, and `Stylist`.
    - Implements `FontMetricsProvider`, color-scheme plumbing, and media query evaluation.
 
 4. **Cascade Orchestrator** (`cascade/`)
-
    - Coordinates the two-pass process, applies presentation attribute mappings, merges HTML defaults, and drives Stylo rebuilds.
 
 5. **Fonts Module** (`fonts/`)
-
    - Parses @font-face entries, integrates system/embedded fonts, and surfaces handles to both Stylo (for metrics) and the renderer (for shaping).
 
 6. **Styled Tree Builder** (`tree/`)
-
    - Builds the immutable `StyledTree` from Stylo’s computed values plus csscascade metadata.
    - Emits layout hints (display, writing mode) for downstream layout engines like `taffy`.
 
