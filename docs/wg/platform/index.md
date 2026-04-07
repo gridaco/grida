@@ -4,7 +4,6 @@ tags:
   - internal
   - wg
   - platform
-
 ---
 
 # Platform (WG)

@@ -21,7 +21,7 @@ jobs:
             image: ubuntu-latest
           - name: windows
             image: windows-latest
-          
+
           # - name: macos-apple-silicon
           #   image: macos-15
     runs-on: ${{ matrix.os.image }}
@@ -30,7 +30,6 @@ jobs:
         working-directory: ./desktop
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 

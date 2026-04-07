@@ -89,10 +89,10 @@ For the full property-by-property tracking, see `docs/wg/format/css.md` and `doc
 
 The crate has two modules:
 
-| Module | Purpose |
-|--------|---------|
-| `rcdom` | Reference-counted DOM (from html5ever). Parses HTML into a tree of `Node` handles. |
-| `tree` | Style-resolved tree. Wraps `RcDom` nodes with Stylo `ComputedValues`. Contains `StyleRuntime` (Stylo orchestration) and `StyledNode` (output). |
+| Module  | Purpose                                                                                                                                        |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rcdom` | Reference-counted DOM (from html5ever). Parses HTML into a tree of `Node` handles.                                                             |
+| `tree`  | Style-resolved tree. Wraps `RcDom` nodes with Stylo `ComputedValues`. Contains `StyleRuntime` (Stylo orchestration) and `StyledNode` (output). |
 
 The planned module structure (from ARCHITECTURE.md) fans this out into `dom/`, `stylesheets/`, `stylo_bridge/`, `cascade/`, `fonts/`, `tree/`, and `layout_hooks/`. The current proof-of-concept keeps everything in `tree/mod.rs` intentionally; it will be split once the API stabilizes.
 
@@ -100,11 +100,11 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design document (note: asp
 
 ## Why Stylo
 
-| Engine | Language | Embeddable? |
-|--------|----------|-------------|
-| Blink (Chrome) | C++ | No — deeply coupled to Blink internals |
-| WebKit | C++ | No — same problem |
-| Stylo (Servo/Firefox) | Rust | **Yes** — designed as a standalone crate |
+| Engine                | Language | Embeddable?                              |
+| --------------------- | -------- | ---------------------------------------- |
+| Blink (Chrome)        | C++      | No — deeply coupled to Blink internals   |
+| WebKit                | C++      | No — same problem                        |
+| Stylo (Servo/Firefox) | Rust     | **Yes** — designed as a standalone crate |
 
 There is no alternative. Any Rust project that needs correct CSS cascade either uses Stylo or builds an incomplete reimplementation.
 

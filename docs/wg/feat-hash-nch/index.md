@@ -5,7 +5,6 @@ tags:
   - wg
   - performance
   - resources
-
 ---
 
 # Fast Hashing – `hash-nch`

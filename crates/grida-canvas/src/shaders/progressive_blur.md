@@ -11,7 +11,6 @@ Uses **two-pass separable Gaussian blur** for optimal performance while maintain
 The implementation splits the 2D Gaussian blur into two 1D passes:
 
 1. **Horizontal Pass** (`progressive_blur_horizontal.sksl`):
-
    - Calculates gradient mask value at current position
    - Interpolates blur radius based on mask (minRadius → maxRadius)
    - Applies 1D Gaussian blur along X-axis only

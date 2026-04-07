@@ -6,7 +6,6 @@ tags:
   - canvas
   - painting
   - rendering
-
 ---
 
 # Noise Effects - `fe-noise`
@@ -650,7 +649,6 @@ feMerge (blend enhanced RGB noise with fill)
 ## References
 
 - **SVG Filter Effects Specification**: https://www.w3.org/TR/SVG11/filters.html
-
   - `feTurbulence`: Fractal noise generation
   - `feColorMatrix`: Color transformations
   - `feComponentTransfer`: Per-channel transfer functions
@@ -658,12 +656,10 @@ feMerge (blend enhanced RGB noise with fill)
   - `feMerge`: Layer stacking
 
 - **Perlin Noise**: Ken Perlin, "Improving Noise" (2002)
-
   - Original procedural noise algorithm
   - Fractal Brownian Motion (fBm) for multi-octave detail
 
 - **Skia Graphics Library**: https://skia.org
-
   - `fractal_perlin_noise`: Native Perlin noise shader
   - `ColorMatrix`: 4×5 color transformation matrix (normalized 0-1 range)
   - Blend modes: Porter-Duff compositing operations

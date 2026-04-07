@@ -3982,8 +3982,7 @@ export namespace format {
             fbs.NoiseEffectColorsKind.Mono
           );
           fbs.NoiseEffectColors.addMonoColor(builder, monoColorOffset);
-          coloringOffset =
-            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+          coloringOffset = fbs.NoiseEffectColors.endNoiseEffectColors(builder);
         } else if (noise.mode === "duo") {
           const color1 =
             noise.color1 || ({ r: 0, g: 0, b: 0, a: 1 } as cg.RGBA32F);
@@ -3992,14 +3991,10 @@ export namespace format {
           const duoColor1Offset = structs.rgba32f(builder, color1);
           const duoColor2Offset = structs.rgba32f(builder, color2);
           fbs.NoiseEffectColors.startNoiseEffectColors(builder);
-          fbs.NoiseEffectColors.addKind(
-            builder,
-            fbs.NoiseEffectColorsKind.Duo
-          );
+          fbs.NoiseEffectColors.addKind(builder, fbs.NoiseEffectColorsKind.Duo);
           fbs.NoiseEffectColors.addDuoColor1(builder, duoColor1Offset);
           fbs.NoiseEffectColors.addDuoColor2(builder, duoColor2Offset);
-          coloringOffset =
-            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+          coloringOffset = fbs.NoiseEffectColors.endNoiseEffectColors(builder);
         } else {
           // Multi
           fbs.NoiseEffectColors.startNoiseEffectColors(builder);
@@ -4007,12 +4002,8 @@ export namespace format {
             builder,
             fbs.NoiseEffectColorsKind.Multi
           );
-          fbs.NoiseEffectColors.addMultiOpacity(
-            builder,
-            noise.opacity ?? 1.0
-          );
-          coloringOffset =
-            fbs.NoiseEffectColors.endNoiseEffectColors(builder);
+          fbs.NoiseEffectColors.addMultiOpacity(builder, noise.opacity ?? 1.0);
+          coloringOffset = fbs.NoiseEffectColors.endNoiseEffectColors(builder);
         }
 
         // Create FeNoiseEffect table

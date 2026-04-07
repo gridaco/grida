@@ -29,7 +29,10 @@ The text shadow is handled as the shadow of the effect from figma.
 
 ```css
 text-shadow: 1px 1px 2px #ff2;
-text-shadow: 1px 1px 2px red, 0 0 1em blue, 0 0 0.2em blue;
+text-shadow:
+  1px 1px 2px red,
+  0 0 1em blue,
+  0 0 0.2em blue;
 ```
 
 **flutter**

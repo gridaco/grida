@@ -1,0 +1,29 @@
+# JS/TS formatting check (oxfmt).
+# Rust formatting (cargo fmt) is handled in test-crates.yml,
+# which is path-scoped to crates/** changes.
+name: fmt
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  oxfmt:
+    name: oxfmt --check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm fmt:check

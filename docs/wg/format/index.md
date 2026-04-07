@@ -13,12 +13,12 @@ Tracking docs for the Grida IR schema and how external formats map into it.
 
 ## Pages
 
-| Page                  | Description                                         |
-| --------------------- | --------------------------------------------------- |
-| [Grida IR](./grida)   | Canonical IR reference — node types, paint, layout  |
-| [CSS](./css)          | CSS → Grida IR property mapping and TODO tracker    |
-| [HTML](./html)        | HTML element → Grida IR node mapping                |
-| [SVG](./svg)          | SVG → usvg → Grida IR mapping and TODO tracker      |
+| Page                | Description                                        |
+| ------------------- | -------------------------------------------------- |
+| [Grida IR](./grida) | Canonical IR reference — node types, paint, layout |
+| [CSS](./css)        | CSS → Grida IR property mapping and TODO tracker   |
+| [HTML](./html)      | HTML element → Grida IR node mapping               |
+| [SVG](./svg)        | SVG → usvg → Grida IR mapping and TODO tracker     |
 
 ## How to use these docs
 

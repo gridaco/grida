@@ -4,7 +4,6 @@ import { ShineBorder } from "@/www/ui/shine-border";
 import { useStopwatch } from "react-timer-hook";
 import { cn } from "@/components/lib/utils";
 
-
 export function GenerationImageFrame({
   image,
   className,

@@ -7,7 +7,6 @@ tags:
   - chromium
   - rendering
   - svg
-
 ---
 
 # Chromium SVG Pattern Paint Server

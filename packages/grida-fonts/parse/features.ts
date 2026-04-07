@@ -59,7 +59,8 @@ function parseLookupGlyphs(font: any, lookupIndex: number): number[] {
   const lookupCount = bin.readUshort(data, lookupListOffset);
   if (lookupIndex >= lookupCount) return [];
   const lookupOffset =
-    lookupListOffset + bin.readUshort(data, lookupListOffset + 2 + lookupIndex * 2);
+    lookupListOffset +
+    bin.readUshort(data, lookupListOffset + 2 + lookupIndex * 2);
   const lookupType = bin.readUshort(data, lookupOffset);
   const subtableCount = bin.readUshort(data, lookupOffset + 4);
   const glyphs: number[] = [];
@@ -158,10 +159,7 @@ function buildGlyphMap(font: any): Map<number, string> {
             let glyph;
             if (table.idRangeOffset[i]) {
               const idx =
-                table.idRangeOffset[i] / 2 +
-                (code - start) +
-                i -
-                segCount;
+                table.idRangeOffset[i] / 2 + (code - start) + i - segCount;
               glyph = table.glyphIdArray[idx];
             } else {
               glyph = (code + table.idDelta[i]) & 0xffff;
@@ -202,4 +200,3 @@ function buildGlyphMap(font: any): Map<number, string> {
   }
   return map;
 }
-

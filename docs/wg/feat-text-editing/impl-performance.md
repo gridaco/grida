@@ -7,7 +7,6 @@ tags:
   - typography
   - text
   - performance
-
 ---
 
 ## Motivation

@@ -196,7 +196,11 @@ describe("History Management", () => {
   describe("clearsFuture: false (selection preserves redo)", () => {
     test("edit → undo → select → redo restores the edit", () => {
       // Make a content edit
-      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Edited" });
+      ed.doc.dispatch({
+        type: "node/change/*",
+        node_id: "rect1",
+        name: "Edited",
+      });
       vi.advanceTimersByTime(500);
       expect(ed.doc.historySnapshot.past).toHaveLength(1);
 
@@ -218,7 +222,11 @@ describe("History Management", () => {
     });
 
     test("edit → undo → blur → redo restores the edit", () => {
-      ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Edited" });
+      ed.doc.dispatch({
+        type: "node/change/*",
+        node_id: "rect1",
+        name: "Edited",
+      });
       vi.advanceTimersByTime(500);
 
       ed.doc.undo();

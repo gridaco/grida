@@ -116,7 +116,10 @@ export function useMixedPaints() {
   const { selection } = slice;
 
   const paints = useMemo(
-    () => instance.propertiesQuery.queryPaintGroups(selection, "fill", { recursive: true }),
+    () =>
+      instance.propertiesQuery.queryPaintGroups(selection, "fill", {
+        recursive: true,
+      }),
     [slice, instance]
   );
 

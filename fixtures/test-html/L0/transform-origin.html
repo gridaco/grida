@@ -1,131 +1,129 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Transform: transform-origin</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
 
-<head>
-  <meta charset="utf-8" />
-  <title>Transform: transform-origin</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 24px;
-      background: #fff;
-      color: #000;
-      font-family: system-ui, sans-serif;
-      font-size: 14px;
-    }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
 
-    .label {
-      font-size: 11px;
-      color: #666;
-      padding-bottom: 4px;
-    }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 48px;
+      }
 
-    .grid {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      gap: 48px;
-    }
+      .cell {
+        width: 120px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
 
-    .cell {
-      width: 120px;
-      height: 120px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
+      .box {
+        width: 80px;
+        height: 80px;
+        background: #000;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: #fff;
+      }
 
-    .box {
-      width: 80px;
-      height: 80px;
-      background: #000;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      color: #fff;
-    }
+      /* All rotate 45deg but with different origins */
+      .origin-center {
+        transform: rotate(45deg);
+        /* default: transform-origin: 50% 50% */
+      }
 
-    /* All rotate 45deg but with different origins */
-    .origin-center {
-      transform: rotate(45deg);
-      /* default: transform-origin: 50% 50% */
-    }
+      .origin-top-left {
+        transform: rotate(45deg);
+        transform-origin: 0% 0%;
+      }
 
-    .origin-top-left {
-      transform: rotate(45deg);
-      transform-origin: 0% 0%;
-    }
+      .origin-top-right {
+        transform: rotate(45deg);
+        transform-origin: 100% 0%;
+      }
 
-    .origin-top-right {
-      transform: rotate(45deg);
-      transform-origin: 100% 0%;
-    }
+      .origin-bottom-left {
+        transform: rotate(45deg);
+        transform-origin: 0% 100%;
+      }
 
-    .origin-bottom-left {
-      transform: rotate(45deg);
-      transform-origin: 0% 100%;
-    }
+      .origin-bottom-right {
+        transform: rotate(45deg);
+        transform-origin: 100% 100%;
+      }
 
-    .origin-bottom-right {
-      transform: rotate(45deg);
-      transform-origin: 100% 100%;
-    }
+      .origin-custom {
+        transform: rotate(45deg);
+        transform-origin: 25% 75%;
+      }
 
-    .origin-custom {
-      transform: rotate(45deg);
-      transform-origin: 25% 75%;
-    }
+      /* Scale with different origins */
+      .scale-center {
+        transform: scale(1.5);
+        /* default: center */
+      }
 
-    /* Scale with different origins */
-    .scale-center {
-      transform: scale(1.5);
-      /* default: center */
-    }
+      .scale-top-left {
+        transform: scale(1.5);
+        transform-origin: 0% 0%;
+      }
+    </style>
+  </head>
 
-    .scale-top-left {
-      transform: scale(1.5);
-      transform-origin: 0% 0%;
-    }
-  </style>
-</head>
-
-<body>
-  <div class="grid">
-    <div class="cell">
-      <div class="label">origin: center</div>
-      <div class="box origin-center">center</div>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">origin: center</div>
+        <div class="box origin-center">center</div>
+      </div>
+      <div class="cell">
+        <div class="label">origin: top-left</div>
+        <div class="box origin-top-left">0% 0%</div>
+      </div>
+      <div class="cell">
+        <div class="label">origin: top-right</div>
+        <div class="box origin-top-right">100% 0%</div>
+      </div>
+      <div class="cell">
+        <div class="label">origin: bottom-left</div>
+        <div class="box origin-bottom-left">0% 100%</div>
+      </div>
+      <div class="cell">
+        <div class="label">origin: bottom-right</div>
+        <div class="box origin-bottom-right">100% 100%</div>
+      </div>
+      <div class="cell">
+        <div class="label">origin: 25% 75%</div>
+        <div class="box origin-custom">25% 75%</div>
+      </div>
+      <div class="cell">
+        <div class="label">scale center</div>
+        <div class="box scale-center">scale</div>
+      </div>
+      <div class="cell">
+        <div class="label">scale top-left</div>
+        <div class="box scale-top-left">scale TL</div>
+      </div>
     </div>
-    <div class="cell">
-      <div class="label">origin: top-left</div>
-      <div class="box origin-top-left">0% 0%</div>
-    </div>
-    <div class="cell">
-      <div class="label">origin: top-right</div>
-      <div class="box origin-top-right">100% 0%</div>
-    </div>
-    <div class="cell">
-      <div class="label">origin: bottom-left</div>
-      <div class="box origin-bottom-left">0% 100%</div>
-    </div>
-    <div class="cell">
-      <div class="label">origin: bottom-right</div>
-      <div class="box origin-bottom-right">100% 100%</div>
-    </div>
-    <div class="cell">
-      <div class="label">origin: 25% 75%</div>
-      <div class="box origin-custom">25% 75%</div>
-    </div>
-    <div class="cell">
-      <div class="label">scale center</div>
-      <div class="box scale-center">scale</div>
-    </div>
-    <div class="cell">
-      <div class="label">scale top-left</div>
-      <div class="box scale-top-left">scale TL</div>
-    </div>
-  </div>
-</body>
-
+  </body>
 </html>

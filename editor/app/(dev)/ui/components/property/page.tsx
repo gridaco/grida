@@ -60,8 +60,8 @@ function GroupedDemo() {
     <div className="space-y-4">
       <h3 className="text-sm font-medium">Grouped — Blend mode</h3>
       <p className="text-xs text-muted-foreground max-w-prose">
-        Grouped <code>EnumItem[][]</code> with separators between groups.
-        Hover or arrow-key through items to see <code>onValueSeeked</code> fire.
+        Grouped <code>EnumItem[][]</code> with separators between groups. Hover
+        or arrow-key through items to see <code>onValueSeeked</code> fire.
       </p>
       <div className="flex items-center gap-4">
         <PropertyEnumV2
@@ -96,13 +96,11 @@ function PreviewDemo() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium">
-        Live preview — Font weight
-      </h3>
+      <h3 className="text-sm font-medium">Live preview — Font weight</h3>
       <p className="text-xs text-muted-foreground max-w-prose">
-        The <code>onValueSeeked</code> callback drives a live preview.
-        The text weight changes as you hover or arrow through items,
-        and commits only on click / Enter.
+        The <code>onValueSeeked</code> callback drives a live preview. The text
+        weight changes as you hover or arrow through items, and commits only on
+        click / Enter.
       </p>
       <div className="flex items-center gap-6">
         <PropertyEnumV2
@@ -128,8 +126,7 @@ function PreviewDemo() {
             Committed: <code className="font-mono">{committed}</code>
           </div>
           <div>
-            Previewing:{" "}
-            <code className="font-mono">{preview ?? "(none)"}</code>
+            Previewing: <code className="font-mono">{preview ?? "(none)"}</code>
           </div>
         </div>
       </div>
@@ -178,9 +175,9 @@ export default function PropertyDemoPage() {
           <h1 className="text-2xl font-bold mb-2">PropertyEnumV2</h1>
           <p className="text-sm text-muted-foreground max-w-prose">
             Successor to <code>PropertyEnum</code>. Built on Base UI Combobox
-            with <code>onValueSeeked</code> support — fires when the user
-            hovers or navigates to an item via keyboard, before committing.
-            This enables live-preview patterns (blend mode, font weight, etc.)
+            with <code>onValueSeeked</code> support — fires when the user hovers
+            or navigates to an item via keyboard, before committing. This
+            enables live-preview patterns (blend mode, font weight, etc.)
             directly in the property panel without manual DropdownMenu wiring.
           </p>
         </div>

@@ -1373,13 +1373,13 @@ probes in `examples/skia_bench/` for per-primitive validation data.
 
     **Measured impact (Apple M2 Pro, GPU benchmark, 01-135k 136K nodes):**
 
-    | Scenario | Metric | Before | After | Delta |
-    | -------- | ------ | ------ | ----- | ----- |
-    | baseline_nocache_fit | draw_us | 8,867 | 7,248 | **-18%** |
-    | baseline_nocache_fit | mid_flush_us | 44,442 | 42,642 | **-4%** |
-    | pan settle (fit) | settle_us | 74,520 | 65,659 | **-12%** |
-    | fl_16ms | MAX | 110,407 | 82,731 | **-25%** |
-    | fl_500ms | draw_us | 9,144 | 5,202 | **-43%** |
+    | Scenario             | Metric       | Before  | After  | Delta    |
+    | -------------------- | ------------ | ------- | ------ | -------- |
+    | baseline_nocache_fit | draw_us      | 8,867   | 7,248  | **-18%** |
+    | baseline_nocache_fit | mid_flush_us | 44,442  | 42,642 | **-4%**  |
+    | pan settle (fit)     | settle_us    | 74,520  | 65,659 | **-12%** |
+    | fl_16ms              | MAX          | 110,407 | 82,731 | **-25%** |
+    | fl_500ms             | draw_us      | 9,144   | 5,202  | **-43%** |
 
     Implementation: `Renderer::frame()` in `runtime/scene.rs`.
 

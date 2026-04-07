@@ -33,11 +33,11 @@ accurate segment selection without expensive curve–polygon comparisons. Lasso
 selections only target vertices and tangents for performance reasons.
 
 | Intersects Rect | Endpoint Selected | Fully Contained | Segment Selected |
-| ---------------- | ---------------- | --------------- | ---------------- |
-| ✅                | ❌                | ❌               | ✅                |
-| ✅                | ✅                | ❌               | ❌               |
-| ✅                | ✅                | ✅               | ✅                |
-| ❌                | –                | –               | ❌               |
+| --------------- | ----------------- | --------------- | ---------------- |
+| ✅              | ❌                | ❌              | ✅               |
+| ✅              | ✅                | ❌              | ❌               |
+| ✅              | ✅                | ✅              | ✅               |
+| ❌              | –                 | –               | ❌               |
 
 # Translate Vector Controls
 

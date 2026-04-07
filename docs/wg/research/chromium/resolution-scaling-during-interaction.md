@@ -7,7 +7,6 @@ tags:
   - chromium
   - rendering
   - performance
-
 ---
 
 # Chromium Resolution Scaling During Interaction

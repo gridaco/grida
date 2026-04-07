@@ -1,9 +1,20 @@
+// https://oxc.rs/docs/guide/usage/formatter/config-file-reference.html
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": [],
   "printWidth": 80,
   "trailingComma": "es5",
   "experimentalSortPackageJson": {
     "sortScripts": true,
   },
+  "ignorePatterns": [
+    "third_party/externals/",
+    ".legacy/",
+    ".ref/",
+    ".json5",
+    "data/",
+    "bin/",
+    "*.clipboard.html",
+    "worker-configuration.d.ts",
+    "database-generated.types.ts",
+  ],
 }

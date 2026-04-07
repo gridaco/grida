@@ -6,7 +6,6 @@ tags:
   - chromium
   - compositing
   - rendering
-
 ---
 
 # Chromium Render Surfaces

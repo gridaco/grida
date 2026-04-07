@@ -6,7 +6,6 @@ tags:
   - canvas
   - masks
   - rendering
-
 ---
 
 # Masks — Working Group Draft (`masks`)

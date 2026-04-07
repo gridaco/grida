@@ -3,7 +3,8 @@ id: TC-CANVAS-INPUT-002
 title: Editor History System Takes Precedence in Content Edit Mode
 module: canvas
 area: input
-tags: [undo, redo, history, content-edit-mode, cmd-z, contenteditable, text-editing]
+tags:
+  [undo, redo, history, content-edit-mode, cmd-z, contenteditable, text-editing]
 status: verified
 severity: critical
 date: 2025-12-22

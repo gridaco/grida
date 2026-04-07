@@ -21,4 +21,3 @@ describe("node smoke", () => {
     expect(typeof factory.module.UTF8ToString).toBe("function");
   }, 30_000);
 });
-

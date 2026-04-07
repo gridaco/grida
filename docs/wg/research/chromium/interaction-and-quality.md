@@ -6,7 +6,6 @@ tags:
   - chromium
   - rendering
   - compositing
-
 ---
 
 # Chromium Interaction and Quality Management

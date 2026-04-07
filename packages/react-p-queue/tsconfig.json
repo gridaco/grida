@@ -6,12 +6,7 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": [
-      "vitest/globals",
-      "node"
-    ]
+    "types": ["vitest/globals", "node"]
   },
-  "exclude": [
-    "dist"
-  ]
+  "exclude": ["dist"]
 }

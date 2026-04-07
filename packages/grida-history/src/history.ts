@@ -226,9 +226,7 @@ export class HistoryImpl implements History {
     const prepareResult = this._prepareProviders(tx);
 
     if (prepareResult instanceof Promise) {
-      return prepareResult.then((prepared) =>
-        this._finishUndo(tx, prepared)
-      );
+      return prepareResult.then((prepared) => this._finishUndo(tx, prepared));
     }
 
     return this._finishUndo(tx, prepareResult);
@@ -267,9 +265,7 @@ export class HistoryImpl implements History {
     const prepareResult = this._prepareProviders(tx);
 
     if (prepareResult instanceof Promise) {
-      return prepareResult.then((prepared) =>
-        this._finishRedo(tx, prepared)
-      );
+      return prepareResult.then((prepared) => this._finishRedo(tx, prepared));
     }
 
     return this._finishRedo(tx, prepareResult);

@@ -4,7 +4,6 @@ tags:
   - internal
   - wg
   - editor
-
 ---
 
 UX Surface documents specify **Grida editor's specific practical UX specifications** for surface interactions, selection, targeting, and related user interface behaviors.

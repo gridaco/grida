@@ -2,11 +2,11 @@
   "name": "@grida/bitmap",
   "private": true,
   "description": "Core Bitmap Graphics Editor",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@grida/cmath": "workspace:*",
     "@grida/color": "workspace:*"
-  },
-  "scripts": {
-    "typecheck": "tsc --noEmit"
   }
 }

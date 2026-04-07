@@ -82,7 +82,14 @@ describe("refig publish smoke", () => {
       const fixturePath = join(tmp, "fixture.json");
       writeFileSync(fixturePath, JSON.stringify(MINIMAL_REST_FIXTURE));
       const outPath = join(tmp, "smoke-out.png");
-      const refigCli = join(tmp, "node_modules", "@grida", "refig", "dist", "cli.mjs");
+      const refigCli = join(
+        tmp,
+        "node_modules",
+        "@grida",
+        "refig",
+        "dist",
+        "cli.mjs"
+      );
       execSync(
         `"${process.execPath}" "${refigCli}" fixture.json --node 1:1 --out smoke-out.png --format png`,
         { cwd: tmp, stdio: "pipe", timeout: 60_000 }

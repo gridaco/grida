@@ -72,7 +72,10 @@ describe("raster export (node)", () => {
   }, 30_000);
 
   it("registers fixture image with addImageWithId and renders with custom RID", async () => {
-    const imagePath = resolve(process.cwd(), "../../fixtures/images/stripes.png");
+    const imagePath = resolve(
+      process.cwd(),
+      "../../fixtures/images/stripes.png"
+    );
     const imageBytes = new Uint8Array(readFileSync(imagePath));
 
     const doc = {
@@ -144,10 +147,17 @@ describe("raster export (node)", () => {
       useEmbeddedFonts: true,
     });
 
-    const result = canvas.addImageWithId(imageBytes, "res://images/test-fixture-stripes");
+    const result = canvas.addImageWithId(
+      imageBytes,
+      "res://images/test-fixture-stripes"
+    );
     expect(result).not.toBe(false);
-    expect((result as { width: number; height: number }).width).toBeGreaterThan(0);
-    expect((result as { width: number; height: number }).height).toBeGreaterThan(0);
+    expect((result as { width: number; height: number }).width).toBeGreaterThan(
+      0
+    );
+    expect(
+      (result as { width: number; height: number }).height
+    ).toBeGreaterThan(0);
 
     canvas.loadScene(JSON.stringify(doc));
 

@@ -38,9 +38,7 @@ export function GenerateImageToolUI({
               Generated
             </span>
           )}
-          {isError && (
-            <span className="text-xs text-destructive">Failed</span>
-          )}
+          {isError && <span className="text-xs text-destructive">Failed</span>}
         </span>
       </div>
 

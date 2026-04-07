@@ -92,7 +92,9 @@ no solid fill with multiple gradient fill
 
 ```css
 ._1 {
-  background: linear-gradient(to bottom, #fff, #fff), linear-gradient(to bottom, #fff, #fff);
+  background:
+    linear-gradient(to bottom, #fff, #fff),
+    linear-gradient(to bottom, #fff, #fff);
 }
 ```
 
@@ -103,8 +105,12 @@ Using array syntax
 ```css
 ._1 {
   background-image: url("image1.jpg"), url("image2.jpg");
-  background-position: right bottom, left top;
-  background-size: 50% 50%, auto;
+  background-position:
+    right bottom,
+    left top;
+  background-size:
+    50% 50%,
+    auto;
 }
 ```
 

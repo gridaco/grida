@@ -173,7 +173,7 @@ $ grida add 2422:10181
 ```tsx
 import { NewModuleFromFigma } from "../grida/new-module-from-figma";
 
-export default function() {
+export default function () {
   return (
     <>
       {/* ... */}

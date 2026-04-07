@@ -4,7 +4,8 @@ import { iofigma } from "../lib";
 
 const FIXTURES_BASE = __dirname + "/../../../fixtures/test-fig/clipboard";
 
-const COMPONENT_BLUE = FIXTURES_BASE + "/component-component-blue.clipboard.html";
+const COMPONENT_BLUE =
+  FIXTURES_BASE + "/component-component-blue.clipboard.html";
 const COMPONENT_RED = FIXTURES_BASE + "/component-component-red.clipboard.html";
 const INSTANCE_BLUE =
   FIXTURES_BASE + "/component-component-instance-blue.clipboard.html";
@@ -72,5 +73,3 @@ describe("iofigma.kiwi.buildClipboardRootNodes (components/instances)", () => {
     expect(roots.some((n) => n.type === "COMPONENT")).toBe(false);
   });
 });
-
-

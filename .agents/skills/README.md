@@ -45,9 +45,9 @@ description: >
 
 ### Frontmatter Fields
 
-| Field         | Required | Description                                                                                                    |
-| ------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `name`        | Yes      | Short, hyphenated identifier used for referencing and invocation (e.g. `cg-perf`, `canvas-wasm`)               |
+| Field         | Required | Description                                                                                                     |
+| ------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `name`        | Yes      | Short, hyphenated identifier used for referencing and invocation (e.g. `cg-perf`, `canvas-wasm`)                |
 | `description` | Yes      | What the skill covers and when to activate it. **This is how agents decide whether to load the skill.** (below) |
 
 Your agent runtime may support additional fields (e.g. `allowed-tools`, `context`, `model`). Check its documentation for what's available.

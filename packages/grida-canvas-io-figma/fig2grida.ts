@@ -186,7 +186,9 @@ function main(): void {
       process.exit(1);
     }
     if (args.pages) {
-      console.error("--pages is currently only supported for .fig/.deck input.");
+      console.error(
+        "--pages is currently only supported for .fig/.deck input."
+      );
       process.exit(1);
     }
   }

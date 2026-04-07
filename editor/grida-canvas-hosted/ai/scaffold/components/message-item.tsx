@@ -117,15 +117,12 @@ export function AssistantMessage({
       //     (text or tool) follows this reasoning group — meaning the
       //     reasoning block is still the active stream frontier.
       const hasDeltaParts = group.items.some(
-        (p: any) =>
-          p.type === "reasoning-delta" || p.type === "reasoning-start"
+        (p: any) => p.type === "reasoning-delta" || p.type === "reasoning-start"
       );
       const isLastGroup = groupIndex === groupedParts.length - 1;
       const nothingFollows =
         isLastGroup ||
-        groupedParts
-          .slice(groupIndex + 1)
-          .every((g) => g.kind === "reasoning");
+        groupedParts.slice(groupIndex + 1).every((g) => g.kind === "reasoning");
       const isReasoningStreaming =
         hasDeltaParts || (!!isStreaming && nothingFollows);
 
@@ -145,10 +142,7 @@ export function AssistantMessage({
       if (!textContent) return null;
 
       return (
-        <MessageContent
-          key={key}
-          className="w-full rounded-none border-0 px-0"
-        >
+        <MessageContent key={key} className="w-full rounded-none border-0 px-0">
           <MessageResponse>{textContent}</MessageResponse>
         </MessageContent>
       );
@@ -203,9 +197,7 @@ function ToolPart({ part }: { part: any }) {
         />
       );
     case canvas_use.tools_spec.name_tree:
-      return (
-        <TreeToolUI output={output} state={state} errorText={errorText} />
-      );
+      return <TreeToolUI output={output} state={state} errorText={errorText} />;
     case canvas_use.tools_spec.name_data_artboard_sizes:
       return (
         <ArtboardSizesToolUI

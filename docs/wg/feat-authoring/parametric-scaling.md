@@ -5,7 +5,6 @@ tags:
   - wg
   - editor
   - authoring
-
 ---
 
 | feature id           | status   | description                                  | PRs                                               |
@@ -56,7 +55,6 @@ Simple resize is insufficient because it changes box geometry but leaves geometr
 ## Goals / non-goals
 
 - **Goals**
-
   - **Visual identity preservation**: scaling should preserve proportions of all geometry-contributing parameters.
   - **Backend-independence**: behavior is defined over the document model, not a renderer implementation.
   - **Deterministic rewrite**: applying scale produces a stable authored state (no latent transform needed).
@@ -106,13 +104,11 @@ Notes:
 ## Examples
 
 - **Rectangle**
-
   - Before: `width=100`, `height=100`, `stroke_width=3`
   - Apply $s=2$
   - After: `width=200`, `height=200`, `stroke_width=6`
 
 - **Progressive blur**
-
   - The progressive blur line coordinates are normalized (`x1/y1/x2/y2` in -1..1), so they remain unchanged.
   - The blur radii (`radius`, `radius2`) scale by $s$.
 
@@ -191,7 +187,6 @@ The following categories are intentionally **not listed** in the table above, be
 Some properties _look_ geometric (they contain lengths/coordinates), but their meaning and desired behavior can vary by product rules and editor UX. For these properties, this proposal treats them as **non-scaled by default**.
 
 - **Guides** (`guides[].offset`)
-
   - **Default**: **N** (do not scale)
   - **Rationale**: guides are editor/workspace UI aids; scaling objects should not re-author workspace guides.
   - **Allowed extension**: an implementation MAY offer a separate “scale guides” command, but it is not part of parameter-space scaling.

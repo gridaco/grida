@@ -6,7 +6,6 @@ tags:
   - typography
   - text
   - fonts
-
 ---
 
 # Paragraph - `opsz: auto`

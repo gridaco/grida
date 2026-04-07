@@ -198,28 +198,26 @@ describe("fig2grida", () => {
   });
 
   describe("REST JSON (restJsonToGridaDocument)", () => {
-    test(
-      "converts captured REST archive (zip → document.json + images) to Grida document",
-      () => {
-        const { documentJson, images } = loadFigmaRestArchive(
-          `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
-        );
-        const result = restJsonToGridaDocument(documentJson, { images });
+    test("converts captured REST archive (zip → document.json + images) to Grida document", () => {
+      const { documentJson, images } = loadFigmaRestArchive(
+        `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
+      );
+      const result = restJsonToGridaDocument(documentJson, { images });
 
-        expect(result.document.scenes_ref.length).toBeGreaterThan(0);
-        expect(Object.keys(result.document.nodes).length).toBeGreaterThan(0);
-        for (const ref of result.imageRefsUsed) {
-          if (ref in images) {
-            expect(result.assets[ref]).toBeDefined();
-            expect(result.assets[ref]!.byteLength).toBeGreaterThan(0);
-          }
+      expect(result.document.scenes_ref.length).toBeGreaterThan(0);
+      expect(Object.keys(result.document.nodes).length).toBeGreaterThan(0);
+      for (const ref of result.imageRefsUsed) {
+        if (ref in images) {
+          expect(result.assets[ref]).toBeDefined();
+          expect(result.assets[ref]!.byteLength).toBeGreaterThan(0);
         }
-      },
-      120_000
-    );
+      }
+    }, 120_000);
 
     test("throws when document.children is missing", () => {
-      expect(() => restJsonToGridaDocument({})).toThrow(/no document\.children/);
+      expect(() => restJsonToGridaDocument({})).toThrow(
+        /no document\.children/
+      );
     });
 
     test("treats non-CANVAS children as implicit page when no CANVAS nodes exist", () => {

@@ -5,7 +5,6 @@ tags:
   - wg
   - editor
   - authoring
-
 ---
 
 Authoring features are a collection of **authoring-time** behaviors in the editor: operations that **rewrite node parameters** to achieve an intended visual result, rather than relying on runtime transforms or renderer-specific tricks.

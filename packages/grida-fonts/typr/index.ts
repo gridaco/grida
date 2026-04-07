@@ -546,8 +546,9 @@ namespace Typr {
   }
 
   // CBLC Table Types
-  export interface CBLCTable
-    extends Array<[number, number, number, number[]]> {}
+  export interface CBLCTable extends Array<
+    [number, number, number, number[]]
+  > {}
 
   // CBDT Table Types
   export interface CBDTTable extends Uint8Array {}
@@ -559,8 +560,9 @@ namespace Typr {
   }
 
   // COLR Table Types
-  export interface COLRTable
-    extends Array<{ [key: string]: [number, number] } | number[]> {}
+  export interface COLRTable extends Array<
+    { [key: string]: [number, number] } | number[]
+  > {}
 
   // CPAL Table Types
   export interface CPALTable extends Uint8Array {}
@@ -591,8 +593,9 @@ namespace Typr {
   }
 
   // GVAR Table Types
-  export interface GVARTable
-    extends Array<Array<[number[][], number[], number[] | null]>> {}
+  export interface GVARTable extends Array<
+    Array<[number[][], number[], number[] | null]>
+  > {}
 
   // AVAR Table Types
   export interface AVARTable extends Array<number[]> {}

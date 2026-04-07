@@ -7,7 +7,6 @@ tags:
   - canvas
   - svg
   - painting
-
 ---
 
 # SVG Pattern Support

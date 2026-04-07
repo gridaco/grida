@@ -1417,7 +1417,7 @@ function SectionText({ node_id }: { node_id: string }) {
           </PropertySectionHeaderActions>
         </PropertySectionHeaderItem>
         <PropertySectionContent>
-           <PropertyRow>
+          <PropertyRow>
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">
               <FontFamilyControl

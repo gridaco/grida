@@ -66,4 +66,3 @@ describe("cmath.ui.gradient", () => {
     expect(transform[1][2]).toBeCloseTo(0.5);
   });
 });
-

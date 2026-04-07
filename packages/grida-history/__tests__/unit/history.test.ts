@@ -1,10 +1,7 @@
 import { HistoryImpl } from "../../src/history";
 import { __resetTransactionIdCounter } from "../../src/transaction";
 import { __resetPreviewIdCounter } from "../../src/preview";
-import {
-  counterDelta,
-  failingRevertDelta,
-} from "../helpers";
+import { counterDelta, failingRevertDelta } from "../helpers";
 import { MockProvider } from "../helpers/mock-provider";
 import type { CommittedTransaction } from "../../src/types";
 

@@ -4,8 +4,10 @@ export interface StatAxis extends Typr.STATAxisRecord {
   values: Typr.STATAxisValue[];
 }
 
-export interface StatCombination
-  extends Pick<Typr.STATAxisValueFormat4, "format" | "name" | "flags"> {
+export interface StatCombination extends Pick<
+  Typr.STATAxisValueFormat4,
+  "format" | "name" | "flags"
+> {
   values: { tag: string; value: number }[];
 }
 

@@ -158,42 +158,34 @@ Tip: You can combine both concepts—use per‑paint blends internally, and then
 > Replace the placeholder text with demo images later.
 
 1. Single Solid
-
    - Normal at 78% opacity. Shows simple transparency.
    - [demo image placeholder]
 
 2. Single Linear Gradient (Normal)
-
    - Red → Blue, fully opaque.
    - [demo image placeholder]
 
 3. Solid + Solid (Multiply)
-
    - Base: Red (Normal 39%), Top: Blue (Multiply 39%). Produces lavender.
    - [demo image placeholder]
 
 4. Solid + Linear (Screen)
-
    - Base: Yellow, Top: Magenta→Cyan (Screen 60%).
    - [demo image placeholder]
 
 5. Linear + Linear (Overlay)
-
    - Two different gradients layered; Overlay boosts contrast.
    - [demo image placeholder]
 
 6. Linear + Radial (Soft Light)
-
    - Subtle central highlight over a linear base.
    - [demo image placeholder]
 
 7. Image + Solid (Multiply)
-
    - Darken a checker image with a semi‑opaque solid.
    - [demo image placeholder]
 
 8. Image + Radial (Hard Light)
-
    - Strong center glow over an image.
    - [demo image placeholder]
 

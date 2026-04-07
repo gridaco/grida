@@ -9,13 +9,11 @@ Test fixture containing three pages with different FRAME configurations for comp
 This `.fig` file contains three pages:
 
 1. **Page 1: "page-with-frame"**
-
    - Contains a regular FRAME node named "frame"
    - Contains 3 colored rectangles (red, green, blue)
    - Properties: `frameMaskDisabled: true`, `resizeToFit: undefined`
 
 2. **Page 2: "page-with-group"**
-
    - Contains a GROUP node (stored as FRAME in Kiwi format) named "group"
    - Contains 3 colored rectangles (red, green, blue)
    - Properties: `frameMaskDisabled: false`, `resizeToFit: true`

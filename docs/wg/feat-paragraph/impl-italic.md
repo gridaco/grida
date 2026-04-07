@@ -6,7 +6,6 @@ tags:
   - typography
   - text
   - fonts
-
 ---
 
 # Paragraph - `italic`
@@ -66,7 +65,6 @@ When dealing with italic styles in font families, there are four common scenario
 
 3. **One family, one variable font (theoretical ital axis or slnt axis)**  
    This scenario involves a single variable font file that could theoretically support axes such as 'ital' (italic) or 'slnt' (slant) for smooth interpolation between upright and italic styles. However, no examples of this scenario were found in the 2025 Google Fonts registry.
-
    - 3-1. **One family, one variable font with italic instances (exceptional case)**  
       This is an exceptional scenario where a single variable font supports the `slnt` axis and has explicit italic instances defined in `fvar.instances` (like Recursive and Roboto Flex). These fonts are not flagged as "italic" by OS/2 flags, but they support `slnt` axis with explicit italic instances. Detection relies on PostScript names in the name table (derived from `fvar.instances` analysis) rather than reliable table sources, making this a unique case that requires special handling in font parsing logic.
 
@@ -221,14 +219,12 @@ For each face (file) discovered in a family, extract and normalize:
    If a STAT `AxisValue`/style mapping explicitly names the style “Italic” (or localized equivalent) for the face’s default location (or for a named instance shipped within the same file), treat it as italic. This covers VFs where vendors rely on STAT for style naming.
 
 3. **Variable‑font Italic via `ital` axis** → `Italic` (with recipe)
-
    - If the face exposes `ital` and either:
      - default location has `ital=1`, **or**
      - a named instance sets `ital=1`,
        then register an italic capability with an axis recipe (e.g., `{ital:1}`).
 
 4. **Scenario 3‑1: VF with `slnt` axis & _italic instances_ (no OS/2 italic)** → `Italic` (with recipe)
-
    - If there is **no** OS/2 italic bit, **no** `ital` axis, **but** the face has `slnt` **and** at least one `fvar`/STAT‑named instance whose style name clearly denotes _Italic_ (e.g., “Italic”, “Bold Italic”),  
      then register that instance as italic and **record its `slnt` value** as the recipe (e.g., `{slnt:-10}`).
    - This explicitly whitelists families like **Recursive** and **Roboto Flex** where italic is provided through named `slnt` instances rather than flags.
@@ -290,7 +286,6 @@ Detect scenario for diagnostics and selection policy:
 When resolving a request `(weight, stretch, style)` where `style ∈ {normal, italic}`:
 
 - **Italic requested**
-
   1. If `italic_slots[(w,s)]` exists → select it (apply `vf_recipe` if present).
   2. Else, nearest‑neighbor in `italic_slots` by weight/stretch.
   3. Else, if **Single VF** exposes `ital` axis → synthesize instance `{ital:1}` for closest `(w,s)`.

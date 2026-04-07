@@ -245,10 +245,7 @@ describe("refig CLI", () => {
   }, 120_000);
 
   it("renders with --fonts directory", () => {
-    const caveatDir = join(
-      __dirname,
-      "../../../fixtures/fonts/Caveat"
-    );
+    const caveatDir = join(__dirname, "../../../fixtures/fonts/Caveat");
     if (!existsSync(caveatDir)) {
       console.warn(`Skipping: Caveat font not found at ${caveatDir}`);
       return;

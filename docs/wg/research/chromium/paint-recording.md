@@ -7,7 +7,6 @@ tags:
   - chromium
   - rendering
   - compositing
-
 ---
 
 # Chromium Paint Recording System
@@ -49,44 +48,44 @@ with no vtable.
 
 ### Type Enum (33 op types)
 
-| Op Type                   | Category     | Purpose                                        |
-| ------------------------- | ------------ | ---------------------------------------------- |
-| `kSave`                   | State        | Save canvas state                              |
-| `kRestore`                | State        | Restore canvas state                           |
-| `kSaveLayer`              | State        | Save layer (with PaintFlags)                   |
-| `kSaveLayerAlpha`         | State        | Save layer with alpha                          |
-| `kSaveLayerFilters`       | State        | Save layer with filters                        |
-| `kConcat`                 | Transform    | Concatenate 4x4 matrix                         |
-| `kScale`                  | Transform    | Scale canvas                                   |
-| `kRotate`                 | Transform    | Rotate canvas                                  |
-| `kTranslate`              | Transform    | Translate canvas                                |
-| `kSetMatrix`              | Transform    | Set absolute matrix                             |
-| `kClipRect`               | Clip         | Clip by rect                                   |
-| `kClipRRect`              | Clip         | Clip by rounded rect                           |
-| `kClipPath`               | Clip         | Clip by path                                   |
-| `kDrawRect`               | Draw         | Draw rectangle                                 |
-| `kDrawIRect`              | Draw         | Draw integer rectangle                         |
-| `kDrawRRect`              | Draw         | Draw rounded rectangle                         |
-| `kDrawDRRect`             | Draw         | Draw double-rounded-rect                       |
-| `kDrawOval`               | Draw         | Draw oval                                      |
-| `kDrawArc`                | Draw         | Draw arc (with PaintFlags)                     |
-| `kDrawArcLite`            | Draw         | Draw arc (lite flags)                          |
-| `kDrawLine`               | Draw         | Draw line (with PaintFlags)                    |
-| `kDrawLineLite`           | Draw         | Draw line (lite flags)                         |
-| `kDrawPath`               | Draw         | Draw path                                      |
-| `kDrawImage`              | Draw         | Draw image at position                         |
-| `kDrawImageRect`          | Draw         | Draw image stretched into rect                 |
-| `kDrawTextBlob`           | Draw         | Draw text blob                                 |
-| `kDrawSlug`               | Draw         | Draw GPU-serialized text (Slug)                |
-| `kDrawVertices`           | Draw         | Draw vertex mesh                               |
-| `kDrawRecord`             | Draw         | Replay a nested PaintRecord                    |
-| `kDrawScrollingContents`  | Draw         | Draw non-composited scrolling contents         |
-| `kDrawSkottie`            | Draw         | Draw Lottie/Skottie animation                  |
-| `kDrawColor`              | Draw         | Fill with color + blend mode                   |
-| `kAnnotate`               | Metadata     | Annotation (URL links)                         |
-| `kCustomData`             | Metadata     | User-defined placeholder                       |
-| `kSetNodeId`              | Metadata     | Associate ops with a DOM node (for hit testing)|
-| `kNoop`                   | Control      | No operation                                   |
+| Op Type                  | Category  | Purpose                                         |
+| ------------------------ | --------- | ----------------------------------------------- |
+| `kSave`                  | State     | Save canvas state                               |
+| `kRestore`               | State     | Restore canvas state                            |
+| `kSaveLayer`             | State     | Save layer (with PaintFlags)                    |
+| `kSaveLayerAlpha`        | State     | Save layer with alpha                           |
+| `kSaveLayerFilters`      | State     | Save layer with filters                         |
+| `kConcat`                | Transform | Concatenate 4x4 matrix                          |
+| `kScale`                 | Transform | Scale canvas                                    |
+| `kRotate`                | Transform | Rotate canvas                                   |
+| `kTranslate`             | Transform | Translate canvas                                |
+| `kSetMatrix`             | Transform | Set absolute matrix                             |
+| `kClipRect`              | Clip      | Clip by rect                                    |
+| `kClipRRect`             | Clip      | Clip by rounded rect                            |
+| `kClipPath`              | Clip      | Clip by path                                    |
+| `kDrawRect`              | Draw      | Draw rectangle                                  |
+| `kDrawIRect`             | Draw      | Draw integer rectangle                          |
+| `kDrawRRect`             | Draw      | Draw rounded rectangle                          |
+| `kDrawDRRect`            | Draw      | Draw double-rounded-rect                        |
+| `kDrawOval`              | Draw      | Draw oval                                       |
+| `kDrawArc`               | Draw      | Draw arc (with PaintFlags)                      |
+| `kDrawArcLite`           | Draw      | Draw arc (lite flags)                           |
+| `kDrawLine`              | Draw      | Draw line (with PaintFlags)                     |
+| `kDrawLineLite`          | Draw      | Draw line (lite flags)                          |
+| `kDrawPath`              | Draw      | Draw path                                       |
+| `kDrawImage`             | Draw      | Draw image at position                          |
+| `kDrawImageRect`         | Draw      | Draw image stretched into rect                  |
+| `kDrawTextBlob`          | Draw      | Draw text blob                                  |
+| `kDrawSlug`              | Draw      | Draw GPU-serialized text (Slug)                 |
+| `kDrawVertices`          | Draw      | Draw vertex mesh                                |
+| `kDrawRecord`            | Draw      | Replay a nested PaintRecord                     |
+| `kDrawScrollingContents` | Draw      | Draw non-composited scrolling contents          |
+| `kDrawSkottie`           | Draw      | Draw Lottie/Skottie animation                   |
+| `kDrawColor`             | Draw      | Fill with color + blend mode                    |
+| `kAnnotate`              | Metadata  | Annotation (URL links)                          |
+| `kCustomData`            | Metadata  | User-defined placeholder                        |
+| `kSetNodeId`             | Metadata  | Associate ops with a DOM node (for hit testing) |
+| `kNoop`                  | Control   | No operation                                    |
 
 ### Dispatch Without Vtable
 
@@ -128,14 +127,14 @@ data_: [Op1 | padding | Op2 | padding | Op3 | ...]
        offset 0         offset N         offset M
 ```
 
-| Field                | Type                        | Purpose                              |
-| -------------------- | --------------------------- | ------------------------------------ |
-| `data_`              | `unique_ptr<char, AlignedFreeDeleter>` | Raw byte buffer             |
-| `used_`              | `size_t`                    | Bytes occupied by ops                |
-| `reserved_`          | `size_t`                    | Total allocated bytes                |
-| `op_count_`          | `size_t`                    | Number of top-level ops              |
-| `subrecord_bytes_used_` | `size_t`                 | Bytes from nested records            |
-| `subrecord_op_count_` | `size_t`                   | Op count from nested records         |
+| Field                   | Type                                   | Purpose                      |
+| ----------------------- | -------------------------------------- | ---------------------------- |
+| `data_`                 | `unique_ptr<char, AlignedFreeDeleter>` | Raw byte buffer              |
+| `used_`                 | `size_t`                               | Bytes occupied by ops        |
+| `reserved_`             | `size_t`                               | Total allocated bytes        |
+| `op_count_`             | `size_t`                               | Number of top-level ops      |
+| `subrecord_bytes_used_` | `size_t`                               | Bytes from nested records    |
+| `subrecord_op_count_`   | `size_t`                               | Op count from nested records |
 
 Initial buffer size: 4096 bytes. Alignment: 8 bytes.
 
@@ -212,12 +211,12 @@ mechanism for spatial queries.
 Chromium's R-tree implementation uses STR (sort-tile-recursive) bulk
 loading. Key properties:
 
-| Property       | Value                        |
-| -------------- | ---------------------------- |
-| Min children   | 6                            |
-| Max children   | 11                           |
-| Node storage   | Flat `std::vector<Node<T>>`  |
-| Payload        | `size_t` (byte offsets)      |
+| Property       | Value                       |
+| -------------- | --------------------------- |
+| Min children   | 6                           |
+| Max children   | 11                          |
+| Node storage   | Flat `std::vector<Node<T>>` |
+| Payload        | `size_t` (byte offsets)     |
 | Bounding boxes | `gfx::Rect` (visual rects)  |
 
 All nodes are stored in a flat vector (no per-node heap allocation). The
@@ -355,16 +354,16 @@ Source: `cc/paint/paint_op_buffer_iterator.h` (lines 213-249)
 
 ## Key Constants
 
-| Constant                    | Value | Purpose                                  |
-| --------------------------- | ----- | ---------------------------------------- |
-| `kPaintOpAlign`             | 8     | Op alignment in bytes                    |
-| `kInitialBufferSize`        | 4096  | Initial PaintOpBuffer allocation         |
-| `kMaxOpsToAnalyzeForLayer`  | 10    | Solid color analysis op limit (per layer)|
-| `kMaxOpsToAnalyze`          | 5     | Solid color analysis op limit (per tile) |
-| R-tree min children         | 6     | Minimum branching factor                 |
-| R-tree max children         | 11    | Maximum branching factor                 |
-| Recording vector reserve    | 1024  | Pre-allocated visual_rects/offsets       |
-| Paired stack reserve        | 32    | Pre-allocated save/restore nesting       |
+| Constant                   | Value | Purpose                                   |
+| -------------------------- | ----- | ----------------------------------------- |
+| `kPaintOpAlign`            | 8     | Op alignment in bytes                     |
+| `kInitialBufferSize`       | 4096  | Initial PaintOpBuffer allocation          |
+| `kMaxOpsToAnalyzeForLayer` | 10    | Solid color analysis op limit (per layer) |
+| `kMaxOpsToAnalyze`         | 5     | Solid color analysis op limit (per tile)  |
+| R-tree min children        | 6     | Minimum branching factor                  |
+| R-tree max children        | 11    | Maximum branching factor                  |
+| Recording vector reserve   | 1024  | Pre-allocated visual_rects/offsets        |
+| Paired stack reserve       | 32    | Pre-allocated save/restore nesting        |
 
 ---
 

@@ -54,7 +54,14 @@ describe("Subscription (headless)", () => {
     expect(spy).toHaveBeenCalledTimes(1);
 
     // Dispatching a camera transform should NOT fire the selection subscriber
-    ed.doc.dispatch({ type: "transform", transform: [[2, 0, 0], [0, 2, 0]], sync: false });
+    ed.doc.dispatch({
+      type: "transform",
+      transform: [
+        [2, 0, 0],
+        [0, 2, 0],
+      ],
+      sync: false,
+    });
     expect(spy).toHaveBeenCalledTimes(1); // still 1
   });
 });

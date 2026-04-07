@@ -40,31 +40,32 @@ interface FlipPageProps {
   onLinkClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
-const FlipPage: React.FC<FlipPageProps> = React.forwardRef<HTMLDivElement, FlipPageProps>(
-  ({ onLinkClick, pageNumber, width, height }, ref) => {
-    return (
-      <div
-        className="shadow-lg rounded-sm overflow-hidden"
-        ref={ref as React.RefObject<HTMLDivElement>}
-      >
-        <Page
-          pageNumber={pageNumber}
-          width={width}
-          height={height}
-          renderAnnotationLayer={true}
-          renderTextLayer={true}
-          onClick={(e) => {
-            const anchor = (e.target as HTMLElement).closest("a");
-            if (anchor) {
-              onLinkClick?.(e);
-            }
-            //
-          }}
-        />
-      </div>
-    );
-  }
-);
+const FlipPage: React.FC<FlipPageProps> = React.forwardRef<
+  HTMLDivElement,
+  FlipPageProps
+>(({ onLinkClick, pageNumber, width, height }, ref) => {
+  return (
+    <div
+      className="shadow-lg rounded-sm overflow-hidden"
+      ref={ref as React.RefObject<HTMLDivElement>}
+    >
+      <Page
+        pageNumber={pageNumber}
+        width={width}
+        height={height}
+        renderAnnotationLayer={true}
+        renderTextLayer={true}
+        onClick={(e) => {
+          const anchor = (e.target as HTMLElement).closest("a");
+          if (anchor) {
+            onLinkClick?.(e);
+          }
+          //
+        }}
+      />
+    </div>
+  );
+});
 
 FlipPage.displayName = "FlipPage";
 

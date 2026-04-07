@@ -3,7 +3,6 @@ id: intro
 tags:
   - reference
   - user-facing
-
 ---
 
 # API References & Blueprints

@@ -97,9 +97,7 @@ interface Grida2DRuntime {
    * Resolve a missing image by providing its raw bytes for a given resource ID.
    */
   resolveImage(rid: string, bytes: Uint8Array): void;
-  applyTransactions(
-    transactions: unknown[][]
-  ): {
+  applyTransactions(transactions: unknown[][]): {
     success: boolean;
     applied: number;
     total: number;

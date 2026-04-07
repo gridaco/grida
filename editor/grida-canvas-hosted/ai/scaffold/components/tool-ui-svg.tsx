@@ -51,9 +51,7 @@ export function SvgToolUI({
               Created
             </span>
           )}
-          {isError && (
-            <span className="text-xs text-destructive">Failed</span>
-          )}
+          {isError && <span className="text-xs text-destructive">Failed</span>}
         </span>
       </div>
 

@@ -17,11 +17,15 @@
  */
 
 .markdown-body {
-    font-family: Geist, system-ui, -apple-system, sans-serif;
-    font-size: 16px;
-    line-height: 1.5;
-    color: rgb(31, 35, 40);
-    padding: 16px;
+  font-family:
+    Geist,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgb(31, 35, 40);
+  padding: 16px;
 }
 
 /* ── Headings ── */
@@ -32,136 +36,156 @@
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-    font-weight: 600;
-    margin-top: 24px;
-    margin-bottom: 16px;
-    color: rgb(31, 35, 40);
+  font-weight: 600;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  color: rgb(31, 35, 40);
 }
 
-.markdown-body h1 { font-size: 32px; }
-.markdown-body h2 { font-size: 24px; }
-.markdown-body h3 { font-size: 20px; }
-.markdown-body h4 { font-size: 16px; }
-.markdown-body h5 { font-size: 14px; }
-.markdown-body h6 { font-size: 13.5px; }
+.markdown-body h1 {
+  font-size: 32px;
+}
+.markdown-body h2 {
+  font-size: 24px;
+}
+.markdown-body h3 {
+  font-size: 20px;
+}
+.markdown-body h4 {
+  font-size: 16px;
+}
+.markdown-body h5 {
+  font-size: 14px;
+}
+.markdown-body h6 {
+  font-size: 13.5px;
+}
 
 .markdown-body h1,
 .markdown-body h2 {
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgb(216, 222, 228);
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgb(216, 222, 228);
 }
 
 /* ── Paragraphs ── */
 
 .markdown-body p {
-    margin-top: 0;
-    margin-bottom: 16px;
+  margin-top: 0;
+  margin-bottom: 16px;
 }
 
 /* ── Links ── */
 
 .markdown-body a {
-    color: rgb(9, 105, 218);
-    text-decoration: underline;
+  color: rgb(9, 105, 218);
+  text-decoration: underline;
 }
 
 /* ── Inline code ── */
 
 .markdown-body code {
-    font-family: SF Mono, Menlo, Consolas, monospace;
-    font-size: 85%;
-    background-color: rgb(246, 248, 250);
-    padding: 2px 6px;
-    border-radius: 6px;
+  font-family:
+    SF Mono,
+    Menlo,
+    Consolas,
+    monospace;
+  font-size: 85%;
+  background-color: rgb(246, 248, 250);
+  padding: 2px 6px;
+  border-radius: 6px;
 }
 
 /* ── Code blocks ── */
 
 .markdown-body pre {
-    background-color: rgb(246, 248, 250);
-    border: 1px solid rgb(216, 222, 228);
-    border-radius: 6px;
-    padding: 16px;
-    margin-bottom: 16px;
-    overflow: auto;
+  background-color: rgb(246, 248, 250);
+  border: 1px solid rgb(216, 222, 228);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+  overflow: auto;
 }
 
 .markdown-body pre code {
-    font-family: SF Mono, Menlo, Consolas, monospace;
-    font-size: 85%;
-    line-height: 1.45;
-    background-color: transparent;
-    padding: 0;
-    border-radius: 0;
+  font-family:
+    SF Mono,
+    Menlo,
+    Consolas,
+    monospace;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
 }
 
 /* ── Blockquotes ── */
 
 .markdown-body blockquote {
-    padding-left: 16px;
-    border-left: 4px solid rgb(208, 215, 222);
-    margin-top: 0;
-    margin-bottom: 16px;
-    color: rgb(31, 35, 40);
+  padding-left: 16px;
+  border-left: 4px solid rgb(208, 215, 222);
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: rgb(31, 35, 40);
 }
 
 /* ── Lists ── */
 
 .markdown-body ul,
 .markdown-body ol {
-    padding-left: 24px;
-    margin-top: 0;
-    margin-bottom: 8px;
+  padding-left: 24px;
+  margin-top: 0;
+  margin-bottom: 8px;
 }
 
 .markdown-body li {
-    margin-bottom: 4px;
+  margin-bottom: 4px;
 }
 
 /* ── Tables ── */
 
 .markdown-body table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-bottom: 16px;
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 16px;
 }
 
 .markdown-body th,
 .markdown-body td {
-    padding: 8px;
-    border: 1px solid rgb(216, 222, 228);
+  padding: 8px;
+  border: 1px solid rgb(216, 222, 228);
 }
 
 .markdown-body th {
-    font-weight: 600;
-    background-color: rgb(246, 248, 250);
+  font-weight: 600;
+  background-color: rgb(246, 248, 250);
 }
 
 /* ── Horizontal rules ── */
 
 .markdown-body hr {
-    border: none;
-    border-top: 2px solid rgb(216, 222, 228);
-    margin: 8px 0 10px 0;
+  border: none;
+  border-top: 2px solid rgb(216, 222, 228);
+  margin: 8px 0 10px 0;
 }
 
 /* ── Inline formatting ── */
 
 .markdown-body strong {
-    font-weight: 700;
+  font-weight: 700;
 }
 
 .markdown-body em {
-    font-style: italic;
+  font-style: italic;
 }
 
 .markdown-body del {
-    text-decoration: line-through;
+  text-decoration: line-through;
 }
 
 /* ── Images ── */
 
 .markdown-body img {
-    max-width: 100%;
-    height: auto;
+  max-width: 100%;
+  height: auto;
 }

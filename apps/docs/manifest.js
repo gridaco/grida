@@ -15,8 +15,7 @@ module.exports = {
             routes: [
               {
                 title: "Icons loader",
-                path:
-                  "https://blog.grida.co/bridged-assistant-update-2021-0-1f1-meet-powerful-bridged-design-assistants-icon-loader-552b452396a4",
+                path: "https://blog.grida.co/bridged-assistant-update-2021-0-1f1-meet-powerful-bridged-design-assistants-icon-loader-552b452396a4",
               },
             ],
           },
@@ -102,8 +101,7 @@ module.exports = {
             routes: [
               {
                 title: "Automatic interfacing strategy",
-                path:
-                  "/docs/@designto-code/component-property-interfacing-auto",
+                path: "/docs/@designto-code/component-property-interfacing-auto",
               },
             ],
           },
@@ -206,8 +204,7 @@ module.exports = {
             routes: [
               {
                 title: "Multiple decoration Boxdecoration",
-                path:
-                  "/docs/@designto-code/flutter-box-decoration-multiple-visuals",
+                path: "/docs/@designto-code/flutter-box-decoration-multiple-visuals",
               },
               {
                 title: "Multiple gradients",

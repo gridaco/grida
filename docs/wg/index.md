@@ -5,7 +5,6 @@ sidebar_position: 1
 tags:
   - internal
   - wg
-
 ---
 
 # Working Group

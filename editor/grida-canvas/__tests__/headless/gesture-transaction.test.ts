@@ -18,7 +18,13 @@ function createDoc(): grida.program.document.Document {
     links: { scene1: ["rect1"] },
     nodes: {
       scene1: sceneNode("scene1", "Scene 1"),
-      rect1: rectNode("rect1", { name: "Rect 1", x: 0, y: 0, width: 100, height: 100 }),
+      rect1: rectNode("rect1", {
+        name: "Rect 1",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      }),
     },
     entry_scene_id: "scene1",
     bitmaps: {},
@@ -153,9 +159,11 @@ describe("Gesture Transactions via dispatch recording modes", () => {
     );
 
     // "record" mode (default) during gesture — should be suppressed
-    ed.doc.dispatch(
-      { type: "node/change/*", node_id: "rect1", name: "Mid" } satisfies D,
-    );
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Mid",
+    } satisfies D);
 
     expect(ed.doc.historySnapshot.past).toHaveLength(1); // still just select
 
@@ -168,7 +176,11 @@ describe("Gesture Transactions via dispatch recording modes", () => {
   });
 
   test("property change → gesture → undo each separately", () => {
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Renamed" } satisfies D);
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Renamed",
+    } satisfies D);
     vi.advanceTimersByTime(500);
     expect(ed.doc.historySnapshot.past).toHaveLength(1);
 
@@ -195,7 +207,10 @@ describe("Gesture Transactions via dispatch recording modes", () => {
     // non-empty would skip re-rendering.
     const emissions: { action: any; patchCount: number }[] = [];
     const __unsub = ed.doc.subscribe((_doc, action, patches) => {
-      emissions.push({ action: action?.type ?? "undo/redo", patchCount: patches?.length ?? 0 });
+      emissions.push({
+        action: action?.type ?? "undo/redo",
+        patchCount: patches?.length ?? 0,
+      });
     });
 
     ed.doc.dispatch(
@@ -240,7 +255,11 @@ describe("Gesture Transactions via dispatch recording modes", () => {
 
   test("undo during active gesture: aborts gesture, then undoes previous entry", () => {
     // Setup: create a history entry first
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Base" } satisfies D);
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Base",
+    } satisfies D);
     vi.advanceTimersByTime(500);
     expect(ed.doc.historySnapshot.past).toHaveLength(1);
 

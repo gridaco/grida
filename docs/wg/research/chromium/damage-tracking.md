@@ -7,7 +7,6 @@ tags:
   - chromium
   - compositing
   - performance
-
 ---
 
 # Chromium Damage Tracking

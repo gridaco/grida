@@ -4,7 +4,6 @@ tags:
   - internal
   - wg
   - format-schema
-
 ---
 
 # `.grida` Naming Conventions

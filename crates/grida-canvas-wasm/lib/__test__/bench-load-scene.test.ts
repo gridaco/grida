@@ -28,7 +28,10 @@ import { io } from "../../../../packages/grida-canvas-io/index";
 const LOCAL_FIXTURES_DIR = resolve(__dirname, "fixtures/local");
 
 /** Shared test fixtures (committed). */
-const SHARED_FIXTURES_DIR = resolve(__dirname, "../../../../fixtures/test-grida");
+const SHARED_FIXTURES_DIR = resolve(
+  __dirname,
+  "../../../../fixtures/test-grida"
+);
 
 let module: any;
 

@@ -7,7 +7,6 @@ tags:
   - chromium
   - compositing
   - rendering
-
 ---
 
 # Chromium Property Trees
@@ -57,11 +56,11 @@ An `element_id_to_node_index_` map allows direct lookup from a compositor
 
 Key node ID constants:
 
-| Constant                       | Value | Meaning                              |
-| ------------------------------ | ----- | ------------------------------------ |
-| `kInvalidPropertyNodeId`       | -1    | No node                              |
-| `kRootPropertyNodeId`          | 0     | Root of every property tree          |
-| `kSecondaryRootPropertyNodeId` | 1     | Contents root / viewport root        |
+| Constant                       | Value | Meaning                       |
+| ------------------------------ | ----- | ----------------------------- |
+| `kInvalidPropertyNodeId`       | -1    | No node                       |
+| `kRootPropertyNodeId`          | 0     | Root of every property tree   |
+| `kSecondaryRootPropertyNodeId` | 1     | Contents root / viewport root |
 
 Source: `cc/trees/property_tree.h` (lines 65-158),
 `cc/trees/property_ids.h` (lines 11-17)
@@ -75,29 +74,29 @@ screen-space transform.
 
 ### Fields
 
-| Field                                               | Type                | Purpose                                                     |
-| --------------------------------------------------- | ------------------- | ----------------------------------------------------------- |
-| `id`                                                | `int`               | Index in the transform tree vector                          |
-| `parent_id`                                         | `int`               | Parent node index                                           |
-| `local`                                             | `gfx::Transform`    | Local transform matrix                                      |
-| `origin`                                            | `gfx::Point3F`      | Transform origin                                            |
-| `post_translation`                                  | `gfx::Vector2dF`    | Post-transform translation                                  |
-| `to_parent`                                         | `gfx::Transform`    | Combined local-to-parent (computed)                         |
-| `scroll_offset`                                     | `gfx::PointF`       | Scroll offset applied to this transform                     |
-| `snap_amount`                                       | `gfx::Vector2dF`    | Pixel-snapping correction amount                            |
-| `sorting_context_id`                                | `int`               | 3D rendering context (0 = none)                             |
-| `maximum_animation_scale`                           | `float`             | Max scale during current animation                          |
-| `needs_local_transform_update`                      | `bool`              | Dirty flag for `to_parent` recomputation                    |
-| `node_and_ancestors_are_animated_or_invertible`     | `bool`              | Cached ancestor check                                       |
-| `has_potential_animation`                            | `bool`              | Whether a transform animation may run                       |
-| `is_currently_animating`                            | `bool`              | Whether a transform animation is currently running          |
-| `to_screen_is_potentially_animated`                 | `bool`              | Whether this node or any ancestor has a potential animation |
-| `flattens_inherited_transform`                      | `bool`              | Whether to flatten the inherited 3D transform               |
-| `node_and_ancestors_are_flat`                       | `bool`              | Whether all ancestors and this node are flat                |
-| `scrolls`                                           | `bool`              | Whether this node scrolls                                   |
-| `should_be_snapped`                                 | `bool`              | Whether to snap to pixel grid                               |
-| `will_change_transform`                             | `bool`              | Whether `will-change: transform` is set                     |
-| `node_or_ancestors_will_change_transform`           | `bool`              | Propagated will-change flag                                 |
+| Field                                           | Type             | Purpose                                                     |
+| ----------------------------------------------- | ---------------- | ----------------------------------------------------------- |
+| `id`                                            | `int`            | Index in the transform tree vector                          |
+| `parent_id`                                     | `int`            | Parent node index                                           |
+| `local`                                         | `gfx::Transform` | Local transform matrix                                      |
+| `origin`                                        | `gfx::Point3F`   | Transform origin                                            |
+| `post_translation`                              | `gfx::Vector2dF` | Post-transform translation                                  |
+| `to_parent`                                     | `gfx::Transform` | Combined local-to-parent (computed)                         |
+| `scroll_offset`                                 | `gfx::PointF`    | Scroll offset applied to this transform                     |
+| `snap_amount`                                   | `gfx::Vector2dF` | Pixel-snapping correction amount                            |
+| `sorting_context_id`                            | `int`            | 3D rendering context (0 = none)                             |
+| `maximum_animation_scale`                       | `float`          | Max scale during current animation                          |
+| `needs_local_transform_update`                  | `bool`           | Dirty flag for `to_parent` recomputation                    |
+| `node_and_ancestors_are_animated_or_invertible` | `bool`           | Cached ancestor check                                       |
+| `has_potential_animation`                       | `bool`           | Whether a transform animation may run                       |
+| `is_currently_animating`                        | `bool`           | Whether a transform animation is currently running          |
+| `to_screen_is_potentially_animated`             | `bool`           | Whether this node or any ancestor has a potential animation |
+| `flattens_inherited_transform`                  | `bool`           | Whether to flatten the inherited 3D transform               |
+| `node_and_ancestors_are_flat`                   | `bool`           | Whether all ancestors and this node are flat                |
+| `scrolls`                                       | `bool`           | Whether this node scrolls                                   |
+| `should_be_snapped`                             | `bool`           | Whether to snap to pixel grid                               |
+| `will_change_transform`                         | `bool`           | Whether `will-change: transform` is set                     |
+| `node_or_ancestors_will_change_transform`       | `bool`           | Propagated will-change flag                                 |
 
 ### `to_parent` Computation
 
@@ -154,29 +153,29 @@ k2DScaleTransformWithCompositedDescendants, kTest
 
 ### Key Fields
 
-| Field                                 | Type                | Purpose                                             |
-| ------------------------------------- | ------------------- | --------------------------------------------------- |
-| `id`                                  | `int`               | Index in the effect tree vector                     |
-| `parent_id`                           | `int`               | Parent node index                                   |
-| `opacity`                             | `float`             | Local opacity (0.0-1.0)                             |
-| `screen_space_opacity`                | `float`             | Computed total opacity to screen                    |
-| `filters`                             | `FilterOperations`  | Foreground filters (blur, shadow, etc.)             |
-| `backdrop_filters`                    | `FilterOperations`  | Backdrop filters                                    |
-| `backdrop_filter_quality`             | `float`             | Quality factor for backdrop filter (default 1.0)    |
-| `blend_mode`                          | `SkBlendMode`       | Blend mode (default `kSrcOver`)                     |
-| `render_surface_reason`               | `RenderSurfaceReason` | Why a render surface exists (or `kNone`)         |
-| `transform_id`                        | `int`               | Associated transform node                           |
-| `clip_id`                             | `int`               | Associated clip node                                |
-| `target_id`                           | `int`               | Ancestor effect node with render surface             |
-| `cache_render_surface`                | `bool`              | Whether the render surface should be cached          |
-| `effect_changed`                      | `bool`              | Dirty flag for damage tracking                       |
-| `is_fast_rounded_corner`              | `bool`              | Whether to use the fast rounded-corner path          |
-| `is_drawn`                            | `bool`              | Whether this subtree is drawn                        |
-| `subtree_hidden`                      | `bool`              | Whether this subtree is hidden                       |
-| `has_potential_opacity_animation`      | `bool`              | Whether an opacity animation may run                 |
-| `has_potential_filter_animation`       | `bool`              | Whether a filter animation may run                   |
-| `lcd_text_disallowed_by_filter`        | `bool`              | Whether ancestor filters disable LCD text            |
-| `lcd_text_disallowed_by_backdrop_filter` | `bool`            | Whether ancestor backdrop filters disable LCD text   |
+| Field                                    | Type                  | Purpose                                            |
+| ---------------------------------------- | --------------------- | -------------------------------------------------- |
+| `id`                                     | `int`                 | Index in the effect tree vector                    |
+| `parent_id`                              | `int`                 | Parent node index                                  |
+| `opacity`                                | `float`               | Local opacity (0.0-1.0)                            |
+| `screen_space_opacity`                   | `float`               | Computed total opacity to screen                   |
+| `filters`                                | `FilterOperations`    | Foreground filters (blur, shadow, etc.)            |
+| `backdrop_filters`                       | `FilterOperations`    | Backdrop filters                                   |
+| `backdrop_filter_quality`                | `float`               | Quality factor for backdrop filter (default 1.0)   |
+| `blend_mode`                             | `SkBlendMode`         | Blend mode (default `kSrcOver`)                    |
+| `render_surface_reason`                  | `RenderSurfaceReason` | Why a render surface exists (or `kNone`)           |
+| `transform_id`                           | `int`                 | Associated transform node                          |
+| `clip_id`                                | `int`                 | Associated clip node                               |
+| `target_id`                              | `int`                 | Ancestor effect node with render surface           |
+| `cache_render_surface`                   | `bool`                | Whether the render surface should be cached        |
+| `effect_changed`                         | `bool`                | Dirty flag for damage tracking                     |
+| `is_fast_rounded_corner`                 | `bool`                | Whether to use the fast rounded-corner path        |
+| `is_drawn`                               | `bool`                | Whether this subtree is drawn                      |
+| `subtree_hidden`                         | `bool`                | Whether this subtree is hidden                     |
+| `has_potential_opacity_animation`        | `bool`                | Whether an opacity animation may run               |
+| `has_potential_filter_animation`         | `bool`                | Whether a filter animation may run                 |
+| `lcd_text_disallowed_by_filter`          | `bool`                | Whether ancestor filters disable LCD text          |
+| `lcd_text_disallowed_by_backdrop_filter` | `bool`                | Whether ancestor backdrop filters disable LCD text |
 
 ### Computed Properties
 
@@ -197,15 +196,15 @@ Source: `cc/trees/effect_node.h` (lines 32-236),
 
 ### Fields
 
-| Field                                        | Type                           | Purpose                                                 |
-| -------------------------------------------- | ------------------------------ | ------------------------------------------------------- |
-| `id`                                         | `int`                          | Index in the clip tree vector                           |
-| `parent_id`                                  | `int`                          | Parent node index                                       |
-| `clip`                                       | `gfx::RectF`                  | Clip rect in the space of `transform_id`                |
-| `transform_id`                               | `int`                          | Transform node defining this clip's local space         |
-| `pixel_moving_filter_id`                     | `int`                          | Effect node with pixel-moving filter (or invalid)       |
-| `cached_clip_rects`                          | `InlinedVector<ClipRectData,3>` | Per-target cached accumulated clips                    |
-| `cached_accumulated_rect_in_screen_space`    | `gfx::RectF`                  | Accumulated clip to root in screen space                |
+| Field                                     | Type                            | Purpose                                           |
+| ----------------------------------------- | ------------------------------- | ------------------------------------------------- |
+| `id`                                      | `int`                           | Index in the clip tree vector                     |
+| `parent_id`                               | `int`                           | Parent node index                                 |
+| `clip`                                    | `gfx::RectF`                    | Clip rect in the space of `transform_id`          |
+| `transform_id`                            | `int`                           | Transform node defining this clip's local space   |
+| `pixel_moving_filter_id`                  | `int`                           | Effect node with pixel-moving filter (or invalid) |
+| `cached_clip_rects`                       | `InlinedVector<ClipRectData,3>` | Per-target cached accumulated clips               |
+| `cached_accumulated_rect_in_screen_space` | `gfx::RectF`                    | Accumulated clip to root in screen space          |
 
 When `pixel_moving_filter_id` is valid, the clip node does not apply its
 `clip` rect directly. Instead, it expands the accumulated clip to include
@@ -225,23 +224,23 @@ Source: `cc/trees/clip_node.h` (lines 23-82)
 
 ### Fields
 
-| Field                                  | Type                  | Purpose                                         |
-| -------------------------------------- | --------------------- | ----------------------------------------------- |
-| `id`                                   | `int`                 | Index in the scroll tree vector                  |
-| `parent_id`                            | `int`                 | Parent node index                                |
-| `container_bounds`                     | `gfx::Size`          | Visible scroll area (excluding non-overlay bars) |
-| `bounds`                               | `gfx::Size`          | Total content size                               |
-| `element_id`                           | `ElementId`          | Element associated with this scroll container    |
-| `transform_id`                         | `int`                 | Transform node containing the scroll offset      |
-| `container_origin`                     | `gfx::Point`         | Origin of container in parent transform space    |
-| `main_thread_repaint_reasons`          | `uint32_t`           | Bitmask of reasons scroll requires main thread   |
-| `overscroll_behavior`                  | `OverscrollBehavior` | `kNone`, `kAuto`, or `kContain`                  |
-| `snap_container_data`                  | `optional<SnapContainerData>` | CSS scroll snap configuration          |
-| `user_scrollable_horizontal`           | `bool`               | Whether user can scroll horizontally             |
-| `user_scrollable_vertical`             | `bool`               | Whether user can scroll vertically               |
-| `scrolls_inner_viewport`              | `bool`               | Whether this is the inner viewport scroller      |
-| `scrolls_outer_viewport`              | `bool`               | Whether this is the outer viewport scroller      |
-| `is_composited`                        | `bool`               | Whether scrolling is composited (not main-thread)|
+| Field                         | Type                          | Purpose                                           |
+| ----------------------------- | ----------------------------- | ------------------------------------------------- |
+| `id`                          | `int`                         | Index in the scroll tree vector                   |
+| `parent_id`                   | `int`                         | Parent node index                                 |
+| `container_bounds`            | `gfx::Size`                   | Visible scroll area (excluding non-overlay bars)  |
+| `bounds`                      | `gfx::Size`                   | Total content size                                |
+| `element_id`                  | `ElementId`                   | Element associated with this scroll container     |
+| `transform_id`                | `int`                         | Transform node containing the scroll offset       |
+| `container_origin`            | `gfx::Point`                  | Origin of container in parent transform space     |
+| `main_thread_repaint_reasons` | `uint32_t`                    | Bitmask of reasons scroll requires main thread    |
+| `overscroll_behavior`         | `OverscrollBehavior`          | `kNone`, `kAuto`, or `kContain`                   |
+| `snap_container_data`         | `optional<SnapContainerData>` | CSS scroll snap configuration                     |
+| `user_scrollable_horizontal`  | `bool`                        | Whether user can scroll horizontally              |
+| `user_scrollable_vertical`    | `bool`                        | Whether user can scroll vertically                |
+| `scrolls_inner_viewport`      | `bool`                        | Whether this is the inner viewport scroller       |
+| `scrolls_outer_viewport`      | `bool`                        | Whether this is the outer viewport scroller       |
+| `is_composited`               | `bool`                        | Whether scrolling is composited (not main-thread) |
 
 ### Main-Thread Scrolling Reasons
 
@@ -275,14 +274,14 @@ The `PropertyTrees` class holds all four trees and global state:
 
 ### State Flags
 
-| Flag                | Purpose                                                |
-| ------------------- | ------------------------------------------------------ |
-| `needs_rebuild`     | Tree structure changed (nodes added/removed)           |
-| `changed`           | Any property changed since last tracking reset         |
-| `full_tree_damaged` | Everything must be re-rendered                         |
-| `is_main_thread`    | Whether this is the main-thread copy                   |
-| `is_active`         | Whether this is on the active tree                     |
-| `sequence_number`   | Incremented on each commit for versioning              |
+| Flag                | Purpose                                        |
+| ------------------- | ---------------------------------------------- |
+| `needs_rebuild`     | Tree structure changed (nodes added/removed)   |
+| `changed`           | Any property changed since last tracking reset |
+| `full_tree_damaged` | Everything must be re-rendered                 |
+| `is_main_thread`    | Whether this is the main-thread copy           |
+| `is_active`         | Whether this is on the active tree             |
+| `sequence_number`   | Incremented on each commit for versioning      |
 
 ### Viewport Deltas
 

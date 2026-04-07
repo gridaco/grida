@@ -2998,9 +2998,7 @@ export class Editor
 
     // Resolve viewport: prefer explicit API, fall back to DOM wrapper
     if (!viewportApi && viewportElement == null) {
-      throw new Error(
-        "Editor requires either viewportElement or viewportApi"
-      );
+      throw new Error("Editor requires either viewportElement or viewportApi");
     }
     const resolvedViewport: editor.api.IViewportApi = viewportApi
       ? viewportApi
@@ -5316,10 +5314,7 @@ export class EditorSurface
     const item = new ClipboardItem({ "image/png": blob });
     if (this.ui.clipboard) {
       await this.ui.clipboard.write([item]);
-    } else if (
-      typeof navigator !== "undefined" &&
-      navigator.clipboard?.write
-    ) {
+    } else if (typeof navigator !== "undefined" && navigator.clipboard?.write) {
       await navigator.clipboard.write([item]);
     } else {
       return false;

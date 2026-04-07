@@ -76,7 +76,9 @@ typesciprt
 ```css
 .background-blur {
   width: 100%;
-  font: 8vw system-ui, sans-serif;
+  font:
+    8vw system-ui,
+    sans-serif;
   font-weight: 900;
   height: 150px;
 }

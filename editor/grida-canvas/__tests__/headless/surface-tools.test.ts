@@ -93,9 +93,9 @@ describe("Surface Tools (headless)", () => {
     expect(ed.state.gesture_modifiers.transform_with_center_origin).toBe("on");
 
     ed.surface.surfaceConfigureTransformWithPreserveAspectRatioModifier("on");
-    expect(ed.state.gesture_modifiers.transform_with_preserve_aspect_ratio).toBe(
-      "on"
-    );
+    expect(
+      ed.state.gesture_modifiers.transform_with_preserve_aspect_ratio
+    ).toBe("on");
 
     ed.surface.surfaceConfigureRotateWithQuantizeModifier(15);
     expect(ed.state.gesture_modifiers.rotate_with_quantize).toBe(15);
