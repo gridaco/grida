@@ -119,12 +119,10 @@ pub mod flex {
             } else {
                 Axis::Y
             }
+        } else if width >= height {
+            Axis::X
         } else {
-            if width >= height {
-                Axis::X
-            } else {
-                Axis::Y
-            }
+            Axis::Y
         };
 
         let gaps = rect::get_gaps(boundingboxes, axis);

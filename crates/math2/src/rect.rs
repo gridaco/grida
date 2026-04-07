@@ -681,8 +681,8 @@ pub fn axis_projection_intersection(
     projections
         .iter()
         .skip(1)
-        .fold(Some(projections[0]), |acc, p| {
-            acc.and_then(|cur| super::vector2::intersection(cur, *p))
+        .try_fold(projections[0], |acc, p| {
+            super::vector2::intersection(acc, *p)
         })
 }
 

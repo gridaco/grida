@@ -38,7 +38,7 @@ pub fn fract(x: f32) -> f32 {
 /// assert!(v >= 0.0 && v <= 1.0);
 /// ```
 pub fn noise(x: f32, y: f32) -> f32 {
-    fract(((x * 12.9898 + y * 78.233).sin()) * 43758.5453)
+    fract(((x * 12.9898 + y * 78.233).sin()) * 43_758.547)
 }
 
 /// Returns all integer pixel coordinates along a straight line between
@@ -163,7 +163,7 @@ pub fn scale(bitmap: &Bitmap, factor: Vector2) -> Bitmap {
 
 /// Resizes a bitmap to the specified `[width, height]`.
 pub fn resize(bitmap: &Bitmap, dst: Vector2) -> Bitmap {
-    let (w2, h2) = (dst[0] as f32, dst[1] as f32);
+    let (w2, h2) = (dst[0], dst[1]);
     let fx = w2 / bitmap.width as f32;
     let fy = h2 / bitmap.height as f32;
     scale(bitmap, [fx, fy])
