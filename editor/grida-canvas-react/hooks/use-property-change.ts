@@ -2,6 +2,7 @@
  * Hooks for managing history-aware property changes in sidecontrol UI.
  *
  * **usePropertyPreview** — for hover-based controls (dropdowns, font pickers).
+ * **useAsyncPropertyPreview** — same, but for async apply fns (e.g. font-family loading).
  */
 import { useCallback, useRef, useState } from "react";
 import { useCurrentEditor } from "../use-editor";
@@ -98,6 +99,100 @@ export function usePropertyPreview<T>(
     isOpen.current = false;
     committedRef.current = null;
     setCommittedValue(null);
+    editor.doc.previewDiscard();
+  }, [editor]);
+
+  return { committedValue, onOpen, onSeek, onCommit, onClose };
+}
+
+/**
+ * Async variant of {@link usePropertyPreview} for properties whose apply
+ * function is asynchronous (e.g. font-family, which must load font files
+ * before the canvas can render them).
+ *
+ * Differences from the sync version:
+ * - `apply` returns `Promise<void>` (or void).
+ * - `onSeek` awaits the apply before calling `previewSet()`.
+ * - A monotonic seek counter ensures that a slow load that resolves after
+ *   the user has already moved to another item is silently discarded.
+ *
+ * @param label — history label for the preview session
+ * @param apply — async function that loads + dispatches a value to the store
+ */
+export function useAsyncPropertyPreview<T>(
+  label: string,
+  apply: (value: T) => Promise<void> | void
+) {
+  const editor = useCurrentEditor();
+  const isOpen = useRef(false);
+  const committedRef = useRef<T | null>(null);
+  const [committedValue, setCommittedValue] = useState<T | null>(null);
+  const seekGen = useRef(0);
+
+  const onOpen = useCallback(
+    (currentValue: T) => {
+      if (isOpen.current) return;
+      isOpen.current = true;
+      committedRef.current = currentValue;
+      setCommittedValue(currentValue);
+      seekGen.current++;
+      editor.doc.previewStart(label);
+    },
+    [editor, label]
+  );
+
+  const onSeek = useCallback(
+    (value: T | null | undefined) => {
+      if (!isOpen.current) return;
+      const gen = ++seekGen.current;
+      const target = value != null ? value : committedRef.current;
+      if (target == null) return;
+
+      const result = apply(target);
+      if (result && typeof (result as Promise<void>).then === "function") {
+        (result as Promise<void>).then(() => {
+          // Only capture if this is still the latest seek
+          if (gen === seekGen.current && isOpen.current) {
+            editor.doc.previewSet();
+          }
+        });
+      } else {
+        editor.doc.previewSet();
+      }
+    },
+    [editor, apply]
+  );
+
+  const onCommit = useCallback(
+    (value?: T) => {
+      if (!isOpen.current) return;
+      isOpen.current = false;
+      committedRef.current = null;
+      setCommittedValue(null);
+      seekGen.current++;
+
+      if (value != null) {
+        const result = apply(value);
+        if (result && typeof (result as Promise<void>).then === "function") {
+          (result as Promise<void>).then(() => {
+            editor.doc.previewCommit();
+          });
+        } else {
+          editor.doc.previewCommit();
+        }
+      } else {
+        editor.doc.previewCommit();
+      }
+    },
+    [editor, apply]
+  );
+
+  const onClose = useCallback(() => {
+    if (!isOpen.current) return;
+    isOpen.current = false;
+    committedRef.current = null;
+    setCommittedValue(null);
+    seekGen.current++;
     editor.doc.previewDiscard();
   }, [editor]);
 

@@ -1417,13 +1417,13 @@ function SectionText({ node_id }: { node_id: string }) {
           </PropertySectionHeaderActions>
         </PropertySectionHeaderItem>
         <PropertySectionContent>
-          <PropertyRow>
+           <PropertyRow>
             <PropertyLineLabel>Font</PropertyLineLabel>
             <div className="flex-1">
               <FontFamilyControl
                 id="sidecontrol-font-family-single"
                 value={font_family}
-                onValueChange={actions.fontFamily}
+                selection={[node_id]}
               />
             </div>
           </PropertyRow>
@@ -1552,12 +1552,7 @@ function SectionMixedText({ ids }: { ids: string[] }) {
               <FontFamilyControl
                 id="sidecontrol-font-family-mixed"
                 value={font_family?.value}
-                onValueChange={(value: string) => {
-                  const target = font_family?.ids ?? ids;
-                  target.forEach((id) => {
-                    instance.changeTextNodeFontFamilySync(id, value);
-                  });
-                }}
+                selection={font_family?.ids ?? ids}
               />
             </div>
           </PropertyRow>
