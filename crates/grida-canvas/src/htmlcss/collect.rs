@@ -518,6 +518,14 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Box shadow
     el.box_shadow = extract_box_shadow(style);
 
+    // Transform
+    el.transform = extract_transform(style);
+    el.transform_origin = if el.transform.is_some() {
+        extract_transform_origin(style)
+    } else {
+        None
+    };
+
     // Blend mode
     el.blend_mode = extract_blend_mode(style);
 
@@ -1211,6 +1219,124 @@ fn extract_blend_mode(style: &ComputedValues) -> BlendMode {
         MixBlend::Luminosity => BlendMode::Luminosity,
         _ => BlendMode::Normal,
     }
+}
+
+// ─── Transform extraction ───────────────────────────────────────────
+
+/// Flatten CSS `transform` property into a 2D affine matrix [a, b, c, d, tx, ty].
+///
+/// Applies each TransformOperation in sequence (left-to-right in CSS = post-multiply).
+/// Returns `None` if transform is `none` (identity / empty list).
+fn extract_transform(style: &ComputedValues) -> Option<[f32; 6]> {
+    use style::values::computed::transform::TransformOperation;
+
+    let bx = style.get_box();
+    let transform = bx.clone_transform();
+    let ops = &transform.0;
+    if ops.is_empty() {
+        return None;
+    }
+
+    let lp_px = |lp: &style::values::computed::LengthPercentage| -> f32 {
+        lp.to_length().map(|l| l.px()).unwrap_or(0.0)
+    };
+
+    // Matrix layout: [a, b, c, d, tx, ty]
+    // | a c tx |
+    // | b d ty |
+    // | 0 0  1 |
+    let mut m: [f32; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+
+    for op in ops.iter() {
+        let op_m = match op {
+            TransformOperation::Matrix(mat) => [
+                mat.a as f32,
+                mat.b as f32,
+                mat.c as f32,
+                mat.d as f32,
+                mat.e as f32,
+                mat.f as f32,
+            ],
+            TransformOperation::Matrix3D(mat) => [
+                mat.m11 as f32,
+                mat.m12 as f32,
+                mat.m21 as f32,
+                mat.m22 as f32,
+                mat.m41 as f32,
+                mat.m42 as f32,
+            ],
+            TransformOperation::Translate(tx, ty) | TransformOperation::Translate3D(tx, ty, _) => {
+                [1.0, 0.0, 0.0, 1.0, lp_px(tx), lp_px(ty)]
+            }
+            TransformOperation::TranslateX(tx) => [1.0, 0.0, 0.0, 1.0, lp_px(tx), 0.0],
+            TransformOperation::TranslateY(ty) => [1.0, 0.0, 0.0, 1.0, 0.0, lp_px(ty)],
+            TransformOperation::Scale(sx, sy) | TransformOperation::Scale3D(sx, sy, _) => {
+                [*sx as f32, 0.0, 0.0, *sy as f32, 0.0, 0.0]
+            }
+            TransformOperation::ScaleX(sx) => [*sx as f32, 0.0, 0.0, 1.0, 0.0, 0.0],
+            TransformOperation::ScaleY(sy) => [1.0, 0.0, 0.0, *sy as f32, 0.0, 0.0],
+            TransformOperation::Rotate(angle) | TransformOperation::RotateZ(angle) => {
+                let (sin, cos) = (angle.radians() as f32).sin_cos();
+                [cos, sin, -sin, cos, 0.0, 0.0]
+            }
+            TransformOperation::Skew(ax, ay) => {
+                let tan_x = (ax.radians() as f32).tan();
+                let tan_y = (ay.radians() as f32).tan();
+                [1.0, tan_y, tan_x, 1.0, 0.0, 0.0]
+            }
+            TransformOperation::SkewX(ax) => [1.0, 0.0, (ax.radians() as f32).tan(), 1.0, 0.0, 0.0],
+            TransformOperation::SkewY(ay) => [1.0, (ay.radians() as f32).tan(), 0.0, 1.0, 0.0, 0.0],
+            // Z-only and 3D-only ops have no 2D effect
+            _ => continue,
+        };
+
+        m = mat_mul(m, op_m);
+    }
+
+    let is_identity = (m[0] - 1.0).abs() < 1e-6
+        && m[1].abs() < 1e-6
+        && m[2].abs() < 1e-6
+        && (m[3] - 1.0).abs() < 1e-6
+        && m[4].abs() < 1e-6
+        && m[5].abs() < 1e-6;
+    if is_identity {
+        None
+    } else {
+        Some(m)
+    }
+}
+
+/// Extract CSS `transform-origin` as fractions (0..1) of the element's box.
+///
+/// Returns `None` for the CSS default (50%, 50%) — paint uses box center.
+/// Absolute px origins are not yet supported; they are treated as fractions.
+fn extract_transform_origin(style: &ComputedValues) -> Option<(f32, f32)> {
+    let origin = style.get_box().clone_transform_origin();
+
+    let resolve = |lp: &style::values::computed::LengthPercentage| -> f32 {
+        lp.to_percentage().map(|p| p.0).unwrap_or(0.5)
+    };
+
+    let x = resolve(&origin.horizontal);
+    let y = resolve(&origin.vertical);
+
+    if (x - 0.5).abs() < 1e-6 && (y - 0.5).abs() < 1e-6 {
+        None
+    } else {
+        Some((x, y))
+    }
+}
+
+/// Multiply two 2D affine matrices: result = a * b.
+fn mat_mul(a: [f32; 6], b: [f32; 6]) -> [f32; 6] {
+    [
+        a[0] * b[0] + a[2] * b[1],
+        a[1] * b[0] + a[3] * b[1],
+        a[0] * b[2] + a[2] * b[3],
+        a[1] * b[2] + a[3] * b[3],
+        a[0] * b[4] + a[2] * b[5] + a[4],
+        a[1] * b[4] + a[3] * b[5] + a[5],
+    ]
 }
 
 fn map_overflow(ov: style::values::specified::box_::Overflow) -> types::Overflow {

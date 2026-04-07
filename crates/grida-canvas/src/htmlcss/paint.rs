@@ -72,6 +72,27 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
     canvas.save();
     canvas.translate((x, y));
 
+    // ── CSS transform (applied after positioning, around transform-origin) ──
+    // Bakes T(origin) * M * T(-origin) into a single matrix concat.
+    if let Some(m) = style.transform {
+        let (ox, oy) = match style.transform_origin {
+            Some((fx, fy)) => (fx * w, fy * h),
+            None => (w * 0.5, h * 0.5),
+        };
+        let matrix = skia_safe::Matrix::new_all(
+            m[0],
+            m[2],
+            m[4] + ox - m[0] * ox - m[2] * oy,
+            m[1],
+            m[3],
+            m[5] + oy - m[1] * ox - m[3] * oy,
+            0.0,
+            0.0,
+            1.0,
+        );
+        canvas.concat(&matrix);
+    }
+
     if needs_layer {
         let mut layer_paint = Paint::default();
         layer_paint.set_alpha((style.opacity * 255.0) as u8);

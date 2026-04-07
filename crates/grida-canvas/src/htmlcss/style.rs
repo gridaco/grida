@@ -68,7 +68,12 @@ pub struct StyledElement {
     pub box_shadow: Vec<BoxShadow>,
 
     // ── Transform (rare non-inherited) ──
-    // TODO: transform, transform_origin
+    /// Flattened 2D affine transform matrix [a, b, c, d, tx, ty].
+    /// `None` when no transform is applied (identity).
+    pub transform: Option<[f32; 6]>,
+    /// Transform origin as fractions (0..1) of the element's box size.
+    /// `None` means the CSS default (50%, 50%) — paint uses box center.
+    pub transform_origin: Option<(f32, f32)>,
 
     // ── Positioning (rare non-inherited) ──
     pub position: Position,
@@ -441,6 +446,8 @@ impl Default for StyledElement {
             overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
             box_shadow: Vec::new(),
+            transform: None,
+            transform_origin: None,
             position: Position::Static,
             inset: CssEdgeInsets::default(),
             z_index: None,
