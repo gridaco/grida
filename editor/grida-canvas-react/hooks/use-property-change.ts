@@ -50,11 +50,16 @@ export function usePropertyPreview<T>(
   const isOpen = useRef(false);
   const committedRef = useRef<T | null>(null);
   const [committedValue, setCommittedValue] = useState<T | null>(null);
+  // Tracks whether onCommit has been called. Prevents onClose from
+  // discarding a preview that was already committed — necessary because
+  // some UI components fire onOpenChange(false) after onValueChange.
+  const didCommit = useRef(false);
 
   const onOpen = useCallback(
     (currentValue: T) => {
       if (isOpen.current) return;
       isOpen.current = true;
+      didCommit.current = false;
       committedRef.current = currentValue;
       setCommittedValue(currentValue);
       editor.doc.previewStart(label);
@@ -82,19 +87,31 @@ export function usePropertyPreview<T>(
 
   const onCommit = useCallback(
     (value?: T) => {
-      if (!isOpen.current) return;
+      if (!isOpen.current && !editor.doc.isPreviewActive) return;
       isOpen.current = false;
+      didCommit.current = true;
       committedRef.current = null;
       setCommittedValue(null);
       if (value != null) {
         apply(value);
       }
+      // Capture the final state so the committed delta reflects the
+      // actual value, then push it to the undo stack.
+      editor.doc.previewSet();
       editor.doc.previewCommit();
     },
     [editor, apply]
   );
 
   const onClose = useCallback(() => {
+    if (didCommit.current) {
+      // Commit already handled the preview lifecycle — nothing to do.
+      didCommit.current = false;
+      isOpen.current = false;
+      committedRef.current = null;
+      setCommittedValue(null);
+      return;
+    }
     if (!isOpen.current) return;
     isOpen.current = false;
     committedRef.current = null;
@@ -128,11 +145,13 @@ export function useAsyncPropertyPreview<T>(
   const committedRef = useRef<T | null>(null);
   const [committedValue, setCommittedValue] = useState<T | null>(null);
   const seekGen = useRef(0);
+  const didCommit = useRef(false);
 
   const onOpen = useCallback(
     (currentValue: T) => {
       if (isOpen.current) return;
       isOpen.current = true;
+      didCommit.current = false;
       committedRef.current = currentValue;
       setCommittedValue(currentValue);
       seekGen.current++;
@@ -165,22 +184,28 @@ export function useAsyncPropertyPreview<T>(
 
   const onCommit = useCallback(
     (value?: T) => {
-      if (!isOpen.current) return;
+      if (!isOpen.current && !editor.doc.isPreviewActive) return;
       isOpen.current = false;
+      didCommit.current = true;
       committedRef.current = null;
       setCommittedValue(null);
-      seekGen.current++;
+      const gen = ++seekGen.current;
 
       if (value != null) {
         const result = apply(value);
         if (result && typeof (result as Promise<void>).then === "function") {
           (result as Promise<void>).then(() => {
-            editor.doc.previewCommit();
+            if (gen === seekGen.current) {
+              editor.doc.previewSet();
+              editor.doc.previewCommit();
+            }
           });
         } else {
+          editor.doc.previewSet();
           editor.doc.previewCommit();
         }
       } else {
+        editor.doc.previewSet();
         editor.doc.previewCommit();
       }
     },
@@ -188,6 +213,13 @@ export function useAsyncPropertyPreview<T>(
   );
 
   const onClose = useCallback(() => {
+    if (didCommit.current) {
+      didCommit.current = false;
+      isOpen.current = false;
+      committedRef.current = null;
+      setCommittedValue(null);
+      return;
+    }
     if (!isOpen.current) return;
     isOpen.current = false;
     committedRef.current = null;

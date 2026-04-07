@@ -431,6 +431,9 @@ export function FontFamilyControl({
     null
   );
   const seekGenRef = React.useRef(0);
+  // Set to true when handleSelect is in-flight so handleOpenChange
+  // knows the close is a commit, not a dismiss.
+  const isCommittingRef = React.useRef(false);
 
   const ensurePreviewStarted = React.useCallback(() => {
     if (previewActiveRef.current) return;
@@ -483,21 +486,28 @@ export function FontFamilyControl({
       // start a preview so the commit produces a clean undo entry.
       ensurePreviewStarted();
 
+      // Signal that a commit is in-flight so handleOpenChange skips discard.
+      isCommittingRef.current = true;
+
       void Promise.all(
         selection.map((id) =>
           editor.changeTextNodeFontFamilySync(id, fontFamily)
         )
       ).then(() => {
-        if (gen === seekGenRef.current) {
-          editor.doc.previewCommit();
-        }
+        // Only commit if this is still the latest select operation.
+        if (gen !== seekGenRef.current) return;
+
+        editor.doc.previewSet();
+        editor.doc.previewCommit();
+
+        // Reset preview state after the commit succeeds.
+        previewActiveRef.current = false;
+        committedRef.current = null;
+        setCommittedValue(null);
+        isCommittingRef.current = false;
       });
 
-      // Reset preview state
-      previewActiveRef.current = false;
-      committedRef.current = null;
-      setCommittedValue(null);
-      seekGenRef.current++;
+      // Close the popover immediately for responsive UI.
       setOpen(false);
     },
     [editor, selection, ensurePreviewStarted]
@@ -506,7 +516,7 @@ export function FontFamilyControl({
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
       setOpen(next);
-      if (!next) {
+      if (!next && !isCommittingRef.current) {
         // Closing without selection — discard if a preview was active
         if (previewActiveRef.current) {
           seekGenRef.current++;
