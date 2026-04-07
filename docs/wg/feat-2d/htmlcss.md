@@ -74,10 +74,27 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `display: inline`       | ✅     | Merged into parent's Paragraph as InlineRunItem   |
 | `display: none`         | ✅     | Subtree skipped                                   |
 | `display: flex`         | ✅     | Via Taffy — direction, wrap, align, justify, gap  |
-| `display: grid`         | ✅     | Via Taffy `Display::Grid`                         |
+| `display: grid`         | ✅     | Via Taffy `Display::Grid` — full property support |
 | `display: list-item`    | ✅     | Marker text generated (bullet/number)             |
 | `display: table`        | ⚠️     | Falls back to block flow (no column grid)         |
 | `display: inline-block` | ⚠️     | Treated as inline                                 |
+
+### Grid Layout
+
+| CSS Property              | Status | Notes                                              |
+| ------------------------- | ------ | -------------------------------------------------- |
+| `grid-template-columns`   | ✅     | px, %, fr, minmax(), fit-content(), repeat()       |
+| `grid-template-rows`      | ✅     | px, %, fr, minmax(), fit-content(), repeat()       |
+| `grid-auto-columns`       | ✅     | Implicit track sizing                              |
+| `grid-auto-rows`          | ✅     | Implicit track sizing                              |
+| `grid-auto-flow`          | ✅     | row, column, dense                                 |
+| `grid-column` (start/end) | ✅     | Line numbers, span                                 |
+| `grid-row` (start/end)    | ✅     | Line numbers, span                                 |
+| `repeat(auto-fill, ...)`  | ✅     | Via Taffy                                          |
+| `repeat(auto-fit, ...)`   | ✅     | Via Taffy                                          |
+| `grid-template-areas`     | ❌     | Not collected from Stylo (named areas not mapped)  |
+| Named grid lines          | ❌     | Line names ignored; numeric placement only         |
+| `subgrid`                 | ❌     | Taffy does not support subgrid                     |
 
 ### Box Model
 
@@ -252,6 +269,8 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `visibility`         | ✅     | hidden/collapse skips painting      |
 | `overflow`           | ✅     | hidden/clip via canvas clip_rect    |
 | `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius |
+| `box-shadow` (inset) | ✅     | clip + EvenOdd frame via PathBuilder |
+| `box-shadow` (multi) | ✅     | Multiple shadows stacked            |
 | `mix-blend-mode`     | ✅     | All CSS blend modes                 |
 
 ### Positioning
@@ -318,9 +337,9 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 | CSS Property         | Status | Notes                               |
 | -------------------- | ------ | ----------------------------------- |
-| `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius |
-| `box-shadow: inset`  | ❌     |                                     |
-| Multiple shadows     | ❌     | Only first shadow painted           |
+| `box-shadow` (outer) | ✅     | blur, spread, offset, border-radius  |
+| `box-shadow: inset`  | ✅     | clip + EvenOdd frame via PathBuilder |
+| Multiple shadows     | ✅     | All shadows stacked in order         |
 
 ### Positioning (extended)
 
