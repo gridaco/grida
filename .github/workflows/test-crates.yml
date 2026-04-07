@@ -77,7 +77,7 @@ jobs:
       - name: Cache cargo build outputs
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: clippy
+          shared-key: test-native
           cache-all-crates: true
           cache-workspace-crates: true
           cache-on-failure: true
