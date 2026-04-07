@@ -1,6 +1,9 @@
 // Copyright 2018 the Resvg Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// Vendored third-party code — suppress clippy warnings
+#![allow(clippy::all)]
+
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;

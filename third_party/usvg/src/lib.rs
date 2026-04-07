@@ -52,6 +52,8 @@ and can focus just on the rendering part.
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 #![warn(missing_copy_implementations)]
+// Vendored third-party code — suppress clippy warnings
+#![allow(clippy::all)]
 
 mod parser;
 #[cfg(feature = "text")]
