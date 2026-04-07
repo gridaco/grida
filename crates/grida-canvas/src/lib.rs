@@ -41,8 +41,6 @@ pub(crate) mod stylo_test {
     static STYLO_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     pub fn lock() -> MutexGuard<'static, ()> {
-        STYLO_TEST_LOCK
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
+        STYLO_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
