@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mixed: Form Layout</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .form {
+        width: 360px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .form-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #000;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .form-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #000;
+      }
+
+      .form-input {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: #fff;
+        color: #000;
+      }
+
+      .form-textarea {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: #fff;
+        color: #000;
+        resize: none;
+      }
+
+      .form-select {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: #fff;
+        color: #000;
+      }
+
+      .form-row {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .form-hint {
+        font-size: 11px;
+        color: #666;
+      }
+
+      .form-actions {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .btn {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 8px 20px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        background: #fff;
+        color: #000;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        background: #000;
+        color: #fff;
+        border-color: #000;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="form">
+      <div class="form-title">Contact Form</div>
+
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input class="form-input" type="text" value="Jane Doe" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" value="jane@example.com" />
+        <span class="form-hint">We'll never share your email.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Subject</label>
+        <select class="form-select">
+          <option>General Inquiry</option>
+          <option selected>Bug Report</option>
+          <option>Feature Request</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Message</label>
+        <textarea class="form-textarea" rows="4">
+I found an issue with the canvas renderer when zooming past 400%.</textarea
+        >
+      </div>
+
+      <div class="form-row">
+        <input type="checkbox" checked />
+        <span>I agree to the terms</span>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn">Cancel</button>
+        <button class="btn btn-primary">Submit</button>
+      </div>
+    </div>
+  </body>
+</html>
