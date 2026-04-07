@@ -66,7 +66,7 @@ describe("Scenario: Preview", () => {
   it("slider: scrub 10 values, commit → one undo step", async () => {
     const h = new HistoryImpl();
     const store = new MockStore();
-    store.set("node1", "opacity", 1.0);
+    store.set("node1", "opacity", 0.5);
 
     const original = store.get("node1", "opacity");
     const preview = h.preview("adjust opacity");
@@ -81,11 +81,11 @@ describe("Scenario: Preview", () => {
     }
 
     preview.commit();
-    expect(store.get("node1", "opacity")).toBe(1.0);
+    expect(store.get("node1", "opacity")).toBe(1.0); // last scrubbed value
     expect(h.stack.pastCount).toBe(1);
 
     await h.undo();
-    expect(store.get("node1", "opacity")).toBe(1.0); // original was 1.0
+    expect(store.get("node1", "opacity")).toBe(0.5); // original
   });
 
   it("slider: scrub 10 values, cancel → original", () => {

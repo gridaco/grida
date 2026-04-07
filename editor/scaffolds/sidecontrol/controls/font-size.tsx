@@ -77,8 +77,6 @@ export function FontSizeControl({
           }}
           onValueSeeked={preview.onSeek}
           onValueChange={(v) => {
-            const num = parseInt(v);
-            onValueCommit?.({ type: "set", value: num });
             preview.onCommit(v);
           }}
         />

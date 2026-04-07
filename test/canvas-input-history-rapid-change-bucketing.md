@@ -17,7 +17,7 @@ covered_by:
 
 Rapid dispatches of the same action type within a 300ms window are merged into a single undo step. This covers continuous interactions where the user's intent is ambiguous — they may be dragging a slider smoothly or tapping an arrow key repeatedly. The system groups by time proximity and action type identity.
 
-When the action type changes (e.g., user finishes adjusting opacity and starts adjusting rotation), the previous bucket is flushed as one undo step and a new bucket begins. When the user stops making changes for >300ms, the bucket auto-flushes.
+When the action type string changes (e.g., switching from `"node/change/*"` to `"paste"`), the previous bucket is flushed as one undo step and a new bucket begins. Note that many property changes share the same `"node/change/*"` action type, so consecutive property edits (opacity, rotation, etc.) may merge into one bucket unless separated by a >300ms pause. When the user stops making changes for >300ms, the bucket auto-flushes.
 
 Undo always flushes the pending bucket first, so the user never loses an in-flight change by pressing Cmd+Z.
 
@@ -59,6 +59,6 @@ This applies universally to all dispatches that use the default `"record"` mode 
 
 ## Notes
 
-The 300ms window is configured as `BUCKET_TIMEOUT_MS` in the `EditorHistoryAdapter`. The bucket groups by `actionType` string equality — `"node/change/*"` is the most common action type for property changes, so all property changes from the same control type merge naturally.
+The 300ms window is configured as `BUCKET_TIMEOUT_MS` in the `EditorHistoryAdapter`. The bucket groups by `actionType` string equality — `"node/change/*"` is common for property edits, so consecutive property edits may merge unless a timeout or explicit transaction boundary flushes the bucket.
 
 Explicit gesture transactions (`begin-gesture`/`end-gesture`) bypass bucketing entirely — they capture a before/after snapshot. Bucketing is for the ambient case where no explicit transaction boundaries exist.

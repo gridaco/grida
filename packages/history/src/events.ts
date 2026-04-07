@@ -27,7 +27,8 @@ export class EventEmitter<Events extends Record<string, Fn>> {
   emit<K extends keyof Events>(event: K, ...args: Parameters<Events[K]>): void {
     const set = this.listeners.get(event);
     if (set) {
-      for (const handler of set) {
+      // Snapshot to avoid issues if a handler adds/removes listeners during emit
+      for (const handler of [...set]) {
         handler(...args);
       }
     }

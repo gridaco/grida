@@ -36,7 +36,7 @@ After this, releasing the mouse button should be a no-op — the gesture was alr
 5. Expected: rectangle A snaps back to its pre-drag position AND the rename is undone (name reverts to original)
 6. Release the mouse
 7. Expected: nothing happens — the gesture was already aborted
-8. Verify: redo stack has entries for both the rename and (optionally) the aborted gesture state
+8. Verify: redo stack has an entry for the undone rename action; the aborted gesture must not create a redo entry
 
 ### Variant: scale gesture
 
@@ -54,4 +54,4 @@ Same pattern with rotation handle.
 
 This is a niche interaction — most users release the mouse before pressing Cmd+Z. But it occurs naturally when the user starts a drag, realizes it's wrong, and reflexively hits Cmd+Z instead of pressing Escape. The behavior must be clean to avoid corrupted history state that affects all subsequent undo/redo operations.
 
-The implementation aborts the gesture at the `EditorDocumentStore.undo()` level: it checks `hasActiveGesture`, calls `abortGesture()` (which reverts state to the before-snapshot and discards the open transaction), then proceeds with normal undo.
+The implementation aborts the gesture at the `EditorDocumentStore.undo()` level: it checks `hasActiveGesture`, calls `abortGesture()` (which reverts state to the before-snapshot and discards the open transaction without producing a redo entry), then proceeds with normal undo.

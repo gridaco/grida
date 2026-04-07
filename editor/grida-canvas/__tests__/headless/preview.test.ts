@@ -166,8 +166,6 @@ describe("Preview (headless)", () => {
   });
 
   test("normal dispatch works after preview commit", () => {
-    const originalName = (ed.state.document.nodes.rect1 as any).name;
-
     // Full preview cycle
     ed.doc.previewStart("test");
     ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Previewed" });

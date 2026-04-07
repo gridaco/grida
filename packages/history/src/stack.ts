@@ -70,6 +70,9 @@ export class StackImpl implements Stack {
     const tx = this.future.pop() ?? null;
     if (tx) {
       this.past.push(tx);
+      while (this.past.length > this.maxDepth) {
+        this.past.shift();
+      }
     }
     return tx;
   }

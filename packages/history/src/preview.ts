@@ -40,11 +40,14 @@ export class PreviewImpl implements Preview {
     if (this._state !== "active") {
       throw new Error(`Cannot set on ${this._state} preview "${this.label}"`);
     }
-    // Revert previous tentative delta
-    if (this._currentDelta) {
-      this._currentDelta.revert();
+    // Revert previous tentative delta first
+    const prev = this._currentDelta;
+    if (prev) {
+      prev.revert();
+      // Clear after successful revert so we don't double-revert on error below
+      this._currentDelta = null;
     }
-    // Apply new
+    // Apply new — if this throws, bookkeeping is consistent (no current delta)
     delta.apply();
     this._currentDelta = delta;
   }
@@ -72,12 +75,15 @@ export class PreviewImpl implements Preview {
     if (this._state !== "active") {
       throw new Error(`Cannot discard ${this._state} preview "${this.label}"`);
     }
-    this._state = "discarded";
 
+    // Revert the current delta before changing state so that if revert()
+    // throws, the preview remains "active" and can be retried or committed.
     if (this._currentDelta) {
       this._currentDelta.revert();
       this._currentDelta = null;
     }
+
+    this._state = "discarded";
 
     if (this.onDiscard) {
       this.onDiscard();

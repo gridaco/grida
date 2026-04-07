@@ -4,7 +4,6 @@ import { __resetPreviewIdCounter } from "../../src/preview";
 import {
   counterDelta,
   failingRevertDelta,
-  failingApplyDelta,
 } from "../helpers";
 import { MockProvider } from "../helpers/mock-provider";
 import type { CommittedTransaction } from "../../src/types";

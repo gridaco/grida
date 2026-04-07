@@ -28,7 +28,6 @@ export function failingRevertDelta(
   increment: number,
   providerId = "test"
 ): Delta {
-  const before = counter.value;
   const after = counter.value + increment;
   return {
     providerId,

@@ -66,6 +66,18 @@ export class HistoryImpl implements History {
       this._removeTransaction(tx);
     };
 
+    // When a nested transaction commits, it merges deltas into its parent
+    // but does not call onCommit (only top-level commits do). We still need
+    // to remove it from _activeTransactions so the next begin() doesn't
+    // pick a committed child as parent.
+    const origCommit = tx.commit.bind(tx);
+    tx.commit = () => {
+      origCommit();
+      if (tx.parent) {
+        this._removeTransaction(tx);
+      }
+    };
+
     this._activeTransactions.push(tx);
     return tx;
   }
@@ -169,11 +181,13 @@ export class HistoryImpl implements History {
       const result = op();
       if (result instanceof Promise) {
         this._busy = true;
-        const p = result.finally(() => {
+        this._undoQueue = result.then(
+          () => {},
+          () => {}
+        );
+        return result.finally(() => {
           this._busy = false;
         });
-        this._undoQueue = p.then(() => {});
-        return p;
       }
       return result;
     }
@@ -191,8 +205,7 @@ export class HistoryImpl implements History {
       });
     });
     this._undoQueue = this._undoQueue.finally(() => {
-      // Check if queue is empty — if so, clear busy
-      // (This is simplified; in practice we'd track depth)
+      this._busy = false;
     });
     return p;
   }

@@ -1,6 +1,6 @@
 ---
 id: TC-CANVAS-INPUT-007
-title: Dropdown Preview Reverts on Mouse-Leave and on Close Without Selection
+title: Dropdown Preview Reverts on Close Without Selection (and on Mouse-Leave Where Supported)
 module: canvas
 area: input
 tags:
@@ -20,7 +20,7 @@ Property dropdowns that support hover preview (blend mode, font style, font fami
 
 1. Preview the hovered value live on the canvas without creating an undo entry
 2. Keep the checkmark on the originally selected value (not the hovered one)
-3. Revert the canvas to the original value when the mouse leaves all options
+3. Revert the canvas to the original value when the mouse leaves all options (for controls that emit highlight-cleared events)
 4. Revert the canvas to the original value when the dropdown closes without a selection
 5. Commit as one undo step when the user clicks to select a value
 
@@ -69,6 +69,6 @@ The checkmark stability is achieved by passing `preview.committedValue ?? liveVa
 
 ## Notes
 
-The revert-on-mouse-leave behavior depends on the UI primitive firing a "highlight cleared" event. `PropertyEnumV2` (Combobox) fires `onValueSeeked(undefined)` when no item is highlighted. The `BlendModeDropdown` uses `DropdownMenu` which does NOT fire mouse-leave — it only reverts on dropdown close. This is a known limitation.
+The revert-on-mouse-leave behavior depends on the UI primitive firing a "highlight cleared" event. `PropertyEnumV2` (Combobox) fires `onValueSeeked(undefined)` when no item is highlighted. `BlendModeDropdown` (DropdownMenu) does not currently emit this event and reverts on close without selection instead. This is a known limitation.
 
 The `usePropertyPreview` hook's `onSeek(null | undefined)` handler calls `apply(committedValue)` + `previewSet()` to revert the canvas while keeping the preview session open for the next hover.
