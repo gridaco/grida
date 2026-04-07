@@ -9,7 +9,7 @@ use crate::cg::prelude::*;
 use super::style::GradientStop;
 
 use csscascade::adapter::{self, HtmlElement};
-use csscascade::dom::{DemoDom, DemoNodeData};
+use csscascade::dom::{DemoDom, DemoNode, DemoNodeData};
 
 use style::color::{AbsoluteColor, ColorSpace};
 use style::dom::TElement;
@@ -150,6 +150,36 @@ fn to_roman(mut n: i32) -> String {
     result
 }
 
+// ─── HTML attribute helpers ─────────────────────────────────────────
+
+/// Get an HTML attribute value from a DOM node.
+fn get_element_attr(node: &DemoNode, name: &str) -> Option<String> {
+    match &node.data {
+        DemoNodeData::Element(data) => data
+            .attrs
+            .iter()
+            .find(|a| a.name.local.as_ref().eq_ignore_ascii_case(name))
+            .map(|a| a.value.to_string()),
+        _ => None,
+    }
+}
+
+/// Check if an HTML attribute is present (boolean attribute like `checked`, `disabled`).
+fn has_element_attr(node: &DemoNode, name: &str) -> bool {
+    get_element_attr(node, name).is_some()
+}
+
+/// Collect the concatenated text content of a DOM node's children (shallow).
+fn collect_text_content(dom: &DemoDom, node: &DemoNode) -> String {
+    let mut text = String::new();
+    for child_id in &node.children {
+        if let DemoNodeData::Text(t) = &dom.node(*child_id).data {
+            text.push_str(t);
+        }
+    }
+    text
+}
+
 fn collect_element(element: HtmlElement) -> StyledElement {
     collect_element_with_counter(element, &mut None)
 }
@@ -214,10 +244,13 @@ fn collect_element_with_counter(
         None
     };
 
-    // Collect children, merging consecutive inline content into InlineGroups
+    // ── Widget detection (form controls) ──
     let dom = adapter::dom();
     let node_data = dom.node(element.node_id());
 
+    let is_void_widget = detect_widget(&tag, node_data, dom, &mut el);
+
+    // Collect children, merging consecutive inline content into InlineGroups
     let mut pending_inline: Vec<InlineRunItem> = Vec::new();
     let parent_text_align = el.font.text_align;
     let parent_font = el.font.clone();
@@ -234,40 +267,46 @@ fn collect_element_with_counter(
         }));
     }
 
-    for child_id in &node_data.children {
-        let child_node = dom.node(*child_id);
-        match &child_node.data {
-            DemoNodeData::Text(text) => {
-                let processed = process_whitespace(text, parent_white_space);
-                if !processed.is_empty() {
-                    pending_inline.push(InlineRunItem::Text(TextRun {
-                        text: processed,
-                        font: parent_font.clone(),
-                        color: parent_color,
-                        decoration: None,
-                    }));
+    // Void widget elements (<input>) have no DOM children to collect.
+    if !is_void_widget {
+        for child_id in &node_data.children {
+            let child_node = dom.node(*child_id);
+            match &child_node.data {
+                DemoNodeData::Text(text) => {
+                    let processed = process_whitespace(text, parent_white_space);
+                    if !processed.is_empty() {
+                        pending_inline.push(InlineRunItem::Text(TextRun {
+                            text: processed,
+                            font: parent_font.clone(),
+                            color: parent_color,
+                            decoration: None,
+                        }));
+                    }
                 }
-            }
-            DemoNodeData::Element(_) => {
-                let child_el = HtmlElement::from_node_id(*child_id);
-                let child = collect_element_with_counter(child_el, &mut child_counter);
-                if child.display == types::Display::None {
-                    continue;
-                }
+                DemoNodeData::Element(_) => {
+                    let child_el = HtmlElement::from_node_id(*child_id);
+                    let child = collect_element_with_counter(child_el, &mut child_counter);
+                    if child.display == types::Display::None {
+                        continue;
+                    }
 
-                if child.display == types::Display::Inline
-                    || child.display == types::Display::InlineBlock
-                {
-                    // Flatten inline element's content into the pending items
-                    // (Chromium: InlineItemsBuilder flattens DOM → kOpenTag/kText/kCloseTag)
-                    collect_inline_items(&child, &mut pending_inline);
-                } else {
-                    // Block child — flush pending inline content first
-                    flush_inline_group(&mut pending_inline, parent_text_align, &mut el.children);
-                    el.children.push(StyledNode::Element(child));
+                    // Widgets with intrinsic sizes need their own Taffy node
+                    // for sizing to work — don't flatten them into inline groups.
+                    let is_inline = child.display == types::Display::Inline
+                        || child.display == types::Display::InlineBlock;
+                    if is_inline && !child.widget.is_widget() {
+                        collect_inline_items(&child, &mut pending_inline);
+                    } else {
+                        flush_inline_group(
+                            &mut pending_inline,
+                            parent_text_align,
+                            &mut el.children,
+                        );
+                        el.children.push(StyledNode::Element(child));
+                    }
                 }
+                _ => {}
             }
-            _ => {} // comments, doctypes
         }
     }
 
@@ -275,6 +314,320 @@ fn collect_element_with_counter(
     flush_inline_group(&mut pending_inline, parent_text_align, &mut el.children);
 
     el
+}
+
+// ─── Widget (form control) detection ────────────────────────────────
+
+/// Chromium placeholder color (#757575).
+const PLACEHOLDER_COLOR: CGColor = CGColor {
+    r: 117,
+    g: 117,
+    b: 117,
+    a: 255,
+};
+
+/// Detect form control elements and populate `StyledElement::widget`.
+///
+/// Returns `true` for void elements (like `<input>`) whose DOM children
+/// should be skipped.
+fn detect_widget(tag: &str, node_data: &DemoNode, dom: &DemoDom, el: &mut StyledElement) -> bool {
+    match tag {
+        "input" => {
+            detect_input_widget(node_data, el);
+            true // <input> is a void element
+        }
+        "textarea" => {
+            detect_textarea_widget(node_data, dom, el);
+            true // skip text children — value already injected
+        }
+        "select" => {
+            detect_select_widget(node_data, dom, el);
+            true // skip <option> children — selected text already injected
+        }
+        "button" => {
+            let disabled = has_element_attr(node_data, "disabled");
+            el.widget = WidgetAppearance::PushButton { disabled };
+            if el.display == types::Display::Inline {
+                el.display = types::Display::InlineBlock;
+            }
+            // Default button padding if UA didn't provide any
+            apply_default_button_padding(el);
+            false // <button> has normal DOM children
+        }
+        _ => false,
+    }
+}
+
+fn detect_input_widget(node_data: &DemoNode, el: &mut StyledElement) {
+    let input_type = get_element_attr(node_data, "type")
+        .unwrap_or_else(|| "text".to_string())
+        .to_ascii_lowercase();
+    let disabled = has_element_attr(node_data, "disabled");
+
+    if el.display == types::Display::Inline {
+        el.display = types::Display::InlineBlock;
+    }
+
+    match input_type.as_str() {
+        "checkbox" => {
+            el.widget = WidgetAppearance::Checkbox {
+                checked: has_element_attr(node_data, "checked"),
+                disabled,
+            };
+        }
+        "radio" => {
+            el.widget = WidgetAppearance::Radio {
+                checked: has_element_attr(node_data, "checked"),
+                disabled,
+            };
+        }
+        "range" => {
+            let min = get_element_attr(node_data, "min")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0.0);
+            let max = get_element_attr(node_data, "max")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(100.0);
+            let value = get_element_attr(node_data, "value")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or((min + max) / 2.0);
+            el.widget = WidgetAppearance::SliderHorizontal {
+                min,
+                max,
+                value,
+                disabled,
+            };
+        }
+        "color" => {
+            let hex = get_element_attr(node_data, "value").unwrap_or_else(|| "#000000".into());
+            let color = parse_hex_color(&hex).unwrap_or(CGColor::BLACK);
+            el.widget = WidgetAppearance::ColorWell {
+                value: color,
+                disabled,
+            };
+        }
+        "submit" | "reset" | "button" => {
+            let label =
+                get_element_attr(node_data, "value").or_else(|| match input_type.as_str() {
+                    "submit" => Some("Submit".into()),
+                    "reset" => Some("Reset".into()),
+                    _ => None,
+                });
+            el.widget = WidgetAppearance::PushButton { disabled };
+            apply_default_button_padding(el);
+            if let Some(text) = label {
+                inject_synthetic_text(el, &text, el.color);
+            }
+        }
+        "hidden" => {
+            el.display = types::Display::None;
+        }
+        _ => {
+            let text_type = match input_type.as_str() {
+                "password" => TextFieldType::Password,
+                "email" => TextFieldType::Email,
+                "search" => TextFieldType::Search,
+                "url" => TextFieldType::Url,
+                "tel" => TextFieldType::Tel,
+                "number" => TextFieldType::Number,
+                _ => TextFieldType::Text,
+            };
+            let placeholder = get_element_attr(node_data, "placeholder");
+            let value = get_element_attr(node_data, "value");
+            let size = get_element_attr(node_data, "size")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(20u32);
+
+            let display_text = if let Some(ref v) = value {
+                if text_type == TextFieldType::Password {
+                    Some(("\u{2022}".repeat(v.len()), el.color))
+                } else {
+                    Some((v.clone(), el.color))
+                }
+            } else {
+                placeholder.as_ref().map(|p| (p.clone(), PLACEHOLDER_COLOR))
+            };
+
+            if let Some((text, color)) = display_text {
+                inject_synthetic_text(el, &text, color);
+            }
+
+            el.widget = WidgetAppearance::TextField {
+                input_type: text_type,
+                placeholder,
+                value,
+                size,
+                disabled,
+            };
+            apply_default_text_control_padding(el);
+        }
+    }
+}
+
+fn detect_textarea_widget(node_data: &DemoNode, dom: &DemoDom, el: &mut StyledElement) {
+    let placeholder = get_element_attr(node_data, "placeholder");
+    let disabled = has_element_attr(node_data, "disabled");
+    let rows = get_element_attr(node_data, "rows")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2u32);
+    let cols = get_element_attr(node_data, "cols")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20u32);
+
+    let text_content = collect_text_content(dom, node_data);
+    let value = if text_content.trim().is_empty() {
+        None
+    } else {
+        Some(text_content)
+    };
+
+    let display_text = if let Some(ref v) = value {
+        Some((v.clone(), el.color))
+    } else {
+        placeholder.as_ref().map(|p| (p.clone(), PLACEHOLDER_COLOR))
+    };
+
+    if let Some((text, color)) = display_text {
+        inject_synthetic_text(el, &text, color);
+    }
+
+    if el.display == types::Display::Inline {
+        el.display = types::Display::InlineBlock;
+    }
+
+    el.widget = WidgetAppearance::TextArea {
+        placeholder,
+        value,
+        rows,
+        cols,
+        disabled,
+    };
+    apply_default_text_control_padding(el);
+}
+
+fn detect_select_widget(node_data: &DemoNode, dom: &DemoDom, el: &mut StyledElement) {
+    let disabled = has_element_attr(node_data, "disabled");
+    let mut selected_text: Option<String> = None;
+    let mut first_option_text: Option<String> = None;
+
+    for child_id in &node_data.children {
+        let child_node = dom.node(*child_id);
+        if let DemoNodeData::Element(data) = &child_node.data {
+            let local = data.name.local.as_ref();
+            if local.eq_ignore_ascii_case("option") {
+                let text = collect_text_content(dom, child_node).trim().to_string();
+                if first_option_text.is_none() && !text.is_empty() {
+                    first_option_text = Some(text.clone());
+                }
+                let is_selected = data
+                    .attrs
+                    .iter()
+                    .any(|a| a.name.local.as_ref().eq_ignore_ascii_case("selected"));
+                if is_selected && !text.is_empty() {
+                    selected_text = Some(text);
+                    break;
+                }
+            }
+            if local.eq_ignore_ascii_case("optgroup") {
+                for gc_id in &child_node.children {
+                    let gc = dom.node(*gc_id);
+                    if let DemoNodeData::Element(gc_data) = &gc.data {
+                        if gc_data.name.local.as_ref().eq_ignore_ascii_case("option") {
+                            let text = collect_text_content(dom, gc).trim().to_string();
+                            if first_option_text.is_none() && !text.is_empty() {
+                                first_option_text = Some(text.clone());
+                            }
+                            let is_selected = gc_data
+                                .attrs
+                                .iter()
+                                .any(|a| a.name.local.as_ref().eq_ignore_ascii_case("selected"));
+                            if is_selected && !text.is_empty() {
+                                selected_text = Some(text);
+                                break;
+                            }
+                        }
+                    }
+                }
+                if selected_text.is_some() {
+                    break;
+                }
+            }
+        }
+    }
+
+    let display_text = selected_text.clone().or(first_option_text);
+    if let Some(ref text) = display_text {
+        inject_synthetic_text(el, text, el.color);
+    }
+
+    if el.display == types::Display::Inline {
+        el.display = types::Display::InlineBlock;
+    }
+
+    el.widget = WidgetAppearance::Menulist {
+        selected_text: display_text,
+        disabled,
+    };
+    apply_default_text_control_padding(el);
+}
+
+/// Inject synthetic text content into a styled element as an InlineGroup child.
+/// Apply default button padding when UA stylesheet didn't provide any.
+/// Chromium default: ~6px 16px (block, inline).
+fn apply_default_button_padding(el: &mut StyledElement) {
+    let has_padding = el.padding.top > 0.0
+        || el.padding.right > 0.0
+        || el.padding.bottom > 0.0
+        || el.padding.left > 0.0;
+    if !has_padding {
+        el.padding = EdgeInsets {
+            top: 4.0,
+            right: 16.0,
+            bottom: 4.0,
+            left: 16.0,
+        };
+    }
+}
+
+/// Apply default text control padding when UA stylesheet didn't provide any.
+/// Chromium default: ~1px 2px.
+fn apply_default_text_control_padding(el: &mut StyledElement) {
+    let has_padding = el.padding.top > 0.0
+        || el.padding.right > 0.0
+        || el.padding.bottom > 0.0
+        || el.padding.left > 0.0;
+    if !has_padding {
+        el.padding = EdgeInsets {
+            top: 2.0,
+            right: 4.0,
+            bottom: 2.0,
+            left: 4.0,
+        };
+    }
+}
+
+fn inject_synthetic_text(el: &mut StyledElement, text: &str, color: CGColor) {
+    el.children.push(StyledNode::InlineGroup(InlineGroup {
+        items: vec![InlineRunItem::Text(TextRun {
+            text: text.to_string(),
+            font: el.font.clone(),
+            color,
+            decoration: None,
+        })],
+        text_align: el.font.text_align,
+    }));
+}
+
+/// Parse a `#RRGGBB` hex color string.
+fn parse_hex_color(hex: &str) -> Option<CGColor> {
+    let hex = hex.strip_prefix('#')?;
+    if hex.len() != 6 {
+        return None;
+    }
+    let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+    Some(CGColor { r, g, b, a: 255 })
 }
 
 /// Recursively flatten an inline element's content into text runs.

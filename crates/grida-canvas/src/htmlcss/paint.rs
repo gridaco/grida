@@ -16,7 +16,7 @@ use skia_safe::{Canvas, ClipOp, Color, Paint, PaintStyle, PictureRecorder, Rect}
 use super::layout::{build_skia_text_style, LayoutBox, LayoutNode};
 use super::style::{
     BackgroundLayer, BorderSide, ConicGradient, GradientStop, InlineBoxDecoration, InlineGroup,
-    InlineRunItem, LinearGradient, RadialGradient, StyledElement, TextRun,
+    InlineRunItem, LinearGradient, RadialGradient, StyledElement, TextRun, WidgetAppearance,
 };
 use super::types;
 
@@ -109,7 +109,9 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
     }
 
     // ── Phase 1: Background (Chromium: kBlockBackground) ──
-    // Order: outer box-shadow → background-color → border → inset box-shadow
+    // Order: widget bg → outer box-shadow → background-color → border → inset box-shadow
+    // Widget background painted first so CSS background/border can override.
+    paint_widget_background(canvas, style, w, h);
     paint_box_shadow_outer(canvas, style, w, h);
     paint_background(canvas, style, w, h);
     paint_borders(canvas, style, w, h);
@@ -139,6 +141,9 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
             }
         }
     }
+
+    // ── Phase 3: Widget chrome (form control appearance) ──
+    paint_widget_chrome(canvas, style, w, h);
 
     // ── Restore ──
     if needs_layer {
@@ -726,4 +731,374 @@ fn paint_inline_group(
 
     // Pass 2: Paint the paragraph text on top (Chromium: TextPainter)
     para.paint(canvas, (x, y));
+}
+
+// ─── Widget chrome painting ─────────────────────────────────────────
+
+/// Paint widget background/border — called BEFORE children so text
+/// renders on top.
+fn paint_widget_background(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
+    const BORDER_COLOR: Color = Color::from_argb(255, 118, 118, 118);
+    const DISABLED_BORDER: Color = Color::from_argb(255, 192, 192, 192);
+
+    let has_bg = !style.background.is_empty();
+    let has_border = style.border.top.width > 0.0
+        || style.border.right.width > 0.0
+        || style.border.bottom.width > 0.0
+        || style.border.left.width > 0.0;
+
+    match &style.widget {
+        WidgetAppearance::PushButton { disabled } => {
+            if !has_bg {
+                let mut fill = Paint::default();
+                fill.set_style(PaintStyle::Fill);
+                fill.set_color(Color::from_argb(255, 239, 239, 239));
+                fill.set_anti_alias(true);
+                canvas.draw_round_rect(Rect::from_xywh(0.0, 0.0, w, h), 4.0, 4.0, &fill);
+            }
+            if !has_border {
+                let mut stroke = Paint::default();
+                stroke.set_style(PaintStyle::Stroke);
+                stroke.set_stroke_width(1.0);
+                stroke.set_color(if *disabled {
+                    DISABLED_BORDER
+                } else {
+                    Color::from_argb(255, 195, 195, 195)
+                });
+                stroke.set_anti_alias(true);
+                canvas.draw_round_rect(
+                    Rect::from_xywh(0.5, 0.5, w - 1.0, h - 1.0),
+                    4.0,
+                    4.0,
+                    &stroke,
+                );
+            }
+        }
+        WidgetAppearance::TextField { .. } | WidgetAppearance::TextArea { .. } => {
+            if !has_border {
+                let disabled = matches!(
+                    &style.widget,
+                    WidgetAppearance::TextField { disabled: true, .. }
+                        | WidgetAppearance::TextArea { disabled: true, .. }
+                );
+                let mut paint = Paint::default();
+                paint.set_style(PaintStyle::Stroke);
+                paint.set_stroke_width(1.0);
+                paint.set_color(if disabled {
+                    DISABLED_BORDER
+                } else {
+                    BORDER_COLOR
+                });
+                paint.set_anti_alias(true);
+                canvas.draw_round_rect(
+                    Rect::from_xywh(0.5, 0.5, w - 1.0, h - 1.0),
+                    2.0,
+                    2.0,
+                    &paint,
+                );
+            }
+        }
+        WidgetAppearance::Menulist { disabled, .. } => {
+            if !has_border {
+                let mut paint = Paint::default();
+                paint.set_style(PaintStyle::Stroke);
+                paint.set_stroke_width(1.0);
+                paint.set_color(if *disabled {
+                    DISABLED_BORDER
+                } else {
+                    BORDER_COLOR
+                });
+                paint.set_anti_alias(true);
+                canvas.draw_round_rect(
+                    Rect::from_xywh(0.5, 0.5, w - 1.0, h - 1.0),
+                    2.0,
+                    2.0,
+                    &paint,
+                );
+            }
+        }
+        _ => {} // checkbox, radio, slider, color — no background phase needed
+    }
+}
+
+/// Paint widget overlays — called AFTER children for elements that need
+/// chrome drawn on top (checkmarks, carets, sliders, color swatches).
+fn paint_widget_chrome(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
+    const ACCENT: Color = Color::from_argb(255, 26, 115, 232);
+    const BORDER_COLOR: Color = Color::from_argb(255, 118, 118, 118);
+    const DISABLED_BORDER: Color = Color::from_argb(255, 192, 192, 192);
+    const TRACK_COLOR: Color = Color::from_argb(255, 192, 192, 192);
+    const CHEVRON_COLOR: Color = Color::from_argb(255, 102, 102, 102);
+
+    match &style.widget {
+        WidgetAppearance::Checkbox { checked, disabled } => {
+            paint_checkbox(
+                canvas,
+                w,
+                h,
+                *checked,
+                *disabled,
+                ACCENT,
+                BORDER_COLOR,
+                DISABLED_BORDER,
+            );
+        }
+        WidgetAppearance::Radio { checked, disabled } => {
+            paint_radio(
+                canvas,
+                w,
+                h,
+                *checked,
+                *disabled,
+                ACCENT,
+                BORDER_COLOR,
+                DISABLED_BORDER,
+            );
+        }
+        WidgetAppearance::Menulist { disabled, .. } => {
+            paint_select_caret(canvas, w, h, *disabled, CHEVRON_COLOR, DISABLED_BORDER);
+        }
+        WidgetAppearance::SliderHorizontal {
+            min,
+            max,
+            value,
+            disabled,
+        } => {
+            paint_slider(
+                canvas,
+                w,
+                h,
+                *min,
+                *max,
+                *value,
+                *disabled,
+                ACCENT,
+                TRACK_COLOR,
+                DISABLED_BORDER,
+            );
+        }
+        WidgetAppearance::ColorWell { value, disabled } => {
+            paint_color_well(
+                canvas,
+                w,
+                h,
+                value,
+                *disabled,
+                BORDER_COLOR,
+                DISABLED_BORDER,
+            );
+        }
+        _ => {} // PushButton, TextField, TextArea — handled in paint_widget_background
+    }
+}
+
+fn paint_checkbox(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    checked: bool,
+    disabled: bool,
+    accent: Color,
+    border_color: Color,
+    disabled_border: Color,
+) {
+    let size = w.min(h);
+    let x = (w - size) / 2.0;
+    let y = (h - size) / 2.0;
+    let rect = Rect::from_xywh(x + 0.5, y + 0.5, size - 1.0, size - 1.0);
+
+    if checked {
+        let mut fill = Paint::default();
+        fill.set_style(PaintStyle::Fill);
+        fill.set_color(if disabled { disabled_border } else { accent });
+        fill.set_anti_alias(true);
+        canvas.draw_round_rect(rect, 2.0, 2.0, &fill);
+
+        // Checkmark path (✓)
+        let mut path = skia_safe::PathBuilder::new();
+        let cx = x + size / 2.0;
+        let cy = y + size / 2.0;
+        let s = size * 0.3;
+        path.move_to((cx - s * 0.8, cy));
+        path.line_to((cx - s * 0.15, cy + s * 0.65));
+        path.line_to((cx + s * 0.85, cy - s * 0.55));
+
+        let mut stroke = Paint::default();
+        stroke.set_style(PaintStyle::Stroke);
+        stroke.set_color(Color::WHITE);
+        stroke.set_stroke_width(1.5);
+        stroke.set_anti_alias(true);
+        stroke.set_stroke_cap(skia_safe::PaintCap::Round);
+        stroke.set_stroke_join(skia_safe::PaintJoin::Round);
+        canvas.draw_path(&path.detach(), &stroke);
+    } else {
+        let mut stroke = Paint::default();
+        stroke.set_style(PaintStyle::Stroke);
+        stroke.set_stroke_width(1.0);
+        stroke.set_color(if disabled {
+            disabled_border
+        } else {
+            border_color
+        });
+        stroke.set_anti_alias(true);
+        canvas.draw_round_rect(rect, 2.0, 2.0, &stroke);
+    }
+}
+
+fn paint_radio(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    checked: bool,
+    disabled: bool,
+    accent: Color,
+    border_color: Color,
+    disabled_border: Color,
+) {
+    let size = w.min(h);
+    let cx = w / 2.0;
+    let cy = h / 2.0;
+    let radius = size / 2.0 - 0.5;
+
+    if checked {
+        let mut outer = Paint::default();
+        outer.set_style(PaintStyle::Fill);
+        outer.set_color(if disabled { disabled_border } else { accent });
+        outer.set_anti_alias(true);
+        canvas.draw_circle((cx, cy), radius, &outer);
+
+        let mut inner = Paint::default();
+        inner.set_style(PaintStyle::Fill);
+        inner.set_color(Color::WHITE);
+        inner.set_anti_alias(true);
+        canvas.draw_circle((cx, cy), radius * 0.4, &inner);
+    } else {
+        let mut stroke = Paint::default();
+        stroke.set_style(PaintStyle::Stroke);
+        stroke.set_stroke_width(1.0);
+        stroke.set_color(if disabled {
+            disabled_border
+        } else {
+            border_color
+        });
+        stroke.set_anti_alias(true);
+        canvas.draw_circle((cx, cy), radius, &stroke);
+    }
+}
+
+fn paint_select_caret(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    disabled: bool,
+    chevron_color: Color,
+    disabled_color: Color,
+) {
+    let arrow_w = 8.0;
+    let arrow_h = 5.0;
+    let right_pad = 8.0;
+    let ax = w - right_pad - arrow_w;
+    let ay = (h - arrow_h) / 2.0;
+
+    let mut path = skia_safe::PathBuilder::new();
+    path.move_to((ax, ay));
+    path.line_to((ax + arrow_w / 2.0, ay + arrow_h));
+    path.line_to((ax + arrow_w, ay));
+
+    let mut paint = Paint::default();
+    paint.set_style(PaintStyle::Stroke);
+    paint.set_stroke_width(1.5);
+    paint.set_color(if disabled {
+        disabled_color
+    } else {
+        chevron_color
+    });
+    paint.set_anti_alias(true);
+    paint.set_stroke_cap(skia_safe::PaintCap::Round);
+    paint.set_stroke_join(skia_safe::PaintJoin::Round);
+    canvas.draw_path(&path.detach(), &paint);
+}
+
+fn paint_slider(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    min: f32,
+    max: f32,
+    value: f32,
+    disabled: bool,
+    accent: Color,
+    track_color: Color,
+    disabled_color: Color,
+) {
+    let track_h = 4.0;
+    let thumb_r = 6.0;
+    let track_pad = thumb_r;
+    let track_y = (h - track_h) / 2.0;
+
+    // Track background
+    let mut track_paint = Paint::default();
+    track_paint.set_style(PaintStyle::Fill);
+    track_paint.set_color(track_color);
+    track_paint.set_anti_alias(true);
+    let track_rect = Rect::from_xywh(track_pad, track_y, w - track_pad * 2.0, track_h);
+    canvas.draw_round_rect(track_rect, track_h / 2.0, track_h / 2.0, &track_paint);
+
+    // Thumb position
+    let range = if (max - min).abs() < f32::EPSILON {
+        1.0
+    } else {
+        max - min
+    };
+    let ratio = ((value - min) / range).clamp(0.0, 1.0);
+    let thumb_x = track_pad + ratio * (w - track_pad * 2.0);
+    let thumb_y = h / 2.0;
+
+    // Filled portion
+    let mut filled = Paint::default();
+    filled.set_style(PaintStyle::Fill);
+    filled.set_color(if disabled { disabled_color } else { accent });
+    filled.set_anti_alias(true);
+    let filled_rect = Rect::from_xywh(track_pad, track_y, thumb_x - track_pad, track_h);
+    canvas.draw_round_rect(filled_rect, track_h / 2.0, track_h / 2.0, &filled);
+
+    // Thumb circle
+    let mut thumb = Paint::default();
+    thumb.set_style(PaintStyle::Fill);
+    thumb.set_color(if disabled { disabled_color } else { accent });
+    thumb.set_anti_alias(true);
+    canvas.draw_circle((thumb_x, thumb_y), thumb_r, &thumb);
+}
+
+fn paint_color_well(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    value: &CGColor,
+    disabled: bool,
+    border_color: Color,
+    disabled_border: Color,
+) {
+    let pad = 3.0;
+    let swatch = Rect::from_xywh(pad, pad, w - pad * 2.0, h - pad * 2.0);
+
+    let mut fill = Paint::default();
+    fill.set_style(PaintStyle::Fill);
+    fill.set_color(Color::from_argb(value.a, value.r, value.g, value.b));
+    fill.set_anti_alias(true);
+    if disabled {
+        fill.set_alpha(128);
+    }
+    canvas.draw_round_rect(swatch, 2.0, 2.0, &fill);
+
+    let mut stroke = Paint::default();
+    stroke.set_style(PaintStyle::Stroke);
+    stroke.set_stroke_width(1.0);
+    stroke.set_color(if disabled {
+        disabled_border
+    } else {
+        border_color
+    });
+    stroke.set_anti_alias(true);
+    canvas.draw_round_rect(swatch, 2.0, 2.0, &stroke);
 }

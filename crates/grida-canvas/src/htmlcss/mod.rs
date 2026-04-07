@@ -790,4 +790,188 @@ code block
         }
         None
     }
+
+    // ── Widget (form control) tests ──
+
+    #[test]
+    fn test_widget_button() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        // <input type="submit"> is a PushButton rendered as void element
+        // with injected label text. <button> element relies on Stylo UA styles
+        // which may not produce layout in servo mode — test with <input> instead.
+        let pic = render(
+            r#"<input type="submit" value="Click" />"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Submit button should render");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(h > 0.0, "Submit button should have height, got {h}");
+    }
+
+    #[test]
+    fn test_widget_input_text() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<input type="text" placeholder="Name" />"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Text input should render");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(h > 0.0, "Text input should have height, got {h}");
+    }
+
+    #[test]
+    fn test_widget_input_password() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<input type="password" value="secret" />"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Password input should render");
+    }
+
+    #[test]
+    fn test_widget_checkbox() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<input type="checkbox" /><input type="checkbox" checked />"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Checkbox should render");
+    }
+
+    #[test]
+    fn test_widget_radio() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<input type="radio" /><input type="radio" checked />"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Radio should render");
+    }
+
+    #[test]
+    fn test_widget_select() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<select><option>Apple</option><option selected>Banana</option></select>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Select should render");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(h > 0.0, "Select should have height, got {h}");
+    }
+
+    #[test]
+    fn test_widget_textarea() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<textarea placeholder="Message..."></textarea>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Textarea should render");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(h > 0.0, "Textarea should have height, got {h}");
+    }
+
+    #[test]
+    fn test_widget_input_range() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<input type="range" min="0" max="100" value="50" />"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Range slider should render");
+    }
+
+    #[test]
+    fn test_widget_input_color() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r##"<input type="color" value="#ff0000" />"##,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Color input should render");
+    }
+
+    #[test]
+    fn test_widget_input_hidden() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<input type="hidden" value="secret" />"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Hidden input should render (empty)");
+    }
+
+    #[test]
+    fn test_widget_fieldset() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = render(
+            r#"<fieldset><legend>Info</legend><input type="text" /></fieldset>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "Fieldset should render");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(h > 0.0, "Fieldset should have height, got {h}");
+    }
+
+    #[test]
+    fn test_widget_form_mixed() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let html = r#"
+            <form>
+                <label>Name: <input type="text" value="Alice" /></label>
+                <br />
+                <label><input type="checkbox" checked /> Agree</label>
+                <br />
+                <select><option selected>Option 1</option></select>
+                <br />
+                <textarea rows="3">Some text</textarea>
+                <br />
+                <button>Submit</button>
+            </form>
+        "#;
+        let pic = render(html, 600.0, 400.0, &fonts);
+        assert!(pic.is_ok(), "Mixed form should render");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(
+            h > 50.0,
+            "Mixed form should have substantial height, got {h}"
+        );
+    }
 }

@@ -108,6 +108,12 @@ pub struct StyledElement {
     pub grid_row_start: GridPlacement,
     pub grid_row_end: GridPlacement,
 
+    // ── Widget (form controls) ──
+    /// Widget appearance for form controls. Populated from HTML tag +
+    /// attributes during collect phase. `WidgetAppearance::None` for
+    /// non-widget elements.
+    pub widget: WidgetAppearance,
+
     // ── Children ──
     pub children: Vec<StyledNode>,
 }
@@ -419,6 +425,88 @@ pub struct InlineBoxDecoration {
     pub padding_block: f32,
 }
 
+// ─── Widget Appearance (form controls) ──────────────────────────────
+
+/// Widget appearance metadata, extracted from HTML tag + attributes.
+///
+/// Named after the CSS `appearance` property (Chromium: `ControlPart`).
+/// When `appearance: auto`, browsers paint platform-native chrome for
+/// these widgets. Our renderer paints a generic/neutral chrome — the
+/// "generic platform" look.
+///
+/// Per CSS spec, widgets are **non-replaced** inline-block elements with
+/// standard box model. This enum captures the widget-specific visual
+/// identity that goes beyond normal CSS box painting.
+///
+/// Variant names follow Chromium's `ControlPart` / `-webkit-appearance`
+/// keyword values: `TextField`, `Checkbox`, `Radio`, `Menulist`,
+/// `PushButton`, `SliderHorizontal`, `ColorWell`.
+#[derive(Debug, Clone, Default)]
+pub enum WidgetAppearance {
+    /// Not a widget — normal CSS element.
+    #[default]
+    None,
+    /// `<input type="text|email|password|search|url|tel|number">`
+    /// or `<input>` with no `type` (defaults to `"text"`).
+    TextField {
+        input_type: TextFieldType,
+        placeholder: Option<String>,
+        value: Option<String>,
+        size: u32, // HTML `size` attribute (default 20)
+        disabled: bool,
+    },
+    /// `<input type="checkbox">`
+    Checkbox { checked: bool, disabled: bool },
+    /// `<input type="radio">`
+    Radio { checked: bool, disabled: bool },
+    /// `<textarea>`
+    TextArea {
+        placeholder: Option<String>,
+        value: Option<String>,
+        rows: u32,
+        cols: u32,
+        disabled: bool,
+    },
+    /// `<select>` — shows selected option text + dropdown caret.
+    Menulist {
+        selected_text: Option<String>,
+        disabled: bool,
+    },
+    /// `<button>` or `<input type="submit|reset|button">`.
+    /// Button content flows through normal children — only metadata here.
+    PushButton { disabled: bool },
+    /// `<input type="range">`
+    SliderHorizontal {
+        min: f32,
+        max: f32,
+        value: f32,
+        disabled: bool,
+    },
+    /// `<input type="color">`
+    ColorWell { value: CGColor, disabled: bool },
+}
+
+impl WidgetAppearance {
+    /// Returns `true` if this is any widget (not `None`).
+    pub fn is_widget(&self) -> bool {
+        !matches!(self, WidgetAppearance::None)
+    }
+}
+
+/// Sub-type for text field inputs — determines masking behavior and
+/// input-mode hints.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum TextFieldType {
+    #[default]
+    Text,
+    Password,
+    Email,
+    Search,
+    Url,
+    Tel,
+    Number,
+}
+
 // ─── Defaults ────────────────────────────────────────────────────────
 
 impl Default for StyledElement {
@@ -472,6 +560,7 @@ impl Default for StyledElement {
             grid_column_end: GridPlacement::default(),
             grid_row_start: GridPlacement::default(),
             grid_row_end: GridPlacement::default(),
+            widget: WidgetAppearance::default(),
             children: Vec::new(),
         }
     }

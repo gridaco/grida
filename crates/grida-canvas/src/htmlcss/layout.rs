@@ -358,7 +358,56 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
         super::faux_table::apply_faux_table_style_by_tag(&el.tag, &mut style);
     }
 
+    // Widget intrinsic sizing — apply default dimensions for form controls
+    // when CSS doesn't set explicit sizes.
+    apply_widget_intrinsic_size(&el.widget, el.width, el.height, &mut style);
+
     style
+}
+
+/// Apply intrinsic size defaults for widget elements.
+///
+/// Only overrides `Dimension::auto()` — explicit CSS dimensions take
+/// precedence. Per HTML spec, form controls have platform-dependent
+/// default sizes; we use generic values matching Chromium's defaults.
+fn apply_widget_intrinsic_size(
+    widget: &super::style::WidgetAppearance,
+    css_width: types::CssLength,
+    css_height: types::CssLength,
+    style: &mut taffy::Style,
+) {
+    use super::style::WidgetAppearance;
+
+    const AVG_CHAR_WIDTH: f32 = 8.0;
+    const CONTROL_LINE_HEIGHT: f32 = 22.0;
+
+    let (default_w, default_h) = match widget {
+        WidgetAppearance::TextField { size, .. } => {
+            (*size as f32 * AVG_CHAR_WIDTH, CONTROL_LINE_HEIGHT)
+        }
+        WidgetAppearance::Checkbox { .. } | WidgetAppearance::Radio { .. } => (13.0, 13.0),
+        WidgetAppearance::TextArea { rows, cols, .. } => {
+            (*cols as f32 * AVG_CHAR_WIDTH, *rows as f32 * 18.0)
+        }
+        WidgetAppearance::Menulist { .. } => (150.0, CONTROL_LINE_HEIGHT),
+        WidgetAppearance::SliderHorizontal { .. } => (129.0, 16.0),
+        WidgetAppearance::ColorWell { .. } => (44.0, CONTROL_LINE_HEIGHT),
+        WidgetAppearance::PushButton { .. } => {
+            // Buttons size to content — only set minimum height if auto.
+            if css_height == types::CssLength::Auto {
+                style.min_size.height = Dimension::length(CONTROL_LINE_HEIGHT);
+            }
+            return;
+        }
+        WidgetAppearance::None => return,
+    };
+
+    if css_width == types::CssLength::Auto {
+        style.size.width = Dimension::length(default_w);
+    }
+    if css_height == types::CssLength::Auto {
+        style.size.height = Dimension::length(default_h);
+    }
 }
 
 // ─── Conversion helpers ──────────────────────────────────────────────
