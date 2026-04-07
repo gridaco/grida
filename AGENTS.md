@@ -14,6 +14,8 @@ Currently, we have below features / modules.
 
 ## Project Structure
 
+> **When entering an unfamiliar directory**, always check for `README.md` and `AGENTS.md` first. These files contain domain-specific context, conventions, and constraints that override general assumptions. The table below lists the known ones, but sub-directories and individual packages may have their own as well.
+
 | directory              | README                                       | AGENTS                                       | notes                                         |
 | ---------------------- | -------------------------------------------- | -------------------------------------------- | --------------------------------------------- |
 | [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                            |
@@ -69,7 +71,9 @@ Grida heavily relies on Supabase (PostgreSQL).
 **Tooling**
 
 - Turborepo - monorepo build orchestration
-- oxfmt (oxc) - code formatter
+- oxfmt (oxc) - code formatter (JS/TS)
+- cargo fmt (rustfmt) - code formatter (Rust)
+- just - command runner (see `justfile` at repo root)
 
 ## Documentation
 
@@ -177,6 +181,9 @@ We use turborepo (except few isolated packages).
 To run test, build, and dev, use below commands.
 
 ```sh
+# format the entire repo (JS/TS + Rust) — run this regularly, especially before committing
+just fmt
+
 # run tests (all, not recommended. requires crates build)
 turbo test
 
@@ -216,12 +223,14 @@ cargo clippy --no-deps
 # for crates specific build
 cargo build
 
-# format crates
+# format crates only
 cargo fmt --all
 ```
 
+> **Important for agents:** Always run `just fmt` before creating commits. Both `oxfmt` (JS/TS) and `cargo fmt` (Rust) are enforced in CI — PRs will fail format checks if code is not formatted.
+
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
-To handle this, you can build the `/packages/*`, then run typecheck. (when networking is not available)
+To handle this, you can build the `/packages/*`, then run typecheck.
 
 ### Running `pnpm typecheck` from a clean checkout
 
@@ -233,7 +242,7 @@ steps before executing `pnpm typecheck`:
 pnpm install
 
 # build shared packages and the wasm bundle
-pnpm turbo build --filter="./packages/*"
+pnpm build:packages
 pnpm turbo build --filter @grida/canvas-wasm
 
 # finally, run the repository-wide typecheck

@@ -1,10 +1,17 @@
 default:
     just --list
 
+# Format the entire repo (JS/TS via oxfmt + Rust via cargo fmt)
+fmt:
+    pnpm fmt
+    cargo fmt --all
+
 # Run type checking and cargo check
 check:
     pnpm turbo typecheck
+    pnpm fmt:check
     cargo check --all-targets --all-features
+    cargo fmt --all -- --check
 
 # Run tests
 test:
