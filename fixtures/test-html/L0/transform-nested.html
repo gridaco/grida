@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Transform: Nested & Composed</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #fff;
+      color: #000;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+    }
+
+    .label {
+      font-size: 11px;
+      color: #666;
+      padding-bottom: 4px;
+    }
+
+    .grid {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 48px;
+    }
+
+    .cell {
+      width: 160px;
+      height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .outer {
+      width: 100px;
+      height: 100px;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .inner {
+      width: 50px;
+      height: 50px;
+      background: #000;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #fff;
+    }
+
+    /* Nested: parent rotates, child scales */
+    .parent-rotate {
+      transform: rotate(20deg);
+    }
+
+    .child-scale {
+      transform: scale(1.3);
+    }
+
+    /* Nested: parent translates, child rotates */
+    .parent-translate {
+      transform: translate(10px, 10px);
+    }
+
+    .child-rotate {
+      transform: rotate(45deg);
+    }
+
+    /* Transform + opacity */
+    .rotate-opacity {
+      transform: rotate(30deg);
+      opacity: 0.6;
+    }
+
+    /* Transform + overflow hidden */
+    .rotate-clip {
+      transform: rotate(15deg);
+      overflow: hidden;
+    }
+
+    /* Transform + border-radius */
+    .skew-rounded {
+      transform: skewX(10deg);
+      border-radius: 16px;
+      background: #000;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #fff;
+    }
+
+    /* Transform on flex child */
+    .flex-container {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .flex-child-rotated {
+      width: 40px;
+      height: 40px;
+      background: #000;
+      border-radius: 4px;
+      transform: rotate(45deg);
+    }
+
+    .flex-child-normal {
+      width: 40px;
+      height: 40px;
+      background: #666;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="grid">
+    <div class="cell">
+      <div class="label">nested: parent rotate + child scale</div>
+      <div class="outer parent-rotate">
+        <div class="inner child-scale">nest</div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">nested: parent translate + child rotate</div>
+      <div class="outer parent-translate">
+        <div class="inner child-rotate">nest</div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">rotate + opacity</div>
+      <div class="outer rotate-opacity">
+        <div class="inner">0.6</div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">rotate + overflow:hidden</div>
+      <div class="outer rotate-clip">
+        <div class="inner" style="width:80px;height:80px">clip</div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">skew + border-radius</div>
+      <div class="skew-rounded">skew</div>
+    </div>
+    <div class="cell">
+      <div class="label">flex child rotated</div>
+      <div class="flex-container">
+        <div class="flex-child-normal"></div>
+        <div class="flex-child-rotated"></div>
+        <div class="flex-child-normal"></div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

@@ -518,6 +518,12 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Box shadow
     el.box_shadow = extract_box_shadow(style);
 
+    // Transform
+    el.transform = extract_transform(style);
+    if !el.transform.is_empty() {
+        el.transform_origin = extract_transform_origin(style);
+    }
+
     // Blend mode
     el.blend_mode = extract_blend_mode(style);
 
@@ -1210,6 +1216,101 @@ fn extract_blend_mode(style: &ComputedValues) -> BlendMode {
         MixBlend::Color => BlendMode::Color,
         MixBlend::Luminosity => BlendMode::Luminosity,
         _ => BlendMode::Normal,
+    }
+}
+
+// ─── Transform extraction ───────────────────────────────────────────
+
+/// Extract CSS `transform` operations, preserving percentage/length operands.
+/// Returns an empty Vec for `transform: none`.
+fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
+    use style::values::computed::transform::TransformOperation;
+    use types::{LengthPercentage as LP, TransformOp};
+
+    let transform = style.get_box().clone_transform();
+    let ops = &transform.0;
+    if ops.is_empty() {
+        return Vec::new();
+    }
+
+    let resolve_lp = |lp: &style::values::computed::LengthPercentage| -> LP {
+        if let Some(pct) = lp.to_percentage() {
+            LP::Percent(pct.0)
+        } else if let Some(len) = lp.to_length() {
+            LP::Px(len.px())
+        } else {
+            LP::Px(0.0)
+        }
+    };
+
+    let mut result = Vec::with_capacity(ops.len());
+    for op in ops.iter() {
+        let ir_op = match op {
+            TransformOperation::Matrix(mat) => TransformOp::Matrix([
+                mat.a as f32,
+                mat.b as f32,
+                mat.c as f32,
+                mat.d as f32,
+                mat.e as f32,
+                mat.f as f32,
+            ]),
+            TransformOperation::Matrix3D(mat) => TransformOp::Matrix([
+                mat.m11 as f32,
+                mat.m12 as f32,
+                mat.m21 as f32,
+                mat.m22 as f32,
+                mat.m41 as f32,
+                mat.m42 as f32,
+            ]),
+            TransformOperation::Translate(tx, ty) | TransformOperation::Translate3D(tx, ty, _) => {
+                TransformOp::Translate(resolve_lp(tx), resolve_lp(ty))
+            }
+            TransformOperation::TranslateX(tx) => {
+                TransformOp::Translate(resolve_lp(tx), LP::Px(0.0))
+            }
+            TransformOperation::TranslateY(ty) => {
+                TransformOp::Translate(LP::Px(0.0), resolve_lp(ty))
+            }
+            TransformOperation::Scale(sx, sy) | TransformOperation::Scale3D(sx, sy, _) => {
+                TransformOp::Scale(*sx as f32, *sy as f32)
+            }
+            TransformOperation::ScaleX(sx) => TransformOp::Scale(*sx as f32, 1.0),
+            TransformOperation::ScaleY(sy) => TransformOp::Scale(1.0, *sy as f32),
+            TransformOperation::Rotate(angle) | TransformOperation::RotateZ(angle) => {
+                TransformOp::Rotate(angle.radians() as f32)
+            }
+            TransformOperation::Skew(ax, ay) => {
+                TransformOp::Skew(ax.radians() as f32, ay.radians() as f32)
+            }
+            TransformOperation::SkewX(ax) => TransformOp::Skew(ax.radians() as f32, 0.0),
+            TransformOperation::SkewY(ay) => TransformOp::Skew(0.0, ay.radians() as f32),
+            // Z-only and 3D-only ops have no 2D effect
+            _ => continue,
+        };
+        result.push(ir_op);
+    }
+    result
+}
+
+/// Extract CSS `transform-origin`, preserving px vs % for each axis.
+fn extract_transform_origin(style: &ComputedValues) -> types::TransformOrigin {
+    use types::LengthPercentage as LP;
+
+    let origin = style.get_box().clone_transform_origin();
+
+    let resolve = |lp: &style::values::computed::LengthPercentage| -> LP {
+        if let Some(pct) = lp.to_percentage() {
+            LP::Percent(pct.0)
+        } else if let Some(len) = lp.to_length() {
+            LP::Px(len.px())
+        } else {
+            LP::Percent(0.5)
+        }
+    };
+
+    types::TransformOrigin {
+        x: resolve(&origin.horizontal),
+        y: resolve(&origin.vertical),
     }
 }
 

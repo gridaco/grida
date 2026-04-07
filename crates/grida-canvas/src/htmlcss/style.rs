@@ -68,7 +68,11 @@ pub struct StyledElement {
     pub box_shadow: Vec<BoxShadow>,
 
     // ── Transform (rare non-inherited) ──
-    // TODO: transform, transform_origin
+    /// CSS `transform` operations, preserving unresolved percentage/length
+    /// operands. Empty means no transform. Resolved to a matrix at paint time.
+    pub transform: Vec<TransformOp>,
+    /// CSS `transform-origin`. Defaults to 50% 50% (center).
+    pub transform_origin: TransformOrigin,
 
     // ── Positioning (rare non-inherited) ──
     pub position: Position,
@@ -441,6 +445,8 @@ impl Default for StyledElement {
             overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
             box_shadow: Vec::new(),
+            transform: Vec::new(),
+            transform_origin: TransformOrigin::default(),
             position: Position::Static,
             inset: CssEdgeInsets::default(),
             z_index: None,
