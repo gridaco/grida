@@ -207,8 +207,7 @@ impl ElemNameTrait for OwnedElemName {
 
 impl DemoDomBuilder {
     fn new() -> Self {
-        let mut nodes = Vec::new();
-        nodes.push(NodeTemp::new(NodeDataTemp::Document));
+        let nodes = vec![NodeTemp::new(NodeDataTemp::Document)];
         Self {
             nodes: RefCell::new(nodes),
             document: NodeId(0),
@@ -317,7 +316,7 @@ impl DemoDomBuilder {
         let mut existing = existing.borrow_mut();
         let existing_names: Vec<_> = existing.iter().map(|attr| attr.name.clone()).collect();
         for attr in attrs {
-            if existing_names.iter().any(|name| *name == attr.name) {
+            if existing_names.contains(&attr.name) {
                 continue;
             }
             existing.push(attr);
@@ -468,12 +467,11 @@ impl TreeSink for DemoDomBuilder {
     }
 
     fn append(&self, parent: &Self::Handle, child: NodeOrText<Self::Handle>) {
-        if let NodeOrText::AppendText(ref text) = child {
-            if let Some(last) = self.last_child(*parent) {
-                if self.append_to_existing_text(last, text) {
-                    return;
-                }
-            }
+        if let NodeOrText::AppendText(ref text) = child
+            && let Some(last) = self.last_child(*parent)
+            && self.append_to_existing_text(last, text)
+        {
+            return;
         }
 
         let new_child = match child {

@@ -35,3 +35,6 @@ markup5ever = "0.36.1"
 tendril = "0.4.3"
 atomic_refcell = "0.1.13"
 
+[lints]
+workspace = true
+
