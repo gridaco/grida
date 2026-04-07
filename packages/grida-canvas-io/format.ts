@@ -864,6 +864,33 @@ export namespace format {
             }
           }
 
+          // Encode font variations BEFORE starting TextStyleRec
+          let fontVariationsOffset: flatbuffers.Offset | undefined = undefined;
+          if (
+            node.font_variations &&
+            Object.keys(node.font_variations).length > 0
+          ) {
+            const fontVariationOffsets: flatbuffers.Offset[] = [];
+            const entries = Object.entries(node.font_variations).reverse();
+            for (const [axis, value] of entries) {
+              const axisOffset = builder.createString(axis);
+              fontVariationOffsets.push(
+                fbs.FontVariation.createFontVariation(
+                  builder,
+                  axisOffset,
+                  value
+                )
+              );
+            }
+            if (fontVariationOffsets.length > 0) {
+              fontVariationsOffset =
+                fbs.TextStyleRec.createFontVariationsVector(
+                  builder,
+                  fontVariationOffsets
+                );
+            }
+          }
+
           // Create required offsets BEFORE starting TextStyleRec
           // Add required font_family string (must be created before table)
           const fontFamilyOffset = builder.createString(node.font_family ?? "");
@@ -923,10 +950,47 @@ export namespace format {
               node.font_weight ?? 400 // default weight
             )
           );
+          // Add font_width (field 4)
+          if (node.font_width !== undefined && node.font_width !== 0) {
+            fbs.TextStyleRec.addFontWidth(builder, node.font_width);
+          }
+          // Add font_style_italic (field 5)
+          if (node.font_style_italic !== undefined) {
+            fbs.TextStyleRec.addFontStyleItalic(
+              builder,
+              node.font_style_italic
+            );
+          }
           // Add required font_kerning (field 6)
           fbs.TextStyleRec.addFontKerning(builder, node.font_kerning ?? true);
+          // Add font_optical_sizing (field 7)
+          if (
+            node.font_optical_sizing !== undefined &&
+            node.font_optical_sizing !== "auto"
+          ) {
+            const optKind =
+              node.font_optical_sizing === "none"
+                ? fbs.FontOpticalSizingKind.None
+                : fbs.FontOpticalSizingKind.Fixed;
+            const optValue =
+              typeof node.font_optical_sizing === "number"
+                ? node.font_optical_sizing
+                : 0;
+            fbs.TextStyleRec.addFontOpticalSizing(
+              builder,
+              fbs.FontOpticalSizing.createFontOpticalSizing(
+                builder,
+                optKind,
+                optValue
+              )
+            );
+          }
           if (fontFeaturesOffset !== undefined) {
             fbs.TextStyleRec.addFontFeatures(builder, fontFeaturesOffset);
+          }
+          // Add font_variations (field 9)
+          if (fontVariationsOffset !== undefined) {
+            fbs.TextStyleRec.addFontVariations(builder, fontVariationsOffset);
           }
           // Add required letter_spacing (field 10)
           fbs.TextStyleRec.addLetterSpacing(builder, letterSpacingOffset);
@@ -1042,6 +1106,33 @@ export namespace format {
             }
           }
 
+          // Font variations
+          let fontVariationsOffset2: flatbuffers.Offset | undefined = undefined;
+          if (
+            style.font_variations &&
+            Object.keys(style.font_variations).length > 0
+          ) {
+            const fontVariationOffsets: flatbuffers.Offset[] = [];
+            const entries = Object.entries(style.font_variations).reverse();
+            for (const [axis, value] of entries) {
+              const axisOffset = builder.createString(axis);
+              fontVariationOffsets.push(
+                fbs.FontVariation.createFontVariation(
+                  builder,
+                  axisOffset,
+                  value
+                )
+              );
+            }
+            if (fontVariationOffsets.length > 0) {
+              fontVariationsOffset2 =
+                fbs.TextStyleRec.createFontVariationsVector(
+                  builder,
+                  fontVariationOffsets
+                );
+            }
+          }
+
           const fontFamilyOffset = builder.createString(
             style.font_family ?? ""
           );
@@ -1094,9 +1185,46 @@ export namespace format {
               (style.font_weight as number) ?? 400
             )
           );
+          // Add font_width (field 4)
+          if (style.font_width !== undefined && style.font_width !== 0) {
+            fbs.TextStyleRec.addFontWidth(builder, style.font_width);
+          }
+          // Add font_style_italic (field 5)
+          if (style.font_style_italic !== undefined) {
+            fbs.TextStyleRec.addFontStyleItalic(
+              builder,
+              style.font_style_italic
+            );
+          }
           fbs.TextStyleRec.addFontKerning(builder, style.font_kerning ?? true);
+          // Add font_optical_sizing (field 7)
+          if (
+            style.font_optical_sizing !== undefined &&
+            style.font_optical_sizing !== "auto"
+          ) {
+            const optKind =
+              style.font_optical_sizing === "none"
+                ? fbs.FontOpticalSizingKind.None
+                : fbs.FontOpticalSizingKind.Fixed;
+            const optValue =
+              typeof style.font_optical_sizing === "number"
+                ? style.font_optical_sizing
+                : 0;
+            fbs.TextStyleRec.addFontOpticalSizing(
+              builder,
+              fbs.FontOpticalSizing.createFontOpticalSizing(
+                builder,
+                optKind,
+                optValue
+              )
+            );
+          }
           if (fontFeaturesOffset !== undefined) {
             fbs.TextStyleRec.addFontFeatures(builder, fontFeaturesOffset);
+          }
+          // Add font_variations (field 9)
+          if (fontVariationsOffset2 !== undefined) {
+            fbs.TextStyleRec.addFontVariations(builder, fontVariationsOffset2);
           }
           fbs.TextStyleRec.addLetterSpacing(builder, letterSpacingOffset);
           fbs.TextStyleRec.addWordSpacing(builder, wordSpacingOffset);
@@ -5600,8 +5728,12 @@ export namespace format {
           let textDecorationLine: cg.TextDecorationLine = "none";
           let fontSize: number = 14;
           let fontWeight: number = 400;
+          let fontWidth: number | undefined = undefined;
+          let fontStyleItalic: boolean | undefined = undefined;
           let fontKerning: boolean = true;
+          let fontOpticalSizing: cg.OpticalSizing | undefined = undefined;
           let fontFamily: string | undefined = undefined;
+          let fontVariations: Record<string, number> | undefined = undefined;
           let letterSpacing: number | undefined = undefined;
           let wordSpacing: number | undefined = undefined;
           let lineHeight: number | undefined = undefined;
@@ -5633,8 +5765,42 @@ export namespace format {
               if (fontWeightStruct) {
                 fontWeight = fontWeightStruct.value();
               }
+              // Decode font_width (field 4)
+              const fontWidthValue = textStyle.fontWidth();
+              if (fontWidthValue !== 0) {
+                fontWidth = fontWidthValue;
+              }
+              // Decode font_style_italic (field 5)
+              fontStyleItalic = textStyle.fontStyleItalic();
               fontKerning = textStyle.fontKerning();
-
+              // Decode font_optical_sizing (field 7)
+              const fontOpticalSizingStruct = textStyle.fontOpticalSizing();
+              if (fontOpticalSizingStruct) {
+                const optKind = fontOpticalSizingStruct.kind();
+                if (optKind === fbs.FontOpticalSizingKind.None) {
+                  fontOpticalSizing = "none";
+                } else if (optKind === fbs.FontOpticalSizingKind.Fixed) {
+                  fontOpticalSizing = fontOpticalSizingStruct.value();
+                }
+                // Auto is default, leave as undefined
+              }
+              // Decode font_variations (field 9)
+              const fontVariationsLength = textStyle.fontVariationsLength();
+              if (fontVariationsLength > 0) {
+                fontVariations = {};
+                for (let i = 0; i < fontVariationsLength; i++) {
+                  const variation = textStyle.fontVariations(i);
+                  if (variation) {
+                    const axis = variation.variationAxis();
+                    if (axis) {
+                      fontVariations[axis] = variation.variationValue();
+                    }
+                  }
+                }
+                if (Object.keys(fontVariations).length === 0) {
+                  fontVariations = undefined;
+                }
+              }
               // Decode letter_spacing (field 10)
               const letterSpacingStruct = textStyle.letterSpacing();
               if (letterSpacingStruct) {
@@ -5746,7 +5912,15 @@ export namespace format {
             font_family: fontFamily,
             font_size: fontSize,
             font_weight: fontWeight,
+            ...(fontWidth !== undefined ? { font_width: fontWidth } : {}),
+            ...(fontStyleItalic !== undefined
+              ? { font_style_italic: fontStyleItalic }
+              : {}),
             font_kerning: fontKerning,
+            ...(fontOpticalSizing !== undefined
+              ? { font_optical_sizing: fontOpticalSizing }
+              : {}),
+            ...(fontVariations ? { font_variations: fontVariations } : {}),
             text_decoration_line: textDecorationLine,
             text_align: textAlign,
             text_align_vertical: textAlignVertical,
@@ -5775,8 +5949,12 @@ export namespace format {
           let textDecorationLine: cg.TextDecorationLine = "none";
           let fontSize: number = 14;
           let fontWeight: number = 400;
+          let fontWidth: number | undefined = undefined;
+          let fontStyleItalic: boolean | undefined = undefined;
           let fontKerning: boolean = true;
+          let fontOpticalSizing: cg.OpticalSizing | undefined = undefined;
           let fontFamily: string | undefined = undefined;
+          let fontVariations: Record<string, number> | undefined = undefined;
           let letterSpacing: number | undefined = undefined;
           let wordSpacing: number | undefined = undefined;
           let lineHeight: number | undefined = undefined;
@@ -5803,8 +5981,41 @@ export namespace format {
             if (fontWeightStruct) {
               fontWeight = fontWeightStruct.value();
             }
+            // Decode font_width (field 4)
+            const fontWidthValue = textStyle.fontWidth();
+            if (fontWidthValue !== 0) {
+              fontWidth = fontWidthValue;
+            }
+            // Decode font_style_italic (field 5)
+            fontStyleItalic = textStyle.fontStyleItalic();
             fontKerning = textStyle.fontKerning();
-
+            // Decode font_optical_sizing (field 7)
+            const fontOpticalSizingStruct = textStyle.fontOpticalSizing();
+            if (fontOpticalSizingStruct) {
+              const optKind = fontOpticalSizingStruct.kind();
+              if (optKind === fbs.FontOpticalSizingKind.None) {
+                fontOpticalSizing = "none";
+              } else if (optKind === fbs.FontOpticalSizingKind.Fixed) {
+                fontOpticalSizing = fontOpticalSizingStruct.value();
+              }
+            }
+            // Decode font_variations (field 9)
+            const fontVariationsLength = textStyle.fontVariationsLength();
+            if (fontVariationsLength > 0) {
+              fontVariations = {};
+              for (let i = 0; i < fontVariationsLength; i++) {
+                const variation = textStyle.fontVariations(i);
+                if (variation) {
+                  const axis = variation.variationAxis();
+                  if (axis) {
+                    fontVariations[axis] = variation.variationValue();
+                  }
+                }
+              }
+              if (Object.keys(fontVariations).length === 0) {
+                fontVariations = undefined;
+              }
+            }
             const letterSpacingStruct = textStyle.letterSpacing();
             if (letterSpacingStruct) {
               if (letterSpacingStruct.kind() === fbs.TextDimensionKind.Factor) {
@@ -5854,7 +6065,15 @@ export namespace format {
             font_family: fontFamily,
             font_size: fontSize,
             font_weight: fontWeight,
+            ...(fontWidth !== undefined ? { font_width: fontWidth } : {}),
+            ...(fontStyleItalic !== undefined
+              ? { font_style_italic: fontStyleItalic }
+              : {}),
             font_kerning: fontKerning,
+            ...(fontOpticalSizing !== undefined
+              ? { font_optical_sizing: fontOpticalSizing }
+              : {}),
+            ...(fontVariations ? { font_variations: fontVariations } : {}),
             text_decoration_line: textDecorationLine,
             ...(letterSpacing !== undefined
               ? { letter_spacing: letterSpacing }
