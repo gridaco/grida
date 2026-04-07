@@ -201,8 +201,8 @@ fn multi_contrast_cf() -> sk::ColorFilter {
 /// Generate an identity LUT (pass-through)
 fn identity_lut() -> [u8; 256] {
     let mut t = [0u8; 256];
-    for i in 0..256 {
-        t[i] = i as u8;
+    for (i, item) in t.iter_mut().enumerate() {
+        *item = i as u8;
     }
     t
 }
@@ -214,8 +214,8 @@ fn identity_lut() -> [u8; 256] {
 /// Higher threshold = less noise visible (lower density)
 fn lut_threshold(threshold: usize) -> [u8; 256] {
     let mut t = [0u8; 256];
-    for i in 0..256 {
-        t[i] = if i >= threshold { 255 } else { 0 };
+    for (i, item) in t.iter_mut().enumerate() {
+        *item = if i >= threshold { 255 } else { 0 };
     }
     t
 }
@@ -236,8 +236,8 @@ fn lut_duo_pattern1(density: f32) -> [u8; 256] {
     let end = 127; // midpoint
 
     let mut lut = [0u8; 256];
-    for i in start..=end {
-        lut[i] = 255;
+    for item in lut.iter_mut().take(end + 1).skip(start) {
+        *item = 255;
     }
     lut
 }
@@ -258,8 +258,8 @@ fn lut_duo_pattern2(density: f32) -> [u8; 256] {
     let end = (127.5 + d / 2.0 * 255.0).round() as usize;
 
     let mut lut = [0u8; 256];
-    for i in start..=end.min(255) {
-        lut[i] = 255;
+    for item in lut.iter_mut().take(end.min(255) + 1).skip(start) {
+        *item = 255;
     }
     lut
 }

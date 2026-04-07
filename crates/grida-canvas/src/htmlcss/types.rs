@@ -135,17 +135,12 @@ pub enum CssLength {
 }
 
 /// CSS line-height (inherited text property).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum LineHeight {
+    #[default]
     Normal,
     Number(f32),
     Px(f32),
-}
-
-impl Default for LineHeight {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// CSS `float` property.

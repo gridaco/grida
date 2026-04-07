@@ -103,7 +103,7 @@ pub fn group_ranges_by_uniform_gap(
                 loop_indices: sorted,
                 min: starts.iter().cloned().fold(f32::INFINITY, f32::min),
                 max: ends.iter().cloned().fold(f32::NEG_INFINITY, f32::max),
-                gap: distances.get(0).cloned().unwrap_or(0.0),
+                gap: distances.first().cloned().unwrap_or(0.0),
             });
         }
     }

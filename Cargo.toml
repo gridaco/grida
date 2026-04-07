@@ -9,6 +9,10 @@ members = [
   "crates/math2",
 ]
 
+[workspace.lints.clippy]
+# Style choices for a graphics engine — intentionally allowed
+upper_case_acronyms = "allow" # AABB, RGB, HSL, SVG are domain terms
+
 # Reduce debug information for tests to lower memory usage during linking in CI
 # opt-level = 1 speeds up compilation while maintaining debuggability
 [profile.test]

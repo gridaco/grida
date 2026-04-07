@@ -107,11 +107,8 @@ fn attr_style_to_skia(
         }
     }
 
-    match style.letter_spacing {
-        at_mod::TextDimension::Fixed(v) => {
-            ts.set_letter_spacing(v);
-        }
-        _ => {}
+    if let at_mod::TextDimension::Fixed(v) = style.letter_spacing {
+        ts.set_letter_spacing(v);
     }
 
     ts.add_font_feature("kern", if style.font_kerning { 1 } else { 0 });
@@ -1403,8 +1400,8 @@ impl TextLayoutEngine for SkiaLayoutEngine {
 
         let u16_pos = utf8_to_utf16_offset(slice, local_offset) as u32;
         let range = block.paragraph.get_word_boundary(u16_pos);
-        let start = block.byte_start + utf16_to_utf8_offset(slice, range.start as usize);
-        let end = block.byte_start + utf16_to_utf8_offset(slice, range.end as usize);
+        let start = block.byte_start + utf16_to_utf8_offset(slice, range.start);
+        let end = block.byte_start + utf16_to_utf8_offset(slice, range.end);
         (start, end)
     }
 
@@ -1433,7 +1430,7 @@ impl TextLayoutEngine for SkiaLayoutEngine {
             // Clamp selection to this block's range
             let sel_start = start.max(block.byte_start);
             let sel_end = end.min(block.byte_end);
-            if sel_start >= sel_end && !(block.byte_start == block.byte_end) {
+            if sel_start >= sel_end && (block.byte_start != block.byte_end) {
                 continue;
             }
 
@@ -1464,6 +1461,7 @@ impl TextLayoutEngine for SkiaLayoutEngine {
         let first_line = line_index_for_offset_utf8(&metrics, start);
         let last_line = line_index_for_offset_utf8(&metrics, end.saturating_sub(1).max(start));
 
+        #[allow(clippy::needless_range_loop)]
         for idx in first_line..=last_line {
             let lm = &metrics[idx];
             if !lm.is_empty_line(text) {

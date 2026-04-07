@@ -212,8 +212,7 @@ impl ParagraphCacheLayout {
             }
         }
 
-        let para = builder.build();
-        para
+        builder.build()
     }
 
     /// Build and layout the paragraph with **per-run** attributed styling,

@@ -488,12 +488,10 @@ impl<'a> NodePainter<'a> {
                             );
                         });
                     });
-            } else {
-                if let Some(children) = graph.get_children(id) {
-                    for child_id in children {
-                        if let Ok(child) = graph.get_node(child_id) {
-                            self.draw_node_recursively(child_id, child, graph, cache);
-                        }
+            } else if let Some(children) = graph.get_children(id) {
+                for child_id in children {
+                    if let Ok(child) = graph.get_node(child_id) {
+                        self.draw_node_recursively(child_id, child, graph, cache);
                     }
                 }
             }

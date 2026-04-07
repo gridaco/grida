@@ -257,7 +257,7 @@ impl PiecewiseVectorNetworkGeometry {
 /// - The segments list is flat; ordering and connectivity must be tracked
 ///   separately to construct regions or faces.
 /// - Regions are optional and may be omitted for stroke-only paths.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VectorNetwork {
     pub vertices: Vec<(f32, f32)>,
     pub segments: Vec<VectorNetworkSegment>,
@@ -496,19 +496,9 @@ impl VectorNetwork {
     }
 }
 
-impl Default for VectorNetwork {
-    fn default() -> Self {
-        VectorNetwork {
-            vertices: vec![],
-            segments: vec![],
-            regions: vec![],
-        }
-    }
-}
-
-impl Into<skia_safe::Path> for VectorNetwork {
-    fn into(self) -> skia_safe::Path {
-        self.to_union_path()
+impl From<VectorNetwork> for skia_safe::Path {
+    fn from(val: VectorNetwork) -> Self {
+        val.to_union_path()
     }
 }
 

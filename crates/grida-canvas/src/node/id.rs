@@ -26,6 +26,7 @@ impl NodeIdGenerator {
     }
 
     /// Generate the next unique node ID.
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> NodeId {
         let id = self.counter;
         self.counter += 1;

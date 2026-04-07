@@ -140,10 +140,9 @@ impl Drop for Node {
                 ref template_contents,
                 ..
             } = node.data
+                && let Some(template_contents) = template_contents.borrow_mut().take()
             {
-                if let Some(template_contents) = template_contents.borrow_mut().take() {
-                    nodes.push(template_contents);
-                }
+                nodes.push(template_contents);
             }
         }
     }
@@ -300,12 +299,11 @@ impl TreeSink for RcDom {
 
     fn append(&self, parent: &Handle, child: NodeOrText<Handle>) {
         // Append to an existing Text node if we have one.
-        if let NodeOrText::AppendText(text) = &child {
-            if let Some(h) = parent.children.borrow().last() {
-                if append_to_existing_text(h, text) {
-                    return;
-                }
-            }
+        if let NodeOrText::AppendText(text) = &child
+            && let Some(h) = parent.children.borrow().last()
+            && append_to_existing_text(h, text)
+        {
+            return;
         }
 
         append(

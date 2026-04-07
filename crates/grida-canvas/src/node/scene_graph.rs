@@ -693,13 +693,13 @@ impl SceneGraph {
 
         match parent {
             Parent::Root => {
-                self.roots.push(id.clone());
+                self.roots.push(id);
             }
             Parent::NodeId(parent_id) => {
                 if let Some(children) = self.links.get_mut(&parent_id) {
-                    children.push(id.clone());
+                    children.push(id);
                 } else {
-                    self.links.insert(parent_id, vec![id.clone()]);
+                    self.links.insert(parent_id, vec![id]);
                 }
             }
         }
@@ -730,7 +730,7 @@ impl SceneGraph {
         let children = self
             .links
             .get_mut(parent)
-            .ok_or_else(|| SceneGraphError::ParentNotFound(parent.clone()))?;
+            .ok_or(SceneGraphError::ParentNotFound(*parent))?;
         children.push(child);
         Ok(())
     }
@@ -745,11 +745,11 @@ impl SceneGraph {
         let children = self
             .links
             .get_mut(parent)
-            .ok_or_else(|| SceneGraphError::ParentNotFound(parent.clone()))?;
+            .ok_or(SceneGraphError::ParentNotFound(*parent))?;
 
         if index > children.len() {
             return Err(SceneGraphError::IndexOutOfBounds {
-                parent: parent.clone(),
+                parent: *parent,
                 index,
                 len: children.len(),
             });
@@ -764,12 +764,12 @@ impl SceneGraph {
         let children = self
             .links
             .get_mut(parent)
-            .ok_or_else(|| SceneGraphError::ParentNotFound(parent.clone()))?;
+            .ok_or(SceneGraphError::ParentNotFound(*parent))?;
 
         let pos = children
             .iter()
             .position(|id| id == child)
-            .ok_or_else(|| SceneGraphError::ChildNotFound(child.clone()))?;
+            .ok_or(SceneGraphError::ChildNotFound(*child))?;
 
         children.remove(pos);
         Ok(())
@@ -807,16 +807,14 @@ impl SceneGraph {
 
     /// Get a reference to a node by ID
     pub fn get_node(&self, id: &NodeId) -> SceneGraphResult<&Node> {
-        self.nodes
-            .get(id)
-            .ok_or_else(|| SceneGraphError::NodeNotFound(id.clone()))
+        self.nodes.get(id).ok_or(SceneGraphError::NodeNotFound(*id))
     }
 
     /// Get a mutable reference to a node by ID
     pub fn get_node_mut(&mut self, id: &NodeId) -> SceneGraphResult<&mut Node> {
         self.nodes
             .get_mut(id)
-            .ok_or_else(|| SceneGraphError::NodeNotFound(id.clone()))
+            .ok_or(SceneGraphError::NodeNotFound(*id))
     }
 
     /// Get the display name for a node, if one was set.
@@ -834,7 +832,7 @@ impl SceneGraph {
         self.geo_data.remove(id);
         self.nodes
             .remove(id)
-            .ok_or_else(|| SceneGraphError::NodeNotFound(id.clone()))
+            .ok_or(SceneGraphError::NodeNotFound(*id))
     }
 
     /// Check if a node exists in the repository
@@ -912,7 +910,7 @@ impl SceneGraph {
         visitor: &mut impl FnMut(&NodeId),
     ) -> SceneGraphResult<()> {
         if !self.has_node(root) {
-            return Err(SceneGraphError::NodeNotFound(root.clone()));
+            return Err(SceneGraphError::NodeNotFound(*root));
         }
 
         visitor(root);
@@ -933,7 +931,7 @@ impl SceneGraph {
         visitor: &mut impl FnMut(&NodeId),
     ) -> SceneGraphResult<()> {
         if !self.has_node(root) {
-            return Err(SceneGraphError::NodeNotFound(root.clone()));
+            return Err(SceneGraphError::NodeNotFound(*root));
         }
 
         if let Some(children) = self.get_children(root) {
@@ -950,19 +948,19 @@ impl SceneGraph {
     /// Get all ancestors of a node (path to root)
     pub fn ancestors(&self, id: &NodeId) -> SceneGraphResult<Vec<NodeId>> {
         if !self.has_node(id) {
-            return Err(SceneGraphError::NodeNotFound(id.clone()));
+            return Err(SceneGraphError::NodeNotFound(*id));
         }
 
         let mut result = Vec::new();
-        let mut current = id.clone();
+        let mut current = *id;
 
         // Find parent by searching all links
         loop {
             let mut found_parent = false;
             for (parent_id, children) in &self.links {
                 if children.contains(&current) {
-                    result.push(parent_id.clone());
-                    current = parent_id.clone();
+                    result.push(parent_id);
+                    current = parent_id;
                     found_parent = true;
                     break;
                 }
@@ -979,14 +977,14 @@ impl SceneGraph {
     /// Get all descendants of a node (all children recursively)
     pub fn descendants(&self, id: &NodeId) -> SceneGraphResult<Vec<NodeId>> {
         if !self.has_node(id) {
-            return Err(SceneGraphError::NodeNotFound(id.clone()));
+            return Err(SceneGraphError::NodeNotFound(*id));
         }
 
         let mut result = Vec::new();
 
         self.walk_preorder(id, &mut |node_id| {
             if node_id != id {
-                result.push(node_id.clone());
+                result.push(*node_id);
             }
         })?;
 

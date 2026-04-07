@@ -304,7 +304,7 @@ impl<'a> Painter<'a> {
             // Skip noise entirely — it's expensive and purely decorative.
             noises: Vec::new(),
             // Keep glass — it's context-dependent and visually essential.
-            glass: effects.glass.clone(),
+            glass: effects.glass,
         }
     }
 
@@ -1288,6 +1288,7 @@ impl<'a> Painter<'a> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_text_span(
         &self,
         id: &NodeId,
@@ -2704,7 +2705,7 @@ impl<'a> Painter<'a> {
 
             // Merge shadow + source (None = passthrough source)
             colorized.and_then(|shadow_layer| {
-                skia_safe::image_filters::merge([Some(shadow_layer), None].into_iter(), None)
+                skia_safe::image_filters::merge([Some(shadow_layer), None], None)
             })
         } else {
             // Fast path: use Skia's built-in drop_shadow (draws shadow + source)

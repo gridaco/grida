@@ -27,7 +27,7 @@ pub fn build_ellipse_vector_network_ccw(shape: &EllipseShape) -> VectorNetwork {
 }
 
 fn ellipse_to_vector_network(shape: &EllipseShape, clockwise: bool) -> VectorNetwork {
-    const KAPPA: f32 = 0.5522847498307936;
+    const KAPPA: f32 = 0.552_284_8;
     let rx = shape.width / 2.0;
     let ry = shape.height / 2.0;
     let cx = rx;

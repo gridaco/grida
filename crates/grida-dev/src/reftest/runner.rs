@@ -192,7 +192,7 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     let mut test_results = Vec::new();
 
     // Process each test sequentially
-    for (_index, pair) in test_pairs.iter().enumerate() {
+    for pair in test_pairs.iter() {
         pb.set_message(format!("processing {}", pair.test_name));
 
         // Load reference PNG to get target dimensions for scaling

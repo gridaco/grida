@@ -7,16 +7,16 @@ pub struct RectShape {
     pub height: f32,
 }
 
-impl Into<skia_safe::Rect> for &RectShape {
-    fn into(self) -> skia_safe::Rect {
-        skia_safe::Rect::from_wh(self.width, self.height)
+impl From<&RectShape> for skia_safe::Rect {
+    fn from(val: &RectShape) -> Self {
+        skia_safe::Rect::from_wh(val.width, val.height)
     }
 }
 
-impl Into<skia_safe::Path> for &RectShape {
-    fn into(self) -> skia_safe::Path {
-        let rect: skia_safe::Rect = self.into();
-        skia_safe::Path::rect(&rect, None)
+impl From<&RectShape> for skia_safe::Path {
+    fn from(val: &RectShape) -> Self {
+        let rect: skia_safe::Rect = val.into();
+        skia_safe::Path::rect(rect, None)
     }
 }
 

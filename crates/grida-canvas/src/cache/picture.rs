@@ -7,15 +7,9 @@ use skia_safe::Picture;
 /// Currently only the `depth` parameter is used:
 /// - `None` caches the entire scene as a single picture.
 /// - `Some(depth)` caches up to `depth` levels of nodes separately.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PictureCacheStrategy {
     pub depth: Option<usize>,
-}
-
-impl Default for PictureCacheStrategy {
-    fn default() -> Self {
-        Self { depth: None }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -29,6 +23,12 @@ pub struct PictureCache {
     /// (insert, invalidate, invalidate_node). The prefill loop uses this
     /// to skip the 136K-iteration cache-hit check when nothing changed.
     generation: u64,
+}
+
+impl Default for PictureCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PictureCache {
@@ -74,7 +74,7 @@ impl PictureCache {
         if variant_key == 0 {
             return self.default_store.get(id);
         }
-        self.variant_store.get(&(id.clone(), variant_key))
+        self.variant_store.get(&(*id, variant_key))
     }
 
     /// Store a picture for a node in a specific render variant.
@@ -91,6 +91,10 @@ impl PictureCache {
 
     pub fn len(&self) -> usize {
         self.default_store.len() + self.variant_store.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.default_store.is_empty() && self.variant_store.is_empty()
     }
 
     /// Returns true when the variant store has no entries.

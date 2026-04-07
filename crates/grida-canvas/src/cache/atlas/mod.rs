@@ -10,6 +10,7 @@
 //! - [`atlas`] — Single atlas page: GPU surface + packer + slot-to-node mapping.
 //! - [`atlas_set`] — Manages multiple atlas pages with overflow and eviction.
 
+#[allow(clippy::module_inception)]
 pub mod atlas;
 pub mod atlas_set;
 pub mod packing;

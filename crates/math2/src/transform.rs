@@ -185,7 +185,7 @@ impl AffineTransform {
         let [[a, c, tx], [b, d, ty]] = self.matrix;
 
         let det = a * d - b * c;
-        if det.abs() < std::f32::EPSILON {
+        if det.abs() < f32::EPSILON {
             return None;
         }
 

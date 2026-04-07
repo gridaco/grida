@@ -141,7 +141,7 @@ fn build_attributed_paragraph_inner(
     let has_any_strokes = attr
         .runs
         .iter()
-        .any(|r| r.strokes.as_ref().map_or(false, |s| !s.is_empty()));
+        .any(|r| r.strokes.as_ref().is_some_and(|s| !s.is_empty()));
 
     // ----- Fill paragraph -----
     let fill_para = {

@@ -59,9 +59,9 @@ impl FilterShadowEffect {
     }
 }
 
-impl Into<FilterEffect> for FilterShadowEffect {
-    fn into(self) -> FilterEffect {
-        match self {
+impl From<FilterShadowEffect> for FilterEffect {
+    fn from(val: FilterShadowEffect) -> Self {
+        match val {
             FilterShadowEffect::DropShadow(shadow) => FilterEffect::DropShadow(shadow),
             FilterShadowEffect::InnerShadow(shadow) => FilterEffect::InnerShadow(shadow),
         }

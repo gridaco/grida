@@ -229,16 +229,16 @@ pub mod axis {
         for (i, &a) in agents.iter().enumerate() {
             let (_snap, delta, idxs) = align::scalar(a, anchors, threshold);
             let signed = _snap - a;
-            if delta.abs() <= threshold {
-                if min_delta.is_infinite() || (signed - signed_delta).abs() <= tolerance {
-                    hit_agents.push(i);
-                    for idx in idxs {
-                        hit_anchors.insert(idx);
-                    }
-                    if delta.abs() < min_delta.abs() {
-                        min_delta = delta;
-                        signed_delta = signed;
-                    }
+            if delta.abs() <= threshold
+                && (min_delta.is_infinite() || (signed - signed_delta).abs() <= tolerance)
+            {
+                hit_agents.push(i);
+                for idx in idxs {
+                    hit_anchors.insert(idx);
+                }
+                if delta.abs() < min_delta.abs() {
+                    min_delta = delta;
+                    signed_delta = signed;
                 }
             }
         }
@@ -290,10 +290,10 @@ pub mod axis {
 
         let x = config
             .x
-            .and_then(|t| Some(snap1d(&x_agents, &x_anchors, t, tolerance)));
+            .map(|t| snap1d(&x_agents, &x_anchors, t, tolerance));
         let y = config
             .y
-            .and_then(|t| Some(snap1d(&y_agents, &y_anchors, t, tolerance)));
+            .map(|t| snap1d(&y_agents, &y_anchors, t, tolerance));
         Snap2DAxisAlignedResult { x, y }
     }
 
@@ -384,7 +384,7 @@ pub mod canvas {
         let agent_points = rect::to_9points_chunk(&agent);
         let anchor_points: Vec<axis::AxisAlignedPoint> = anchors
             .iter()
-            .flat_map(|r| rect::to_9points_chunk(r))
+            .flat_map(rect::to_9points_chunk)
             .map(|p| (Some(p[0]), Some(p[1])))
             .collect();
 

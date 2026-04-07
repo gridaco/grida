@@ -21,21 +21,16 @@ use skia_safe::{
 /// Controls how zero-width and empty-line selection rectangles are expanded.
 ///
 /// See the manifesto §"Selection geometry policy" for full semantics.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum EmptyLineSelectionPolicy {
     /// Raw engine output, no expansion. Zero-width rects remain invisible.
     None,
     /// Expand zero-width rects by a small fixed amount (~0.5× font size).
     /// Non-empty lines keep glyph-tight bounds.
+    #[default]
     GlyphRect,
     /// Expand every selected line's rect to the full layout width.
     LineBox,
-}
-
-impl Default for EmptyLineSelectionPolicy {
-    fn default() -> Self {
-        Self::GlyphRect
-    }
 }
 
 // ---------------------------------------------------------------------------

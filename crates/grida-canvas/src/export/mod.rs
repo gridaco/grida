@@ -64,7 +64,7 @@ impl ExportSize {
                 height: self.height * scale,
             },
             ExportConstraints::ScaleToWidth(width) => {
-                let target_w = *width as f32;
+                let target_w = *width;
                 let target_h = if self.width > 0.0 {
                     self.height * target_w / self.width
                 } else {
@@ -76,7 +76,7 @@ impl ExportSize {
                 }
             }
             ExportConstraints::ScaleToHeight(height) => {
-                let target_h = *height as f32;
+                let target_h = *height;
                 let target_w = if self.height > 0.0 {
                     self.width * target_h / self.height
                 } else {
@@ -103,9 +103,7 @@ pub fn export_node_as(
 
     // 1. find node
     // get the size of the node
-    let Some(rect) = geometry.get_render_bounds(node_id) else {
-        return None;
-    };
+    let rect = geometry.get_render_bounds(node_id)?;
     let width = rect.width;
     let height = rect.height;
 
@@ -117,17 +115,17 @@ pub fn export_node_as(
             ExportAs::PDF(pdf_format) => pdf_format,
             _ => unreachable!(),
         };
-        return export_node_as_pdf(scene, fonts, images, rect, format);
+        export_node_as_pdf(scene, fonts, images, rect, format)
     } else if format.is_format_svg() {
         let format: ExportAsSVG = match format {
             ExportAs::SVG(svg_format) => svg_format,
             _ => unreachable!(),
         };
-        return export_node_as_svg(scene, fonts, images, rect, format);
+        export_node_as_svg(scene, fonts, images, rect, format)
     } else if format.is_format_image() {
         let format: ExportAsImage = format.clone().try_into().unwrap();
-        return export_node_as_image(scene, fonts, images, size, rect, format);
+        export_node_as_image(scene, fonts, images, size, rect, format)
     } else {
-        return None;
+        None
     }
 }

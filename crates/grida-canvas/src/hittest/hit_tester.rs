@@ -85,21 +85,14 @@ impl<'a> HitTester<'a> {
 
         while let Some(id) = current_id {
             // Get the node to check if it's a container with clip enabled
-            if let Ok(node) = graph.get_node(&id) {
-                match node {
-                    Node::Container(n) => {
-                        if n.clip {
-                            // Check if the point is within this container's bounds
-                            if let Some(bounds) = self.cache.geometry.get_world_bounds(&id) {
-                                if !rect::contains_point(&bounds, point) {
-                                    // Point is outside this clipping container's bounds
-                                    return false;
-                                }
-                            }
+            if let Ok(Node::Container(n)) = graph.get_node(&id) {
+                if n.clip {
+                    // Check if the point is within this container's bounds
+                    if let Some(bounds) = self.cache.geometry.get_world_bounds(&id) {
+                        if !rect::contains_point(&bounds, point) {
+                            // Point is outside this clipping container's bounds
+                            return false;
                         }
-                    }
-                    _ => {
-                        // Other node types don't have clipping
                     }
                 }
             }
@@ -314,11 +307,11 @@ impl<'a> HitTester<'a> {
 
             // Bounds + clip check (same as `intersects`)
             if let Some(bounds) = self.cache.geometry.get_world_bounds(id) {
-                if rect::intersects(&bounds, rect) {
-                    if self.is_point_within_parent_clip_bounds(id, center_point) {
-                        selected_set.insert(*id);
-                        out.push(*id);
-                    }
+                if rect::intersects(&bounds, rect)
+                    && self.is_point_within_parent_clip_bounds(id, center_point)
+                {
+                    selected_set.insert(*id);
+                    out.push(*id);
                 }
             }
         }

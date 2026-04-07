@@ -74,6 +74,7 @@ pub struct Tree {
 
 impl Tree {
     /// Creates a tree from the supplied root node.
+    #[allow(clippy::arc_with_non_send_sync)]
     fn new(root: StyledNode, runtime: Arc<StyleRuntime>) -> Self {
         Self {
             root: Arc::new(root),
@@ -89,6 +90,7 @@ impl Tree {
     ///
     /// NOTE: The current implementation only mirrors the DOM structure with stub
     /// styles; full cascade integration will replace this once the Stylo bridge is wired.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(input: &str) -> Result<Self, TreeError> {
         let runtime = StyleRuntime::new()?;
         let opts = default_parse_opts();
@@ -125,11 +127,13 @@ impl Tree {
         let handle = styled_node_to_dom(&self.root, options);
         let serializable: SerializableHandle = handle.into();
         let mut buffer = Vec::new();
-        let mut serialize_opts = SerializeOpts::default();
-        serialize_opts.traversal_scope = if options.include_root() {
-            TraversalScope::IncludeNode
-        } else {
-            TraversalScope::ChildrenOnly(None)
+        let serialize_opts = SerializeOpts {
+            traversal_scope: if options.include_root() {
+                TraversalScope::IncludeNode
+            } else {
+                TraversalScope::ChildrenOnly(None)
+            },
+            ..Default::default()
         };
         serialize(&mut buffer, &serializable, serialize_opts).map_err(TreeError::Serialize)?;
         String::from_utf8(buffer).map_err(TreeError::Utf8)
@@ -194,18 +198,12 @@ impl StyledNode {
 }
 
 /// A thin, type-safe wrapper around node identifiers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct NodeId(u64);
 
 impl NodeId {
     pub fn new(raw: u64) -> Self {
         Self(raw)
-    }
-}
-
-impl Default for NodeId {
-    fn default() -> Self {
-        Self(0)
     }
 }
 
@@ -422,14 +420,14 @@ fn styled_node_to_dom(node: &StyledNode, options: &WriteOptions) -> Handle {
                 })
                 .collect();
 
-            if options.inline_styles() {
-                if let Some(serialized) = serialize_all_properties(&node.get_style()) {
-                    attrs_vec.retain(|attr| attr.name.local.as_ref() != "style");
-                    attrs_vec.push(HtmlAttribute {
-                        name: QualName::new(None, ns!(), LocalName::from("style")),
-                        value: StrTendril::from(serialized.as_str()),
-                    });
-                }
+            if options.inline_styles()
+                && let Some(serialized) = serialize_all_properties(&node.get_style())
+            {
+                attrs_vec.retain(|attr| attr.name.local.as_ref() != "style");
+                attrs_vec.push(HtmlAttribute {
+                    name: QualName::new(None, ns!(), LocalName::from("style")),
+                    value: StrTendril::from(serialized.as_str()),
+                });
             }
             let handle = Node::new(NodeData::Element {
                 name: qual,
@@ -517,6 +515,7 @@ impl StyleRuntime {
 
         let stylist = Stylist::new(device, quirks_mode);
 
+        #[allow(clippy::arc_with_non_send_sync)]
         Ok(Arc::new(Self {
             stylist,
             shared_lock,

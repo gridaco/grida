@@ -191,7 +191,7 @@ impl HtmlElement {
         self.attr_iter()
             .filter(|(attr, _)| namespace_matches(ns, &attr.name.ns))
             .find(|(_, stored)| *stored == local_name)
-            .map_or(false, |(attr, _)| operation.eval_str(attr.value.as_ref()))
+            .is_some_and(|(attr, _)| operation.eval_str(attr.value.as_ref()))
     }
 
     fn lang_attribute_value(&self) -> Option<&str> {
@@ -815,7 +815,7 @@ fn namespace_matches(
 }
 
 fn atom_ident_str(atom: &AtomIdent) -> &str {
-    atom.as_ref().as_ref()
+    atom.as_ref()
 }
 
 fn sibling_pair(id: NodeId) -> (Option<HtmlNode>, Option<HtmlNode>) {

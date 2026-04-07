@@ -222,7 +222,6 @@ impl LayoutTree {
         measure_provider: Option<&mut TextMeasureProvider<'_>>,
     ) -> Result<(), taffy::TaffyError> {
         if let Some(provider) = measure_provider {
-            let provider = provider;
             self.taffy.compute_layout_with_measure(
                 root,
                 available_space,

@@ -77,7 +77,6 @@ use serde::{Deserialize, Serialize};
 /// - [Skia SkPathEffect](https://skia.org/docs/user/api/skpaint_overview/#patheffect)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
-
 pub struct StrokeDashArray(pub Vec<f32>);
 
 impl StrokeDashArray {

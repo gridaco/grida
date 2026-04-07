@@ -74,10 +74,7 @@ impl IdConverter {
         // Extract scene metadata from SceneNode
         let (scene_name, bg_color) =
             if let Some(JSONNode::Scene(scene_node)) = file.document.nodes.get(&scene_id) {
-                (
-                    scene_node.name.clone(),
-                    Some(scene_node.background_color.clone()),
-                )
+                (scene_node.name.clone(), Some(scene_node.background_color))
             } else {
                 (scene_id.clone(), None)
             };

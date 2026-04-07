@@ -74,7 +74,7 @@ impl SelectionState {
             if seen.contains(id) {
                 false
             } else {
-                seen.push(id.clone());
+                seen.push(*id);
                 true
             }
         });

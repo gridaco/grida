@@ -86,7 +86,7 @@ impl FontRepository {
             }
         }
         self.missing.remove(&family);
-        self.fonts.entry(family).or_insert_with(Vec::new).push(hash);
+        self.fonts.entry(family).or_default().push(hash);
         self.bump_generation();
     }
 
@@ -103,10 +103,7 @@ impl FontRepository {
                 self.user_provider.register_typeface(tf, Some(family));
             }
         }
-        self.fonts
-            .entry(family.to_string())
-            .or_insert_with(Vec::new)
-            .push(hash);
+        self.fonts.entry(family.to_string()).or_default().push(hash);
         self.missing.remove(family);
         self.bump_generation();
     }
@@ -167,6 +164,11 @@ impl FontRepository {
     /// Total number of font families loaded.
     pub fn len(&self) -> usize {
         self.fonts.len()
+    }
+
+    /// Returns true if no font families are loaded.
+    pub fn is_empty(&self) -> bool {
+        self.fonts.is_empty()
     }
 
     /// Total number of fonts loaded across all families.

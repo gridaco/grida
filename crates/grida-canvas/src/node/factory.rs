@@ -10,6 +10,12 @@ use math2::{box_fit::BoxFit, transform::AffineTransform};
 /// Actual IDs should be assigned by SceneRuntime or another ID management system.
 pub struct NodeFactory;
 
+impl Default for NodeFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeFactory {
     pub fn new() -> Self {
         Self {}

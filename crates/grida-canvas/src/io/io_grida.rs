@@ -41,7 +41,7 @@ impl From<JSONGradientStop> for GradientStop {
     fn from(stop: JSONGradientStop) -> Self {
         GradientStop {
             offset: stop.offset,
-            color: stop.color.into(),
+            color: stop.color,
         }
     }
 }
@@ -288,7 +288,7 @@ impl From<JSONFeShadow> for FeShadow {
             dy: box_shadow.dy,
             blur: box_shadow.blur,
             spread: box_shadow.spread,
-            color: box_shadow.color.into(),
+            color: box_shadow.color,
             active: box_shadow.active,
         }
     }
@@ -359,11 +359,8 @@ fn default_num_octaves() -> i32 {
 impl From<JSONFeNoiseColors> for NoiseEffectColors {
     fn from(json: JSONFeNoiseColors) -> Self {
         match json {
-            JSONFeNoiseColors::Mono { color } => NoiseEffectColors::Mono { color: color },
-            JSONFeNoiseColors::Duo { color1, color2 } => NoiseEffectColors::Duo {
-                color1: color1,
-                color2: color2,
-            },
+            JSONFeNoiseColors::Mono { color } => NoiseEffectColors::Mono { color },
+            JSONFeNoiseColors::Duo { color1, color2 } => NoiseEffectColors::Duo { color1, color2 },
             JSONFeNoiseColors::Multi { opacity } => NoiseEffectColors::Multi { opacity },
         }
     }
@@ -391,7 +388,7 @@ impl From<Option<JSONPaint>> for Paint {
                 blend_mode,
                 active,
             }) => Paint::Solid(SolidPaint {
-                color: color,
+                color,
                 blend_mode,
                 active,
             }),
@@ -520,11 +517,7 @@ impl From<JSONVariableWidthProfile> for VarWidthProfile {
     fn from(profile: JSONVariableWidthProfile) -> Self {
         VarWidthProfile {
             base: 1.0, // TODO: need to use node's stroke width as base
-            stops: profile
-                .stops
-                .into_iter()
-                .map(|s| WidthStop::from(s))
-                .collect(),
+            stops: profile.stops.into_iter().collect(),
         }
     }
 }
@@ -926,7 +919,7 @@ impl JSONNode {
 }
 
 /// JSON representation of LayoutMode for deserialization
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Clone, Copy, Default)]
 pub enum JSONLayoutMode {
     /// Legacy - will be removed, replaced with Normal
     #[serde(rename = "flow")]
@@ -934,13 +927,8 @@ pub enum JSONLayoutMode {
     #[serde(rename = "flex")]
     Flex,
     #[serde(rename = "normal")]
+    #[default]
     Normal,
-}
-
-impl Default for JSONLayoutMode {
-    fn default() -> Self {
-        JSONLayoutMode::Normal
-    }
 }
 
 impl From<JSONLayoutMode> for LayoutMode {
@@ -956,15 +944,11 @@ impl From<JSONLayoutMode> for LayoutMode {
 /// JSON representation of Axis for deserialization
 #[derive(Debug, Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum JSONAxis {
+    #[default]
     Horizontal,
     Vertical,
-}
-
-impl Default for JSONAxis {
-    fn default() -> Self {
-        JSONAxis::Horizontal
-    }
 }
 
 impl From<JSONAxis> for Axis {
@@ -1496,7 +1480,7 @@ impl From<JSONTextSpanNode> for TextSpanNodeRec {
                     text_decoration_skip_ink: node.text_decoration_skip_ink,
                     text_decoration_thickness: node.text_decoration_thickness,
                 }),
-                font_family: node.font_family.unwrap_or_else(|| "".to_string()),
+                font_family: node.font_family.unwrap_or_default(),
                 font_size: node.font_size.unwrap_or(14.0),
                 font_weight: node.font_weight,
                 font_width: node.font_width,
@@ -1747,7 +1731,8 @@ impl From<JSONImageNode> for Node {
                 active,
             }) => {
                 let resolved = h.unwrap_or_else(|| url.clone());
-                let image_paint = ImagePaint {
+
+                ImagePaint {
                     image: ResourceRef::RID(resolved),
                     quarter_turns: quarter_turns % 4,
                     alignement: Alignment::CENTER,
@@ -1756,9 +1741,7 @@ impl From<JSONImageNode> for Node {
                     blend_mode,
                     filters,
                     active,
-                };
-
-                image_paint
+                }
             }
             _ => ImagePaint {
                 image: ResourceRef::RID(url.clone()),
@@ -2201,7 +2184,7 @@ fn json_paint_to_image_paint_fit(
             // Handle tile mode using the separate scale and repeat fields
             ImagePaintFit::Tile(ImageTile {
                 scale: scale.unwrap_or(1.0),
-                repeat: repeat.map(|r| r.into()).unwrap_or(ImageRepeat::Repeat),
+                repeat: repeat.unwrap_or(ImageRepeat::Repeat),
             })
         }
         Some("contain") => ImagePaintFit::Fit(BoxFit::Contain),
@@ -2564,9 +2547,10 @@ fn merge_effects(
 }
 
 /// Flattened JSON representation of LayerBlendMode for easier deserialization
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub enum JSONLayerBlendMode {
     #[serde(rename = "pass-through")]
+    #[default]
     PassThrough,
     #[serde(rename = "normal")]
     Normal,
@@ -2602,15 +2586,9 @@ pub enum JSONLayerBlendMode {
     Luminosity,
 }
 
-impl Default for JSONLayerBlendMode {
-    fn default() -> Self {
-        JSONLayerBlendMode::PassThrough
-    }
-}
-
-impl Into<LayerBlendMode> for JSONLayerBlendMode {
-    fn into(self) -> LayerBlendMode {
-        match self {
+impl From<JSONLayerBlendMode> for LayerBlendMode {
+    fn from(val: JSONLayerBlendMode) -> Self {
+        match val {
             JSONLayerBlendMode::PassThrough => LayerBlendMode::PassThrough,
             JSONLayerBlendMode::Normal => LayerBlendMode::Blend(BlendMode::Normal),
             JSONLayerBlendMode::Multiply => LayerBlendMode::Blend(BlendMode::Multiply),
@@ -2643,9 +2621,9 @@ pub enum JSONLayerMaskType {
     Luminance,
 }
 
-impl Into<LayerMaskType> for JSONLayerMaskType {
-    fn into(self) -> LayerMaskType {
-        match self {
+impl From<JSONLayerMaskType> for LayerMaskType {
+    fn from(val: JSONLayerMaskType) -> Self {
+        match val {
             JSONLayerMaskType::Geometry => LayerMaskType::Geometry,
             JSONLayerMaskType::Alpha => LayerMaskType::Image(ImageMaskType::Alpha),
             JSONLayerMaskType::Luminance => LayerMaskType::Image(ImageMaskType::Luminance),

@@ -45,11 +45,11 @@ pub fn build_star_points(shape: &RegularStarShape) -> Vec<CGPoint> {
     points
 }
 
-impl Into<SimplePolygonShape> for RegularStarShape {
-    fn into(self) -> SimplePolygonShape {
+impl From<RegularStarShape> for SimplePolygonShape {
+    fn from(val: RegularStarShape) -> Self {
         SimplePolygonShape {
-            points: build_star_points(&self),
-            corner_radius: self.corner_radius,
+            points: build_star_points(&val),
+            corner_radius: val.corner_radius,
         }
     }
 }

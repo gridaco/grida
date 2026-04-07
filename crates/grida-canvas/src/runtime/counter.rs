@@ -5,6 +5,12 @@ pub struct FrameCounter {
     next: u64,
 }
 
+impl Default for FrameCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FrameCounter {
     /// Create a new frame counter starting at 0
     pub fn new() -> Self {

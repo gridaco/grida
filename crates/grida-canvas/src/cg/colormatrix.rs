@@ -35,7 +35,7 @@ pub fn saturation(s: f32) -> [f32; 20] {
         0.0,               0.0,               0.0,               1.0, 0.0,
     ];
 
-    return matrix;
+    matrix
 }
 
 /// Generate a 5x4 color matrix for hue rotation (SVG/CSS-compatible).
@@ -92,7 +92,7 @@ pub fn hue_rotate(angle: f32) -> [f32; 20] {
         0.0,                               0.0,                               0.0,                               1.0, 0.0,
     ];
 
-    return matrix;
+    matrix
 }
 
 #[rustfmt::skip]

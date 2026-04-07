@@ -40,7 +40,7 @@ use style::values::specified::text::TextDecorationLine as StyloTextDecorationLin
 /// Callers must serialize access externally (e.g. via a mutex).
 pub fn from_html_str(html: &str) -> Result<SceneGraph, String> {
     // Ensure Stylo thread state is initialized (idempotent after first call).
-    let _ = thread_state::initialize(ThreadState::LAYOUT);
+    thread_state::initialize(ThreadState::LAYOUT);
 
     // 1. Parse HTML into arena DOM
     let dom =
@@ -344,10 +344,7 @@ impl SceneBuilder {
             } else {
                 // No visual properties — safe to merge margin into padding.
                 // This avoids an extra wrapper node in the tree.
-                let existing = node
-                    .layout_container
-                    .layout_padding
-                    .unwrap_or(EdgeInsets::zero());
+                let existing = node.layout_container.layout_padding.unwrap_or_default();
                 node.layout_container.layout_padding = Some(EdgeInsets {
                     top: existing.top + margin.top,
                     right: existing.right + margin.right,
@@ -869,8 +866,8 @@ fn css_background_to_fills(style: &ComputedValues) -> Paints {
 
     // 2. Background images (gradient layers on top)
     for image in bg.background_image.0.iter() {
-        match image {
-            GenericImage::Gradient(gradient) => match gradient.as_ref() {
+        if let GenericImage::Gradient(gradient) = image {
+            match gradient.as_ref() {
                 GenericGradient::Linear {
                     direction, items, ..
                 } => {
@@ -907,8 +904,7 @@ fn css_background_to_fills(style: &ComputedValues) -> Paints {
                         ..Default::default()
                     }));
                 }
-            },
-            _ => {}
+            }
         }
     }
 
@@ -985,6 +981,7 @@ fn gradient_items_to_stops(
         let start_offset = raw[start].0.unwrap();
         let end_offset = raw[end].0.unwrap();
         let count = (end - start) as f32;
+        #[allow(clippy::needless_range_loop)]
         for j in (start + 1)..end {
             let t = (j - start) as f32 / count;
             raw[j].0 = Some(start_offset + t * (end_offset - start_offset));
@@ -1057,6 +1054,7 @@ fn conic_gradient_items_to_stops(
         let start_offset = raw[start].0.unwrap();
         let end_offset = raw[end].0.unwrap();
         let count = (end - start) as f32;
+        #[allow(clippy::needless_range_loop)]
         for j in (start + 1)..end {
             let t = (j - start) as f32 / count;
             raw[j].0 = Some(start_offset + t * (end_offset - start_offset));
@@ -1339,49 +1337,37 @@ fn css_dimensions_to_cg(style: &ComputedValues, dims: &mut LayoutDimensionStyle)
     }
 
     // min-width
-    match &pos.min_width {
-        GenericSize::LengthPercentage(lp) => {
-            if let Some(len) = lp.0.to_length() {
-                let px = len.px();
-                if px > 0.0 {
-                    dims.layout_min_width = Some(px);
-                }
+    if let GenericSize::LengthPercentage(lp) = &pos.min_width {
+        if let Some(len) = lp.0.to_length() {
+            let px = len.px();
+            if px > 0.0 {
+                dims.layout_min_width = Some(px);
             }
         }
-        _ => {}
     }
 
     // min-height
-    match &pos.min_height {
-        GenericSize::LengthPercentage(lp) => {
-            if let Some(len) = lp.0.to_length() {
-                let px = len.px();
-                if px > 0.0 {
-                    dims.layout_min_height = Some(px);
-                }
+    if let GenericSize::LengthPercentage(lp) = &pos.min_height {
+        if let Some(len) = lp.0.to_length() {
+            let px = len.px();
+            if px > 0.0 {
+                dims.layout_min_height = Some(px);
             }
         }
-        _ => {}
     }
 
     // max-width
-    match &pos.max_width {
-        GenericMaxSize::LengthPercentage(lp) => {
-            if let Some(len) = lp.0.to_length() {
-                dims.layout_max_width = Some(len.px());
-            }
+    if let GenericMaxSize::LengthPercentage(lp) = &pos.max_width {
+        if let Some(len) = lp.0.to_length() {
+            dims.layout_max_width = Some(len.px());
         }
-        _ => {}
     }
 
     // max-height
-    match &pos.max_height {
-        GenericMaxSize::LengthPercentage(lp) => {
-            if let Some(len) = lp.0.to_length() {
-                dims.layout_max_height = Some(len.px());
-            }
+    if let GenericMaxSize::LengthPercentage(lp) = &pos.max_height {
+        if let Some(len) = lp.0.to_length() {
+            dims.layout_max_height = Some(len.px());
         }
-        _ => {}
     }
 }
 

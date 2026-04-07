@@ -103,6 +103,12 @@ impl Ticker for EventLoopClock {
     }
 }
 
+impl Default for EventLoopClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventLoopClock {
     /// Creates a new `EventLoopClock` initialized to the current time.
     ///

@@ -122,7 +122,7 @@ pub fn a2c(
     recursive: Option<(f32, f32, f32, f32)>,
 ) -> Vec<f32> {
     let pi = std::f32::consts::PI;
-    let _120 = pi * 120.0 / 180.0;
+    let angle_120_rad = pi * 120.0 / 180.0;
     let rad = pi / 180.0 * angle;
 
     let rotate = |x: f32, y: f32, r: f32| -> (f32, f32) {
@@ -192,11 +192,11 @@ pub fn a2c(
     let mut df = f2 - f1;
     let mut res: Vec<f32> = Vec::new();
 
-    if df.abs() > _120 {
+    if df.abs() > angle_120_rad {
         let f2old = f2;
         let x2old = x2;
         let y2old = y2;
-        f2 = f1 + _120 * if sweep_flag && f2 > f1 { 1.0 } else { -1.0 };
+        f2 = f1 + angle_120_rad * if sweep_flag && f2 > f1 { 1.0 } else { -1.0 };
         x2 = cx + rx * f2.cos();
         y2 = cy + ry * f2.sin();
         res = a2c(

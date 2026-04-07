@@ -47,12 +47,12 @@ impl EllipticalRingSectorShape {
 /// Build a closed arc path for [`EllipticalArcShape`].
 pub fn build_ring_sector_path(shape: &EllipticalRingSectorShape) -> Path {
     if shape.corner_radius <= 0.0 {
-        __build_ring_sector_path_no_corner_with_arc_to(&shape)
+        __build_ring_sector_path_no_corner_with_arc_to(shape)
     } else {
         // TODO: this is a trick for implementing the corner to a ring sector.
         // do it the right way later.
         #[allow(deprecated)]
-        __build_ring_sector_path_with_corner_6subpath(&shape)
+        __build_ring_sector_path_with_corner_6subpath(shape)
     }
 }
 
