@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Input — Range & Color</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">range — default</div>
+        <input type="range" />
+      </div>
+      <div class="cell">
+        <div class="label">range — min=0 max=100 value=25</div>
+        <input type="range" min="0" max="100" value="25" />
+      </div>
+      <div class="cell">
+        <div class="label">range — min=0 max=100 value=75</div>
+        <input type="range" min="0" max="100" value="75" />
+      </div>
+      <div class="cell">
+        <div class="label">range — disabled</div>
+        <input type="range" value="50" disabled />
+      </div>
+      <div class="cell">
+        <div class="label">color</div>
+        <input type="color" value="#ff0000" />
+      </div>
+      <div class="cell">
+        <div class="label">date</div>
+        <input type="date" value="2026-01-15" />
+      </div>
+      <div class="cell">
+        <div class="label">time</div>
+        <input type="time" value="14:30" />
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Input — Text Types</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+
+      input {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">type=text</div>
+        <input type="text" value="Hello World" />
+      </div>
+      <div class="cell">
+        <div class="label">type=text (placeholder)</div>
+        <input type="text" placeholder="Enter your name" />
+      </div>
+      <div class="cell">
+        <div class="label">type=password</div>
+        <input type="password" value="secret123" />
+      </div>
+      <div class="cell">
+        <div class="label">type=email</div>
+        <input type="email" value="user@example.com" />
+      </div>
+      <div class="cell">
+        <div class="label">type=search</div>
+        <input type="search" value="search query" />
+      </div>
+      <div class="cell">
+        <div class="label">type=url</div>
+        <input type="url" value="https://grida.co" />
+      </div>
+      <div class="cell">
+        <div class="label">type=tel</div>
+        <input type="tel" value="+1 555-0100" />
+      </div>
+      <div class="cell">
+        <div class="label">type=number</div>
+        <input type="number" value="42" />
+      </div>
+      <div class="cell">
+        <div class="label">disabled</div>
+        <input type="text" value="Cannot edit" disabled />
+      </div>
+      <div class="cell">
+        <div class="label">readonly</div>
+        <input type="text" value="Read only text" readonly />
+      </div>
+    </div>
+  </body>
+</html>

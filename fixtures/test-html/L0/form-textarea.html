@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Textarea</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+
+      textarea {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">default</div>
+        <textarea rows="4" cols="30">
+This is some text content inside a textarea element.</textarea
+        >
+      </div>
+      <div class="cell">
+        <div class="label">placeholder</div>
+        <textarea
+          rows="4"
+          cols="30"
+          placeholder="Type something here..."
+        ></textarea>
+      </div>
+      <div class="cell">
+        <div class="label">disabled</div>
+        <textarea rows="4" cols="30" disabled>
+Disabled textarea content</textarea
+        >
+      </div>
+      <div class="cell">
+        <div class="label">readonly</div>
+        <textarea rows="4" cols="30" readonly>
+Read-only textarea content</textarea
+        >
+      </div>
+      <div class="cell">
+        <div class="label">resize: none (styled)</div>
+        <textarea rows="4" cols="30" style="resize: none">
+No resize handle</textarea
+        >
+      </div>
+    </div>
+  </body>
+</html>

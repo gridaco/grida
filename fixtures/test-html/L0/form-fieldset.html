@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Fieldset & Legend</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .row {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">fieldset + legend</div>
+        <fieldset>
+          <legend>Personal Info</legend>
+          <div class="row">
+            <label>Name</label>
+            <input type="text" value="Jane" />
+          </div>
+          <div class="row">
+            <label>Email</label>
+            <input type="email" value="jane@example.com" />
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="cell">
+        <div class="label">disabled fieldset</div>
+        <fieldset disabled>
+          <legend>Disabled Group</legend>
+          <div class="row">
+            <label>Field A</label>
+            <input type="text" value="Cannot edit" />
+          </div>
+          <div class="row">
+            <label>Field B</label>
+            <input type="text" value="Also disabled" />
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="cell">
+        <div class="label">nested fieldset</div>
+        <fieldset>
+          <legend>Outer</legend>
+          <div class="row">
+            <label>Outer field</label>
+            <input type="text" value="Value" />
+          </div>
+          <fieldset>
+            <legend>Inner</legend>
+            <div class="row">
+              <label>Inner field</label>
+              <input type="text" value="Nested" />
+            </div>
+          </fieldset>
+        </fieldset>
+      </div>
+    </div>
+  </body>
+</html>

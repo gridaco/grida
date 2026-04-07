@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Progress & Meter</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">progress — 0%</div>
+        <progress value="0" max="100"></progress>
+      </div>
+      <div class="cell">
+        <div class="label">progress — 50%</div>
+        <progress value="50" max="100"></progress>
+      </div>
+      <div class="cell">
+        <div class="label">progress — 100%</div>
+        <progress value="100" max="100"></progress>
+      </div>
+      <div class="cell">
+        <div class="label">progress — indeterminate</div>
+        <progress></progress>
+      </div>
+      <div class="cell">
+        <div class="label">meter — low</div>
+        <meter
+          min="0"
+          max="100"
+          low="30"
+          high="70"
+          optimum="80"
+          value="15"
+        ></meter>
+      </div>
+      <div class="cell">
+        <div class="label">meter — mid</div>
+        <meter
+          min="0"
+          max="100"
+          low="30"
+          high="70"
+          optimum="80"
+          value="50"
+        ></meter>
+      </div>
+      <div class="cell">
+        <div class="label">meter — high</div>
+        <meter
+          min="0"
+          max="100"
+          low="30"
+          high="70"
+          optimum="80"
+          value="85"
+        ></meter>
+      </div>
+    </div>
+  </body>
+</html>

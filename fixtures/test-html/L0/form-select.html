@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Select</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+
+      select {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">single select</div>
+        <select>
+          <option>Option A</option>
+          <option selected>Option B</option>
+          <option>Option C</option>
+        </select>
+      </div>
+
+      <div class="cell">
+        <div class="label">with optgroup</div>
+        <select>
+          <optgroup label="Fruits">
+            <option>Apple</option>
+            <option>Banana</option>
+          </optgroup>
+          <optgroup label="Vegetables">
+            <option>Carrot</option>
+            <option>Spinach</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="cell">
+        <div class="label">disabled</div>
+        <select disabled>
+          <option>Cannot change</option>
+          <option>Option B</option>
+        </select>
+      </div>
+
+      <div class="cell">
+        <div class="label">multiple (size=4)</div>
+        <select multiple size="4">
+          <option>Red</option>
+          <option selected>Green</option>
+          <option>Blue</option>
+          <option selected>Yellow</option>
+          <option>Purple</option>
+        </select>
+      </div>
+    </div>
+  </body>
+</html>

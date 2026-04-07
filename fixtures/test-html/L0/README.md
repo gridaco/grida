@@ -41,6 +41,7 @@ A small set of broad subsystems — not one domain per CSS property.
 | `text`      | `color`, `font-*`, `text-align`, `text-transform`, `text-indent`, `text-overflow`, `text-shadow`, `line-height`, `letter-spacing`, `word-spacing`, `text-decoration-*`, `white-space`, `word-break`, `overflow-wrap`, `direction`, `writing-mode` |
 | `inline`    | Inline element rendering (`<strong>`, `<em>`, `<code>`, inline box decoration)                                                                                                                                                                    |
 | `list`      | `<ul>`, `<ol>`, `list-style-type`, counters, nested lists                                                                                                                                                                                         |
+| `form`      | `<input>`, `<textarea>`, `<select>`, `<button>`, `<fieldset>`, `<legend>`, `<progress>`, `<meter>`, form element appearance                                                                                                                       |
 | `table`     | `display: table*`, `border-collapse`, `border-spacing`                                                                                                                                                                                            |
 | `filter`    | `filter`, `backdrop-filter`                                                                                                                                                                                                                       |
 | `transform` | `transform`, `transform-origin`, `perspective`                                                                                                                                                                                                    |
@@ -104,6 +105,16 @@ inline-elements.html                    <strong>, <em>, <code>
 list-unordered.html                     <ul> disc/circle/square
 list-ordered.html                       <ol> decimal, alpha
 list-nested.html                        nested list counters
+
+# --- form ---
+form-input-text.html                    text, password, email, search, url, tel, number
+form-input-checkbox.html                checkbox and radio buttons
+form-input-range.html                   range, color, date, time
+form-textarea.html                      textarea states and resize
+form-select.html                        single, optgroup, multiple
+form-button.html                        button and input[type=submit/reset/button]
+form-fieldset.html                      fieldset, legend, disabled group
+form-progress.html                      progress and meter elements
 
 # --- filter ---
 filter-blur.html                        filter: blur()

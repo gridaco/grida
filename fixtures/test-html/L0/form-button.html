@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Button</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">&lt;button&gt;</div>
+        <button>Click Me</button>
+      </div>
+      <div class="cell">
+        <div class="label">type=submit</div>
+        <button type="submit">Submit</button>
+      </div>
+      <div class="cell">
+        <div class="label">type=reset</div>
+        <button type="reset">Reset</button>
+      </div>
+      <div class="cell">
+        <div class="label">disabled</div>
+        <button disabled>Disabled</button>
+      </div>
+      <div class="cell">
+        <div class="label">input type=submit</div>
+        <input type="submit" value="Submit Input" />
+      </div>
+      <div class="cell">
+        <div class="label">input type=reset</div>
+        <input type="reset" value="Reset Input" />
+      </div>
+      <div class="cell">
+        <div class="label">input type=button</div>
+        <input type="button" value="Button Input" />
+      </div>
+    </div>
+  </body>
+</html>

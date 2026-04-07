@@ -34,99 +34,153 @@
   </head>
   <body>
     <div class="sections">
-
       <!-- grid-template-columns: fixed -->
       <div>
         <div class="label">grid-template-columns: 100px 100px 100px</div>
-        <div class="grid-specimen" style="display: grid; grid-template-columns: 100px 100px 100px;">
-          <div style="background: #000; color: #fff;">1</div>
-          <div style="background: #ccc;">2</div>
-          <div style="background: #000; color: #fff;">3</div>
+        <div
+          class="grid-specimen"
+          style="display: grid; grid-template-columns: 100px 100px 100px"
+        >
+          <div style="background: #000; color: #fff">1</div>
+          <div style="background: #ccc">2</div>
+          <div style="background: #000; color: #fff">3</div>
         </div>
       </div>
 
       <!-- grid-template-columns: fr -->
       <div>
         <div class="label">grid-template-columns: 1fr 2fr 1fr</div>
-        <div class="grid-specimen" style="display: grid; grid-template-columns: 1fr 2fr 1fr;">
-          <div style="background: #000; color: #fff;">1fr</div>
-          <div style="background: #ccc;">2fr</div>
-          <div style="background: #000; color: #fff;">1fr</div>
+        <div
+          class="grid-specimen"
+          style="display: grid; grid-template-columns: 1fr 2fr 1fr"
+        >
+          <div style="background: #000; color: #fff">1fr</div>
+          <div style="background: #ccc">2fr</div>
+          <div style="background: #000; color: #fff">1fr</div>
         </div>
       </div>
 
       <!-- grid-template-columns: repeat -->
       <div>
         <div class="label">grid-template-columns: repeat(4, 1fr)</div>
-        <div class="grid-specimen" style="display: grid; grid-template-columns: repeat(4, 1fr);">
-          <div style="background: #000; color: #fff;">1</div>
-          <div style="background: #ccc;">2</div>
-          <div style="background: #000; color: #fff;">3</div>
-          <div style="background: #ccc;">4</div>
+        <div
+          class="grid-specimen"
+          style="display: grid; grid-template-columns: repeat(4, 1fr)"
+        >
+          <div style="background: #000; color: #fff">1</div>
+          <div style="background: #ccc">2</div>
+          <div style="background: #000; color: #fff">3</div>
+          <div style="background: #ccc">4</div>
         </div>
       </div>
 
       <!-- grid-template-rows -->
       <div>
         <div class="label">grid-template-rows: 40px 80px 40px</div>
-        <div class="grid-specimen" style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 40px 80px 40px;">
-          <div style="background: #000; color: #fff;">r1</div>
-          <div style="background: #ccc;">r1</div>
-          <div style="background: #ccc;">r2</div>
-          <div style="background: #000; color: #fff;">r2</div>
-          <div style="background: #000; color: #fff;">r3</div>
-          <div style="background: #ccc;">r3</div>
+        <div
+          class="grid-specimen"
+          style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 40px 80px 40px;
+          "
+        >
+          <div style="background: #000; color: #fff">r1</div>
+          <div style="background: #ccc">r1</div>
+          <div style="background: #ccc">r2</div>
+          <div style="background: #000; color: #fff">r2</div>
+          <div style="background: #000; color: #fff">r3</div>
+          <div style="background: #ccc">r3</div>
         </div>
       </div>
 
       <!-- gap -->
       <div>
         <div class="label">gap: 8px 16px</div>
-        <div class="grid-specimen" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 16px;">
-          <div style="background: #000; color: #fff;">1</div>
-          <div style="background: #000; color: #fff;">2</div>
-          <div style="background: #000; color: #fff;">3</div>
-          <div style="background: #000; color: #fff;">4</div>
-          <div style="background: #000; color: #fff;">5</div>
-          <div style="background: #000; color: #fff;">6</div>
+        <div
+          class="grid-specimen"
+          style="
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px 16px;
+          "
+        >
+          <div style="background: #000; color: #fff">1</div>
+          <div style="background: #000; color: #fff">2</div>
+          <div style="background: #000; color: #fff">3</div>
+          <div style="background: #000; color: #fff">4</div>
+          <div style="background: #000; color: #fff">5</div>
+          <div style="background: #000; color: #fff">6</div>
         </div>
       </div>
 
       <!-- grid-column / grid-row spanning -->
       <div>
         <div class="label">grid-column: span 2 / grid-row: span 2</div>
-        <div class="grid-specimen" style="display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 60px); gap: 4px;">
-          <div style="background: #000; color: #fff; grid-column: span 2;">span 2 cols</div>
-          <div style="background: #ccc;">1x1</div>
-          <div style="background: #ccc;">1x1</div>
-          <div style="background: #000; color: #fff; grid-row: span 2;">span 2 rows</div>
-          <div style="background: #ccc;">1x1</div>
+        <div
+          class="grid-specimen"
+          style="
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 60px);
+            gap: 4px;
+          "
+        >
+          <div style="background: #000; color: #fff; grid-column: span 2">
+            span 2 cols
+          </div>
+          <div style="background: #ccc">1x1</div>
+          <div style="background: #ccc">1x1</div>
+          <div style="background: #000; color: #fff; grid-row: span 2">
+            span 2 rows
+          </div>
+          <div style="background: #ccc">1x1</div>
         </div>
       </div>
 
       <!-- grid-auto-flow: dense -->
       <div>
         <div class="label">grid-auto-flow: dense</div>
-        <div class="grid-specimen" style="display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-flow: dense; gap: 4px;">
-          <div style="background: #000; color: #fff; grid-column: span 2;">wide</div>
-          <div style="background: #ccc;">a</div>
-          <div style="background: #ccc;">b</div>
-          <div style="background: #000; color: #fff; grid-column: span 2;">wide</div>
-          <div style="background: #ccc;">c</div>
+        <div
+          class="grid-specimen"
+          style="
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-auto-flow: dense;
+            gap: 4px;
+          "
+        >
+          <div style="background: #000; color: #fff; grid-column: span 2">
+            wide
+          </div>
+          <div style="background: #ccc">a</div>
+          <div style="background: #ccc">b</div>
+          <div style="background: #000; color: #fff; grid-column: span 2">
+            wide
+          </div>
+          <div style="background: #ccc">c</div>
         </div>
       </div>
 
       <!-- grid-template-areas -->
       <div>
         <div class="label">grid-template-areas: "h h" "s m" "f f"</div>
-        <div class="grid-specimen" style="display: grid; grid-template-areas: 'h h' 's m' 'f f'; grid-template-columns: 100px 1fr; grid-template-rows: 40px 80px 40px; gap: 4px;">
-          <div style="background: #000; color: #fff; grid-area: h;">header</div>
-          <div style="background: #ccc; grid-area: s;">side</div>
-          <div style="background: #eee; grid-area: m;">main</div>
-          <div style="background: #000; color: #fff; grid-area: f;">footer</div>
+        <div
+          class="grid-specimen"
+          style="
+            display: grid;
+            grid-template-areas: &quot;h h&quot; &quot;s m&quot; &quot;f f&quot;;
+            grid-template-columns: 100px 1fr;
+            grid-template-rows: 40px 80px 40px;
+            gap: 4px;
+          "
+        >
+          <div style="background: #000; color: #fff; grid-area: h">header</div>
+          <div style="background: #ccc; grid-area: s">side</div>
+          <div style="background: #eee; grid-area: m">main</div>
+          <div style="background: #000; color: #fff; grid-area: f">footer</div>
         </div>
       </div>
-
     </div>
   </body>
 </html>

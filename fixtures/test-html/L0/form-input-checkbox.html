@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Form: Input — Checkbox & Radio</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .row {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">checkbox — unchecked</div>
+        <div class="row">
+          <input type="checkbox" />
+          <span>Option A</span>
+        </div>
+        <div class="row">
+          <input type="checkbox" />
+          <span>Option B</span>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">checkbox — checked</div>
+        <div class="row">
+          <input type="checkbox" checked />
+          <span>Selected</span>
+        </div>
+        <div class="row">
+          <input type="checkbox" checked />
+          <span>Also selected</span>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">checkbox — disabled</div>
+        <div class="row">
+          <input type="checkbox" disabled />
+          <span>Disabled unchecked</span>
+        </div>
+        <div class="row">
+          <input type="checkbox" checked disabled />
+          <span>Disabled checked</span>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">radio — unchecked</div>
+        <div class="row">
+          <input type="radio" name="group-a" />
+          <span>Choice 1</span>
+        </div>
+        <div class="row">
+          <input type="radio" name="group-a" />
+          <span>Choice 2</span>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">radio — checked</div>
+        <div class="row">
+          <input type="radio" name="group-b" checked />
+          <span>Selected</span>
+        </div>
+        <div class="row">
+          <input type="radio" name="group-b" />
+          <span>Not selected</span>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">radio — disabled</div>
+        <div class="row">
+          <input type="radio" name="group-c" disabled />
+          <span>Disabled</span>
+        </div>
+        <div class="row">
+          <input type="radio" name="group-c" checked disabled />
+          <span>Disabled checked</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
