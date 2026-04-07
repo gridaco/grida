@@ -1369,8 +1369,7 @@ probes in `examples/skia_bench/` for per-primitive validation data.
     Picture cache prefill, compositor updates, and GPU draw calls are
     all eliminated for culled nodes.
 
-    Mirrors Chromium's `MinimumContentsScale` (`cc/layers/
-    picture_layer_impl.cc`).
+    Mirrors Chromium's `MinimumContentsScale` (`cc/layers/picture_layer_impl.cc`).
 
     **Measured impact (Apple M2 Pro, GPU benchmark, 01-135k 136K nodes):**
 
@@ -1387,7 +1386,6 @@ probes in `examples/skia_bench/` for per-primitive validation data.
 53. **Text LOD (H1 cull + H2 greek)**
 
     Two-stage policy driven by projected font size (`font_max · z`).
-
     - **H1 cull** (`font·z < 1 px`): remove text layer from frame
       plan. Glyphs at this size cannot render a readable shape.
     - **H2 greek** (`1 ≤ font·z < 6 px`): at draw time, replace the

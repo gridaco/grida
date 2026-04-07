@@ -21,12 +21,12 @@ Hardware: Apple M2 Pro, Metal 4.1, 1000x1000 viewport.
 
 ### Results
 
-| Nodes | full (AA on) | 0.02x (AA on) | 0.02x (AA off) | skip (0 draws) |
-|-------|-------------|---------------|----------------|----------------|
-| 1,000 | 621 µs | 809 µs | 442 µs | 286 µs |
-| 5,000 | 1,923 µs | 3,426 µs | 1,535 µs | 271 µs |
-| 10,000 | 2,986 µs | 6,221 µs | 2,180 µs | 458 µs |
-| 40,000 | 9,628 µs | 21,878 µs | 6,804 µs | 324 µs |
+| Nodes  | full (AA on) | 0.02x (AA on) | 0.02x (AA off) | skip (0 draws) |
+| ------ | ------------ | ------------- | -------------- | -------------- |
+| 1,000  | 621 µs       | 809 µs        | 442 µs         | 286 µs         |
+| 5,000  | 1,923 µs     | 3,426 µs      | 1,535 µs       | 271 µs         |
+| 10,000 | 2,986 µs     | 6,221 µs      | 2,180 µs       | 458 µs         |
+| 40,000 | 9,628 µs     | 21,878 µs     | 6,804 µs       | 324 µs         |
 
 ### Key findings
 
@@ -93,12 +93,12 @@ measure isolated GPU cost, not real-world frame rate.
 
 ## Real-scene results (135K nodes, 01-135k.perf.grida)
 
-| Scenario | AA on | AA off | Delta |
-|----------|-------|--------|-------|
-| baseline_nocache_zoom_slow_fit (0.02x) | 62,038 µs | 60,103 µs | **-3%** |
-| mid_flush at fit | 50,599 µs | 48,773 µs | -4% |
+| Scenario                                    | AA on     | AA off    | Delta   |
+| ------------------------------------------- | --------- | --------- | ------- |
+| baseline_nocache_zoom_slow_fit (0.02x)      | 62,038 µs | 60,103 µs | **-3%** |
+| mid_flush at fit                            | 50,599 µs | 48,773 µs | -4%     |
 | baseline_nocache_zoom_slow_high (zoomed in) | 21,190 µs | 19,491 µs | **-8%** |
-| mid_flush at high zoom | 16,542 µs | 15,009 µs | -9% |
+| mid_flush at high zoom                      | 16,542 µs | 15,009 µs | -9%     |
 
 The improvement is smaller than the isolated bench predicted (3-9% vs
 3.2x) because the real scene has complex Path nodes where picture cache

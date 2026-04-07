@@ -5,7 +5,6 @@ tags:
   - wg
   - canvas
   - rendering
-
 ---
 
 # Stroke-Fill Opacity Compositing
