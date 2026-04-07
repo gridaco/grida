@@ -7,7 +7,6 @@ tags:
   - canvas
   - wasm
   - performance
-
 ---
 
 # Resources - `resources`

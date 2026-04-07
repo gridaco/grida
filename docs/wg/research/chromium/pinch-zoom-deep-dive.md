@@ -7,7 +7,6 @@ tags:
   - chromium
   - rendering
   - compositing
-
 ---
 
 # Chromium Pinch-Zoom Deep Dive

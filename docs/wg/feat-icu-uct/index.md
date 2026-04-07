@@ -7,7 +7,6 @@ tags:
   - icu
   - typography
   - text
-
 ---
 
 # Unicode Coverage Tracker / Unicode Count Table (UCT)

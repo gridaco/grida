@@ -5,7 +5,6 @@ tags:
   - wg
   - typography
   - fonts
-
 ---
 
 # Font Generation - `fontgen`

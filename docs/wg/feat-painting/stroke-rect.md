@@ -6,7 +6,6 @@ tags:
   - canvas
   - painting
   - rendering
-
 ---
 
 # Rectangular Stroke - `stroke-rect`
@@ -107,26 +106,22 @@ Solid fills can't express dash/dot patterns; use **path stroking** with clipping
 #### Steps
 
 1. **Path construction**
-
    - Build a **centerline path** around the rectangle:
      - For each side, the centerline lies at `side_offset = side_width / 2` from the outer edge.
      - Include **corner arcs** for rounded corners.
    - If widths differ per side, treat each side as an **independent open segment** between its corner arcs.
 
 2. **Dash effect**
-
    - Apply a dash PathEffect (SVG semantics):
      - Normalize intervals: if odd length → duplicate once.
      - Preserve zeros; classify `[0, g]` as **invisible**; `[d, 0]` as **solid**.
      - `phase` ≈ `-stroke-dashoffset`.
 
 3. **Clip to the stroke ring**
-
    - `clip(outer_rrect)` then `clip(inner_rrect, Difference)`.
    - Ensures dashes stay within the stroke band and corners remain clean.
 
 4. **Caps & joins**
-
    - **Dashed:** `cap = Butt` (or `Square` for more CSS-like boxes).
    - **Dotted:** `cap = Round` with short “on” segments.
    - Joins are not visible if sides are treated as separate open segments; if stroking the full loop, use `join = Miter|Bevel`.

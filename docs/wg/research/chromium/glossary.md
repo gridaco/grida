@@ -6,7 +6,6 @@ tags:
   - chromium
   - rendering
   - compositing
-
 ---
 
 # Chromium Compositor — Glossary

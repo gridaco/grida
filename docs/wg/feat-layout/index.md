@@ -5,7 +5,6 @@ tags:
   - wg
   - layout
   - canvas
-
 ---
 
 # Layout Model - `layout`

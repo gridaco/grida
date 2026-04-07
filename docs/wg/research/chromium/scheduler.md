@@ -7,7 +7,6 @@ tags:
   - chromium
   - compositing
   - performance
-
 ---
 
 # Chromium Compositor Scheduler
@@ -26,11 +25,11 @@ tracking feeds into frame decisions see
 
 ## The Three-Thread Model
 
-| Thread          | Role                                                          | Key Class                   |
-| --------------- | ------------------------------------------------------------- | --------------------------- |
-| Main thread     | Blink paint, layout, JavaScript. Produces `DisplayItemList`.  | `ProxyMain`                 |
-| Impl thread     | Manages layer tree, schedules raster, builds compositor frames. | `ProxyImpl`, `Scheduler`  |
-| Worker threads  | Tile rasterization (up to 32 concurrent tasks).               | `TaskGraphRunner`           |
+| Thread         | Role                                                            | Key Class                |
+| -------------- | --------------------------------------------------------------- | ------------------------ |
+| Main thread    | Blink paint, layout, JavaScript. Produces `DisplayItemList`.    | `ProxyMain`              |
+| Impl thread    | Manages layer tree, schedules raster, builds compositor frames. | `ProxyImpl`, `Scheduler` |
+| Worker threads | Tile rasterization (up to 32 concurrent tasks).                 | `TaskGraphRunner`        |
 
 The `Scheduler` runs on the impl thread and is the sole decision-maker for
 frame timing. It queries the `SchedulerStateMachine` for what action to
@@ -45,11 +44,11 @@ Source: `cc/scheduler/scheduler.h`, `cc/trees/proxy_impl.cc`
 The scheduler subscribes to a `BeginFrameSource` which produces
 vsync-aligned timing signals. Three implementations exist:
 
-| Source                          | Behavior                                                    |
-| ------------------------------- | ----------------------------------------------------------- |
-| `DelayBasedBeginFrameSource`   | Timer-based, locked to an external vsync interval           |
-| `BackToBackBeginFrameSource`   | Fires as soon as the previous frame is acknowledged         |
-| `ExternalBeginFrameSource`     | Ticked manually (used for cross-process frame coordination) |
+| Source                       | Behavior                                                    |
+| ---------------------------- | ----------------------------------------------------------- |
+| `DelayBasedBeginFrameSource` | Timer-based, locked to an external vsync interval           |
+| `BackToBackBeginFrameSource` | Fires as soon as the previous frame is acknowledged         |
+| `ExternalBeginFrameSource`   | Ticked manually (used for cross-process frame coordination) |
 
 The scheduler subscribes/unsubscribes based on whether a frame is needed
 (`ShouldSubscribeToBeginFrames()`). When idle (no damage, no pending
@@ -136,6 +135,7 @@ The state machine enters `INSIDE_DEADLINE`. The draw phase begins.
 ### 8. Draw
 
 `ScheduledActionDrawIfPossible()` calls:
+
 1. `PrepareToDraw()` — runs damage tracking, builds render passes
 2. `DrawLayers()` — generates and submits the `CompositorFrame`
 3. `DidDrawAllLayers()` — resets damage state
@@ -154,14 +154,14 @@ Source: `cc/scheduler/scheduler.cc` (lines 381-1014),
 
 The scheduler chooses a deadline mode based on the current state:
 
-| Mode             | When To Fire                  | When Used                                              |
-| ---------------- | ----------------------------- | ------------------------------------------------------ |
-| `NONE`           | Never                         | Synchronous compositor, or not in a frame              |
-| `IMMEDIATE`      | ASAP                          | Active tree ready, or no pending main work             |
-| `WAIT_FOR_SCROLL`| `frame_time + interval * 0.333` | During scrolling, waiting for scroll input           |
-| `REGULAR`        | `args.deadline`               | Impl has animations but also waiting for main commit   |
-| `LATE`           | `frame_time + interval`       | Nothing to draw on impl, just waiting for main         |
-| `BLOCKED`        | Indefinitely                  | Full-pipe mode, headless, waiting for all stages       |
+| Mode              | When To Fire                    | When Used                                            |
+| ----------------- | ------------------------------- | ---------------------------------------------------- |
+| `NONE`            | Never                           | Synchronous compositor, or not in a frame            |
+| `IMMEDIATE`       | ASAP                            | Active tree ready, or no pending main work           |
+| `WAIT_FOR_SCROLL` | `frame_time + interval * 0.333` | During scrolling, waiting for scroll input           |
+| `REGULAR`         | `args.deadline`                 | Impl has animations but also waiting for main commit |
+| `LATE`            | `frame_time + interval`         | Nothing to draw on impl, just waiting for main       |
+| `BLOCKED`         | Indefinitely                    | Full-pipe mode, headless, waiting for all stages     |
 
 The mode is selected by `CurrentBeginImplFrameDeadlineMode()`. The key
 insight: `IMMEDIATE` is used when the impl thread already has everything
@@ -177,12 +177,12 @@ Source: `cc/scheduler/scheduler_state_machine.h` (lines 68-86),
 
 Frames are skipped (not produced) for four reasons:
 
-| Reason             | Trigger                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| `kRecoverLatency`  | MISSED frame past its deadline, or queued frame replaced     |
-| `kNoDamage`        | `!BeginFrameNeeded()`, or no submit and no pending work      |
-| `kWaitingOnMain`   | Frame ended without draw because commit/activation pending   |
-| `kDrawThrottled`   | `needs_redraw_` but draw throttled by pending `CompositorFrameAck` |
+| Reason            | Trigger                                                            |
+| ----------------- | ------------------------------------------------------------------ |
+| `kRecoverLatency` | MISSED frame past its deadline, or queued frame replaced           |
+| `kNoDamage`       | `!BeginFrameNeeded()`, or no submit and no pending work            |
+| `kWaitingOnMain`  | Frame ended without draw because commit/activation pending         |
+| `kDrawThrottled`  | `needs_redraw_` but draw throttled by pending `CompositorFrameAck` |
 
 Draw throttling is controlled by `pending_submit_frames_`: the compositor
 allows at most 1 pending submit (`kMaxPendingSubmitFrames = 1`) before
@@ -201,18 +201,18 @@ in isolation.
 
 ### Key State Variables
 
-| Variable                                | Type    | Purpose                                      |
-| --------------------------------------- | ------- | -------------------------------------------- |
-| `begin_impl_frame_state_`              | enum    | IDLE, INSIDE_BEGIN_FRAME, INSIDE_DEADLINE    |
-| `begin_main_frame_state_`              | enum    | IDLE, SENT, READY_TO_COMMIT                  |
-| `has_pending_tree_`                     | bool    | Whether a pending tree exists                |
-| `pending_tree_is_ready_for_activation_` | bool    | Whether pending tree can activate            |
-| `active_tree_needs_first_draw_`         | bool    | Whether the active tree hasn't been drawn    |
-| `needs_redraw_`                         | bool    | Whether a draw is needed                     |
-| `needs_begin_main_frame_`              | bool    | Whether main thread work is needed           |
-| `needs_prepare_tiles_`                  | bool    | Whether tile management is needed            |
-| `forced_redraw_state_`                  | enum    | Forced redraw state machine (for checkerboard)|
-| `consecutive_checkerboard_animations_`  | int     | Count of frames with checkerboarding         |
+| Variable                                | Type | Purpose                                        |
+| --------------------------------------- | ---- | ---------------------------------------------- |
+| `begin_impl_frame_state_`               | enum | IDLE, INSIDE_BEGIN_FRAME, INSIDE_DEADLINE      |
+| `begin_main_frame_state_`               | enum | IDLE, SENT, READY_TO_COMMIT                    |
+| `has_pending_tree_`                     | bool | Whether a pending tree exists                  |
+| `pending_tree_is_ready_for_activation_` | bool | Whether pending tree can activate              |
+| `active_tree_needs_first_draw_`         | bool | Whether the active tree hasn't been drawn      |
+| `needs_redraw_`                         | bool | Whether a draw is needed                       |
+| `needs_begin_main_frame_`               | bool | Whether main thread work is needed             |
+| `needs_prepare_tiles_`                  | bool | Whether tile management is needed              |
+| `forced_redraw_state_`                  | enum | Forced redraw state machine (for checkerboard) |
+| `consecutive_checkerboard_animations_`  | int  | Count of frames with checkerboarding           |
 
 ### Action Priority
 
@@ -324,12 +324,12 @@ Source: `cc/scheduler/scheduler_state_machine.cc` (lines 1359-1377),
 `ProxyImpl::RenewTreePriority()` sets the tree priority based on
 interaction state:
 
-| Interaction                    | Tree Priority                    |
-| ------------------------------ | -------------------------------- |
-| Active scrolling               | `SMOOTHNESS_TAKES_PRIORITY`     |
-| Pinch gesture / page scale     | `SMOOTHNESS_TAKES_PRIORITY`     |
-| Evicted UI resources           | `NEW_CONTENT_TAKES_PRIORITY`    |
-| Default (idle)                 | `SAME_PRIORITY_FOR_BOTH_TREES`  |
+| Interaction                | Tree Priority                  |
+| -------------------------- | ------------------------------ |
+| Active scrolling           | `SMOOTHNESS_TAKES_PRIORITY`    |
+| Pinch gesture / page scale | `SMOOTHNESS_TAKES_PRIORITY`    |
+| Evicted UI resources       | `NEW_CONTENT_TAKES_PRIORITY`   |
+| Default (idle)             | `SAME_PRIORITY_FOR_BOTH_TREES` |
 
 The smoothness priority has a 250ms expiration timer. When it expires and
 no gesture is active, priority returns to `SAME_PRIORITY_FOR_BOTH_TREES`.
@@ -340,13 +340,13 @@ Source: `cc/trees/proxy_impl.cc` (lines 520-588)
 
 ## DrawResult Enum
 
-| Result                             | Meaning                                               | Scheduler Response                    |
-| ---------------------------------- | ----------------------------------------------------- | ------------------------------------- |
-| `kSuccess`                         | Frame drawn and submitted                             | Reset checkerboard counter            |
-| `kAbortedCheckerboardAnimations`   | Visible tiles missing during animation                | Increment checkerboard counter        |
-| `kAbortedMissingHighResContent`    | High-res tiles missing                                | Request BeginMainFrame                |
-| `kAbortedCantDraw`                 | `can_draw_` is false                                  | Retry up to 3 times                   |
-| `kAbortedDrainingPipeline`         | Pipeline draining                                     | Reset counters                        |
+| Result                           | Meaning                                | Scheduler Response             |
+| -------------------------------- | -------------------------------------- | ------------------------------ |
+| `kSuccess`                       | Frame drawn and submitted              | Reset checkerboard counter     |
+| `kAbortedCheckerboardAnimations` | Visible tiles missing during animation | Increment checkerboard counter |
+| `kAbortedMissingHighResContent`  | High-res tiles missing                 | Request BeginMainFrame         |
+| `kAbortedCantDraw`               | `can_draw_` is false                   | Retry up to 3 times            |
+| `kAbortedDrainingPipeline`       | Pipeline draining                      | Reset counters                 |
 
 Source: `cc/scheduler/draw_result.h`
 
@@ -354,16 +354,16 @@ Source: `cc/scheduler/draw_result.h`
 
 ## Key Settings
 
-| Setting                                                     | Default | Purpose                                               |
-| ----------------------------------------------------------- | ------- | ----------------------------------------------------- |
-| `main_frame_before_activation_enabled`                      | false   | Send BMF while pending tree exists                    |
-| `main_frame_before_commit_enabled`                          | false   | Send BMF while previous commit pending                |
-| `commit_to_active_tree`                                     | false   | Skip pending tree (UI compositor only)                |
-| `wait_for_all_pipeline_stages_before_draw`                  | false   | Full-pipe mode (headless)                             |
-| `maximum_number_of_failed_draws_before_draw_is_forced`      | 3       | Checkerboard tolerance                                |
-| `disable_frame_rate_limit`                                  | false   | Disable draw throttling                               |
-| `scroll_deadline_mode_enabled`                              | false   | Enable WAIT_FOR_SCROLL deadline mode                  |
-| `scroll_deadline_ratio`                                     | 0.333   | Fraction of interval to wait for scroll input         |
+| Setting                                                | Default | Purpose                                       |
+| ------------------------------------------------------ | ------- | --------------------------------------------- |
+| `main_frame_before_activation_enabled`                 | false   | Send BMF while pending tree exists            |
+| `main_frame_before_commit_enabled`                     | false   | Send BMF while previous commit pending        |
+| `commit_to_active_tree`                                | false   | Skip pending tree (UI compositor only)        |
+| `wait_for_all_pipeline_stages_before_draw`             | false   | Full-pipe mode (headless)                     |
+| `maximum_number_of_failed_draws_before_draw_is_forced` | 3       | Checkerboard tolerance                        |
+| `disable_frame_rate_limit`                             | false   | Disable draw throttling                       |
+| `scroll_deadline_mode_enabled`                         | false   | Enable WAIT_FOR_SCROLL deadline mode          |
+| `scroll_deadline_ratio`                                | 0.333   | Fraction of interval to wait for scroll input |
 
 Source: `cc/scheduler/scheduler_settings.h`
 

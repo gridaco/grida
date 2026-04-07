@@ -62,7 +62,9 @@ css multiple shadows are supported, separated by commas.
 ex
 
 ```css
-box-shadow: 12px 12px 2px 1px rgba(0, 0, 255, 0.2), 5px -1px 2px 1px rgb(59, 0, 19);
+box-shadow:
+  12px 12px 2px 1px rgba(0, 0, 255, 0.2),
+  5px -1px 2px 1px rgb(59, 0, 19);
 ```
 
 **flutter**

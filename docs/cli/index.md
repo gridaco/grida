@@ -177,7 +177,7 @@ So for example (react), In your `pages/index.tsx`, you may import like..
 ```tsx
 import { NewModuleFromFigma } from "../grida/new-module-from-figma";
 
-export default function() {
+export default function () {
   return (
     <>
       {/* ... */}

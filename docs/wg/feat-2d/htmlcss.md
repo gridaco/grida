@@ -385,18 +385,18 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Transform
 
-| CSS Property          | Status | Notes                                              |
-| --------------------- | ------ | -------------------------------------------------- |
-| `transform`           | ✅     | 2D: translate, rotate, scale, skew, matrix         |
-| `transform-origin`    | ✅     | Percentage-based origins (default 50% 50%)         |
-| `transform-box`       | ❌     |                                                    |
-| `transform-style`     | ❌     |                                                    |
-| `translate`           | ❌     | Individual property (use `transform:` instead)     |
-| `rotate`              | ❌     | Individual property (use `transform:` instead)     |
-| `scale`               | ❌     | Individual property (use `transform:` instead)     |
-| `perspective`         | ❌     |                                                    |
-| `perspective-origin`  | ❌     |                                                    |
-| `backface-visibility` | ❌     |                                                    |
+| CSS Property          | Status | Notes                                          |
+| --------------------- | ------ | ---------------------------------------------- |
+| `transform`           | ✅     | 2D: translate, rotate, scale, skew, matrix     |
+| `transform-origin`    | ✅     | Percentage-based origins (default 50% 50%)     |
+| `transform-box`       | ❌     |                                                |
+| `transform-style`     | ❌     |                                                |
+| `translate`           | ❌     | Individual property (use `transform:` instead) |
+| `rotate`              | ❌     | Individual property (use `transform:` instead) |
+| `scale`               | ❌     | Individual property (use `transform:` instead) |
+| `perspective`         | ❌     |                                                |
+| `perspective-origin`  | ❌     |                                                |
+| `backface-visibility` | ❌     |                                                |
 
 ### Filter & Effects
 

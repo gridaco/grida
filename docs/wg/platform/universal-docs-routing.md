@@ -6,7 +6,6 @@ tags:
   - wg
   - platform
   - routing
-
 ---
 
 # Universal Docs Routing
@@ -130,11 +129,11 @@ Notes:
 
 ## Examples
 
-| universal path          | canonical path (example)                                                |
-| ----------------------- | ----------------------------------------------------------------------- |
-| `/_/dash`               | `/acme/project/dash`                                                  |
-| `/_/ciam`               | `/acme/project/ciam`                                                  |
-| `/_/connect/share`      | `/acme/project/00000000-0000-0000-0000-000000001234/connect/share`     |
+| universal path     | canonical path (example)                                           |
+| ------------------ | ------------------------------------------------------------------ |
+| `/_/dash`          | `/acme/project/dash`                                               |
+| `/_/ciam`          | `/acme/project/ciam`                                               |
+| `/_/connect/share` | `/acme/project/00000000-0000-0000-0000-000000001234/connect/share` |
 
 ---
 
@@ -143,4 +142,3 @@ Notes:
 - No implicit guessing or inference beyond the route registry.
 - No alternate universal prefixes (`/_/_/`, `/__/`).
 - No doc type leakage in the universal path.
-

@@ -82,13 +82,13 @@ Scene
 
 ## Constraints
 
-| Rule          | Detail                                                    |
-| ------------- | --------------------------------------------------------- |
-| **Parent**    | Must be `Scene` or `Tray`                                 |
-| **Children**  | Any node type: Container, Group, Text, Tray, shapes, etc. |
-| **Layout**    | None. Always `none`. Not configurable.                    |
-| **Rendering** | Canvas-only. Never appears in exported output.            |
-| **Clipping**  | None. Children can overflow.                              |
+| Rule          | Detail                                                                    |
+| ------------- | ------------------------------------------------------------------------- |
+| **Parent**    | Must be `Scene` or `Tray`                                                 |
+| **Children**  | Any node type: Container, Group, Text, Tray, shapes, etc.                 |
+| **Layout**    | None. Always `none`. Not configurable.                                    |
+| **Rendering** | Canvas-only. Never appears in exported output.                            |
+| **Clipping**  | None. Children can overflow.                                              |
 | **Styling**   | Fills, strokes, and corner radius supported. No effects (shadows, blurs). |
 
 ### Validation Invariants

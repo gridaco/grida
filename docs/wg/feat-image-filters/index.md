@@ -6,7 +6,6 @@ tags:
   - canvas
   - filters
   - rendering
-
 ---
 
 # Image Filters - `image-filters`

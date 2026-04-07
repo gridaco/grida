@@ -6,7 +6,6 @@ tags:
   - canvas
   - vector
   - editor
-
 ---
 
 # Grida's VectorNetwork Implementation.

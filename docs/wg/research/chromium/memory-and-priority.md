@@ -6,7 +6,6 @@ tags:
   - chromium
   - compositing
   - performance
-
 ---
 
 # Chromium Memory Management and Tile Priority

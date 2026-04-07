@@ -5,7 +5,6 @@ tags:
   - internal
   - wg
   - css
-
 ---
 
 # About `css_properties.json5`

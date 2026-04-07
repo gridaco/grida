@@ -7,7 +7,6 @@ tags:
   - typography
   - text
   - editor
-
 ---
 
 ## Motivation
@@ -341,7 +340,7 @@ The host maintains the scroll offset and adjusts it in response to:
   2. Rebuild layout at the new width.
   3. After reflow, find the line that now contains the recorded byte offset. Compute `new_scroll_y = new_line.top() + fraction`.
   4. Clamp to `[0, max_scroll_y]`.
-  
+
   Special case: if `scroll_y == 0` before reflow, it stays `0` (no anchoring needed; the document top is already the anchor).
 
 ### Engine requirements

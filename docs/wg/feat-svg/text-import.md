@@ -7,7 +7,6 @@ tags:
   - svg
   - import
   - text
-
 ---
 
 # SVG Text Import Model
