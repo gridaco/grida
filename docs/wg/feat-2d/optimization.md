@@ -1363,8 +1363,7 @@ probes in `examples/skia_bench/` for per-primitive validation data.
     Decision: `w·z < ε && h·z < ε` — both axes must be subpixel.
     Thin shapes (large in one axis) survive. Gated by `zoom < 1.0`.
 
-    Mirrors Chromium's `MinimumContentsScale` (`cc/layers/
-    picture_layer_impl.cc`).
+    Mirrors Chromium's `MinimumContentsScale` (`cc/layers/picture_layer_impl.cc`).
 
     Design: filter `indices` in `Renderer::frame()` after R-tree
     query, using per-layer bounds stored in a parallel
@@ -1373,7 +1372,6 @@ probes in `examples/skia_bench/` for per-primitive validation data.
 53. **Text LOD (H1 cull + H2 greek)**
 
     Two-stage policy driven by projected font size (`font_max · z`).
-
     - **H1 cull** (`font·z < 1 px`): remove text layer from frame
       plan. Glyphs at this size cannot render a readable shape.
     - **H2 greek** (`1 ≤ font·z < 6 px`): at draw time, replace the
