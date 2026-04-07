@@ -1392,23 +1392,6 @@ mod tests {
     use crate::layout::ComputedLayout;
     use crate::node::schema::Scene;
     use std::collections::HashMap;
-    use std::sync::Mutex;
-
-    /// Global mutex to serialize HTML tests.
-    ///
-    /// The CSS cascade adapter uses a process-global `DEMO_DOM` static, so
-    /// concurrent `from_html_str` calls race on that shared slot and cause
-    /// Stylo `debug_assert` panics ("Why are we here?").  A mutex ensures
-    /// only one test touches the global DOM at a time.
-    ///
-    /// We use `lock().unwrap_or_else(|e| e.into_inner())` to recover from
-    /// poison so that a single test failure doesn't cascade to all others.
-    static HTML_TEST_LOCK: Mutex<()> = Mutex::new(());
-
-    /// Lock the HTML test mutex, clearing poison if a prior test panicked.
-    fn lock_html() -> std::sync::MutexGuard<'static, ()> {
-        HTML_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
-    }
 
     /// Parse HTML and run the layout engine, returning the scene and a
     /// map of every node's computed layout.
@@ -1455,7 +1438,7 @@ mod tests {
 
     #[test]
     fn smoke_test_basic_html() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1483,7 +1466,7 @@ mod tests {
 
     #[test]
     fn test_inline_style_attribute() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html>
   <body>
@@ -1496,7 +1479,7 @@ mod tests {
 
     #[test]
     fn test_borders_and_shadows() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1514,7 +1497,7 @@ mod tests {
 
     #[test]
     fn test_flex_alignment() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1535,7 +1518,7 @@ mod tests {
 
     #[test]
     fn test_gradient_backgrounds() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html>
   <head>
@@ -1560,7 +1543,7 @@ mod tests {
     /// 3 fixed-size divs in a flex row with gap.
     #[test]
     fn test_flex_row_positions() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; flex-direction:row; gap:10px; width:300px; height:100px;">
@@ -1597,7 +1580,7 @@ mod tests {
     /// 3 fixed-size divs in a flex column with gap.
     #[test]
     fn test_flex_column_positions() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; flex-direction:column; gap:10px; width:100px; height:300px;">
@@ -1630,7 +1613,7 @@ mod tests {
     /// justify-content: center with 2 fixed children.
     #[test]
     fn test_flex_justify_center() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; justify-content:center; width:200px; height:100px;">
@@ -1662,7 +1645,7 @@ mod tests {
     /// justify-content: space-between with 3 fixed children.
     #[test]
     fn test_flex_justify_space_between() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; justify-content:space-between; width:200px; height:100px;">
@@ -1694,7 +1677,7 @@ mod tests {
     /// align-items: center with a single child shorter than container.
     #[test]
     fn test_flex_align_center() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; align-items:center; width:200px; height:100px;">
@@ -1722,7 +1705,7 @@ mod tests {
     /// flex-grow: second child fills remaining space.
     #[test]
     fn test_flex_grow() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; width:300px; height:100px;">
@@ -1758,7 +1741,7 @@ mod tests {
     /// Container padding offsets children.
     #[test]
     fn test_flex_padding() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; padding:10px; width:200px; height:100px;">
@@ -1787,7 +1770,7 @@ mod tests {
     /// Flex column gap direction is correct (gap applies vertically).
     #[test]
     fn test_flex_gap_column_direction() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; flex-direction:column; gap:15px; width:100px; height:300px;">
@@ -1818,7 +1801,7 @@ mod tests {
     /// Nested flex: outer row, inner column with children.
     #[test]
     fn test_nested_flex() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; flex-direction:row; width:400px; height:200px;">
@@ -1869,7 +1852,7 @@ mod tests {
     /// Explicit width/height dimensions are preserved.
     #[test]
     fn test_explicit_dimensions() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="width:200px; height:100px;"></div>
@@ -1896,7 +1879,7 @@ mod tests {
     /// flex-wrap: children that overflow wrap to the next line.
     #[test]
     fn test_flex_wrap() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; flex-wrap:wrap; width:150px; height:200px;">
@@ -1944,7 +1927,7 @@ mod tests {
     /// text-shadow maps to drop-shadow effects on the TextSpan node.
     #[test]
     fn test_text_shadow() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div><span style="text-shadow: 2px 3px 4px rgba(0,0,0,0.6);">Hello</span></div>
@@ -1982,7 +1965,7 @@ mod tests {
     /// Multiple text-shadows produce multiple DropShadow effects.
     #[test]
     fn test_text_shadow_multiple() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div><span style="text-shadow: 1px 1px 2px black, 0 0 8px blue;">Multi</span></div>
@@ -2009,7 +1992,7 @@ mod tests {
     /// box-shadow (inset + outer) maps to InnerShadow + DropShadow.
     #[test]
     fn test_box_shadow() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="width:100px; height:100px; box-shadow: 4px 4px 8px black, inset 2px 2px 4px red;"></div>
@@ -2044,7 +2027,7 @@ mod tests {
     /// filter: blur() maps to FeLayerBlur on a rectangle.
     #[test]
     fn test_filter_blur() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="width:100px; height:100px; filter: blur(6px);"></div>
@@ -2075,7 +2058,7 @@ mod tests {
     /// filter: drop-shadow() maps to DropShadow effect on a rectangle.
     #[test]
     fn test_filter_drop_shadow() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="width:100px; height:100px; filter: drop-shadow(4px 4px 8px black);"></div>
@@ -2115,7 +2098,7 @@ mod tests {
     /// override is available. This test verifies the pipeline doesn't crash.
     #[test]
     fn test_backdrop_filter_blur() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="width:200px; height:200px;">
@@ -2145,7 +2128,7 @@ mod tests {
     /// mix-blend-mode: multiply maps to LayerBlendMode::Blend(BlendMode::Multiply).
     #[test]
     fn test_mix_blend_mode() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="width:100px; height:100px; mix-blend-mode: multiply;"></div>
@@ -2174,7 +2157,7 @@ mod tests {
     /// mix-blend-mode: normal stays as PassThrough (default).
     #[test]
     fn test_mix_blend_mode_normal() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="width:100px; height:100px; mix-blend-mode: normal;"></div>
@@ -2200,7 +2183,7 @@ mod tests {
     /// Effects on containers: filter + blend mode on a flex container.
     #[test]
     fn test_container_effects() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="display:flex; width:200px; height:100px; filter: blur(4px); mix-blend-mode: screen;">
@@ -2241,7 +2224,7 @@ mod tests {
     /// text-decoration-color maps to TextDecorationRec.text_decoration_color.
     #[test]
     fn test_text_decoration_color() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="text-decoration: underline; text-decoration-color: #ef4444;">Red underline</div>
@@ -2280,7 +2263,7 @@ mod tests {
     /// text-decoration-style maps to TextDecorationRec.text_decoration_style.
     #[test]
     fn test_text_decoration_style() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="text-decoration: underline; text-decoration-style: wavy;">Wavy</div>
@@ -2315,7 +2298,7 @@ mod tests {
     /// Combined: text-decoration with color + style + line.
     #[test]
     fn test_text_decoration_combined() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body>
   <div style="text-decoration: line-through; text-decoration-color: #3b82f6; text-decoration-style: dashed;">Combo</div>
@@ -2359,7 +2342,7 @@ mod tests {
     /// h1 margin should merge into padding (no extra wrapper container).
     #[test]
     fn test_h1_margin_no_double_wrap() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body style="margin:0; padding:0;">
   <h1>Hello</h1>
@@ -2409,7 +2392,7 @@ mod tests {
     /// Inline elements (<strong>, <em>, <code>) should merge into a single AttributedText.
     #[test]
     fn test_inline_elements_merge_to_attributed_text() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body style="margin:0;">
   <p>Hello <strong>world</strong>!</p>
@@ -2470,7 +2453,7 @@ mod tests {
     /// Whitespace between inline elements must be preserved.
     #[test]
     fn test_inline_whitespace_preserved() {
-        let _guard = lock_html();
+        let _guard = crate::stylo_test::lock();
         let html = r#"<!doctype html>
 <html><body style="margin:0;">
   <p>Default <span style="color: red;">red</span> and <span style="color: green;">green</span> text.</p>
