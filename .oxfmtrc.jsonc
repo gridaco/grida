@@ -12,5 +12,6 @@
     ".json5",
     "bin",
     "*.clipboard.html",
+    "worker-configuration.d.ts",
   ],
 }
