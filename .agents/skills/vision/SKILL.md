@@ -154,11 +154,11 @@ uv run $SCRIPT crates/grida-canvas/goldens/progressive_blur.png \
 
 ## Troubleshooting
 
-| Symptom                          | Cause                            | Fix                                       |
-| -------------------------------- | -------------------------------- | ----------------------------------------- |
-| `cannot reach Ollama`            | Ollama not running               | `ollama serve`                            |
-| `no Gemma 4 vision model found`  | Gemma 4 not installed            | `ollama pull gemma4`                      |
-| `model 'X' is not available`     | Model name typo or not installed | `--list-models` to see what's installed   |
-| Slow response                    | Large model on CPU               | Try a smaller tag (e.g. `gemma4:e2b`)     |
-| Vague or wrong answer            | Generic prompt                   | Write a more specific `--prompt`          |
-| `'ollama' package not found`     | Not using `uv run`               | Run with `uv run ask.py` instead          |
+| Symptom                         | Cause                            | Fix                                     |
+| ------------------------------- | -------------------------------- | --------------------------------------- |
+| `cannot reach Ollama`           | Ollama not running               | `ollama serve`                          |
+| `no Gemma 4 vision model found` | Gemma 4 not installed            | `ollama pull gemma4`                    |
+| `model 'X' is not available`    | Model name typo or not installed | `--list-models` to see what's installed |
+| Slow response                   | Large model on CPU               | Try a smaller tag (e.g. `gemma4:e2b`)   |
+| Vague or wrong answer           | Generic prompt                   | Write a more specific `--prompt`        |
+| `'ollama' package not found`    | Not using `uv run`               | Run with `uv run ask.py` instead        |

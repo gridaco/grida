@@ -489,6 +489,7 @@ Let's trace through a complex example with cascading:
    - **Step 1**: Copy presentation attributes
      - `stroke="black"` → added
    - **Step 2**: Apply CSS rules (in document order)
+
      ```rust
      for rule in &style_sheet.rules {
          if rule.selector.matches(&XmlNode(xml_node)) {
@@ -501,6 +502,7 @@ Let's trace through a complex example with cascading:
      - Rule 2: `.highlight { fill: red !important; }` → matches! → `fill="red"` (important)
      - Rule 3: `rect { fill: green; }` → matches! → `fill="green"`
      - **Result after CSS**: `fill="green"` (last matching rule wins, but `!important` preserved)
+
    - **Step 3**: Apply style attribute
      - `style="fill:yellow"` → `fill="yellow"`
      - **Final result**: `fill="yellow"` (style attribute has highest priority, unless `!important`)
