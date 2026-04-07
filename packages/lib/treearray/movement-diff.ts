@@ -84,7 +84,7 @@ export function movementDiff({
 
 interface __InsertResult<
   T extends ISortItem = any,
-  O extends ISortItem = ISortItem
+  O extends ISortItem = ISortItem,
 > {
   insert: O;
   data: (T | O)[];

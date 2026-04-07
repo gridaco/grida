@@ -74,5 +74,3 @@ describe("iofigma.kiwi clipboard overrides (fixtures)", () => {
     }
   });
 });
-
-

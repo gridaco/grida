@@ -19,8 +19,7 @@ export interface TreeNodeWithUnevenSortDataArrayItem {
   parent?: ParentKey;
 }
 
-export interface TreeNodeAsArrayItem
-  extends TreeNodeWithUnevenSortDataArrayItem {
+export interface TreeNodeAsArrayItem extends TreeNodeWithUnevenSortDataArrayItem {
   id: Key;
   index: number;
   parent: ParentKey;

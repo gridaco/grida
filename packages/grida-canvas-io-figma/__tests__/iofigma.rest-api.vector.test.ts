@@ -417,9 +417,7 @@ describe("iofigma.restful.factory.document", () => {
       expect(pathChildren.length).toBeGreaterThan(0);
       expect(boolChildren.length).toBe(1);
       expect(boolChildren[0].op).toBe("intersection");
-      expect(pathChildren.length + boolChildren.length).toBe(
-        childNodes.length
-      );
+      expect(pathChildren.length + boolChildren.length).toBe(childNodes.length);
 
       pathChildren.forEach((child) => {
         expect(child.type).toBe("path");
@@ -429,8 +427,7 @@ describe("iofigma.restful.factory.document", () => {
       });
 
       // Verify the boolean node has children (fill clone + stroke)
-      const boolNodeChildren =
-        gridaDocument.links[boolChildren[0].id];
+      const boolNodeChildren = gridaDocument.links[boolChildren[0].id];
       expect(boolNodeChildren).toBeDefined();
       expect(boolNodeChildren!.length).toBe(2);
 

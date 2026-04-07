@@ -8,16 +8,8 @@
     "noImplicitAny": true,
     "skipLibCheck": true,
     "declaration": true,
-    "types": [
-      "vitest/globals",
-      "node"
-    ]
+    "types": ["vitest/globals", "node"]
   },
-  "include": [
-    "src",
-    "__tests__"
-  ],
-  "exclude": [
-    "dist"
-  ]
+  "include": ["src", "__tests__"],
+  "exclude": ["dist"]
 }

@@ -8,8 +8,8 @@ type IDeepTreeItemLike = {
 };
 
 export class TreeArray<
-  T extends
-    TreeNodeWithUnevenSortDataArrayItem = TreeNodeWithUnevenSortDataArrayItem,
+  T extends TreeNodeWithUnevenSortDataArrayItem =
+    TreeNodeWithUnevenSortDataArrayItem,
 > {
   constructor(
     readonly seed: TreeNodeWithUnevenSortDataArrayItem[],

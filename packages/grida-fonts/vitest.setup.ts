@@ -46,4 +46,3 @@ const NativeTextDecoder = (globalThis as any).TextDecoder;
 (globalThis as any).window = {
   TextDecoder: NativeTextDecoder,
 };
-

@@ -116,10 +116,10 @@ export namespace tokens {
    * - A right-hand side (ConditionRHS)
    */
   export type ShorthandBooleanBinaryExpression<
-    LHS extends
-      ShorthandBooleanBinaryExpressionLHS = ShorthandBooleanBinaryExpressionLHS,
-    RHS extends
-      ShorthandBooleanBinaryExpressionRHS = ShorthandBooleanBinaryExpressionRHS,
+    LHS extends ShorthandBooleanBinaryExpressionLHS =
+      ShorthandBooleanBinaryExpressionLHS,
+    RHS extends ShorthandBooleanBinaryExpressionRHS =
+      ShorthandBooleanBinaryExpressionRHS,
   > = [LHS, BooleanBinaryOperator, RHS];
 
   /**
