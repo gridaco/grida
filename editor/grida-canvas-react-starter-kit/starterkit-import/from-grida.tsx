@@ -53,8 +53,8 @@ export function ImportFromGridaDialog({
         <DialogHeader>
           <DialogTitle>Open .grida</DialogTitle>
           <DialogDescription>
-            Import a document from a <code>.grida</code> or{" "}
-            <code>.grida1</code> file.
+            Import a document from a <code>.grida</code> or <code>.grida1</code>{" "}
+            file.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

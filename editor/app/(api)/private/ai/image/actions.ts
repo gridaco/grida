@@ -91,7 +91,9 @@ export async function upscaleImage(
   }
 
   // Validate auth & rate limit
-  const cost_mills = ai.toMills(ai.image_tools.models["nightmareai/real-esrgan"].cost_usd);
+  const cost_mills = ai.toMills(
+    ai.image_tools.models["nightmareai/real-esrgan"].cost_usd
+  );
   const authError = await validateAuthAndRateLimit(cost_mills);
   if (authError) {
     return authError;

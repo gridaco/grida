@@ -8,7 +8,11 @@ import {
   TaskItem,
   TaskTrigger,
 } from "@/components/ai-elements/task";
-import { deriveToolState, type ToolUIOutputProps, type TreeOutput } from "./tool-ui-shared";
+import {
+  deriveToolState,
+  type ToolUIOutputProps,
+  type TreeOutput,
+} from "./tool-ui-shared";
 
 export function TreeToolUI({
   output,

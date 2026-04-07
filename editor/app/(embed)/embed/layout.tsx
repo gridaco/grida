@@ -12,6 +12,8 @@ export const metadata: Metadata = {
  */
 export default function EmbedLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh w-full bg-background text-foreground">{children}</div>
+    <div className="min-h-dvh w-full bg-background text-foreground">
+      {children}
+    </div>
   );
 }

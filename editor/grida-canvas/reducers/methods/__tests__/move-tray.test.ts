@@ -8,10 +8,7 @@ import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
 import color from "@grida/color";
 import type grida from "@grida/schema";
 
-function trayNode(
-  id: string,
-  name: string
-): grida.program.nodes.TrayNode {
+function trayNode(id: string, name: string): grida.program.nodes.TrayNode {
   return {
     id,
     type: "tray",

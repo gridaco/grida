@@ -42,9 +42,7 @@ export async function POST(req: NextRequest) {
           return undefined;
         }
         if (part.type === "finish") {
-          const spec = lastModelId
-            ? modelSpecById(lastModelId)
-            : undefined;
+          const spec = lastModelId ? modelSpecById(lastModelId) : undefined;
 
           return {
             totalUsage: part.totalUsage,

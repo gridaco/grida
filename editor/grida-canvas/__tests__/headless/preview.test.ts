@@ -39,7 +39,11 @@ describe("Preview (headless)", () => {
     ed.doc.previewStart("test");
 
     // Dispatch a change and capture it as preview
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Preview A" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Preview A",
+    });
     ed.doc.previewSet();
 
     expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview A");
@@ -52,11 +56,19 @@ describe("Preview (headless)", () => {
   test("preview set reverts previous before applying new", () => {
     ed.doc.previewStart("test");
 
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Preview A" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Preview A",
+    });
     ed.doc.previewSet();
     expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview A");
 
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Preview B" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Preview B",
+    });
     ed.doc.previewSet();
     expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview B");
 
@@ -71,10 +83,18 @@ describe("Preview (headless)", () => {
 
     ed.doc.previewStart("test");
 
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Preview A" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Preview A",
+    });
     ed.doc.previewSet();
 
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Preview B" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Preview B",
+    });
     ed.doc.previewSet();
 
     ed.doc.previewDiscard();
@@ -87,7 +107,11 @@ describe("Preview (headless)", () => {
 
     ed.doc.previewStart("test");
 
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Committed" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Committed",
+    });
     ed.doc.previewSet();
 
     ed.doc.previewCommit();
@@ -114,13 +138,21 @@ describe("Preview (headless)", () => {
     ed.doc.previewStart("test");
 
     // Seek to A
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Preview A" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Preview A",
+    });
     ed.doc.previewSet();
     expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview A");
 
     // Final commit dispatches to B, then captures via previewSet + previewCommit.
     // This mirrors the real pattern: onCommit calls apply(B) then previewSet() + previewCommit().
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Final B" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Final B",
+    });
     ed.doc.previewSet();
     ed.doc.previewCommit();
 
@@ -155,7 +187,11 @@ describe("Preview (headless)", () => {
 
     // Dispatch without previewSet — simulates the record() path being
     // silently dropped while a preview is active.
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Silent" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Silent",
+    });
 
     // State is mutated...
     expect((ed.state.document.nodes.rect1 as any).name).toBe("Silent");
@@ -168,14 +204,22 @@ describe("Preview (headless)", () => {
   test("normal dispatch works after preview commit", () => {
     // Full preview cycle
     ed.doc.previewStart("test");
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Previewed" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Previewed",
+    });
     ed.doc.previewSet();
     ed.doc.previewCommit();
     expect(ed.doc.historySnapshot.past).toHaveLength(1);
 
     // A subsequent normal dispatch should still record to history.
     // This verifies that _activePreview is properly cleared after commit.
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "After Preview" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "After Preview",
+    });
 
     // Give the bucket time to flush (synchronous in test — the reducer
     // ran inline). The bucket uses setTimeout so we flush manually.
@@ -187,13 +231,21 @@ describe("Preview (headless)", () => {
   test("normal dispatch works after preview discard", () => {
     // Full preview cycle — discard
     ed.doc.previewStart("test");
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "Previewed" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "Previewed",
+    });
     ed.doc.previewSet();
     ed.doc.previewDiscard();
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
 
     // Subsequent dispatch should record normally — _activePreview cleared.
-    ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "After Discard" });
+    ed.doc.dispatch({
+      type: "node/change/*",
+      node_id: "rect1",
+      name: "After Discard",
+    });
     expect((ed.state.document.nodes.rect1 as any).name).toBe("After Discard");
   });
 });

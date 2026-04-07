@@ -11,8 +11,7 @@ export interface ToolUIBaseProps {
 }
 
 /** Props for tools that display input + output. */
-export interface ToolUIProps<I = unknown, O = unknown>
-  extends ToolUIBaseProps {
+export interface ToolUIProps<I = unknown, O = unknown> extends ToolUIBaseProps {
   input: I;
   output: O | undefined;
 }

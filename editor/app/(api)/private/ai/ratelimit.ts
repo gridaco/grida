@@ -19,11 +19,7 @@ const ratelimit = new Ratelimit({
 /**
  * Read the user's remaining budget (in mills) without consuming any.
  */
-export async function ai_budget_remaining({
-  user_id,
-}: {
-  user_id: string;
-}) {
+export async function ai_budget_remaining({ user_id }: { user_id: string }) {
   const { reset, remaining } = await ratelimit.getRemaining(
     `ratelimit_u_${user_id}`
   );

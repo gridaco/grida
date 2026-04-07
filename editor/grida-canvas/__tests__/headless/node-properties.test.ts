@@ -24,21 +24,31 @@ describe("Node Properties (headless)", () => {
       node_id: "rect-0",
       name: "My Rectangle",
     });
-    const node = ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode;
+    const node = ed.state.document.nodes[
+      "rect-0"
+    ] as grida.program.nodes.UnknownNode;
     expect(node.name).toBe("My Rectangle");
   });
 
   test("toggle node active", () => {
-    const before = (ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode).active;
+    const before = (
+      ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode
+    ).active;
     ed.doc.toggleNodeActive("rect-0");
-    const after = (ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode).active;
+    const after = (
+      ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode
+    ).active;
     expect(after).toBe(!before);
   });
 
   test("toggle node locked", () => {
-    const before = (ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode).locked;
+    const before = (
+      ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode
+    ).locked;
     ed.doc.toggleNodeLocked("rect-0");
-    const after = (ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode).locked;
+    const after = (
+      ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode
+    ).locked;
     expect(after).toBe(!before);
   });
 
@@ -48,7 +58,9 @@ describe("Node Properties (headless)", () => {
       node_id: "rect-0",
       opacity: 0.5,
     });
-    const node = ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode;
+    const node = ed.state.document.nodes[
+      "rect-0"
+    ] as grida.program.nodes.UnknownNode;
     expect(node.opacity).toBe(0.5);
   });
 
@@ -58,7 +70,9 @@ describe("Node Properties (headless)", () => {
       node_id: "rect-0",
       rotation: 45,
     });
-    const node = ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode;
+    const node = ed.state.document.nodes[
+      "rect-0"
+    ] as grida.program.nodes.UnknownNode;
     expect(node.rotation).toBe(45);
   });
 
@@ -85,7 +99,9 @@ describe("Node Properties (headless)", () => {
       node_id: "rect-0",
       layout_target_width: 300,
     });
-    const node = ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode;
+    const node = ed.state.document.nodes[
+      "rect-0"
+    ] as grida.program.nodes.UnknownNode;
     expect(node.layout_target_width).toBe(300);
   });
 
@@ -94,7 +110,9 @@ describe("Node Properties (headless)", () => {
     expect(proxy.id).toBe("rect-0");
 
     proxy.name = "Renamed";
-    const node = ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode;
+    const node = ed.state.document.nodes[
+      "rect-0"
+    ] as grida.program.nodes.UnknownNode;
     expect(node.name).toBe("Renamed");
     expect(proxy.name).toBe("Renamed");
   });
@@ -102,7 +120,9 @@ describe("Node Properties (headless)", () => {
   test("NodeProxy opacity set", () => {
     const proxy = ed.doc.getNodeById("rect-0");
     proxy.opacity = 0.3;
-    const node = ed.state.document.nodes["rect-0"] as grida.program.nodes.UnknownNode;
+    const node = ed.state.document.nodes[
+      "rect-0"
+    ] as grida.program.nodes.UnknownNode;
     expect(node.opacity).toBe(0.3);
   });
 });

@@ -204,9 +204,7 @@ export class CanvasWasmSVGInterfaceProvider
     return null;
   }
 
-  svgToDocument(
-    svg: string
-  ): Uint8Array | null {
+  svgToDocument(svg: string): Uint8Array | null {
     return this.surface.svgkit.toDocument(svg);
   }
 }

@@ -51,8 +51,7 @@ export const request_schema = jsonSchema<StreamingResponse>({
     colors: {
       type: "array",
       items: { type: "string" },
-      description:
-        "list of main colors used in the design - the brand colors",
+      description: "list of main colors used in the design - the brand colors",
     },
     width: {
       type: ["number", "null"],

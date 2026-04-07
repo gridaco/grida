@@ -199,12 +199,26 @@ export class EditorHistoryAdapter {
       case "record-immediate":
         this._flushBucket();
         if (this._gestureTx || this._activePreview) return;
-        this._recordImmediate(actionType, beforeState, afterState, patches, inversePatches, clearsFuture);
+        this._recordImmediate(
+          actionType,
+          beforeState,
+          afterState,
+          patches,
+          inversePatches,
+          clearsFuture
+        );
         return;
 
       case "record":
         if (this._gestureTx || this._activePreview) return;
-        this._recordBucketed(actionType, beforeState, afterState, patches, inversePatches, clearsFuture);
+        this._recordBucketed(
+          actionType,
+          beforeState,
+          afterState,
+          patches,
+          inversePatches,
+          clearsFuture
+        );
         return;
     }
   }
@@ -269,26 +283,37 @@ export class EditorHistoryAdapter {
     clearTimeout(b.timer);
     this._bucket = null;
 
-    const { beforeSnapshot, afterSnapshot, actionType, patches, inversePatches, clearsFuture } = b;
+    const {
+      beforeSnapshot,
+      afterSnapshot,
+      actionType,
+      patches,
+      inversePatches,
+      clearsFuture,
+    } = b;
 
     const delta: Delta<EditorDeltaDescriptor> = {
       providerId: "document",
-      descriptor: { actionType: actionType as Action["type"], patches, inversePatches },
+      descriptor: {
+        actionType: actionType as Action["type"],
+        patches,
+        inversePatches,
+      },
       apply: () => {
-        this._setState(
-          applyDocumentSnapshot(this._getState(), afterSnapshot)
-        );
+        this._setState(applyDocumentSnapshot(this._getState(), afterSnapshot));
       },
       revert: () => {
-        this._setState(
-          applyDocumentSnapshot(this._getState(), beforeSnapshot)
-        );
+        this._setState(applyDocumentSnapshot(this._getState(), beforeSnapshot));
       },
     };
 
-    this._history.atomic(actionType, (tx) => {
-      tx.push(delta);
-    }, { clearsFuture });
+    this._history.atomic(
+      actionType,
+      (tx) => {
+        tx.push(delta);
+      },
+      { clearsFuture }
+    );
 
     this._pastLabels.push(actionType);
     if (clearsFuture) {
@@ -324,21 +349,21 @@ export class EditorHistoryAdapter {
         inversePatches: filteredInverse,
       },
       apply: () => {
-        this._setState(
-          applyDocumentSnapshot(this._getState(), afterSnapshot)
-        );
+        this._setState(applyDocumentSnapshot(this._getState(), afterSnapshot));
       },
       revert: () => {
-        this._setState(
-          applyDocumentSnapshot(this._getState(), beforeSnapshot)
-        );
+        this._setState(applyDocumentSnapshot(this._getState(), beforeSnapshot));
       },
     };
 
     const cf = clearsFuture ?? true;
-    this._history.atomic(actionType, (tx) => {
-      tx.push(delta);
-    }, { clearsFuture: cf });
+    this._history.atomic(
+      actionType,
+      (tx) => {
+        tx.push(delta);
+      },
+      { clearsFuture: cf }
+    );
 
     this._pastLabels.push(actionType);
     if (cf) {
@@ -384,14 +409,10 @@ export class EditorHistoryAdapter {
         inversePatches: [],
       },
       apply: () => {
-        this._setState(
-          applyDocumentSnapshot(this._getState(), afterSnapshot)
-        );
+        this._setState(applyDocumentSnapshot(this._getState(), afterSnapshot));
       },
       revert: () => {
-        this._setState(
-          applyDocumentSnapshot(this._getState(), beforeSnapshot)
-        );
+        this._setState(applyDocumentSnapshot(this._getState(), beforeSnapshot));
       },
     });
 
@@ -412,9 +433,7 @@ export class EditorHistoryAdapter {
     this._gestureTx = null;
     this._gestureBeforeSnapshot = null;
 
-    this._setState(
-      applyDocumentSnapshot(this._getState(), beforeSnapshot)
-    );
+    this._setState(applyDocumentSnapshot(this._getState(), beforeSnapshot));
     tx.abort();
   }
 
@@ -446,8 +465,8 @@ export class EditorHistoryAdapter {
     if (result instanceof Promise) {
       console.error(
         "[@grida/history] EditorHistoryAdapter.undo() received a Promise. " +
-        "Async providers are not supported by the editor adapter. " +
-        "The undo may not have completed."
+          "Async providers are not supported by the editor adapter. " +
+          "The undo may not have completed."
       );
       return null;
     }
@@ -477,7 +496,7 @@ export class EditorHistoryAdapter {
     if (result instanceof Promise) {
       console.error(
         "[@grida/history] EditorHistoryAdapter.redo() received a Promise. " +
-        "Async providers are not supported by the editor adapter."
+          "Async providers are not supported by the editor adapter."
       );
       return null;
     }

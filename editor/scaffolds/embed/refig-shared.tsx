@@ -1,10 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  useCurrentEditor,
-  useEditorState,
-} from "@/grida-canvas-react";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import {
