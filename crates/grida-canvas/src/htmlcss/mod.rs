@@ -20,12 +20,125 @@ pub mod types;
 use crate::runtime::font_repository::FontRepository;
 use github_markdown::GITHUB_MARKDOWN_CSS;
 
+// ─── Image provider trait ───────────────────────────────────────────
+
+/// Host-provided image resolver for the htmlcss rendering pipeline.
+///
+/// Inspired by Chromium's `ImageResourceContent` + `ImageResourceObserver`
+/// pattern. The htmlcss module asks for an image by URL; the host decides
+/// how and when to provide it. The trait is intentionally minimal —
+/// no lifecycle management, no caching, no fetching. Those are host concerns.
+///
+/// # Use Cases
+///
+/// - **CLI (pre-resolved):** Host loads all images before calling `render()`.
+///   A `HashMap<String, Image>` wrapper implements this trivially.
+/// - **WASM (async drain):** Host renders with missing images → inspects
+///   placeholder output → fetches missing URLs → re-renders.
+/// - **Native app:** Any `ResourceFetcher` implementation the host provides.
+pub trait ImageProvider {
+    /// Resolve a URL to a decoded Skia image.
+    ///
+    /// Returns `None` if the image is not (yet) available. Implementations
+    /// may record the miss for later fetching (drain-missing pattern).
+    fn get(&self, url: &str) -> Option<&skia_safe::Image>;
+
+    /// Get intrinsic dimensions without requiring the full decoded image.
+    ///
+    /// Used during layout for replaced elements when decode may be deferred.
+    /// Default implementation delegates to `get()` and reads dimensions.
+    fn get_size(&self, url: &str) -> Option<(u32, u32)> {
+        self.get(url)
+            .map(|img| (img.width() as u32, img.height() as u32))
+    }
+}
+
+/// Null image provider — always returns `None`.
+///
+/// Zero-cost default for image-free rendering. Use when the HTML content
+/// contains no images, or when images are intentionally not provided.
+pub struct NoImages;
+
+impl ImageProvider for NoImages {
+    fn get(&self, _url: &str) -> Option<&skia_safe::Image> {
+        None
+    }
+}
+
+/// Pre-loaded image provider backed by a `HashMap`.
+///
+/// The "pre-resolved" flow: load all images before calling `render()`.
+/// Suitable for CLI tools, export pipelines, and test harnesses.
+///
+/// # Usage
+///
+/// ```ignore
+/// let mut images = PreloadedImages::new();
+/// images.insert("https://example.com/photo.jpg", decoded_skia_image);
+/// let picture = htmlcss::render(html, width, height, &fonts, &images)?;
+/// ```
+pub struct PreloadedImages {
+    images: std::collections::HashMap<String, skia_safe::Image>,
+}
+
+impl PreloadedImages {
+    pub fn new() -> Self {
+        Self {
+            images: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Insert a decoded Skia image keyed by its URL.
+    pub fn insert(&mut self, url: impl Into<String>, image: skia_safe::Image) {
+        self.images.insert(url.into(), image);
+    }
+
+    /// Number of loaded images.
+    pub fn len(&self) -> usize {
+        self.images.len()
+    }
+
+    /// Whether no images are loaded.
+    pub fn is_empty(&self) -> bool {
+        self.images.is_empty()
+    }
+
+    /// Decode image bytes (PNG, JPEG, WebP, GIF) into a Skia `Image` and insert.
+    ///
+    /// Returns `Some((width, height))` on success, `None` if decode fails.
+    pub fn insert_bytes(&mut self, url: impl Into<String>, bytes: &[u8]) -> Option<(u32, u32)> {
+        let data = skia_safe::Data::new_copy(bytes);
+        let image = skia_safe::Image::from_encoded(data)?;
+        let w = image.width() as u32;
+        let h = image.height() as u32;
+        self.images.insert(url.into(), image);
+        Some((w, h))
+    }
+}
+
+impl Default for PreloadedImages {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ImageProvider for PreloadedImages {
+    fn get(&self, url: &str) -> Option<&skia_safe::Image> {
+        self.images.get(url)
+    }
+}
+
 /// Render HTML+CSS to a Skia Picture.
+///
+/// Images referenced by `<img src>` or `background-image: url()` are
+/// resolved via the `images` provider at layout and paint time. Missing
+/// images render as placeholders — the pipeline never blocks on loads.
 pub fn render(
     html: &str,
     width: f32,
     _height: f32,
     fonts: &FontRepository,
+    images: &dyn ImageProvider,
 ) -> Result<skia_safe::Picture, String> {
     let root = collect::collect_styled_tree(html)?;
     let Some(root) = root else {
@@ -38,7 +151,7 @@ pub fn render(
             .expect("empty picture"));
     };
 
-    let layout_root = layout::compute_layout(&root, width, fonts);
+    let layout_root = layout::compute_layout(&root, width, fonts, images);
     let content_height = layout_root.height;
 
     Ok(paint::paint_to_picture(
@@ -46,6 +159,7 @@ pub fn render(
         width,
         content_height,
         fonts,
+        images,
     ))
 }
 
@@ -56,12 +170,66 @@ pub fn measure_content_height(
     html: &str,
     width: f32,
     fonts: &FontRepository,
+    images: &dyn ImageProvider,
 ) -> Result<f32, String> {
     let root = collect::collect_styled_tree(html)?;
     let Some(root) = root else {
         return Ok(0.0);
     };
-    Ok(layout::compute_content_height(&root, width, fonts))
+    Ok(layout::compute_content_height(&root, width, fonts, images))
+}
+
+/// Collect all image URLs referenced in HTML content.
+///
+/// Runs the Stylo cascade to resolve CSS `background-image: url()` values,
+/// then walks the styled tree to extract all image URLs from:
+/// - `<img src="...">` elements
+/// - `background-image: url("...")` CSS properties
+///
+/// Use this to pre-load images before calling [`render()`] (CLI / pre-resolved flow).
+///
+/// # Example
+///
+/// ```ignore
+/// let urls = htmlcss::collect_image_urls(html)?;
+/// let images = load_all(urls).await; // your loader
+/// let picture = htmlcss::render(html, width, height, &fonts, &images)?;
+/// ```
+pub fn collect_image_urls(html: &str) -> Result<Vec<String>, String> {
+    let root = collect::collect_styled_tree(html)?;
+    let Some(root) = root else {
+        return Ok(Vec::new());
+    };
+    let mut urls = Vec::new();
+    collect_urls_from_element(&root, &mut urls);
+    urls.sort();
+    urls.dedup();
+    Ok(urls)
+}
+
+fn collect_urls_from_element(el: &style::StyledElement, urls: &mut Vec<String>) {
+    // Replaced content (<img src>)
+    if let Some(ref replaced) = el.replaced {
+        if !replaced.src.is_empty() {
+            urls.push(replaced.src.clone());
+        }
+    }
+
+    // Background image URLs
+    for layer in &el.background {
+        if let style::BackgroundLayer::Image(style::StyleImage::Url(url)) = layer {
+            if !url.is_empty() {
+                urls.push(url.clone());
+            }
+        }
+    }
+
+    // Recurse into children
+    for child in &el.children {
+        if let style::StyledNode::Element(child_el) = child {
+            collect_urls_from_element(child_el, urls);
+        }
+    }
 }
 
 /// Convert GFM markdown to a self-contained HTML document with GitHub-flavored CSS.
@@ -86,11 +254,26 @@ mod tests {
         FontRepository::new(Arc::new(Mutex::new(ByteStore::new())))
     }
 
+    /// Test helper: render with no image provider.
+    fn test_render(
+        html: &str,
+        width: f32,
+        height: f32,
+        fonts: &FontRepository,
+    ) -> Result<skia_safe::Picture, String> {
+        render(html, width, height, fonts, &NoImages)
+    }
+
+    /// Test helper: measure with no image provider.
+    fn test_measure(html: &str, width: f32, fonts: &FontRepository) -> Result<f32, String> {
+        measure_content_height(html, width, fonts, &NoImages)
+    }
+
     #[test]
     fn test_render_empty() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render("", 400.0, 300.0, &fonts);
+        let pic = test_render("", 400.0, 300.0, &fonts);
         assert!(pic.is_ok());
     }
 
@@ -98,7 +281,7 @@ mod tests {
     fn test_render_heading() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render("<h1>Hello</h1>", 400.0, 300.0, &fonts).unwrap();
+        let pic = test_render("<h1>Hello</h1>", 400.0, 300.0, &fonts).unwrap();
         assert!(pic.cull_rect().width() > 0.0);
     }
 
@@ -106,7 +289,7 @@ mod tests {
     fn test_render_with_style_block() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             "<style>h1 { color: blue }</style><h1>Blue</h1>",
             400.0,
             300.0,
@@ -119,7 +302,7 @@ mod tests {
     fn test_render_table() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             "<table><tr><td>A</td><td>B</td></tr></table>",
             600.0,
             300.0,
@@ -132,7 +315,7 @@ mod tests {
     fn test_render_flex() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="display:flex;gap:10px"><div>A</div><div>B</div></div>"#,
             400.0,
             300.0,
@@ -173,7 +356,7 @@ mod tests {
         );
 
         // Check layout produces side-by-side boxes
-        let layout_root = layout::compute_layout(&root, 400.0, &fonts);
+        let layout_root = layout::compute_layout(&root, 400.0, &fonts, &NoImages);
         fn find_grid_layout<'a>(
             lb: &'a layout::LayoutBox<'a>,
         ) -> Option<&'a layout::LayoutBox<'a>> {
@@ -219,7 +402,7 @@ mod tests {
     fn test_render_grid_basic() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="display:grid;grid-template-columns:100px 100px 100px;gap:8px">
                 <div>A</div><div>B</div><div>C</div>
             </div>"#,
@@ -234,7 +417,7 @@ mod tests {
     fn test_render_grid_fr() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="display:grid;grid-template-columns:1fr 2fr 1fr">
                 <div>1fr</div><div>2fr</div><div>1fr</div>
             </div>"#,
@@ -249,7 +432,7 @@ mod tests {
     fn test_render_grid_repeat() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
                 <div>1</div><div>2</div><div>3</div><div>4</div>
             </div>"#,
@@ -264,7 +447,7 @@ mod tests {
     fn test_render_grid_span() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
                 <div style="grid-column:span 2">wide</div>
                 <div>1x1</div>
@@ -281,7 +464,7 @@ mod tests {
     fn test_render_grid_auto_flow_dense() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-flow:dense;gap:4px">
                 <div style="grid-column:span 2">wide</div>
                 <div>a</div>
@@ -299,7 +482,7 @@ mod tests {
     fn test_render_box_shadow_outer() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="width:100px;height:80px;box-shadow:4px 4px 8px rgba(0,0,0,0.5)">shadow</div>"#,
             300.0,
             200.0,
@@ -312,7 +495,7 @@ mod tests {
     fn test_render_box_shadow_inset() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="width:100px;height:80px;box-shadow:inset 0 2px 8px rgba(0,0,0,0.6)">inset</div>"#,
             300.0,
             200.0,
@@ -325,7 +508,7 @@ mod tests {
     fn test_render_box_shadow_combined() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="width:100px;height:80px;box-shadow:0 4px 12px rgba(0,0,0,0.4),inset 0 1px 4px rgba(0,0,0,0.1)">both</div>"#,
             300.0,
             200.0,
@@ -369,7 +552,7 @@ mod tests {
     fn test_render_opacity() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<div style="opacity:0.5"><p>Semi-transparent</p></div>"#,
             400.0,
             300.0,
@@ -439,7 +622,7 @@ mod tests {
     fn test_measure_height() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let h = measure_content_height("<p>Hello</p>", 400.0, &fonts).unwrap();
+        let h = test_measure("<p>Hello</p>", 400.0, &fonts).unwrap();
         assert!(h > 0.0, "Content height should be positive, got {h}");
     }
 
@@ -447,7 +630,7 @@ mod tests {
     fn test_head_hidden() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<html><head><style>p{color:red}</style></head><body><p>V</p></body></html>"#,
             400.0,
             300.0,
@@ -465,7 +648,7 @@ mod tests {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = markdown_to_styled_html("# Hello World");
-        let pic = render(&html, 400.0, 300.0, &fonts);
+        let pic = test_render(&html, 400.0, 300.0, &fonts);
         assert!(pic.is_ok(), "Markdown heading should render");
         assert!(pic.unwrap().cull_rect().height() > 0.0);
     }
@@ -493,7 +676,7 @@ code block
 2. Second
 "#;
         let html = markdown_to_styled_html(md);
-        let pic = render(&html, 600.0, 300.0, &fonts);
+        let pic = test_render(&html, 600.0, 300.0, &fonts);
         assert!(pic.is_ok(), "Mixed markdown content should render");
         let h = pic.unwrap().cull_rect().height();
         assert!(
@@ -513,7 +696,7 @@ code block
 | Bob   | 25  | London   |
 "#;
         let html = markdown_to_styled_html(md);
-        let pic = render(&html, 600.0, 300.0, &fonts);
+        let pic = test_render(&html, 600.0, 300.0, &fonts);
         assert!(pic.is_ok(), "Markdown table should render");
     }
 
@@ -522,7 +705,7 @@ code block
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = markdown_to_styled_html("");
-        let pic = render(&html, 400.0, 300.0, &fonts);
+        let pic = test_render(&html, 400.0, 300.0, &fonts);
         assert!(pic.is_ok(), "Empty markdown should render");
     }
 
@@ -719,7 +902,7 @@ code block
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = include_str!("../../../../fixtures/test-html/L0/transform-2d.html");
-        let pic = render(html, 800.0, 600.0, &fonts);
+        let pic = test_render(html, 800.0, 600.0, &fonts);
         assert!(pic.is_ok(), "transform-2d.html should render without error");
     }
 
@@ -728,7 +911,7 @@ code block
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = r#"<div style="width:100px;height:100px;background:#000;transform:rotate(45deg);transform-origin:0% 0%">origin</div>"#;
-        let pic = render(html, 400.0, 300.0, &fonts);
+        let pic = test_render(html, 400.0, 300.0, &fonts);
         assert!(pic.is_ok());
     }
 
@@ -737,7 +920,7 @@ code block
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = include_str!("../../../../fixtures/test-html/L0/transform-origin.html");
-        let pic = render(html, 800.0, 600.0, &fonts);
+        let pic = test_render(html, 800.0, 600.0, &fonts);
         assert!(
             pic.is_ok(),
             "transform-origin.html should render without error"
@@ -749,7 +932,7 @@ code block
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = include_str!("../../../../fixtures/test-html/L0/transform-nested.html");
-        let pic = render(html, 800.0, 600.0, &fonts);
+        let pic = test_render(html, 800.0, 600.0, &fonts);
         assert!(
             pic.is_ok(),
             "transform-nested.html should render without error"
@@ -762,7 +945,7 @@ code block
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = r#"<div style="width:200px;height:50px;background:#000;transform:translateX(50%)">T</div>"#;
-        let pic = render(html, 400.0, 300.0, &fonts);
+        let pic = test_render(html, 400.0, 300.0, &fonts);
         assert!(pic.is_ok());
     }
 
@@ -772,7 +955,7 @@ code block
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
         let html = r#"<div style="width:100px;height:100px;background:#000;transform:rotate(45deg);transform-origin:10px 20px">T</div>"#;
-        let pic = render(html, 400.0, 300.0, &fonts);
+        let pic = test_render(html, 400.0, 300.0, &fonts);
         assert!(pic.is_ok());
     }
 
@@ -800,7 +983,7 @@ code block
         // <input type="submit"> is a PushButton rendered as void element
         // with injected label text. <button> element relies on Stylo UA styles
         // which may not produce layout in servo mode — test with <input> instead.
-        let pic = render(
+        let pic = test_render(
             r#"<input type="submit" value="Click" />"#,
             400.0,
             300.0,
@@ -815,7 +998,7 @@ code block
     fn test_widget_input_text() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<input type="text" placeholder="Name" />"#,
             400.0,
             300.0,
@@ -830,7 +1013,7 @@ code block
     fn test_widget_input_password() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<input type="password" value="secret" />"#,
             400.0,
             300.0,
@@ -843,7 +1026,7 @@ code block
     fn test_widget_checkbox() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<input type="checkbox" /><input type="checkbox" checked />"#,
             400.0,
             300.0,
@@ -856,7 +1039,7 @@ code block
     fn test_widget_radio() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<input type="radio" /><input type="radio" checked />"#,
             400.0,
             300.0,
@@ -869,7 +1052,7 @@ code block
     fn test_widget_select() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<select><option>Apple</option><option selected>Banana</option></select>"#,
             400.0,
             300.0,
@@ -884,7 +1067,7 @@ code block
     fn test_widget_textarea() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<textarea placeholder="Message..."></textarea>"#,
             400.0,
             300.0,
@@ -899,7 +1082,7 @@ code block
     fn test_widget_input_range() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<input type="range" min="0" max="100" value="50" />"#,
             400.0,
             300.0,
@@ -912,7 +1095,7 @@ code block
     fn test_widget_input_color() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r##"<input type="color" value="#ff0000" />"##,
             400.0,
             300.0,
@@ -925,7 +1108,7 @@ code block
     fn test_widget_input_hidden() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<input type="hidden" value="secret" />"#,
             400.0,
             300.0,
@@ -938,7 +1121,7 @@ code block
     fn test_widget_fieldset() {
         let _guard = crate::stylo_test::lock();
         let fonts = test_fonts();
-        let pic = render(
+        let pic = test_render(
             r#"<fieldset><legend>Info</legend><input type="text" /></fieldset>"#,
             400.0,
             300.0,
@@ -966,12 +1149,112 @@ code block
                 <button>Submit</button>
             </form>
         "#;
-        let pic = render(html, 600.0, 400.0, &fonts);
+        let pic = test_render(html, 600.0, 400.0, &fonts);
         assert!(pic.is_ok(), "Mixed form should render");
         let h = pic.unwrap().cull_rect().height();
         assert!(
             h > 50.0,
             "Mixed form should have substantial height, got {h}"
+        );
+    }
+
+    // ── Image element tests ──
+
+    /// Verify <img> is collected as StyledNode::Replaced.
+    #[test]
+    fn test_img_collection() {
+        let _guard = crate::stylo_test::lock();
+        let html =
+            r#"<div><img src="test://photo.jpg" width="200" height="150" alt="A photo" /></div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+
+        fn find_replaced(el: &style::StyledElement) -> Option<&style::ReplacedContent> {
+            if let Some(ref r) = el.replaced {
+                return Some(r);
+            }
+            for child in &el.children {
+                if let style::StyledNode::Element(e) = child {
+                    if let Some(found) = find_replaced(e) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+
+        let replaced =
+            find_replaced(&root).expect("Should find element with replaced content for <img>");
+        assert_eq!(replaced.src, "test://photo.jpg");
+        assert_eq!(replaced.alt.as_deref(), Some("A photo"));
+        assert_eq!(replaced.attr_width, Some(200));
+        assert_eq!(replaced.attr_height, Some(150));
+    }
+
+    /// Verify <img> renders with placeholder (no crash) when no images provided.
+    #[test]
+    fn test_img_render_placeholder() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = test_render(
+            r#"<div><img src="test://missing.png" width="100" height="80" /></div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "<img> with NoImages should render placeholder");
+        let h = pic.unwrap().cull_rect().height();
+        assert!(h > 0.0, "Should have positive height, got {h}");
+    }
+
+    /// Verify collect_image_urls extracts correct URLs.
+    #[test]
+    fn test_collect_image_urls() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div>
+            <img src="photo.jpg" width="100" height="80" />
+            <div style="background-image:url('bg.png')"></div>
+        </div>"#;
+        let urls = collect_image_urls(html).unwrap();
+        println!("collected URLs: {:?}", urls);
+        assert!(
+            urls.contains(&"photo.jpg".to_string()),
+            "Should find img src, got {:?}",
+            urls
+        );
+        // Note: background-image url() goes through Stylo ComputedUrl resolution.
+        // With no base URL, Stylo may resolve "bg.png" to an absolute URL.
+        // The img src is from raw HTML attributes and is preserved as-is.
+    }
+
+    /// Verify images render when PreloadedImages has the data.
+    #[test]
+    fn test_img_render_with_provider() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+
+        let png_bytes = include_bytes!("../../../../fixtures/images/checker.png");
+        let mut images = PreloadedImages::new();
+        images.insert_bytes("photo.jpg".to_string(), png_bytes);
+
+        let html = r#"<div><img src="photo.jpg" width="50" height="50" /></div>"#;
+        let pic = render(html, 400.0, 300.0, &fonts, &images);
+        assert!(pic.is_ok(), "Should render with image provider");
+    }
+
+    /// Verify background-image: url() doesn't crash with NoImages.
+    #[test]
+    fn test_background_image_url_placeholder() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = test_render(
+            r#"<div style="width:200px;height:100px;background-image:url('test://bg.png')">content</div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(
+            pic.is_ok(),
+            "background-image url with NoImages should render"
         );
     }
 }

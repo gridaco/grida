@@ -85,6 +85,23 @@ impl ImageRepository {
             .map(|img| (img.width() as u32, img.height() as u32))
     }
 
+    /// Insert a decoded image directly from bytes, keyed by an arbitrary URL string.
+    ///
+    /// Unlike [`insert()`] which reads from `ByteStore` by hash, this decodes
+    /// the image inline. Useful for HTML embed images where the key is a
+    /// relative path or HTTP URL, not a `res://` RID.
+    pub fn insert_bytes(&mut self, src: String, bytes: &[u8]) -> Option<(u32, u32)> {
+        let data = skia_safe::Data::new_copy(bytes);
+        let image = Image::from_encoded(data)?;
+        let width = image.width() as u32;
+        let height = image.height() as u32;
+        let mipmapped = image.with_default_mipmaps().unwrap_or(image);
+        self.images.insert(src.clone(), mipmapped);
+        self.missing_refs.borrow_mut().remove(&src);
+        self.reported_refs.remove(&src);
+        Some((width, height))
+    }
+
     /// Removes an image from the repository by its source URL.
     pub fn remove(&mut self, src: &str) -> Option<Image> {
         self.images.remove(src)
@@ -116,5 +133,17 @@ impl ImageRepository {
     pub fn clear_missing_tracking(&mut self) {
         self.missing_refs.borrow_mut().clear();
         self.reported_refs.clear();
+    }
+}
+
+// ─── ImageProvider adapter ──────────────────────────────────────────
+
+impl crate::htmlcss::ImageProvider for ImageRepository {
+    fn get(&self, url: &str) -> Option<&skia_safe::Image> {
+        self.get(url)
+    }
+
+    fn get_size(&self, url: &str) -> Option<(u32, u32)> {
+        self.get_size(url)
     }
 }

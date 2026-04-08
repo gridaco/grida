@@ -201,6 +201,7 @@ impl EditorDocument {
                                 &html,
                                 actual_w,
                                 &app.renderer().fonts,
+                                &cg::htmlcss::NoImages,
                             )
                             .ok()
                         }
@@ -208,6 +209,7 @@ impl EditorDocument {
                             &n.html,
                             actual_w,
                             &app.renderer().fonts,
+                            &cg::htmlcss::NoImages,
                         )
                         .ok(),
                         _ => None,

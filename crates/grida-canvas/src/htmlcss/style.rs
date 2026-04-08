@@ -54,7 +54,7 @@ pub struct StyledElement {
     /// Background layers, bottom-to-top. May include solid color and/or gradients.
     pub background: Vec<BackgroundLayer>,
     pub border_radius: CornerRadii,
-    // TODO: background-image (url), background-position, background-size, background-repeat
+    // TODO: background-position, background-size, background-repeat
 
     // ── Text / Font (StyleInheritedData — inherited through tree) ──
     pub color: CGColor,
@@ -114,6 +114,11 @@ pub struct StyledElement {
     /// non-widget elements.
     pub widget: WidgetAppearance,
 
+    // ── Replaced content (<img>) ──
+    /// For replaced elements (`<img>`), the external content reference.
+    /// `None` for normal elements.
+    pub replaced: Option<ReplacedContent>,
+
     // ── Children ──
     pub children: Vec<StyledNode>,
 }
@@ -128,6 +133,29 @@ pub enum StyledNode {
     /// paragraph. Each run carries its own font/color — mapped to Skia
     /// ParagraphBuilder push_style/pop per run.
     InlineGroup(InlineGroup),
+}
+
+/// Content of a replaced element (Chromium: `LayoutReplaced`).
+///
+/// Replaced elements have intrinsic dimensions from their content, not
+/// from CSS. The `src` URL is resolved via `ImageProvider` at paint time.
+///
+/// Intrinsic size resolution order (follows HTML spec):
+/// 1. Decoded image dimensions (from `ImageProvider::get_size()`)
+/// 2. HTML `width`/`height` attributes
+/// 3. Default 300×150 (HTML spec fallback for replaced elements)
+#[derive(Debug, Clone)]
+pub struct ReplacedContent {
+    /// Image source URL (from HTML `src` attribute).
+    pub src: String,
+    /// Alt text for placeholder display when image is unavailable.
+    pub alt: Option<String>,
+    /// Intrinsic width hint from HTML `width` attribute.
+    pub attr_width: Option<u32>,
+    /// Intrinsic height hint from HTML `height` attribute.
+    pub attr_height: Option<u32>,
+    /// CSS `object-fit` — how the image content fits its box.
+    pub object_fit: super::types::ObjectFit,
 }
 
 /// Consecutive inline items merged into a single paragraph.
@@ -281,13 +309,38 @@ pub struct BoxShadow {
 
 // ─── Background Sub-types (StyleBackgroundData) ─────────────────────
 
-/// A single background layer — solid color or gradient.
+/// A CSS image value — polymorphic like Chromium's `StyleImage`.
+///
+/// Gradients are always synchronous (generated at paint time from parameters).
+/// URL images are resolved lazily via `ImageProvider` at paint time.
+///
+/// Chromium: `StyleImage` base class with subclasses `StyleFetchedImage`
+/// (URL-referenced), `StyleGeneratedImage` (gradients), `StylePendingImage`.
+#[derive(Debug, Clone)]
+pub enum StyleImage {
+    /// `url("...")` — resolved at paint time via `ImageProvider`.
+    /// Chromium: `StyleFetchedImage` wrapping `ImageResourceContent`.
+    Url(String),
+    /// `linear-gradient(...)` — generated at paint time from parameters.
+    LinearGradient(LinearGradient),
+    /// `radial-gradient(...)` — generated at paint time from parameters.
+    RadialGradient(RadialGradient),
+    /// `conic-gradient(...)` — generated at paint time from parameters.
+    ConicGradient(ConicGradient),
+}
+
+/// A single background layer — solid color or image.
+///
+/// Mirrors Chromium's `FillLayer` which stores a `StyleImage*` for any
+/// background layer type (gradient, url, or none) plus a separate color
+/// slot. Our representation flattens this into a two-variant enum.
 #[derive(Debug, Clone)]
 pub enum BackgroundLayer {
+    /// Solid color fill (CSS `background-color`).
     Solid(CGColor),
-    LinearGradient(LinearGradient),
-    RadialGradient(RadialGradient),
-    ConicGradient(ConicGradient),
+    /// Image layer: gradient or URL-referenced image.
+    /// Chromium: `FillLayer::image_` field holding a `StyleImage*`.
+    Image(StyleImage),
 }
 
 /// CSS `linear-gradient()`.
@@ -561,6 +614,7 @@ impl Default for StyledElement {
             grid_row_start: GridPlacement::default(),
             grid_row_end: GridPlacement::default(),
             widget: WidgetAppearance::default(),
+            replaced: None,
             children: Vec::new(),
         }
     }

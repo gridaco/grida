@@ -38,6 +38,7 @@ material when designing rendering systems that face similar problems.
 | [node-data-layout.md](./node-data-layout.md)                                           | Node data layout: DOM RareData, compositor property trees, ECS comparison                          |
 | [svg-pattern.md](./svg-pattern.md)                                                     | SVG `<pattern>` paint server semantics, Chromium/resvg/Skia comparison                             |
 | [blink-rendering-pipeline.md](./blink-rendering-pipeline.md)                           | Blink Style → Layout → Paint pipeline, ComputedStyle groups, LayoutNG, inline layout, list markers |
+| [external-resource-loading.md](./external-resource-loading.md)                         | Resource fetch lifecycle, ImageResource observer pattern, CSS background-image/img loading pipeline |
 
 ## Source locations
 

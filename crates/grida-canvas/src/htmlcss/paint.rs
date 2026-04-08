@@ -16,9 +16,11 @@ use skia_safe::{Canvas, ClipOp, Color, Paint, PaintStyle, PictureRecorder, Rect}
 use super::layout::{build_skia_text_style, LayoutBox, LayoutNode};
 use super::style::{
     BackgroundLayer, BorderSide, ConicGradient, GradientStop, InlineBoxDecoration, InlineGroup,
-    InlineRunItem, LinearGradient, RadialGradient, StyledElement, TextRun, WidgetAppearance,
+    InlineRunItem, LinearGradient, RadialGradient, StyleImage, StyledElement, TextRun,
+    WidgetAppearance,
 };
 use super::types;
+use super::ImageProvider;
 
 /// Paint a `LayoutBox` tree into a Skia `Picture`.
 pub fn paint_to_picture(
@@ -26,13 +28,14 @@ pub fn paint_to_picture(
     width: f32,
     height: f32,
     fonts: &FontRepository,
+    images: &dyn ImageProvider,
 ) -> skia_safe::Picture {
     let font_collection = fonts.font_collection();
     let mut recorder = PictureRecorder::new();
     let bounds = Rect::from_wh(width, height.max(1.0));
     let canvas = recorder.begin_recording(bounds, false);
 
-    paint_box(canvas, root, font_collection);
+    paint_box(canvas, root, font_collection, images);
 
     // Marker rect so Skia preserves the cull rect
     {
@@ -49,7 +52,12 @@ pub fn paint_to_picture(
 
 // ─── Recursive box painter (Chromium: BoxFragmentPainter) ────────────
 
-fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
+fn paint_box(
+    canvas: &Canvas,
+    layout: &LayoutBox,
+    fonts: &FontCollection,
+    images: &dyn ImageProvider,
+) {
     let style = layout.style;
 
     // Visibility check (Chromium: early return in PaintObject)
@@ -113,15 +121,30 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
     // Widget background painted first so CSS background/border can override.
     paint_widget_background(canvas, style, w, h);
     paint_box_shadow_outer(canvas, style, w, h);
-    paint_background(canvas, style, w, h);
+    paint_background(canvas, style, w, h, images);
     paint_borders(canvas, style, w, h);
     paint_box_shadow_inset(canvas, style, w, h);
+
+    // ── Phase 1.5: Replaced content (<img>) ──
+    // Replaced elements paint their image content instead of children.
+    if let Some(ref replaced) = style.replaced {
+        paint_replaced(
+            canvas,
+            replaced,
+            0.0,
+            0.0,
+            w,
+            h,
+            &style.border_radius,
+            images,
+        );
+    }
 
     // ── Phase 2: Children (Chromium: kForeground for inlines, recurse for blocks) ──
     for child in &layout.children {
         match child {
             LayoutNode::Box(child_box) => {
-                paint_box(canvas, child_box, fonts);
+                paint_box(canvas, child_box, fonts, images);
             }
             LayoutNode::Text {
                 run,
@@ -207,7 +230,13 @@ fn mat_mul(a: [f32; 6], b: [f32; 6]) -> [f32; 6] {
 
 // ─── Background painting (Chromium: BoxPainterBase::PaintFillLayers) ──
 
-fn paint_background(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
+fn paint_background(
+    canvas: &Canvas,
+    style: &StyledElement,
+    w: f32,
+    h: f32,
+    images: &dyn ImageProvider,
+) {
     if style.background.is_empty() {
         return;
     }
@@ -227,25 +256,52 @@ fn paint_background(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
                 }
                 paint.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
             }
-            BackgroundLayer::LinearGradient(grad) => {
-                if let Some(shader) = build_linear_gradient_shader(grad, w, h) {
-                    paint.set_shader(shader);
-                } else {
-                    continue;
-                }
-            }
-            BackgroundLayer::RadialGradient(grad) => {
-                if let Some(shader) = build_radial_gradient_shader(grad, w, h) {
-                    paint.set_shader(shader);
-                } else {
-                    continue;
-                }
-            }
-            BackgroundLayer::ConicGradient(grad) => {
-                if let Some(shader) = build_conic_gradient_shader(grad, w, h) {
-                    paint.set_shader(shader);
-                } else {
-                    continue;
+            BackgroundLayer::Image(style_image) => {
+                match style_image {
+                    StyleImage::LinearGradient(grad) => {
+                        if let Some(shader) = build_linear_gradient_shader(grad, w, h) {
+                            paint.set_shader(shader);
+                        } else {
+                            continue;
+                        }
+                    }
+                    StyleImage::RadialGradient(grad) => {
+                        if let Some(shader) = build_radial_gradient_shader(grad, w, h) {
+                            paint.set_shader(shader);
+                        } else {
+                            continue;
+                        }
+                    }
+                    StyleImage::ConicGradient(grad) => {
+                        if let Some(shader) = build_conic_gradient_shader(grad, w, h) {
+                            paint.set_shader(shader);
+                        } else {
+                            continue;
+                        }
+                    }
+                    StyleImage::Url(url) => {
+                        if let Some(image) = images.get(url) {
+                            // Default: stretch image to fill the background area.
+                            // TODO: background-size, background-position, background-repeat
+                            let src_rect =
+                                Rect::from_wh(image.width() as f32, image.height() as f32);
+                            canvas.save();
+                            if !r.is_zero() {
+                                let mut rrect = skia_safe::RRect::new();
+                                rrect.set_rect_radii(rect, &r.to_skia_radii());
+                                canvas.clip_rrect(rrect, ClipOp::Intersect, true);
+                            }
+                            canvas.draw_image_rect(
+                                image,
+                                Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
+                                rect,
+                                &paint,
+                            );
+                            canvas.restore();
+                        }
+                        // Missing image: skip layer (non-blocking)
+                        continue;
+                    }
                 }
             }
         }
@@ -258,6 +314,82 @@ fn paint_background(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
             canvas.draw_rrect(rrect, &paint);
         }
     }
+}
+
+// ─── Replaced element painting (Chromium: ReplacedPainter) ──────────
+
+/// Paint a replaced element (`<img>`).
+///
+/// If the image is available via `ImageProvider`, it is drawn with
+/// `object-fit` semantics. If unavailable, a placeholder is painted.
+fn paint_replaced(
+    canvas: &Canvas,
+    content: &super::style::ReplacedContent,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    border_radius: &super::style::CornerRadii,
+    images: &dyn ImageProvider,
+) {
+    canvas.save();
+    canvas.translate((x, y));
+
+    let dest_rect = Rect::from_xywh(0.0, 0.0, w, h);
+
+    // Clip to the element's content box. Replaced elements never paint
+    // outside their box (object-fit: none/cover can produce oversized dst
+    // rects that must be clipped). Border-radius further refines this.
+    if !border_radius.is_zero() {
+        let mut rrect = skia_safe::RRect::new();
+        rrect.set_rect_radii(dest_rect, &border_radius.to_skia_radii());
+        canvas.clip_rrect(rrect, ClipOp::Intersect, true);
+    } else {
+        canvas.clip_rect(dest_rect, ClipOp::Intersect, true);
+    }
+
+    if let Some(image) = images.get(&content.src) {
+        let img_w = image.width() as f32;
+        let img_h = image.height() as f32;
+
+        let box_fit = content.object_fit.to_box_fit(img_w, img_h, w, h);
+        let t = box_fit.calculate_transform((img_w, img_h), (w, h));
+
+        let paint = Paint::default();
+        canvas.save();
+        canvas.concat(&skia_safe::Matrix::new_all(
+            t.matrix[0][0],
+            t.matrix[0][1],
+            t.matrix[0][2],
+            t.matrix[1][0],
+            t.matrix[1][1],
+            t.matrix[1][2],
+            0.0,
+            0.0,
+            1.0,
+        ));
+        canvas.draw_image(image, (0.0, 0.0), Some(&paint));
+        canvas.restore();
+    } else {
+        // Placeholder: light gray rect
+        let mut paint = Paint::default();
+        paint.set_color(Color::from_argb(255, 238, 238, 238));
+        paint.set_style(PaintStyle::Fill);
+        canvas.draw_rect(dest_rect, &paint);
+
+        // Light border
+        let mut border_paint = Paint::default();
+        border_paint.set_color(Color::from_argb(255, 204, 204, 204));
+        border_paint.set_style(PaintStyle::Stroke);
+        border_paint.set_stroke_width(1.0);
+        canvas.draw_rect(dest_rect, &border_paint);
+
+        // NOTE: alt text rendering intentionally omitted — placeholder rect
+        // is preferred for visual consistency. Alt text could be added here
+        // via: if let Some(ref alt) = content.alt { paint_alt_text(...) }
+    }
+
+    canvas.restore();
 }
 
 // ─── Gradient shaders ────────────────────────────────────────────────

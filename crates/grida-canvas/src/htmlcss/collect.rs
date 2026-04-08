@@ -250,6 +250,22 @@ fn collect_element_with_counter(
 
     let is_void_widget = detect_widget(&tag, node_data, dom, &mut el);
 
+    // Extract object-fit from Stylo for replaced elements (<img>)
+    if el.replaced.is_some() {
+        use style::properties::longhands::object_fit::computed_value::T as StyloObjectFit;
+        let of = style.get_position().clone_object_fit();
+        let object_fit = match of {
+            StyloObjectFit::Fill => types::ObjectFit::Fill,
+            StyloObjectFit::Contain => types::ObjectFit::Contain,
+            StyloObjectFit::Cover => types::ObjectFit::Cover,
+            StyloObjectFit::None => types::ObjectFit::None,
+            StyloObjectFit::ScaleDown => types::ObjectFit::ScaleDown,
+        };
+        if let Some(ref mut replaced) = el.replaced {
+            replaced.object_fit = object_fit;
+        }
+    }
+
     // Collect children, merging consecutive inline content into InlineGroups
     let mut pending_inline: Vec<InlineRunItem> = Vec::new();
     let parent_text_align = el.font.text_align;
@@ -294,7 +310,7 @@ fn collect_element_with_counter(
                     // for sizing to work — don't flatten them into inline groups.
                     let is_inline = child.display == types::Display::Inline
                         || child.display == types::Display::InlineBlock;
-                    if is_inline && !child.widget.is_widget() {
+                    if is_inline && !child.widget.is_widget() && child.replaced.is_none() {
                         collect_inline_items(&child, &mut pending_inline);
                     } else {
                         flush_inline_group(
@@ -328,10 +344,44 @@ const PLACEHOLDER_COLOR: CGColor = CGColor {
 
 /// Detect form control elements and populate `StyledElement::widget`.
 ///
+// ─── Replaced element (<img>) detection ────────────────────────────
+
+/// Extract `<img>` attributes into a `ReplacedContent`.
+///
+/// Follows the HTML spec for replaced elements:
+/// - `src` — image URL
+/// - `alt` — alternative text (for placeholder display)
+/// - `width`/`height` — intrinsic size hints
+fn detect_img_element(node: &DemoNode) -> ReplacedContent {
+    let src = get_element_attr(node, "src").unwrap_or_default();
+    let alt = get_element_attr(node, "alt");
+    let attr_width = get_element_attr(node, "width").and_then(|s| s.parse::<u32>().ok());
+    let attr_height = get_element_attr(node, "height").and_then(|s| s.parse::<u32>().ok());
+
+    ReplacedContent {
+        src,
+        alt,
+        attr_width,
+        attr_height,
+        object_fit: types::ObjectFit::Fill, // HTML spec default for <img>
+    }
+}
+
+// ─── Widget (form control) detection ────────────────────────────────
+
 /// Returns `true` for void elements (like `<input>`) whose DOM children
 /// should be skipped.
 fn detect_widget(tag: &str, node_data: &DemoNode, dom: &DemoDom, el: &mut StyledElement) -> bool {
     match tag {
+        "img" => {
+            el.replaced = Some(detect_img_element(node_data));
+            // <img> is a replaced inline element — force inline-block so it
+            // gets its own Taffy node (not merged into InlineGroup).
+            if el.display == types::Display::Inline {
+                el.display = types::Display::InlineBlock;
+            }
+            true // <img> is a void element
+        }
         "input" => {
             detect_input_widget(node_data, el);
             true // <input> is a void element
@@ -1121,10 +1171,10 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
         }
     }
 
-    // 2. Background image layers (gradients on top)
+    // 2. Background image layers (gradients and URL images on top)
     for image in bg.background_image.0.iter() {
-        if let GenericImage::Gradient(gradient) = image {
-            match gradient.as_ref() {
+        match image {
+            GenericImage::Gradient(gradient) => match gradient.as_ref() {
                 GenericGradient::Linear {
                     direction, items, ..
                 } => {
@@ -1133,25 +1183,47 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
                         continue;
                     }
                     let angle_deg = extract_gradient_angle(direction);
-                    layers.push(BackgroundLayer::LinearGradient(LinearGradient {
-                        angle_deg,
-                        stops,
-                    }));
+                    layers.push(BackgroundLayer::Image(StyleImage::LinearGradient(
+                        LinearGradient { angle_deg, stops },
+                    )));
                 }
                 GenericGradient::Radial { items, .. } => {
                     let stops = gradient_items_to_stops(items);
                     if stops.is_empty() {
                         continue;
                     }
-                    layers.push(BackgroundLayer::RadialGradient(RadialGradient { stops }));
+                    layers.push(BackgroundLayer::Image(StyleImage::RadialGradient(
+                        RadialGradient { stops },
+                    )));
                 }
                 GenericGradient::Conic { items, .. } => {
                     let stops = conic_gradient_items_to_stops(items);
                     if stops.is_empty() {
                         continue;
                     }
-                    layers.push(BackgroundLayer::ConicGradient(ConicGradient { stops }));
+                    layers.push(BackgroundLayer::Image(StyleImage::ConicGradient(
+                        ConicGradient { stops },
+                    )));
                 }
+            },
+            GenericImage::Url(computed_url) => {
+                // Extract URL string from Stylo's ComputedUrl.
+                // ComputedUrl::Valid(Arc<Url>) — resolved absolute URL
+                // ComputedUrl::Invalid(Arc<String>) — unresolved (no base URL)
+                //
+                // Our HTML has no document base URL, so relative URLs like
+                // "bg.png" become ComputedUrl::Invalid. We accept both forms.
+                use style::values::computed::url::ComputedUrl;
+                let url_str = match computed_url {
+                    ComputedUrl::Valid(url) => url.as_str().to_string(),
+                    ComputedUrl::Invalid(s) => s.to_string(),
+                };
+                if !url_str.is_empty() {
+                    layers.push(BackgroundLayer::Image(StyleImage::Url(url_str)));
+                }
+            }
+            _ => {
+                // Other image types (e.g. element(), image-set()) — skip
             }
         }
     }

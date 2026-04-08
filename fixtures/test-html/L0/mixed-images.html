@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mixed: Images — Local and Remote</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      /* Card with background-image hero + img avatar */
+      .card {
+        width: 240px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .card-hero {
+        width: 240px;
+        height: 120px;
+        background-size: cover;
+        background-position: center;
+      }
+      .card-body {
+        padding: 12px;
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        align-items: center;
+      }
+      .card-avatar {
+        border-radius: 50%;
+      }
+      .card-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .card-title {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .card-desc {
+        font-size: 12px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <!-- Card 1: local images -->
+      <div class="card">
+        <div
+          class="card-hero"
+          style="background-image: url('../../images/stripes.png')"
+        ></div>
+        <div class="card-body">
+          <img
+            class="card-avatar"
+            src="../../images/checker.png"
+            width="32"
+            height="32"
+            alt="avatar"
+          />
+          <div class="card-text">
+            <div class="card-title">Local Images</div>
+            <div class="card-desc">checker.png + stripes.png</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: remote images -->
+      <div class="card">
+        <div
+          class="card-hero"
+          style="
+            background-image: url('https://picsum.photos/id/1015/240/120');
+          "
+        ></div>
+        <div class="card-body">
+          <img
+            class="card-avatar"
+            src="https://picsum.photos/id/64/32/32"
+            width="32"
+            height="32"
+            alt="avatar"
+          />
+          <div class="card-text">
+            <div class="card-title">Remote Images</div>
+            <div class="card-desc">picsum.photos HTTPS</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: mixed local bg + remote img -->
+      <div class="card">
+        <div
+          class="card-hero"
+          style="background-image: url('../../images/checker.png')"
+        ></div>
+        <div class="card-body">
+          <img
+            class="card-avatar"
+            src="https://picsum.photos/id/433/32/32"
+            width="32"
+            height="32"
+            alt="avatar"
+          />
+          <div class="card-text">
+            <div class="card-title">Mixed Sources</div>
+            <div class="card-desc">local bg + remote avatar</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: missing images (placeholder behavior) -->
+      <div class="card">
+        <div
+          class="card-hero"
+          style="
+            background-image: url('missing-hero.jpg');
+            background-color: #f0f0f0;
+          "
+        ></div>
+        <div class="card-body">
+          <img
+            class="card-avatar"
+            src="missing-avatar.jpg"
+            width="32"
+            height="32"
+            alt="missing"
+          />
+          <div class="card-text">
+            <div class="card-title">Missing Images</div>
+            <div class="card-desc">placeholder fallback</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1403,8 +1403,19 @@ impl UnknownTargetApplication {
     fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
-            let (hash, url, _, _, _) = self.renderer.add_image(&msg.data);
-            println!("📝 Registered image with renderer: {} ({})", hash, url);
+            if msg.src.starts_with("res://")
+                || msg.src.starts_with("system://")
+                || msg.src.is_empty()
+            {
+                // Standard canvas image: hash bytes → res:// RID
+                let (hash, url, _, _, _) = self.renderer.add_image(&msg.data);
+                println!("📝 Registered image with renderer: {} ({})", hash, url);
+            } else {
+                // HTML embed image: URL key (relative path, http://, etc.)
+                if let Some((w, h)) = self.renderer.add_image_by_url(&msg.src, &msg.data) {
+                    println!("📝 Registered HTML image: {} ({}x{})", msg.src, w, h);
+                }
+            }
             updated = true;
         }
         if updated {
