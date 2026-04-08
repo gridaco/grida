@@ -16,7 +16,7 @@ This package is the Next.js app that powers **`grida.co`** and tenant domains (e
   - `components/` should remain route-agnostic and override-friendly (see [`components/AGENTS.md`](components/AGENTS.md))
   - `kits/` are stateful “drop-in widgets” that must not couple to global editor/workbench state (see [`kits/AGENTS.md`](kits/AGENTS.md))
   - `scaffolds/` are feature assemblies and may bind to global/editor state
-- **Stable public asset URLs**: put canonical assets under `public/` (e.g. `/brand/...png`) when you need a durable, crawlable, cache-friendly path. (If you care about image search quirks, see [`app/(www)/SEO.md`](<app/(www)/SEO.md>).)
+- **Stable public asset URLs**: put canonical assets under `public/` (e.g. `/brand/...png`) when you need a durable, crawlable, cache-friendly path. (If you care about image search quirks, use the repo [`SEO skill`](../.agents/skills/seo/SKILL.md).)
 
 ## Multi-tenancy (host-based tenant routing)
 
@@ -63,7 +63,7 @@ Tenant sites are primarily accessed via **tenant domains** (e.g. `xyz.grida.site
 | `(tools)`     | Standalone tools                                       | —                                                    | Tools live under `app/(tools)/tools/*`. Some tools include a local `AGENTS.md` (example: [`halftone`](<app/(tools)/tools/halftone/AGENTS.md>)).                                 |
 | `(preview)`   | Embed/preview surfaces                                 | —                                                    | Read-only previews and embed-purpose routes (often consumed by tools/playground).                                                                                               |
 | `(library)`   | Library (open assets) pages                            | —                                                    | Library browsing/marketing routes.                                                                                                                                              |
-| `(www)`       | Public marketing / SEO pages                           | [`app/(www)/SEO.md`](<app/(www)/SEO.md>)             | Public `grida.co` landing pages and SEO-first routes.                                                                                                                           |
+| `(www)`       | Public marketing / SEO pages                           | [`SEO skill`](../.agents/skills/seo/SKILL.md)        | Public `grida.co` landing pages and SEO-first routes.                                                                                                                           |
 | `(site)`      | Public pages not SEO-first                             | —                                                    | Public routes that aren’t primarily marketing/SEO.                                                                                                                              |
 | `(insiders)`  | Insider/local-only routes                              | —                                                    | Local-only/internal tooling and flows. Don’t depend on these for production UX.                                                                                                 |
 | `(canvas)`    | Canvas playground & dev tools                          | —                                                    | Canvas playground, examples, experimental canvas features, and canvas-specific dev tools (e.g. I/O, AI).                                                                        |
