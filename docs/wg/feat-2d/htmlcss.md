@@ -181,7 +181,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | CSS Property              | Status | Notes                               |
 | ------------------------- | ------ | ----------------------------------- |
 | `background-color`        | ✅     | Solid color with border-radius      |
-| `background-image: url()` | ✅     | Via `ImageProvider` trait            |
+| `background-image: url()` | ✅     | Via `ImageProvider` trait           |
 | `linear-gradient()`       | ✅     | All directions + angles, multi-stop |
 | `radial-gradient()`       | ✅     | Circle/ellipse                      |
 | `conic-gradient()`        | ✅     | Sweep gradient                      |
@@ -493,13 +493,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Image Rendering
 
-| CSS Property        | Status | Notes                                  |
-| ------------------- | ------ | -------------------------------------- |
-| `image-rendering`   | ❌     |                                        |
-| `image-orientation` | ❌     |                                        |
-| `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown  |
-| `object-position`   | ❌     |                                        |
-| `object-view-box`   | ❌     |                                        |
+| CSS Property        | Status | Notes                                 |
+| ------------------- | ------ | ------------------------------------- |
+| `image-rendering`   | ❌     |                                       |
+| `image-orientation` | ❌     |                                       |
+| `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown |
+| `object-position`   | ❌     |                                       |
+| `object-view-box`   | ❌     |                                       |
 
 ### Shape (Floats)
 
@@ -539,11 +539,11 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Replaced Elements
 
-| CSS Property          | Status | Notes                                              |
-| --------------------- | ------ | -------------------------------------------------- |
-| `<img>` rendering     | ✅     | Via `ImageProvider` trait; placeholder if missing   |
-| `object-fit`          | ✅     | Fill, Contain, Cover, None, ScaleDown              |
-| `<video>`, `<canvas>` | ❌     |                                                    |
+| CSS Property          | Status | Notes                                             |
+| --------------------- | ------ | ------------------------------------------------- |
+| `<img>` rendering     | ✅     | Via `ImageProvider` trait; placeholder if missing |
+| `object-fit`          | ✅     | Fill, Contain, Cover, None, ScaleDown             |
+| `<video>`, `<canvas>` | ❌     |                                                   |
 
 ### Interaction & UI
 
@@ -617,11 +617,13 @@ and `CloseBox` inject Skia placeholders that consume inline space matching
 ### Image loading (ImageProvider trait)
 
 Images (`<img src>`, `background-image: url()`) are resolved via a host-provided
-`ImageProvider` trait. The pipeline never blocks on image loads — missing images
-render as placeholders. This mirrors Chromium's non-blocking resource loading
-pattern (see `docs/wg/research/chromium/external-resource-loading.md`).
+`ImageProvider` trait. The pipeline never blocks on image loads — missing `<img>`
+elements render as placeholder rects, while missing `background-image` layers are
+silently skipped. This mirrors Chromium's non-blocking resource loading pattern
+(see `docs/wg/research/chromium/external-resource-loading.md`).
 
 Three use cases:
+
 - **Pre-resolved (CLI):** Host loads images before calling `render()`. Pass a
   `HashMap<String, Image>` wrapper as the provider.
 - **Async drain (WASM):** Render with `NoImages` → inspect output → host fetches

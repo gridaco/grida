@@ -44,13 +44,13 @@ ImageResource decodes to `blink::Image`, FontResource to font data).
 kNotStarted → kPending → kCached | kLoadError | kDecodeError
 ```
 
-| State           | Meaning                                   |
-| --------------- | ----------------------------------------- |
-| `kNotStarted`   | Resource created but fetch not initiated  |
-| `kPending`      | Fetch in progress (network or cache)      |
-| `kCached`       | Successfully loaded and decoded           |
-| `kLoadError`    | Network error (404, timeout, CORS)        |
-| `kDecodeError`  | Data arrived but decode failed            |
+| State          | Meaning                                  |
+| -------------- | ---------------------------------------- |
+| `kNotStarted`  | Resource created but fetch not initiated |
+| `kPending`     | Fetch in progress (network or cache)     |
+| `kCached`      | Successfully loaded and decoded          |
+| `kLoadError`   | Network error (404, timeout, CORS)       |
+| `kDecodeError` | Data arrived but decode failed           |
 
 Additional transitions exist for multipart images (progressive JPEG,
 animated GIF) and cache revalidation (304 responses).
@@ -92,6 +92,7 @@ Document
 ```
 
 Flow:
+
 1. Consumer calls `ResourceFetcher::RequestResource(FetchParams)`
 2. Fetcher checks MemoryCache (keyed by URL + request headers)
 3. Cache hit → return existing Resource (may still be loading)
@@ -104,13 +105,13 @@ Source: `third_party/blink/renderer/platform/loader/fetch/resource_fetcher.cc`
 
 Resources are prioritized by type and document position:
 
-| Priority | Resource Types                              |
-| -------- | ------------------------------------------- |
-| Highest  | Main document, critical CSS                 |
-| High     | Visible images, preloaded resources         |
-| Medium   | Scripts, fonts                              |
-| Low      | Below-fold images, prefetch                 |
-| Lowest   | Speculative preload, favicon                |
+| Priority | Resource Types                      |
+| -------- | ----------------------------------- |
+| Highest  | Main document, critical CSS         |
+| High     | Visible images, preloaded resources |
+| Medium   | Scripts, fonts                      |
+| Low      | Below-fold images, prefetch         |
+| Lowest   | Speculative preload, favicon        |
 
 `ResourceLoadScheduler` enforces per-host connection limits and
 priority queuing.
@@ -156,12 +157,12 @@ Source: `third_party/blink/renderer/core/loader/resource/image_resource_observer
 
 ### Who Observes Images?
 
-| Observer              | Trigger Source                   | Action on Notify               |
-| --------------------- | -------------------------------- | ------------------------------ |
-| `ImageLoader`         | `<img>` element                  | Invalidate layout + paint      |
-| `StyleFetchedImage`   | CSS `background-image: url()`    | Invalidate paint (no relayout) |
-| `CSSImageValue`       | CSS `border-image-source`        | Invalidate paint               |
-| `LayoutImage`         | `<img>` layout object            | Invalidate intrinsic size      |
+| Observer            | Trigger Source                | Action on Notify               |
+| ------------------- | ----------------------------- | ------------------------------ |
+| `ImageLoader`       | `<img>` element               | Invalidate layout + paint      |
+| `StyleFetchedImage` | CSS `background-image: url()` | Invalidate paint (no relayout) |
+| `CSSImageValue`     | CSS `border-image-source`     | Invalidate paint               |
+| `LayoutImage`       | `<img>` layout object         | Invalidate intrinsic size      |
 
 ### CSS background-image Flow
 
@@ -311,19 +312,19 @@ in `ImageRepository` we have its decoded `skia::Image` and can query
 
 ## Source Files
 
-| File | Role |
-| ---- | ---- |
-| `platform/loader/fetch/resource.h` | Abstract Resource base |
-| `platform/loader/fetch/resource_fetcher.cc` | Central fetch coordinator |
-| `platform/loader/fetch/resource_load_scheduler.cc` | Priority queuing |
-| `core/loader/resource/image_resource.h` | Image resource subclass |
-| `core/loader/resource/image_resource_content.h` | Content + observer mgmt |
-| `core/loader/resource/image_resource_observer.h` | Observer interface |
-| `core/loader/image_loader.cc` | `<img>` element loader |
-| `core/style/style_image.h` | CSS image abstraction |
-| `core/style/style_fetched_image.h` | URL-referenced CSS image |
-| `core/style/fill_layer.h` | CSS background layer stack |
-| `core/paint/box_painter_base.cc` | Background/border painting |
-| `core/layout/layout_replaced.cc` | Replaced element sizing |
+| File                                               | Role                       |
+| -------------------------------------------------- | -------------------------- |
+| `platform/loader/fetch/resource.h`                 | Abstract Resource base     |
+| `platform/loader/fetch/resource_fetcher.cc`        | Central fetch coordinator  |
+| `platform/loader/fetch/resource_load_scheduler.cc` | Priority queuing           |
+| `core/loader/resource/image_resource.h`            | Image resource subclass    |
+| `core/loader/resource/image_resource_content.h`    | Content + observer mgmt    |
+| `core/loader/resource/image_resource_observer.h`   | Observer interface         |
+| `core/loader/image_loader.cc`                      | `<img>` element loader     |
+| `core/style/style_image.h`                         | CSS image abstraction      |
+| `core/style/style_fetched_image.h`                 | URL-referenced CSS image   |
+| `core/style/fill_layer.h`                          | CSS background layer stack |
+| `core/paint/box_painter_base.cc`                   | Background/border painting |
+| `core/layout/layout_replaced.cc`                   | Replaced element sizing    |
 
 All paths relative to `third_party/blink/renderer/`.
