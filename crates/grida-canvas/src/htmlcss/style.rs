@@ -44,6 +44,9 @@ pub struct StyledElement {
     pub max_width: CssLength,
     pub min_height: CssLength,
     pub max_height: CssLength,
+    /// CSS `aspect-ratio` — stored as `width / height` (e.g. `16/9` → `1.777…`).
+    /// `None` means `auto` (no preferred ratio).
+    pub aspect_ratio: Option<f32>,
 
     // ── Box Model: spacing (StyleBoxData + StyleSurroundData) ──
     pub margin: CssEdgeInsets,
@@ -522,6 +525,7 @@ impl Default for StyledElement {
             max_width: CssLength::Auto,
             min_height: CssLength::Auto,
             max_height: CssLength::Auto,
+            aspect_ratio: None,
             margin: CssEdgeInsets::default(),
             padding: EdgeInsets::zero(),
             border: BorderBox::default(),

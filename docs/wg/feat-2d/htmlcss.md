@@ -93,7 +93,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `width`, `height` (%)         | ⚠️     | % not resolved against parent             |
 | `min-width`, `max-width`      | ✅     | Via Taffy                                 |
 | `min-height`, `max-height`    | ✅     | Via Taffy                                 |
-| `aspect-ratio`                | ❌     |                                           |
+| `aspect-ratio`                | ⚠️     | Via Taffy; broken in flex layouts ([taffy#804]) |
 | `inline-size`, `block-size`   | ❌     | Logical sizing not mapped                 |
 | `min-inline-size`, etc.       | ❌     | Logical sizing not mapped                 |
 | `padding` (all sides)         | ✅     | px values                                 |
@@ -622,3 +622,7 @@ container provides its own bounds. Author padding is preserved.
 
 Inter-element whitespace (newlines/spaces between block elements) is detected
 and dropped during inline group flushing to prevent empty 24px-tall blocks.
+
+<!-- Link references -->
+
+[taffy#804]: https://github.com/DioxusLabs/taffy/issues/804

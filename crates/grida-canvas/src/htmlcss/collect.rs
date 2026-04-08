@@ -856,6 +856,23 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     el.max_width = extract_max_size(&pos.max_width);
     el.max_height = extract_max_size(&pos.max_height);
 
+    // Aspect ratio
+    // NOTE: `auto <ratio>` is treated the same as `<ratio>` — the `auto`
+    // keyword only differs for replaced elements (img, video), which we
+    // don't yet handle. When replaced element support is added, check
+    // `ar.auto` and prefer the intrinsic ratio when `auto` is set.
+    {
+        use style::values::generics::position::PreferredRatio;
+        let ar = pos.aspect_ratio;
+        if let PreferredRatio::Ratio(ratio) = ar.ratio {
+            let w = ratio.0 .0;
+            let h = ratio.1 .0;
+            if w.is_finite() && h.is_finite() && w > 0.0 && h > 0.0 {
+                el.aspect_ratio = Some(w / h);
+            }
+        }
+    }
+
     // Inset (for positioned elements)
     el.inset = extract_inset(style);
 
