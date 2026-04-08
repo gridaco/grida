@@ -324,6 +324,7 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
             x: map_overflow(el.overflow_x),
             y: map_overflow(el.overflow_y),
         },
+        aspect_ratio: el.aspect_ratio,
         ..taffy::Style::default()
     };
 
