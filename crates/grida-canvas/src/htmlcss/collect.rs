@@ -847,6 +847,9 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Border radius
     el.border_radius = extract_border_radius(style);
 
+    // Outline (does not affect layout — paint-only)
+    el.outline = extract_outline(style);
+
     // Dimensions
     let pos = style.get_position();
     el.width = extract_size(&pos.width);
@@ -855,6 +858,23 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     el.min_height = extract_size(&pos.min_height);
     el.max_width = extract_max_size(&pos.max_width);
     el.max_height = extract_max_size(&pos.max_height);
+
+    // Aspect ratio
+    // NOTE: `auto <ratio>` is treated the same as `<ratio>` — the `auto`
+    // keyword only differs for replaced elements (img, video), which we
+    // don't yet handle. When replaced element support is added, check
+    // `ar.auto` and prefer the intrinsic ratio when `auto` is set.
+    {
+        use style::values::generics::position::PreferredRatio;
+        let ar = pos.aspect_ratio;
+        if let PreferredRatio::Ratio(ratio) = ar.ratio {
+            let w = ratio.0 .0;
+            let h = ratio.1 .0;
+            if w.is_finite() && h.is_finite() && w > 0.0 && h > 0.0 {
+                el.aspect_ratio = Some(w / h);
+            }
+        }
+    }
 
     // Inset (for positioned elements)
     el.inset = extract_inset(style);
@@ -997,25 +1017,26 @@ fn extract_css_margin(style: &ComputedValues) -> CssEdgeInsets {
     }
 }
 
+/// Map Stylo `BorderStyle` to our `types::BorderStyle`.
+/// Shared by border and outline extraction.
+fn map_border_style(bs: style::values::specified::border::BorderStyle) -> types::BorderStyle {
+    use style::values::specified::border::BorderStyle as BS;
+    match bs {
+        BS::None => types::BorderStyle::None,
+        BS::Solid => types::BorderStyle::Solid,
+        BS::Dashed => types::BorderStyle::Dashed,
+        BS::Dotted => types::BorderStyle::Dotted,
+        BS::Double => types::BorderStyle::Double,
+        BS::Groove => types::BorderStyle::Groove,
+        BS::Ridge => types::BorderStyle::Ridge,
+        BS::Inset => types::BorderStyle::Inset,
+        BS::Outset => types::BorderStyle::Outset,
+        _ => types::BorderStyle::None,
+    }
+}
+
 fn extract_border(style: &ComputedValues) -> BorderBox {
     let b = style.get_border();
-
-    let extract_side_style =
-        |bs: style::values::specified::border::BorderStyle| -> types::BorderStyle {
-            use style::values::specified::border::BorderStyle as BS;
-            match bs {
-                BS::None => types::BorderStyle::None,
-                BS::Solid => types::BorderStyle::Solid,
-                BS::Dashed => types::BorderStyle::Dashed,
-                BS::Dotted => types::BorderStyle::Dotted,
-                BS::Double => types::BorderStyle::Double,
-                BS::Groove => types::BorderStyle::Groove,
-                BS::Ridge => types::BorderStyle::Ridge,
-                BS::Inset => types::BorderStyle::Inset,
-                BS::Outset => types::BorderStyle::Outset,
-                _ => types::BorderStyle::None,
-            }
-        };
 
     let extract_color = |color: &style::values::computed::Color| -> CGColor {
         color
@@ -1028,23 +1049,62 @@ fn extract_border(style: &ComputedValues) -> BorderBox {
         top: BorderSide {
             width: b.border_top_width.to_f32_px(),
             color: extract_color(&style.clone_border_top_color()),
-            style: extract_side_style(b.border_top_style),
+            style: map_border_style(b.border_top_style),
         },
         right: BorderSide {
             width: b.border_right_width.to_f32_px(),
             color: extract_color(&style.clone_border_right_color()),
-            style: extract_side_style(b.border_right_style),
+            style: map_border_style(b.border_right_style),
         },
         bottom: BorderSide {
             width: b.border_bottom_width.to_f32_px(),
             color: extract_color(&style.clone_border_bottom_color()),
-            style: extract_side_style(b.border_bottom_style),
+            style: map_border_style(b.border_bottom_style),
         },
         left: BorderSide {
             width: b.border_left_width.to_f32_px(),
             color: extract_color(&style.clone_border_left_color()),
-            style: extract_side_style(b.border_left_style),
+            style: map_border_style(b.border_left_style),
         },
+    }
+}
+
+/// Extract CSS `outline` properties.
+///
+/// Chromium: `ComputedStyle::OutlineWidth()`, `OutlineColor()`,
+/// `OutlineStyle()`, `OutlineOffset()`.
+fn extract_outline(style: &ComputedValues) -> Outline {
+    let o = style.get_outline();
+
+    if !o.outline_has_nonzero_width() {
+        return Outline::default();
+    }
+
+    // outline-style: Auto | BorderStyle(bs)
+    let outline_style = {
+        use style::values::computed::OutlineStyle;
+        match o.outline_style {
+            OutlineStyle::Auto => types::BorderStyle::Solid, // auto → solid for our purposes
+            OutlineStyle::BorderStyle(bs) => map_border_style(bs),
+        }
+    };
+
+    if outline_style == types::BorderStyle::None {
+        return Outline::default();
+    }
+
+    // outline-color defaults to currentcolor per CSS spec
+    let color = o
+        .outline_color
+        .as_absolute()
+        .map(abs_color_to_cg)
+        .unwrap_or_else(|| abs_color_to_cg(&style.get_inherited_text().color));
+
+    Outline {
+        width: o.outline_width.to_f32_px(),
+        color,
+        style: outline_style,
+        offset: o.outline_offset.to_f32_px(),
     }
 }
 
