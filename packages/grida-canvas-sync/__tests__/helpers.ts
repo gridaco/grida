@@ -247,9 +247,10 @@ export class MockServer {
 
 export function makeNode(
   id: string,
-  props: Record<string, unknown> = {}
+  props: Record<string, unknown> = {},
+  type: string = "rectangle"
 ): SerializedNode {
-  return { type: "rectangle", id, ...props } as SerializedNode;
+  return { type, id, ...props } as SerializedNode;
 }
 
 export function emptyState(): DocumentState {

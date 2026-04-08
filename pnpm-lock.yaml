@@ -357,6 +357,9 @@ importers:
       '@grida/bitmap':
         specifier: workspace:*
         version: link:../packages/grida-canvas-bitmap
+      '@grida/canvas-sync':
+        specifier: workspace:*
+        version: link:../packages/grida-canvas-sync
       '@grida/canvas-wasm':
         specifier: workspace:*
         version: link:../crates/grida-canvas-wasm
@@ -882,18 +885,6 @@ importers:
       vaul:
         specifier: ^0.9.9
         version: 0.9.9(@types/react-dom@19.1.3(@types/react@19.1.3))(@types/react@19.1.3)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      y-protocols:
-        specifier: ^1.0.6
-        version: 1.0.7(yjs@13.6.29)
-      y-webrtc:
-        specifier: ^10.3.0
-        version: 10.3.0(yjs@13.6.29)
-      y-websocket:
-        specifier: ^3.0.0
-        version: 3.0.0(yjs@13.6.29)
-      yjs:
-        specifier: ^13.6.27
-        version: 13.6.29
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -1200,6 +1191,18 @@ importers:
 
   packages/grida-canvas-sequence: {}
 
+  packages/grida-canvas-sync:
+    devDependencies:
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.7.0)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@5.9.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+
   packages/grida-canvas-tailwind: {}
 
   packages/grida-canvas-tailwind-colors: {}
@@ -1303,18 +1306,12 @@ importers:
 
   services/grida-canvas-document-worker-cf:
     dependencies:
+      '@grida/canvas-sync':
+        specifier: workspace:*
+        version: link:../../packages/grida-canvas-sync
       hono:
         specifier: ^4.9.8
         version: 4.11.8
-      lib0:
-        specifier: ^0.2.114
-        version: 0.2.117
-      y-protocols:
-        specifier: ^1.0.6
-        version: 1.0.7(yjs@13.6.29)
-      yjs:
-        specifier: ^13.6.27
-        version: 13.6.29
     devDependencies:
       typescript:
         specifier: 5.9.3
@@ -8949,9 +8946,6 @@ packages:
     resolution: {integrity: sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==}
     engines: {node: '>=6'}
 
-  err-code@3.0.1:
-    resolution: {integrity: sha512-GiaH0KJUewYok+eeY05IIgjtAe4Yltygk9Wqp1V5yVWLdhf0hYZchRjNIT9bb0mSwRcIusT3cx7PJUf3zEIfUA==}
-
   error-ex@1.3.2:
     resolution: {integrity: sha512-7dFHNmqeFSEt2ZBsCriorKnn3Z2pj+fd9kmI6QoWw4//DL+icEBfc0U7qJCisqrTsKTjw4fNFy2pW9OqStD84g==}
 
@@ -9593,9 +9587,6 @@ packages:
   geojson@0.5.0:
     resolution: {integrity: sha512-/Bx5lEn+qRF4TfQ5aLu6NH+UKtvIv7Lhc487y/c8BdludrCTpiWf9wyI0RTyqg49MFefIAvFDuEi5Dfd/zgNxQ==}
     engines: {node: '>= 0.10'}
-
-  get-browser-rtc@1.1.0:
-    resolution: {integrity: sha512-MghbMJ61EJrRsDe7w1Bvqt3ZsBuqhce5nrn/XAwgwOXhcsz53/ltdxOse1h/8eKXj5slzxdsz56g5rzOFSGwfQ==}
 
   get-caller-file@2.0.5:
     resolution: {integrity: sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==}
@@ -10686,11 +10677,6 @@ packages:
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
-
-  lib0@0.2.107:
-    resolution: {integrity: sha512-2xih/AugT0dJSgeSfsW/bqIPILlsqzEtmw8hXzWEnMLrOz12DTK5z9rjNgUT21/HkBjHSznOQBr67bcZdc8Ltg==}
-    engines: {node: '>=16'}
-    hasBin: true
 
   lib0@0.2.114:
     resolution: {integrity: sha512-gcxmNFzA4hv8UYi8j43uPlQ7CGcyMJ2KQb5kZASw6SnAKAf10hK12i2fjrS3Cl/ugZa5Ui6WwIu1/6MIXiHttQ==}
@@ -13545,9 +13531,6 @@ packages:
   simple-get@4.0.1:
     resolution: {integrity: sha512-brv7p5WgH0jmQJr1ZDDfKDOSeWWg+OVypG99A/5vYGPqJ6pxiaHLy8nxtFjBA7oMa01ebA9gfh1uMCFqOuXxvA==}
 
-  simple-peer@9.11.1:
-    resolution: {integrity: sha512-D1SaWpOW8afq1CZGWB8xTfrT3FekjQmPValrqncJMX7QFl8YwhrPTZvMCANLtgBwwdS+7zURyqxDDEmY558tTw==}
-
   simplesignal@2.1.7:
     resolution: {integrity: sha512-PEo2qWpUke7IMhlqiBxrulIFvhJRLkl1ih52Rwa+bPjzhJepcd4GIjn2RiQmFSx3dQvsEAgF0/lXMwMN7vODaA==}
 
@@ -14918,18 +14901,6 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.18.2:
-    resolution: {integrity: sha512-DMricUmwGZUVr++AEAe2uiVM7UoO9MAVZMDu05UQOaUII0lp+zOzLLU4Xqh/JvTqklB1T4uELaaPBKyjE1r4fQ==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
   ws@8.19.0:
     resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
     engines: {node: '>=10.0.0'}
@@ -14984,19 +14955,6 @@ packages:
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
     peerDependencies:
       yjs: ^13.0.0
-
-  y-webrtc@10.3.0:
-    resolution: {integrity: sha512-KalJr7dCgUgyVFxoG3CQYbpS0O2qybegD0vI4bYnYHI0MOwoVbucED3RZ5f2o1a5HZb1qEssUKS0H/Upc6p1lA==}
-    engines: {node: '>=12'}
-    hasBin: true
-    peerDependencies:
-      yjs: ^13.6.8
-
-  y-websocket@3.0.0:
-    resolution: {integrity: sha512-mUHy7AzkOZ834T/7piqtlA8Yk6AchqKqcrCXjKW8J1w2lPtRDjz8W5/CvXz9higKAHgKRKqpI3T33YkRFLkPtg==}
-    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
-    peerDependencies:
-      yjs: ^13.5.6
 
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
@@ -24346,8 +24304,6 @@ snapshots:
 
   env-paths@2.2.1: {}
 
-  err-code@3.0.1: {}
-
   error-ex@1.3.2:
     dependencies:
       is-arrayish: 0.2.1
@@ -25353,8 +25309,6 @@ snapshots:
   geojson-vt@4.0.2: {}
 
   geojson@0.5.0: {}
-
-  get-browser-rtc@1.1.0: {}
 
   get-caller-file@2.0.5: {}
 
@@ -26580,10 +26534,6 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
-
-  lib0@0.2.107:
-    dependencies:
-      isomorphic.js: 0.2.5
 
   lib0@0.2.114:
     dependencies:
@@ -30334,18 +30284,6 @@ snapshots:
       simple-concat: 1.0.1
     optional: true
 
-  simple-peer@9.11.1:
-    dependencies:
-      buffer: 6.0.3
-      debug: 4.4.3
-      err-code: 3.0.1
-      get-browser-rtc: 1.1.0
-      queue-microtask: 1.2.3
-      randombytes: 2.1.0
-      readable-stream: 3.6.2
-    transitivePeerDependencies:
-      - supports-color
-
   simplesignal@2.1.7: {}
 
   sirv@2.0.4:
@@ -31909,9 +31847,6 @@ snapshots:
 
   ws@8.18.0: {}
 
-  ws@8.18.2:
-    optional: true
-
   ws@8.19.0: {}
 
   wsl-utils@0.1.0:
@@ -31949,25 +31884,6 @@ snapshots:
   y-protocols@1.0.7(yjs@13.6.29):
     dependencies:
       lib0: 0.2.114
-      yjs: 13.6.29
-
-  y-webrtc@10.3.0(yjs@13.6.29):
-    dependencies:
-      lib0: 0.2.107
-      simple-peer: 9.11.1
-      y-protocols: 1.0.7(yjs@13.6.29)
-      yjs: 13.6.29
-    optionalDependencies:
-      ws: 8.18.2
-    transitivePeerDependencies:
-      - bufferutil
-      - supports-color
-      - utf-8-validate
-
-  y-websocket@3.0.0(yjs@13.6.29):
-    dependencies:
-      lib0: 0.2.107
-      y-protocols: 1.0.7(yjs@13.6.29)
       yjs: 13.6.29
 
   y18n@5.0.8: {}

@@ -10,6 +10,7 @@
  *   - `meta`       — key-value metadata (document clock, schema version, scenes)
  *
  * All writes happen synchronously via `sql.exec()` inside the DO's single-threaded model.
+ * Multi-statement writes are wrapped in `transactionSync()` for atomicity.
  */
 
 import type {
@@ -17,6 +18,7 @@ import type {
   SerializedNode,
   DocumentDiff,
   NodeOp,
+  SceneOp,
 } from "@grida/canvas-sync";
 
 // ---------------------------------------------------------------------------
@@ -35,9 +37,11 @@ export interface StoredDocument {
 
 export class SyncStorage {
   private readonly sql: SqlStorage;
+  private readonly storage: DurableObjectStorage;
 
-  constructor(sql: SqlStorage) {
-    this.sql = sql;
+  constructor(storage: DurableObjectStorage) {
+    this.storage = storage;
+    this.sql = storage.sql;
     this._ensureSchema();
   }
 
@@ -87,41 +91,46 @@ export class SyncStorage {
   // Diff application
   // -------------------------------------------------------------------------
 
-  /** Apply a diff and persist to SQLite. Returns the new clock value. */
+  /**
+   * Apply a diff and persist to SQLite atomically.
+   * Wrapped in a synchronous transaction to prevent partial writes on crash.
+   */
   applyDiff(diff: DocumentDiff, clock: number): void {
-    // Apply node operations
-    if (diff.nodes) {
-      for (const [id, op] of Object.entries(diff.nodes)) {
-        this._applyNodeOp(id, op, clock);
-      }
-    }
-
-    // Apply scene operations
-    if (diff.scenes) {
-      let scenes = this._getMetaJson<NodeId[]>("scenes", []);
-      for (const sceneOp of diff.scenes) {
-        switch (sceneOp.op) {
-          case "add":
-            if (!scenes.includes(sceneOp.id)) {
-              scenes.push(sceneOp.id);
-            }
-            break;
-          case "remove":
-            scenes = scenes.filter((id) => id !== sceneOp.id);
-            break;
-          case "reorder":
-            scenes = [...sceneOp.ids];
-            break;
+    this.storage.transactionSync(() => {
+      // Apply node operations
+      if (diff.nodes) {
+        for (const [id, op] of Object.entries(diff.nodes)) {
+          this._applyNodeOp(id, op, clock);
         }
       }
-      this._setMetaJson("scenes", scenes);
-    }
 
-    // Update clock
-    this._setMetaInt("clock", clock);
+      // Apply scene operations
+      if (diff.scenes) {
+        let scenes = this._getMetaJson<NodeId[]>("scenes", []);
+        for (const sceneOp of diff.scenes) {
+          switch (sceneOp.op) {
+            case "add":
+              if (!scenes.includes(sceneOp.id)) {
+                scenes.push(sceneOp.id);
+              }
+              break;
+            case "remove":
+              scenes = scenes.filter((id) => id !== sceneOp.id);
+              break;
+            case "reorder":
+              scenes = [...sceneOp.ids];
+              break;
+          }
+        }
+        this._setMetaJson("scenes", scenes);
+      }
 
-    // Prune tombstones if too many
-    this._pruneTombstones(5000);
+      // Update clock
+      this._setMetaInt("clock", clock);
+
+      // Prune tombstones if too many
+      this._pruneTombstones(5000);
+    });
   }
 
   private _applyNodeOp(id: NodeId, op: NodeOp, clock: number): void {
@@ -189,6 +198,12 @@ export class SyncStorage {
    *   - Nodes that were deleted since `sinceClock` (as remove ops)
    *
    * Returns null if the clock is current (no changes).
+   *
+   * Note: scene ordering is NOT included in the delta — the caller
+   * (SyncRoom._handleConnect) sends `scenes` separately as a full snapshot
+   * alongside the diff. This is intentional: scene ordering is small enough
+   * that a full snapshot is simpler and more reliable than tracking incremental
+   * scene ops in the delta.
    */
   getDelta(sinceClock: number): DocumentDiff | null {
     const currentClock = this._getMetaInt("clock", 0);

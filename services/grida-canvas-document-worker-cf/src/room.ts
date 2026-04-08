@@ -16,8 +16,6 @@ import type {
   ServerMessage,
   DocumentDiff,
   PresenceState,
-  NodeId,
-  SerializedNode,
 } from "@grida/canvas-sync";
 import {
   DocumentClock,
@@ -28,10 +26,17 @@ import {
 import { SyncStorage } from "./storage";
 
 // ---------------------------------------------------------------------------
-// Session metadata (attached to WebSocket via tags)
+// Constants
 // ---------------------------------------------------------------------------
 
 const SESSION_TAG_PREFIX = "session:";
+
+/** Maximum incoming WebSocket message size in bytes (1 MB). */
+const MAX_MESSAGE_SIZE = 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// Session metadata (attached to WebSocket via tags)
+// ---------------------------------------------------------------------------
 
 interface SessionState {
   schemaVersion?: string;
@@ -55,16 +60,13 @@ export class G1DO implements DurableObject {
 
   constructor(state: DurableObjectState, _env: Env) {
     this.state = state;
-    // Block all requests until initialization is done
-    this.state.blockConcurrencyWhile(async () => {
-      this._initialize();
-    });
+    this.state.blockConcurrencyWhile(() => this._initializeAsync());
   }
 
-  private _initialize(): void {
+  private async _initializeAsync(): Promise<void> {
     if (this.initialized) return;
 
-    this.storage = new SyncStorage(this.state.storage.sql);
+    this.storage = new SyncStorage(this.state.storage);
     const stored = this.storage.getFullState();
 
     this.canonical = {
@@ -132,6 +134,16 @@ export class G1DO implements DurableObject {
   ): Promise<void> {
     if (typeof message !== "string") return;
 
+    // Guard: reject oversized messages
+    if (message.length > MAX_MESSAGE_SIZE) {
+      this._send(ws, {
+        type: "error",
+        code: "MESSAGE_TOO_LARGE",
+        message: `Message exceeds ${MAX_MESSAGE_SIZE} byte limit`,
+      });
+      return;
+    }
+
     let msg: ClientMessage;
     try {
       msg = JSON.parse(message) as ClientMessage;
@@ -172,7 +184,8 @@ export class G1DO implements DurableObject {
     const sessionId = this._getSessionId(ws);
     if (sessionId) {
       this.sessions.delete(sessionId);
-      // Broadcast updated presence (peer left)
+      // Broadcast updated presence (peer left) — always send, even if
+      // the peers map is now empty, so clients clear stale cursors.
       this._broadcastPresence();
     }
   }
@@ -181,8 +194,14 @@ export class G1DO implements DurableObject {
     const sessionId = this._getSessionId(ws);
     if (sessionId) {
       this.sessions.delete(sessionId);
+      // Broadcast presence removal before closing
+      this._broadcastPresence();
     }
-    ws.close(1011, "WebSocket error");
+    try {
+      ws.close(1011, "WebSocket error");
+    } catch {
+      // Already closed
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -248,11 +267,9 @@ export class G1DO implements DurableObject {
       return;
     }
 
-    // Apply the diff
+    // Apply the diff (in-memory + SQLite, atomically)
     const newClock = this.clock.tick();
     this.canonical = applyDiff(this.canonical, msg.diff);
-
-    // Persist to SQLite
     this.storage.applyDiff(msg.diff, newClock);
 
     // Ack the pusher
@@ -306,9 +323,12 @@ export class G1DO implements DurableObject {
     }
   }
 
-  /** Broadcast current presence state to all sessions. */
+  /**
+   * Broadcast current presence state to all sessions.
+   * Always sends, even when peers map is empty — this signals to clients
+   * that a peer has left and stale cursors should be cleared.
+   */
   private _broadcastPresence(): void {
-    // Build per-session presence views (each session gets everyone else's presence)
     const allPresence: Record<string, PresenceState> = {};
     for (const [sid, session] of this.sessions) {
       if (session.presence) {
@@ -328,13 +348,11 @@ export class G1DO implements DurableObject {
         }
       }
 
-      // Only send if there are peers with presence
-      if (Object.keys(peers).length > 0) {
-        try {
-          ws.send(JSON.stringify({ type: "presence", peers }));
-        } catch {
-          // WebSocket may have closed
-        }
+      // Always send — empty peers signals "everyone left"
+      try {
+        ws.send(JSON.stringify({ type: "presence", peers }));
+      } catch {
+        // WebSocket may have closed
       }
     }
   }

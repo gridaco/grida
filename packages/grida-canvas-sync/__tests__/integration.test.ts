@@ -508,7 +508,7 @@ describe("multi-client integration", () => {
         nodes: {
           s1: {
             op: "put",
-            node: { type: "scene", id: "s1", name: "Page 1" } as any,
+            node: makeNode("s1", { name: "Page 1" }, "scene"),
           },
         },
         scenes: [{ op: "add", id: "s1" }],
@@ -522,8 +522,8 @@ describe("multi-client integration", () => {
     it("client A removes a scene, client B sees it", () => {
       const initial: DocumentState = {
         nodes: {
-          s1: { type: "scene", id: "s1", name: "Page 1" } as any,
-          s2: { type: "scene", id: "s2", name: "Page 2" } as any,
+          s1: makeNode("s1", { name: "Page 1" }, "scene"),
+          s2: makeNode("s2", { name: "Page 2" }, "scene"),
         },
         scenes: ["s1", "s2"],
       };
@@ -559,7 +559,7 @@ describe("multi-client integration", () => {
         nodes: {
           s1: {
             op: "put",
-            node: { type: "scene", id: "s1", name: "Main" } as any,
+            node: makeNode("s1", { name: "Main" }, "scene"),
           },
           rect1: {
             op: "put",
@@ -629,11 +629,7 @@ describe("multi-client integration", () => {
         nodes: {
           group1: {
             op: "put",
-            node: {
-              type: "group",
-              id: "group1",
-              parent_id: "s1",
-            } as any,
+            node: makeNode("group1", { parent_id: "s1" }, "group"),
           },
           rect1: {
             op: "patch",

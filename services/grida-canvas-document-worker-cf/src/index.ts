@@ -10,10 +10,12 @@
  */
 
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 
 export { G1DO } from "./room";
 
 const app = new Hono<{ Bindings: Env }>();
+app.use("*", cors());
 
 // Health check
 app.get("/health", (c) => c.text("ok"));
