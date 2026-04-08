@@ -10,10 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.9.8",
-    "lib0": "^0.2.114",
-    "y-protocols": "^1.0.6",
-    "yjs": "^13.6.27"
+    "@grida/canvas-sync": "workspace:*",
+    "hono": "^4.9.8"
   },
   "devDependencies": {
     "typescript": "^5",

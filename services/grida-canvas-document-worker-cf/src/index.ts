@@ -1,57 +1,52 @@
-import { type Context, Hono } from "hono";
-import { cors } from "hono/cors";
-import { G1DO } from "./do";
+/**
+ * Grida Canvas Document Worker — Cloudflare Worker entrypoint.
+ *
+ * Routes:
+ *   GET /room/:roomId  → WebSocket upgrade to the SyncRoom Durable Object
+ *   GET /health        → 200 OK
+ *
+ * Legacy route (kept for backward compatibility during migration):
+ *   GET /editor/:roomId → Same as /room/:roomId
+ */
 
-const app = new Hono();
-app.use("*", cors());
+import { Hono } from "hono";
 
-const route = app.route(
-  "/editor",
-  app.get("/:id", async (c: Context) => {
-    try {
-      if (c.req.header("Upgrade") !== "websocket") {
-        return c.body("Expected websocket", {
-          status: 426,
-          statusText: "Upgrade Required",
-        });
-      }
+export { G1DO } from "./room";
 
-      const roomId = c.req.param("id");
-      if (!roomId || roomId.length === 0) {
-        return c.body("Invalid room ID", {
-          status: 400,
-          statusText: "Bad Request",
-        });
-      }
+const app = new Hono<{ Bindings: Env }>();
 
-      // Basic room ID validation for security
-      if (!/^[a-zA-Z0-9_-]+$/.test(roomId) || roomId.length > 100) {
-        return c.body("Invalid room ID format", {
-          status: 400,
-          statusText: "Bad Request",
-        });
-      }
+// Health check
+app.get("/health", (c) => c.text("ok"));
 
-      const obj = c.env.G1;
-      const stub = obj.get(obj.idFromName(roomId));
+// WebSocket upgrade → Durable Object
+app.get("/room/:roomId", (c) => {
+  return upgradeToRoom(c.env, c.req.raw, c.req.param("roomId"));
+});
 
-      // Create websocket connection directly
-      const client = (stub as any).createRoom(roomId);
+// Legacy route (the old YJS service used /editor/:roomId)
+app.get("/editor/:roomId", (c) => {
+  return upgradeToRoom(c.env, c.req.raw, c.req.param("roomId"));
+});
 
-      return new Response(null, {
-        webSocket: client,
-        status: 101,
-        statusText: "Switching Protocols",
-      });
-    } catch (error) {
-      console.error("WebSocket connection error:", error);
-      return c.body("Internal Server Error", {
-        status: 500,
-        statusText: "Internal Server Error",
-      });
-    }
-  })
-);
+function upgradeToRoom(
+  env: Env,
+  request: Request,
+  roomId: string
+): Response | Promise<Response> {
+  // Validate room ID
+  if (!roomId || roomId.length > 100 || !/^[a-zA-Z0-9_-]+$/.test(roomId)) {
+    return new Response("Invalid room ID", { status: 400 });
+  }
 
-export default route;
-export { G1DO };
+  // Must be a WebSocket upgrade
+  if (request.headers.get("Upgrade") !== "websocket") {
+    return new Response("Expected WebSocket upgrade", { status: 426 });
+  }
+
+  // Route to the Durable Object for this room
+  const id = env.G1.idFromName(roomId);
+  const stub = env.G1.get(id);
+  return stub.fetch(request);
+}
+
+export default app;
