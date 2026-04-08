@@ -180,3 +180,63 @@ compositing:
   label: Compositing
   permalink: /compositing
   description: Layers, surfaces, tiles, and GPU composition.
+
+feat-2d:
+  label: 2D features
+  permalink: /feat-2d
+  description: Working-group notes on the 2D canvas engine and related systems.
+
+htmlcss:
+  label: HTML & CSS
+  permalink: /htmlcss
+  description: HTML/CSS alignment, design-to-code mapping, and web styling topics.
+
+lod:
+  label: LOD
+  permalink: /lod
+  description: Level-of-detail strategies for scene content and rendering.
+
+frame-budget:
+  label: Frame budget
+  permalink: /frame-budget
+  description: Per-frame time budgets, scheduling, and cost awareness in the render loop.
+
+benchmarking:
+  label: Benchmarking
+  permalink: /benchmarking
+  description: Performance measurement, profiling, and WASM or engine benchmarks.
+
+tray:
+  label: Tray
+  permalink: /tray
+  description: Tray-related UX and rendering surfaces (working group).
+
+scene-graph:
+  label: Scene graph
+  permalink: /scene-graph
+  description: Scene tree structure, traversal, and graph-level concerns.
+
+format:
+  label: Format
+  permalink: /format
+  description: File and interchange formats (Grida IR, SVG, HTML, Markdown, etc.).
+
+html:
+  label: HTML
+  permalink: /html
+  description: HTML import, mapping, and web document structure in Grida formats.
+
+markdown:
+  label: Markdown
+  permalink: /markdown
+  description: Markdown interchange and documentation-as-format topics.
+
+paint:
+  label: Paint
+  permalink: /paint
+  description: Paint records, display lists, and rasterization-oriented paint pipelines.
+
+data-layout:
+  label: Data layout
+  permalink: /data-layout
+  description: Memory layout, SoA/AoS, and property storage models (e.g. engine research).
