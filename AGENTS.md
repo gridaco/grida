@@ -35,7 +35,7 @@ Currently, we have below features / modules.
 
 **Languages**
 
-- Node.js 22 - main runtime for most apps
+- Node.js 24 LTS - main runtime for most apps
 - TypeScript 5 - main language for most apps
 - Python 3.12 - partially used for tasks / jobs, that are independent, e.g. `/library`
 - Deno - partially used for tasks / jobs, that shares the codebase, e.g. `/jobs`
