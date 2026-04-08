@@ -22,4 +22,4 @@ by specifing the id flag, you can take advantage in below scenarios.
 
 ## See also
 
-- [`--hash`](./--hash/README.md)
+- [`--hash`](./--hash.md)

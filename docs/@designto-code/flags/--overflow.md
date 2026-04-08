@@ -15,4 +15,4 @@ stage:
 
 ## See also
 
-[`--scroll`](./--scroll/README.md)
+[`--scroll`](./--scroll.md)

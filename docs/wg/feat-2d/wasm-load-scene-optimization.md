@@ -219,7 +219,7 @@ enum. To eliminate this cost, the split must happen **upstream** — at scene
 graph construction time — so that geometry-relevant data is never stored
 inside the monolithic `Node` enum in the first place.
 
-See [docs/wg/research/chromium/node-data-layout.md](../../research/chromium/node-data-layout.md)
+See [docs/wg/research/chromium/node-data-layout.md](../research/chromium/node-data-layout.md)
 for research on Chromium's property tree architecture, which solves
 exactly this problem by storing properties in separate flat arrays indexed
 by integer IDs.
@@ -257,5 +257,5 @@ Replace `Node` enum with entity-component storage (e.g., archetype-based).
 **Recommendation: Option A** (split at SceneGraph) as the incremental path,
 with Option B as the long-term goal once the split maps stabilize.
 
-See [docs/wg/research/chromium/node-data-layout.md](../../research/chromium/node-data-layout.md)
+See [docs/wg/research/chromium/node-data-layout.md](../research/chromium/node-data-layout.md)
 for the full analysis including ECS tradeoffs and mutation considerations.
