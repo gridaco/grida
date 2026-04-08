@@ -63,6 +63,11 @@ pub struct StyledElement {
     pub color: CGColor,
     pub font: FontProps,
 
+    // ── Outline (rare non-inherited — does not affect layout) ──
+    /// CSS `outline`. Painted on top of all content, follows border-radius.
+    /// Chromium: `OutlinePainter`, `PaintPhase::kSelfOutlineOnly`.
+    pub outline: Outline,
+
     // ── Visual Effects (rare non-inherited) ──
     pub opacity: f32,
     pub blend_mode: BlendMode,
@@ -205,6 +210,43 @@ pub struct BorderBox {
     pub right: BorderSide,
     pub bottom: BorderSide,
     pub left: BorderSide,
+}
+
+/// CSS `outline` — uniform stroke painted on top of all content.
+///
+/// Unlike `border`, outline is always uniform (no per-side control),
+/// does not affect layout, and paints over content rather than between
+/// background and content.
+///
+/// Chromium: `ComputedStyle::OutlineWidth()`, `OutlineColor()`,
+/// `OutlineStyle()`, `OutlineOffset()`. Painted by `OutlinePainter`
+/// during `PaintPhase::kSelfOutlineOnly`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Outline {
+    pub width: f32,
+    pub color: CGColor,
+    pub style: BorderStyle,
+    /// Distance from the border edge. Positive = outward, negative = inward.
+    pub offset: f32,
+}
+
+impl Default for Outline {
+    fn default() -> Self {
+        Self {
+            width: 0.0,
+            color: CGColor::BLACK,
+            style: BorderStyle::None,
+            offset: 0.0,
+        }
+    }
+}
+
+impl Outline {
+    /// Returns `true` if the outline is visible (non-zero width + visible style).
+    /// Chromium: `ComputedStyle::HasOutline()`.
+    pub fn has_outline(&self) -> bool {
+        self.width > 0.0 && self.style != BorderStyle::None
+    }
 }
 
 /// Per-corner border radii with separate x/y values (elliptical).
@@ -533,6 +575,7 @@ impl Default for StyledElement {
             border_radius: CornerRadii::default(),
             color: CGColor::BLACK,
             font: FontProps::default(),
+            outline: Outline::default(),
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             overflow_x: Overflow::Visible,

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Outline</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .columns {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .rows {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .box {
+        width: 120px;
+        height: 80px;
+        background: #eee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+
+      /* ── Specimens ── */
+
+      .outline-solid {
+        outline: 3px solid #000;
+      }
+      .outline-dashed {
+        outline: 2px dashed #000;
+      }
+      .outline-dotted {
+        outline: 2px dotted #000;
+      }
+      .outline-color {
+        outline: 3px solid #c00;
+      }
+      .outline-thick {
+        outline: 6px solid #000;
+      }
+      .outline-offset-pos {
+        outline: 3px solid #000;
+        outline-offset: 8px;
+      }
+      .outline-offset-neg {
+        outline: 3px solid #000;
+        outline-offset: -4px;
+      }
+      .outline-radius {
+        outline: 3px solid #000;
+        border-radius: 12px;
+      }
+      .outline-radius-offset {
+        outline: 3px solid #000;
+        outline-offset: 6px;
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="rows">
+      <div>
+        <div class="label">outline: 3px solid #000</div>
+        <div class="columns">
+          <div class="box outline-solid">solid</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">outline: 2px dashed / dotted</div>
+        <div class="columns">
+          <div class="box outline-dashed">dashed</div>
+          <div class="box outline-dotted">dotted</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">outline: 3px solid #c00 (red)</div>
+        <div class="columns">
+          <div class="box outline-color">color</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">outline: 6px solid #000 (thick)</div>
+        <div class="columns">
+          <div class="box outline-thick">thick</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">outline-offset: 8px / -4px</div>
+        <div class="columns">
+          <div class="box outline-offset-pos">offset +8</div>
+          <div class="box outline-offset-neg">offset -4</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">outline + border-radius: 12px</div>
+        <div class="columns">
+          <div class="box outline-radius">radius</div>
+          <div class="box outline-radius-offset">radius + offset</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

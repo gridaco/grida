@@ -3,7 +3,8 @@
 //! Paint order follows Chromium's phases (simplified):
 //! 1. **Background** — box-shadow (outer), background-color, border, box-shadow (inset)
 //! 2. **Children** — recurse into child boxes and inline content
-//! 3. **Outline** — (not yet implemented)
+//! 3. **Widget chrome** — form control appearance (checkmarks, carets, etc.)
+//! 4. **Outline** — CSS outline, painted on top of all content
 //!
 //! Opacity, clipping, and visibility are handled via canvas save/restore.
 
@@ -16,7 +17,8 @@ use skia_safe::{Canvas, ClipOp, Color, Paint, PaintStyle, PictureRecorder, Rect}
 use super::layout::{build_skia_text_style, LayoutBox, LayoutNode};
 use super::style::{
     BackgroundLayer, BorderSide, ConicGradient, GradientStop, InlineBoxDecoration, InlineGroup,
-    InlineRunItem, LinearGradient, RadialGradient, StyledElement, TextRun, WidgetAppearance,
+    InlineRunItem, LinearGradient, Outline, RadialGradient, StyledElement, TextRun,
+    WidgetAppearance,
 };
 use super::types;
 
@@ -104,7 +106,11 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
         canvas.save_layer(&layer_rec);
     }
 
+    // Overflow clip gets its own save/restore so that outline (which paints
+    // outside the box) is not clipped. Outline still participates in the
+    // opacity layer above.
     if needs_clip {
+        canvas.save();
         canvas.clip_rect(Rect::from_xywh(0.0, 0.0, w, h), ClipOp::Intersect, true);
     }
 
@@ -144,6 +150,14 @@ fn paint_box(canvas: &Canvas, layout: &LayoutBox, fonts: &FontCollection) {
 
     // ── Phase 3: Widget chrome (form control appearance) ──
     paint_widget_chrome(canvas, style, w, h);
+
+    if needs_clip {
+        canvas.restore(); // pop overflow clip
+    }
+
+    // ── Phase 4: Outline (Chromium: PaintPhase::kSelfOutlineOnly) ──
+    // Painted outside the overflow clip but inside the opacity layer.
+    paint_outline(canvas, style, w, h);
 
     // ── Restore ──
     if needs_layer {
@@ -379,26 +393,27 @@ fn paint_borders(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
 }
 
 fn border_paint(side: &BorderSide) -> Paint {
+    stroke_paint(side.color, side.width, side.style)
+}
+
+/// Shared stroke paint builder for border sides and outline.
+/// Applies dash/dot path effects for dashed/dotted styles.
+fn stroke_paint(color: CGColor, width: f32, style: types::BorderStyle) -> Paint {
     let mut paint = Paint::default();
-    paint.set_color(Color::from_argb(
-        side.color.a,
-        side.color.r,
-        side.color.g,
-        side.color.b,
-    ));
-    paint.set_stroke_width(side.width);
+    paint.set_color(Color::from_argb(color.a, color.r, color.g, color.b));
+    paint.set_stroke_width(width);
     paint.set_style(PaintStyle::Stroke);
     paint.set_anti_alias(true);
 
-    match side.style {
+    match style {
         types::BorderStyle::Dashed => {
-            let dash_len = side.width * 3.0;
+            let dash_len = width * 3.0;
             if let Some(effect) = skia_safe::PathEffect::dash(&[dash_len, dash_len], 0.0) {
                 paint.set_path_effect(effect);
             }
         }
         types::BorderStyle::Dotted => {
-            if let Some(effect) = skia_safe::PathEffect::dash(&[side.width, side.width], 0.0) {
+            if let Some(effect) = skia_safe::PathEffect::dash(&[width, width], 0.0) {
                 paint.set_path_effect(effect);
             }
             paint.set_stroke_cap(skia_safe::paint::Cap::Round);
@@ -407,6 +422,62 @@ fn border_paint(side: &BorderSide) -> Paint {
     }
 
     paint
+}
+
+// ─── Outline (Chromium: OutlinePainter::PaintOutlineRects) ─────────────────
+
+/// Paint CSS `outline` as a stroked rect/rrect around the element.
+///
+/// Chromium paints outline during `PaintPhase::kSelfOutlineOnly`, on top
+/// of all content. Since Chrome 94, outline follows `border-radius` with
+/// corner radii expanded by `outline-offset + outline-width/2`.
+///
+/// We mirror this: compute an expanded rect offset from the border edge
+/// by `outline-offset + outline-width/2` (stroke center), then draw a
+/// stroked RRect using the element's border-radius (expanded proportionally).
+fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
+    let outline = &style.outline;
+    if !outline.has_outline() {
+        return;
+    }
+
+    let paint = outline_paint(outline);
+
+    // The stroke is centered on the outline path. The path sits at
+    // `outline-offset` from the border edge, so the stroke center is
+    // at `offset + width/2` from the border edge.
+    let half_w = outline.width / 2.0;
+    let expand = outline.offset + half_w;
+
+    let outline_rect = Rect::from_xywh(-expand, -expand, w + expand * 2.0, h + expand * 2.0);
+
+    let r = &style.border_radius;
+    if r.is_zero() {
+        canvas.draw_rect(outline_rect, &paint);
+    } else {
+        // Expand corner radii proportionally (Chromium: ComputeCornerRadii)
+        let radii = expand_radii(r, expand);
+        let mut rrect = skia_safe::RRect::new();
+        rrect.set_rect_radii(outline_rect, &radii);
+        canvas.draw_rrect(rrect, &paint);
+    }
+}
+
+fn outline_paint(outline: &Outline) -> Paint {
+    stroke_paint(outline.color, outline.width, outline.style)
+}
+
+/// Expand border-radius values outward by `expand` pixels.
+/// Chromium: `ComputeCornerRadii` — radii grow when offset is positive,
+/// shrink when negative (clamped to 0).
+fn expand_radii(r: &super::style::CornerRadii, expand: f32) -> [skia_safe::Point; 4] {
+    let e = |v: f32| (v + expand).max(0.0);
+    [
+        skia_safe::Point::new(e(r.tl_x), e(r.tl_y)),
+        skia_safe::Point::new(e(r.tr_x), e(r.tr_y)),
+        skia_safe::Point::new(e(r.br_x), e(r.br_y)),
+        skia_safe::Point::new(e(r.bl_x), e(r.bl_y)),
+    ]
 }
 
 // ─── Box shadow (Chromium: BoxPainterBase::PaintNormalBoxShadow / PaintInsetBoxShadow) ──
