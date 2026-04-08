@@ -10,7 +10,7 @@ import {
   GridaBlock,
   GridaBlockRenderer,
   ObjectFit,
-} from "@/app/(dev)/canvas/experimental/grid/blocks";
+} from "@/app/(canvas)/canvas/experimental/grid/blocks";
 import { InsertPanel } from "./panel";
 import React, { useEffect, useState } from "react";
 import {
