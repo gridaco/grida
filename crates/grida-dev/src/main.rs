@@ -427,25 +427,34 @@ async fn load_html_images(
     let mut local_results: Vec<(String, Option<Vec<u8>>)> = Vec::new();
     let mut remote_futures = Vec::new();
 
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .unwrap_or_default();
+
     for url in urls {
         if url.starts_with("http://") || url.starts_with("https://") {
             let url = url.clone();
+            let client = client.clone();
             remote_futures.push(async move {
                 eprintln!("  [img] fetching {url} ...");
-                let result = match reqwest::get(&url).await {
-                    Ok(resp) => {
-                        let status = resp.status();
-                        match resp.bytes().await {
+                let result = match client.get(&url).send().await {
+                    Ok(resp) => match resp.error_for_status() {
+                        Ok(resp) => match resp.bytes().await {
                             Ok(b) => {
-                                eprintln!("  [img] fetched {url} ({status}, {} bytes)", b.len());
+                                eprintln!("  [img] fetched {url} ({} bytes)", b.len());
                                 Some(b.to_vec())
                             }
                             Err(e) => {
                                 eprintln!("  [img] fetch body failed {url}: {e}");
                                 None
                             }
+                        },
+                        Err(e) => {
+                            eprintln!("  [img] fetch rejected {url}: {e}");
+                            None
                         }
-                    }
+                    },
                     Err(e) => {
                         eprintln!("  [img] fetch failed {url}: {e}");
                         None

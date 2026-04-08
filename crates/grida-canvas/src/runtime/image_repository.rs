@@ -49,22 +49,28 @@ impl ImageRepository {
     /// Skia evaluates the mipmap LOD at rasterization time based on the
     /// final transform, so this works correctly with `PictureCache`.
     pub fn insert(&mut self, src: String, hash: u64) -> Option<(u32, u32)> {
-        if let Some(bytes) = self.store.lock().unwrap().get(hash) {
-            let data = skia_safe::Data::new_copy(bytes);
-            if let Some(image) = Image::from_encoded(data) {
-                let width = image.width() as u32;
-                let height = image.height() as u32;
-                // Attach Skia's built-in mipmap chain. Falls back to the
-                // original image if generation fails (e.g. 1×1 images).
-                let mipmapped = image.with_default_mipmaps().unwrap_or(image);
-                self.images.insert(src.clone(), mipmapped);
-                // Clear from tracking — this ref is now satisfied.
-                self.missing_refs.borrow_mut().remove(&src);
-                self.reported_refs.remove(&src);
-                return Some((width, height));
-            }
-        }
-        None
+        let bytes = self.store.lock().unwrap().get(hash)?.to_vec();
+        let data = skia_safe::Data::new_copy(&bytes);
+        let image = Image::from_encoded(data)?;
+        self.insert_decoded(src, image)
+    }
+
+    /// Insert a decoded image directly from bytes, keyed by an arbitrary URL string.
+    pub fn insert_bytes(&mut self, src: String, bytes: &[u8]) -> Option<(u32, u32)> {
+        let data = skia_safe::Data::new_copy(bytes);
+        let image = Image::from_encoded(data)?;
+        self.insert_decoded(src, image)
+    }
+
+    /// Shared decode → mipmap → store → tracking-clear path.
+    fn insert_decoded(&mut self, src: String, image: Image) -> Option<(u32, u32)> {
+        let width = image.width() as u32;
+        let height = image.height() as u32;
+        let mipmapped = image.with_default_mipmaps().unwrap_or(image);
+        self.images.insert(src.clone(), mipmapped);
+        self.missing_refs.borrow_mut().remove(&src);
+        self.reported_refs.remove(&src);
+        Some((width, height))
     }
 
     /// Gets a reference to an image by its source URL.
@@ -83,23 +89,6 @@ impl ImageRepository {
         self.images
             .get(src)
             .map(|img| (img.width() as u32, img.height() as u32))
-    }
-
-    /// Insert a decoded image directly from bytes, keyed by an arbitrary URL string.
-    ///
-    /// Unlike [`insert()`] which reads from `ByteStore` by hash, this decodes
-    /// the image inline. Useful for HTML embed images where the key is a
-    /// relative path or HTTP URL, not a `res://` RID.
-    pub fn insert_bytes(&mut self, src: String, bytes: &[u8]) -> Option<(u32, u32)> {
-        let data = skia_safe::Data::new_copy(bytes);
-        let image = Image::from_encoded(data)?;
-        let width = image.width() as u32;
-        let height = image.height() as u32;
-        let mipmapped = image.with_default_mipmaps().unwrap_or(image);
-        self.images.insert(src.clone(), mipmapped);
-        self.missing_refs.borrow_mut().remove(&src);
-        self.reported_refs.remove(&src);
-        Some((width, height))
     }
 
     /// Removes an image from the repository by its source URL.

@@ -297,7 +297,13 @@ fn apply_replaced_intrinsic_size(
         }
     }
 
-    // If still auto after HTML attrs, use natural image dimensions
+    // If still auto after HTML attrs, use natural image dimensions or fallback.
+    // When no intrinsic info exists at all, use 2:1 default aspect ratio
+    // (HTML spec: 300×150 default object size).
+    if img_size.is_none() && style.aspect_ratio.is_none() {
+        style.aspect_ratio = Some(2.0); // 300/150
+    }
+
     let w_is_auto = style.size.width == Dimension::auto();
     let h_is_auto = style.size.height == Dimension::auto();
 
@@ -307,15 +313,12 @@ fn apply_replaced_intrinsic_size(
         } else if h_is_auto {
             // No size info at all → 300×150 fallback
             style.size.width = Dimension::length(300.0);
-            style.size.height = Dimension::length(150.0);
         }
         // else: width auto + height set + aspect_ratio → Taffy resolves
     }
 
     if style.size.height == Dimension::auto() {
         if let Some((_, nh)) = img_size {
-            // Only set natural height if width wasn't explicitly set to
-            // something different (aspect_ratio handles that case)
             if style.aspect_ratio.is_none() {
                 style.size.height = Dimension::length(nh as f32);
             }
@@ -403,6 +406,7 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
             x: map_overflow(el.overflow_x),
             y: map_overflow(el.overflow_y),
         },
+        aspect_ratio: el.aspect_ratio,
         ..taffy::Style::default()
     };
 

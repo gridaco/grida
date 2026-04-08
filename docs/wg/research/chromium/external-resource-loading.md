@@ -1,6 +1,9 @@
 ---
 title: "Chromium External Resource Loading — Lifecycle & Architecture"
+description: "How Chromium fetches, caches, and integrates external resources (images, stylesheets, fonts) into the rendering pipeline."
+keywords: [chromium, resource-loading, images, css, blink, fetch]
 tags: [research, chromium, resource-loading, images, css]
+format: md
 ---
 
 # Chromium External Resource Loading
@@ -16,7 +19,7 @@ architecture patterns relevant to our htmlcss module's image support.
 Chromium classifies external resources by type, each with its own loader
 and caching behavior:
 
-```
+```text
 Resource (abstract base)
   ├── ImageResource          <img src>, CSS background-image, border-image
   ├── CSSStyleSheetResource  <link rel="stylesheet">, @import
@@ -71,7 +74,7 @@ CSS `url()` values and HTML `src` attributes are resolved against the
 document's base URL during style resolution. The resolved URL becomes
 the resource key.
 
-```
+```text
 CSS:     background-image: url("logo.png")
 Resolve: https://example.com/css/../logo.png → https://example.com/logo.png
 ```
@@ -80,7 +83,7 @@ Resolve: https://example.com/css/../logo.png → https://example.com/logo.png
 
 `ResourceFetcher` is the central coordinator. Each Document owns one.
 
-```
+```text
 Document
   └── ResourceFetcher
         ├── MemoryCache lookup (content-addressed)
@@ -120,7 +123,7 @@ Source: `third_party/blink/renderer/platform/loader/fetch/resource_load_schedule
 
 ### ImageResource → ImageResourceContent → Image
 
-```
+```text
 ImageResource (platform fetch layer)
     │ owns
     ▼
@@ -162,7 +165,7 @@ Source: `third_party/blink/renderer/core/loader/resource/image_resource_observer
 
 ### CSS background-image Flow
 
-```
+```text
 CSS Parser
   ↓ url("bg.png")
 CSSImageValue
@@ -185,7 +188,7 @@ which may be a `StylePendingImage` (not yet fetched), a
 
 ### `<img>` Element Flow
 
-```
+```text
 HTML Parser
   ↓ <img src="photo.jpg">
 HTMLImageElement
@@ -223,7 +226,7 @@ Source: `third_party/blink/renderer/core/layout/layout_replaced.cc`
 
 ### Memory Cache (in-process)
 
-```
+```text
 MemoryCache (singleton per renderer process)
   ├── keyed by (URL, request mode, credentials mode)
   ├── strong refs for in-use resources (have observers)

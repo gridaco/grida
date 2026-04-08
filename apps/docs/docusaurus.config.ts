@@ -49,7 +49,11 @@ const config: Config = {
   organizationName: "gridaco",
   projectName: "grida",
   onBrokenLinks: "ignore",
-  onBrokenMarkdownLinks: "warn",
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: "warn",
+    },
+  },
   stylesheets: [require.resolve("katex/dist/katex.min.css")],
   i18n: {
     defaultLocale: "en",

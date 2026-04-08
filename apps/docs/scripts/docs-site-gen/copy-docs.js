@@ -11,12 +11,11 @@ const dest = path.join(__dirname, "../../../docs/docs");
  * use fse.copySync() to copy files.
  */
 function copyAll() {
-  fse.copySync(origin, dest, { overwrite: true }, function (err) {
-    if (err) {
-      console.error(err);
-    } else {
-    }
-  });
+  // Mirror `/docs` into the Docusaurus content dir: remove stale files so
+  // deletions in the source tree do not leave duplicate routes (e.g. README
+  // vs index) in the build output.
+  fse.emptyDirSync(dest);
+  fse.copySync(origin, dest, { overwrite: true });
 }
 
 module.exports = copyAll;

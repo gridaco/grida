@@ -17,6 +17,6 @@ As a design choice, for example, a designer can add a boxshadow & radius to the 
 
 e.g.
 
-- `--ignore=*` - same as [`//@ignore`](../@ignore/README.md)
+- `--ignore=*` - same as `//@ignore` (see [flags index](./index.md))
 - `--ignore=effects`
 - `--ignore=border-radius`

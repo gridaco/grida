@@ -61,6 +61,22 @@ describe("clipboard", () => {
     expect(decoded).toEqual(testPayload);
   });
 
+  it("should decode clipboard data wrapped with Windows fragment markers", () => {
+    // Windows clipboard API adds <!--StartFragment--> and <!--EndFragment--> markers
+    // See: https://learn.microsoft.com/en-us/windows/win32/dataxchg/html-clipboard-format
+    const encoded = io.clipboard.encodeClipboardHtml(testPayload);
+    const windowsHtml = `<html><body><!--StartFragment-->${encoded}<!--EndFragment--></body></html>`;
+    const decoded = io.clipboard.decodeClipboardHtml(windowsHtml);
+    expect(decoded).toEqual(testPayload);
+  });
+
+  it("should decode clipboard data with Windows markers and browser meta tags", () => {
+    const encoded = io.clipboard.encodeClipboardHtml(testPayload);
+    const windowsHtml = `<meta charset='utf-8'><html><head></head><body><!--StartFragment-->${encoded}<!--EndFragment--></body></html>`;
+    const decoded = io.clipboard.decodeClipboardHtml(windowsHtml);
+    expect(decoded).toEqual(testPayload);
+  });
+
   it("should return null for invalid clipboard data", () => {
     // Test with invalid HTML
     expect(io.clipboard.decodeClipboardHtml("<div>invalid</div>")).toBeNull();

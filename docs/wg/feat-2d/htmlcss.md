@@ -87,23 +87,23 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Box Model
 
-| CSS Property                  | Status | Notes                                     |
-| ----------------------------- | ------ | ----------------------------------------- |
-| `width`, `height`             | ✅     | px and auto                               |
-| `width`, `height` (%)         | ⚠️     | % not resolved against parent             |
-| `min-width`, `max-width`      | ✅     | Via Taffy                                 |
-| `min-height`, `max-height`    | ✅     | Via Taffy                                 |
-| `aspect-ratio`                | ❌     |                                           |
-| `inline-size`, `block-size`   | ❌     | Logical sizing not mapped                 |
-| `min-inline-size`, etc.       | ❌     | Logical sizing not mapped                 |
-| `padding` (all sides)         | ✅     | px values                                 |
-| `margin` (all sides)          | ✅     | px, auto; collapsing via Taffy block flow |
-| `box-sizing`                  | ✅     | Via Taffy                                 |
-| `overflow`                    | ✅     | hidden/clip via canvas clip_rect          |
-| `overflow-x`, `overflow-y`    | ⚠️     | Mapped to single overflow axis            |
-| `overflow-clip-margin`        | ❌     |                                           |
-| `overflow-wrap` / `word-wrap` | ❌     |                                           |
-| `resize`                      | ❌     |                                           |
+| CSS Property                  | Status | Notes                                           |
+| ----------------------------- | ------ | ----------------------------------------------- |
+| `width`, `height`             | ✅     | px and auto                                     |
+| `width`, `height` (%)         | ⚠️     | % not resolved against parent                   |
+| `min-width`, `max-width`      | ✅     | Via Taffy                                       |
+| `min-height`, `max-height`    | ✅     | Via Taffy                                       |
+| `aspect-ratio`                | ⚠️     | Via Taffy; broken in flex layouts ([taffy#804]) |
+| `inline-size`, `block-size`   | ❌     | Logical sizing not mapped                       |
+| `min-inline-size`, etc.       | ❌     | Logical sizing not mapped                       |
+| `padding` (all sides)         | ✅     | px values                                       |
+| `margin` (all sides)          | ✅     | px, auto; collapsing via Taffy block flow       |
+| `box-sizing`                  | ✅     | Via Taffy                                       |
+| `overflow`                    | ✅     | hidden/clip via canvas clip_rect                |
+| `overflow-x`, `overflow-y`    | ⚠️     | Mapped to single overflow axis                  |
+| `overflow-clip-margin`        | ❌     |                                                 |
+| `overflow-wrap` / `word-wrap` | ❌     |                                                 |
+| `resize`                      | ❌     |                                                 |
 
 ### Positioning
 
@@ -221,13 +221,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Outline
 
-| CSS Property     | Status | Notes |
-| ---------------- | ------ | ----- |
-| `outline`        | ❌     |       |
-| `outline-color`  | ❌     |       |
-| `outline-style`  | ❌     |       |
-| `outline-width`  | ❌     |       |
-| `outline-offset` | ❌     |       |
+| CSS Property     | Status | Notes                                             |
+| ---------------- | ------ | ------------------------------------------------- |
+| `outline`        | ✅     | Shorthand; solid/dashed/dotted painted            |
+| `outline-color`  | ✅     | currentcolor fallback                             |
+| `outline-style`  | ✅     | auto treated as solid; groove/ridge/etc. fallback |
+| `outline-width`  | ✅     |                                                   |
+| `outline-offset` | ✅     | Positive (outward) and negative (inward)          |
 
 ### Box Shadow
 
@@ -637,3 +637,7 @@ container provides its own bounds. Author padding is preserved.
 
 Inter-element whitespace (newlines/spaces between block elements) is detected
 and dropped during inline group flushing to prevent empty 24px-tall blocks.
+
+<!-- Link references -->
+
+[taffy#804]: https://github.com/DioxusLabs/taffy/issues/804

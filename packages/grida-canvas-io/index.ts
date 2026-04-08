@@ -53,6 +53,24 @@ export namespace io {
     const __data_grida_io_prefix = "data-grida-io-";
     const __data_grida_clipboard = "data-grida-io-clipboard";
 
+    /**
+     * Strips Windows-specific clipboard HTML markers.
+     *
+     * On Windows, the clipboard API wraps HTML content with
+     * `<!--StartFragment-->` and `<!--EndFragment-->` comment markers
+     * (part of the CF_HTML format). These comments can cause XML/HTML
+     * parsers to fail when decoding clipboard content.
+     *
+     * @see https://learn.microsoft.com/en-us/windows/win32/dataxchg/html-clipboard-format
+     * @param html - Raw HTML string from clipboard
+     * @returns HTML string with Windows fragment markers removed
+     */
+    function stripWindowsClipboardMarkers(html: string): string {
+      return html
+        .replace(/<!--StartFragment-->/g, "")
+        .replace(/<!--EndFragment-->/g, "");
+    }
+
     interface ClipboardPayloadBase {
       payload_id: string;
     }
@@ -180,7 +198,7 @@ export namespace io {
           attributeNamePrefix: "@",
           unpairedTags: ["meta"],
         });
-        const parsed = parser.parse(html);
+        const parsed = parser.parse(stripWindowsClipboardMarkers(html));
         const span = parsed.html?.body?.span || parsed.span;
         const data = span?.[`@${__data_grida_clipboard}`];
         if (!data || !data.startsWith("b64:")) return null;
@@ -420,7 +438,8 @@ export namespace io {
             return resolve({ type: "text", text: data });
           });
         } else if (item.kind === "string" && item.type === "text/html") {
-          item.getAsString((html) => {
+          item.getAsString((_html) => {
+            const html = stripWindowsClipboardMarkers(_html);
             // Try Grida clipboard first
             const data = io.clipboard.decodeClipboardHtml(html);
             if (data) {
@@ -482,7 +501,7 @@ export namespace io {
         if (types.includes("text/html")) {
           try {
             const blob = await clipboardItem.getType("text/html");
-            const html = await blob.text();
+            const html = stripWindowsClipboardMarkers(await blob.text());
 
             // Try Grida clipboard first
             const gridaData = decodeClipboardHtml(html);

@@ -44,7 +44,7 @@
     "color-parse": "^2.0.2"
   },
   "devDependencies": {
-    "@types/node": "^22",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@webgpu/types": "^0.1.60",
     "react": "^19.0.0"
