@@ -134,8 +134,8 @@ export class G1DO implements DurableObject {
   ): Promise<void> {
     if (typeof message !== "string") return;
 
-    // Guard: reject oversized messages
-    if (message.length > MAX_MESSAGE_SIZE) {
+    // Guard: reject oversized messages (check UTF-8 byte length, not UTF-16 code units)
+    if (new TextEncoder().encode(message).byteLength > MAX_MESSAGE_SIZE) {
       this._send(ws, {
         type: "error",
         code: "MESSAGE_TOO_LARGE",
@@ -267,10 +267,14 @@ export class G1DO implements DurableObject {
       return;
     }
 
-    // Apply the diff (in-memory + SQLite, atomically)
-    const newClock = this.clock.tick();
-    this.canonical = applyDiff(this.canonical, msg.diff);
+    // Persist first — if storage throws, in-memory state stays consistent.
+    // Compute the next clock value without advancing yet.
+    const newClock = this.clock.value + 1;
     this.storage.applyDiff(msg.diff, newClock);
+
+    // Only advance in-memory state after successful persist
+    this.clock.tick();
+    this.canonical = applyDiff(this.canonical, msg.diff);
 
     // Ack the pusher
     this._send(ws, {

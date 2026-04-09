@@ -165,18 +165,26 @@ describe("computeDiff", () => {
     expect(diff.scenes).toEqual([{ op: "reorder", ids: ["s2", "s1"] }]);
   });
 
-  it("detects scene additions", () => {
+  it("detects scene additions via reorder", () => {
     const before: DocumentState = { nodes: {}, scenes: ["s1"] };
     const after: DocumentState = { nodes: {}, scenes: ["s1", "s2"] };
     const diff = computeDiff(before, after)!;
-    expect(diff.scenes).toContainEqual({ op: "add", id: "s2" });
+    expect(diff.scenes).toEqual([{ op: "reorder", ids: ["s1", "s2"] }]);
   });
 
-  it("detects scene removals", () => {
+  it("detects scene removals via reorder", () => {
     const before: DocumentState = { nodes: {}, scenes: ["s1", "s2"] };
     const after: DocumentState = { nodes: {}, scenes: ["s1"] };
     const diff = computeDiff(before, after)!;
-    expect(diff.scenes).toContainEqual({ op: "remove", id: "s2" });
+    expect(diff.scenes).toEqual([{ op: "reorder", ids: ["s1"] }]);
+  });
+
+  it("preserves ordering with mixed add+remove", () => {
+    const before: DocumentState = { nodes: {}, scenes: ["a", "b", "c"] };
+    const after: DocumentState = { nodes: {}, scenes: ["c", "b", "d"] };
+    const diff = computeDiff(before, after)!;
+    const result = applyDiff(before, diff);
+    expect(result.scenes).toEqual(["c", "b", "d"]);
   });
 });
 

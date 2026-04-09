@@ -145,6 +145,14 @@ describe("validateDiff", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("scene add for non-scene node type fails", () => {
+    const state = stateWith({ r1: makeNode("r1") }); // type is "rectangle"
+    const diff: DocumentDiff = { scenes: [{ op: "add", id: "r1" }] };
+    const result = validateDiff(state, diff);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0].code).toBe("SCENE_ADD_NOT_SCENE");
+  });
+
   it("scene remove for non-existent scene fails", () => {
     const state = stateWith({}, ["s1"]);
     const diff: DocumentDiff = { scenes: [{ op: "remove", id: "s2" }] };

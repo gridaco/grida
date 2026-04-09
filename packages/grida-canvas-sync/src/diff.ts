@@ -127,6 +127,11 @@ function computeNodePatch(
 
 /**
  * Compute scene diff. Returns scene ops or null if identical.
+ *
+ * Always emits a single `reorder` op containing the full target ordering.
+ * This is simpler and more correct than separate add/remove/reorder ops,
+ * because mixed membership + ordering changes (e.g. `[a,b] → [c,b]`)
+ * cannot be reliably reconstructed from individual add/remove ops alone.
  */
 function computeSceneDiff(
   before: readonly NodeId[],
@@ -140,30 +145,9 @@ function computeSceneDiff(
     return null;
   }
 
-  const ops: SceneOp[] = [];
-  const beforeSet = new Set(before);
-  const afterSet = new Set(after);
-
-  // Removed scenes
-  for (const id of before) {
-    if (!afterSet.has(id)) {
-      ops.push({ op: "remove", id });
-    }
-  }
-
-  // Added scenes
-  for (const id of after) {
-    if (!beforeSet.has(id)) {
-      ops.push({ op: "add", id });
-    }
-  }
-
-  // If the set is the same but order changed, emit a reorder
-  if (ops.length === 0) {
-    ops.push({ op: "reorder", ids: after });
-  }
-
-  return ops;
+  // Emit a single reorder that captures the full target state.
+  // applyDiff treats "reorder" as a full replacement of the scenes array.
+  return [{ op: "reorder", ids: after }];
 }
 
 // ---------------------------------------------------------------------------

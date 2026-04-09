@@ -1,13 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  MockServer,
-  MockTransport,
-  createRoom,
-  connectAll,
-  assertConvergence,
-  makeNode,
-  emptyState,
-} from "./helpers";
+import { createRoom, connectAll, assertConvergence, makeNode } from "./helpers";
 import type { DocumentState } from "../src/diff";
 import type { DocumentDiff } from "../src/protocol";
 
@@ -314,7 +306,7 @@ describe("multi-client integration", () => {
       const { server, clients, transports } = createRoom(2, initial);
       connectAll(server, transports);
 
-      const [A, B] = clients;
+      const [A] = clients;
 
       // Disconnect A
       server.disconnectSession("client-0");
@@ -358,7 +350,7 @@ describe("multi-client integration", () => {
       const { server, clients, transports } = createRoom(2);
       connectAll(server, transports);
 
-      const [A, B] = clients;
+      const [A] = clients;
       transports[0].sent = []; // Clear handshake messages
 
       // Simulate rapid property changes (e.g., dragging a resize handle)
@@ -530,7 +522,7 @@ describe("multi-client integration", () => {
       const { server, clients, transports } = createRoom(2, initial);
       connectAll(server, transports);
 
-      const [A, B] = clients;
+      const [A] = clients;
 
       A.pushDiff({
         nodes: { s1: { op: "remove" } },

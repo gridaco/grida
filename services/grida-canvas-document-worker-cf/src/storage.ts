@@ -128,7 +128,7 @@ export class SyncStorage {
       // Update clock
       this._setMetaInt("clock", clock);
 
-      // Prune tombstones if too many
+      // Prune tombstones if too many, recording the floor clock
       this._pruneTombstones(5000);
     });
   }
@@ -209,6 +209,11 @@ export class SyncStorage {
     const currentClock = this._getMetaInt("clock", 0);
     if (sinceClock >= currentClock) return null;
 
+    // If the requested clock is older than the oldest retained tombstone,
+    // we can't guarantee a complete delta — return null to force full state.
+    const tombstoneFloor = this._getMetaInt("tombstone_floor", 0);
+    if (sinceClock < tombstoneFloor) return null;
+
     const nodeOps: Record<NodeId, NodeOp> = {};
     let hasOps = false;
 
@@ -288,8 +293,19 @@ export class SyncStorage {
     const count = (countRows[0]?.cnt as number) ?? 0;
     if (count <= maxCount) return;
 
-    // Delete the oldest tombstones beyond the limit
+    // Find the clock of the oldest tombstone that will survive pruning.
+    // Any client with sinceClock < this value cannot get a reliable delta.
     const toDelete = count - maxCount;
+    const floorRows = this.sql
+      .exec(
+        "SELECT clock FROM tombstones ORDER BY clock ASC LIMIT 1 OFFSET ?",
+        toDelete
+      )
+      .toArray();
+    if (floorRows.length > 0) {
+      this._setMetaInt("tombstone_floor", floorRows[0].clock as number);
+    }
+
     this.sql.exec(
       "DELETE FROM tombstones WHERE node_id IN (SELECT node_id FROM tombstones ORDER BY clock ASC LIMIT ?)",
       toDelete

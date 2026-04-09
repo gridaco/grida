@@ -21,7 +21,7 @@ import type {
   ConnectMessage,
   PresenceState,
 } from "../src/protocol";
-import { type DocumentState, applyDiff, isDiffEmpty } from "../src/diff";
+import { type DocumentState, applyDiff } from "../src/diff";
 import { validateDiff } from "../src/validate";
 import { DocumentClock } from "../src/clock";
 import { SyncClient } from "../src/client";
@@ -320,11 +320,12 @@ export function assertConvergence(
       );
     }
 
-    // Same field values for each node
+    // Same field values for each node (check all keys from both sides)
     for (const id of serverIds) {
       const sNode = serverNodes[id];
       const cNode = clientNodes[id];
-      for (const key of Object.keys(sNode)) {
+      const allKeys = new Set([...Object.keys(sNode), ...Object.keys(cNode)]);
+      for (const key of allKeys) {
         const sv = JSON.stringify(sNode[key]);
         const cv = JSON.stringify(cNode[key]);
         if (sv !== cv) {

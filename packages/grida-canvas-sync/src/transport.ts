@@ -92,6 +92,11 @@ export class WebSocketTransport implements ISyncTransport {
   connect(): void {
     if (this._status !== "disconnected") return;
     this._intentionalClose = false;
+    // Cancel any pending reconnect timer to prevent a second socket
+    if (this._reconnectTimer !== null) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     this._openSocket();
   }
 

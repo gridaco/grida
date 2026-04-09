@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SyncClient, type SyncClientStatus } from "../src/client";
 import type { DocumentState } from "../src/diff";
 import type {
@@ -144,7 +144,7 @@ describe("SyncClient", () => {
     });
 
     it("sends connect message with schema and lastClock", () => {
-      const { transport, client } = createClientAndTransport(emptyState(), 42);
+      const { transport } = createClientAndTransport(emptyState(), 42);
       transport.simulateConnected();
 
       const msg = transport.sent.find((m) => m.type === "connect");

@@ -137,7 +137,7 @@ export class PresenceSyncAdapter {
     this._unsubscribePresence = this._client.on("presenceChange", (peers) => {
       const cursors: Record<string, editor.state.MultiplayerCursor> = {};
 
-      for (const [peerId, presence] of Object.entries(peers)) {
+      for (const presence of Object.values(peers)) {
         if (!presence.cursor || !presence.profile?.color) continue;
 
         const cursor = presence.cursor;

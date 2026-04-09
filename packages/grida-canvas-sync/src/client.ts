@@ -267,11 +267,24 @@ export class SyncClient {
       }
     }
 
+    // Any speculative diffs from the previous connection are stale —
+    // they were never ack'd, so the server doesn't have them.
+    // Requeue them into unsent so they get re-pushed.
+    if (this._speculative.length > 0) {
+      let requeued = this._unsent;
+      for (const spec of this._speculative) {
+        requeued = composeDiffs(spec, requeued);
+      }
+      this._unsent = requeued;
+      this._speculative = [];
+    }
+    this._pushInFlight = false;
+
     this._serverClock = msg.clock;
     this._setStatus("ready");
     this._recomputeLocalState();
 
-    // If we have unsent changes from before reconnect, push them
+    // If we have unsent changes (including requeued speculative), push them
     if (!isDiffEmpty(this._unsent)) {
       this._schedulePush();
     }
@@ -390,18 +403,27 @@ export class SyncClient {
    * Emits "stateChange" if the state actually changed.
    */
   private _recomputeLocalState(): void {
+    // Fast path: if there are no speculative or unsent changes,
+    // the local state IS the canonical state (same reference).
+    if (this._speculative.length === 0 && isDiffEmpty(this._unsent)) {
+      if (this._localState === this._canonical) return;
+      this._localState = this._canonical;
+      this._emit("stateChange", this._localState);
+      return;
+    }
+
+    // Slow path: apply all pending diffs on top of canonical.
     let merged = this._canonical;
 
     for (const spec of this._speculative) {
-      merged = applyDiff(merged, spec);
+      if (!isDiffEmpty(spec)) {
+        merged = applyDiff(merged, spec);
+      }
     }
 
     if (!isDiffEmpty(this._unsent)) {
       merged = applyDiff(merged, this._unsent);
     }
-
-    // Ref check — if nothing changed, skip the event
-    if (merged === this._localState) return;
 
     this._localState = merged;
     this._emit("stateChange", merged);

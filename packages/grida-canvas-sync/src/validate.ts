@@ -62,12 +62,15 @@ export function validateDiff(
   }
 
   if (diff.scenes) {
-    // Build a projected node set (after applying node ops from this diff)
-    const projectedNodes = new Set(Object.keys(state.nodes));
+    // Build a projected node set with types (after applying node ops from this diff)
+    const projectedNodeTypes = new Map<string, string>();
+    for (const [id, node] of Object.entries(state.nodes)) {
+      projectedNodeTypes.set(id, node.type);
+    }
     if (diff.nodes) {
       for (const [id, op] of Object.entries(diff.nodes)) {
-        if (op.op === "put") projectedNodes.add(id);
-        if (op.op === "remove") projectedNodes.delete(id);
+        if (op.op === "put") projectedNodeTypes.set(id, op.node.type);
+        if (op.op === "remove") projectedNodeTypes.delete(id);
       }
     }
 
@@ -75,11 +78,17 @@ export function validateDiff(
     for (const sceneOp of diff.scenes) {
       switch (sceneOp.op) {
         case "add":
-          if (!projectedNodes.has(sceneOp.id)) {
+          if (!projectedNodeTypes.has(sceneOp.id)) {
             errors.push({
               target: sceneOp.id,
               code: "SCENE_ADD_MISSING_NODE",
               message: `Scene add references non-existent node "${sceneOp.id}"`,
+            });
+          } else if (projectedNodeTypes.get(sceneOp.id) !== "scene") {
+            errors.push({
+              target: sceneOp.id,
+              code: "SCENE_ADD_NOT_SCENE",
+              message: `Scene add references node "${sceneOp.id}" with type "${projectedNodeTypes.get(sceneOp.id)}", expected "scene"`,
             });
           }
           break;
