@@ -4,19 +4,17 @@
   "private": true,
   "scripts": {
     "cf-typegen": "wrangler types",
-    "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "wrangler:deploy": "wrangler deploy"
   },
   "dependencies": {
-    "hono": "^4.9.8",
-    "lib0": "^0.2.114",
-    "y-protocols": "^1.0.6",
-    "yjs": "^13.6.27"
+    "@grida/canvas-sync": "workspace:*",
+    "hono": "^4.9.8"
   },
   "devDependencies": {
     "typescript": "^5",
-    "wrangler": "^4.40.1"
+    "wrangler": "^4.81.0"
   }
 }

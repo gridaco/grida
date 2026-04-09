@@ -98,7 +98,7 @@ import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
-import { EditorYSyncPlugin } from "@/grida-canvas/plugins/yjs";
+import { EditorSyncPlugin } from "@/grida-canvas/plugins/sync";
 import { Editor } from "@/grida-canvas/editor";
 import { PlayerAvatar } from "@/components/multiplayer/avatar";
 import grida from "@grida/schema";
@@ -276,7 +276,7 @@ const get_or_create_demo_session_cursor_id = (): string => {
 };
 
 function useSyncMultiplayerCursors(editor: Editor, room_id?: string) {
-  const pluginRef = useRef<EditorYSyncPlugin | null>(null);
+  const pluginRef = useRef<EditorSyncPlugin | null>(null);
 
   useEffect(() => {
     if (!room_id) return;
@@ -284,7 +284,7 @@ function useSyncMultiplayerCursors(editor: Editor, room_id?: string) {
     const cursorId = get_or_create_demo_session_cursor_id();
 
     if (!pluginRef.current) {
-      pluginRef.current = new EditorYSyncPlugin(editor, room_id, {
+      pluginRef.current = new EditorSyncPlugin(editor, room_id, {
         cursor_id: cursorId,
         palette: colors[randomcolorname({ exclude: neutral_colors })],
       });
@@ -327,7 +327,7 @@ export type CanvasPlaygroundProps = {
 
 export default function CanvasPlayground({
   document = distro.playground.EMPTY_DOCUMENT,
-  backend = "dom",
+  backend = "canvas",
   templates,
   src,
   room_id,
