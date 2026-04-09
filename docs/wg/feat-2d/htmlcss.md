@@ -37,7 +37,7 @@ Phase 1: Collect (collect.rs)     Phase 2: Layout (layout.rs)     Phase 3: Paint
 
 | File         | Purpose                                                              |
 | ------------ | -------------------------------------------------------------------- |
-| `mod.rs`     | Public API: `render()`, `measure_content_height()`                   |
+| `mod.rs`     | Public API: `render()`, `measure_content_height()`, `ImageProvider`  |
 | `types.rs`   | CSS-specific enums (Display, Position, Overflow, FlexDirection, ...) |
 | `style.rs`   | StyledElement IR, reusing cg primitives where aligned                |
 | `collect.rs` | Stylo DOM → StyledElement tree (no Skia objects)                     |
@@ -181,7 +181,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | CSS Property              | Status | Notes                               |
 | ------------------------- | ------ | ----------------------------------- |
 | `background-color`        | ✅     | Solid color with border-radius      |
-| `background-image: url()` | ❌     |                                     |
+| `background-image: url()` | ✅     | Via `ImageProvider` trait           |
 | `linear-gradient()`       | ✅     | All directions + angles, multi-stop |
 | `radial-gradient()`       | ✅     | Circle/ellipse                      |
 | `conic-gradient()`        | ✅     | Sweep gradient                      |
@@ -193,7 +193,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `background-clip`         | ❌     |                                     |
 | `background-attachment`   | ❌     |                                     |
 | `background-blend-mode`   | ❌     | Different from `mix-blend-mode`     |
-| `background` (shorthand)  | ⚠️     | Color and gradient layers only      |
+| `background` (shorthand)  | ⚠️     | Color, gradient, and url() layers   |
 
 ### Border
 
@@ -209,12 +209,12 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `border-style: double`     | ❌     | Enum defined, paint falls back to solid    |
 | `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)     |
 | `border` (shorthand)       | ✅     |                                            |
-| `border-image`             | ❌     |                                            |
-| `border-image-outset`      | ❌     |                                            |
-| `border-image-repeat`      | ❌     |                                            |
-| `border-image-slice`       | ❌     |                                            |
-| `border-image-source`      | ❌     |                                            |
-| `border-image-width`       | ❌     |                                            |
+| `border-image`             | ✅     | 9-slice via `ImageProvider`                |
+| `border-image-outset`      | ✅     | Extends border-image area                  |
+| `border-image-repeat`      | ✅     | stretch/repeat/round/space                 |
+| `border-image-slice`       | ✅     | px values; `fill` keyword                  |
+| `border-image-source`      | ✅     | url() via `ImageProvider`                  |
+| `border-image-width`       | ✅     | px values; falls back to border-width      |
 | `border-collapse`          | ❌     |                                            |
 | `border-spacing`           | ❌     |                                            |
 | Logical border properties  | ❌     | `border-block-*`, `border-inline-*`        |
@@ -493,13 +493,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Image Rendering
 
-| CSS Property        | Status | Notes |
-| ------------------- | ------ | ----- |
-| `image-rendering`   | ❌     |       |
-| `image-orientation` | ❌     |       |
-| `object-fit`        | ❌     |       |
-| `object-position`   | ❌     |       |
-| `object-view-box`   | ❌     |       |
+| CSS Property        | Status | Notes                                 |
+| ------------------- | ------ | ------------------------------------- |
+| `image-rendering`   | ❌     |                                       |
+| `image-orientation` | ❌     |                                       |
+| `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown |
+| `object-position`   | ❌     |                                       |
+| `object-view-box`   | ❌     |                                       |
 
 ### Shape (Floats)
 
@@ -539,10 +539,11 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Replaced Elements
 
-| CSS Property          | Status | Notes                     |
-| --------------------- | ------ | ------------------------- |
-| `<img>` rendering     | ❌     | Images not loaded/painted |
-| `<video>`, `<canvas>` | ❌     |                           |
+| CSS Property          | Status | Notes                                             |
+| --------------------- | ------ | ------------------------------------------------- |
+| `<img>` rendering     | ✅     | Via `ImageProvider` trait; placeholder if missing |
+| `object-fit`          | ✅     | Fill, Contain, Cover, None, ScaleDown             |
+| `<video>`, `<canvas>` | ❌     |                                                   |
 
 ### Interaction & UI
 
@@ -612,6 +613,22 @@ Follows Chromium's `kOpenTag`/`kCloseTag` model. `InlineRunItem::OpenBox`
 and `CloseBox` inject Skia placeholders that consume inline space matching
 `padding + border` width. Decoration rects are painted using
 `Paragraph::get_rects_for_range()`.
+
+### Image loading (ImageProvider trait)
+
+Images (`<img src>`, `background-image: url()`) are resolved via a host-provided
+`ImageProvider` trait. The pipeline never blocks on image loads — missing `<img>`
+elements render as placeholder rects, while missing `background-image` layers are
+silently skipped. This mirrors Chromium's non-blocking resource loading pattern
+(see `docs/wg/research/chromium/external-resource-loading.md`).
+
+Three use cases:
+
+- **Pre-resolved (CLI):** Host loads images before calling `render()`. Pass a
+  `HashMap<String, Image>` wrapper as the provider.
+- **Async drain (WASM):** Render with `NoImages` → inspect output → host fetches
+  missing URLs → re-render with populated provider.
+- **Canvas runtime:** `ImageRepository` implements `ImageProvider` directly.
 
 ### Root margin stripping
 

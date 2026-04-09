@@ -280,6 +280,70 @@ pub enum GridPlacement {
     Span(u16),
 }
 
+// ─── Border image types ────────────────────────────────────────────
+
+/// CSS `border-image-repeat` keyword (per axis).
+///
+/// Controls how edge and center slices of a border-image are tiled
+/// to fill their respective regions.
+/// Chromium: `BorderImageRepeatKeyword` in `NinePieceImage`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BorderImageRepeat {
+    /// Scale the slice to fill the region (default).
+    #[default]
+    Stretch,
+    /// Tile the slice; clip if the last tile doesn't fit.
+    Repeat,
+    /// Tile the slice; scale tiles so the last one fits exactly.
+    Round,
+    /// Tile the slice with uniform spacing; no scaling.
+    Space,
+}
+
+// ─── Replaced element types ────────────────────────────────────────
+
+/// CSS `object-fit` for replaced elements (`<img>`, `<video>`).
+///
+/// Wraps `math2::box_fit::BoxFit` (which covers Fill/Contain/Cover/None) and
+/// adds `ScaleDown` (CSS-only, not in the Flutter/design-tool model).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ObjectFit {
+    #[default]
+    Fill,
+    Contain,
+    Cover,
+    None,
+    /// Like `contain`, but never scales up beyond natural size.
+    ScaleDown,
+}
+
+impl ObjectFit {
+    /// Convert to `math2::box_fit::BoxFit` for reuse of `calculate_transform()`.
+    /// `ScaleDown` resolves to `Contain` or `None` depending on whether
+    /// the image is larger than the box.
+    pub fn to_box_fit(
+        self,
+        img_w: f32,
+        img_h: f32,
+        box_w: f32,
+        box_h: f32,
+    ) -> math2::box_fit::BoxFit {
+        match self {
+            Self::Fill => math2::box_fit::BoxFit::Fill,
+            Self::Contain => math2::box_fit::BoxFit::Contain,
+            Self::Cover => math2::box_fit::BoxFit::Cover,
+            Self::None => math2::box_fit::BoxFit::None,
+            Self::ScaleDown => {
+                if img_w > box_w || img_h > box_h {
+                    math2::box_fit::BoxFit::Contain
+                } else {
+                    math2::box_fit::BoxFit::None
+                }
+            }
+        }
+    }
+}
+
 // ─── Transform types ────────────────────────────────────────────────
 
 /// A length-or-percentage value. Percentages are resolved against the

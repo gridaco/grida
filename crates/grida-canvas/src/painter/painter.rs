@@ -2149,6 +2149,7 @@ impl<'a> Painter<'a> {
                                         md_layer.width,
                                         md_layer.height,
                                         self.fonts,
+                                        self.images,
                                     ) {
                                         Ok(picture) => {
                                             let cull = picture.cull_rect();
@@ -2226,6 +2227,7 @@ impl<'a> Painter<'a> {
                                         html_layer.width,
                                         html_layer.height,
                                         self.fonts,
+                                        self.images,
                                     ) {
                                         Ok(picture) => {
                                             // Clip to the picture's actual content bounds

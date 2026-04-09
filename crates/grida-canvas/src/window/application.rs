@@ -1403,9 +1403,29 @@ impl UnknownTargetApplication {
     fn process_image_queue(&mut self) {
         let mut updated = false;
         while let Ok(Some(msg)) = self.image_rx.try_next() {
-            let (hash, url, _, _, _) = self.renderer.add_image(&msg.data);
-            println!("📝 Registered image with renderer: {} ({})", hash, url);
-            updated = true;
+            let ok = if msg.src.starts_with("res://") || msg.src.starts_with("system://") {
+                // Keyed by RID — preserve the caller's key
+                if let Some((w, h, _)) = self.renderer.add_image_with_rid(&msg.data, &msg.src) {
+                    println!("📝 Registered image: {} ({}x{})", msg.src, w, h);
+                    true
+                } else {
+                    false
+                }
+            } else if msg.src.is_empty() {
+                // No key — content-addressed (hash → res://images/{hash})
+                let (hash, url, _, _, _) = self.renderer.add_image(&msg.data);
+                println!("📝 Registered image: {} ({})", hash, url);
+                true
+            } else {
+                // Arbitrary URL key (HTML embed images)
+                if let Some((w, h)) = self.renderer.add_image_by_url(&msg.src, &msg.data) {
+                    println!("📝 Registered HTML image: {} ({}x{})", msg.src, w, h);
+                    true
+                } else {
+                    false
+                }
+            };
+            updated |= ok;
         }
         if updated {
             self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);

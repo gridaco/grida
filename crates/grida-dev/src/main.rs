@@ -243,9 +243,12 @@ fn build_empty_scene() -> Scene {
 }
 
 async fn run_interactive(file: Option<String>, system_fonts: bool) -> Result<()> {
-    // Load initial scene(s). For raster images we also capture the raw bytes
-    // so we can register them with the renderer once it's ready.
-    let mut initial_image: Option<ImageMessage> = None;
+    // Load initial scene(s). For raster images and HTML embeds we also capture
+    // the raw bytes so we can register them with the renderer once it's ready.
+    // `initial_raster`: keyed by res:// RID (raster images)
+    // `initial_html_images`: keyed by URL string (HTML embed images)
+    let mut initial_raster: Option<ImageMessage> = None;
+    let mut initial_html_images: grida_dev::image_loader::ImageData = Vec::new();
     let initial_scenes = if let Some(ref source) = file {
         let path = Path::new(source);
         let ext = path
@@ -255,11 +258,17 @@ async fn run_interactive(file: Option<String>, system_fonts: bool) -> Result<()>
             .unwrap_or_default();
         if !is_url(source) && is_raster_ext(&ext) {
             let raster = load_raster(path)?;
-            initial_image = Some(ImageMessage {
+            initial_raster = Some(ImageMessage {
                 src: raster.rid,
                 data: raster.bytes,
             });
             vec![raster.scene]
+        } else if !is_url(source) && matches!(ext.as_str(), "html" | "htm") {
+            // HTML files: always use embed mode for CLI startup
+            // (interactive drop uses ask_html_import_mode dialog)
+            let result = scene_from_html_embed_path(path).await?;
+            initial_html_images = result.images;
+            vec![result.scene]
         } else {
             load_scenes_from_source(source).await?
         }
@@ -285,11 +294,17 @@ async fn run_interactive(file: Option<String>, system_fonts: bool) -> Result<()>
 
     run_demo_window_with_drop(
         first,
-        move |_renderer, tx, _font_tx, proxy| {
-            // Register initial raster image bytes if present.
-            if let Some(msg) = initial_image {
+        move |renderer, tx, _font_tx, proxy| {
+            // Register initial raster image bytes via channel (res:// RID keyed).
+            if let Some(msg) = initial_raster {
                 let _ = tx.unbounded_send(msg.clone());
                 let _ = proxy.send_event(HostEvent::ImageLoaded(msg));
+            }
+
+            // Register HTML embed images directly on the renderer (URL keyed).
+            // These use arbitrary URL strings as keys, not res:// RIDs.
+            for (url, bytes) in initial_html_images {
+                renderer.add_image_by_url(&url, &bytes);
             }
 
             let mut guard = drop_rx.lock().expect("drop rx mutex poisoned");
@@ -339,7 +354,13 @@ fn scene_from_html_path(path: &Path) -> Result<Scene> {
     })
 }
 
-fn scene_from_html_embed_path(path: &Path) -> Result<Scene> {
+/// Result of loading an HTML embed: the scene plus any pre-loaded image data.
+struct HtmlEmbedScene {
+    scene: Scene,
+    images: grida_dev::image_loader::ImageData,
+}
+
+async fn scene_from_html_embed_path(path: &Path) -> Result<HtmlEmbedScene> {
     use cg::cg::prelude::CGColor;
     use cg::node::factory::NodeFactory;
     use cg::node::scene_graph::{Parent, SceneGraph};
@@ -348,6 +369,14 @@ fn scene_from_html_embed_path(path: &Path) -> Result<Scene> {
     let html_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
 
+    // 1. Extract image URLs from the HTML content
+    let urls = cg::htmlcss::collect_image_urls(&html_source).unwrap_or_default();
+
+    // 2. Resolve and load images (local + remote)
+    let base_dir = path.parent().unwrap_or(Path::new("."));
+    let (preloaded, image_messages) = grida_dev::image_loader::load_images(&urls, base_dir).await;
+
+    // 3. Measure content height with images available for intrinsic sizing
     let width = 800.0f32;
     let temp_fonts = {
         use cg::resources::ByteStore;
@@ -357,8 +386,8 @@ fn scene_from_html_embed_path(path: &Path) -> Result<Scene> {
         repo.enable_system_fallback();
         repo
     };
-    let height =
-        cg::htmlcss::measure_content_height(&html_source, width, &temp_fonts).unwrap_or(600.0);
+    let height = cg::htmlcss::measure_content_height(&html_source, width, &temp_fonts, &preloaded)
+        .unwrap_or(600.0);
 
     let nf = NodeFactory::new();
     let mut node = nf.create_html_embed_node();
@@ -368,13 +397,16 @@ fn scene_from_html_embed_path(path: &Path) -> Result<Scene> {
     let mut graph = SceneGraph::new();
     graph.append_child(Node::HTMLEmbed(node), Parent::Root);
 
-    Ok(Scene {
-        name: path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "HTML (Embed)".to_string()),
-        graph,
-        background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
+    Ok(HtmlEmbedScene {
+        scene: Scene {
+            name: path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "HTML (Embed)".to_string()),
+            graph,
+            background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
+        },
+        images: image_messages,
     })
 }
 
@@ -483,7 +515,13 @@ fn is_raster_ext(ext: &str) -> bool {
     matches!(ext, "png" | "jpg" | "jpeg" | "webp")
 }
 
-async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
+/// Scenes + any pre-loaded image data that needs to be registered with the renderer.
+struct LoadedScenes {
+    scenes: Vec<Scene>,
+    images: grida_dev::image_loader::ImageData,
+}
+
+async fn load_master_scenes_from_path(path: &Path) -> Result<LoadedScenes> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -491,16 +529,36 @@ async fn load_master_scenes_from_path(path: &Path) -> Result<Vec<Scene>> {
         .ok_or_else(|| anyhow::anyhow!("Dropped file has no extension: {}", path.display()))?;
 
     match ext.as_str() {
-        "grida" | "grida1" => load_scenes_from_source(&path.to_string_lossy()).await,
-        "svg" => scene_from_svg_path(path).map(|s| vec![s]),
+        "grida" | "grida1" => {
+            load_scenes_from_source(&path.to_string_lossy())
+                .await
+                .map(|scenes| LoadedScenes {
+                    scenes,
+                    images: Vec::new(),
+                })
+        }
+        "svg" => scene_from_svg_path(path).map(|s| LoadedScenes {
+            scenes: vec![s],
+            images: Vec::new(),
+        }),
         "html" | "htm" => {
             if ask_html_import_mode() {
-                scene_from_html_embed_path(path).map(|s| vec![s])
+                let result = scene_from_html_embed_path(path).await?;
+                Ok(LoadedScenes {
+                    scenes: vec![result.scene],
+                    images: result.images,
+                })
             } else {
-                scene_from_html_path(path).map(|s| vec![s])
+                scene_from_html_path(path).map(|s| LoadedScenes {
+                    scenes: vec![s],
+                    images: Vec::new(),
+                })
             }
         }
-        "md" | "markdown" => scene_from_markdown_embed_path(path).map(|s| vec![s]),
+        "md" | "markdown" => scene_from_markdown_embed_path(path).map(|s| LoadedScenes {
+            scenes: vec![s],
+            images: Vec::new(),
+        }),
         // Raster images are handled separately in start_master_drop_task.
         other => Err(anyhow::anyhow!(
             "Unsupported dropped file type ({}): {}",
@@ -550,9 +608,15 @@ fn start_master_drop_task(
 
             // Non-raster files: load scenes, then resolve any embedded image refs.
             match load_master_scenes_from_path(&path).await {
-                Ok(scenes) => {
-                    let scenes_for_loader = scenes.clone();
-                    if scenes_tx.send(scenes).is_err() {
+                Ok(loaded) => {
+                    // Register HTML embed images via the image channel.
+                    for msg in grida_dev::image_loader::into_image_messages(loaded.images) {
+                        let _ = image_tx.unbounded_send(msg.clone());
+                        let _ = proxy.send_event(HostEvent::ImageLoaded(msg));
+                    }
+
+                    let scenes_for_loader = loaded.scenes.clone();
+                    if scenes_tx.send(loaded.scenes).is_err() {
                         eprintln!("failed to send scenes to window");
                         continue;
                     }
