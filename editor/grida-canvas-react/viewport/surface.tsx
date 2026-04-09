@@ -1613,10 +1613,8 @@ function LayerOverlayRotationHandle({
   };
 
   const cursor_svg_data = useMemo(() => {
-    // TODO: not accurate
     const initial_rotation = anchor_initial_cursor_rotation[anchor];
-    const svg_rotation = rotation === 0 ? initial_rotation : rotation;
-    return cursors.rotate_svg_data(svg_rotation);
+    return cursors.rotate_svg_data(initial_rotation + rotation);
   }, [rotation, anchor]);
 
   return (

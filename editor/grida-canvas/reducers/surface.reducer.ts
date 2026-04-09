@@ -593,14 +593,18 @@ function __self_start_gesture(
       const { selection } = gesture;
 
       self_selectNode(draft, "reset", selection);
+      const rect = context.geometry.getNodeAbsoluteBoundingRect(selection)!;
+      const center: cmath.Vector2 = [
+        rect.x + rect.width / 2,
+        rect.y + rect.height / 2,
+      ];
+      const initial_angle = cmath.vector2.angle(center, draft.pointer.position);
       __self_start_gesture_rotate(draft, {
         selection: selection,
-        initial_bounding_rectangle:
-          context.geometry.getNodeAbsoluteBoundingRect(selection)!,
-        // TODO: the offset of rotation handle relative to the center of the rectangle
+        initial_bounding_rectangle: rect,
         offset: cmath.vector2.zero,
+        initial_angle,
       });
-      //
       break;
     }
     case "translate-vector-controls": {
@@ -910,10 +914,12 @@ function __self_start_gesture_rotate(
     selection,
     offset,
     initial_bounding_rectangle,
+    initial_angle,
   }: {
     selection: string;
     initial_bounding_rectangle: cmath.Rectangle;
     offset: cmath.Vector2;
+    initial_angle: number;
   }
 ) {
   const node = dq.__getNodeById(
@@ -927,6 +933,8 @@ function __self_start_gesture_rotate(
     initial_bounding_rectangle: initial_bounding_rectangle,
     offset: offset,
     selection: selection,
+    initial_angle: initial_angle,
+    initial_rotation: rotation,
     rotation: rotation,
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
