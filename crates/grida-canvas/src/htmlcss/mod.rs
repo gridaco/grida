@@ -224,6 +224,15 @@ fn collect_urls_from_element(el: &style::StyledElement, urls: &mut Vec<String>) 
         }
     }
 
+    // Border image source URL
+    if let Some(ref bi) = el.border_image {
+        if let style::StyleImage::Url(url) = &bi.source {
+            if !url.is_empty() {
+                urls.push(url.clone());
+            }
+        }
+    }
+
     // Recurse into children
     for child in &el.children {
         if let style::StyledNode::Element(child_el) = child {

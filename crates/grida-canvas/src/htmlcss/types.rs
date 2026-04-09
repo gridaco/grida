@@ -280,6 +280,26 @@ pub enum GridPlacement {
     Span(u16),
 }
 
+// ─── Border image types ────────────────────────────────────────────
+
+/// CSS `border-image-repeat` keyword (per axis).
+///
+/// Controls how edge and center slices of a border-image are tiled
+/// to fill their respective regions.
+/// Chromium: `BorderImageRepeatKeyword` in `NinePieceImage`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BorderImageRepeat {
+    /// Scale the slice to fill the region (default).
+    #[default]
+    Stretch,
+    /// Tile the slice; clip if the last tile doesn't fit.
+    Repeat,
+    /// Tile the slice; scale tiles so the last one fits exactly.
+    Round,
+    /// Tile the slice with uniform spacing; no scaling.
+    Space,
+}
+
 // ─── Replaced element types ────────────────────────────────────────
 
 /// CSS `object-fit` for replaced elements (`<img>`, `<video>`).

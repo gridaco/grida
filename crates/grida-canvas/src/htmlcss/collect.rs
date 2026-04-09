@@ -883,6 +883,16 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
         };
     }
 
+    // Box sizing (in Stylo, box-sizing is in the "position" property group)
+    {
+        let pos = style.get_position();
+        use style::properties::longhands::box_sizing::computed_value::T as StyloBoxSizing;
+        el.box_sizing = match pos.clone_box_sizing() {
+            StyloBoxSizing::ContentBox => types::BoxSizing::ContentBox,
+            StyloBoxSizing::BorderBox => types::BoxSizing::BorderBox,
+        };
+    }
+
     // Margin (may be auto or %)
     el.margin = extract_css_margin(style);
 
@@ -891,6 +901,9 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
 
     // Border
     el.border = extract_border(style);
+
+    // Border image (9-slice)
+    el.border_image = extract_border_image(style);
 
     // Border radius
     el.border_radius = extract_border_radius(style);
@@ -1117,6 +1130,109 @@ fn extract_border(style: &ComputedValues) -> BorderBox {
     }
 }
 
+/// Extract CSS `border-image` properties (Chromium: NinePieceImage).
+///
+/// Returns `Some(BorderImage)` when `border-image-source` is set to a
+/// non-none value. The source image URL is extracted the same way as
+/// `background-image: url()` — via `GenericImage::Url` / `ComputedUrl`.
+fn extract_border_image(style: &ComputedValues) -> Option<BorderImage> {
+    let b = style.get_border();
+
+    let source = convert_image(&b.border_image_source)?;
+
+    // border-image-slice: BorderImageSlice { offsets: Rect<NonNegative<NumberOrPercentage>>, fill }
+    let slice_computed = &b.border_image_slice;
+    let s = &slice_computed.offsets;
+    let resolve_nop = |v: &style::values::computed::NonNegativeNumberOrPercentage| -> f32 {
+        use style::values::computed::NumberOrPercentage;
+        match &v.0 {
+            NumberOrPercentage::Number(n) => *n,
+            NumberOrPercentage::Percentage(p) => p.0 * 100.0,
+        }
+    };
+    let slice = EdgeInsets {
+        top: resolve_nop(&s.0),
+        right: resolve_nop(&s.1),
+        bottom: resolve_nop(&s.2),
+        left: resolve_nop(&s.3),
+    };
+
+    // border-image-outset: Rect<NonNegativeLengthOrNumber>
+    let o = &b.border_image_outset;
+    let resolve_lon = |v: &style::values::computed::NonNegativeLengthOrNumber| -> f32 {
+        use style::values::generics::length::GenericLengthOrNumber;
+        match v {
+            GenericLengthOrNumber::Number(n) => n.0,
+            GenericLengthOrNumber::Length(lp) => lp.0.px(),
+        }
+    };
+    let outset = EdgeInsets {
+        top: resolve_lon(&o.0),
+        right: resolve_lon(&o.1),
+        bottom: resolve_lon(&o.2),
+        left: resolve_lon(&o.3),
+    };
+
+    // border-image-repeat: (keyword_x, keyword_y)
+    let repeat = &b.border_image_repeat;
+    let map_repeat =
+        |kw: &style::values::specified::border::BorderImageRepeatKeyword| -> types::BorderImageRepeat {
+            use style::values::specified::border::BorderImageRepeatKeyword as BIR;
+            match kw {
+                BIR::Stretch => types::BorderImageRepeat::Stretch,
+                BIR::Repeat => types::BorderImageRepeat::Repeat,
+                BIR::Round => types::BorderImageRepeat::Round,
+                BIR::Space => types::BorderImageRepeat::Space,
+            }
+        };
+
+    // border-image-width: Rect<BorderImageSideWidth>
+    // Number(n) is a multiplier of the corresponding border-width.
+    // LengthPercentage is an absolute value. Auto = use slice value.
+    let biw = &b.border_image_width;
+    let border_widths = [
+        b.border_top_width.to_f32_px(),
+        b.border_right_width.to_f32_px(),
+        b.border_bottom_width.to_f32_px(),
+        b.border_left_width.to_f32_px(),
+    ];
+    let resolve_bisw =
+        |v: &style::values::computed::BorderImageSideWidth, border_w: f32| -> Option<f32> {
+            use style::values::generics::border::BorderImageSideWidth as BISW;
+            match v {
+                BISW::Number(n) => Some(n.0 * border_w),
+                BISW::LengthPercentage(lp) => Some(lp.0.to_length().map(|l| l.px()).unwrap_or(0.0)),
+                BISW::Auto => None,
+            }
+        };
+    let width = {
+        let t = resolve_bisw(&biw.0, border_widths[0]);
+        let r = resolve_bisw(&biw.1, border_widths[1]);
+        let bv = resolve_bisw(&biw.2, border_widths[2]);
+        let l = resolve_bisw(&biw.3, border_widths[3]);
+        if t.is_some() || r.is_some() || bv.is_some() || l.is_some() {
+            Some(EdgeInsets {
+                top: t.unwrap_or(0.0),
+                right: r.unwrap_or(0.0),
+                bottom: bv.unwrap_or(0.0),
+                left: l.unwrap_or(0.0),
+            })
+        } else {
+            None
+        }
+    };
+
+    Some(BorderImage {
+        source,
+        slice,
+        fill: slice_computed.fill,
+        width,
+        outset,
+        repeat_x: map_repeat(&repeat.0),
+        repeat_y: map_repeat(&repeat.1),
+    })
+}
+
 /// Extract CSS `outline` properties.
 ///
 /// Chromium: `ComputedStyle::OutlineWidth()`, `OutlineColor()`,
@@ -1153,6 +1269,60 @@ fn extract_outline(style: &ComputedValues) -> Outline {
         color,
         style: outline_style,
         offset: o.outline_offset.to_f32_px(),
+    }
+}
+
+/// Convert a Stylo `GenericImage` to our `StyleImage`.
+///
+/// Shared by `extract_background` and `extract_border_image` — both need
+/// the same URL/gradient conversion from Stylo's computed image type.
+fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
+    use style::values::computed::url::ComputedUrl;
+    use style::values::generics::image::{GenericGradient, GenericImage};
+
+    match image {
+        GenericImage::None => None,
+        GenericImage::Url(computed_url) => {
+            let url_str = match computed_url {
+                ComputedUrl::Valid(url) => url.as_str().to_string(),
+                ComputedUrl::Invalid(s) => s.to_string(),
+            };
+            if url_str.is_empty() {
+                None
+            } else {
+                Some(StyleImage::Url(url_str))
+            }
+        }
+        GenericImage::Gradient(gradient) => match gradient.as_ref() {
+            GenericGradient::Linear {
+                direction, items, ..
+            } => {
+                let stops = gradient_items_to_stops(items);
+                if stops.is_empty() {
+                    return None;
+                }
+                let angle_deg = extract_gradient_angle(direction);
+                Some(StyleImage::LinearGradient(LinearGradient {
+                    angle_deg,
+                    stops,
+                }))
+            }
+            GenericGradient::Radial { items, .. } => {
+                let stops = gradient_items_to_stops(items);
+                if stops.is_empty() {
+                    return None;
+                }
+                Some(StyleImage::RadialGradient(RadialGradient { stops }))
+            }
+            GenericGradient::Conic { items, .. } => {
+                let stops = conic_gradient_items_to_stops(items);
+                if stops.is_empty() {
+                    return None;
+                }
+                Some(StyleImage::ConicGradient(ConicGradient { stops }))
+            }
+        },
+        _ => None,
     }
 }
 
@@ -1216,8 +1386,6 @@ fn extract_inset(_style: &ComputedValues) -> CssEdgeInsets {
 }
 
 fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
-    use style::values::generics::image::{GenericGradient, GenericImage};
-
     let bg = style.get_background();
     let mut layers: Vec<BackgroundLayer> = Vec::new();
 
@@ -1231,58 +1399,8 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
 
     // 2. Background image layers (gradients and URL images on top)
     for image in bg.background_image.0.iter() {
-        match image {
-            GenericImage::Gradient(gradient) => match gradient.as_ref() {
-                GenericGradient::Linear {
-                    direction, items, ..
-                } => {
-                    let stops = gradient_items_to_stops(items);
-                    if stops.is_empty() {
-                        continue;
-                    }
-                    let angle_deg = extract_gradient_angle(direction);
-                    layers.push(BackgroundLayer::Image(StyleImage::LinearGradient(
-                        LinearGradient { angle_deg, stops },
-                    )));
-                }
-                GenericGradient::Radial { items, .. } => {
-                    let stops = gradient_items_to_stops(items);
-                    if stops.is_empty() {
-                        continue;
-                    }
-                    layers.push(BackgroundLayer::Image(StyleImage::RadialGradient(
-                        RadialGradient { stops },
-                    )));
-                }
-                GenericGradient::Conic { items, .. } => {
-                    let stops = conic_gradient_items_to_stops(items);
-                    if stops.is_empty() {
-                        continue;
-                    }
-                    layers.push(BackgroundLayer::Image(StyleImage::ConicGradient(
-                        ConicGradient { stops },
-                    )));
-                }
-            },
-            GenericImage::Url(computed_url) => {
-                // Extract URL string from Stylo's ComputedUrl.
-                // ComputedUrl::Valid(Arc<Url>) — resolved absolute URL
-                // ComputedUrl::Invalid(Arc<String>) — unresolved (no base URL)
-                //
-                // Our HTML has no document base URL, so relative URLs like
-                // "bg.png" become ComputedUrl::Invalid. We accept both forms.
-                use style::values::computed::url::ComputedUrl;
-                let url_str = match computed_url {
-                    ComputedUrl::Valid(url) => url.as_str().to_string(),
-                    ComputedUrl::Invalid(s) => s.to_string(),
-                };
-                if !url_str.is_empty() {
-                    layers.push(BackgroundLayer::Image(StyleImage::Url(url_str)));
-                }
-            }
-            _ => {
-                // Other image types (e.g. element(), image-set()) — skip
-            }
+        if let Some(style_image) = convert_image(image) {
+            layers.push(BackgroundLayer::Image(style_image));
         }
     }
 

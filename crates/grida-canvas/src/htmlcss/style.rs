@@ -59,6 +59,11 @@ pub struct StyledElement {
     pub border_radius: CornerRadii,
     // TODO: background-position, background-size, background-repeat
 
+    // ── Border Image (Chromium: NinePieceImage) ──
+    /// CSS `border-image` — replaces normal borders with a 9-slice image.
+    /// `None` when `border-image-source` is not set or is `none`.
+    pub border_image: Option<BorderImage>,
+
     // ── Text / Font (StyleInheritedData — inherited through tree) ──
     pub color: CGColor,
     pub font: FontProps,
@@ -238,6 +243,30 @@ pub struct BorderBox {
     pub right: BorderSide,
     pub bottom: BorderSide,
     pub left: BorderSide,
+}
+
+/// CSS `border-image` resolved properties (Chromium: NinePieceImage).
+///
+/// Replaces normal CSS borders with a 9-slice image. The source image is
+/// divided into 9 regions by `slice` offsets, then each region is drawn
+/// into the corresponding part of the element's border area.
+#[derive(Debug, Clone)]
+pub struct BorderImage {
+    /// Image source — url() or gradient.
+    pub source: StyleImage,
+    /// Slice offsets (top, right, bottom, left) in source image coordinates.
+    /// Defines how the source image is divided into 9 regions.
+    pub slice: EdgeInsets,
+    /// Whether to paint the center region (CSS `fill` keyword).
+    pub fill: bool,
+    /// Border-image rendering widths. `None` = use element's border-width.
+    pub width: Option<EdgeInsets>,
+    /// Outset: extends the border-image area beyond the border box.
+    pub outset: EdgeInsets,
+    /// Repeat mode for horizontal edges (top/bottom).
+    pub repeat_x: super::types::BorderImageRepeat,
+    /// Repeat mode for vertical edges (left/right).
+    pub repeat_y: super::types::BorderImageRepeat,
 }
 
 /// CSS `outline` — uniform stroke painted on top of all content.
@@ -626,6 +655,7 @@ impl Default for StyledElement {
             border: BorderBox::default(),
             background: Vec::new(),
             border_radius: CornerRadii::default(),
+            border_image: None,
             color: CGColor::BLACK,
             font: FontProps::default(),
             outline: Outline::default(),

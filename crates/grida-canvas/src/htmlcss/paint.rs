@@ -127,7 +127,7 @@ fn paint_box(
     paint_widget_background(canvas, style, w, h);
     paint_box_shadow_outer(canvas, style, w, h);
     paint_background(canvas, style, w, h, images);
-    paint_borders(canvas, style, w, h);
+    paint_borders(canvas, style, w, h, images);
     paint_box_shadow_inset(canvas, style, w, h);
 
     // ── Phase 1.5: Replaced content (<img>) ──
@@ -253,6 +253,55 @@ fn mat_mul(a: [f32; 6], b: [f32; 6]) -> [f32; 6] {
     ]
 }
 
+// ─── StyleImage resolution (Chromium: StyleImage::GetImage) ─────────
+
+/// Resolve a `StyleImage` to a concrete Skia `Image`.
+///
+/// This is the single entry point for converting any CSS image value
+/// (url or gradient) to a paintable image. Mirrors Chromium's polymorphic
+/// `StyleImage::GetImage()` — the caller never branches on image type.
+///
+/// - **Url**: looked up from `ImageProvider`. Returns `None` if unavailable.
+/// - **Gradient**: rasterized to a Skia surface at `(w, h)` and snapshotted.
+///   This matches Chromium's `GradientGeneratedImage::Create(shader, size)`.
+fn resolve_style_image(
+    style_image: &StyleImage,
+    w: f32,
+    h: f32,
+    images: &dyn ImageProvider,
+) -> Option<skia_safe::Image> {
+    match style_image {
+        StyleImage::Url(url) => images.get(url).cloned(),
+        StyleImage::LinearGradient(grad) => {
+            rasterize_gradient(w, h, |w, h| build_linear_gradient_shader(grad, w, h))
+        }
+        StyleImage::RadialGradient(grad) => {
+            rasterize_gradient(w, h, |w, h| build_radial_gradient_shader(grad, w, h))
+        }
+        StyleImage::ConicGradient(grad) => {
+            rasterize_gradient(w, h, |w, h| build_conic_gradient_shader(grad, w, h))
+        }
+    }
+}
+
+/// Rasterize a gradient shader to a Skia `Image` at the given size.
+fn rasterize_gradient(
+    w: f32,
+    h: f32,
+    build_shader: impl FnOnce(f32, f32) -> Option<skia_safe::Shader>,
+) -> Option<skia_safe::Image> {
+    let shader = build_shader(w, h)?;
+    let iw = (w.ceil() as i32).max(1);
+    let ih = (h.ceil() as i32).max(1);
+    let info = skia_safe::ImageInfo::new_n32_premul((iw, ih), None);
+    let mut surface = skia_safe::surfaces::raster(&info, None, None)?;
+    let canvas = surface.canvas();
+    let mut paint = Paint::default();
+    paint.set_shader(shader);
+    canvas.draw_rect(Rect::from_wh(w, h), &paint);
+    surface.image_snapshot().into()
+}
+
 // ─── Background painting (Chromium: BoxPainterBase::PaintFillLayers) ──
 
 fn paint_background(
@@ -282,52 +331,24 @@ fn paint_background(
                 paint.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
             }
             BackgroundLayer::Image(style_image) => {
-                match style_image {
-                    StyleImage::LinearGradient(grad) => {
-                        if let Some(shader) = build_linear_gradient_shader(grad, w, h) {
-                            paint.set_shader(shader);
-                        } else {
-                            continue;
-                        }
+                if let Some(image) = resolve_style_image(style_image, w, h, images) {
+                    let src_rect = Rect::from_wh(image.width() as f32, image.height() as f32);
+                    canvas.save();
+                    if !r.is_zero() {
+                        let mut rrect = skia_safe::RRect::new();
+                        rrect.set_rect_radii(rect, &r.to_skia_radii());
+                        canvas.clip_rrect(rrect, ClipOp::Intersect, true);
                     }
-                    StyleImage::RadialGradient(grad) => {
-                        if let Some(shader) = build_radial_gradient_shader(grad, w, h) {
-                            paint.set_shader(shader);
-                        } else {
-                            continue;
-                        }
-                    }
-                    StyleImage::ConicGradient(grad) => {
-                        if let Some(shader) = build_conic_gradient_shader(grad, w, h) {
-                            paint.set_shader(shader);
-                        } else {
-                            continue;
-                        }
-                    }
-                    StyleImage::Url(url) => {
-                        if let Some(image) = images.get(url) {
-                            // Default: stretch image to fill the background area.
-                            // TODO: background-size, background-position, background-repeat
-                            let src_rect =
-                                Rect::from_wh(image.width() as f32, image.height() as f32);
-                            canvas.save();
-                            if !r.is_zero() {
-                                let mut rrect = skia_safe::RRect::new();
-                                rrect.set_rect_radii(rect, &r.to_skia_radii());
-                                canvas.clip_rrect(rrect, ClipOp::Intersect, true);
-                            }
-                            canvas.draw_image_rect(
-                                image,
-                                Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
-                                rect,
-                                &paint,
-                            );
-                            canvas.restore();
-                        }
-                        // Missing image: skip layer (non-blocking)
-                        continue;
-                    }
+                    // TODO: background-size, background-position, background-repeat
+                    canvas.draw_image_rect(
+                        &image,
+                        Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
+                        rect,
+                        &paint,
+                    );
+                    canvas.restore();
                 }
+                continue;
             }
         }
 
@@ -505,9 +526,259 @@ fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<s
     )
 }
 
-// ─── Border painting (Chromium: BoxBorderPainter::PaintBorder) ───────
+// ─── Border image painting (Chromium: NinePieceImagePainter) ────────
 
-fn paint_borders(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
+/// Paint a CSS `border-image` using the 9-slice algorithm.
+///
+/// Returns `true` if the image was painted (caller should skip normal borders),
+/// `false` if the image is unavailable (caller falls through to normal borders).
+///
+/// The 9-slice algorithm divides the source image into 9 regions:
+/// ```text
+/// ┌──────┬──────────┬──────┐
+/// │  TL  │    T     │  TR  │  corners: always scaled to fit
+/// ├──────┼──────────┼───���──┤
+/// │  L   │  center  │  R   │  edges: per border-image-repeat
+/// ├──────┼──────────┼──────┤
+/// │  BL  │    B     │  BR  │  center: only if `fill` is set
+/// └──────┴────���─────┴──────┘
+/// ```
+fn paint_border_image(
+    canvas: &Canvas,
+    bi: &super::style::BorderImage,
+    style: &StyledElement,
+    w: f32,
+    h: f32,
+    images: &dyn ImageProvider,
+) -> bool {
+    // Border-image area: border-box expanded by outset
+    let area_x = -bi.outset.left;
+    let area_y = -bi.outset.top;
+    let area_w = w + bi.outset.left + bi.outset.right;
+    let area_h = h + bi.outset.top + bi.outset.bottom;
+
+    // Resolve the source image — uniform path for url() and gradient()
+    let image = match resolve_style_image(&bi.source, area_w, area_h, images) {
+        Some(img) => img,
+        None => return false,
+    };
+
+    let img_w = image.width() as f32;
+    let img_h = image.height() as f32;
+    if img_w <= 0.0 || img_h <= 0.0 {
+        return false;
+    }
+
+    // Rendering widths: border-image-width or fall back to border-width
+    let rw = bi.width.unwrap_or(crate::cg::prelude::EdgeInsets {
+        top: style.border.top.width,
+        right: style.border.right.width,
+        bottom: style.border.bottom.width,
+        left: style.border.left.width,
+    });
+
+    // Slice offsets in source image coordinates (clamp to image dimensions)
+    let st = bi.slice.top.min(img_h);
+    let sr = bi.slice.right.min(img_w);
+    let sb = bi.slice.bottom.min(img_h);
+    let sl = bi.slice.left.min(img_w);
+
+    let paint = Paint::default();
+
+    canvas.save();
+    canvas.translate((area_x, area_y));
+
+    // ── Draw 4 corners (always scaled to fit) ──
+    // Top-left
+    if sl > 0.0 && st > 0.0 && rw.left > 0.0 && rw.top > 0.0 {
+        let src = Rect::from_xywh(0.0, 0.0, sl, st);
+        let dst = Rect::from_xywh(0.0, 0.0, rw.left, rw.top);
+        canvas.draw_image_rect(
+            &image,
+            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+            dst,
+            &paint,
+        );
+    }
+    // Top-right
+    if sr > 0.0 && st > 0.0 && rw.right > 0.0 && rw.top > 0.0 {
+        let src = Rect::from_xywh(img_w - sr, 0.0, sr, st);
+        let dst = Rect::from_xywh(area_w - rw.right, 0.0, rw.right, rw.top);
+        canvas.draw_image_rect(
+            &image,
+            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+            dst,
+            &paint,
+        );
+    }
+    // Bottom-left
+    if sl > 0.0 && sb > 0.0 && rw.left > 0.0 && rw.bottom > 0.0 {
+        let src = Rect::from_xywh(0.0, img_h - sb, sl, sb);
+        let dst = Rect::from_xywh(0.0, area_h - rw.bottom, rw.left, rw.bottom);
+        canvas.draw_image_rect(
+            &image,
+            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+            dst,
+            &paint,
+        );
+    }
+    // Bottom-right
+    if sr > 0.0 && sb > 0.0 && rw.right > 0.0 && rw.bottom > 0.0 {
+        let src = Rect::from_xywh(img_w - sr, img_h - sb, sr, sb);
+        let dst = Rect::from_xywh(area_w - rw.right, area_h - rw.bottom, rw.right, rw.bottom);
+        canvas.draw_image_rect(
+            &image,
+            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+            dst,
+            &paint,
+        );
+    }
+
+    // Edge source regions
+    let edge_src_w = (img_w - sl - sr).max(0.0);
+    let edge_src_h = (img_h - st - sb).max(0.0);
+    // Edge destination regions
+    let edge_dst_w = (area_w - rw.left - rw.right).max(0.0);
+    let edge_dst_h = (area_h - rw.top - rw.bottom).max(0.0);
+
+    // ── Draw 4 edges ──
+    // Top edge
+    if edge_src_w > 0.0 && st > 0.0 && edge_dst_w > 0.0 && rw.top > 0.0 {
+        let src = Rect::from_xywh(sl, 0.0, edge_src_w, st);
+        let dst = Rect::from_xywh(rw.left, 0.0, edge_dst_w, rw.top);
+        paint_edge_region(canvas, &image, src, dst, bi.repeat_x, true, &paint);
+    }
+    // Bottom edge
+    if edge_src_w > 0.0 && sb > 0.0 && edge_dst_w > 0.0 && rw.bottom > 0.0 {
+        let src = Rect::from_xywh(sl, img_h - sb, edge_src_w, sb);
+        let dst = Rect::from_xywh(rw.left, area_h - rw.bottom, edge_dst_w, rw.bottom);
+        paint_edge_region(canvas, &image, src, dst, bi.repeat_x, true, &paint);
+    }
+    // Left edge
+    if edge_src_h > 0.0 && sl > 0.0 && edge_dst_h > 0.0 && rw.left > 0.0 {
+        let src = Rect::from_xywh(0.0, st, sl, edge_src_h);
+        let dst = Rect::from_xywh(0.0, rw.top, rw.left, edge_dst_h);
+        paint_edge_region(canvas, &image, src, dst, bi.repeat_y, false, &paint);
+    }
+    // Right edge
+    if edge_src_h > 0.0 && sr > 0.0 && edge_dst_h > 0.0 && rw.right > 0.0 {
+        let src = Rect::from_xywh(img_w - sr, st, sr, edge_src_h);
+        let dst = Rect::from_xywh(area_w - rw.right, rw.top, rw.right, edge_dst_h);
+        paint_edge_region(canvas, &image, src, dst, bi.repeat_y, false, &paint);
+    }
+
+    // ── Draw center (only if fill is set) ──
+    if bi.fill && edge_src_w > 0.0 && edge_src_h > 0.0 && edge_dst_w > 0.0 && edge_dst_h > 0.0 {
+        let src = Rect::from_xywh(sl, st, edge_src_w, edge_src_h);
+        let dst = Rect::from_xywh(rw.left, rw.top, edge_dst_w, edge_dst_h);
+        canvas.draw_image_rect(
+            &image,
+            Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+            dst,
+            &paint,
+        );
+    }
+
+    canvas.restore();
+    true
+}
+
+/// Paint a single edge region of a border-image with the specified repeat mode.
+///
+/// `is_horizontal` — true for top/bottom edges (tile along x-axis),
+/// false for left/right edges (tile along y-axis).
+fn paint_edge_region(
+    canvas: &Canvas,
+    image: &skia_safe::Image,
+    src: Rect,
+    dst: Rect,
+    repeat: types::BorderImageRepeat,
+    is_horizontal: bool,
+    paint: &Paint,
+) {
+    match repeat {
+        types::BorderImageRepeat::Stretch => {
+            canvas.draw_image_rect(
+                image,
+                Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                dst,
+                paint,
+            );
+        }
+        types::BorderImageRepeat::Repeat
+        | types::BorderImageRepeat::Round
+        | types::BorderImageRepeat::Space => {
+            // Tile the source slice along the tiling axis.
+            // For Round: adjust tile size so tiles fit exactly.
+            // For Space: add uniform gaps between tiles.
+            let (tile_natural, dst_extent) = if is_horizontal {
+                (src.width() * (dst.height() / src.height()), dst.width())
+            } else {
+                (src.height() * (dst.width() / src.width()), dst.height())
+            };
+
+            if tile_natural <= 0.0 || dst_extent <= 0.0 {
+                return;
+            }
+
+            let (tile_size, gap) = match repeat {
+                types::BorderImageRepeat::Round => {
+                    let n = (dst_extent / tile_natural).round().max(1.0);
+                    (dst_extent / n, 0.0)
+                }
+                types::BorderImageRepeat::Space => {
+                    let n = (dst_extent / tile_natural).floor();
+                    if n <= 1.0 {
+                        (tile_natural, 0.0)
+                    } else {
+                        let total_gap = dst_extent - n * tile_natural;
+                        (tile_natural, total_gap / (n - 1.0))
+                    }
+                }
+                _ => (tile_natural, 0.0), // Repeat: natural size, no gap
+            };
+
+            canvas.save();
+            canvas.clip_rect(dst, ClipOp::Intersect, false);
+
+            let mut offset = 0.0;
+            while offset < dst_extent {
+                let tile_dst = if is_horizontal {
+                    Rect::from_xywh(dst.left + offset, dst.top, tile_size, dst.height())
+                } else {
+                    Rect::from_xywh(dst.left, dst.top + offset, dst.width(), tile_size)
+                };
+                canvas.draw_image_rect(
+                    image,
+                    Some((&src, skia_safe::canvas::SrcRectConstraint::Fast)),
+                    tile_dst,
+                    paint,
+                );
+                offset += tile_size + gap;
+            }
+
+            canvas.restore();
+        }
+    }
+}
+
+// ─── Border painting (Chromium: BoxBorderPainter::PaintBorder) ──────��
+
+fn paint_borders(
+    canvas: &Canvas,
+    style: &StyledElement,
+    w: f32,
+    h: f32,
+    images: &dyn ImageProvider,
+) {
+    // Per CSS spec, border-image replaces normal borders when set.
+    if let Some(ref bi) = style.border_image {
+        if paint_border_image(canvas, bi, style, w, h, images) {
+            return;
+        }
+        // Image not available — fall through to normal border painting
+    }
+
     let b = &style.border;
 
     if b.top.width > 0.0 && b.top.style != types::BorderStyle::None {

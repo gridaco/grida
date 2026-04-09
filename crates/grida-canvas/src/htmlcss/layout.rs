@@ -329,6 +329,10 @@ fn apply_replaced_intrinsic_size(
 
 fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
     let mut style = taffy::Style {
+        box_sizing: match el.box_sizing {
+            types::BoxSizing::ContentBox => taffy::BoxSizing::ContentBox,
+            types::BoxSizing::BorderBox => taffy::BoxSizing::BorderBox,
+        },
         display: match el.display {
             types::Display::Flex => taffy::Display::Flex,
             types::Display::Grid => taffy::Display::Grid,

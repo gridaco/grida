@@ -209,12 +209,12 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `border-style: double`     | ❌     | Enum defined, paint falls back to solid    |
 | `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)     |
 | `border` (shorthand)       | ✅     |                                            |
-| `border-image`             | ❌     |                                            |
-| `border-image-outset`      | ❌     |                                            |
-| `border-image-repeat`      | ❌     |                                            |
-| `border-image-slice`       | ❌     |                                            |
-| `border-image-source`      | ❌     |                                            |
-| `border-image-width`       | ❌     |                                            |
+| `border-image`             | ✅     | 9-slice via `ImageProvider`                |
+| `border-image-outset`      | ✅     | Extends border-image area                  |
+| `border-image-repeat`      | ✅     | stretch/repeat/round/space                 |
+| `border-image-slice`       | ✅     | px values; `fill` keyword                  |
+| `border-image-source`      | ✅     | url() via `ImageProvider`                  |
+| `border-image-width`       | ✅     | px values; falls back to border-width      |
 | `border-collapse`          | ❌     |                                            |
 | `border-spacing`           | ❌     |                                            |
 | Logical border properties  | ❌     | `border-block-*`, `border-inline-*`        |
