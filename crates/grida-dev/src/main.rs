@@ -248,7 +248,7 @@ async fn run_interactive(file: Option<String>, system_fonts: bool) -> Result<()>
     // `initial_raster`: keyed by res:// RID (raster images)
     // `initial_html_images`: keyed by URL string (HTML embed images)
     let mut initial_raster: Option<ImageMessage> = None;
-    let mut initial_html_images: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut initial_html_images: grida_dev::image_loader::ImageData = Vec::new();
     let initial_scenes = if let Some(ref source) = file {
         let path = Path::new(source);
         let ext = path
@@ -357,9 +357,7 @@ fn scene_from_html_path(path: &Path) -> Result<Scene> {
 /// Result of loading an HTML embed: the scene plus any pre-loaded image data.
 struct HtmlEmbedScene {
     scene: Scene,
-    /// Pre-loaded images: (url_key, raw_bytes).
-    /// Keys match what `htmlcss::collect_image_urls()` returns.
-    images: Vec<(String, Vec<u8>)>,
+    images: grida_dev::image_loader::ImageData,
 }
 
 async fn scene_from_html_embed_path(path: &Path) -> Result<HtmlEmbedScene> {
@@ -376,7 +374,7 @@ async fn scene_from_html_embed_path(path: &Path) -> Result<HtmlEmbedScene> {
 
     // 2. Resolve and load images (local + remote)
     let base_dir = path.parent().unwrap_or(Path::new("."));
-    let (preloaded, image_messages) = load_html_images(&urls, base_dir).await;
+    let (preloaded, image_messages) = grida_dev::image_loader::load_images(&urls, base_dir).await;
 
     // 3. Measure content height with images available for intrinsic sizing
     let width = 800.0f32;
@@ -410,91 +408,6 @@ async fn scene_from_html_embed_path(path: &Path) -> Result<HtmlEmbedScene> {
         },
         images: image_messages,
     })
-}
-
-/// Resolve image URLs and load them from disk or network.
-///
-/// Returns a `PreloadedImages` for measurement/rendering and a list of
-/// `(url, bytes)` pairs for registering with the canvas renderer.
-async fn load_html_images(
-    urls: &[String],
-    base_dir: &Path,
-) -> (cg::htmlcss::PreloadedImages, Vec<(String, Vec<u8>)>) {
-    let mut preloaded = cg::htmlcss::PreloadedImages::new();
-    let mut loaded = Vec::new();
-
-    // Partition into local (sync) and remote (async, fetched in parallel)
-    let mut local_results: Vec<(String, Option<Vec<u8>>)> = Vec::new();
-    let mut remote_futures = Vec::new();
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .unwrap_or_default();
-
-    for url in urls {
-        if url.starts_with("http://") || url.starts_with("https://") {
-            let url = url.clone();
-            let client = client.clone();
-            remote_futures.push(async move {
-                eprintln!("  [img] fetching {url} ...");
-                let result = match client.get(&url).send().await {
-                    Ok(resp) => match resp.error_for_status() {
-                        Ok(resp) => match resp.bytes().await {
-                            Ok(b) => {
-                                eprintln!("  [img] fetched {url} ({} bytes)", b.len());
-                                Some(b.to_vec())
-                            }
-                            Err(e) => {
-                                eprintln!("  [img] fetch body failed {url}: {e}");
-                                None
-                            }
-                        },
-                        Err(e) => {
-                            eprintln!("  [img] fetch rejected {url}: {e}");
-                            None
-                        }
-                    },
-                    Err(e) => {
-                        eprintln!("  [img] fetch failed {url}: {e}");
-                        None
-                    }
-                };
-                (url, result)
-            });
-        } else {
-            let resolved = base_dir.join(url);
-            let bytes = match std::fs::read(&resolved) {
-                Ok(b) => Some(b),
-                Err(e) => {
-                    eprintln!(
-                        "  [img] read failed {} (resolved: {}): {e}",
-                        url,
-                        resolved.display()
-                    );
-                    None
-                }
-            };
-            local_results.push((url.clone(), bytes));
-        }
-    }
-
-    // Fetch all remote images concurrently
-    let remote_results = futures::future::join_all(remote_futures).await;
-
-    // Combine results
-    for (url, bytes) in local_results.into_iter().chain(remote_results) {
-        if let Some(bytes) = bytes {
-            preloaded.insert_bytes(url.clone(), &bytes);
-            loaded.push((url, bytes));
-        }
-    }
-
-    if !loaded.is_empty() {
-        eprintln!("  [img] loaded {}/{} images", loaded.len(), urls.len());
-    }
-
-    (preloaded, loaded)
 }
 
 /// Show a dialog asking the user to choose between Embed and Convert for HTML files.
@@ -605,8 +518,7 @@ fn is_raster_ext(ext: &str) -> bool {
 /// Scenes + any pre-loaded image data that needs to be registered with the renderer.
 struct LoadedScenes {
     scenes: Vec<Scene>,
-    /// Pre-loaded images: (url_key, raw_bytes).
-    images: Vec<(String, Vec<u8>)>,
+    images: grida_dev::image_loader::ImageData,
 }
 
 async fn load_master_scenes_from_path(path: &Path) -> Result<LoadedScenes> {
@@ -697,14 +609,8 @@ fn start_master_drop_task(
             // Non-raster files: load scenes, then resolve any embedded image refs.
             match load_master_scenes_from_path(&path).await {
                 Ok(loaded) => {
-                    // Register any HTML embed images via the image channel.
-                    // The application's process_image_queue() detects non-res://
-                    // keys and calls add_image_by_url() accordingly.
-                    for (url, bytes) in loaded.images {
-                        let msg = ImageMessage {
-                            src: url,
-                            data: bytes,
-                        };
+                    // Register HTML embed images via the image channel.
+                    for msg in grida_dev::image_loader::into_image_messages(loaded.images) {
                         let _ = image_tx.unbounded_send(msg.clone());
                         let _ = proxy.send_event(HostEvent::ImageLoaded(msg));
                     }
