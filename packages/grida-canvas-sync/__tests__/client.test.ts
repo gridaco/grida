@@ -21,6 +21,9 @@ class MockTransport implements ISyncTransport {
   private _statusHandlers = new Set<(status: TransportStatus) => void>();
 
   send(message: ClientMessage): void {
+    if (this.status !== "connected") {
+      throw new Error("MockTransport: not connected");
+    }
     this.sent.push(message);
   }
 
@@ -68,9 +71,10 @@ class MockTransport implements ISyncTransport {
 
 function makeNode(
   id: string,
-  props: Record<string, unknown> = {}
+  props: Record<string, unknown> = {},
+  type: string = "rectangle"
 ): SerializedNode {
-  return { type: "rectangle", id, ...props } as SerializedNode;
+  return { type, id, ...props } as SerializedNode;
 }
 
 function emptyState(): DocumentState {
@@ -453,21 +457,31 @@ describe("SyncClient", () => {
       const { transport, client } = createClientAndTransport();
       connectClient(transport, client);
 
-      const handler = vi.fn();
-      client.on("stateChange", handler);
+      const stateHandler = vi.fn();
+      const errorHandler = vi.fn();
+      client.on("stateChange", stateHandler);
+      client.on("error", errorHandler);
+
+      // Record call count before destroy
+      const callsBefore = stateHandler.mock.calls.length;
 
       client.destroy();
+      expect(client.status).toBe("disconnected");
 
-      // Delivering a message after destroy should not call the handler
+      // Delivering messages after destroy should not call any handler
       transport.deliver({
         type: "patch",
         serverClock: 1,
         diff: { nodes: { n1: { op: "remove" } } },
       });
+      transport.deliver({
+        type: "error",
+        code: "TEST",
+        message: "should be ignored",
+      });
 
-      // Handler might have been called during destroy's disconnect,
-      // but the point is the event system is torn down
-      expect(client.status).toBe("disconnected");
+      expect(stateHandler.mock.calls.length).toBe(callsBefore);
+      expect(errorHandler).not.toHaveBeenCalled();
     });
   });
 });
