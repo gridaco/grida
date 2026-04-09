@@ -342,8 +342,6 @@ const PLACEHOLDER_COLOR: CGColor = CGColor {
     a: 255,
 };
 
-/// Detect form control elements and populate `StyledElement::widget`.
-///
 // ─── Replaced element (<img>) detection ────────────────────────────
 
 /// Extract `<img>` attributes into a `ReplacedContent`.
