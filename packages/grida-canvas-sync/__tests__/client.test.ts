@@ -112,9 +112,11 @@ function connectClient(
       scenes: serverState.scenes,
     });
   } else {
+    // clock: 1 means the server has been initialized (not empty).
+    // Use clock: 0 only for empty-room seed tests.
     transport.deliver({
       type: "connect_ok",
-      clock: 0,
+      clock: 1,
     });
   }
 }
@@ -153,6 +155,31 @@ describe("SyncClient", () => {
         schema: "0.91.0-test",
         lastClock: 42,
       });
+    });
+
+    it("preserves local state when server responds with no state and no diff", () => {
+      const initialState: DocumentState = {
+        nodes: {
+          n1: makeNode("n1", { width: 100 }),
+          scene: makeNode("scene", { name: "Main" }, "scene"),
+        },
+        scenes: ["scene"],
+      };
+      const { transport, client } = createClientAndTransport(initialState);
+      transport.simulateConnected();
+
+      // Server responds with empty room — no state, no diff
+      transport.deliver({
+        type: "connect_ok",
+        clock: 0,
+      });
+
+      // Client should NOT overwrite its local state with empty
+      expect(client.state.nodes["n1"]).toEqual(makeNode("n1", { width: 100 }));
+      expect(client.state.nodes["scene"]).toBeDefined();
+      expect(client.state.scenes).toEqual(["scene"]);
+      expect(client.serverClock).toBe(0);
+      // Note: SyncClient does NOT seed the room — that's the adapter's responsibility
     });
 
     it("applies server state on connect_ok with full state", () => {

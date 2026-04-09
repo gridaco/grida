@@ -266,6 +266,7 @@ export class SyncClient {
         this._canonical = { ...this._canonical, scenes: msg.scenes };
       }
     }
+    // else: no state, no diff — server has nothing new. Canonical stays as-is.
 
     // Any speculative diffs from the previous connection are stale —
     // they were never ack'd, so the server doesn't have them.

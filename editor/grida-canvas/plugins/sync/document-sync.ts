@@ -23,6 +23,7 @@ import { documentToState, stateToDocument } from "./serialize";
 export class DocumentSyncAdapter {
   private _unsubscribeEditor: (() => void) | null = null;
   private _unsubscribeClient: (() => void) | null = null;
+  private _unsubscribeStatus: (() => void) | null = null;
 
   /**
    * Mutex to prevent feedback loops:
@@ -41,6 +42,9 @@ export class DocumentSyncAdapter {
    */
   lastSyncedState: DocumentState;
 
+  /** Whether we've already seeded the room. */
+  private _seeded = false;
+
   constructor(
     private readonly _editor: Editor,
     private readonly _client: SyncClient
@@ -49,6 +53,7 @@ export class DocumentSyncAdapter {
 
     this._setupEditorToClient();
     this._setupClientToEditor();
+    this._setupRoomSeed();
   }
 
   // -----------------------------------------------------------------------
@@ -118,13 +123,45 @@ export class DocumentSyncAdapter {
   }
 
   // -----------------------------------------------------------------------
+  // Room seeding (adapter-level policy)
+  // -----------------------------------------------------------------------
+
+  /**
+   * When the client connects to an empty room (serverClock === 0),
+   * push the editor's local document to seed the room.
+   *
+   * This is an editor-level policy decision, not a sync protocol concern.
+   * The SyncClient is agnostic — it just faithfully applies server state.
+   * The adapter knows "I have a local document and the room is empty."
+   */
+  private _setupRoomSeed(): void {
+    this._unsubscribeStatus = this._client.on("statusChange", (status) => {
+      if (status !== "ready") return;
+      if (this._seeded) return;
+      this._seeded = true;
+
+      // If the server clock is 0, the room is empty — seed it.
+      if (this._client.serverClock === 0) {
+        const localState = documentToState(this._editor.doc.state.document);
+        const seedDiff = computeDiff({ nodes: {}, scenes: [] }, localState);
+        if (seedDiff) {
+          this._client.pushDiff(seedDiff);
+          this.lastSyncedState = localState;
+        }
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------------
   // Cleanup
   // -----------------------------------------------------------------------
 
   destroy(): void {
     this._unsubscribeEditor?.();
     this._unsubscribeClient?.();
+    this._unsubscribeStatus?.();
     this._unsubscribeEditor = null;
     this._unsubscribeClient = null;
+    this._unsubscribeStatus = null;
   }
 }
