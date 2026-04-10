@@ -3217,24 +3217,14 @@ export namespace format {
           node.stroke_dash_array
         );
 
-        // Create VariableWidthProfile (empty for now)
-        const emptyStopsOffset = fbs.VariableWidthProfile.createStopsVector(
-          builder,
-          []
-        );
-        fbs.VariableWidthProfile.startVariableWidthProfile(builder);
-        fbs.VariableWidthProfile.addStops(builder, emptyStopsOffset);
-        const strokeWidthProfileOffset =
-          fbs.VariableWidthProfile.endVariableWidthProfile(builder);
-
         // Create StrokeGeometryTrait table
+        // NOTE: VariableWidthProfile is intentionally omitted when there are
+        // no stops. The FBS field is optional — omitting it yields `None` on
+        // the Rust decode side, which correctly routes to the regular stroke
+        // renderer instead of the variable-width stroke path.
         fbs.StrokeGeometryTrait.startStrokeGeometryTrait(builder);
         fbs.StrokeGeometryTrait.addStrokeWidth(builder, node.stroke_width ?? 0);
         fbs.StrokeGeometryTrait.addStrokeStyle(builder, strokeStyleOffset);
-        fbs.StrokeGeometryTrait.addStrokeWidthProfile(
-          builder,
-          strokeWidthProfileOffset
-        );
         return fbs.StrokeGeometryTrait.endStrokeGeometryTrait(builder);
       }
 
