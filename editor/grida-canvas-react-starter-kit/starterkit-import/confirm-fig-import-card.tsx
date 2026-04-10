@@ -1,5 +1,6 @@
 import React from "react";
-import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { LayersIcon, BoxIcon } from "lucide-react";
 import type { FigFileImportResult } from "./use-fig-file-import";
 
 /**
@@ -12,30 +13,47 @@ export function ConfirmFigImportCard({
 }: {
   parsed: FigFileImportResult;
 }) {
+  const totalNodes = parsed.scenes.reduce((s, sc) => s + sc.nodeCount, 0);
+
   return (
-    <Card className="p-4 space-y-4">
+    <div className="space-y-4">
       {parsed.thumbnailUrl && (
-        <div className="flex justify-center">
+        <div className="flex justify-center rounded-lg border border-border bg-muted/30 p-4">
           {/* eslint-disable-next-line @next/next/no-img-element -- Intentional: thumbnail from parsed Figma file. */}
           <img
             src={parsed.thumbnailUrl}
             alt="File thumbnail"
-            className="max-w-full max-h-48 rounded-md border border-border object-contain"
+            className="max-w-full max-h-48 rounded-md object-contain"
           />
         </div>
       )}
-      <div className="space-y-2">
-        <p className="text-sm font-medium">
-          This will add {parsed.sceneCount} new scene(s) to your document:
-        </p>
-        <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside max-h-40 overflow-y-auto">
-          {parsed.scenes.map((scene, i) => (
-            <li key={i}>
-              {scene.name} ({scene.nodeCount} node(s))
-            </li>
-          ))}
-        </ul>
+
+      {/* Summary badges */}
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary">
+          <LayersIcon className="size-3" />
+          {parsed.sceneCount} scene{parsed.sceneCount !== 1 ? "s" : ""}
+        </Badge>
+        <Badge variant="secondary">
+          <BoxIcon className="size-3" />
+          {totalNodes} node{totalNodes !== 1 ? "s" : ""}
+        </Badge>
       </div>
-    </Card>
+
+      {/* Scene list */}
+      <div className="rounded-lg border border-border divide-y divide-border max-h-48 overflow-y-auto">
+        {parsed.scenes.map((scene, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between px-3 py-2 text-sm"
+          >
+            <span className="font-medium truncate">{scene.name}</span>
+            <span className="text-xs text-muted-foreground shrink-0 ml-3">
+              {scene.nodeCount} node{scene.nodeCount !== 1 ? "s" : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -9,9 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { FigmaLogoIcon } from "@radix-ui/react-icons";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { FigmaLogoIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import { FileIcon, CheckCircle2Icon } from "lucide-react";
 import { FileDropzone } from "./file-dropzone";
 import {
   useFigFileImport,
@@ -51,21 +52,28 @@ export function ImportFromFigmaSlidesDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <Alert>
+          <InfoCircledIcon />
+          <AlertTitle>File Upload Only</AlertTitle>
+          <AlertDescription>
+            <p>
+              Figma Slides (<code>.deck</code>) cannot be accessed via the Figma
+              REST API. To import, save the deck locally from Figma first (File
+              &rarr; Save local copy), then upload the <code>.deck</code> file
+              here.
+            </p>
+          </AlertDescription>
+        </Alert>
+
         <div className="space-y-4">
           {fig.step === "select" && (
             <>
-              <div>
-                <Label className="text-sm">Select a .deck file</Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Import Figma Slides pages as Grida scenes.
-                </p>
-              </div>
-
               <FileDropzone
                 accept=".deck"
                 onFileSelected={fig.setSelectedFile}
-                buttonText="Select .deck File or Drag & Drop"
-                loadingText="Processing..."
+                buttonText="Click to browse or drag & drop"
+                description="Accepts .deck files from Figma Slides"
+                loadingText="Parsing deck..."
                 dragText="Drop .deck file here"
                 errorMessage="Please drop a .deck file"
                 validateFile={validateDeckFile}
@@ -74,11 +82,22 @@ export function ImportFromFigmaSlidesDialog({
 
               {fig.selectedFile && (
                 <div className="space-y-2">
-                  <p className="text-sm">
-                    <strong>Selected:</strong> {fig.selectedFile.name}
-                  </p>
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+                    <FileIcon className="size-4 text-muted-foreground shrink-0" />
+                    <span className="truncate font-medium">
+                      {fig.selectedFile.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                      {(fig.selectedFile.size / 1024).toFixed(0)} KB
+                    </span>
+                  </div>
                   {fig.parsing && (
-                    <Progress value={fig.progress} className="w-full" />
+                    <div className="space-y-1">
+                      <Progress value={fig.progress} className="w-full h-1.5" />
+                      <p className="text-xs text-muted-foreground">
+                        Parsing slides... {fig.progress}%
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -87,11 +106,10 @@ export function ImportFromFigmaSlidesDialog({
 
           {fig.step === "confirm" && fig.parsed && (
             <>
-              <div>
-                <Label className="text-sm">Confirm Import</Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Review the scenes that will be imported from{" "}
-                  <strong>{fig.selectedFile?.name}</strong>
+              <div className="flex items-center gap-2">
+                <CheckCircle2Icon className="size-4 text-emerald-500 shrink-0" />
+                <p className="text-sm">
+                  Ready to import from <strong>{fig.selectedFile?.name}</strong>
                 </p>
               </div>
 
@@ -105,7 +123,10 @@ export function ImportFromFigmaSlidesDialog({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           {fig.step === "confirm" && (
-            <Button onClick={() => fig.runImport(close)}>Import</Button>
+            <Button onClick={() => fig.runImport(close)}>
+              Import {fig.parsed?.sceneCount} Scene
+              {fig.parsed?.sceneCount !== 1 ? "s" : ""}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

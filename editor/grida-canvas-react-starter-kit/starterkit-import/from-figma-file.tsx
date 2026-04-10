@@ -9,7 +9,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
@@ -17,6 +16,7 @@ import {
   FigmaLogoIcon,
   InfoCircledIcon,
 } from "@radix-ui/react-icons";
+import { FileIcon, CheckCircle2Icon } from "lucide-react";
 import Link from "next/link";
 import { Kbd } from "@/components/ui/kbd";
 import { FileDropzone } from "./file-dropzone";
@@ -83,39 +83,46 @@ export function ImportFromFigmaFileDialog({
         <div className="space-y-4">
           {fig.step === "select" && (
             <>
-              <div>
-                <Label className="text-sm">Select a .fig file</Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Import Figma pages as Grida scenes.{" "}
-                  <Link
-                    href="/docs/with-figma/guides/how-to-get-fig-file"
-                    target="_blank"
-                    className="inline-flex items-center gap-1 underline hover:opacity-70"
-                  >
-                    How to get a .fig file
-                    <ExternalLinkIcon className="size-3" />
-                  </Link>
-                </p>
-              </div>
-
               <FileDropzone
                 accept=".fig,.deck"
                 onFileSelected={fig.setSelectedFile}
-                buttonText="Select .fig File or Drag & Drop"
-                loadingText="Processing..."
+                buttonText="Click to browse or drag & drop"
+                description="Accepts .fig and .deck files"
+                loadingText="Parsing file..."
                 dragText="Drop .fig file here"
                 errorMessage="Please drop a .fig file"
                 validateFile={validateFigFile}
                 disabled={fig.parsing}
               />
+              <p className="text-xs text-muted-foreground">
+                <Link
+                  href="/docs/with-figma/guides/how-to-get-fig-file"
+                  target="_blank"
+                  className="inline-flex items-center gap-1 underline hover:opacity-70"
+                >
+                  How to get a .fig file
+                  <ExternalLinkIcon className="size-3" />
+                </Link>
+              </p>
 
               {fig.selectedFile && (
                 <div className="space-y-2">
-                  <p className="text-sm">
-                    <strong>Selected:</strong> {fig.selectedFile.name}
-                  </p>
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+                    <FileIcon className="size-4 text-muted-foreground shrink-0" />
+                    <span className="truncate font-medium">
+                      {fig.selectedFile.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                      {(fig.selectedFile.size / 1024).toFixed(0)} KB
+                    </span>
+                  </div>
                   {fig.parsing && (
-                    <Progress value={fig.progress} className="w-full" />
+                    <div className="space-y-1">
+                      <Progress value={fig.progress} className="w-full h-1.5" />
+                      <p className="text-xs text-muted-foreground">
+                        Parsing file... {fig.progress}%
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -124,11 +131,10 @@ export function ImportFromFigmaFileDialog({
 
           {fig.step === "confirm" && fig.parsed && (
             <>
-              <div>
-                <Label className="text-sm">Confirm Import</Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Review the scenes that will be imported from{" "}
-                  <strong>{fig.selectedFile?.name}</strong>
+              <div className="flex items-center gap-2">
+                <CheckCircle2Icon className="size-4 text-emerald-500 shrink-0" />
+                <p className="text-sm">
+                  Ready to import from <strong>{fig.selectedFile?.name}</strong>
                 </p>
               </div>
 
@@ -142,7 +148,10 @@ export function ImportFromFigmaFileDialog({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           {fig.step === "confirm" && (
-            <Button onClick={() => fig.runImport(close)}>Import</Button>
+            <Button onClick={() => fig.runImport(close)}>
+              Import {fig.parsed?.sceneCount} Scene
+              {fig.parsed?.sceneCount !== 1 ? "s" : ""}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
