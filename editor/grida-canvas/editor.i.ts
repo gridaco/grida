@@ -1518,12 +1518,32 @@ export namespace editor.state {
   }
 
   /**
+   * Isolation mode state.
+   *
+   * Isolation restricts the viewport to a single node's subtree: only the
+   * isolated node and its descendants are drawn and hit-tested. This is the
+   * canonical "which slide am I viewing" state in the slides editor, and
+   * is fully independent of selection.
+   */
+  export interface IEditorIsolationState {
+    /**
+     * When set, the viewport is isolated to this node's subtree:
+     * only the node and its descendants are drawn and hit-tested.
+     * `null` means no isolation (full scene visible).
+     *
+     * Persisted in undo/redo history.
+     */
+    isolation_root_node_id: string | null;
+  }
+
+  /**
    * @persistent
    */
   export interface IDocumentState
     extends
       editor.state.IMinimalDocumentState,
-      editor.state.IScenePersistenceState {
+      editor.state.IScenePersistenceState,
+      editor.state.IEditorIsolationState {
     /**
      * current scene id
      */
@@ -1579,7 +1599,8 @@ export namespace editor.state {
    */
   export const __RESET_SCENE_STATE: editor.state.IScenePersistenceState &
     editor.state.ISceneSurfaceState &
-    editor.state.IEditorFeatureRepeatableDuplicateState = {
+    editor.state.IEditorFeatureRepeatableDuplicateState &
+    editor.state.IEditorIsolationState = {
     dragging: false,
     active_duplication: null,
     content_edit_mode: undefined,
@@ -1591,6 +1612,7 @@ export namespace editor.state {
     selection: [],
     hits: [],
     surface_snapping: undefined,
+    isolation_root_node_id: null,
   };
 
   export interface IEditorStateInit

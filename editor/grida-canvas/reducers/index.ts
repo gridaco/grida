@@ -78,6 +78,16 @@ export default function reducer(
           Object.assign(draft, editor.state.__RESET_SCENE_STATE);
           return;
         }
+        case "isolation": {
+          const { node_id } = action;
+          if (node_id !== null) {
+            // Validate: node must exist in the document.
+            const node = state.document.nodes[node_id];
+            if (!node) return;
+          }
+          draft.isolation_root_node_id = node_id;
+          return;
+        }
         case "transform": {
           const { transform, sync } = action;
           draft.transform = transform;

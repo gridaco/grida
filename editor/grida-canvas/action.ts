@@ -40,6 +40,7 @@ export type EditorAction =
 export type DocumentAction =
   | LoadSceneAction
   | SceneAction
+  | SetIsolationAction
   | EditorSelectAction
   | EditorTitleBarHoverAction
   | EditorUITriggeredHoverAction
@@ -198,6 +199,22 @@ export interface __InternalWebfontListLoadAction {
 export interface LoadSceneAction {
   type: "load";
   scene: string;
+}
+
+/**
+ * Set or clear isolation mode.
+ *
+ * When `node_id` is a string, the viewport is restricted to that node's
+ * subtree (only it and its descendants are drawn and hit-tested).
+ * Pass `null` to clear isolation.
+ *
+ * In the slides editor, each slide is a root tray and isolation is the
+ * canonical "which slide am I viewing" state — fully independent of
+ * selection.
+ */
+export interface SetIsolationAction {
+  type: "isolation";
+  node_id: string | null;
 }
 
 export type SceneAction =
