@@ -2,6 +2,7 @@
   "recommendations": [
     "oxc.oxc-vscode",
     "dbaeumer.vscode-eslint",
+    "rust-lang.rust-analyzer",
     "editorconfig.editorconfig"
   ]
 }
