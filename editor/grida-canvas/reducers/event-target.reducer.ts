@@ -1252,7 +1252,7 @@ function __get_insertion_target(
   const hits = state.hits.slice();
   for (const hit of hits) {
     const node = dq.__getNodeById(state, hit);
-    if (node.type === "container") return hit;
+    if (node.type === "container" || node.type === "tray") return hit;
   }
   return null;
 }
