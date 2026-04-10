@@ -73,6 +73,83 @@ fn main() {
     )
     .expect("Valid geometry");
 
+    // Curve with a sharp direction change at the vertex (hook shape) —
+    // previously this produced a "hinge" artifact at the junction point.
+    let curve_4_profile = VarWidthProfile {
+        base: 2.0,
+        stops: vec![
+            WidthStop { u: 0.00, r: 5.0 },
+            WidthStop { u: 0.5, r: 30.0 },
+            WidthStop { u: 1.00, r: 15.0 },
+        ],
+    };
+    let curve_4 = PiecewiseVectorNetworkGeometry::new(
+        vec![
+            (200.0, 1400.0), // bottom of vertical stem
+            (200.0, 1100.0), // top of stem / start of curve
+            (800.0, 1100.0), // end of hook
+        ],
+        vec![
+            // Straight vertical segment (stem)
+            VectorNetworkSegment::ab(0, 1),
+            // Curved horizontal segment (hook)
+            VectorNetworkSegment {
+                a: 1,
+                b: 2,
+                ta: (0.0, -200.0),
+                tb: (0.0, 200.0),
+            },
+        ],
+    )
+    .expect("Valid geometry");
+
+    // Multi-segment S-curve with bezier segments — tests smooth transitions
+    let curve_5_profile = VarWidthProfile {
+        base: 2.0,
+        stops: vec![
+            WidthStop { u: 0.00, r: 3.0 },
+            WidthStop { u: 0.25, r: 25.0 },
+            WidthStop { u: 0.75, r: 25.0 },
+            WidthStop { u: 1.00, r: 3.0 },
+        ],
+    };
+    let curve_5 = PiecewiseVectorNetworkGeometry::new(
+        vec![
+            (1000.0, 1400.0),
+            (1000.0, 1200.0),
+            (1400.0, 1100.0),
+            (1800.0, 1200.0),
+            (1800.0, 1400.0),
+        ],
+        vec![
+            VectorNetworkSegment {
+                a: 0,
+                b: 1,
+                ta: (0.0, -60.0),
+                tb: (0.0, 60.0),
+            },
+            VectorNetworkSegment {
+                a: 1,
+                b: 2,
+                ta: (120.0, 0.0),
+                tb: (-120.0, 0.0),
+            },
+            VectorNetworkSegment {
+                a: 2,
+                b: 3,
+                ta: (120.0, 0.0),
+                tb: (-120.0, 0.0),
+            },
+            VectorNetworkSegment {
+                a: 3,
+                b: 4,
+                ta: (0.0, 60.0),
+                tb: (0.0, -60.0),
+            },
+        ],
+    )
+    .expect("Valid geometry");
+
     // Render using VNPainter with direct variable width stroke
     let mut surface = surfaces::raster_n32_premul((2550, 3300)).expect("surface");
     let canvas = surface.canvas();
@@ -82,6 +159,8 @@ fn main() {
     painter.draw_stroke_variable_width(&curve_1, &[Paint::from(CGColor::BLACK)], &width_profile_1);
     painter.draw_stroke_variable_width(&curve_2, &[Paint::from(CGColor::BLACK)], &width_profile_1);
     painter.draw_stroke_variable_width(&curve_3, &[Paint::from(CGColor::BLACK)], &width_profile_1);
+    painter.draw_stroke_variable_width(&curve_4, &[Paint::from(CGColor::BLACK)], &curve_4_profile);
+    painter.draw_stroke_variable_width(&curve_5, &[Paint::from(CGColor::BLACK)], &curve_5_profile);
 
     let image = surface.image_snapshot();
     let data = image
