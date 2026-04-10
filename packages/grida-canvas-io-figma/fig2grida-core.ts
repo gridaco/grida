@@ -769,7 +769,7 @@ export function figFileToGridaDocument(
   const pageIndex = options?.pageIndex;
 
   let pages = [...figFile.pages].sort((a, b) =>
-    a.sortkey.localeCompare(b.sortkey)
+    a.sortkey < b.sortkey ? -1 : a.sortkey > b.sortkey ? 1 : 0
   );
 
   // Scope to specific pages by index if requested (and not scoped by node).
@@ -807,6 +807,79 @@ export function figFileToGridaDocument(
   }
 
   const merged = mergeFigPages(pageResults, (ref) => extractedImages.get(ref));
+
+  return {
+    document: merged.document,
+    assets: merged.imageRecord,
+    imageRefsUsed: Array.from(merged.imageRefsUsed),
+    pageNames: merged.pageNames,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// deckBytesToSlidesDocument — .deck → Grida Slides document
+// ---------------------------------------------------------------------------
+
+export interface DeckToSlidesOptions extends Pick<
+  iofigma.restful.factory.SlidesFactoryContext,
+  | "prefer_fixed_text_sizing"
+  | "preserve_figma_ids"
+  | "placeholder_for_missing_images"
+> {}
+
+/**
+ * Convert a Figma Deck (`.deck`) file into a Grida Slides `Document`.
+ *
+ * The resulting document has **one scene** whose root children are
+ * `TrayNode`s — one per slide. `SLIDE_GRID` and `SLIDE_ROW` wrapper
+ * nodes are skipped; their children (the actual `SLIDE` nodes) are
+ * promoted directly under the scene.
+ *
+ * This matches the Grida Slides model described in
+ * `docs/wg/feat-slides/plan.md`.
+ *
+ * @param input - `.deck` file bytes (same binary format as `.fig`)
+ * @param options - Optional conversion options
+ * @returns In-memory Document + assets
+ */
+export function deckBytesToSlidesDocument(
+  input: Uint8Array,
+  options?: DeckToSlidesOptions
+): GridaDocumentResult {
+  _idCounter = 0;
+  const figFile = iofigma.kiwi.parseFile(input);
+  const extractedImages = iofigma.kiwi.extractImages(figFile.zip_files);
+  const placeholderForMissing =
+    options?.placeholder_for_missing_images !== false;
+
+  // Use all pages (deck files typically have one page)
+  const pages = [...figFile.pages].sort((a, b) =>
+    a.sortkey < b.sortkey ? -1 : a.sortkey > b.sortkey ? 1 : 0
+  );
+
+  const pageResults: FigPageResult[] = [];
+  for (const page of pages) {
+    const result = iofigma.kiwi.convertPageToSlidesScene(page, {
+      resolve_image_src: (ref: string) =>
+        extractedImages.has(ref) ? `res://images/${ref}` : null,
+      gradient_id_generator: makeIdGenerator("grad"),
+      placeholder_for_missing_images: placeholderForMissing,
+      preserve_figma_ids: options?.preserve_figma_ids,
+      prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
+    });
+    pageResults.push({ name: page.name, result });
+  }
+
+  const merged = mergeFigPages(pageResults, (ref) => extractedImages.get(ref));
+
+  // Rename the single scene to "Slides" for clarity in the slides app.
+  if (merged.document.scenes_ref.length === 1) {
+    const sceneId = merged.document.scenes_ref[0];
+    const sceneNode = merged.document.nodes[sceneId] as any;
+    if (sceneNode) {
+      sceneNode.name = "Slides";
+    }
+  }
 
   return {
     document: merged.document,

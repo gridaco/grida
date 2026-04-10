@@ -290,9 +290,9 @@ describe("FigImporter", () => {
         expect(typeof page.sortkey).toBe("string");
       });
 
-      // Pages can be sorted by sortkey (lexicographic comparison)
+      // Pages can be sorted by sortkey (codepoint comparison, NOT localeCompare)
       const sortedPages = [...figFile.pages].sort((a, b) =>
-        a.sortkey.localeCompare(b.sortkey)
+        a.sortkey < b.sortkey ? -1 : a.sortkey > b.sortkey ? 1 : 0
       );
       expect(sortedPages.length).toBe(figFile.pages.length);
     });

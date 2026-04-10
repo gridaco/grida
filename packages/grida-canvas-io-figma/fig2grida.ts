@@ -151,7 +151,7 @@ function printInfo(inputPath: string, verbose: boolean): void {
 
   // Sort pages by sortkey to show them in Figma order
   const sortedPages = [...figFile.pages].sort((a, b) =>
-    a.sortkey.localeCompare(b.sortkey)
+    a.sortkey < b.sortkey ? -1 : a.sortkey > b.sortkey ? 1 : 0
   );
 
   sortedPages.forEach((page, idx) => {

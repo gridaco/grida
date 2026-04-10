@@ -85,6 +85,9 @@ Properties we've analyzed and documented from the Kiwi schema:
 | `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`                           | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs                                                                                                                   |
 | `fontName`                      | `FontName?`                       | `NodeChange.fontName`                                   | Primary font reference                 | Contains `family`, `style`, `postscript`. See [Text & Font](#text--font): `style` is human-readable (e.g. "Regular", "Bold Italic"), not CSS. Prefer `fontMetaData` for import.                         |
 | `fontMetaData`                  | `FontMetaData[]?`                 | `TextData.fontMetaData`, `DerivedTextData.fontMetaData` | Canonical font style per text run      | **Authoritative** for `fontWeight` and `fontStyle` (NORMAL/ITALIC). Aligns with Figma REST API. See [Text & Font](#text--font).                                                                         |
+| `slideSpeakerNotes`             | `string?`                         | `NodeChange.slideSpeakerNotes`                          | Slide speaker notes                    | Present on SLIDE nodes in `.deck` files. Free-text presentation notes.                                                                                                                                  |
+| `isSkippedSlide`                | `boolean?`                        | `NodeChange.isSkippedSlide`                             | Skip slide in presentation             | `true` = slide is skipped during playback; `undefined` = included.                                                                                                                                      |
+| `pageType`                      | `EditorType?`                     | `NodeChange.pageType`                                   | Editor mode for a CANVAS page          | `SLIDES` (`2`) for Figma Slides pages. See [Slides / Deck format](#slides--deck-format).                                                                                                                |
 
 ### parentIndex
 
@@ -117,22 +120,22 @@ Figma uses **fractional indexing** (also known as "orderable strings") for maint
 **Implementation:**
 
 ```typescript
-// Sort pages by parentIndex.position
+// Sort pages by parentIndex.position (codepoint comparison)
 const sortedPages = canvasNodes.sort((a, b) => {
   const aPos = a.parentIndex?.position ?? "";
   const bPos = b.parentIndex?.position ?? "";
-  return aPos.localeCompare(bPos); // Lexicographic comparison
+  return aPos < bPos ? -1 : aPos > bPos ? 1 : 0;
 });
 
 // Sort children by parentIndex.position
 const sortedChildren = children.sort((a, b) => {
   const aPos = a.parentIndex?.position ?? "";
   const bPos = b.parentIndex?.position ?? "";
-  return aPos.localeCompare(bPos);
+  return aPos < bPos ? -1 : aPos > bPos ? 1 : 0;
 });
 ```
 
-**Important:** Always use lexicographic (string) comparison with `localeCompare()`. Never try to parse these as numbers - the strings are already in the correct format for sorting.
+**Important:** Use **codepoint comparison** (`< >`), **not** `localeCompare()`. Figma's fractional index strings use ASCII characters including punctuation (`"`, `#`, `$`, `%`, `&`, `'`, etc.) whose ordering must match raw codepoint values. `localeCompare()` applies locale-aware collation that scrambles these characters — particularly visible in `.deck` files where single-character position strings are common.
 
 ### sortPosition
 
@@ -357,6 +360,105 @@ Clipboard payloads may include a canvas commonly named `"Internal Only Canvas"` 
 - `fixtures/test-fig/clipboard/component-component-instance-red.clipboard.html`
 - `fixtures/test-fig/clipboard/component-component-set-component-instance-blue.clipboard.html`
 - `fixtures/test-fig/clipboard/component-component-set-component-instance-red.clipboard.html`
+
+### Slides / Deck format
+
+`.deck` files are Figma Slides documents. They use the same Kiwi binary
+format as `.fig` but with a different prelude string:
+
+| File type | Prelude magic |
+| --------- | ------------- |
+| `.fig`    | `"fig-kiwi"`  |
+| `.deck`   | `"fig-deck"`  |
+
+The file-level `editorType` field (`EditScope.editorType` or
+`NodeChange.editorType`) is set to `EditorType.SLIDES` (`2`) for deck
+files. Individual pages may carry `pageType?: EditorType` on their
+CANVAS `NodeChange`.
+
+#### EditorType enum
+
+```text
+enum EditorType {
+  DESIGN = 0;
+  WHITEBOARD = 1;
+  SLIDES = 2;
+  DEV_HANDOFF = 3;
+  SITES = 4;
+  COOPER = 5;
+  ILLUSTRATION = 6;
+  FIGMAKE = 7;
+}
+```
+
+#### Slide node types
+
+| Kiwi type                   | Numeric | Role                                            |
+| --------------------------- | ------- | ----------------------------------------------- |
+| `SLIDE`                     | 32      | A single slide (structurally like FRAME)        |
+| `INTERACTIVE_SLIDE_ELEMENT` | 34      | Interactive element within a slide (frame-like) |
+| `SLIDE_GRID`                | 37      | Grid container holding SLIDE_ROW nodes          |
+| `SLIDE_ROW`                 | 38      | Row container holding SLIDE nodes               |
+
+**Hierarchy (observed in `.deck` files):**
+
+```text
+CANVAS (page)
+  └─ SLIDE_GRID
+       ├─ SLIDE_ROW
+       │    ├─ SLIDE "Slide 1"
+       │    │    └─ (content nodes: FRAME, TEXT, VECTOR, ...)
+       │    ├─ SLIDE "Slide 2"
+       │    └─ ...
+       └─ SLIDE_ROW
+            └─ SLIDE "Slide N"
+```
+
+`SLIDE_GRID` and `SLIDE_ROW` are organizational wrappers that enable
+Figma's infinite canvas UX for slides. They carry standard frame
+properties (fills, layout, clips) but serve no semantic purpose for the
+slides themselves.
+
+#### Slide-specific NodeChange fields
+
+| Field                  | Type              | Location                   | Purpose                                     |
+| ---------------------- | ----------------- | -------------------------- | ------------------------------------------- |
+| `slideSpeakerNotes`    | `string?`         | `NodeChange` (on `SLIDE`)  | Speaker/presentation notes for the slide    |
+| `isSkippedSlide`       | `boolean?`        | `NodeChange` (on `SLIDE`)  | Skip this slide during presentation         |
+| `slideNumber`          | `SlideNumber?`    | `NodeChange` (on `SLIDE`)  | Slide numbering mode                        |
+| `slideNumberSeparator` | `string?`         | `NodeChange` (on `SLIDE`)  | Separator string for compound slide numbers |
+| `slideThumbnailHash`   | `string?`         | `NodeChange` (on `SLIDE`)  | Hash of the slide's cached thumbnail image  |
+| `slideThemeData`       | `SlideThemeData?` | `NodeChange`               | Theme ID + version for the slide            |
+| `slideThemeMap`        | `SlideThemeMap?`  | `NodeChange`               | Theme mapping data                          |
+| `slideTemplateFileKey` | `string?`         | `NodeChange`               | Figma file key of the template used         |
+| `pageType`             | `EditorType?`     | `NodeChange` (on `CANVAS`) | Identifies the editor mode for this page    |
+
+#### SlideNumber enum
+
+```text
+enum SlideNumber {
+  NONE = 0;
+  SLIDE = 1;
+  SECTION = 2;
+  SUBSECTION = 3;
+  TOTAL_WITHIN_DECK = 4;
+  TOTAL_WITHIN_SECTION = 5;
+}
+```
+
+#### SlideThemeData
+
+```text
+message SlideThemeData {
+  ThemeID themeID = 1;
+  string version = 2;
+}
+```
+
+**Verified in fixtures:**
+
+- `fixtures/test-fig/deck/light.deck`
+- `fixtures/test-fig/deck/local/how-to-use-figma-slides.deck`
 
 ### Vector
 

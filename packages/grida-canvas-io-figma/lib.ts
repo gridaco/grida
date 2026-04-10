@@ -2266,10 +2266,6 @@ export namespace iofigma {
         }
 
         const rootNode = processNode(node) as grida.program.nodes.ContainerNode;
-        // Keep absolute positioning from Figma (all Figma nodes are absolute by default)
-        // rootNode.layout_positioning = "relative";
-        // rootNode.layout_inset_left = 0;
-        // rootNode.layout_inset_top = 0;
 
         if (!rootNode) {
           throw new Error("Failed to process root node");
@@ -2305,6 +2301,168 @@ export namespace iofigma {
           imageRefsUsed: context._shared_image_refs_used
             ? []
             : Array.from(imageRefsUsed),
+        };
+      }
+
+      /**
+       * Context for {@link slidesDocument} — the Figma Deck (`.deck`) import path.
+       *
+       * Intentionally a narrow subset of {@link FactoryContext}; keeps the
+       * slides entry point decoupled from design-import internals.
+       */
+      export type SlidesFactoryContext = Pick<
+        FactoryContext,
+        | "node_id_generator"
+        | "gradient_id_generator"
+        | "resolve_image_src"
+        | "preserve_figma_ids"
+        | "placeholder_for_missing_images"
+        | "prefer_fixed_text_sizing"
+      >;
+
+      // -----------------------------------------------------------------------
+      // slidesDocument — Figma Deck → Grida Slides
+      // -----------------------------------------------------------------------
+
+      /**
+       * Collect all `X_SLIDE` IR nodes from an IR tree, skipping
+       * `X_SLIDE_GRID` / `X_SLIDE_ROW` wrappers (depth-first).
+       */
+      function collectSlideNodes(node: InputNode): __ir.SlideNodeIR[] {
+        if (node.type === "X_SLIDE") return [node as __ir.SlideNodeIR];
+        if (node.type === "X_SLIDE_GRID" || node.type === "X_SLIDE_ROW") {
+          const slides: __ir.SlideNodeIR[] = [];
+          for (const child of (node as any).children ?? []) {
+            slides.push(...collectSlideNodes(child));
+          }
+          return slides;
+        }
+        // Any other node type at root level — not a slide, ignore.
+        return [];
+      }
+
+      /**
+       * Build a `TrayNode` from an `X_SLIDE` IR node.
+       *
+       * Reuses the same trait functions as `node_without_children` but
+       * produces a `TrayNode` unconditionally — no mode flag needed.
+       */
+      function slideToTray(
+        slide: __ir.SlideNodeIR,
+        gridaId: string,
+        context: SlidesFactoryContext,
+        imageRefsUsed: Set<string>
+      ): grida.program.nodes.TrayNode {
+        return {
+          id: gridaId,
+          ...base_node_trait({
+            name: slide.name,
+            visible: slide.visible,
+            locked: slide.locked,
+            rotation: slide.rotation,
+            opacity: 1,
+            blendMode: "PASS_THROUGH",
+          }),
+          ...positioning_trait(slide, undefined),
+          ...fills_trait(slide.fills ?? [], context, imageRefsUsed),
+          ...stroke_trait(slide, context, imageRefsUsed),
+          ...rectangular_stroke_width_trait(slide as any),
+          ...corner_radius_trait(slide as any),
+          type: "tray",
+        };
+      }
+
+      /**
+       * Convert a Figma Deck IR tree into a Grida Slides document.
+       *
+       * This is a **separate entry point** from {@link document}:
+       *
+       * 1. Walks the IR tree to collect `X_SLIDE` nodes (skipping
+       *    `X_SLIDE_GRID` / `X_SLIDE_ROW` wrappers).
+       * 2. For each slide, constructs a `TrayNode` from its properties.
+       * 3. Converts each slide's children via {@link document} (the
+       *    standard design-import pipeline, untouched).
+       * 4. Assembles a single scene whose root children are trays.
+       *
+       * @param rootNode - The page's root IR node (typically an X_SLIDE_GRID)
+       * @param images   - Image reference map (forwarded to `document()`)
+       * @param context  - Slides factory context
+       */
+      export function slidesDocument(
+        rootNode: InputNode,
+        images: { [key: string]: string },
+        context: SlidesFactoryContext
+      ): FigmaImportResult {
+        const slides = collectSlideNodes(rootNode);
+
+        if (slides.length === 0) {
+          throw new Error(
+            "slidesDocument: no X_SLIDE nodes found in the IR tree"
+          );
+        }
+
+        // Shared ID generator across all slides to avoid collisions.
+        let counter = 0;
+        const generateId =
+          context.node_id_generator ??
+          (() => `figma-import-${Date.now()}-${++counter}`);
+
+        const allNodes: Record<string, grida.program.nodes.Node> = {};
+        const allLinks: Record<string, string[]> = {};
+        const allImageRefs = new Set<string>();
+        const trayIds: string[] = [];
+
+        const docContext: FactoryContext = {
+          ...context,
+          node_id_generator: generateId,
+          prefer_path_for_geometry: true,
+        };
+
+        for (const slide of slides) {
+          // 1. Create the tray node from the slide's own properties.
+          const trayId = context.preserve_figma_ids ? slide.id : generateId();
+          const tray = slideToTray(slide, trayId, context, allImageRefs);
+          allNodes[trayId] = tray;
+          trayIds.push(trayId);
+
+          // 2. Convert each child of the slide via the standard pipeline.
+          const childIds: string[] = [];
+          for (const child of (slide as any).children ?? []) {
+            const result = document(child, images, docContext);
+            // Merge the child subtree into our flat collections.
+            Object.assign(allNodes, result.document.nodes);
+            Object.assign(allLinks, result.document.links);
+            result.imageRefsUsed.forEach((ref) => allImageRefs.add(ref));
+            // The scene's children_refs are the converted root node(s).
+            childIds.push(...result.document.scene.children_refs);
+          }
+
+          if (childIds.length > 0) {
+            allLinks[trayId] = childIds;
+          }
+        }
+
+        const sceneId = generateId();
+        const packed: grida.program.document.IPackedSceneDocument = {
+          nodes: allNodes,
+          links: allLinks,
+          scene: {
+            type: "scene",
+            id: sceneId,
+            name: "Slides",
+            children_refs: trayIds,
+            guides: [],
+            edges: [],
+            constraints: { children: "multiple" },
+          },
+          bitmaps: {},
+          images: {},
+          properties: {},
+        };
+
+        return {
+          document: packed,
+          imageRefsUsed: Array.from(allImageRefs),
         };
       }
 
@@ -4295,7 +4453,12 @@ export namespace iofigma {
         }
       });
 
-      // Sort children by parentIndex.position (fractional index string), if present
+      // Sort children by parentIndex.position (fractional index string), if present.
+      // IMPORTANT: Use codepoint comparison (< >), NOT localeCompare.
+      // Figma's fractional index strings are designed for lexicographic byte
+      // ordering. localeCompare applies locale-aware collation that scrambles
+      // ASCII punctuation characters (e.g. ", #, $, %) used in short position
+      // strings — particularly common in .deck files.
       guidToNode.forEach((parentNode) => {
         if (
           !("children" in (parentNode as any)) ||
@@ -4308,7 +4471,7 @@ export namespace iofigma {
           const bKiwi = guidToKiwi.get((b as any).id);
           const aPos = aKiwi?.parentIndex?.position ?? "";
           const bPos = bKiwi?.parentIndex?.position ?? "";
-          return aPos.localeCompare(bPos);
+          return aPos < bPos ? -1 : aPos > bPos ? 1 : 0;
         });
       });
     }
@@ -4596,7 +4759,7 @@ export namespace iofigma {
       /**
        * Sort key from parentIndex.position (fractional index string)
        * Use this to sort pages to preserve original Figma order.
-       * Compare lexicographically: pageA.sortkey.localeCompare(pageB.sortkey)
+       * Compare by codepoint: pageA.sortkey < pageB.sortkey ? -1 : pageA.sortkey > pageB.sortkey ? 1 : 0
        * Examples: "!", "Qd&", "QeU", "Qf"
        */
       sortkey: string;
@@ -4663,7 +4826,7 @@ export namespace iofigma {
      * Note: CANVAS nodes use parentIndex.position (fractional index strings) for ordering,
      * not sortPosition. These are lexicographically sortable strings like "!", "Qd&", "QeU", etc.
      *
-     * To sort pages: pages.sort((a, b) => a.sortkey.localeCompare(b.sortkey))
+     * To sort pages: pages.sort((a, b) => a.sortkey < b.sortkey ? -1 : a.sortkey > b.sortkey ? 1 : 0)
      */
     function extractPages(
       figData: ParsedFigmaArchive,
@@ -4772,6 +4935,70 @@ export namespace iofigma {
           background_color,
           // TODO: convert it to our format, number.
           // order: page.sortkey,
+        },
+      };
+
+      individualResults.forEach((result) => {
+        const doc = result.document;
+        Object.assign(merged.nodes, doc.nodes);
+        Object.assign(merged.links, doc.links);
+        Object.assign(merged.images, doc.images);
+        Object.assign(merged.bitmaps, doc.bitmaps);
+        Object.assign(merged.properties, doc.properties);
+        merged.scene.children_refs.push(...doc.scene.children_refs);
+        result.imageRefsUsed.forEach((ref: string) => imageRefsUsed.add(ref));
+      });
+
+      return {
+        document: merged,
+        imageRefsUsed: Array.from(imageRefsUsed),
+      };
+    }
+
+    /**
+     * Convert a `.deck` page into a Grida Slides scene.
+     *
+     * Like {@link convertPageToScene}, but uses `slidesDocument()` so that
+     * `X_SLIDE` nodes become trays and `X_SLIDE_GRID` / `X_SLIDE_ROW`
+     * wrappers are skipped (children promoted).
+     */
+    export function convertPageToSlidesScene(
+      page: FigPage,
+      context: iofigma.restful.factory.SlidesFactoryContext
+    ): iofigma.restful.factory.FigmaImportResult {
+      let counter = 0;
+      const sharedNodeIdGenerator =
+        context.node_id_generator ??
+        (() => `figma-import-${Date.now()}-${++counter}`);
+      const sharedContext: iofigma.restful.factory.SlidesFactoryContext = {
+        ...context,
+        node_id_generator: sharedNodeIdGenerator,
+      };
+
+      const individualResults = page.rootNodes.map((rootNode) =>
+        iofigma.restful.factory.slidesDocument(rootNode, {}, sharedContext)
+      );
+
+      if (individualResults.length === 1) {
+        return individualResults[0];
+      }
+
+      // Merge multiple roots into single document
+      const imageRefsUsed = new Set<string>();
+      const merged: grida.program.document.IPackedSceneDocument = {
+        bitmaps: {},
+        images: {},
+        nodes: {},
+        links: {},
+        properties: {},
+        scene: {
+          type: "scene",
+          id: "tmp",
+          name: page.name,
+          children_refs: [],
+          guides: [],
+          edges: [],
+          constraints: { children: "multiple" },
         },
       };
 
