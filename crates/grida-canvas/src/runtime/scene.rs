@@ -357,6 +357,13 @@ pub struct Renderer {
     last_prefill_generation: u64,
     last_prefill_variant_key: u64,
     last_prefill_layer_count: usize,
+    /// Render-time viewport filter. See [`super::filter::RenderFilter`].
+    render_filter: super::filter::RenderFilter,
+    /// Precomputed set of node IDs visible under the current isolation
+    /// mode. Includes the isolation root itself and all its descendants.
+    /// `None` when isolation is inactive. Rebuilt by
+    /// [`set_isolation_mode`] and cleared on `SCENE_LOAD`.
+    isolation_set: Option<HashSet<NodeId>>,
 }
 
 impl Renderer {
@@ -670,6 +677,8 @@ impl Renderer {
             last_prefill_generation: u64::MAX,
             last_prefill_variant_key: u64::MAX,
             last_prefill_layer_count: 0,
+            render_filter: super::filter::RenderFilter::default(),
+            isolation_set: None,
         }
     }
 
@@ -1019,6 +1028,52 @@ impl Renderer {
     /// This flag must be set **before** calling `load_scene` / `switch_scene`.
     pub fn set_skip_layout(&mut self, skip: bool) {
         self.config.skip_layout = skip;
+    }
+
+    // -------------------------------------------------------------------
+    // Isolation mode (render-time viewport filter)
+    // -------------------------------------------------------------------
+
+    /// Set or clear isolation mode.
+    ///
+    /// When set, only the given node and its descendants are drawn and
+    /// hit-tested. Pass `None` to clear. The precomputed descendant set
+    /// is rebuilt from the current scene graph immediately.
+    pub fn set_isolation_mode(&mut self, mode: Option<super::filter::IsolationMode>) {
+        self.render_filter.isolation_mode = mode;
+        self.rebuild_isolation_set();
+    }
+
+    /// Read-only access to the current isolation mode.
+    pub fn isolation_mode(&self) -> Option<&super::filter::IsolationMode> {
+        self.render_filter.isolation_mode.as_ref()
+    }
+
+    /// Read-only access to the precomputed isolation set.
+    ///
+    /// Returns `None` when isolation is inactive. When active, the set
+    /// contains the isolation root and all its descendants — every layer
+    /// whose `id` is in this set should be drawn / hit-tested.
+    pub fn isolation_set(&self) -> Option<&HashSet<NodeId>> {
+        self.isolation_set.as_ref()
+    }
+
+    /// Rebuild the precomputed isolation set from the current scene graph
+    /// and render filter. Called after changing isolation mode or loading
+    /// a new scene.
+    fn rebuild_isolation_set(&mut self) {
+        self.isolation_set = self.render_filter.isolation_mode.as_ref().and_then(|iso| {
+            let scene = self.scene.as_ref()?;
+            let root = iso.root;
+            let mut set = HashSet::new();
+            set.insert(root);
+            if let Ok(descendants) = scene.graph.descendants(&root) {
+                for id in descendants {
+                    set.insert(id);
+                }
+            }
+            Some(set)
+        });
     }
 
     /// Render the queued frame if any and return the completed statistics.
@@ -1560,6 +1615,10 @@ impl Renderer {
         let _t0 = crate::sys::perf_now();
 
         self.scene = Some(scene);
+
+        // Reset isolation — it is viewport-only, not persisted.
+        self.render_filter = super::filter::RenderFilter::default();
+        self.isolation_set = None;
 
         self.scene_cache = cache::scene::SceneCache::new();
         self.pan_image_cache = None;
@@ -2206,6 +2265,23 @@ impl Renderer {
             // not stability.
             queried.sort_unstable();
             queried
+        };
+
+        // Apply isolation-mode filter: retain only layers belonging to the
+        // isolated subtree. O(1) per layer via HashSet lookup.
+        let indices = if let Some(iso_set) = &self.isolation_set {
+            indices
+                .into_iter()
+                .filter(|&idx| {
+                    self.scene_cache
+                        .layers
+                        .layers
+                        .get(idx)
+                        .is_some_and(|entry| iso_set.contains(&entry.id))
+                })
+                .collect::<Vec<_>>()
+        } else {
+            indices
         };
 
         // Pre-filter compositor-relevant indices during the same pass.

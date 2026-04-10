@@ -101,6 +101,7 @@ const EXPECTED_FUNCTIONS = [
   { name: "_runtime_renderer_set_pixel_preview_scale", paramCount: 2 },
   { name: "_runtime_renderer_set_pixel_preview_stable", paramCount: 2 },
   { name: "_runtime_renderer_set_skip_layout", paramCount: 2 },
+  { name: "_runtime_renderer_set_isolation_mode", paramCount: 3 },
 ] as const;
 
 // Expected Emscripten runtime methods

@@ -267,6 +267,12 @@ declare namespace canvas {
       skip: boolean
     ): void;
 
+    _runtime_renderer_set_isolation_mode(
+      state: GridaCanvasApplicationPtr,
+      id_ptr: number,
+      id_len: number
+    ): void;
+
     _runtime_renderer_set_outline_mode(
       state: GridaCanvasApplicationPtr,
       enable: boolean

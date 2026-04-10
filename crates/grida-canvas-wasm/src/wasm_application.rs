@@ -1139,6 +1139,22 @@ pub unsafe extern "C" fn runtime_renderer_set_skip_layout(
 }
 
 #[no_mangle]
+/// js::_runtime_renderer_set_isolation_mode
+///
+/// Set or clear isolation mode. When `id_ptr`/`id_len` point to a valid
+/// UTF-8 string, isolation is enabled for that node. Pass null/0 to clear.
+pub unsafe extern "C" fn runtime_renderer_set_isolation_mode(
+    app: *mut UnknownTargetApplication,
+    id_ptr: *const u8,
+    id_len: usize,
+) {
+    if let Some(app) = app.as_mut() {
+        let id = __str_from_ptr_len(id_ptr, id_len);
+        app.runtime_renderer_set_isolation_mode(id.as_deref());
+    }
+}
+
+#[no_mangle]
 /// js::_runtime_renderer_set_outline_mode
 ///
 /// Back-compat shim: delegates to `runtime_renderer_set_render_policy_flags`.

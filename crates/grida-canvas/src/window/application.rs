@@ -115,6 +115,13 @@ pub trait ApplicationApi {
     /// instead of running the Taffy flexbox engine. Set **before** loading a scene.
     fn runtime_renderer_set_skip_layout(&mut self, skip: bool);
 
+    /// Set or clear isolation mode.
+    ///
+    /// When `root_user_id` is `Some`, only the identified node and its
+    /// descendants are drawn and hit-tested. Pass `None` to clear.
+    /// Isolation is viewport-only — it does not mutate the document.
+    fn runtime_renderer_set_isolation_mode(&mut self, root_user_id: Option<&str>);
+
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
     fn devtools_rendering_set_show_fps_meter(&mut self, show: bool);
@@ -646,6 +653,17 @@ impl ApplicationApi for UnknownTargetApplication {
         self.renderer.set_skip_layout(skip);
     }
 
+    fn runtime_renderer_set_isolation_mode(&mut self, root_user_id: Option<&str>) {
+        let mode = root_user_id.and_then(|id| {
+            let internal = self.user_id_to_internal(id)?;
+            Some(crate::runtime::filter::IsolationMode { root: internal })
+        });
+        self.renderer.set_isolation_mode(mode);
+        self.renderer
+            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+        self.queue();
+    }
+
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
         self.devtools_rendering_show_tiles = debug;
     }
@@ -865,14 +883,17 @@ impl UnknownTargetApplication {
         &mut self,
         event: crate::surface::SurfaceEvent,
     ) -> crate::surface::SurfaceResponse {
+        let iso_set = self.renderer.isolation_set();
         let (_hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(iso_set);
             let r = self
                 .surface
                 .dispatch(event, &ht, &scene.graph, &self.ui_hit_regions);
             (ht, r)
         } else {
-            let ht = crate::hittest::HitTester::new(self.renderer.get_cache());
+            let ht = crate::hittest::HitTester::new(self.renderer.get_cache())
+                .with_isolation_set(iso_set);
             let r = self
                 .surface
                 .dispatch(event, &ht, &NoHierarchy, &self.ui_hit_regions);
@@ -893,7 +914,8 @@ impl UnknownTargetApplication {
     /// Returns the topmost node ID at that point, or `None`.
     pub fn hit_test_point(&self, canvas_point: [f32; 2]) -> Option<crate::node::schema::NodeId> {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(self.renderer.isolation_set());
             ht.hit_first(canvas_point)
         } else {
             None
@@ -904,7 +926,8 @@ impl UnknownTargetApplication {
     /// Returns the topmost ancestors that intersect the rect.
     pub fn hit_test_rect(&self, rect: &math2::rect::Rectangle) -> Vec<crate::node::schema::NodeId> {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(self.renderer.isolation_set());
             ht.intersects_topmost(rect)
         } else {
             Vec::new()
@@ -944,7 +967,8 @@ impl UnknownTargetApplication {
         ids: &[crate::node::schema::NodeId],
     ) -> bool {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(self.renderer.isolation_set());
             ht.point_in_selection_bounds(point, ids)
         } else {
             false
@@ -1468,13 +1492,14 @@ impl UnknownTargetApplication {
         println!("✅ Font repository information printed");
     }
 
-    fn get_hit_tester(&mut self) -> crate::hittest::HitTester<'_> {
+    fn get_hit_tester(&self) -> crate::hittest::HitTester<'_> {
         // Pass the scene graph if available to enable culling checks
-        if let Some(scene) = self.renderer.scene.as_ref() {
+        let base = if let Some(scene) = self.renderer.scene.as_ref() {
             crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
         } else {
             crate::hittest::HitTester::new(self.renderer.get_cache())
-        }
+        };
+        base.with_isolation_set(self.renderer.isolation_set())
     }
 
     fn verbose(&self, msg: &str) {

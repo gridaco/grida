@@ -898,6 +898,24 @@ export class Scene {
     this.module._runtime_renderer_set_skip_layout(this.appptr, skip);
   }
 
+  /**
+   * Set or clear isolation mode.
+   *
+   * When `nodeId` is a string, only that node and its descendants are
+   * drawn and hit-tested. Pass `null` to clear isolation.
+   * Isolation is viewport-only — it does not mutate the document.
+   */
+  runtime_renderer_set_isolation_mode(nodeId: string | null) {
+    this._assertAlive();
+    if (nodeId === null) {
+      this.module._runtime_renderer_set_isolation_mode(this.appptr, 0, 0);
+      return;
+    }
+    const [ptr, len] = this._alloc_string(nodeId);
+    this.module._runtime_renderer_set_isolation_mode(this.appptr, ptr, len - 1);
+    this._free_string(ptr, len);
+  }
+
   runtime_renderer_set_outline_mode(enable: boolean) {
     this._assertAlive();
     this.module._runtime_renderer_set_outline_mode(this.appptr, enable);
