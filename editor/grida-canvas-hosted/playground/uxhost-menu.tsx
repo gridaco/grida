@@ -63,7 +63,9 @@ import { nanoid } from "nanoid";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
-  ImportFromFigmaDialog,
+  ImportFromFigmaApiDialog,
+  ImportFromFigmaFileDialog,
+  ImportFromFigmaSlidesDialog,
   ImportFromGridaDialog,
 } from "@/grida-canvas-react-starter-kit/starterkit-import";
 import { canvas_examples } from "./examples";
@@ -90,7 +92,9 @@ export function PlaygroundMenuContent({
   toggleMinimal?: () => void;
 } = {}) {
   const instance = useCurrentEditor();
-  const importFromFigmaDialog = useDialogState("import-from-figma");
+  const importFigmaFile = useDialogState("import-figma-file");
+  const importFigmaSlides = useDialogState("import-figma-slides");
+  const importFigmaApi = useDialogState("import-figma-api");
   const importFromGrida = useDialogState("import-from-grida", {
     refreshkey: true,
   });
@@ -176,8 +180,50 @@ export function PlaygroundMenuContent({
         }}
       />
 
-      <ImportFromFigmaDialog
-        {...importFromFigmaDialog.props}
+      <ImportFromFigmaFileDialog
+        {...importFigmaFile.props}
+        onImportFig={async (result) => {
+          const iofigma = await import("@grida/io-figma");
+          const FigImporter = iofigma.default.kiwi.FigImporter;
+
+          // Parse the .fig file
+          const buffer = await result.file.arrayBuffer();
+          const figFile = FigImporter.parseFile(new Uint8Array(buffer));
+
+          // TODO: Future enhancement - support importing entire document as single operation
+          // Currently loops per-scene for simplicity and to avoid bugs
+
+          // Process each page as a separate scene
+          for (const page of figFile.pages) {
+            const sceneId = `scene-${nanoid()}`;
+            instance.surface.surfaceCreateScene({
+              id: sceneId,
+              name: page.name,
+            });
+
+            if (page.rootNodes.length > 0) {
+              const { document: packedDoc } = FigImporter.convertPageToScene(
+                page,
+                {
+                  gradient_id_generator: () => v4(),
+                }
+              );
+              instance.surface.insert({ document: packedDoc });
+            }
+          }
+        }}
+      />
+
+      <ImportFromFigmaSlidesDialog
+        {...importFigmaSlides.props}
+        onImportFig={async () => {
+          // TODO: dedicated .deck import pipeline not yet implemented.
+          toast.info("Figma Slides import is not yet implemented");
+        }}
+      />
+
+      <ImportFromFigmaApiDialog
+        {...importFigmaApi.props}
         onImport={async (res) => {
           const images = res.images ?? {};
           const context: iofigma.restful.factory.FactoryContext = {
@@ -215,36 +261,6 @@ export function PlaygroundMenuContent({
 
           instance.surface.insert({ document: gridaDoc });
         }}
-        onImportFig={async (result) => {
-          const iofigma = await import("@grida/io-figma");
-          const FigImporter = iofigma.default.kiwi.FigImporter;
-
-          // Parse the .fig file
-          const buffer = await result.file.arrayBuffer();
-          const figFile = FigImporter.parseFile(new Uint8Array(buffer));
-
-          // TODO: Future enhancement - support importing entire document as single operation
-          // Currently loops per-scene for simplicity and to avoid bugs
-
-          // Process each page as a separate scene
-          for (const page of figFile.pages) {
-            const sceneId = `scene-${nanoid()}`;
-            instance.surface.surfaceCreateScene({
-              id: sceneId,
-              name: page.name,
-            });
-
-            if (page.rootNodes.length > 0) {
-              const { document: packedDoc } = FigImporter.convertPageToScene(
-                page,
-                {
-                  gradient_id_generator: () => v4(),
-                }
-              );
-              instance.surface.insert({ document: packedDoc });
-            }
-          }
-        }}
       />
 
       <SettingsDialog
@@ -257,7 +273,9 @@ export function PlaygroundMenuContent({
           onExport={onExport}
           onImportGrida={importFromGrida.openDialog}
           onImportImage={handleImportImageClick}
-          onImportFigma={importFromFigmaDialog.openDialog}
+          onImportFigmaFile={importFigmaFile.openDialog}
+          onImportFigmaSlides={importFigmaSlides.openDialog}
+          onImportFigmaApi={importFigmaApi.openDialog}
         />
         <EditMenuContent
           hasSelection={hasSelection}
@@ -311,12 +329,16 @@ function FileMenuContent({
   onExport,
   onImportGrida,
   onImportImage,
-  onImportFigma,
+  onImportFigmaFile,
+  onImportFigmaSlides,
+  onImportFigmaApi,
 }: {
   onExport: () => void;
   onImportGrida: () => void;
   onImportImage: () => void;
-  onImportFigma: () => void;
+  onImportFigmaFile: () => void;
+  onImportFigmaSlides: () => void;
+  onImportFigmaApi: () => void;
 }) {
   return (
     <DropdownMenuSub>
@@ -334,10 +356,26 @@ function FileMenuContent({
           <ImageIcon className="size-3.5" />
           Import Image
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onImportFigma} className="text-xs">
-          <FigmaLogoIcon className="size-3.5" />
-          Import Figma
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            <FigmaLogoIcon className="size-3.5" />
+            Import Figma
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuItem onClick={onImportFigmaFile} className="text-xs">
+              <FigmaLogoIcon className="size-3.5" />
+              Import .fig
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onImportFigmaSlides} className="text-xs">
+              <FigmaLogoIcon className="size-3.5" />
+              Import .deck
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onImportFigmaApi} className="text-xs">
+              <FigmaLogoIcon className="size-3.5" />
+              Import from API
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import {
   FetchNodeResult,
-  ImportFromFigmaDialog,
+  ImportFromFigmaApiDialog,
 } from "@/grida-canvas-react-starter-kit/starterkit-import";
 import { Button } from "@/components/ui/button";
 import { FigmaLogoIcon } from "@radix-ui/react-icons";
@@ -18,7 +18,7 @@ export default function IOFigmaPage() {
 
   return (
     <main className="w-dvw h-dvh">
-      <ImportFromFigmaDialog {...dialog.props} onImport={setFig} />
+      <ImportFromFigmaApiDialog {...dialog.props} onImport={setFig} />
       <div className="flex flex-col w-full h-full">
         <header className="flex items-center justify-between p-4 border-b">
           <div className="flex gap-4 items-center">
