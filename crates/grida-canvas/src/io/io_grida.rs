@@ -513,11 +513,13 @@ impl From<Option<JSONPaint>> for Paint {
     }
 }
 
-impl From<JSONVariableWidthProfile> for VarWidthProfile {
-    fn from(profile: JSONVariableWidthProfile) -> Self {
+impl JSONVariableWidthProfile {
+    /// Convert to `VarWidthProfile` using the node's stroke width to derive
+    /// `base` (half-width), matching the FBS decoder convention.
+    fn into_profile(self, stroke_width: f32) -> VarWidthProfile {
         VarWidthProfile {
-            base: 1.0, // TODO: need to use node's stroke width as base
-            stops: profile.stops.into_iter().collect(),
+            base: stroke_width * 0.5,
+            stops: self.stops.into_iter().collect(),
         }
     }
 }
@@ -2053,7 +2055,10 @@ impl From<JSONVectorNode> for Node {
             fills: merge_paints(node.base.fill, node.base.fill_paints),
             strokes: merge_paints(node.base.stroke, node.base.stroke_paints),
             stroke_width: node.base.stroke_width,
-            stroke_width_profile: node.base.stroke_width_profile.map(|p| p.into()),
+            stroke_width_profile: node
+                .base
+                .stroke_width_profile
+                .map(|p| p.into_profile(node.base.stroke_width)),
             stroke_align: node.base.stroke_align.unwrap_or(StrokeAlign::Inside),
             stroke_cap: node.base.stroke_cap.unwrap_or_default(),
             stroke_join: node.base.stroke_join.unwrap_or_default(),

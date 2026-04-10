@@ -1999,6 +1999,7 @@ export namespace format {
                 stroke_cap: lineNode.stroke_cap,
                 stroke_join: lineNode.stroke_join,
                 stroke_dash_array: lineNode.stroke_dash_array,
+                stroke_width_profile: lineNode.stroke_width_profile,
               });
             const strokePaintsFiltered = paints(lineNode, "stroke");
             const strokePaintsOffset = format.paint.encode.strokePaints(
@@ -2122,6 +2123,7 @@ export namespace format {
                 stroke_cap: vectorNode.stroke_cap,
                 stroke_join: vectorNode.stroke_join,
                 stroke_dash_array: vectorNode.stroke_dash_array,
+                stroke_width_profile: vectorNode.stroke_width_profile,
               });
             const vectorWithSmoothing =
               vectorNode as grida.program.nodes.VectorNode &
@@ -2186,6 +2188,7 @@ export namespace format {
                 stroke_cap: pathNode.stroke_cap,
                 stroke_join: pathNode.stroke_join,
                 stroke_dash_array: pathNode.stroke_dash_array,
+                stroke_width_profile: pathNode.stroke_width_profile,
               });
             const fillPaintsFiltered = paints(pathNode, "fill");
             const fillPaintsOffset = format.paint.encode.fillPaints(
@@ -2233,6 +2236,7 @@ export namespace format {
                 stroke_cap: booleanNode.stroke_cap,
                 stroke_join: booleanNode.stroke_join,
                 stroke_dash_array: booleanNode.stroke_dash_array,
+                stroke_width_profile: booleanNode.stroke_width_profile,
               });
             const booleanWithSmoothing =
               booleanNode as grida.program.nodes.BooleanPathOperationNode &
@@ -3208,6 +3212,7 @@ export namespace format {
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
           stroke_dash_array?: number[];
+          stroke_width_profile?: cg.VariableWidthProfile;
         }>
       ): flatbuffers.Offset {
         const strokeStyleOffset = createStrokeStyle(
@@ -3217,14 +3222,40 @@ export namespace format {
           node.stroke_dash_array
         );
 
-        // Create StrokeGeometryTrait table
-        // NOTE: VariableWidthProfile is intentionally omitted when there are
-        // no stops. The FBS field is optional — omitting it yields `None` on
-        // the Rust decode side, which correctly routes to the regular stroke
-        // renderer instead of the variable-width stroke path.
+        // Encode VariableWidthProfile only when stops are present.
+        // The FBS field is optional — omitting it yields `None` on the Rust
+        // decode side, which correctly routes to the regular stroke renderer
+        // instead of the variable-width stroke path.
+        const stops = node.stroke_width_profile?.stops;
+        let strokeWidthProfileOffset: flatbuffers.Offset | undefined;
+        if (stops && stops.length > 0) {
+          const stopOffsets: flatbuffers.Offset[] = [];
+          for (let i = stops.length - 1; i >= 0; i--) {
+            const s = stops[i]!;
+            stopOffsets.push(
+              fbs.VariableWidthStop.createVariableWidthStop(builder, s.u, s.r)
+            );
+          }
+          const stopsOffset = fbs.VariableWidthProfile.createStopsVector(
+            builder,
+            stopOffsets
+          );
+          strokeWidthProfileOffset =
+            fbs.VariableWidthProfile.createVariableWidthProfile(
+              builder,
+              stopsOffset
+            );
+        }
+
         fbs.StrokeGeometryTrait.startStrokeGeometryTrait(builder);
         fbs.StrokeGeometryTrait.addStrokeWidth(builder, node.stroke_width ?? 0);
         fbs.StrokeGeometryTrait.addStrokeStyle(builder, strokeStyleOffset);
+        if (strokeWidthProfileOffset !== undefined) {
+          fbs.StrokeGeometryTrait.addStrokeWidthProfile(
+            builder,
+            strokeWidthProfileOffset
+          );
+        }
         return fbs.StrokeGeometryTrait.endStrokeGeometryTrait(builder);
       }
 
@@ -3251,16 +3282,6 @@ export namespace format {
           node.stroke_dash_array
         );
 
-        // Create VariableWidthProfile (empty for now)
-        const emptyStopsOffset = fbs.VariableWidthProfile.createStopsVector(
-          builder,
-          []
-        );
-        fbs.VariableWidthProfile.startVariableWidthProfile(builder);
-        fbs.VariableWidthProfile.addStops(builder, emptyStopsOffset);
-        const strokeWidthProfileOffset =
-          fbs.VariableWidthProfile.endVariableWidthProfile(builder);
-
         // Create RectangularStrokeWidth struct using helper function
         const rectangularStrokeWidthOffset = rectangular_stroke_width_from(
           builder,
@@ -3268,6 +3289,9 @@ export namespace format {
         );
 
         // Create RectangularStrokeGeometryTrait table
+        // NOTE: VariableWidthProfile is omitted — rectangular strokes don't
+        // use variable-width profiles. Omitting the field yields `None` on
+        // the Rust decode side.
         fbs.RectangularStrokeGeometryTrait.startRectangularStrokeGeometryTrait(
           builder
         );
@@ -3278,10 +3302,6 @@ export namespace format {
         fbs.RectangularStrokeGeometryTrait.addStrokeStyle(
           builder,
           strokeStyleOffset
-        );
-        fbs.RectangularStrokeGeometryTrait.addStrokeWidthProfile(
-          builder,
-          strokeWidthProfileOffset
         );
         return fbs.RectangularStrokeGeometryTrait.endRectangularStrokeGeometryTrait(
           builder
@@ -3665,6 +3685,7 @@ export namespace format {
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
         stroke_dash_array?: number[];
+        stroke_width_profile?: cg.VariableWidthProfile;
       } {
         if (!trait) {
           return {
@@ -3694,11 +3715,27 @@ export namespace format {
           }
         }
 
+        // Decode variable-width profile
+        let stroke_width_profile: cg.VariableWidthProfile | undefined;
+        const fbProfile = trait.strokeWidthProfile();
+        if (fbProfile) {
+          const len = fbProfile.stopsLength();
+          if (len > 0) {
+            const stops: cg.VariableWidthStop[] = [];
+            for (let i = 0; i < len; i++) {
+              const s = fbProfile.stops(i)!;
+              stops.push({ u: s.u(), r: s.r() });
+            }
+            stroke_width_profile = { stops };
+          }
+        }
+
         return {
           stroke_width: trait.strokeWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
           ...(stroke_dash_array ? { stroke_dash_array } : {}),
+          ...(stroke_width_profile ? { stroke_width_profile } : {}),
         };
       }
 
@@ -6281,6 +6318,12 @@ export namespace format {
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
               : {}),
+            ...(strokeGeometryProps.stroke_width_profile
+              ? {
+                  stroke_width_profile:
+                    strokeGeometryProps.stroke_width_profile,
+                }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.LineNode;
         }
@@ -6362,6 +6405,12 @@ export namespace format {
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
               : {}),
+            ...(strokeGeometryProps.stroke_width_profile
+              ? {
+                  stroke_width_profile:
+                    strokeGeometryProps.stroke_width_profile,
+                }
+              : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.VectorNode;
         }
@@ -6425,6 +6474,12 @@ export namespace format {
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
               : {}),
+            ...(strokeGeometryProps.stroke_width_profile
+              ? {
+                  stroke_width_profile:
+                    strokeGeometryProps.stroke_width_profile,
+                }
+              : {}),
             data: n.data() ?? "",
             fill_rule: fillRule,
             ...(effects || {}),
@@ -6486,6 +6541,12 @@ export namespace format {
             stroke_join: strokeGeometryProps.stroke_join,
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
+              : {}),
+            ...(strokeGeometryProps.stroke_width_profile
+              ? {
+                  stroke_width_profile:
+                    strokeGeometryProps.stroke_width_profile,
+                }
               : {}),
             ...(effects || {}),
           } satisfies grida.program.nodes.BooleanPathOperationNode;
