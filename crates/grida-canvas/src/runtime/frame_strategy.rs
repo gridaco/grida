@@ -86,6 +86,14 @@ pub struct FrameRenderStrategy {
     /// caches are disabled (eager render, stable frame, raster backend)
     /// or no cache is populated, the plan must be built eagerly.
     pub can_defer_plan: bool,
+
+    /// Whether eager-render mode is active (zoom >= threshold).
+    ///
+    /// When true, the renderer prioritizes pixel-perfect output over
+    /// interaction performance tricks. Downstream code uses this to
+    /// disable quality-reducing shortcuts (effect LOD, interaction
+    /// downscale) that would otherwise fire on unstable frames.
+    pub eager_render: bool,
 }
 
 impl FrameRenderStrategy {
@@ -148,6 +156,7 @@ impl FrameRenderStrategy {
             capture_image_caches,
             use_compositor,
             can_defer_plan,
+            eager_render,
         }
     }
 }

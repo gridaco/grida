@@ -577,10 +577,14 @@ impl Renderer {
             &crate::cache::fast_hash::NodeIdHashMap<NodeId, crate::painter::PromotedBlit>,
         >,
     ) -> usize {
-        // Select effect quality based on frame stability.
-        // Unstable (interactive) frames use reduced effects for performance.
-        // Stable (settled) frames use full quality.
-        let policy = if plan.stable {
+        // Select effect quality based on frame stability and eager-render mode.
+        // Unstable (interactive) frames use reduced effects for performance,
+        // UNLESS eager-render is active (zoom >= threshold) — in that case,
+        // always use full quality so the user sees crystal-clear content at
+        // all times without waiting for a settle frame.
+        let eager =
+            self.camera.get_zoom() >= crate::runtime::frame_strategy::EAGER_RENDER_ZOOM_THRESHOLD;
+        let policy = if plan.stable || eager {
             self.config.render_policy
         } else {
             self.config.render_policy.with_reduced_effects()
@@ -1402,8 +1406,14 @@ impl Renderer {
         // --- Full draw path ---
 
         // Reuse or create a downscaled offscreen for interaction rendering.
+        // Skip downscaling in eager-render mode (zoom >= threshold) — at high
+        // zoom the visible node count is small enough for a full-resolution
+        // draw, and downscaling would introduce unnecessary blur.
         let interaction_scale = self.config.interaction_render_scale;
-        let use_downscale = !plan.stable && interaction_scale > 0.0 && interaction_scale < 1.0;
+        let use_downscale = !plan.stable
+            && !strategy.eager_render
+            && interaction_scale > 0.0
+            && interaction_scale < 1.0;
         if use_downscale {
             let sw = (width * interaction_scale).ceil() as i32;
             let sh = (height * interaction_scale).ceil() as i32;
