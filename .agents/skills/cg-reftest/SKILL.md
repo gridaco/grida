@@ -1,16 +1,11 @@
 ---
 name: cg-reftest
 description: >
-  Guides design and review of computer-graphics rendering tests for the
-  cg crate. Covers the distinction between reftests (independent oracle),
-  golden/snapshot regression tests (previously accepted output), and
-  observation-based probe tests (pixel/color assertions without vision).
-  Use when adding, reviewing, or debugging visual comparison tests,
-  pixel diffs, golden image generators, SVG reftest suites, or designing
-  fixtures that can be verified programmatically by probing pixel values.
-  Relevant paths: crates/grida-canvas/tests/, crates/grida-canvas/goldens/,
-  crates/grida-canvas/examples/golden_*, crates/grida-dev/src/reftest/,
-  fixtures/test-svg/, docs/wg/feat-svg/testing.md.
+  Design, review, and debug visual rendering tests: reftests (independent
+  oracle), golden/snapshot regression tests, probe tests (pixel assertions
+  without vision), SVG reftest suites, and Figma refig suites. Use when
+  adding pixel diffs, choosing an oracle strategy, or comparing renderer
+  output against a ground truth.
 ---
 
 # CG Rendering Tests — Reftests & Golden Tests
@@ -33,21 +28,25 @@ How to design, name, and review visual rendering tests in this repo.
 
 Use these terms precisely. Misusing them erodes trust in test results.
 
-| Term                               | Definition                                                                                                                                                                                                                                                          |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Reftest**                        | A test that compares renderer output against an **independent reference** (oracle) whose correctness is established outside this project — e.g. a W3C-provided PNG for an SVG test case. The oracle is the source of truth; a mismatch means our renderer is wrong. |
-| **Independent reference / oracle** | A rendering produced by a separate, trusted implementation or defined by a specification. We do not control its content.                                                                                                                                            |
-| **Golden test**                    | A test that compares renderer output against a **previously accepted snapshot** produced by our own renderer. There is no external truth — the golden file _is_ the expected output because a human reviewed and approved it. Also called a snapshot test.          |
-| **Snapshot test**                  | Synonym for golden test. The snapshot is a frozen output that we assert has not changed.                                                                                                                                                                            |
-| **Render regression test**         | Any test whose purpose is to detect _unintended changes_ in rendering output. Golden tests are regression tests. Reftests are correctness tests.                                                                                                                    |
-| **Pixel diff**                     | Byte-level comparison of two raster images. A single differing channel value is a failure (at zero tolerance).                                                                                                                                                      |
-| **Perceptual diff**                | Comparison in a perceptual color space (e.g. YIQ via the `dify` crate). Weights differences by human visual sensitivity. More forgiving than raw pixel diff but still quantifiable.                                                                                 |
-| **rendiff**                        | Rust crate (`rendiff` v0.2) for histogram-based pixel diffing. Computes a per-channel difference histogram; thresholds are expressed as `[(max_diff, max_count), ...]` pairs. Used in `flatten_rendiff.rs` for equivalence tests. Dep in `crates/grida-canvas/`.    |
-| **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida-dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                     |
-| **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify). Required when rasterization is non-deterministic across platforms.                                                         |
-| **Data test**                      | A test that asserts on the scene graph or computed values directly — no rendering needed. E.g. bounding box, resolved transform matrix, computed style. The cheapest possible assertion.                                                                            |
-| **Probe test**                     | A test that asserts correctness by reading pixel values at specific coordinates in the rendered output. Requires a purpose-built fixture with a minimal color palette and documented probe points. No full-image comparison needed.                                 |
-| **Probe-friendly fixture**         | A fixture explicitly designed for probe testing: minimal colors, no decorative elements, shapes at known coordinates. Often accompanied by a `.probe.json` file declaring expected pixel values at specific points.                                                 |
+| Term                               | Definition                                                                                                                                                                                                                                                            |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Reftest**                        | A test that compares renderer output against an **independent reference** (oracle) whose correctness is established outside this project — e.g. a W3C-provided PNG for an SVG test case. The oracle is the source of truth; a mismatch means our renderer is wrong.   |
+| **Independent reference / oracle** | A rendering produced by a separate, trusted implementation or defined by a specification. We do not control its content.                                                                                                                                              |
+| **Golden test**                    | A test that compares renderer output against a **previously accepted snapshot** produced by our own renderer. There is no external truth — the golden file _is_ the expected output because a human reviewed and approved it. Also called a snapshot test.            |
+| **Snapshot test**                  | Synonym for golden test. The snapshot is a frozen output that we assert has not changed.                                                                                                                                                                              |
+| **Render regression test**         | Any test whose purpose is to detect _unintended changes_ in rendering output. Golden tests are regression tests. Reftests are correctness tests.                                                                                                                      |
+| **Pixel diff**                     | Byte-level comparison of two raster images. A single differing channel value is a failure (at zero tolerance).                                                                                                                                                        |
+| **Perceptual diff**                | Comparison in a perceptual color space (e.g. YIQ via the `dify` crate). Weights differences by human visual sensitivity. More forgiving than raw pixel diff but still quantifiable.                                                                                   |
+| **rendiff**                        | Rust crate (`rendiff` v0.2) for histogram-based pixel diffing. Computes a per-channel difference histogram; thresholds are expressed as `[(max_diff, max_count), ...]` pairs. Used in `flatten_rendiff.rs` for equivalence tests. Dep in `crates/grida-canvas/`.      |
+| **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida-dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                       |
+| **pixelmatch**                     | Pure-JS perceptual image comparison library. YIQ-based, AA-aware. Used by `@grida/reftest`. Zero native deps; same conceptual model as dify, slightly different threshold semantics — see parity notes below.                                                         |
+| **`@grida/reftest`**               | General-purpose, language-agnostic TS reftest CLI + library at `packages/grida-reftest/`. Takes two directories of PNGs, diffs, scores, writes the same bucket layout and JSON report as the Rust `grida-dev reftest`. Does NOT render anything — producers upstream. |
+| **`grida-dev reftest`**            | Rust reftest runner at `crates/grida-dev/src/reftest/`. SVG-specific: renders SVG via our own cg pipeline, then diffs against a reference PNG. Canonical for SVG. For non-SVG formats, use `@grida/reftest` with an upstream renderer.                                |
+| **refig**                          | Short for "Figma reftest." Fixture suites under `fixtures/local/refig/` containing `.fig` + `document.json` + `images/` + `exports/` (oracle PNGs from Figma's Images API). Consumed by a TS render step + `@grida/reftest`. See `fixtures/local/refig/README.md`.    |
+| **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify / pixelmatch). Required when rasterization is non-deterministic across platforms.                                              |
+| **Data test**                      | A test that asserts on the scene graph or computed values directly — no rendering needed. E.g. bounding box, resolved transform matrix, computed style. The cheapest possible assertion.                                                                              |
+| **Probe test**                     | A test that asserts correctness by reading pixel values at specific coordinates in the rendered output. Requires a purpose-built fixture with a minimal color palette and documented probe points. No full-image comparison needed.                                   |
+| **Probe-friendly fixture**         | A fixture explicitly designed for probe testing: minimal colors, no decorative elements, shapes at known coordinates. Often accompanied by a `.probe.json` file declaring expected pixel values at specific points.                                                   |
 
 ---
 
@@ -95,10 +94,31 @@ Use when a **trusted external reference** exists:
   See `docs/wg/feat-svg/testing.md` and `crates/grida-dev/TESTING.md`.
 - **resvg test suite** — feature-focused SVG tests with author-provided
   reference PNGs.
+- **Figma files (refig)** — Figma's own Images API renders every node
+  with an `exportSettings` preset; those PNGs are the oracle. Consumed
+  by a TS render step + `@grida/reftest`. See the Figma section below.
 - **CSS properties** — when a CSS spec defines exact rendering behavior
   and a reference implementation provides ground truth.
 
-A reftest failure means **our renderer has a bug** (or the spec changed).
+A reftest failure means **our renderer has a bug** (or the spec changed,
+or — for refig — Figma's server-side renderer changed).
+
+### Two reftest runners, one report format
+
+Two tools implement the diff/score/report side of reftests. Pick by the
+producer:
+
+| Runner              | Language | Render path                      | Diff engine | Use when                                                            |
+| ------------------- | -------- | -------------------------------- | ----------- | ------------------------------------------------------------------- |
+| `grida-dev reftest` | Rust     | SVG → cg → PNG (built-in)        | dify        | SVG suites (W3C, resvg); renderer runs in-process                   |
+| `@grida/reftest`    | TS       | None — you produce PNGs upstream | pixelmatch  | Figma refig, any cross-language producer, re-diff without re-render |
+
+Both write the **same bucket layout** (`S99/S95/S90/S75/err`) and the
+**same `report.json` schema**. A parity test at
+`packages/grida-reftest/__tests__/parity.test.ts` asserts the two
+tools grade a fixture pair to within ±0.005 similarity and the same
+bucket. Do not let them drift — update this table and both tools if
+the contract ever changes.
 
 ---
 
@@ -151,31 +171,100 @@ not our own renderer. A mismatch means our renderer diverges from the SVG spec
 
 ---
 
-### Figma — preparing an oracle via `figma_archive.py`
+### Figma — the refig reftest pipeline
 
-Figma content has **no oracle** by default — the oracle is Figma's own
-renderer. Use `figma_archive.py --export` to archive the file and export
-oracle PNGs in one step. See the script header for full `--export`
-documentation, prerequisites (nodes need export presets in Figma), and
-limitations.
+Figma content has **no pre-baked oracle** — the oracle is Figma's own
+server-side renderer, accessed via the Images API. The full, end-to-end
+refig suite has four pieces, all living under `fixtures/local/refig/`
+(gitignored):
 
-```sh
-# 1. Archive + export oracle PNGs
-python .agents/skills/io-figma/scripts/figma_archive.py \
-  --filekey <figma-file-key> \
-  --archive-dir fixtures/test-figma/rest-api/local/<fixture-name> \
-  --export
-
-# 2. Convert to .grida for rendering
-npx tsx packages/grida-canvas-io-figma/fig2grida.ts \
-  fixtures/test-figma/rest-api/local/<fixture-name>/document.json \
-  fixtures/test-grida/<fixture-name>.grida
+```
+fixtures/local/refig/<name>.<filekey>/
+├── document.fig      .fig binary (manual File → Save local copy in Figma desktop)
+├── document.json     REST: GET /v1/files/:key?geometry=paths
+├── images/           Image fills from GET /v1/files/:key/images
+└── exports/          Oracle PNGs: one per node with non-empty exportSettings
+    └── <node-id>.png (colon-sanitized: 1:5216 → 1_5216.png)
 ```
 
-The PNGs in `exports/` are the oracle. Without them there is no oracle —
-do not write a Figma visual comparison test without first committing
-Figma-exported reference PNGs. A comparison against our own renderer's
-output is a **golden test**, not a reftest.
+Nodes must have **export presets configured in Figma** before archiving
+(select → right panel → Export +). The REST API does not expose
+`exportSettings` for `SECTION` nodes (figma/rest-api-spec#87) — use
+`FRAME`, `COMPONENT`, or `INSTANCE`. Without exports there is no oracle;
+a comparison against our own renderer's output is a **golden test**,
+not a reftest.
+
+**1. Archive + export oracle PNGs** — `figma_archive.py --export`
+writes `document.json`, `images/`, and `exports/` in one call. See the
+script header for flags, prerequisites, and limitations.
+
+```sh
+python .agents/skills/io-figma/scripts/figma_archive.py \
+  --filekey <figma-file-key> \
+  --archive-dir fixtures/local/refig/<name>.<filekey> \
+  --export
+```
+
+Requires `FIGMA_TOKEN` or `X_FIGMA_TOKEN` in the process environment —
+the script does NOT auto-load `.env`. Requires Python 3.10+ (uses
+`str | None`); on macOS default Python 3.9 use Homebrew's `python3.12`.
+
+**2. Drop the `.fig` binary in** — File → Save local copy in Figma
+desktop, save as `document.fig` inside the suite directory. The REST
+API has no `.fig` download endpoint.
+
+**3. Render with our import pipeline** — Produce per-node actual PNGs
+with the TS-side `@grida/io-figma` pipeline (`.fig` via fig-kiwi, or
+`document.json` via REST converter). The renderer consumes a node's
+`exportSettings` to match Figma's target size/scale per export preset;
+one actual PNG per oracle PNG, filenames matched by Figma node id.
+
+Writes actuals to an out-of-tree directory (e.g.
+`target/refig/<name>/renders/`), one PNG per node, filename matching
+`exports/<node-id>.png`.
+
+**4. Diff via `@grida/reftest`** — The diff/score/report step is
+format-agnostic:
+
+```sh
+npx reftest \
+  --actual-dir   target/refig/<name>/renders \
+  --expected-dir fixtures/local/refig/<name>.<filekey>/exports \
+  --output-dir   target/reftests/<name> \
+  --bg white --mask alpha
+```
+
+Or the programmatic API from a TS test:
+
+```ts
+import { reftest } from "@grida/reftest";
+
+const report = await reftest({
+  name: "<name>",
+  expectedDir: "fixtures/local/refig/<name>.<filekey>/exports",
+  actualDir: "target/refig/<name>/renders",
+  outputDir: "target/reftests/<name>",
+  bg: "white",
+  scoring: { mask: "alpha" },
+});
+```
+
+Output: S99/S95/S90/S75/err bucket directories and a `report.json`
+compatible with the Rust reftest schema. An `average_similarity < 0.9`
+is the threshold where the renderer needs attention.
+
+**Gotchas for refig:**
+
+- The `exports/` oracle is non-deterministic across regenerations. Figma
+  may upgrade its server-side renderer; running `figma_archive.py
+--export` again may produce slightly different PNGs. Treat a
+  regeneration as a new oracle baseline, not a drop-in replacement.
+- Image fills live in `images/` and must be wired into the render step
+  (either pointed at the directory or packed into a `.grida` archive via
+  `fig2grida`).
+- Per-node target sizes come from the node's `exportSettings` in
+  `document.json` — not from a suite-wide viewport. The render step
+  must honor each node's preset.
 
 **Oracle type summary:**
 
@@ -458,6 +547,40 @@ cargo run -p grida-dev -- reftest \
 
 In a PR: _"SVG reftest: shapes-rect improved from S90 to S99 after
 fixing corner radius handling."_
+
+### True reftest — Figma refig against Figma-exported oracle
+
+```bash
+# Pre-requisite: FIGMA_TOKEN / X_FIGMA_TOKEN in env, .env not auto-loaded.
+# Assumes nodes in the Figma file already have exportSettings configured.
+
+# 1. Archive + download oracle PNGs (one-time per suite)
+python .agents/skills/io-figma/scripts/figma_archive.py \
+  --filekey <KEY> \
+  --archive-dir fixtures/local/refig/<name>.<KEY> \
+  --export
+
+# 2. Render per-node actuals with @grida/io-figma
+#    (harness TBD — see fixtures/local/refig/README.md and
+#    docs/wg/feat-fig/refig-testing.md if/when it exists)
+npx tsx packages/grida-canvas-io-figma/refig-render.ts \
+  fixtures/local/refig/<name>.<KEY> \
+  -o target/refig/<name>/renders
+
+# 3. Diff actuals against Figma oracle, write bucketed report
+pnpm --filter @grida/reftest exec reftest \
+  --actual-dir   target/refig/<name>/renders \
+  --expected-dir fixtures/local/refig/<name>.<KEY>/exports \
+  --output-dir   target/reftests/<name> \
+  --bg white --mask alpha
+
+# Result: target/reftests/<name>/report.json + S99/S95/S90/S75/err/ buckets.
+# A score < 1.0 means our Figma import/render diverges from Figma itself.
+# This is a genuine reftest — Figma's exported PNG is the oracle.
+```
+
+In a PR: _"refig(refig-standard): auto-layout row spacing fix, average
+similarity 0.81 → 0.94, 612 tests S75→S95."_
 
 ### Golden/regression test — custom effect
 

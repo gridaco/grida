@@ -131,6 +131,19 @@ python .agents/skills/io-figma/scripts/figma_archive.py \
   --filekey <KEY> --archive-dir fixtures/test-figma/rest-api/local/<name> --export
 ```
 
+### Refig — correctness testing against Figma's renderer
+
+For end-to-end correctness of the Figma import pipeline (does our Grida
+render of a Figma file match Figma's own render?), use the **refig**
+flow: oracle PNGs from Figma's Images API + `@grida/reftest` for the
+diff/score/report. Suites live at `fixtures/local/refig/<name>.<filekey>/`
+(gitignored). See `fixtures/local/refig/README.md` and the `cg-reftest`
+skill's "Figma — the refig reftest pipeline" section for the full flow.
+
+When debugging a conversion bug with a visible visual symptom, run the
+refig suite to locate the diverging nodes, then drill into `lib.ts` for
+the specific node type or property.
+
 ## Tests
 
 ```sh
