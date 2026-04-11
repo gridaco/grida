@@ -221,7 +221,7 @@ export function CampaignTemplateDuo001Viewer({
   locale: "en" | "ko";
   onDoubleClick?: () => void;
 }) {
-  const instance = useEditor(editor.state.init(document));
+  const instance = useEditor(editor.state.init(document), "dom");
   const { resolvedTheme } = useTheme();
   const scheme = resolvedTheme === "dark" ? "dark" : "light";
 

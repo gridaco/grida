@@ -70,7 +70,7 @@ import {
 } from "@/grida-canvas-react-starter-kit/starterkit-import";
 import { canvas_examples } from "./examples";
 import { sitemap } from "@/www/data/sitemap";
-import iofigma from "@grida/io-figma";
+import iofigma, { deckBytesToSlidesDocument } from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { SettingsDialog } from "./uxhost-settings";
 import {
@@ -216,9 +216,23 @@ export function PlaygroundMenuContent({
 
       <ImportFromFigmaSlidesDialog
         {...importFigmaSlides.props}
-        onImportFig={async () => {
-          // TODO: dedicated .deck import pipeline not yet implemented.
-          toast.info("Figma Slides import is not yet implemented");
+        onImportFig={async (result) => {
+          const buffer = await result.file.arrayBuffer();
+          const { document, assets } = deckBytesToSlidesDocument(
+            new Uint8Array(buffer)
+          );
+
+          if (assets && Object.keys(assets).length > 0) {
+            instance.loadImages(assets);
+          }
+
+          instance.commands.reset(
+            editor.state.init({
+              editable: true,
+              document,
+            }),
+            Date.now() + ""
+          );
         }}
       />
 

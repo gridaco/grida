@@ -736,7 +736,7 @@ export function useEditorHotKeys() {
     {
       preventDefault: true,
       ignoreModifiers: true,
-      ignoreEventWhen: (event) => event.ctrlKey,
+      ignoreEventWhen: (event) => event.ctrlKey || event.defaultPrevented,
     }
   );
 

@@ -22,6 +22,7 @@ import {
   BarChart3Icon,
   BarChartHorizontalIcon,
   PenToolIcon,
+  PresentationIcon,
   FoldersIcon,
   MegaphoneIcon,
   PlugIcon,
@@ -69,7 +70,8 @@ export type ResourceTypeIconName =
   | "v0_site"
   | "v0_canvas"
   | "v0_schema"
-  | "v0_campaign_referral";
+  | "v0_campaign_referral"
+  | "slides";
 
 export function ResourceTypeIcon({
   type,
@@ -130,6 +132,8 @@ export function ResourceTypeIcon({
       return <AppWindowIcon {...props} />;
     case "v0_canvas":
       return <PenToolIcon {...props} />;
+    case "slides":
+      return <PresentationIcon {...props} />;
     case "form-x-supabase":
     case "supabase":
       return <SupabaseLogo {...props} />;
