@@ -120,7 +120,21 @@ pub trait ApplicationApi {
     /// When `root_user_id` is `Some`, only the identified node and its
     /// descendants are drawn and hit-tested. Pass `None` to clear.
     /// Isolation is viewport-only — it does not mutate the document.
-    fn runtime_renderer_set_isolation_mode(&mut self, root_user_id: Option<&str>);
+    ///
+    /// `flags` is a bitmask of [`IsolationModeFlags`] constants.
+    /// `overflow_opacity` is only read when `OVERFLOW_DIM` is set in flags.
+    fn runtime_renderer_set_isolation_mode(
+        &mut self,
+        root_user_id: Option<&str>,
+        flags: u32,
+        overflow_opacity: f32,
+    );
+
+    /// Set the isolation mode stage decoration preset.
+    ///
+    /// `preset` is a `u32` discriminant of [`IsolationModeStagePreset`].
+    /// `0` = None (clear), `1` = Slide. Unknown values map to None.
+    fn runtime_renderer_set_isolation_stage_preset(&mut self, preset: u32);
 
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
@@ -653,12 +667,41 @@ impl ApplicationApi for UnknownTargetApplication {
         self.renderer.set_skip_layout(skip);
     }
 
-    fn runtime_renderer_set_isolation_mode(&mut self, root_user_id: Option<&str>) {
+    fn runtime_renderer_set_isolation_mode(
+        &mut self,
+        root_user_id: Option<&str>,
+        flags: u32,
+        overflow_opacity: f32,
+    ) {
+        use crate::runtime::filter::{
+            IsolationModeDimStyle, IsolationModeFlags, IsolationModeOutside,
+        };
+
         let mode = root_user_id.and_then(|id| {
             let internal = self.user_id_to_internal(id)?;
-            Some(crate::runtime::filter::IsolationMode { root: internal })
+            let outside = if flags & IsolationModeFlags::OVERFLOW_DIM != 0 {
+                IsolationModeOutside::Viewport(IsolationModeDimStyle {
+                    opacity: overflow_opacity.clamp(0.0, 1.0),
+                })
+            } else {
+                IsolationModeOutside::Hidden
+            };
+            Some(crate::runtime::filter::IsolationMode {
+                root: internal,
+                outside,
+                stage_preset: crate::runtime::filter::IsolationModeStagePreset::None,
+            })
         });
         self.renderer.set_isolation_mode(mode);
+        self.renderer
+            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+        self.queue();
+    }
+
+    fn runtime_renderer_set_isolation_stage_preset(&mut self, preset: u32) {
+        self.renderer.set_isolation_stage_preset(
+            crate::runtime::filter::IsolationModeStagePreset::from_u32(preset),
+        );
         self.renderer
             .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
         self.queue();

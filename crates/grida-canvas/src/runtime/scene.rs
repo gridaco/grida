@@ -384,6 +384,128 @@ impl Renderer {
         }
     }
 
+    // -------------------------------------------------------------------
+    // Isolation mode — frame-scoped draw context
+    // -------------------------------------------------------------------
+
+    /// Build the isolation draw context for the current frame.
+    ///
+    /// Returns `None` when isolation is inactive. The context resolves
+    /// the stage preset once, looks up the root layer once, and provides
+    /// draw methods for stage background, stage foreground, and viewport
+    /// overlay. All three draw paths (standard, pixel preview, downscale)
+    /// share this single context via [`draw_scene_content`].
+    fn build_isolation_draw_context(&self) -> Option<super::filter::IsolationDrawContext> {
+        use crate::painter::layer::Layer as _;
+
+        let iso = self.render_filter.isolation_mode.as_ref()?;
+        let entry = self
+            .scene_cache
+            .layers
+            .layers
+            .iter()
+            .find(|e| e.id == iso.root)?;
+
+        let transform = entry.layer.transform();
+        let base_shape = entry.layer.shape();
+        let stage = iso.stage_preset.resolve();
+
+        // Stage shape: apply corner-radius override if the preset provides one.
+        let stage_shape = match stage.as_ref().and_then(|s| s.corner_radius) {
+            Some(cr) => {
+                let radii = [
+                    skia_safe::Point::new(cr[0], cr[0]),
+                    skia_safe::Point::new(cr[1], cr[1]),
+                    skia_safe::Point::new(cr[2], cr[2]),
+                    skia_safe::Point::new(cr[3], cr[3]),
+                ];
+                let rrect = skia_safe::RRect::new_rect_radii(base_shape.rect, &radii);
+                crate::painter::geometry::PainterShape::from_rrect(rrect)
+            }
+            None => base_shape.clone(),
+        };
+
+        // World-space clip path from the root's *actual* shape (not the
+        // stage override) for the viewport dim overlay.
+        let base_path = if let Some(pe) = self.scene_cache.path.borrow().get(&iso.root) {
+            (*pe.path).clone()
+        } else {
+            base_shape.to_path()
+        };
+        let root_clip_path = base_path.make_transform(&sk::sk_matrix(transform.matrix));
+
+        Some(super::filter::IsolationDrawContext {
+            iso: iso.clone(),
+            stage,
+            stage_shape,
+            transform,
+            root_clip_path,
+        })
+    }
+
+    // -------------------------------------------------------------------
+    // Unified scene content draw
+    // -------------------------------------------------------------------
+
+    /// Draw the scene content inside the camera transform.
+    ///
+    /// This is the **single orchestration point** for the draw sequence:
+    ///
+    /// 1. Stage background (fills + drop shadows)
+    /// 2. Layer list (via Painter, with or without promoted blits)
+    /// 3. Stage foreground (strokes + inner shadows)
+    /// 4. Viewport dim overlay
+    ///
+    /// All three draw paths (standard, pixel preview, downscale) call
+    /// this method after setting up the canvas transform. This
+    /// eliminates the copy-paste of isolation draw calls across paths
+    /// and ensures any future draw path gets isolation support for free.
+    ///
+    /// Returns `(cache_picture_used, layer_image_cache_hits)`.
+    fn draw_scene_content(
+        &mut self,
+        canvas: &Canvas,
+        plan: &FramePlan,
+        background_color: Option<CGColor>,
+        use_promoted_blits: bool,
+    ) -> (usize, usize) {
+        // Resolve isolation once for the whole frame.
+        let iso_ctx = self.build_isolation_draw_context();
+
+        // 1. Stage background.
+        if let Some(ref ctx) = iso_ctx {
+            ctx.draw_stage_background(canvas, &self.images);
+        }
+
+        // 2. Layer content.
+        let (cache_picture_used, layer_image_cache_hits) = if use_promoted_blits {
+            let (promoted_blits, hits) = self.build_promoted_blits(plan);
+            let blits_ref = if promoted_blits.is_empty() {
+                None
+            } else {
+                Some(&promoted_blits)
+            };
+            let used = self.draw_layers_with_scene_cache_skip(canvas, plan, blits_ref);
+            (used, hits)
+        } else {
+            let used = self.draw_layers_with_scene_cache(canvas, plan);
+            (used, 0)
+        };
+
+        // 3. Stage foreground.
+        if let Some(ref ctx) = iso_ctx {
+            ctx.draw_stage_foreground(canvas, &self.images);
+        }
+
+        // 4. Viewport dim overlay.
+        if let Some(ref ctx) = iso_ctx {
+            let camera_rect = self.camera.rect();
+            ctx.draw_viewport_overlay(canvas, background_color, &camera_rect);
+        }
+
+        (cache_picture_used, layer_image_cache_hits)
+    }
+
     /// Build a [`FrameRenderStrategy`] from the current renderer state.
     ///
     /// This is the **only** place that translates renderer state into
@@ -1060,6 +1182,16 @@ impl Renderer {
     /// whose `id` is in this set should be drawn / hit-tested.
     pub fn isolation_set(&self) -> Option<&HashSet<NodeId>> {
         self.isolation_set.as_ref()
+    }
+
+    /// Set the stage decoration preset on the current isolation mode.
+    ///
+    /// Only takes effect when isolation mode is active. If isolation is
+    /// not active, this is a no-op.
+    pub fn set_isolation_stage_preset(&mut self, preset: super::filter::IsolationModeStagePreset) {
+        if let Some(ref mut iso) = self.render_filter.isolation_mode {
+            iso.stage_preset = preset;
+        }
     }
 
     /// Rebuild the precomputed isolation set from the current scene graph
@@ -2429,7 +2561,9 @@ impl Renderer {
                     off_canvas.translate((tx, ty));
                 }
                 off_canvas.concat(&sk::sk_matrix(pixel_preview.view_matrix.matrix));
-                let cache_picture_used = self.draw_layers_with_scene_cache(off_canvas, plan);
+
+                let (cache_picture_used, _) =
+                    self.draw_scene_content(off_canvas, plan, background_color, false);
 
                 off_canvas.restore();
 
@@ -2493,31 +2627,15 @@ impl Renderer {
         Self::clear_and_paint_background(canvas, background_color, width, height);
 
         canvas.save();
-
-        // Apply camera transform
         canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Build promoted blit map: pre-extract image data for compositor-
-        // cached nodes. The Painter will blit these inline at their correct
-        // z-position in the render command tree, preserving proper z-order
-        // when a live parent (e.g. Container with fills) has promoted children.
-        let (promoted_blits, layer_image_cache_hits) = self.build_promoted_blits(plan);
-
-        // Draw all layers via the Painter with promoted nodes blitted inline.
-        let promoted_blits_ref = if promoted_blits.is_empty() {
-            None
-        } else {
-            Some(&promoted_blits)
-        };
-        let cache_picture_used =
-            self.draw_layers_with_scene_cache_skip(canvas, plan, promoted_blits_ref);
+        let (cache_picture_used, layer_image_cache_hits) =
+            self.draw_scene_content(canvas, plan, background_color, true);
 
         let __painter_duration = __before_paint.elapsed();
-
         canvas.restore();
 
         let compositor_stats = self.scene_cache.compositor.stats();
-
         DrawResult {
             painter_duration: __painter_duration,
             cache_picture_used,
@@ -2528,7 +2646,6 @@ impl Renderer {
             layer_image_cache_bytes: compositor_stats.memory_bytes,
             live_draw_count: plan.regions.iter().map(|(_, indices)| indices.len()).sum(),
         }
-        //
     }
 
     /// Render the scene into a pre-created downscaled offscreen, then
@@ -2563,15 +2680,8 @@ impl Renderer {
         off_canvas.scale((scale, scale));
         off_canvas.concat(&sk::sk_matrix(self.camera.view_matrix().matrix));
 
-        // Build promoted blit map and draw all layers with inline blitting.
-        let (promoted_blits, layer_image_cache_hits) = self.build_promoted_blits(plan);
-        let promoted_blits_ref = if promoted_blits.is_empty() {
-            None
-        } else {
-            Some(&promoted_blits)
-        };
-        let cache_picture_used =
-            self.draw_layers_with_scene_cache_skip(off_canvas, plan, promoted_blits_ref);
+        let (cache_picture_used, layer_image_cache_hits) =
+            self.draw_scene_content(off_canvas, plan, background_color, true);
 
         off_canvas.restore();
 

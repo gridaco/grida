@@ -899,21 +899,67 @@ export class Scene {
   }
 
   /**
+   * Bit flags for `runtime_renderer_set_isolation_mode`.
+   *
+   * - `OVERFLOW_DIM` (0x1): treat the isolation root's bounds as a
+   *   viewport — subtree content that overflows is drawn at reduced
+   *   opacity (`overflowOpacity`).
+   */
+  static readonly ISOLATION_MODE_OVERFLOW_DIM = 1 << 0;
+
+  /**
    * Set or clear isolation mode.
    *
    * When `nodeId` is a string, only that node and its descendants are
    * drawn and hit-tested. Pass `null` to clear isolation.
    * Isolation is viewport-only — it does not mutate the document.
+   *
+   * @param nodeId  Node to isolate, or `null` to clear.
+   * @param flags   Bitmask of `Scene.ISOLATION_MODE_*` constants. Default `0`.
+   * @param overflowOpacity  Opacity for overflow-dimmed content (0–1).
+   *                         Only used when `ISOLATION_MODE_OVERFLOW_DIM` is set.
+   *                         Default `0.15`.
    */
-  runtime_renderer_set_isolation_mode(nodeId: string | null) {
+  runtime_renderer_set_isolation_mode(
+    nodeId: string | null,
+    flags: number = 0,
+    overflowOpacity: number = 0.15
+  ) {
     this._assertAlive();
     if (nodeId === null) {
-      this.module._runtime_renderer_set_isolation_mode(this.appptr, 0, 0);
+      this.module._runtime_renderer_set_isolation_mode(this.appptr, 0, 0, 0, 0);
       return;
     }
     const [ptr, len] = this._alloc_string(nodeId);
-    this.module._runtime_renderer_set_isolation_mode(this.appptr, ptr, len - 1);
+    this.module._runtime_renderer_set_isolation_mode(
+      this.appptr,
+      ptr,
+      len - 1,
+      flags,
+      overflowOpacity
+    );
     this._free_string(ptr, len);
+  }
+
+  /**
+   * Stage decoration preset constants for
+   * `runtime_renderer_set_isolation_stage_preset`.
+   */
+  static readonly ISOLATION_STAGE_PRESET_NONE = 0;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_XL = 1;
+
+  /**
+   * Set the isolation mode stage decoration preset.
+   *
+   * `0` = None (clear), `1` = Slide.
+   * Only takes effect when isolation mode is active.
+   */
+  runtime_renderer_set_isolation_stage_preset(preset: number) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_isolation_stage_preset(
+      this.appptr,
+      preset
+    );
   }
 
   runtime_renderer_set_outline_mode(enable: boolean) {

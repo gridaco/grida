@@ -254,8 +254,19 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.runtime_renderer_set_skip_layout(skip);
     }
 
-    fn runtime_renderer_set_isolation_mode(&mut self, root_user_id: Option<&str>) {
-        self.base.runtime_renderer_set_isolation_mode(root_user_id);
+    fn runtime_renderer_set_isolation_mode(
+        &mut self,
+        root_user_id: Option<&str>,
+        flags: u32,
+        overflow_opacity: f32,
+    ) {
+        self.base
+            .runtime_renderer_set_isolation_mode(root_user_id, flags, overflow_opacity);
+    }
+
+    fn runtime_renderer_set_isolation_stage_preset(&mut self, preset: u32) {
+        self.base
+            .runtime_renderer_set_isolation_stage_preset(preset);
     }
 
     fn set_main_camera_transform(&mut self, transform: AffineTransform) {

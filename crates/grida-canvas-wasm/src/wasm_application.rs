@@ -1141,16 +1141,36 @@ pub unsafe extern "C" fn runtime_renderer_set_skip_layout(
 #[no_mangle]
 /// js::_runtime_renderer_set_isolation_mode
 ///
-/// Set or clear isolation mode. When `id_ptr`/`id_len` point to a valid
-/// UTF-8 string, isolation is enabled for that node. Pass null/0 to clear.
+/// Set or clear isolation mode.
+///
+/// - `id_ptr`/`id_len`: UTF-8 node ID string to isolate. Pass null/0 to clear.
+/// - `flags`: bitmask of `IsolationModeFlags` (bit 0 = OVERFLOW_DIM).
+/// - `overflow_opacity`: opacity for overflow-dimmed content (0.0–1.0).
+///   Only read when `flags & OVERFLOW_DIM != 0`.
 pub unsafe extern "C" fn runtime_renderer_set_isolation_mode(
     app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
+    flags: u32,
+    overflow_opacity: f32,
 ) {
     if let Some(app) = app.as_mut() {
         let id = __str_from_ptr_len(id_ptr, id_len);
-        app.runtime_renderer_set_isolation_mode(id.as_deref());
+        app.runtime_renderer_set_isolation_mode(id.as_deref(), flags, overflow_opacity);
+    }
+}
+
+#[no_mangle]
+/// js::_runtime_renderer_set_isolation_stage_preset
+///
+/// Set the isolation mode stage decoration preset.
+/// `0` = None (clear), `1` = Slide. Unknown values map to None.
+pub unsafe extern "C" fn runtime_renderer_set_isolation_stage_preset(
+    app: *mut UnknownTargetApplication,
+    preset: u32,
+) {
+    if let Some(app) = app.as_mut() {
+        app.runtime_renderer_set_isolation_stage_preset(preset);
     }
 }
 

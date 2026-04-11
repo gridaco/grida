@@ -9,84 +9,83 @@ use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::resources::ByteStore;
 use cg::runtime::camera::Camera2D;
-use cg::runtime::filter::IsolationMode;
+use cg::runtime::filter::{
+    IsolationMode, IsolationModeDimStyle, IsolationModeFlags, IsolationModeOutside,
+    IsolationModeStagePreset,
+};
 use cg::runtime::font_repository::FontRepository;
 use cg::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use math2::transform::AffineTransform;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-// ---------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════
 // Helpers
-// ---------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════
 
-/// Build a scene with two root-level subtrees:
+/// Two root-level subtrees:
 ///
-///   Root A (container at 0,0, 100x100)
-///     +-- Rect A1 (at 10,10, 30x30)
-///     +-- Rect A2 (at 50,50, 30x30)
+/// ```text
+/// Root A (container 0,0  100×100)
+///   ├── Rect A1 (10,10  30×30)
+///   └── Rect A2 (50,50  30×30)
 ///
-///   Root B (container at 200,0, 100x100)
-///     +-- Rect B1 (at 10,10, 30x30)  (world: 210,10 via parent offset)
-///
-/// Returns (scene, root_a, a1, a2, root_b, b1).
+/// Root B (container 200,0  100×100)
+///   └── Rect B1 (10,10  30×30)
+/// ```
 fn build_two_subtree_scene() -> (Scene, NodeId, NodeId, NodeId, NodeId, NodeId) {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
 
-    // Subtree A — at the origin
-    let mut container_a = nf.create_container_node();
-    container_a.layout_dimensions.layout_target_width = Some(100.0);
-    container_a.layout_dimensions.layout_target_height = Some(100.0);
-    let root_a = graph.append_child(Node::Container(container_a), Parent::Root);
+    // Subtree A
+    let mut ca = nf.create_container_node();
+    ca.layout_dimensions.layout_target_width = Some(100.0);
+    ca.layout_dimensions.layout_target_height = Some(100.0);
+    let root_a = graph.append_child(Node::Container(ca), Parent::Root);
 
-    let mut rect_a1 = nf.create_rectangle_node();
-    rect_a1.transform = AffineTransform::new(10.0, 10.0, 0.0);
-    rect_a1.size = Size {
+    let mut ra1 = nf.create_rectangle_node();
+    ra1.transform = AffineTransform::new(10.0, 10.0, 0.0);
+    ra1.size = Size {
         width: 30.0,
         height: 30.0,
     };
-    rect_a1.set_fill(Paint::Solid(SolidPaint::RED));
-    let a1 = graph.append_child(Node::Rectangle(rect_a1), Parent::NodeId(root_a));
+    ra1.set_fill(Paint::Solid(SolidPaint::RED));
+    let a1 = graph.append_child(Node::Rectangle(ra1), Parent::NodeId(root_a));
 
-    let mut rect_a2 = nf.create_rectangle_node();
-    rect_a2.transform = AffineTransform::new(50.0, 50.0, 0.0);
-    rect_a2.size = Size {
+    let mut ra2 = nf.create_rectangle_node();
+    ra2.transform = AffineTransform::new(50.0, 50.0, 0.0);
+    ra2.size = Size {
         width: 30.0,
         height: 30.0,
     };
-    rect_a2.set_fill(Paint::Solid(SolidPaint::RED));
-    let a2 = graph.append_child(Node::Rectangle(rect_a2), Parent::NodeId(root_a));
+    ra2.set_fill(Paint::Solid(SolidPaint::RED));
+    let a2 = graph.append_child(Node::Rectangle(ra2), Parent::NodeId(root_a));
 
-    // Subtree B — offset to x=200 via schema position
-    let mut container_b = nf.create_container_node();
-    container_b.position =
-        LayoutPositioningBasis::Cartesian(cg::cg::types::CGPoint { x: 200.0, y: 0.0 });
-    container_b.layout_dimensions.layout_target_width = Some(100.0);
-    container_b.layout_dimensions.layout_target_height = Some(100.0);
-    let root_b = graph.append_child(Node::Container(container_b), Parent::Root);
+    // Subtree B — offset to x=200
+    let mut cb = nf.create_container_node();
+    cb.position = LayoutPositioningBasis::Cartesian(cg::cg::types::CGPoint { x: 200.0, y: 0.0 });
+    cb.layout_dimensions.layout_target_width = Some(100.0);
+    cb.layout_dimensions.layout_target_height = Some(100.0);
+    let root_b = graph.append_child(Node::Container(cb), Parent::Root);
 
-    let mut rect_b1 = nf.create_rectangle_node();
-    rect_b1.transform = AffineTransform::new(10.0, 10.0, 0.0);
-    rect_b1.size = Size {
+    let mut rb1 = nf.create_rectangle_node();
+    rb1.transform = AffineTransform::new(10.0, 10.0, 0.0);
+    rb1.size = Size {
         width: 30.0,
         height: 30.0,
     };
-    rect_b1.set_fill(Paint::Solid(SolidPaint::RED));
-    let b1 = graph.append_child(Node::Rectangle(rect_b1), Parent::NodeId(root_b));
+    rb1.set_fill(Paint::Solid(SolidPaint::RED));
+    let b1 = graph.append_child(Node::Rectangle(rb1), Parent::NodeId(root_b));
 
     let scene = Scene {
         name: "isolation test".into(),
         background_color: None,
         graph,
     };
-
     (scene, root_a, a1, a2, root_b, b1)
 }
 
 fn make_renderer(scene: Scene, vp_w: i32, vp_h: i32) -> Renderer {
-    // Disable layer compositing so display_list_size_estimated always equals
-    // the total visible node count (no promoted/cached split).
     let mut renderer = Renderer::new_with_options(
         Backend::new_from_raster(vp_w, vp_h),
         None,
@@ -106,186 +105,271 @@ fn make_renderer(scene: Scene, vp_w: i32, vp_h: i32) -> Renderer {
     renderer
 }
 
-fn flush_and_get_stats(renderer: &mut Renderer) -> cg::runtime::scene::FrameFlushStats {
+fn flush_ok(renderer: &mut Renderer) -> cg::runtime::scene::FrameFlushStats {
     match renderer.flush() {
-        FrameFlushResult::OK(stats) => stats,
-        other => panic!(
-            "Expected OK flush, got {:?}",
-            match other {
-                FrameFlushResult::NoPending => "NoPending",
-                FrameFlushResult::NoFrame => "NoFrame",
-                FrameFlushResult::NoScene => "NoScene",
-                _ => "OK",
-            }
-        ),
+        FrameFlushResult::OK(s) => s,
+        FrameFlushResult::NoPending => panic!("flush: NoPending"),
+        FrameFlushResult::NoFrame => panic!("flush: NoFrame"),
+        FrameFlushResult::NoScene => panic!("flush: NoScene"),
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests: frame plan filtering
-// ---------------------------------------------------------------------------
+/// Enable isolation, mark changed, queue, flush — returns stats.
+fn isolate_and_flush(
+    renderer: &mut Renderer,
+    mode: IsolationMode,
+) -> cg::runtime::scene::FrameFlushStats {
+    renderer.set_isolation_mode(Some(mode));
+    renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
+    renderer.queue_stable();
+    flush_ok(renderer)
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Frame plan filtering
+// ═══════════════════════════════════════════════════════════════════════
 
 #[test]
 fn isolation_reduces_display_list() {
-    let (scene, root_a, _a1, _a2, _root_b, _b1) = build_two_subtree_scene();
+    let (scene, root_a, ..) = build_two_subtree_scene();
     let mut renderer = make_renderer(scene, 400, 200);
 
-    // Frame 1: no isolation — all 5 nodes should appear.
+    // Full scene.
     renderer.queue_stable();
-    let stats_all = flush_and_get_stats(&mut renderer);
-    let all_count = stats_all.frame.display_list_size_estimated;
+    let all = flush_ok(&mut renderer).frame.display_list_size_estimated;
 
-    // Frame 2: isolate subtree A (root_a + a1 + a2 = 3 nodes).
-    renderer.set_isolation_mode(Some(IsolationMode { root: root_a }));
-    renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
-    renderer.queue_stable();
-    let stats_isolated = flush_and_get_stats(&mut renderer);
-    let isolated_count = stats_isolated.frame.display_list_size_estimated;
+    // Isolated subtree A (container + 2 rects = 3 nodes).
+    let iso = isolate_and_flush(&mut renderer, IsolationMode::hidden(root_a));
+    let count = iso.frame.display_list_size_estimated;
 
-    assert!(
-        isolated_count < all_count,
-        "Isolated display list ({isolated_count}) should be smaller than \
-         full display list ({all_count})"
-    );
-    // Subtree A has 3 nodes (container + 2 rects), subtree B has 2.
-    // With isolation on A, we expect exactly 3.
-    assert_eq!(
-        isolated_count, 3,
-        "Expected 3 nodes in isolated subtree A, got {isolated_count}"
-    );
+    assert!(count < all, "isolated ({count}) < full ({all})");
+    assert_eq!(count, 3, "subtree A has 3 nodes, got {count}");
 }
 
 #[test]
 fn clearing_isolation_restores_full_scene() {
-    let (scene, root_a, _a1, _a2, _root_b, _b1) = build_two_subtree_scene();
+    let (scene, root_a, ..) = build_two_subtree_scene();
     let mut renderer = make_renderer(scene, 400, 200);
 
-    // Baseline: draw without isolation first.
     renderer.queue_stable();
-    let stats_before = flush_and_get_stats(&mut renderer);
-    let all_count = stats_before.frame.display_list_size_estimated;
+    let baseline = flush_ok(&mut renderer).frame.display_list_size_estimated;
 
-    // Enable isolation.
-    renderer.set_isolation_mode(Some(IsolationMode { root: root_a }));
-    renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
-    renderer.queue_stable();
-    let stats_iso = flush_and_get_stats(&mut renderer);
-    let iso_count = stats_iso.frame.display_list_size_estimated;
-    assert!(
-        iso_count < all_count,
-        "Isolated ({iso_count}) should be less than full ({all_count})"
-    );
+    isolate_and_flush(&mut renderer, IsolationMode::hidden(root_a));
 
-    // Clear isolation — count should be restored to baseline.
     renderer.set_isolation_mode(None);
     renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
     renderer.queue_stable();
-    let stats = flush_and_get_stats(&mut renderer);
+    let restored = flush_ok(&mut renderer).frame.display_list_size_estimated;
 
-    assert_eq!(
-        stats.frame.display_list_size_estimated, all_count,
-        "After clearing isolation, display list should match baseline ({all_count}), got {}",
-        stats.frame.display_list_size_estimated
-    );
+    assert_eq!(restored, baseline, "should match baseline after clearing");
 }
 
-// ---------------------------------------------------------------------------
-// Tests: hit-test filtering
-// ---------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════
+// Hit-test filtering
+// ═══════════════════════════════════════════════════════════════════════
+
+fn build_cache_and_iso_set(scene: &Scene, root: NodeId) -> (SceneCache, HashSet<NodeId>) {
+    let mut cache = SceneCache::new();
+    let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
+    cache.update_geometry(scene, &fonts);
+    cache.update_layers(scene);
+
+    let mut set = HashSet::new();
+    set.insert(root);
+    for id in scene.graph.descendants(&root).unwrap() {
+        set.insert(id);
+    }
+    (cache, set)
+}
 
 #[test]
 fn hit_test_respects_isolation() {
-    let (scene, root_a, a1, _a2, _root_b, b1) = build_two_subtree_scene();
+    let (scene, root_a, a1, _, _, b1) = build_two_subtree_scene();
+    let (cache, iso_set) = build_cache_and_iso_set(&scene, root_a);
 
-    // Build caches the same way the Renderer does.
-    let mut cache = SceneCache::new();
-    let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
-    cache.update_geometry(&scene, &fonts);
-    cache.update_layers(&scene);
-
-    // Build the isolation set for subtree A.
-    let mut iso_set = HashSet::new();
-    iso_set.insert(root_a);
-    let descendants = scene.graph.descendants(&root_a).unwrap();
-    for id in &descendants {
-        iso_set.insert(*id);
-    }
-
-    // Without isolation: hit inside subtree B returns b1.
+    // Without isolation: B-region hit returns b1.
     let ht = HitTester::new(&cache);
-    assert_eq!(
-        ht.hit_first_fast([220.0, 20.0]),
-        Some(b1),
-        "Without isolation, point in B should hit b1"
-    );
+    assert_eq!(ht.hit_first_fast([220.0, 20.0]), Some(b1));
 
-    // With isolation on A: same point returns nothing.
-    let ht_iso = HitTester::new(&cache).with_isolation_set(Some(&iso_set));
-    assert!(
-        ht_iso.hit_first_fast([220.0, 20.0]).is_none(),
-        "With isolation on A, point in B should hit nothing"
-    );
-
-    // With isolation on A: point in A still works.
-    let hit = ht_iso.hit_first_fast([15.0, 15.0]);
-    assert_eq!(
-        hit,
-        Some(a1),
-        "With isolation on A, point in A should hit a1"
-    );
+    // With isolation on A: B-region → nothing, A-region → a1.
+    let ht = HitTester::new(&cache).with_isolation_set(Some(&iso_set));
+    assert!(ht.hit_first_fast([220.0, 20.0]).is_none());
+    assert_eq!(ht.hit_first_fast([15.0, 15.0]), Some(a1));
 }
 
 #[test]
 fn hits_fast_respects_isolation() {
-    let (scene, root_a, _a1, _a2, _root_b, _b1) = build_two_subtree_scene();
+    let (scene, root_a, ..) = build_two_subtree_scene();
+    let (cache, iso_set) = build_cache_and_iso_set(&scene, root_a);
 
-    let mut cache = SceneCache::new();
-    let fonts = FontRepository::new(Arc::new(Mutex::new(ByteStore::new())));
-    cache.update_geometry(&scene, &fonts);
-    cache.update_layers(&scene);
-
-    let mut iso_set = HashSet::new();
-    iso_set.insert(root_a);
-    for id in scene.graph.descendants(&root_a).unwrap() {
-        iso_set.insert(id);
-    }
-
-    // hits_fast at a point overlapping B should return empty under isolation A.
     let ht = HitTester::new(&cache).with_isolation_set(Some(&iso_set));
-    let results = ht.hits_fast([220.0, 20.0]);
-    assert!(
-        results.is_empty(),
-        "hits_fast with isolation on A should return empty for point in B"
-    );
+    assert!(ht.hits_fast([220.0, 20.0]).is_empty());
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Lifecycle
+// ═══════════════════════════════════════════════════════════════════════
 
 #[test]
 fn scene_load_resets_isolation() {
-    let (scene, root_a, _a1, _a2, _root_b, _b1) = build_two_subtree_scene();
+    let (scene, root_a, ..) = build_two_subtree_scene();
     let mut renderer = make_renderer(scene, 400, 200);
 
-    // Enable isolation.
-    renderer.set_isolation_mode(Some(IsolationMode { root: root_a }));
+    renderer.set_isolation_mode(Some(IsolationMode::hidden(root_a)));
     assert!(renderer.isolation_mode().is_some());
 
-    // Load a new scene — isolation should be cleared.
-    let (new_scene, _, _, _, _, _) = build_two_subtree_scene();
+    let (new_scene, ..) = build_two_subtree_scene();
     renderer.load_scene(new_scene);
+    assert!(renderer.isolation_mode().is_none());
+    assert!(renderer.isolation_set().is_none());
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ChangeFlags
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn render_filter_flag() {
+    let f =
+        cg::runtime::changes::ChangeFlags::RENDER_FILTER | cg::runtime::changes::ChangeFlags::NONE;
+    assert!(f.contains(cg::runtime::changes::ChangeFlags::RENDER_FILTER));
+    assert!(!f.contains(cg::runtime::changes::ChangeFlags::SCENE_LOAD));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// IsolationModeOutside
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn viewport_mode_stored() {
+    let (scene, root_a, ..) = build_two_subtree_scene();
+    let mut renderer = make_renderer(scene, 400, 200);
+
+    renderer.set_isolation_mode(Some(IsolationMode {
+        root: root_a,
+        outside: IsolationModeOutside::Viewport(IsolationModeDimStyle { opacity: 0.2 }),
+        stage_preset: IsolationModeStagePreset::None,
+    }));
+
+    let mode = renderer.isolation_mode().unwrap();
+    match &mode.outside {
+        IsolationModeOutside::Viewport(dim) => {
+            assert!((dim.opacity - 0.2).abs() < f32::EPSILON);
+        }
+        other => panic!("expected Viewport, got {other:?}"),
+    }
+}
+
+#[test]
+fn hidden_is_default() {
+    let (scene, root_a, ..) = build_two_subtree_scene();
+    let mut renderer = make_renderer(scene, 400, 200);
+
+    renderer.set_isolation_mode(Some(IsolationMode::hidden(root_a)));
+    assert!(matches!(
+        renderer.isolation_mode().unwrap().outside,
+        IsolationModeOutside::Hidden
+    ));
+}
+
+#[test]
+fn outside_mode_does_not_affect_isolation_set() {
+    let (scene, root_a, ..) = build_two_subtree_scene();
+    let mut renderer = make_renderer(scene, 400, 200);
+
+    renderer.set_isolation_mode(Some(IsolationMode::hidden(root_a)));
+    let set_hidden: HashSet<_> = renderer.isolation_set().unwrap().clone();
+
+    renderer.set_isolation_mode(Some(IsolationMode {
+        root: root_a,
+        outside: IsolationModeOutside::Viewport(IsolationModeDimStyle { opacity: 0.3 }),
+        stage_preset: IsolationModeStagePreset::None,
+    }));
+    let set_viewport: HashSet<_> = renderer.isolation_set().unwrap().clone();
+
+    assert_eq!(set_hidden, set_viewport);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// IsolationModeFlags (C-ABI)
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn overflow_dim_flag() {
+    assert_eq!(IsolationModeFlags::OVERFLOW_DIM, 1);
+    assert_eq!(0u32 & IsolationModeFlags::OVERFLOW_DIM, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Stage presets
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn stage_preset_shadow_xl_resolves() {
+    let style = IsolationModeStagePreset::ShadowXL.resolve().unwrap();
+    assert!(style.fills.is_none(), "ShadowXL should have no fills");
+    assert!(style.strokes.is_none(), "ShadowXL should have no strokes");
     assert!(
-        renderer.isolation_mode().is_none(),
-        "Isolation should be cleared after scene load"
+        style.stroke_width.is_none(),
+        "ShadowXL should have no stroke width"
     );
     assert!(
-        renderer.isolation_set().is_none(),
-        "Isolation set should be None after scene load"
+        style.corner_radius.is_none(),
+        "ShadowXL should have no corner radius"
+    );
+    assert_eq!(
+        style.shadows.as_ref().unwrap().len(),
+        2,
+        "shadow-xl has 2 layers"
     );
 }
 
 #[test]
-fn change_flags_render_filter_is_not_dead() {
-    // Ensure the flag exists and can be combined with others.
-    let flags =
-        cg::runtime::changes::ChangeFlags::RENDER_FILTER | cg::runtime::changes::ChangeFlags::NONE;
-    assert!(flags.contains(cg::runtime::changes::ChangeFlags::RENDER_FILTER));
-    assert!(!flags.contains(cg::runtime::changes::ChangeFlags::SCENE_LOAD));
+fn stage_preset_none_resolves_to_none() {
+    assert!(IsolationModeStagePreset::None.resolve().is_none());
+}
+
+#[test]
+fn stage_preset_from_u32() {
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(0),
+        IsolationModeStagePreset::None
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(1),
+        IsolationModeStagePreset::ShadowXL
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(999),
+        IsolationModeStagePreset::None
+    );
+}
+
+#[test]
+fn stage_preset_set_on_renderer() {
+    let (scene, root_a, ..) = build_two_subtree_scene();
+    let mut renderer = make_renderer(scene, 400, 200);
+
+    renderer.set_isolation_mode(Some(IsolationMode::hidden(root_a)));
+
+    renderer.set_isolation_stage_preset(IsolationModeStagePreset::ShadowXL);
+    assert_eq!(
+        renderer.isolation_mode().unwrap().stage_preset,
+        IsolationModeStagePreset::ShadowXL
+    );
+
+    renderer.set_isolation_stage_preset(IsolationModeStagePreset::None);
+    assert_eq!(
+        renderer.isolation_mode().unwrap().stage_preset,
+        IsolationModeStagePreset::None
+    );
+}
+
+#[test]
+fn stage_preset_noop_without_isolation() {
+    let (scene, ..) = build_two_subtree_scene();
+    let mut renderer = make_renderer(scene, 400, 200);
+
+    renderer.set_isolation_stage_preset(IsolationModeStagePreset::ShadowXL);
+    assert!(renderer.isolation_mode().is_none());
 }
