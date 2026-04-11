@@ -53,8 +53,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.5 }}
           className="max-w-lg text-sm md:text-base text-muted-foreground text-center mt-8"
         >
-          A vector-native workspace for teams creating polished, scalable
-          decks.
+          A vector-native workspace for teams creating polished, scalable decks.
         </motion.p>
 
         <motion.div

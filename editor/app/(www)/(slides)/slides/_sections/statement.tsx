@@ -16,8 +16,7 @@ export default function Statement() {
         Presentations, built as graphics.
         <br />
         <span className="text-muted-foreground/50">
-          Grida Slides gives teams a precise, vector-native way to design
-          decks.
+          Grida Slides gives teams a precise, vector-native way to design decks.
         </span>
       </p>
     </motion.section>
