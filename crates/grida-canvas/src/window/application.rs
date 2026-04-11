@@ -1547,16 +1547,25 @@ impl UnknownTargetApplication {
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.renderer.add_font(family, data);
         self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+        self.queue();
     }
 
     /// Register image bytes with the renderer and return metadata.
     pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
-        self.renderer.add_image(data)
+        let result = self.renderer.add_image(data);
+        self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+        self.queue();
+        result
     }
 
     /// Register image bytes under a caller-specified RID (res:// or system://).
     pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
-        self.renderer.add_image_with_rid(data, rid)
+        let result = self.renderer.add_image_with_rid(data, rid);
+        if result.is_some() {
+            self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+            self.queue();
+        }
+        result
     }
 
     /// Perform a redraw and print diagnostic information.

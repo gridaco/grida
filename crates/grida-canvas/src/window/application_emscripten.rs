@@ -3,7 +3,6 @@ use crate::io::io_grida_patch::TransactionApplyReport;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
-use crate::runtime::changes::ChangeFlags;
 use crate::runtime::scene::Backend;
 use crate::runtime::scene::RendererOptions;
 use crate::window::application::{ApplicationApi, BoundsTarget, UnknownTargetApplication};
@@ -418,27 +417,17 @@ impl EmscriptenApplication {
     /// Multiple calls with the same `family` and different font files are
     /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
-        self.base.renderer.add_font(family, data);
-        // Newly registered fonts may affect cached text layout; the central
-        // apply_changes() dispatcher will invalidate paragraph + picture +
-        // compositor caches on the next frame.
-        self.base.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+        self.base.add_font(family, data);
     }
 
     /// Register an image with the renderer and return metadata.
     pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
-        let result = self.base.renderer.add_image(data);
-        self.base.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
-        result
+        self.base.add_image(data)
     }
 
     /// Register image bytes under a caller-specified RID (res:// or system://).
     pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
-        let result = self.base.renderer.add_image_with_rid(data, rid);
-        if result.is_some() {
-            self.base.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
-        }
-        result
+        self.base.add_image_with_rid(data, rid)
     }
 
     pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
