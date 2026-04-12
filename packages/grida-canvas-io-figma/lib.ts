@@ -3983,9 +3983,15 @@ export namespace iofigma {
           lineHeightPercent:
             nc.lineHeight?.units === "PERCENT"
               ? nc.lineHeight.value
-              : undefined,
+              : nc.lineHeight?.units === "RAW"
+                ? nc.lineHeight.value * 100
+                : undefined,
           lineHeightPercentFontSize:
-            nc.lineHeight?.units === "PERCENT" ? nc.lineHeight.value : 100,
+            nc.lineHeight?.units === "PERCENT"
+              ? nc.lineHeight.value
+              : nc.lineHeight?.units === "RAW"
+                ? nc.lineHeight.value * 100
+                : 100,
           textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
           textCase:
             nc.textCase === "ORIGINAL" ? undefined : (nc.textCase ?? undefined),
@@ -4070,6 +4076,10 @@ export namespace iofigma {
               if (lh.units === "PERCENT") {
                 o.lineHeightPercent = lh.value;
                 o.lineHeightPercentFontSize = lh.value;
+              }
+              if (lh.units === "RAW") {
+                o.lineHeightPercent = lh.value * 100;
+                o.lineHeightPercentFontSize = lh.value * 100;
               }
             }
             if (overrideNc.fillPaints) o.fills = paints(overrideNc.fillPaints);

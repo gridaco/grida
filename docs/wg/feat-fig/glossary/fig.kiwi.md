@@ -644,6 +644,22 @@ When importing Kiwi TEXT nodes to a REST-like or Grida schema:
 
 Figma internally merges and returns these values in the REST API; using FontMetaData ensures the import matches that behavior.
 
+#### Line Height & Letter Spacing Units
+
+`NodeChange.lineHeight` and `NodeChange.letterSpacing` are `{ value: number, units: string }` objects. The `units` field determines interpretation:
+
+| units       | Meaning                        | REST API equivalent         | Conversion to REST                         |
+| ----------- | ------------------------------ | --------------------------- | ------------------------------------------ |
+| `"RAW"`     | Direct multiplier of font size | `lineHeightPercentFontSize` | `value * 100` (e.g. RAW `1.5` → `150`)     |
+| `"PERCENT"` | Percentage of font size        | `lineHeightPercentFontSize` | `value` as-is (e.g. PERCENT `150` → `150`) |
+| `"PIXELS"`  | Absolute pixel value           | `lineHeightPx`              | `value` as-is                              |
+
+**`"RAW"` is the most common unit** for line height in `.fig` / `.deck` files. It represents a unitless factor (like CSS `line-height: 1.5`). The REST API does not expose `"RAW"` — it converts to `lineHeightPercentFontSize` (percentage of font size), so `RAW 1.5` = `lineHeightPercentFontSize 150`.
+
+Letter spacing follows the same pattern: `"PERCENT"` is relative to font size, `"PIXELS"` is absolute.
+
+Style overrides (`TextData.styleOverrideTable`) carry the same `{ value, units }` shape for `lineHeight` and `letterSpacing`.
+
 ### Gradient Paint Transform
 
 Gradient paints (`GRADIENT_LINEAR`, `GRADIENT_RADIAL`, `GRADIENT_ANGULAR`, `GRADIENT_DIAMOND`) carry a `transform` field that defines the gradient's orientation and position within the node's normalized (0-1) coordinate space.
