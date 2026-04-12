@@ -90,7 +90,7 @@ export function compareBuffers(
 
   const diffOutput = opts.diffOutputPath
     ? Buffer.alloc(width * height * 4)
-    : null;
+    : undefined;
 
   const diffPixels = pixelmatch(
     actualOpaque,

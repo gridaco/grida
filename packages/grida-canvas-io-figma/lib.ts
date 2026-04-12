@@ -51,6 +51,7 @@ import kolor from "@grida/color";
 import {
   extractImages as extractImagesFromFigKiwi,
   getBlobBytes,
+  parseCommandsBlob,
   parseVectorNetworkBlob,
   readFigFile,
   readFigFileFromStream,
@@ -1453,19 +1454,19 @@ export namespace iofigma {
             const effectiveFills = fillOverrides ?? parentNode.fills;
             return {
               id: childId,
+              // Child opacity and blend mode stay at defaults; the wrapping
+              // GroupNode (built from the parent via base_node_trait in
+              // node_without_children) already carries parentNode.opacity /
+              // parentNode.blendMode and applies them at composition time.
+              // Copying them here again double-applies (e.g. a 0.25 parent
+              // renders as 0.0625 via parent × child).
               ...base_node_trait({
                 name,
                 visible: "visible" in parentNode ? parentNode.visible : true,
                 locked: "locked" in parentNode ? parentNode.locked : false,
                 rotation: 0,
-                opacity:
-                  "opacity" in parentNode && parentNode.opacity !== undefined
-                    ? parentNode.opacity
-                    : 1,
-                blendMode:
-                  "blendMode" in parentNode && parentNode.blendMode
-                    ? parentNode.blendMode
-                    : "NORMAL",
+                opacity: 1,
+                blendMode: "NORMAL",
               }),
               ...positioning_trait({
                 relativeTransform: [
@@ -1545,19 +1546,16 @@ export namespace iofigma {
             const effectiveFills = fillOverrides ?? parentNode.fills;
             return {
               id: childId,
+              // See createVectorNodeFromPath for the rationale: parent's
+              // opacity / blendMode already live on the wrapping GroupNode;
+              // copying them here double-applies.
               ...base_node_trait({
                 name,
                 visible: "visible" in parentNode ? parentNode.visible : true,
                 locked: "locked" in parentNode ? parentNode.locked : false,
                 rotation: 0,
-                opacity:
-                  "opacity" in parentNode && parentNode.opacity !== undefined
-                    ? parentNode.opacity
-                    : 1,
-                blendMode:
-                  "blendMode" in parentNode && parentNode.blendMode
-                    ? parentNode.blendMode
-                    : "NORMAL",
+                opacity: 1,
+                blendMode: "NORMAL",
               }),
               ...positioning_trait({
                 relativeTransform: [
@@ -4136,7 +4134,121 @@ export namespace iofigma {
       }
 
       /**
-       * Convert NodeChange to VECTOR node or X_VECTOR with parsed vector network
+       * Render a parsed commands array (from {@link parseCommandsBlob}) as an
+       * SVG path string.
+       *
+       * Output is absolute, space-separated, and uses only M/L/Q/C/Z — the
+       * exact dialect REST API `geometry=paths` emits. Numbers are formatted
+       * with {@link fmtNum} (no trailing zeros, but full precision preserved)
+       * so downstream {@link transformSvgPath} and path parsers see clean
+       * coordinates.
+       */
+      function commandsToSvgPath(
+        commands: ReadonlyArray<string | number>
+      ): string {
+        if (commands.length === 0) return "";
+        const parts: string[] = [];
+        let i = 0;
+        while (i < commands.length) {
+          const cmd = commands[i];
+          if (typeof cmd !== "string") {
+            // Desync — bail out. Bad input is better as empty than wrong.
+            return "";
+          }
+          if (cmd === "Z") {
+            parts.push("Z");
+            i += 1;
+            continue;
+          }
+          const arity =
+            cmd === "M" || cmd === "L"
+              ? 2
+              : cmd === "Q"
+                ? 4
+                : cmd === "C"
+                  ? 6
+                  : 0;
+          if (arity === 0) {
+            return "";
+          }
+          if (i + arity >= commands.length) return "";
+          const coords: number[] = [];
+          for (let k = 1; k <= arity; k++) {
+            const n = commands[i + k];
+            if (typeof n !== "number") return "";
+            coords.push(n);
+          }
+          parts.push(`${cmd}${coords.map(fmtNum).join(" ")}`);
+          i += 1 + arity;
+        }
+        return parts.join(" ");
+      }
+
+      /**
+       * Format a f32 as a compact SVG-path-friendly number.
+       * Avoids "1.0000000001" style drift at the cost of being slightly
+       * lossy below 1e-5 — safe for Figma's typical icon scale.
+       */
+      function fmtNum(n: number): string {
+        if (!Number.isFinite(n)) return "0";
+        if (Number.isInteger(n)) return String(n);
+        // 4 decimal places is enough for per-pixel accuracy on 1024px canvases.
+        return parseFloat(n.toFixed(4)).toString();
+      }
+
+      /**
+       * Convert a Kiwi `Path` (commandsBlob + windingRule) to a REST-like
+       * `Path` (SVG string + windingRule). Returns the empty-path sentinel
+       * `{ path: "", ... }` if the blob is missing or malformed, preserving
+       * the original "empty fallback" behaviour for degenerate nodes.
+       */
+      function kiwiPathToRestPath(
+        kp: figkiwi.Path,
+        message: figkiwi.Message
+      ): { path: string; windingRule: "NONZERO" | "EVENODD" } {
+        const wr: "NONZERO" | "EVENODD" = kp.windingRule
+          ? windingRule(kp.windingRule)
+          : "NONZERO";
+        if (kp.commandsBlob === undefined) {
+          return { path: "", windingRule: wr };
+        }
+        const bytes = getBlobBytes(kp.commandsBlob, message);
+        if (!bytes) return { path: "", windingRule: wr };
+        const commands = parseCommandsBlob(bytes);
+        if (!commands) return { path: "", windingRule: wr };
+        return { path: commandsToSvgPath(commands), windingRule: wr };
+      }
+
+      /**
+       * Convert NodeChange to VECTOR node with REST-compatible path data
+       * (or X_VECTOR with vector network as a last resort).
+       *
+       * ## Strategy
+       *
+       * The Kiwi `.fig` format stores vector geometry in two parallel forms:
+       *
+       * 1. `vectorData.vectorNetworkBlob` — a graph of vertices/segments
+       *    plus explicit `regions` that define which closed loops are
+       *    filled and with which winding rule.
+       * 2. `fillGeometry` / `strokeGeometry` — pre-baked path command
+       *    streams (`commandsBlob`), one per filled region, matching what
+       *    the Figma REST API returns when `geometry=paths` is set.
+       *
+       * Grida's `vn.VectorNetwork` only represents vertices and segments;
+       * it has no `regions` field. Converting a Kiwi vector network to
+       * Grida drops the region/loop information, and the renderer then has
+       * to infer faces from the raw graph — which over-fills compound
+       * paths (the "Stitches Logo" / hollow icon class of failures) and
+       * can't honour per-region winding rules.
+       *
+       * The pre-baked `fillGeometry`/`strokeGeometry` side keeps region
+       * semantics intact (one path per filled region, each with its own
+       * winding rule). This is also the side the REST→Grida pipeline is
+       * already tuned for via `prefer_path_for_geometry`.
+       *
+       * We therefore prefer `fillGeometry` + `strokeGeometry` whenever
+       * `commandsBlob` data is available, and fall back to the X_VECTOR
+       * (vectorNetworkBlob) path only when no command streams exist.
        */
       function vectorNode(
         nc: figkiwi.NodeChange,
@@ -4147,7 +4259,34 @@ export namespace iofigma {
         | undefined {
         if (!nc.guid || !nc.name || !nc.size) return undefined;
 
-        // Try to parse vector network blob if available
+        // Decode pre-baked fill/stroke path commands from Kiwi.
+        const fillGeometry = nc.fillGeometry?.map((p) =>
+          kiwiPathToRestPath(p, message)
+        );
+        const strokeGeometry = nc.strokeGeometry?.map((p) =>
+          kiwiPathToRestPath(p, message)
+        );
+
+        const hasAnyRealPath =
+          (fillGeometry?.some((p) => p.path.length > 0) ?? false) ||
+          (strokeGeometry?.some((p) => p.path.length > 0) ?? false);
+
+        if (hasAnyRealPath) {
+          return {
+            ...kiwi_is_layer_trait(nc, "VECTOR"),
+            ...kiwi_blend_opacity_trait(nc),
+            ...kiwi_layout_trait(nc),
+            ...kiwi_geometry_trait(nc),
+            fillGeometry,
+            strokeGeometry,
+            ...kiwi_effects_trait(nc),
+            ...kiwi_has_export_settings_trait(nc),
+          } satisfies figrest.VectorNode;
+        }
+
+        // Fallback: no pre-baked paths — try the vector network blob.
+        // This still loses per-region winding rules but is better than
+        // rendering an empty node.
         if (nc.vectorData?.vectorNetworkBlob !== undefined) {
           const blobBytes = getBlobBytes(
             nc.vectorData.vectorNetworkBlob,
@@ -4164,7 +4303,6 @@ export namespace iofigma {
                 size: nc.size,
               });
 
-              // Return X_VECTOR with parsed network data
               return {
                 ...kiwi_is_layer_trait(nc, "X_VECTOR"),
                 ...kiwi_blend_opacity_trait(nc),
@@ -4179,24 +4317,14 @@ export namespace iofigma {
           }
         }
 
-        // Fallback to regular VECTOR with fillGeometry/strokeGeometry
+        // Last resort: empty-path VECTOR (original behaviour).
         return {
           ...kiwi_is_layer_trait(nc, "VECTOR"),
           ...kiwi_blend_opacity_trait(nc),
           ...kiwi_layout_trait(nc),
           ...kiwi_geometry_trait(nc),
-          fillGeometry: nc.fillGeometry?.map((path) => ({
-            path: "",
-            windingRule: path.windingRule
-              ? windingRule(path.windingRule)
-              : "NONZERO",
-          })),
-          strokeGeometry: nc.strokeGeometry?.map((path) => ({
-            path: "",
-            windingRule: path.windingRule
-              ? windingRule(path.windingRule)
-              : "NONZERO",
-          })),
+          fillGeometry: fillGeometry ?? [],
+          strokeGeometry: strokeGeometry ?? [],
           ...kiwi_effects_trait(nc),
           ...kiwi_has_export_settings_trait(nc),
         } satisfies figrest.VectorNode;
@@ -4286,12 +4414,29 @@ export namespace iofigma {
       }
 
       /**
-       * Convert NodeChange to BOOLEAN_OPERATION node
+       * Convert NodeChange to BOOLEAN_OPERATION node.
+       *
+       * Decodes pre-baked `fillGeometry` / `strokeGeometry` (via
+       * `commandsBlob`) when present, same as {@link vectorNode}. This lets
+       * the downstream REST→Grida pipeline treat the boolean result as a
+       * single baked path (via `processNodeWithGeometryTrait` +
+       * `isBoolGeometryGroup`) and skip child recursion — which is the only
+       * way to render boolean operations correctly from the Kiwi path,
+       * because our VECTOR children now emit `GroupNode`s (not `VectorNode`s)
+       * and the Grida BooleanOp renderer expects leaf shapes.
        */
       function booleanOperation(
-        nc: figkiwi.NodeChange
+        nc: figkiwi.NodeChange,
+        message: figkiwi.Message
       ): figrest.SubcanvasNode | undefined {
         if (!nc.guid || !nc.name || !nc.size) return undefined;
+
+        const fillGeometry = nc.fillGeometry?.map((p) =>
+          kiwiPathToRestPath(p, message)
+        );
+        const strokeGeometry = nc.strokeGeometry?.map((p) =>
+          kiwiPathToRestPath(p, message)
+        );
 
         return {
           ...kiwi_is_layer_trait(nc, "BOOLEAN_OPERATION"),
@@ -4303,6 +4448,8 @@ export namespace iofigma {
             | "SUBTRACT"
             | "EXCLUDE",
           ...kiwi_geometry_trait(nc),
+          fillGeometry,
+          strokeGeometry,
           ...kiwi_children_trait(),
           ...kiwi_effects_trait(nc),
           ...kiwi_has_export_settings_trait(nc),
@@ -4380,7 +4527,7 @@ export namespace iofigma {
           case "STAR":
             return star(nodeChange);
           case "BOOLEAN_OPERATION":
-            return booleanOperation(nodeChange);
+            return booleanOperation(nodeChange, message);
           case "SLIDE":
           case "INTERACTIVE_SLIDE_ELEMENT":
             return slide(nodeChange);
@@ -4535,6 +4682,14 @@ export namespace iofigma {
 
       // Shallow clone
       const cloned: any = { ...(node as any), id: newId };
+
+      // Clones live inside an INSTANCE subtree — they're internal to the
+      // instance and are never directly addressable as export roots.
+      // Figma's own Images API only exports the instance root (or the
+      // surrounding component), not the inlined clones. Copying
+      // `exportSettings` would make our export harness emit phantom
+      // files that have no matching oracle.
+      delete cloned.exportSettings;
 
       // Apply targeted overrides (by guid) to cloned nodes.
       // Note: Rest node ids are guid strings (sessionID:localID).
@@ -4769,10 +4924,18 @@ export namespace iofigma {
      * Parse and extract pages from a .fig file
      * @param fileData - The .fig file as Uint8Array
      * @returns Document with pages ready for import
+     *
+     * Default behaviour: `flattenInstances: true`. Without this, `INSTANCE`
+     * nodes in the returned tree have no children (Kiwi parents them under
+     * the `SYMBOL` definition via parentIndex, not under the instance itself),
+     * so every instance renders as an empty frame. The clipboard entry point
+     * already defaults to `flattenInstances: true`; `.fig` rendering needs
+     * the same default. Callers that want the un-flattened shape can opt out
+     * explicitly with `{ flattenInstances: false }`.
      */
     export function parseFile(
       fileData: Uint8Array,
-      options: BuildTreeOptions = {}
+      options: BuildTreeOptions = { flattenInstances: true }
     ): FigFileDocument {
       const figData = readFigFile(fileData);
       const pages = extractPages(figData, options);
@@ -4791,10 +4954,12 @@ export namespace iofigma {
      * Supports .fig (ZIP) archives larger than 2GB by streaming instead of loading into memory.
      * @param stream - Async iterable of Uint8Array chunks (e.g. Node Readable, fetch body)
      * @returns Document with pages ready for import
+     *
+     * Default behaviour: same as {@link parseFile} — `flattenInstances: true`.
      */
     export async function parseFileFromStream(
       stream: AsyncIterable<Uint8Array>,
-      options: BuildTreeOptions = {}
+      options: BuildTreeOptions = { flattenInstances: true }
     ): Promise<FigFileDocument> {
       const figData = await readFigFileFromStream(stream);
       const pages = extractPages(figData, options);
