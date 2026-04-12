@@ -2509,11 +2509,11 @@ export namespace iofigma {
        * `X_SLIDE_GRID` / `X_SLIDE_ROW` wrappers (depth-first).
        */
       function collectSlideNodes(node: InputNode): __ir.SlideNodeIR[] {
-        if (node.type === "X_SLIDE") return [node as __ir.SlideNodeIR];
+        if (node.type === "X_SLIDE") return [node];
         if (node.type === "X_SLIDE_GRID" || node.type === "X_SLIDE_ROW") {
           const slides: __ir.SlideNodeIR[] = [];
-          for (const child of (node as any).children ?? []) {
-            slides.push(...collectSlideNodes(child));
+          for (const child of node.children ?? []) {
+            slides.push(...collectSlideNodes(child as InputNode));
           }
           return slides;
         }
@@ -2546,8 +2546,8 @@ export namespace iofigma {
           ...positioning_trait(slide, undefined),
           ...fills_trait(slide.fills ?? [], context, imageRefsUsed),
           ...stroke_trait(slide, context, imageRefsUsed),
-          ...rectangular_stroke_width_trait(slide as any),
-          ...corner_radius_trait(slide as any),
+          ...rectangular_stroke_width_trait(slide),
+          ...corner_radius_trait(slide),
           type: "tray",
         };
       }
@@ -2607,7 +2607,7 @@ export namespace iofigma {
 
           // 2. Convert each child of the slide via the standard pipeline.
           const childIds: string[] = [];
-          for (const child of (slide as any).children ?? []) {
+          for (const child of slide.children ?? []) {
             const result = document(child, images, docContext);
             // Merge the child subtree into our flat collections.
             Object.assign(allNodes, result.document.nodes);
@@ -4882,9 +4882,16 @@ export namespace iofigma {
       flattenInstances?: boolean;
     };
 
-    type AnyFigmaNode = NonNullable<
+    /**
+     * Union of all node types returned by the Kiwi factory.
+     *
+     * Every member carries at least `id` (from `IsLayerTrait`) and a
+     * discriminant `type` string. Frame-like nodes additionally carry
+     * `children`.
+     */
+    export type AnyFigmaNode = NonNullable<
       ReturnType<typeof iofigma.kiwi.factory.node>
-    >;
+    > & { id: string };
 
     function buildGuidToKiwiMap(
       nodeChanges: figkiwi.NodeChange[]
@@ -4905,7 +4912,7 @@ export namespace iofigma {
         .filter((node) => node !== undefined) as AnyFigmaNode[];
 
       const guidToNode = new Map<string, AnyFigmaNode>();
-      flat.forEach((node) => guidToNode.set((node as any).id, node));
+      flat.forEach((node) => guidToNode.set(node.id, node));
       return { flat, guidToNode };
     }
 
@@ -4916,15 +4923,16 @@ export namespace iofigma {
     ) {
       // Attach children arrays by consulting parentIndex in Kiwi
       flatNodes.forEach((node) => {
-        const kiwiNode = guidToKiwi.get((node as any).id);
+        const kiwiNode = guidToKiwi.get(node.id);
         if (!kiwiNode?.parentIndex?.guid) return;
 
         const parentGuid = iofigma.kiwi.guid(kiwiNode.parentIndex.guid);
         const parentNode = guidToNode.get(parentGuid);
 
-        if (parentNode && "children" in (parentNode as any)) {
-          if (!(parentNode as any).children) (parentNode as any).children = [];
-          ((parentNode as any).children as any[]).push(node);
+        if (parentNode && "children" in parentNode) {
+          if (!parentNode.children)
+            (parentNode as { children: AnyFigmaNode[] }).children = [];
+          (parentNode.children as AnyFigmaNode[]).push(node);
         }
       });
 
@@ -4935,15 +4943,11 @@ export namespace iofigma {
       // ASCII punctuation characters (e.g. ", #, $, %) used in short position
       // strings — particularly common in .deck files.
       guidToNode.forEach((parentNode) => {
-        if (
-          !("children" in (parentNode as any)) ||
-          !(parentNode as any).children
-        )
-          return;
+        if (!("children" in parentNode) || !parentNode.children) return;
 
-        ((parentNode as any).children as any[]).sort((a, b) => {
-          const aKiwi = guidToKiwi.get((a as any).id);
-          const bKiwi = guidToKiwi.get((b as any).id);
+        (parentNode.children as AnyFigmaNode[]).sort((a, b) => {
+          const aKiwi = guidToKiwi.get(a.id);
+          const bKiwi = guidToKiwi.get(b.id);
           const aPos = aKiwi?.parentIndex?.position ?? "";
           const bPos = bKiwi?.parentIndex?.position ?? "";
           return aPos < bPos ? -1 : aPos > bPos ? 1 : 0;
@@ -5532,7 +5536,7 @@ export namespace iofigma {
       });
 
       const rootNodes = flat.filter((node) => {
-        const kiwi = guidToKiwi.get((node as any).id);
+        const kiwi = guidToKiwi.get(node.id);
         if (!kiwi?.parentIndex?.guid) return true;
 
         const parentGuid = iofigma.kiwi.guid(kiwi.parentIndex.guid);
@@ -5577,7 +5581,7 @@ export namespace iofigma {
       buildChildrenRelationsInPlace(flat, guidToNode, guidToKiwi);
 
       const rootNodes = flat.filter((node) => {
-        const kiwiNode = guidToKiwi.get((node as any).id);
+        const kiwiNode = guidToKiwi.get(node.id);
         if (!kiwiNode?.parentIndex?.guid) return false;
         const parentGuid = iofigma.kiwi.guid(kiwiNode.parentIndex.guid);
         return parentGuid === canvasGuidStr;
@@ -5602,7 +5606,7 @@ export namespace iofigma {
     export interface FigPage {
       name: string;
       canvas: figkiwi.NodeChange;
-      rootNodes: any[]; // Converted REST API nodes with complete children
+      rootNodes: AnyFigmaNode[];
       /**
        * Sort key from parentIndex.position (fractional index string)
        * Use this to sort pages to preserve original Figma order.
@@ -5718,7 +5722,7 @@ export namespace iofigma {
       allNodeChanges: figkiwi.NodeChange[],
       figData: ParsedFigmaArchive,
       options: BuildTreeOptions
-    ): any[] {
+    ): AnyFigmaNode[] {
       const canvasGuid = canvas.guid;
       if (!canvasGuid) return [];
       return buildCanvasRootNodes({
@@ -5832,7 +5836,17 @@ export namespace iofigma {
         node_id_generator: sharedNodeIdGenerator,
       };
 
-      const individualResults = page.rootNodes.map((rootNode) =>
+      // Filter to slide-related root nodes only. Real .deck files can contain
+      // stray FRAME nodes at the root level alongside the expected SLIDE_GRID
+      // hierarchy — these are not slides and would cause slidesDocument() to
+      // throw. The exact semantics of these extra roots are not fully understood
+      // yet (they may be interactive overlays, speaker-note artifacts, or
+      // orphaned design content), so we skip them for now.
+      const slideRootNodes = page.rootNodes.filter(
+        (n) => n.type === "X_SLIDE_GRID"
+      );
+
+      const individualResults = slideRootNodes.map((rootNode) =>
         iofigma.restful.factory.slidesDocument(rootNode, {}, sharedContext)
       );
 
