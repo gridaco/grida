@@ -717,7 +717,11 @@ impl Renderer {
         // Build the viewport culling context from the frame plan.
         // This enables the draw loop to skip off-screen Draw commands with
         // a ~1ns bitset check instead of dispatching each to Skia (~0.5µs).
-        let viewport_cull = crate::painter::ViewportCull::from_plan(plan, &self.scene_cache.layers);
+        let viewport_cull = crate::painter::ViewportCull::from_plan(
+            plan,
+            &self.scene_cache.layers,
+            self.isolation_set.as_ref(),
+        );
 
         let painter = Painter::new_with_scene_cache(
             canvas,

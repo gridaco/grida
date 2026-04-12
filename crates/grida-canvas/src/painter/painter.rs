@@ -23,6 +23,7 @@ use skia_safe::{
     Shader,
 };
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// A compact bitset for O(1) node-visibility queries during drawing.
@@ -71,24 +72,31 @@ impl VisibilitySet {
 /// - `Draw`: O(1) bitset lookup on `visible_leaves`. The R-tree provides
 ///   effect-expanded bounds so nodes whose effects bleed into viewport are
 ///   correctly retained.
-/// - `RenderSurface`: always drawn. Surface bounds lack surface-level effect
-///   inflation (shadow offset, blur radius), making geometric culling unsafe.
+/// - `RenderSurface`: combined hierarchy + geometry check. Skipped when the
+///   surface ID is not in the visible set AND its effect-expanded bounds
+///   (`get_render_bounds`) are fully outside the viewport. This eliminates
+///   `save_layer + clip + restore` GPU cycles for non-isolated slide frames.
 /// - `MaskGroup`: always drawn. No bounds available; rare in practice.
 ///
 /// This mirrors Chromium's compositor architecture: the display list is
 /// stable and cached; visibility culling is a per-frame draw-time concern.
-pub struct ViewportCull {
+pub struct ViewportCull<'a> {
     /// Bitset of visible leaf NodeIds from R-tree intersection query.
     /// `None` when every leaf in the scene is visible — the bitset is then
     /// unnecessary and [`is_leaf_visible`] short-circuits to `true`.
     visible_leaves: Option<VisibilitySet>,
-    /// World-space viewport rectangle. Stored for future use when
-    /// RenderSurface bounds include effect inflation.
-    #[allow(dead_code)]
+    /// World-space viewport rectangle. Used for RenderSurface subtree
+    /// culling — surfaces whose effect-expanded bounds are fully outside
+    /// this rect are skipped.
     viewport: math2::Rectangle,
+    /// When isolation mode is active, the set of node IDs in the isolated
+    /// subtree (root + all descendants). `RenderSurface` commands whose ID
+    /// is not in this set are skipped — this is the authoritative filter
+    /// that prevents cross-page ghost rendering.
+    isolation_set: Option<&'a HashSet<NodeId>>,
 }
 
-impl ViewportCull {
+impl<'a> ViewportCull<'a> {
     /// Build from a [`FramePlan`] and the scene's [`LayerList`].
     ///
     /// Extracts visible NodeIds from the plan's region indices (live-drawn
@@ -99,9 +107,14 @@ impl ViewportCull {
     /// the total layer count), returns an "all-visible" cull that skips the
     /// O(N) bitset construction. On large fit-zoom scenes (100K+ nodes),
     /// this eliminates ~1ms of per-frame allocation + bit-setting work.
+    ///
+    /// `isolation_set`: when isolation mode is active, pass the precomputed
+    /// set of node IDs in the isolated subtree. `RenderSurface` commands
+    /// outside this set will be skipped.
     pub fn from_plan(
         plan: &crate::runtime::scene::FramePlan,
         layers: &super::layer::LayerList,
+        isolation_set: Option<&'a HashSet<NodeId>>,
     ) -> Self {
         // Count visible IDs to detect the all-visible fast path. Regions hold
         // the live-drawn indices; promoted IDs are disjoint from live regions
@@ -112,6 +125,7 @@ impl ViewportCull {
             return Self {
                 visible_leaves: None,
                 viewport: plan.viewport,
+                isolation_set,
             };
         }
 
@@ -128,6 +142,7 @@ impl ViewportCull {
         Self {
             visible_leaves: Some(visible_leaves),
             viewport: plan.viewport,
+            isolation_set,
         }
     }
 
@@ -138,6 +153,19 @@ impl ViewportCull {
             Some(set) => set.contains(id),
             None => true,
         }
+    }
+
+    /// Returns `true` if the given world-space bounds intersect the viewport.
+    ///
+    /// Used for RenderSurface subtree culling: surfaces whose
+    /// effect-expanded bounds (`get_render_bounds`) are fully outside the
+    /// viewport cannot contribute visible pixels.
+    #[inline]
+    pub fn intersects_viewport(&self, bounds: &math2::Rectangle) -> bool {
+        self.viewport.x < bounds.x + bounds.width
+            && self.viewport.x + self.viewport.width > bounds.x
+            && self.viewport.y < bounds.y + bounds.height
+            && self.viewport.y + self.viewport.height > bounds.y
     }
 }
 
@@ -182,7 +210,7 @@ pub struct Painter<'a> {
     /// Per-frame viewport culling context. When set, the draw loop skips
     /// off-screen `Draw` commands using the bitset built from the R-tree
     /// spatial query. `None` means draw everything (wireframe, tests, etc.).
-    viewport_cull: Option<&'a ViewportCull>,
+    viewport_cull: Option<&'a ViewportCull<'a>>,
 }
 
 impl<'a> Painter<'a> {
@@ -247,7 +275,7 @@ impl<'a> Painter<'a> {
 
     /// Set the viewport culling context. When set, the draw loop skips
     /// off-screen `Draw` commands using the R-tree visibility bitset.
-    pub fn with_viewport_cull(mut self, cull: &'a ViewportCull) -> Self {
+    pub fn with_viewport_cull(mut self, cull: &'a ViewportCull<'a>) -> Self {
         self.viewport_cull = Some(cull);
         self
     }
@@ -2499,7 +2527,30 @@ impl<'a> Painter<'a> {
                 PainterRenderCommand::MaskGroup(group) => {
                     self.draw_mask_group_or_passthrough(group)
                 }
-                PainterRenderCommand::RenderSurface(surface) => self.draw_render_surface(surface),
+                PainterRenderCommand::RenderSurface(surface) => {
+                    if let Some(cull) = self.viewport_cull {
+                        if let Some(iso_set) = cull.isolation_set {
+                            // Isolation mode: authoritative filter. Skip any
+                            // surface whose node is not in the isolated subtree.
+                            // The isolation set contains the root + all
+                            // descendants, so parent surfaces wrapping visible
+                            // children are included.
+                            if !iso_set.contains(&surface.id) {
+                                continue;
+                            }
+                        } else {
+                            // No isolation: skip surfaces that are both outside
+                            // the visible set AND geometrically outside the
+                            // viewport (perf optimization for fit-zoom).
+                            if !cull.is_leaf_visible(&surface.id)
+                                && !cull.intersects_viewport(&surface.bounds)
+                            {
+                                continue;
+                            }
+                        }
+                    }
+                    self.draw_render_surface(surface)
+                }
             }
         }
     }
