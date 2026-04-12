@@ -3190,6 +3190,56 @@ export namespace iofigma {
       }
 
       /**
+       * Convert a Kiwi gradient paint transform to REST-style gradientHandlePositions.
+       *
+       * Kiwi stores the gradient transform as a 2×3 affine that maps FROM
+       * node-normalized space TO gradient-unit space. The REST API exposes
+       * `gradientHandlePositions` which are the canonical base control points
+       * mapped INTO node-normalized space — i.e. via the INVERSE of the Kiwi
+       * transform.
+       *
+       * Canonical base points (same as cmath.ui.gradient.baseControlPoints):
+       *   linear:                A=(0, 0.5)   B=(1, 0.5)   C=(0, 1)
+       *   radial/angular/diamond: A=(0.5, 0.5) B=(1, 0.5)  C=(0.5, 1)
+       */
+      function kiwiGradientHandles(
+        t: {
+          m00: number;
+          m01: number;
+          m02: number;
+          m10: number;
+          m11: number;
+          m12: number;
+        },
+        type: string
+      ): [
+        { x: number; y: number },
+        { x: number; y: number },
+        { x: number; y: number },
+      ] {
+        // Invert the 2×3 affine [m00 m01 m02; m10 m11 m12; 0 0 1]
+        const det = t.m00 * t.m11 - t.m01 * t.m10 || 1e-12;
+        const i00 = t.m11 / det;
+        const i01 = -t.m01 / det;
+        const i10 = -t.m10 / det;
+        const i11 = t.m00 / det;
+        const i02 = (t.m01 * t.m12 - t.m11 * t.m02) / det;
+        const i12 = (t.m10 * t.m02 - t.m00 * t.m12) / det;
+
+        const apply = (x: number, y: number) => ({
+          x: i00 * x + i01 * y + i02,
+          y: i10 * x + i11 * y + i12,
+        });
+
+        const isLinear = type === "GRADIENT_LINEAR";
+        return [
+          apply(isLinear ? 0 : 0.5, 0.5), // A
+          apply(1, 0.5), // B
+          apply(isLinear ? 0 : 0.5, 1), // C
+        ];
+      }
+
+      /**
        * Convert Kiwi figrest.Paint to Figma REST API Paint
        */
       function paint(kiwi: figkiwi.Paint): figrest.Paint | undefined {
@@ -3218,17 +3268,7 @@ export namespace iofigma {
               })) ?? [];
 
             const gradientHandlePositions = kiwi.transform
-              ? [
-                  { x: kiwi.transform.m02, y: kiwi.transform.m12 },
-                  {
-                    x: kiwi.transform.m00 + kiwi.transform.m02,
-                    y: kiwi.transform.m10 + kiwi.transform.m12,
-                  },
-                  {
-                    x: kiwi.transform.m01 + kiwi.transform.m02,
-                    y: kiwi.transform.m11 + kiwi.transform.m12,
-                  },
-                ]
+              ? kiwiGradientHandles(kiwi.transform, kiwi.type)
               : [
                   { x: 0, y: 0 },
                   { x: 1, y: 0 },
