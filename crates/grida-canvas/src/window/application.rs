@@ -325,10 +325,14 @@ impl ApplicationApi for UnknownTargetApplication {
             height: height as f32,
         });
 
-        // Declare *what* changed; apply_changes() in frame() will handle
-        // the correct invalidation (viewport caches only, no full nuke).
         self.renderer.mark_changed(ChangeFlags::VIEWPORT_SIZE);
-        self.queue();
+
+        // Bypass queue() — render immediately so the caller never sees a
+        // stale canvas. The frame loop is invalidated+completed inside
+        // render_immediate(), so the next RAF poll returns idle.
+        let now = self.clock.now();
+        self.frame_loop.invalidate(now);
+        self.render_immediate();
     }
 
     fn redraw_requested(&mut self) {
@@ -1504,6 +1508,35 @@ impl UnknownTargetApplication {
         self.last_frame_time = __frame_start;
 
         true
+    }
+
+    /// Render a single complete frame synchronously, bypassing the frame
+    /// loop scheduler. Used by [`resize`] so the caller never sees a stale
+    /// canvas between surface recreation and the next RAF tick.
+    fn render_immediate(&mut self) {
+        let __frame_start = std::time::Instant::now();
+
+        let camera_change = self.renderer.camera.change_kind();
+        let _content_changed = self.renderer.apply_changes(camera_change, true);
+        self.renderer.camera.warm_cache();
+
+        let rect = self.renderer.camera.rect();
+        let zoom = self.renderer.camera.get_zoom();
+        let plan = self
+            .renderer
+            .build_frame_plan(rect, zoom, true, camera_change);
+        self.renderer.camera.consume_change();
+        let stats = self.renderer.flush_with_plan(plan);
+
+        let __render_time = __frame_start.elapsed();
+        if let Some(ref stats) = stats {
+            self.update_stats(stats, __render_time);
+        }
+        self.draw_and_flush_devtools_overlay();
+
+        // Complete the frame loop so the next RAF poll returns None (idle).
+        self.frame_loop.complete(FrameQuality::Stable);
+        self.last_frame_time = __frame_start;
     }
 
     #[cfg(not(target_arch = "wasm32"))]

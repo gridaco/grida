@@ -118,7 +118,14 @@ impl SurfaceState {
     }
 
     /// Recreate the underlying surface with the given dimensions.
+    ///
+    /// Re-queries the current framebuffer binding so that the new surface
+    /// always wraps the active FBO (the host may change it on resize).
     pub fn resize(&mut self, width: i32, height: i32) {
+        let mut fboid: gl::types::GLint = 0;
+        unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
+        self.gpu_state.framebuffer_info.fboid = fboid.try_into().unwrap();
+
         let surface = create_surface(&mut self.gpu_state, width, height);
         self.set_surface(surface);
     }
