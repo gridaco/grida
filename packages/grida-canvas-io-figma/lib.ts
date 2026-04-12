@@ -242,6 +242,18 @@ export namespace iofigma {
     export type SlideRowNodeIR = Omit<figrest.FrameNode, "type"> & {
       type: "X_SLIDE_ROW";
     };
+
+    /**
+     * Extended noise effect that carries Kiwi-only fields (e.g. `seed`)
+     * alongside the standard REST API `NoiseEffect` shape.
+     *
+     * Kiwi "GRAIN" and "NOISE" are both normalized to `type: "NOISE"` to
+     * match the REST spec union (`figrest.Effect`).
+     */
+    export type KiwiNoiseEffect = figrest.NoiseEffect & {
+      /** Random seed for reproducible noise; not in the REST spec. */
+      seed?: number;
+    };
   }
 
   export namespace restful {
@@ -1132,7 +1144,7 @@ export namespace iofigma {
       > {
         // Fallback: REST API without geometry=paths omits `size` and
         // `relativeTransform`; use absoluteBoundingBox as the source of truth.
-        const absBox = (node as any).absoluteBoundingBox as
+        const absBox = node.absoluteBoundingBox as
           | { x: number; y: number; width: number; height: number }
           | null
           | undefined;
@@ -1240,6 +1252,7 @@ export namespace iofigma {
           bottom: number;
           left: number;
         };
+        [key: string]: unknown;
       }) {
         if (!node.individualStrokeWeights) return {};
         const { top, right, bottom, left } = node.individualStrokeWeights;
@@ -1282,6 +1295,7 @@ export namespace iofigma {
         cornerRadius?: number;
         rectangleCornerRadii?: number[];
         cornerSmoothing?: number;
+        [key: string]: unknown;
       }) {
         const baseRadius = node.cornerRadius ?? 0;
         return {
@@ -1289,6 +1303,66 @@ export namespace iofigma {
           corner_smoothing: node.cornerSmoothing,
           ...rectangleCornerRadius(node.rectangleCornerRadii, baseRadius),
         };
+      }
+
+      const NOISE_TYPE_TO_MODE: Record<string, cg.FeNoise["mode"]> = {
+        MONOTONE: "mono",
+        DUOTONE: "duo",
+        MULTITONE: "multi",
+      };
+
+      /**
+       * Converts a `figrest.NoiseEffect` (or `KiwiNoiseEffect` with extra `seed`)
+       * to `cg.FeNoise`.
+       */
+      function convertNoiseEffect(effect: figrest.NoiseEffect): cg.FeNoise {
+        const mode =
+          NOISE_TYPE_TO_MODE[effect.noiseType ?? "MONOTONE"] ?? "mono";
+        const noise: cg.FeNoise = {
+          type: "noise",
+          mode,
+          // Figma uses 4 as default value (from UI)
+          noise_size: effect.noiseSize ?? 4,
+          // Figma density 0–1 maps to our 0–0.5.
+          // Our renderer uses a binary LUT threshold on Perlin noise
+          // (Gaussian, centered at α=128). density=0.5 in our system
+          // already yields ~50% pixel coverage (peak visible grain).
+          // Figma's 100% density matches that peak, not a solid fill.
+          // TODO: revisit if we switch to a perceptually-linear density model.
+          density: (effect.density ?? 1) * 0.5,
+          // Kiwi noise effects carry a `seed` field (not in REST spec)
+          seed: (effect as __ir.KiwiNoiseEffect).seed,
+          blend_mode: effect.blendMode
+            ? map.blendModeMap[effect.blendMode]
+            : undefined,
+          active: true,
+        };
+        if (mode === "mono") {
+          noise.color = kolor.colorformats.newRGBA32F(
+            effect.color.r,
+            effect.color.g,
+            effect.color.b,
+            effect.color.a
+          );
+        } else if (mode === "duo") {
+          noise.color1 = kolor.colorformats.newRGBA32F(
+            effect.color.r,
+            effect.color.g,
+            effect.color.b,
+            effect.color.a
+          );
+          if ("secondaryColor" in effect) {
+            noise.color2 = kolor.colorformats.newRGBA32F(
+              effect.secondaryColor.r,
+              effect.secondaryColor.g,
+              effect.secondaryColor.b,
+              effect.secondaryColor.a
+            );
+          }
+        } else if (mode === "multi" && "opacity" in effect) {
+          noise.opacity = effect.opacity ?? 1;
+        }
+        return noise;
       }
 
       /**
@@ -1364,65 +1438,8 @@ export namespace iofigma {
               };
               break;
 
-            default: {
-              // Handle noise/grain effects passed through from kiwi
-              const e = effect as any;
-              if (e.type === "GRAIN" || e.type === "NOISE") {
-                const noiseTypeMap: Record<string, cg.FeNoise["mode"]> = {
-                  MONOTONE: "mono",
-                  DUOTONE: "duo",
-                  MULTITONE: "multi",
-                };
-                const mode = noiseTypeMap[e.noiseType ?? "MONOTONE"] ?? "mono";
-                const noise: cg.FeNoise = {
-                  type: "noise",
-                  mode,
-                  noise_size:
-                    typeof e.noiseSize === "number"
-                      ? e.noiseSize
-                      : (e.noiseSize?.x ?? 4), // Figma uses 4 as default value (from UI)
-                  // Figma density 0–1 maps to our 0–0.5.
-                  // Our renderer uses a binary LUT threshold on Perlin noise
-                  // (Gaussian, centered at α=128). density=0.5 in our system
-                  // already yields ~50% pixel coverage (peak visible grain).
-                  // Figma's 100% density matches that peak, not a solid fill.
-                  // TODO: revisit if we switch to a perceptually-linear density model.
-                  density: (e.density ?? 1) * 0.5,
-                  seed: e.seed,
-                  blend_mode: e.blendMode
-                    ? map.blendModeMap[e.blendMode as figrest.BlendMode]
-                    : undefined,
-                  active: true,
-                };
-                if (mode === "mono" && e.color) {
-                  noise.color = kolor.colorformats.newRGBA32F(
-                    e.color.r,
-                    e.color.g,
-                    e.color.b,
-                    e.color.a
-                  );
-                } else if (mode === "duo") {
-                  if (e.color) {
-                    noise.color1 = kolor.colorformats.newRGBA32F(
-                      e.color.r,
-                      e.color.g,
-                      e.color.b,
-                      e.color.a
-                    );
-                  }
-                  if (e.secondaryColor) {
-                    noise.color2 = kolor.colorformats.newRGBA32F(
-                      e.secondaryColor.r,
-                      e.secondaryColor.g,
-                      e.secondaryColor.b,
-                      e.secondaryColor.a
-                    );
-                  }
-                } else if (mode === "multi") {
-                  noise.opacity = e.opacity ?? 1;
-                }
-                noises.push(noise);
-              }
+            case "NOISE": {
+              noises.push(convertNoiseEffect(effect));
               break;
             }
           }
@@ -2101,11 +2118,14 @@ export namespace iofigma {
               // Override the group's position to the AABB top-left
               // (relative to parent) with no rotation, since the 2×2
               // transform is now baked into the path data.
-              (groupNode as any).layout_inset_left = aabbX;
-              (groupNode as any).layout_inset_top = aabbY;
-              (groupNode as any).rotation = 0;
-              (groupNode as any).layout_target_width = aabbW;
-              (groupNode as any).layout_target_height = aabbH;
+              groupNode.layout_inset_left = aabbX;
+              groupNode.layout_inset_top = aabbY;
+              // GroupNode schema omits these, but the runtime reads them.
+              Object.assign(groupNode, {
+                rotation: 0,
+                layout_target_width: aabbW,
+                layout_target_height: aabbH,
+              });
             }
           }
 
@@ -2192,7 +2212,7 @@ export namespace iofigma {
                   ...origNode,
                   id: cloneId,
                   name: `${origNode.name} (clip)`,
-                } as any;
+                } as typeof origNode;
                 ids.push(cloneId);
               }
               return ids;
@@ -2262,7 +2282,7 @@ export namespace iofigma {
             // but won't render.
             for (const id of strokeChildIds) {
               if (!orderedSet.has(id)) {
-                (nodes[id] as any).active = false;
+                nodes[id].active = false;
               }
             }
 
@@ -2327,8 +2347,7 @@ export namespace iofigma {
           // into fillGeometry/strokeGeometry and the children are just the
           // construction inputs (not visible in the final output).
           const isBoolGeometryGroup =
-            "type" in currentNode &&
-            (currentNode as any).type === "BOOLEAN_OPERATION" &&
+            currentNode.type === "BOOLEAN_OPERATION" &&
             processedNode.type === "group";
 
           // When a container (FRAME/INSTANCE/COMPONENT) has a non-rotational
@@ -2341,9 +2360,9 @@ export namespace iofigma {
             processedNode.type === "container" &&
             "children" in currentNode &&
             currentNode.children?.length &&
-            (currentNode as any).relativeTransform != null
+            currentNode.relativeTransform != null
           ) {
-            const prt = (currentNode as any).relativeTransform;
+            const prt = currentNode.relativeTransform;
             const pa = prt[0][0],
               pc = prt[0][1];
             const pb = prt[1][0],
@@ -2368,8 +2387,8 @@ export namespace iofigma {
               // Children's new translations land in the grandparent's
               // coordinate space. We then subtract the container's AABB
               // origin so children are local to the new container.
-              const pw = (currentNode as any).size?.x ?? 0;
-              const ph = (currentNode as any).size?.y ?? 0;
+              const pw = currentNode.size?.x ?? 0;
+              const ph = currentNode.size?.y ?? 0;
 
               // Compute AABB first — needed to rebase children.
               const corners = [
@@ -2384,7 +2403,7 @@ export namespace iofigma {
               const aabbH = Math.max(...corners.map((p) => p[1])) - aabbY;
 
               for (const child of currentNode.children) {
-                const crt = (child as any).relativeTransform;
+                const crt = (child as figrest.HasLayoutTrait).relativeTransform;
                 if (!crt) continue;
                 const ca = crt[0][0],
                   cc = crt[0][1],
@@ -2401,18 +2420,19 @@ export namespace iofigma {
                 // container-local by subtracting the AABB origin.
                 const ntx = pa * ctx2 + pc * cty + ptx - aabbX;
                 const nty = pb * ctx2 + pd * cty + pty - aabbY;
-                (child as any).relativeTransform = [
-                  [na, nc, ntx],
-                  [nb, nd, nty],
-                ];
+                (child as { relativeTransform: number[][] }).relativeTransform =
+                  [
+                    [na, nc, ntx],
+                    [nb, nd, nty],
+                  ];
               }
 
               // Reset the container to the AABB with no rotation.
-              (processedNode as any).layout_inset_left = aabbX;
-              (processedNode as any).layout_inset_top = aabbY;
-              (processedNode as any).layout_target_width = aabbW;
-              (processedNode as any).layout_target_height = aabbH;
-              (processedNode as any).rotation = 0;
+              processedNode.layout_inset_left = aabbX;
+              processedNode.layout_inset_top = aabbY;
+              processedNode.layout_target_width = aabbW;
+              processedNode.layout_target_height = aabbH;
+              processedNode.rotation = 0;
             }
           }
 
@@ -2682,8 +2702,8 @@ export namespace iofigma {
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills ?? [], context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
-              ...rectangular_stroke_width_trait(node as any),
-              ...corner_radius_trait(node as any),
+              ...rectangular_stroke_width_trait(node),
+              ...corner_radius_trait(node),
               type: "tray",
             } satisfies grida.program.nodes.TrayNode;
           }
@@ -2953,9 +2973,6 @@ export namespace iofigma {
                 ...text_stroke_trait(node, context, imageRefsUsed),
                 ...style_trait({}),
                 ...effects_trait(node.effects),
-                ...((node as any).fe_noises?.length
-                  ? { fe_noises: (node as any).fe_noises }
-                  : {}),
                 type: "text",
                 text: characters,
                 default_style: defaultStyle,
@@ -3037,9 +3054,6 @@ export namespace iofigma {
                 ...rectangular_stroke_width_trait(node),
                 ...corner_radius_trait(node),
                 ...effects_trait(node.effects),
-                ...((node as any).fe_noises?.length
-                  ? { fe_noises: (node as any).fe_noises }
-                  : {}),
                 type: "rectangle",
               } satisfies grida.program.nodes.RectangleNode;
             }
@@ -3087,7 +3101,7 @@ export namespace iofigma {
           }
           case "LINE": {
             // Fallback for REST API without geometry=paths: use absoluteBoundingBox
-            const lineAbsBox = (node as any).absoluteBoundingBox as
+            const lineAbsBox = node.absoluteBoundingBox as
               | { x: number; y: number; width: number; height: number }
               | null
               | undefined;
@@ -3155,9 +3169,6 @@ export namespace iofigma {
                     ...stroke_trait(node, context, imageRefsUsed),
                     ...corner_radius_trait(node),
                     ...effects_trait(node.effects),
-                    ...((node as any).fe_noises?.length
-                      ? { fe_noises: (node as any).fe_noises }
-                      : {}),
                     type: "vector",
                     vector_network: gridaVectorNetwork,
                   } satisfies grida.program.nodes.VectorNode;
@@ -3334,6 +3345,16 @@ export namespace iofigma {
     }
 
     export namespace factory {
+      /** Kiwi NoiseType enum (numeric or string) → REST noiseType string. */
+      const KIWI_NOISE_TYPE_TO_REST: Record<string, string> = {
+        "0": "MULTITONE",
+        "1": "MONOTONE",
+        "2": "DUOTONE",
+        MULTITONE: "MULTITONE",
+        MONOTONE: "MONOTONE",
+        DUOTONE: "DUOTONE",
+      };
+
       /**
        * Convert Kiwi Color to Figma REST API Color
        */
@@ -3626,26 +3647,35 @@ export namespace iofigma {
                 } satisfies figrest.BlurEffect;
 
               case "GRAIN":
-              case "NOISE":
-                return {
-                  type: effect.type as string,
+              case "NOISE": {
+                const noiseType =
+                  KIWI_NOISE_TYPE_TO_REST[
+                    String(effect.noiseType ?? "MONOTONE")
+                  ] ?? "MONOTONE";
+                const baseNoise: __ir.KiwiNoiseEffect = {
+                  type: "NOISE",
                   visible: effect.visible ?? true,
-                  // Carry kiwi noise fields through the REST intermediate
-                  noiseType: effect.noiseType,
-                  noiseSize: effect.noiseSize
-                    ? vector(effect.noiseSize)
-                    : undefined,
-                  density: effect.density,
-                  seed: effect.seed,
-                  opacity: effect.opacity,
+                  noiseType: noiseType as figrest.NoiseEffect["noiseType"],
+                  noiseSize: effect.noiseSize?.x ?? 4,
+                  density: effect.density ?? 1,
                   blendMode: effect.blendMode
                     ? map.blendMode(effect.blendMode)
                     : "NORMAL",
-                  color: effect.color ? color(effect.color) : undefined,
-                  secondaryColor: effect.secondaryColor
-                    ? color(effect.secondaryColor)
-                    : undefined,
-                } as unknown as figrest.Effect;
+                  color: effect.color
+                    ? color(effect.color)
+                    : { r: 0, g: 0, b: 0, a: 1 },
+                  seed: effect.seed,
+                  ...(noiseType === "DUOTONE" && effect.secondaryColor
+                    ? {
+                        secondaryColor: color(effect.secondaryColor),
+                      }
+                    : {}),
+                  ...(noiseType === "MULTITONE"
+                    ? { opacity: effect.opacity ?? 1 }
+                    : {}),
+                } as __ir.KiwiNoiseEffect;
+                return baseNoise;
+              }
 
               default:
                 return undefined;
@@ -5081,6 +5111,13 @@ export namespace iofigma {
      * For guidPath-based overrides, the LAST guid in the path is used
      * as the key (it identifies the target node).
      */
+    function getChildren(
+      node: AnyFigmaNode | undefined
+    ): figrest.SubcanvasNode[] {
+      if (node && "children" in node) return node.children ?? [];
+      return [];
+    }
+
     function indexOverridesByTargetGuid(
       overrides: figkiwi.NodeChange[]
     ): Map<string, figkiwi.NodeChange> {
@@ -5097,7 +5134,7 @@ export namespace iofigma {
     }
 
     function cloneTreeWithNewIdsAndFlattenInstances(params: {
-      node: any;
+      node: AnyFigmaNode;
       idPrefix: string;
       guidToNode: Map<string, AnyFigmaNode>;
       guidToKiwi: Map<string, figkiwi.NodeChange>;
@@ -5112,7 +5149,7 @@ export namespace iofigma {
         string,
         { r: number; g: number; b: number; a: number }
       >;
-    }): any {
+    }): AnyFigmaNode {
       const {
         node,
         idPrefix,
@@ -5126,11 +5163,15 @@ export namespace iofigma {
       const instanceScale = params.instanceScale;
       const variableColors = params.variableColors;
 
-      const originalId = (node as any).id;
+      const originalId = node.id;
       const newId = `${idPrefix}::${idCounter.n++}::${originalId}`;
 
-      // Shallow clone
-      const cloned: any = { ...(node as any), id: newId };
+      // Shallow mutable clone (union is readonly; mutations below need this).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cloned: Record<string, any> & AnyFigmaNode = {
+        ...node,
+        id: newId,
+      } as Record<string, any> & AnyFigmaNode;
 
       // Apply parent instance scale to this node's size and position.
       // Each nesting level computes its own scale; children of this
@@ -5183,19 +5224,17 @@ export namespace iofigma {
         // already in the instance's coordinate space; Kiwi geometry is
         // in the component's coordinate space.
         if (cloned.fillGeometry) {
-          cloned.fillGeometry = (cloned.fillGeometry as any[]).map(
-            (g: any) => ({
-              ...g,
-              path:
-                typeof g.path === "string"
-                  ? scaleSvgPathCoords(g.path, sx, sy)
-                  : g.path,
-            })
-          );
+          cloned.fillGeometry = cloned.fillGeometry.map((g: figrest.Path) => ({
+            ...g,
+            path:
+              typeof g.path === "string"
+                ? scaleSvgPathCoords(g.path, sx, sy)
+                : g.path,
+          }));
         }
         if (cloned.strokeGeometry) {
-          cloned.strokeGeometry = (cloned.strokeGeometry as any[]).map(
-            (g: any) => ({
+          cloned.strokeGeometry = cloned.strokeGeometry.map(
+            (g: figrest.Path) => ({
               ...g,
               path:
                 typeof g.path === "string"
@@ -5284,7 +5323,7 @@ export namespace iofigma {
             return cloned;
           }
 
-          const componentNode: any = guidToNode.get(componentId);
+          const componentNode = guidToNode.get(componentId);
           if (componentNode) {
             inheritContainerPropsFromComponentIfMissing(cloned, componentNode);
 
@@ -5292,7 +5331,8 @@ export namespace iofigma {
             // The cloned instance already has the scaled size (from
             // the parent's instanceScale), so compare against the
             // component's original size.
-            const compSize = componentNode.size;
+            const compSize =
+              "size" in componentNode ? componentNode.size : undefined;
             const instSize = cloned.size;
             let nestedScale: { sx: number; sy: number } | undefined;
             if (
@@ -5309,7 +5349,7 @@ export namespace iofigma {
               };
             }
 
-            const componentChildren = componentNode.children ?? [];
+            const componentChildren = getChildren(componentNode);
             const nextStack = [...componentStack, componentId];
 
             // Build override map for nested instance children.
@@ -5342,20 +5382,21 @@ export namespace iofigma {
               }
             }
 
-            cloned.children = (componentChildren as any[]).map((child) =>
-              cloneTreeWithNewIdsAndFlattenInstances({
-                node: child,
-                idPrefix,
-                guidToNode,
-                guidToKiwi,
-                options,
-                componentStack: nextStack,
-                idCounter,
-                symbolOverrideByGuid: nestedOverrideByGuid,
-                instanceScale: nestedScale,
-                variableColors,
-              })
-            );
+            (cloned as { children: AnyFigmaNode[] }).children =
+              componentChildren.map((child) =>
+                cloneTreeWithNewIdsAndFlattenInstances({
+                  node: child as AnyFigmaNode,
+                  idPrefix,
+                  guidToNode,
+                  guidToKiwi,
+                  options,
+                  componentStack: nextStack,
+                  idCounter,
+                  symbolOverrideByGuid: nestedOverrideByGuid,
+                  instanceScale: nestedScale,
+                  variableColors,
+                })
+              );
 
             // Mark as flattened so flattenInstancesInPlace.visit()
             // does not re-process this instance.
@@ -5442,7 +5483,7 @@ export namespace iofigma {
 
       const variableColors = buildVariableColorMap(guidToKiwi);
 
-      const visit = (node: any) => {
+      const visit = (node: Record<string, any> & AnyFigmaNode) => {
         if (!node) return;
 
         if (
@@ -5450,8 +5491,8 @@ export namespace iofigma {
           node.componentId &&
           !node._instanceFlattened
         ) {
-          const componentNode: any = guidToNode.get(node.componentId);
-          if (componentNode?.children?.length) {
+          const componentNode = guidToNode.get(node.componentId);
+          if (componentNode && getChildren(componentNode).length) {
             inheritContainerPropsFromComponentIfMissing(node, componentNode);
             const kiwiInstance = guidToKiwi.get(node.id);
             const symbolOverrideByGuid = indexOverridesByTargetGuid(
@@ -5461,7 +5502,8 @@ export namespace iofigma {
             // Compute instance-to-component scale ratio so
             // cloneTreeWithNewIdsAndFlattenInstances can scale
             // children at each nesting level.
-            const compSize = componentNode.size;
+            const compSize =
+              "size" in componentNode ? componentNode.size : undefined;
             const instSize = node.size;
             let instanceScale: { sx: number; sy: number } | undefined;
             if (
@@ -5479,19 +5521,21 @@ export namespace iofigma {
             }
 
             const idCounter = { n: 0 };
-            node.children = (componentNode.children as any[]).map((child) =>
-              cloneTreeWithNewIdsAndFlattenInstances({
-                node: child,
-                idPrefix: node.id,
-                guidToNode,
-                guidToKiwi,
-                options,
-                componentStack: [node.componentId],
-                idCounter,
-                symbolOverrideByGuid,
-                instanceScale,
-                variableColors,
-              })
+            const compChildren = getChildren(componentNode);
+            (node as { children: AnyFigmaNode[] }).children = compChildren.map(
+              (child) =>
+                cloneTreeWithNewIdsAndFlattenInstances({
+                  node: child as AnyFigmaNode,
+                  idPrefix: node.id,
+                  guidToNode,
+                  guidToKiwi,
+                  options,
+                  componentStack: [node.componentId],
+                  idCounter,
+                  symbolOverrideByGuid,
+                  instanceScale,
+                  variableColors,
+                })
             );
           }
         }
