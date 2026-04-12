@@ -1377,8 +1377,17 @@ export namespace iofigma {
                 const noise: cg.FeNoise = {
                   type: "noise",
                   mode,
-                  noise_size: e.noiseSize?.x ?? 0.5,
-                  density: e.density ?? 0.5,
+                  noise_size:
+                    typeof e.noiseSize === "number"
+                      ? e.noiseSize
+                      : (e.noiseSize?.x ?? 4), // Figma uses 4 as default value (from UI)
+                  // Figma density 0–1 maps to our 0–0.5.
+                  // Our renderer uses a binary LUT threshold on Perlin noise
+                  // (Gaussian, centered at α=128). density=0.5 in our system
+                  // already yields ~50% pixel coverage (peak visible grain).
+                  // Figma's 100% density matches that peak, not a solid fill.
+                  // TODO: revisit if we switch to a perceptually-linear density model.
+                  density: (e.density ?? 1) * 0.5,
                   seed: e.seed,
                   blend_mode: e.blendMode
                     ? map.blendModeMap[e.blendMode as figrest.BlendMode]

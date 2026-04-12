@@ -11,7 +11,7 @@ fn main() {
     let effects = vec![
         (
             FeNoiseEffect {
-                noise_size: 2.0,
+                noise_size: 4.0,
                 density: 0.5,
                 num_octaves: 3,
                 seed: 8539.0,
@@ -25,7 +25,7 @@ fn main() {
         ),
         (
             FeNoiseEffect {
-                noise_size: 2.0,
+                noise_size: 4.0,
                 density: 0.5,
                 num_octaves: 3,
                 seed: 8539.0,
@@ -40,7 +40,7 @@ fn main() {
         ),
         (
             FeNoiseEffect {
-                noise_size: 2.0,
+                noise_size: 4.0,
                 density: 0.5,
                 num_octaves: 3,
                 seed: 8539.0,
