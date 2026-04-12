@@ -183,6 +183,7 @@ export function EditorSurface() {
     editor,
     (state) => state.canvas_ui.container_label
   );
+  const editor_type = useEditorState(editor, (state) => state.editor_type);
   const dropzone = useEditorState(editor, (state) => state.dropzone);
   const brush = useBrushState();
   const cursor = useEventTargetCSSCursor();
@@ -506,7 +507,8 @@ export function EditorSurface() {
                   </SurfaceGroup>
                 </SurfaceGroup>
                 {editable && dropzone && <DropzoneOverlay {...dropzone} />}
-                {canvas_ui_container_label === "on" && <RootFramesBarOverlay />}
+                {canvas_ui_container_label === "on" &&
+                  editor_type !== "slides" && <RootFramesBarOverlay />}
               </div>
             </>
           )}

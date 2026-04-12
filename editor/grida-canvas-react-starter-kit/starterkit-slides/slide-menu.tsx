@@ -146,7 +146,11 @@ export function SlideMenuContent() {
             instance.loadImages(file.assets.images);
           }
           mode.resetDocument(
-            editor.state.init({ editable: true, document: file.document }),
+            editor.state.init({
+              editable: true,
+              editor_type: "slides",
+              document: file.document,
+            }),
             Date.now() + ""
           );
         }}
@@ -162,7 +166,11 @@ export function SlideMenuContent() {
             instance.loadImages(assets);
           }
           mode.resetDocument(
-            editor.state.init({ editable: true, document }),
+            editor.state.init({
+              editable: true,
+              editor_type: "slides",
+              document,
+            }),
             Date.now() + ""
           );
         }}
