@@ -2495,7 +2495,7 @@ export namespace format {
           fbs.LinearGradientPaint.addActive(builder, paint.active ?? true);
           fbs.LinearGradientPaint.addXy1(
             builder,
-            structs.alignment(builder, 0, 0)
+            structs.alignment(builder, -1, 0)
           );
           fbs.LinearGradientPaint.addXy2(
             builder,
