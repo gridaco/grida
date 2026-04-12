@@ -3410,6 +3410,14 @@ export namespace iofigma {
           locked: nc.locked ?? false,
           scrollBehavior: "SCROLLS" as const,
           rotation: nc.transform ? extractRotationFromMatrix(nc.transform) : 0,
+          // Preserve overrideKey for instance override matching during
+          // flattening. The guidPath in symbolOverrides references
+          // children by their overrideKey, not their node guid.
+          ...(nc.overrideKey
+            ? {
+                _overrideKey: `${(nc.overrideKey as { sessionID: number; localID: number }).sessionID}:${(nc.overrideKey as { sessionID: number; localID: number }).localID}`,
+              }
+            : {}),
         };
       }
 
@@ -4100,11 +4108,13 @@ export namespace iofigma {
           const o0 = symbolOverrides[0] as figkiwi.NodeChange;
 
           // Only treat as root patch when the override entry is not targeted.
-          // (Targeted overrides should carry guid/type/parentIndex and are applied during flattening.)
+          // Targeted overrides carry guid, type, parentIndex, or guidPath
+          // and are applied during instance flattening — not here.
           const looksLikeRootPatch =
             o0.guid === undefined &&
             o0.type === undefined &&
-            o0.parentIndex?.guid === undefined;
+            o0.parentIndex?.guid === undefined &&
+            (o0 as any).guidPath === undefined;
 
           if (looksLikeRootPatch) {
             // FIXME(kiwi-overrides): this assumes a single root-level patch entry.
@@ -4704,6 +4714,62 @@ export namespace iofigma {
       }
     }
 
+    /**
+     * Scale all coordinate values in an SVG path string by (sx, sy).
+     *
+     * Handles absolute commands (M/L/C/Q/S/T/H/V/A/Z) and relative
+     * commands (m/l/c/q/s/t/h/v/a/z). Numbers are matched and scaled
+     * in-place; command letters pass through unchanged.
+     */
+    function scaleSvgPathCoords(
+      pathData: string,
+      sx: number,
+      sy: number
+    ): string {
+      const tokenRe =
+        /([MLHVCSQTAZmlhvcsqtaz])|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+
+      let cmd = "";
+      let argIdx = 0;
+      const out: string[] = [];
+      let m: RegExpExecArray | null;
+
+      while ((m = tokenRe.exec(pathData)) !== null) {
+        if (m[1]) {
+          cmd = m[1];
+          argIdx = 0;
+          out.push(cmd);
+        } else {
+          const n = parseFloat(m[2]);
+          const upper = cmd.toUpperCase();
+
+          if (upper === "H") {
+            out.push(_fmtN(n * sx));
+          } else if (upper === "V") {
+            out.push(_fmtN(n * sy));
+          } else if (upper === "A") {
+            // Arc: rx ry x-rot large-arc sweep x y
+            const ai = argIdx % 7;
+            if (ai === 0) out.push(_fmtN(n * sx));
+            else if (ai === 1) out.push(_fmtN(n * sy));
+            else if (ai === 5) out.push(_fmtN(n * sx));
+            else if (ai === 6) out.push(_fmtN(n * sy));
+            else out.push(_fmtN(n));
+          } else if (upper === "Z") {
+            out.push(m[2]);
+          } else {
+            out.push(_fmtN(n * (argIdx % 2 === 0 ? sx : sy)));
+          }
+          argIdx++;
+        }
+      }
+      return out.join(" ");
+    }
+
+    function _fmtN(n: number): string {
+      return Number(n.toFixed(4)).toString();
+    }
+
     function cloneTreeWithNewIdsAndFlattenInstances(params: {
       node: any;
       idPrefix: string;
@@ -4712,16 +4778,93 @@ export namespace iofigma {
       componentStack: string[];
       idCounter: { n: number };
       symbolOverrideByGuid?: Map<string, figkiwi.NodeChange>;
+      /** Scale factor from parent instance size / component size. */
+      instanceScale?: { sx: number; sy: number };
     }): any {
       const { node, idPrefix, guidToNode, options, componentStack, idCounter } =
         params;
       const symbolOverrideByGuid = params.symbolOverrideByGuid;
+      const instanceScale = params.instanceScale;
 
       const originalId = (node as any).id;
       const newId = `${idPrefix}::${idCounter.n++}::${originalId}`;
 
       // Shallow clone
       const cloned: any = { ...(node as any), id: newId };
+
+      // Apply parent instance scale to this node's size and position.
+      // Each nesting level computes its own scale; children of this
+      // node will receive the NEXT level's scale (if this node is
+      // itself an INSTANCE with a different size than its component).
+      if (instanceScale) {
+        const { sx, sy } = instanceScale;
+        if (cloned.size) {
+          cloned.size = { x: cloned.size.x * sx, y: cloned.size.y * sy };
+        }
+        if (cloned.relativeTransform) {
+          // Deep-clone the transform arrays to avoid mutating the
+          // component's shared data.
+          cloned.relativeTransform = [
+            [
+              cloned.relativeTransform[0][0],
+              cloned.relativeTransform[0][1],
+              cloned.relativeTransform[0][2] * sx,
+            ],
+            [
+              cloned.relativeTransform[1][0],
+              cloned.relativeTransform[1][1],
+              cloned.relativeTransform[1][2] * sy,
+            ],
+          ];
+        }
+        if (cloned.absoluteBoundingBox) {
+          cloned.absoluteBoundingBox = {
+            ...cloned.absoluteBoundingBox,
+            width: (cloned.absoluteBoundingBox.width ?? 0) * sx,
+            height: (cloned.absoluteBoundingBox.height ?? 0) * sy,
+          };
+        }
+        if (cloned.absoluteRenderBounds) {
+          cloned.absoluteRenderBounds = {
+            ...cloned.absoluteRenderBounds,
+            width: (cloned.absoluteRenderBounds.width ?? 0) * sx,
+            height: (cloned.absoluteRenderBounds.height ?? 0) * sy,
+          };
+        }
+        if (
+          typeof cloned.strokeWeight === "number" &&
+          cloned.strokeWeight > 0
+        ) {
+          cloned.strokeWeight *= Math.sqrt(sx * sy);
+        }
+
+        // Scale fillGeometry / strokeGeometry path coordinates so they
+        // match the new (scaled) size. Figma's REST API returns geometry
+        // already in the instance's coordinate space; Kiwi geometry is
+        // in the component's coordinate space.
+        if (cloned.fillGeometry) {
+          cloned.fillGeometry = (cloned.fillGeometry as any[]).map(
+            (g: any) => ({
+              ...g,
+              path:
+                typeof g.path === "string"
+                  ? scaleSvgPathCoords(g.path, sx, sy)
+                  : g.path,
+            })
+          );
+        }
+        if (cloned.strokeGeometry) {
+          cloned.strokeGeometry = (cloned.strokeGeometry as any[]).map(
+            (g: any) => ({
+              ...g,
+              path:
+                typeof g.path === "string"
+                  ? scaleSvgPathCoords(g.path, sx, sy)
+                  : g.path,
+            })
+          );
+        }
+      }
 
       // Clones live inside an INSTANCE subtree — they're internal to the
       // instance and are never directly addressable as export roots.
@@ -4731,29 +4874,75 @@ export namespace iofigma {
       // files that have no matching oracle.
       delete cloned.exportSettings;
 
-      // Apply targeted overrides (by guid) to cloned nodes.
-      // Note: Rest node ids are guid strings (sessionID:localID).
-      const override = symbolOverrideByGuid?.get(originalId);
+      // Apply targeted overrides (by guid or overrideKey) to cloned nodes.
+      // symbolOverrides use guidPath which references children by their
+      // overrideKey, not their node guid. Try both lookups.
+      const override =
+        symbolOverrideByGuid?.get(originalId) ??
+        (cloned._overrideKey
+          ? symbolOverrideByGuid?.get(cloned._overrideKey)
+          : undefined);
       if (override) {
-        // Minimal: text overrides (characters)
+        // Text overrides
         if (
           cloned.type === "TEXT" &&
           typeof override.textData?.characters === "string"
         ) {
           cloned.characters = override.textData.characters;
         }
-        // Optional common fields that are safe to apply in practice:
+        // Visibility
         if (override.visible !== undefined) cloned.visible = override.visible;
+        // Opacity
         if (override.opacity !== undefined) cloned.opacity = override.opacity;
-        // TODO(kiwi-overrides): apply more targeted overrides when needed.
-        // - Paint overrides: requires converting Kiwi Paints (override.fillPaints/strokePaints)
-        //   onto REST nodes here (we currently only do root-level paints in instance()).
-        // - Text style overrides: font, size, fills, etc.
-        // - Layout/geometry overrides, effect overrides, etc.
-        // - Instance swaps (`overriddenSymbolID`) and nested instance overrides.
+        // Fill paint overrides (e.g. cursor color).
+        // Convert kiwi paints to REST-like format inline since the
+        // factory.paints() helper is not accessible at this scope.
+        if (override.fillPaints !== undefined) {
+          cloned.fills = (override.fillPaints as figkiwi.Paint[])
+            .map((p) => {
+              if (!p.type) return undefined;
+              if (p.type === "SOLID") {
+                const c = p.color;
+                return {
+                  type: "SOLID" as const,
+                  visible: p.visible ?? true,
+                  opacity: p.opacity ?? 1,
+                  blendMode: "NORMAL" as const,
+                  color: c
+                    ? { r: c.r, g: c.g, b: c.b, a: c.a }
+                    : { r: 0, g: 0, b: 0, a: 1 },
+                };
+              }
+              return undefined;
+            })
+            .filter(Boolean);
+        }
+        // Stroke paint overrides
+        if (override.strokePaints !== undefined) {
+          cloned.strokes = (override.strokePaints as figkiwi.Paint[])
+            .map((p) => {
+              if (!p.type) return undefined;
+              if (p.type === "SOLID") {
+                const c = p.color;
+                return {
+                  type: "SOLID" as const,
+                  visible: p.visible ?? true,
+                  opacity: p.opacity ?? 1,
+                  blendMode: "NORMAL" as const,
+                  color: c
+                    ? { r: c.r, g: c.g, b: c.b, a: c.a }
+                    : { r: 0, g: 0, b: 0, a: 1 },
+                };
+              }
+              return undefined;
+            })
+            .filter(Boolean);
+        }
       }
 
-      // Children clone (default: clone existing children)
+      // Children clone (default: clone existing children).
+      // Pass the same instanceScale so all descendants at this
+      // nesting level are scaled uniformly.
       if ("children" in cloned && Array.isArray(cloned.children)) {
         cloned.children = cloned.children.map((child: any) =>
           cloneTreeWithNewIdsAndFlattenInstances({
@@ -4764,6 +4953,7 @@ export namespace iofigma {
             componentStack,
             idCounter,
             symbolOverrideByGuid,
+            instanceScale,
           })
         );
       }
@@ -4781,6 +4971,27 @@ export namespace iofigma {
           if (componentNode) {
             inheritContainerPropsFromComponentIfMissing(cloned, componentNode);
 
+            // Compute this instance's own scale for its children.
+            // The cloned instance already has the scaled size (from
+            // the parent's instanceScale), so compare against the
+            // component's original size.
+            const compSize = componentNode.size;
+            const instSize = cloned.size;
+            let nestedScale: { sx: number; sy: number } | undefined;
+            if (
+              compSize &&
+              instSize &&
+              (Math.abs(compSize.x - instSize.x) > 0.01 ||
+                Math.abs(compSize.y - instSize.y) > 0.01) &&
+              compSize.x > 0 &&
+              compSize.y > 0
+            ) {
+              nestedScale = {
+                sx: instSize.x / compSize.x,
+                sy: instSize.y / compSize.y,
+              };
+            }
+
             const componentChildren = componentNode.children ?? [];
             const nextStack = [...componentStack, componentId];
             cloned.children = (componentChildren as any[]).map((child) =>
@@ -4792,6 +5003,7 @@ export namespace iofigma {
                 componentStack: nextStack,
                 idCounter,
                 symbolOverrideByGuid,
+                instanceScale: nestedScale,
               })
             );
           }
@@ -4821,9 +5033,40 @@ export namespace iofigma {
             const kiwiInstance = guidToKiwi.get(node.id);
             const instOverrides = kiwiInstance?.symbolData?.symbolOverrides;
             (instOverrides ?? []).forEach((o) => {
-              if (o.guid)
+              if (o.guid) {
                 symbolOverrideByGuid.set(iofigma.kiwi.guid(o.guid), o);
+              } else if ((o as any).guidPath?.guids?.length) {
+                // guidPath-based overrides target a specific child via
+                // a path of GUIDs. For single-depth paths, key by the
+                // last GUID (the target child).
+                const guids = (o as any).guidPath.guids as Array<{
+                  sessionID: number;
+                  localID: number;
+                }>;
+                const targetGuid = guids[guids.length - 1];
+                symbolOverrideByGuid.set(iofigma.kiwi.guid(targetGuid), o);
+              }
             });
+
+            // Compute instance-to-component scale ratio so
+            // cloneTreeWithNewIdsAndFlattenInstances can scale
+            // children at each nesting level.
+            const compSize = componentNode.size;
+            const instSize = node.size;
+            let instanceScale: { sx: number; sy: number } | undefined;
+            if (
+              compSize &&
+              instSize &&
+              (Math.abs(compSize.x - instSize.x) > 0.01 ||
+                Math.abs(compSize.y - instSize.y) > 0.01) &&
+              compSize.x > 0 &&
+              compSize.y > 0
+            ) {
+              instanceScale = {
+                sx: instSize.x / compSize.x,
+                sy: instSize.y / compSize.y,
+              };
+            }
 
             const idCounter = { n: 0 };
             node.children = (componentNode.children as any[]).map((child) =>
@@ -4835,6 +5078,7 @@ export namespace iofigma {
                 componentStack: [node.componentId],
                 idCounter,
                 symbolOverrideByGuid,
+                instanceScale,
               })
             );
           }
