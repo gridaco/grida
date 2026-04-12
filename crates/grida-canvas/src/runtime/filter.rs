@@ -128,27 +128,58 @@ pub struct IsolationModeDimStyle {
 // IsolationModeStagePreset
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Predefined stage decoration presets.
+/// Stage decoration presets (Tailwind CSS `box-shadow` scale).
 ///
-/// A stage preset applies ephemeral visual decoration at the isolation
-/// root's shape without mutating the document. The renderer resolves
-/// the preset into concrete [`IsolationModeStageStyle`] properties at
-/// draw time.
+/// `#[repr(u32)]` for C-ABI crossing.
 ///
-/// `#[repr(u32)]` for zero-overhead C-ABI crossing.
+/// | Value | Variant     | Tailwind     |
+/// |------:|-------------|--------------|
+/// |     0 | `None`      | `shadow-none`|
+/// |     1 | `Shadow2XS` | `shadow-2xs` |
+/// |     2 | `ShadowXS`  | `shadow-xs`  |
+/// |     3 | `ShadowSM`  | `shadow-sm`  |
+/// |     4 | `ShadowMD`  | `shadow-md`  |
+/// |     5 | `ShadowLG`  | `shadow-lg`  |
+/// |     6 | `ShadowXL`  | `shadow-xl`  |
+/// |     7 | `Shadow2XL` | `shadow-2xl` |
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
 pub enum IsolationModeStagePreset {
-    /// No stage decoration. The isolation root draws as-is.
     #[default]
     None = 0,
+    Shadow2XS = 1,
+    ShadowXS = 2,
+    ShadowSM = 3,
+    ShadowMD = 4,
+    ShadowLG = 5,
+    ShadowXL = 6,
+    Shadow2XL = 7,
+}
 
-    /// Two-layer drop shadow matching Tailwind `shadow-xl`:
-    ///   `0 20px 25px -5px rgb(0 0 0 / 0.1)`,
-    ///   `0  8px 10px -6px rgb(0 0 0 / 0.1)`
-    ///
-    /// Shadow only — no fill, no stroke, no corner radius override.
-    ShadowXL = 1,
+/// Helper: build a shadow-only stage style from CSS-value tuples.
+/// Each tuple: `(dy, css_blur, spread, alpha_u8)` with `dx` always 0.
+fn shadow_only_stage(layers: &[(f32, f32, f32, u8)]) -> IsolationModeStageStyle {
+    IsolationModeStageStyle {
+        fills: Option::None,
+        strokes: Option::None,
+        stroke_width: Option::None,
+        corner_radius: Option::None,
+        shadows: Some(
+            layers
+                .iter()
+                .map(|&(dy, css_blur, spread, a)| {
+                    FilterShadowEffect::DropShadow(FeShadow {
+                        dx: 0.0,
+                        dy,
+                        blur: css_blur / 2.0, // CSS blur-radius → Skia σ
+                        spread,
+                        color: CGColor::from_u32(u32::from(a)), // black @ a/255
+                        active: true,
+                    })
+                })
+                .collect(),
+        ),
+    }
 }
 
 impl IsolationModeStagePreset {
@@ -156,42 +187,52 @@ impl IsolationModeStagePreset {
     pub fn from_u32(v: u32) -> Self {
         match v {
             0 => Self::None,
-            1 => Self::ShadowXL,
+            1 => Self::Shadow2XS,
+            2 => Self::ShadowXS,
+            3 => Self::ShadowSM,
+            4 => Self::ShadowMD,
+            5 => Self::ShadowLG,
+            6 => Self::ShadowXL,
+            7 => Self::Shadow2XL,
             _ => Self::None,
         }
     }
 
     /// Resolve the preset into concrete draw properties.
     /// Returns `None` for [`None`](Self::None).
+    ///
+    /// CSS values from Tailwind v4 `box-shadow` scale.
+    /// Blur is halved (CSS blur-radius → Skia σ).
+    /// Alpha bytes: 0.05 ≈ 0x0D, 0.1 ≈ 0x1A, 0.25 ≈ 0x40.
     pub fn resolve(self) -> Option<IsolationModeStageStyle> {
         match self {
             Self::None => Option::None,
-            Self::ShadowXL => Some(IsolationModeStageStyle {
-                fills: Option::None,
-                strokes: Option::None,
-                stroke_width: Option::None,
-                corner_radius: Option::None,
-                // Tailwind shadow-xl.
-                // CSS blur-radius is 2× Skia stdDeviation.
-                shadows: Some(vec![
-                    FilterShadowEffect::DropShadow(FeShadow {
-                        dx: 0.0,
-                        dy: 20.0,
-                        blur: 12.5, // CSS 25px / 2
-                        spread: -5.0,
-                        color: CGColor::from_u32(0x0000001A), // black 10%
-                        active: true,
-                    }),
-                    FilterShadowEffect::DropShadow(FeShadow {
-                        dx: 0.0,
-                        dy: 8.0,
-                        blur: 5.0, // CSS 10px / 2
-                        spread: -6.0,
-                        color: CGColor::from_u32(0x0000001A), // black 10%
-                        active: true,
-                    }),
-                ]),
-            }),
+            // shadow-2xs: 0 1px rgb(0 0 0 / 0.05)
+            Self::Shadow2XS => Some(shadow_only_stage(&[(1.0, 0.0, 0.0, 0x0D)])),
+            // shadow-xs:  0 1px 2px 0 rgb(0 0 0 / 0.05)
+            Self::ShadowXS => Some(shadow_only_stage(&[(1.0, 2.0, 0.0, 0x0D)])),
+            // shadow-sm:  0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1)
+            Self::ShadowSM => Some(shadow_only_stage(&[
+                (1.0, 3.0, 0.0, 0x1A),
+                (1.0, 2.0, -1.0, 0x1A),
+            ])),
+            // shadow-md:  0 4px 6px -1px rgb(0 0 0/0.1), 0 2px 4px -2px rgb(0 0 0/0.1)
+            Self::ShadowMD => Some(shadow_only_stage(&[
+                (4.0, 6.0, -1.0, 0x1A),
+                (2.0, 4.0, -2.0, 0x1A),
+            ])),
+            // shadow-lg:  0 10px 15px -3px rgb(0 0 0/0.1), 0 4px 6px -4px rgb(0 0 0/0.1)
+            Self::ShadowLG => Some(shadow_only_stage(&[
+                (10.0, 15.0, -3.0, 0x1A),
+                (4.0, 6.0, -4.0, 0x1A),
+            ])),
+            // shadow-xl:  0 20px 25px -5px rgb(0 0 0/0.1), 0 8px 10px -6px rgb(0 0 0/0.1)
+            Self::ShadowXL => Some(shadow_only_stage(&[
+                (20.0, 25.0, -5.0, 0x1A),
+                (8.0, 10.0, -6.0, 0x1A),
+            ])),
+            // shadow-2xl: 0 25px 50px -12px rgb(0 0 0/0.25)
+            Self::Shadow2XL => Some(shadow_only_stage(&[(25.0, 50.0, -12.0, 0x40)])),
         }
     }
 }
@@ -269,11 +310,19 @@ impl IsolationDrawContext {
         canvas.save();
         canvas.concat(&crate::sk::sk_matrix(self.transform.matrix));
 
-        // Drop shadows (behind fills).
+        // Drop shadows — geometric expansion for spread (CSS `box-shadow`
+        // semantics) instead of dilate/erode which is lossy for low-alpha.
         if let Some(ref shadows) = style.shadows {
             for shadow in shadows {
                 if let FilterShadowEffect::DropShadow(ref s) = shadow {
-                    if s.active {
+                    if !s.active {
+                        continue;
+                    }
+                    if s.spread != 0.0 {
+                        let expanded = self.stage_shape.expanded_by(s.spread);
+                        let no_spread = FeShadow { spread: 0.0, ..*s };
+                        crate::painter::shadow::draw_drop_shadow(canvas, &expanded, &no_spread);
+                    } else {
                         crate::painter::shadow::draw_drop_shadow(canvas, &self.stage_shape, s);
                     }
                 }

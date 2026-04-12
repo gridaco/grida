@@ -305,28 +305,43 @@ fn overflow_dim_flag() {
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-fn stage_preset_shadow_xl_resolves() {
-    let style = IsolationModeStagePreset::ShadowXL.resolve().unwrap();
-    assert!(style.fills.is_none(), "ShadowXL should have no fills");
-    assert!(style.strokes.is_none(), "ShadowXL should have no strokes");
-    assert!(
-        style.stroke_width.is_none(),
-        "ShadowXL should have no stroke width"
-    );
-    assert!(
-        style.corner_radius.is_none(),
-        "ShadowXL should have no corner radius"
-    );
-    assert_eq!(
-        style.shadows.as_ref().unwrap().len(),
-        2,
-        "shadow-xl has 2 layers"
-    );
-}
-
-#[test]
 fn stage_preset_none_resolves_to_none() {
     assert!(IsolationModeStagePreset::None.resolve().is_none());
+}
+
+/// Every non-None preset must resolve to shadow-only (no fills/strokes/radius)
+/// with the expected number of shadow layers.
+#[test]
+fn stage_preset_all_variants_resolve() {
+    let cases: &[(IsolationModeStagePreset, usize, &str)] = &[
+        (IsolationModeStagePreset::Shadow2XS, 1, "shadow-2xs"),
+        (IsolationModeStagePreset::ShadowXS, 1, "shadow-xs"),
+        (IsolationModeStagePreset::ShadowSM, 2, "shadow-sm"),
+        (IsolationModeStagePreset::ShadowMD, 2, "shadow-md"),
+        (IsolationModeStagePreset::ShadowLG, 2, "shadow-lg"),
+        (IsolationModeStagePreset::ShadowXL, 2, "shadow-xl"),
+        (IsolationModeStagePreset::Shadow2XL, 1, "shadow-2xl"),
+    ];
+    for &(preset, expected_layers, name) in cases {
+        let style = preset
+            .resolve()
+            .unwrap_or_else(|| panic!("{name} should resolve"));
+        assert!(style.fills.is_none(), "{name} should have no fills");
+        assert!(style.strokes.is_none(), "{name} should have no strokes");
+        assert!(
+            style.stroke_width.is_none(),
+            "{name} should have no stroke width"
+        );
+        assert!(
+            style.corner_radius.is_none(),
+            "{name} should have no corner radius"
+        );
+        assert_eq!(
+            style.shadows.as_ref().unwrap().len(),
+            expected_layers,
+            "{name} layer count"
+        );
+    }
 }
 
 #[test]
@@ -337,7 +352,31 @@ fn stage_preset_from_u32() {
     );
     assert_eq!(
         IsolationModeStagePreset::from_u32(1),
+        IsolationModeStagePreset::Shadow2XS
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(2),
+        IsolationModeStagePreset::ShadowXS
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(3),
+        IsolationModeStagePreset::ShadowSM
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(4),
+        IsolationModeStagePreset::ShadowMD
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(5),
+        IsolationModeStagePreset::ShadowLG
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(6),
         IsolationModeStagePreset::ShadowXL
+    );
+    assert_eq!(
+        IsolationModeStagePreset::from_u32(7),
+        IsolationModeStagePreset::Shadow2XL
     );
     assert_eq!(
         IsolationModeStagePreset::from_u32(999),
@@ -372,4 +411,169 @@ fn stage_preset_noop_without_isolation() {
 
     renderer.set_isolation_stage_preset(IsolationModeStagePreset::ShadowXL);
     assert!(renderer.isolation_mode().is_none());
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Stage shadow pixel probe — verify shadows actually render
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Read one pixel from a Skia Image, returning `[R, G, B, A]`.
+fn pixel_at(img: &skia_safe::Image, x: i32, y: i32) -> [u8; 4] {
+    let info = img
+        .image_info()
+        .with_dimensions(skia_safe::ISize::new(1, 1));
+    let mut buf = [0u8; 4];
+    img.read_pixels(
+        &info,
+        &mut buf,
+        4,
+        skia_safe::IPoint::new(x, y),
+        skia_safe::image::CachingHint::Allow,
+    );
+    // N32 premul on little-endian = BGRA → swizzle to RGBA.
+    [buf[2], buf[1], buf[0], buf[3]]
+}
+
+/// Bounding box of all non-transparent pixels, or `None`.
+fn content_bbox(img: &skia_safe::Image) -> Option<(i32, i32, i32, i32)> {
+    let (w, h) = (img.width(), img.height());
+    let (mut mn_x, mut mn_y, mut mx_x, mut mx_y) = (w, h, 0i32, 0i32);
+    for y in 0..h {
+        for x in 0..w {
+            if pixel_at(img, x, y)[3] > 0 {
+                mn_x = mn_x.min(x);
+                mn_y = mn_y.min(y);
+                mx_x = mx_x.max(x);
+                mx_y = mx_y.max(y);
+            }
+        }
+    }
+    if mx_x >= mn_x {
+        Some((mn_x, mn_y, mx_x, mx_y))
+    } else {
+        None
+    }
+}
+
+/// Render a 100×100 white container with isolation + the given stage
+/// shadow preset on a 400×400 canvas. Returns the backend surface snapshot.
+///
+/// Uses `flush` (live draw path) rather than `snapshot()` because the
+/// latter uses `draw_nocache` which bypasses isolation mode entirely.
+fn render_stage_shadow(preset: IsolationModeStagePreset) -> skia_safe::Image {
+    let nf = NodeFactory::new();
+    let mut graph = SceneGraph::new();
+
+    let mut container = nf.create_container_node();
+    container.layout_dimensions.layout_target_width = Some(100.0);
+    container.layout_dimensions.layout_target_height = Some(100.0);
+    container.set_fill(Paint::Solid(SolidPaint::WHITE));
+    let root = graph.append_child(Node::Container(container), Parent::Root);
+
+    let scene = Scene {
+        name: "stage shadow probe".into(),
+        background_color: None,
+        graph,
+    };
+
+    let mut renderer = make_renderer(scene, 400, 400);
+    renderer.set_isolation_mode(Some(IsolationMode::hidden(root)));
+    renderer.set_isolation_stage_preset(preset);
+    renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
+    renderer.queue_stable();
+    flush_ok(&mut renderer);
+
+    let surface = unsafe { &mut *renderer.backend.get_surface() };
+    surface.image_snapshot()
+}
+
+#[test]
+fn stage_shadow_xl_renders_pixels() {
+    let img = render_stage_shadow(IsolationModeStagePreset::ShadowXL);
+    let w = img.width();
+    let h = img.height();
+
+    let (_, _, max_x, max_y) = content_bbox(&img).expect("ShadowXL should render pixels");
+    let cx = (max_x + (max_x - 100)) / 2 + 50; // horizontal center of container
+    let cy = (max_y + (max_y - 100)) / 2 + 50;
+
+    // Container center: opaque white.
+    let (_, _, bx, by) = content_bbox(&img).unwrap();
+    let center = pixel_at(&img, (bx - 50).max(0), (by - 50).max(0));
+    assert!(
+        center[3] > 200,
+        "container should be opaque, got {:?}",
+        center
+    );
+
+    // Shadow pixels exist somewhere outside the pure-white container area.
+    let has_shadow = (0..h).any(|y| {
+        (0..w).any(|x| {
+            let px = pixel_at(&img, x, y);
+            px[3] > 0 && !(px[0] > 240 && px[1] > 240 && px[2] > 240 && px[3] == 255)
+        })
+    });
+    assert!(
+        has_shadow,
+        "no shadow pixels found — shadow is NOT rendering"
+    );
+
+    // Far corner: transparent.
+    assert_eq!(
+        pixel_at(&img, 0, 0)[3],
+        0,
+        "far corner should be transparent"
+    );
+}
+
+/// ShadowXL bbox should extend beyond None bbox (shadow adds pixels).
+#[test]
+fn stage_shadow_none_has_no_shadow_pixels() {
+    let bbox_with = content_bbox(&render_stage_shadow(IsolationModeStagePreset::ShadowXL))
+        .expect("ShadowXL should render");
+    let bbox_without = content_bbox(&render_stage_shadow(IsolationModeStagePreset::None))
+        .expect("None should render");
+
+    assert!(
+        bbox_with.3 > bbox_without.3,
+        "ShadowXL bottom ({}) should exceed None bottom ({})",
+        bbox_with.3,
+        bbox_without.3
+    );
+}
+
+/// Every non-None preset should produce a content bbox that extends
+/// beyond the None preset's bbox (shadow pixels exist outside the container).
+#[test]
+fn stage_shadow_all_presets_produce_pixels() {
+    let none_img = render_stage_shadow(IsolationModeStagePreset::None);
+    let none_bbox = content_bbox(&none_img).expect("None should render the container");
+
+    let presets = [
+        (IsolationModeStagePreset::Shadow2XS, "shadow-2xs"),
+        (IsolationModeStagePreset::ShadowXS, "shadow-xs"),
+        (IsolationModeStagePreset::ShadowSM, "shadow-sm"),
+        (IsolationModeStagePreset::ShadowMD, "shadow-md"),
+        (IsolationModeStagePreset::ShadowLG, "shadow-lg"),
+        (IsolationModeStagePreset::ShadowXL, "shadow-xl"),
+        (IsolationModeStagePreset::Shadow2XL, "shadow-2xl"),
+    ];
+
+    for (preset, name) in presets {
+        let img = render_stage_shadow(preset);
+        let bbox = content_bbox(&img)
+            .unwrap_or_else(|| panic!("{name}: no pixels at all! Stage shadow NOT rendering."));
+
+        // Shadow must extend the bbox beyond the None-preset container.
+        let extends = bbox.0 < none_bbox.0
+            || bbox.1 < none_bbox.1
+            || bbox.2 > none_bbox.2
+            || bbox.3 > none_bbox.3;
+        assert!(
+            extends,
+            "{name}: bbox {:?} does not extend beyond None bbox {:?}. \
+             Shadow is NOT rendering!",
+            bbox, none_bbox
+        );
+    }
 }

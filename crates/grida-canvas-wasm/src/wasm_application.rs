@@ -1194,8 +1194,20 @@ pub unsafe extern "C" fn runtime_renderer_set_isolation_mode(
 #[no_mangle]
 /// js::_runtime_renderer_set_isolation_stage_preset
 ///
-/// Set the isolation mode stage decoration preset.
-/// `0` = None (clear), `1` = Slide. Unknown values map to None.
+/// Set the isolation mode stage decoration preset (Tailwind shadow scale).
+///
+/// | value | preset      |
+/// |-------|-------------|
+/// |   0   | None        |
+/// |   1   | shadow-2xs  |
+/// |   2   | shadow-xs   |
+/// |   3   | shadow-sm   |
+/// |   4   | shadow-md   |
+/// |   5   | shadow-lg   |
+/// |   6   | shadow-xl   |
+/// |   7   | shadow-2xl  |
+///
+/// Unknown values map to None.
 pub unsafe extern "C" fn runtime_renderer_set_isolation_stage_preset(
     app: *mut UnknownTargetApplication,
     preset: u32,

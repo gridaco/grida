@@ -118,6 +118,32 @@ impl PainterShape {
         }
     }
 
+    /// Return a new shape expanded (positive) or contracted (negative)
+    /// uniformly on all sides. Corner radii are adjusted by the same
+    /// amount (clamped to ≥ 0), matching CSS `box-shadow` spread.
+    ///
+    /// For ovals and arbitrary paths the expansion is approximated via
+    /// the bounding rect.
+    pub fn expanded_by(&self, amount: f32) -> Self {
+        let rect = self.rect.with_outset((amount, amount));
+        if let Some(rrect) = &self.rrect {
+            let r = rrect.radii_ref();
+            let adjust = |p: &skia_safe::Point| {
+                skia_safe::Point::new((p.x + amount).max(0.0), (p.y + amount).max(0.0))
+            };
+            let new_radii = [adjust(&r[0]), adjust(&r[1]), adjust(&r[2]), adjust(&r[3])];
+            let mut rr = RRect::new();
+            rr.set_rect_radii(rect, &new_radii);
+            Self::from_rrect(rr)
+        } else if self.rect_shape.is_some() {
+            Self::from_rect(rect)
+        } else if self.oval.is_some() {
+            Self::from_oval(rect)
+        } else {
+            Self::from_rect(rect)
+        }
+    }
+
     pub fn to_path(&self) -> Path {
         if let Some(rect) = self.rect_shape {
             Path::rect(rect, None)

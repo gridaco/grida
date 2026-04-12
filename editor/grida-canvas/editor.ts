@@ -3388,7 +3388,7 @@ export class Editor
       ISOLATION_OVERFLOW_DIM,
       0.15
     );
-    this._m_wasm_canvas_scene.runtime_renderer_set_isolation_stage_preset(1);
+    this._m_wasm_canvas_scene.runtime_renderer_set_isolation_stage_preset(7);
     this._scheduleWasmRedraw();
   }
 

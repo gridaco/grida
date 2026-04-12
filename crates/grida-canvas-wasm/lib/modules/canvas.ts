@@ -971,14 +971,32 @@ export class Scene {
   /**
    * Stage decoration preset constants for
    * `runtime_renderer_set_isolation_stage_preset`.
+   *
+   * Maps to the Tailwind CSS `box-shadow` scale.
    */
   static readonly ISOLATION_STAGE_PRESET_NONE = 0;
-  static readonly ISOLATION_STAGE_PRESET_SHADOW_XL = 1;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_2XS = 1;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_XS = 2;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_SM = 3;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_MD = 4;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_LG = 5;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_XL = 6;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_2XL = 7;
 
   /**
    * Set the isolation mode stage decoration preset.
    *
-   * `0` = None (clear), `1` = Slide.
+   * | value | preset      |
+   * |-------|-------------|
+   * |   0   | None        |
+   * |   1   | shadow-2xs  |
+   * |   2   | shadow-xs   |
+   * |   3   | shadow-sm   |
+   * |   4   | shadow-md   |
+   * |   5   | shadow-lg   |
+   * |   6   | shadow-xl   |
+   * |   7   | shadow-2xl  |
+   *
    * Only takes effect when isolation mode is active.
    */
   runtime_renderer_set_isolation_stage_preset(preset: number) {
