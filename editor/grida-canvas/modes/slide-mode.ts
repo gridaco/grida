@@ -255,7 +255,6 @@ export class SlideEditorMode {
         : slides.find((s) => s.id === target);
     if (!slide) return;
     this.editor.doc.setIsolation(slide.id);
-    this.editor.commands.select([], "reset");
     this._fitCamera(slide.id);
   }
 
@@ -300,7 +299,6 @@ export class SlideEditorMode {
         layout_inset_top: 0,
       });
       this.editor.doc.setIsolation(newTrayId);
-      this.editor.commands.select([], "reset");
       this._fitCamera(newTrayId);
     }
 
@@ -351,7 +349,6 @@ export class SlideEditorMode {
 
     if (newId) {
       this.editor.doc.setIsolation(newId);
-      this.editor.commands.select([], "reset");
       this._fitCamera(newId);
     }
 

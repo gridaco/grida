@@ -66,6 +66,35 @@ describe("SlideEditorMode", () => {
     expect((node as any).layout_inset_top).toBe(0);
   });
 
+  // ---- goToSlide / selection clearing ----
+
+  test("goToSlide clears selection from the previous slide", () => {
+    // Insert a child node into slide-1 so we can select it.
+    const [childId] = ed.doc.insert(
+      {
+        prototype: {
+          type: "rectangle",
+          name: "Rect",
+          width: 100,
+          height: 100,
+        },
+      },
+      "slide-1"
+    );
+    expect(childId).toBeDefined();
+
+    // Select the child node.
+    ed.doc.select([childId!]);
+    expect(ed.state.selection).toEqual([childId]);
+
+    // Add a second slide and navigate to it.
+    const slide2 = mode.addSlide()!;
+    expect(ed.state.isolation_root_node_id).toBe(slide2);
+
+    // Selection should have been cleared when isolation changed.
+    expect(ed.state.selection).toEqual([]);
+  });
+
   // ---- navigateSlide ----
 
   test("navigateSlide moves to the next slide", () => {
