@@ -321,6 +321,20 @@ export namespace iofigma {
         NONZERO: "nonzero",
       };
 
+      /**
+       * Figma REST `maskType` → Grida `LayerMaskType`.
+       *
+       * Figma "VECTOR" = outline/geometry mask; "ALPHA"/"LUMINANCE" map 1:1.
+       */
+      export const maskTypeMap: Record<
+        NonNullable<figrest.HasMaskTrait["maskType"]>,
+        cg.LayerMaskType
+      > = {
+        VECTOR: "geometry",
+        ALPHA: "alpha",
+        LUMINANCE: "luminance",
+      };
+
       export const blendModeMap: Record<figrest.BlendMode, cg.BlendMode> = {
         PASS_THROUGH: "normal", // no-op here
         NORMAL: "normal", // Matches the default blend mode.
@@ -1017,6 +1031,75 @@ export namespace iofigma {
           blend_mode: map.layerBlendModeMap[node.blendMode],
           z_index: 0,
         };
+      }
+
+      /**
+       * HasMaskTrait → Grida `mask` property.
+       * Returns empty object when the node is not a mask.
+       */
+      function mask_trait(node: Partial<figrest.HasMaskTrait>) {
+        if (!node.isMask) return {};
+        return { mask: map.maskTypeMap[node.maskType ?? "ALPHA"] };
+      }
+
+      /**
+       * Reorder a children array from Figma's mask scope convention to Grida's.
+       *
+       * **Figma**: the mask node sits at the *start* of its scope; it masks
+       * all *subsequent* siblings (higher indices) until the next mask or
+       * group boundary.
+       *
+       *     Figma children:  [Mask, a, b, c]
+       *                       ^^^^  masked →
+       *
+       * **Grida** (Option 1 — "topmost is the mask"): the mask node sits at
+       * the *end* of its scope; it masks all *preceding* siblings (lower
+       * indices) back to the previous mask or group boundary.
+       *
+       *     Grida children:  [a, b, c, Mask]
+       *                       ← masked  ^^^^
+       *
+       * This function performs the minimal tree surgery: for every mask node
+       * found in `childIds`, it is moved from its current position to just
+       * after the last node it masks (i.e. right before the next mask or
+       * the end of the array).
+       *
+       * Non-mask nodes keep their relative order.  When there are no mask
+       * nodes the array is returned unchanged (same reference).
+       */
+      function figmaMaskScopeToGrida(
+        childIds: string[],
+        nodes: Record<string, grida.program.nodes.Node>
+      ): string[] {
+        const maskIndices: number[] = [];
+        for (let i = 0; i < childIds.length; i++) {
+          const n = nodes[childIds[i]];
+          if (n && "mask" in n && n.mask != null) {
+            maskIndices.push(i);
+          }
+        }
+        if (maskIndices.length === 0) return childIds;
+
+        const result: string[] = [];
+        let cursor = 0;
+        for (let pos = 0; pos < maskIndices.length; pos++) {
+          const mi = maskIndices[pos];
+          while (cursor < mi) {
+            result.push(childIds[cursor]);
+            cursor++;
+          }
+          const scopeEnd = maskIndices[pos + 1] ?? childIds.length;
+          for (let j = mi + 1; j < scopeEnd; j++) {
+            result.push(childIds[j]);
+          }
+          result.push(childIds[mi]);
+          cursor = scopeEnd;
+        }
+        while (cursor < childIds.length) {
+          result.push(childIds[cursor]);
+          cursor++;
+        }
+        return result;
       }
 
       /**
@@ -2330,12 +2413,16 @@ export namespace iofigma {
             "children" in currentNode &&
             currentNode.children?.length
           ) {
-            const childIds = currentNode.children
+            const rawChildIds = currentNode.children
               .map((c) => {
                 return processNode(c, currentNode as FigmaParentNode);
               }) // Process each child
               .filter((child) => child !== undefined) // Remove undefined nodes
               .map((child) => child!.id); // Map to IDs
+
+            // Convert Figma mask scope ordering (mask-first) to Grida
+            // ordering (mask-last).  See figmaMaskScopeToGrida docs.
+            const childIds = figmaMaskScopeToGrida(rawChildIds, nodes);
 
             // Merge with any geometry children already added by
             // attachGeometryChildrenIfPresent (e.g. VECTOR fill paths +
@@ -2852,6 +2939,7 @@ export namespace iofigma {
               return {
                 id: gridaId,
                 ...base_node_trait(node),
+                ...mask_trait(node),
                 ...fills_trait(node.fills, context, imageRefsUsed),
                 ...text_stroke_trait(node, context, imageRefsUsed),
                 ...style_trait({}),
@@ -2872,6 +2960,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...text_stroke_trait(node, context, imageRefsUsed),
               ...style_trait({}),
@@ -2923,6 +3012,7 @@ export namespace iofigma {
               return {
                 id: gridaId,
                 ...base_node_trait(node),
+                ...mask_trait(node),
                 ...positioning_trait(node, parent),
                 type: "group",
               } satisfies grida.program.nodes.GroupNode;
@@ -2931,6 +3021,7 @@ export namespace iofigma {
               return {
                 id: gridaId,
                 ...base_node_trait(node),
+                ...mask_trait(node),
                 ...positioning_trait(node, parent),
                 ...fills_trait(node.fills, context, imageRefsUsed),
                 ...stroke_trait(node, context, imageRefsUsed),
@@ -2946,6 +3037,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
@@ -2967,6 +3059,7 @@ export namespace iofigma {
               return {
                 id: gridaId,
                 ...base_node_trait(node),
+                ...mask_trait(node),
                 ...positioning_trait(node, parent),
                 type: "group",
               } satisfies grida.program.nodes.GroupNode;
@@ -2974,6 +3067,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
@@ -3004,6 +3098,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
               type: "line",
@@ -3045,6 +3140,7 @@ export namespace iofigma {
                   return {
                     id: gridaId,
                     ...base_node_trait(node),
+                    ...mask_trait(node),
                     ...positioning_trait(node, parent),
                     ...fills_trait(node.fills, context, imageRefsUsed),
                     ...stroke_trait(node, context, imageRefsUsed),
@@ -3066,6 +3162,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...positioning_trait(node, parent),
               type: "group",
             } satisfies grida.program.nodes.GroupNode;
@@ -3087,6 +3184,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
@@ -3100,6 +3198,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
@@ -3113,6 +3212,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
+              ...mask_trait(node),
               ...positioning_trait(node, parent),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
@@ -3153,6 +3253,19 @@ export namespace iofigma {
     }
 
     export namespace map {
+      /**
+       * Kiwi `MaskType` → Figma REST `maskType`.
+       * Kiwi uses "OUTLINE" where REST uses "VECTOR".
+       */
+      export const kiwiMaskTypeToRestMap: Record<
+        figkiwi.MaskType,
+        NonNullable<figrest.HasMaskTrait["maskType"]>
+      > = {
+        OUTLINE: "VECTOR",
+        ALPHA: "ALPHA",
+        LUMINANCE: "LUMINANCE",
+      };
+
       /**
        * Convert Kiwi figrest.BlendMode to Figma REST API BlendMode
        * Defaults to "PASS_THROUGH"
@@ -3552,6 +3665,7 @@ export namespace iofigma {
           locked: nc.locked ?? false,
           scrollBehavior: "SCROLLS" as const,
           rotation: nc.transform ? extractRotationFromMatrix(nc.transform) : 0,
+          ...kiwi_mask_trait(nc),
           // Preserve overrideKey for instance override matching during
           // flattening. The guidPath in symbolOverrides references
           // children by their overrideKey, not their node guid.
@@ -3561,6 +3675,19 @@ export namespace iofigma {
               }
             : {}),
         };
+      }
+
+      /**
+       * HasMaskTrait — maps Kiwi mask fields to Figma REST API mask properties.
+       */
+      function kiwi_mask_trait(nc: figkiwi.NodeChange) {
+        if (!nc.mask) return {};
+        const maskType = map.kiwiMaskTypeToRestMap[nc.maskType ?? "ALPHA"];
+        return {
+          isMask: true as const,
+          maskType,
+          isMaskOutline: nc.maskIsOutline ?? nc.maskType === "OUTLINE",
+        } satisfies figrest.HasMaskTrait;
       }
 
       /**
