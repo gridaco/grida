@@ -2,7 +2,9 @@ use crate::cg::color::CGColor;
 use crate::cg::types::{Paint, TextAlignVertical};
 use crate::devtools::{fps_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay};
 use crate::dummy;
-use crate::export::{export_node_as, ExportAs, Exported};
+use crate::export::{
+    export_node_as, export_pdf_document, ExportAs, ExportPdfDocumentOptions, Exported,
+};
 use crate::io::io_grida::{self, JSONFlattenResult};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
 use crate::node::schema::*;
@@ -82,6 +84,16 @@ pub trait ApplicationApi {
     /// the scene.
     fn get_node_id_path(&self, id: &str) -> Option<Vec<String>>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
+
+    /// Export multiple nodes as a single multi-page PDF document.
+    ///
+    /// Each node ID in `options.node_ids` becomes one page in the output.
+    /// Returns the raw PDF bytes, or `None` if no valid pages could be produced.
+    fn export_pdf_document(
+        &mut self,
+        options: &crate::export::ExportPdfDocumentOptions,
+    ) -> Option<Exported>;
+
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
     /// Enable or disable per-node layer compositing cache.
@@ -541,6 +553,34 @@ impl ApplicationApi for UnknownTargetApplication {
             );
         }
         None
+    }
+
+    fn export_pdf_document(&mut self, options: &ExportPdfDocumentOptions) -> Option<Exported> {
+        let scene = self.renderer.scene.as_ref()?;
+        let geometry = &self.renderer.get_cache().geometry;
+
+        // Resolve user IDs → internal NodeIds → render bounds.
+        // Nodes that don't exist or have no bounds are silently skipped.
+        let rects: Vec<math2::Rectangle> = options
+            .node_ids
+            .iter()
+            .filter_map(|user_id| {
+                let internal_id = self.user_id_to_internal(user_id)?;
+                geometry.get_render_bounds(&internal_id)
+            })
+            .collect();
+
+        if rects.is_empty() {
+            return None;
+        }
+
+        export_pdf_document(
+            scene,
+            &self.renderer.fonts,
+            &self.renderer.images,
+            &rects,
+            options,
+        )
     }
 
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {

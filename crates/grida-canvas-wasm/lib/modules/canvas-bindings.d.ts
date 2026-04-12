@@ -155,6 +155,12 @@ declare namespace canvas {
       fmt_len: number
     ): Ptr;
 
+    _export_pdf_document(
+      state: GridaCanvasApplicationPtr,
+      json_ptr: number,
+      json_len: number
+    ): Ptr;
+
     _to_vector_network(
       state: GridaCanvasApplicationPtr,
       id_ptr: number,

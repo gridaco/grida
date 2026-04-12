@@ -129,3 +129,8 @@ pub fn export_node_as(
         None
     }
 }
+
+// Re-export the multi-page PDF document export function.
+// The Application layer resolves user IDs → internal NodeIds → render bounds
+// and calls `export_pdf_document` directly.
+pub use export_as_pdf::export_pdf_document;

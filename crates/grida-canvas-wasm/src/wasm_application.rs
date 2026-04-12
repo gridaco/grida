@@ -1010,6 +1010,37 @@ pub unsafe extern "C" fn export_node_as(
 }
 
 #[no_mangle]
+/// js::_export_pdf_document
+///
+/// Export multiple nodes as a single multi-page PDF document.
+/// `json_ptr`/`json_len` point to a UTF-8 JSON string with shape:
+///   { "node_ids": ["id1", "id2", ...], "page_size": { "width": f, "height": f } | null }
+///
+/// Returns a length-prefixed byte buffer (4-byte LE u32 length + PDF data),
+/// or null on failure.
+pub unsafe extern "C" fn export_pdf_document(
+    app: *mut UnknownTargetApplication,
+    json_ptr: *const u8,
+    json_len: usize,
+) -> *const u8 {
+    use cg::export::ExportPdfDocumentOptions;
+
+    let (Some(app), Some(json_str)) = (app.as_mut(), __str_from_ptr_len(json_ptr, json_len)) else {
+        return std::ptr::null();
+    };
+
+    let Ok(options) = serde_json::from_str::<ExportPdfDocumentOptions>(&json_str) else {
+        return std::ptr::null();
+    };
+
+    if let Some(exported) = app.export_pdf_document(&options) {
+        return alloc_len_prefixed(exported.data());
+    }
+
+    std::ptr::null()
+}
+
+#[no_mangle]
 /// js::_to_vector_network
 pub unsafe extern "C" fn to_vector_network(
     app: *mut UnknownTargetApplication,

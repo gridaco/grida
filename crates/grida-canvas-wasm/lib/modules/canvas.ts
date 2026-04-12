@@ -575,6 +575,33 @@ export class Scene {
     };
   }
 
+  /**
+   * Export multiple nodes as a single multi-page PDF document.
+   *
+   * Each node ID in `options.node_ids` becomes one page in the output PDF.
+   * Returns the raw PDF bytes.
+   */
+  exportPdfDocument(options: types.ExportPdfDocumentOptions): {
+    data: Uint8Array;
+  } {
+    this._assertAlive();
+    const [json_ptr, json_len] = this._alloc_string(JSON.stringify(options));
+    const outptr = this.module._export_pdf_document(
+      this.appptr,
+      json_ptr,
+      json_len - 1
+    );
+    this._free_string(json_ptr, json_len);
+
+    if (outptr === 0) {
+      throw new Error("Failed to export PDF document");
+    }
+
+    return {
+      data: ffi.readLenPrefixedBytes(this.module, outptr),
+    };
+  }
+
   execCommand(command: "ZoomIn" | "ZoomOut") {
     this._assertAlive();
     this.module._command(this.appptr, ApplicationCommandID[command], 0, 0);

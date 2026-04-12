@@ -223,6 +223,13 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.export_node_as(id, format)
     }
 
+    fn export_pdf_document(
+        &mut self,
+        options: &crate::export::ExportPdfDocumentOptions,
+    ) -> Option<crate::export::Exported> {
+        self.base.export_pdf_document(options)
+    }
+
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         self.base.to_vector_network(id)
     }
