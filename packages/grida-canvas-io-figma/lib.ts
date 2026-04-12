@@ -1218,10 +1218,12 @@ export namespace iofigma {
             fe_blur: undefined,
             fe_backdrop_blur: undefined,
             fe_shadows: undefined,
+            fe_noises: undefined,
           };
         }
 
         const shadows: cg.FeShadow[] = [];
+        const noises: cg.FeNoise[] = [];
         let layerBlur: cg.FeLayerBlur | undefined;
         let backdropBlur: cg.FeBackdropBlur | undefined;
 
@@ -1278,6 +1280,59 @@ export namespace iofigma {
                 active: true,
               };
               break;
+
+            default: {
+              // Handle noise/grain effects passed through from kiwi
+              const e = effect as any;
+              if (e.type === "GRAIN" || e.type === "NOISE") {
+                const noiseTypeMap: Record<string, cg.FeNoise["mode"]> = {
+                  MONOTONE: "mono",
+                  DUOTONE: "duo",
+                  MULTITONE: "multi",
+                };
+                const mode = noiseTypeMap[e.noiseType ?? "MONOTONE"] ?? "mono";
+                const noise: cg.FeNoise = {
+                  type: "noise",
+                  mode,
+                  noise_size: e.noiseSize?.x ?? 0.5,
+                  density: e.density ?? 0.5,
+                  seed: e.seed,
+                  blend_mode: e.blendMode
+                    ? map.blendModeMap[e.blendMode as figrest.BlendMode]
+                    : undefined,
+                  active: true,
+                };
+                if (mode === "mono" && e.color) {
+                  noise.color = kolor.colorformats.newRGBA32F(
+                    e.color.r,
+                    e.color.g,
+                    e.color.b,
+                    e.color.a
+                  );
+                } else if (mode === "duo") {
+                  if (e.color) {
+                    noise.color1 = kolor.colorformats.newRGBA32F(
+                      e.color.r,
+                      e.color.g,
+                      e.color.b,
+                      e.color.a
+                    );
+                  }
+                  if (e.secondaryColor) {
+                    noise.color2 = kolor.colorformats.newRGBA32F(
+                      e.secondaryColor.r,
+                      e.secondaryColor.g,
+                      e.secondaryColor.b,
+                      e.secondaryColor.a
+                    );
+                  }
+                } else if (mode === "multi") {
+                  noise.opacity = e.opacity ?? 1;
+                }
+                noises.push(noise);
+              }
+              break;
+            }
           }
         });
 
@@ -1285,6 +1340,7 @@ export namespace iofigma {
           fe_shadows: shadows.length > 0 ? shadows : undefined,
           fe_blur: layerBlur,
           fe_backdrop_blur: backdropBlur,
+          fe_noises: noises.length > 0 ? noises : undefined,
         };
       }
 
@@ -2800,6 +2856,9 @@ export namespace iofigma {
                 ...text_stroke_trait(node, context, imageRefsUsed),
                 ...style_trait({}),
                 ...effects_trait(node.effects),
+                ...((node as any).fe_noises?.length
+                  ? { fe_noises: (node as any).fe_noises }
+                  : {}),
                 type: "text",
                 text: characters,
                 default_style: defaultStyle,
@@ -2878,6 +2937,9 @@ export namespace iofigma {
                 ...rectangular_stroke_width_trait(node),
                 ...corner_radius_trait(node),
                 ...effects_trait(node.effects),
+                ...((node as any).fe_noises?.length
+                  ? { fe_noises: (node as any).fe_noises }
+                  : {}),
                 type: "rectangle",
               } satisfies grida.program.nodes.RectangleNode;
             }
@@ -2988,6 +3050,9 @@ export namespace iofigma {
                     ...stroke_trait(node, context, imageRefsUsed),
                     ...corner_radius_trait(node),
                     ...effects_trait(node.effects),
+                    ...((node as any).fe_noises?.length
+                      ? { fe_noises: (node as any).fe_noises }
+                      : {}),
                     type: "vector",
                     vector_network: gridaVectorNetwork,
                   } satisfies grida.program.nodes.VectorNode;
@@ -3437,6 +3502,28 @@ export namespace iofigma {
                   visible: effect.visible ?? true,
                   radius: effect.radius ?? 0,
                 } satisfies figrest.BlurEffect;
+
+              case "GRAIN":
+              case "NOISE":
+                return {
+                  type: effect.type as string,
+                  visible: effect.visible ?? true,
+                  // Carry kiwi noise fields through the REST intermediate
+                  noiseType: effect.noiseType,
+                  noiseSize: effect.noiseSize
+                    ? vector(effect.noiseSize)
+                    : undefined,
+                  density: effect.density,
+                  seed: effect.seed,
+                  opacity: effect.opacity,
+                  blendMode: effect.blendMode
+                    ? map.blendMode(effect.blendMode)
+                    : "NORMAL",
+                  color: effect.color ? color(effect.color) : undefined,
+                  secondaryColor: effect.secondaryColor
+                    ? color(effect.secondaryColor)
+                    : undefined,
+                } as unknown as figrest.Effect;
 
               default:
                 return undefined;
