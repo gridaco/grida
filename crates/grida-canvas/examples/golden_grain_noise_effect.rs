@@ -65,14 +65,14 @@ fn main() {
         filters: ImageFilters::default(),
     })]);
 
-    // Apply fine film grain with small size and high density
+    // Apply realistic film grain: fine dots, moderate density, subtle color
     rect_grain.effects.noises.push(FeNoiseEffect {
-        noise_size: 2.0, // Very small grain size for fine texture
-        density: 1.0,    // High density for prominent grain
-        num_octaves: 6,  // Many octaves for detailed texture
+        noise_size: 2.0, // Fine grain texture
+        density: 0.45,   // Moderate density for visible but natural grain
+        num_octaves: 8,  // Enough octaves for organic texture
         seed: 42.0,
         coloring: NoiseEffectColors::Mono {
-            color: CGColor::from_rgba(0, 0, 0, 100),
+            color: CGColor::from_rgba(0, 0, 0, 180),
         },
         active: true,
         blend_mode: BlendMode::Normal,
@@ -127,7 +127,7 @@ fn main() {
 
     println!("✓ Generated film grain before/after comparison");
     println!("  - Left: Original image (no grain)");
-    println!("  - Right: With film grain (noise_size: 0.3, density: 0.8, 6 octaves)");
+    println!("  - Right: With film grain (noise_size: 0.5, density: 0.45, 4 octaves)");
     println!("✓ Saved: goldens/grain_noise_effect.png");
 
     renderer.free();

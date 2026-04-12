@@ -31,7 +31,7 @@ fn main() {
                 seed: 8539.0,
                 coloring: NoiseEffectColors::Duo {
                     color1: CGColor::from_rgba(255, 0, 4, 255), // red pattern
-                    color2: CGColor::from_rgba(255, 255, 255, 64), // 25% opacity white base
+                    color2: CGColor::from_rgba(0, 0, 255, 255), // blue pattern
                 },
                 active: true,
                 blend_mode: BlendMode::Normal,

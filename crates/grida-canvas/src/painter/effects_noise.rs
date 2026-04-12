@@ -61,8 +61,11 @@ pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &
 
             let noise_alpha = noise.with_color_filter(luminance_to_alpha_cf());
 
-            // Density controls threshold: higher density = lower threshold = more noise visible
-            let threshold = ((1.0 - effect.density.clamp(0.0, 1.0)) * 255.0).round() as usize;
+            // Density controls binary threshold for discrete grain pattern.
+            // density=0.0 → threshold=255 → no grain
+            // density=0.5 → threshold=128 → ~50% coverage
+            // density=1.0 → threshold=64  → heavy grain (floored to prevent solid)
+            let threshold = density_to_threshold(effect.density);
             let a_lut = lut_threshold(threshold);
             let ident: [u8; 256] = identity_lut();
             let alpha_cf = sk::color_filters::table_argb(&a_lut, &ident, &ident, &ident)
@@ -139,7 +142,8 @@ pub fn render_noise_effect(effect: &FeNoiseEffect, canvas: &sk::Canvas, shape: &
             let enhanced_noise = noise.with_color_filter(multi_contrast_cf());
 
             // Apply density threshold to alpha channel only (keeps enhanced RGB)
-            let threshold = ((1.0 - effect.density.clamp(0.0, 1.0)) * 255.0).round() as usize;
+            // Same binary threshold as Mono for discrete colored dots
+            let threshold = density_to_threshold(effect.density);
             let a_lut = lut_threshold(threshold);
             let ident: [u8; 256] = identity_lut();
             // table_argb(a, r, g, b) - threshold alpha, pass through RGB
@@ -207,9 +211,19 @@ fn identity_lut() -> [u8; 256] {
     t
 }
 
+/// Map density (0..1) to a binary threshold index.
+///
+/// density=0.0 → 255 (nothing passes, no grain)
+/// density=0.5 → 128 (~50% coverage)
+/// density=1.0 → 64  (heavy grain, floored to prevent solid overlay)
+fn density_to_threshold(density: f32) -> usize {
+    let d = density.clamp(0.0, 1.0);
+    (((1.0 - d) * 255.0).round() as usize).max(64)
+}
+
 /// Generate a LUT that outputs 255 for values >= threshold, 0 otherwise
 ///
-/// Used to control noise density by thresholding the alpha mask.
+/// Creates binary discrete grain patterns.
 /// Lower threshold = more noise visible (higher density)
 /// Higher threshold = less noise visible (lower density)
 fn lut_threshold(threshold: usize) -> [u8; 256] {
