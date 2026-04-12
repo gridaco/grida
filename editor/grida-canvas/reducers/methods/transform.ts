@@ -10,16 +10,15 @@ import {
   snapObjectsTranslation,
   threshold,
 } from "../tools/snap";
-import { snapObjectsResize } from "../tools/snap-resize";
 import updateNodeTransform from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
 import grida from "@grida/schema";
-import vn from "@grida/vn";
 import tree from "@grida/tree";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 import type { ReducerContext } from "..";
 import { self_update_gesture_scale } from "./scale";
+import { perf } from "@/grida-canvas/perf";
 
 /**
  * Determines if a node type allows hierarchy changes during translation.
@@ -99,24 +98,31 @@ export function self_update_gesture_transform<
   if (draft.gesture.type === "brush") return;
   if (draft.gesture.type === "guide") return;
 
-  switch (draft.gesture.type) {
-    case "translate": {
-      return __self_update_gesture_transform_translate(draft, context);
+  const __perf_end = perf.start("gesture_transform", {
+    gesture: draft.gesture.type,
+  });
+  try {
+    switch (draft.gesture.type) {
+      case "translate": {
+        return __self_update_gesture_transform_translate(draft, context);
+      }
+      case "sort": {
+        return __self_update_gesture_transform_translate_sort(draft);
+      }
+      case "insert-and-resize":
+      case "scale": {
+        return __self_update_gesture_transform_scale(draft, context);
+      }
+      case "rotate": {
+        return __self_update_gesture_transform_rotate(draft);
+      }
+      default:
+        throw new Error(
+          `Gesture type not supported: ${(draft.gesture as any).type}`
+        );
     }
-    case "sort": {
-      return __self_update_gesture_transform_translate_sort(draft);
-    }
-    case "insert-and-resize":
-    case "scale": {
-      return __self_update_gesture_transform_scale(draft, context);
-    }
-    case "rotate": {
-      return __self_update_gesture_transform_rotate(draft);
-    }
-    default:
-      throw new Error(
-        `Gesture type not supported: ${(draft.gesture as any).type}`
-      );
+  } finally {
+    __perf_end();
   }
 }
 

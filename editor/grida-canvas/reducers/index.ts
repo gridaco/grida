@@ -15,6 +15,7 @@ import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
+import { perf } from "../perf";
 
 enablePatches();
 
@@ -49,6 +50,9 @@ export default function reducer(
     context.logger?.("debug:action", action.type, action);
   }
 
+  const __perf_end = perf.start("reducer.immer_produce", {
+    action_type: action.type,
+  });
   const [nextState, patches, inversePatches] = produceWithPatches(
     state,
     (draft) => {
@@ -133,6 +137,7 @@ export default function reducer(
       }
     }
   );
+  __perf_end();
 
   return [nextState, patches, inversePatches];
 }

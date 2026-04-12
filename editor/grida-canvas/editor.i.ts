@@ -15,6 +15,7 @@ import grida from "@grida/schema";
 import kolor from "@grida/color";
 import tree from "@grida/tree";
 import type { io } from "@grida/io";
+import { perf } from "./perf";
 
 export namespace editor {
   export type EditorContentRenderingBackend = "dom" | "canvas";
@@ -1600,13 +1601,18 @@ export namespace editor.state {
    * Dangerous. Use when absolutely necessary.
    */
   export function snapshot(state: editor.state.IEditorState) {
+    const __perf_end = perf.start("snapshot", {
+      node_count: Object.keys(state.document.nodes).length,
+    });
     const minimal: editor.state.IMinimalDocumentState = {
       document: state.document,
       document_ctx: state.document_ctx,
       document_key: state.document_key,
     };
 
-    return JSON.parse(JSON.stringify(minimal));
+    const result = JSON.parse(JSON.stringify(minimal));
+    __perf_end();
+    return result;
   }
 
   /**

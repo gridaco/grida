@@ -2,6 +2,7 @@ import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { SnapResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
 import { dq } from "@/grida-canvas/query";
+import { perf } from "@/grida-canvas/perf";
 
 const q = 1;
 
@@ -191,6 +192,9 @@ export function getSnapTargets(
     document: { nodes: Record<string, grida.program.nodes.Node> };
   }
 ): string[] {
+  const __perf_end = perf.start("getSnapTargets", {
+    selection_count: selection.length,
+  });
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
     new Set(
@@ -213,5 +217,6 @@ export function getSnapTargets(
     return true;
   });
 
+  __perf_end();
   return snap_target_node_ids;
 }

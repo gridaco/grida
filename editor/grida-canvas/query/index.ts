@@ -2,6 +2,7 @@ import { editor } from "..";
 import type grida from "@grida/schema";
 import assert from "assert";
 import cg from "@grida/cg";
+import { perf } from "../perf";
 
 type NodeID = string & {};
 
@@ -349,20 +350,25 @@ export namespace dq {
     context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID[] {
+    const __perf_end = perf.start("dq.getSiblings");
     const parent_id = getParentId(context, node_id);
 
     if (!parent_id) {
       // FIXME: this is not scoped by the scene - may result unexpected behavior.
       // If the node has no parent, it is at the root level, and all nodes without parents are its "siblings."
-      return Object.keys(context.lu_parent).filter(
+      const result = Object.keys(context.lu_parent).filter(
         (id) => context.lu_parent[id] === null
       );
+      __perf_end();
+      return result;
     }
 
     // Filter all nodes that share the same parent but exclude the input node itself.
-    return Object.keys(context.lu_parent).filter(
+    const result = Object.keys(context.lu_parent).filter(
       (id) => context.lu_parent[id] === parent_id && id !== node_id
     );
+    __perf_end();
+    return result;
   }
 
   /**
@@ -400,12 +406,14 @@ export namespace dq {
     node_id: string,
     recursive = false
   ): NodeID[] {
+    const __perf_end = perf.start("dq.getChildren", { recursive });
     const { lu_parent } = context;
     const directChildren = Object.keys(lu_parent).filter(
       (id) => lu_parent[id] === node_id
     );
 
     if (!recursive) {
+      __perf_end();
       return directChildren;
     }
 
@@ -413,6 +421,7 @@ export namespace dq {
     for (const child of directChildren) {
       allChildren.push(...getChildren(context, child, true));
     }
+    __perf_end();
     return allChildren;
   }
 

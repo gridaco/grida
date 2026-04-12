@@ -48,6 +48,7 @@ import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
+import { perf } from "./perf";
 
 const __DEV__ = process.env.NODE_ENV === "development";
 
@@ -601,17 +602,32 @@ class EditorDocumentStore
       return;
     }
 
+    const __perf_end_dispatch = perf.start("dispatch", {
+      action_type: actions[0]?.type,
+      batch: actions.length,
+    });
+
     let lastAction: Action;
     let allPatches: editor.history.Patch[] = [];
 
     for (const action of actions) {
       const beforeState = this.mstate;
+
+      const __perf_end_reducer = perf.start("dispatch.reducer", {
+        action_type: action.type,
+      });
       const [nextState, patches, inversePatches] = reducer(
         this.mstate,
         action,
         context
       );
+      __perf_end_reducer();
+
       this.mstate = nextState;
+
+      const __perf_end_history = perf.start("dispatch.history", {
+        action_type: action.type,
+      });
       this._historyAdapter.record(
         action.type,
         beforeState,
@@ -621,6 +637,8 @@ class EditorDocumentStore
         recording,
         clearsFuture
       );
+      __perf_end_history();
+
       lastAction = action;
       allPatches = allPatches.concat(patches);
     }
@@ -628,11 +646,19 @@ class EditorDocumentStore
     this._tid++;
 
     // Post-dispatch hooks — synchronous, before external listeners.
+    const __perf_end_hooks = perf.start("dispatch.hooks");
     for (const hook of this._postDispatchHooks) {
       hook(lastAction!, this.mstate);
     }
+    __perf_end_hooks();
 
+    const __perf_end_emit = perf.start("dispatch.emit", {
+      listener_count: this.listeners.size,
+    });
     this.emit(lastAction!, allPatches);
+    __perf_end_emit();
+
+    __perf_end_dispatch();
   }
 
   /**
