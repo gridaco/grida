@@ -458,7 +458,13 @@ export namespace iofigma {
         a: number,
         c: number,
         b: number,
-        d: number
+        d: number,
+        /** Local rect size — when provided, the offset is computed from
+         *  the AABB of the transformed rect corners (consistent with
+         *  processNodeWithGeometryTrait's AABB). Without this, the offset
+         *  comes from the path points themselves, which can differ when
+         *  the path doesn't fill the entire local rect. */
+        localSize?: { w: number; h: number }
       ): { path: string; width: number; height: number } | null {
         // Identity check — no transform needed
         const isIdentity =
@@ -608,9 +614,20 @@ export namespace iofigma {
           }
         }
 
-        // Offset so min corner is at (0, 0)
-        const ox = isFinite(minX) ? minX : 0;
-        const oy = isFinite(minY) ? minY : 0;
+        // Offset so min corner is at (0, 0).
+        // When localSize is provided, use the AABB of the transformed
+        // local rect corners — this is consistent with the AABB that
+        // processNodeWithGeometryTrait uses for the group's position.
+        let ox: number, oy: number;
+        if (localSize) {
+          const lw = localSize.w,
+            lh = localSize.h;
+          ox = Math.min(0, a * lw, c * lh, a * lw + c * lh);
+          oy = Math.min(0, b * lw, d * lh, b * lw + d * lh);
+        } else {
+          ox = isFinite(minX) ? minX : 0;
+          oy = isFinite(minY) ? minY : 0;
+        }
 
         for (const g of groups) {
           const isRel =
@@ -669,11 +686,20 @@ export namespace iofigma {
           })
           .join("");
 
-        return {
-          path,
-          width: isFinite(maxX - minX) ? maxX - minX : 0,
-          height: isFinite(maxY - minY) ? maxY - minY : 0,
-        };
+        let rw: number, rh: number;
+        if (localSize) {
+          const lw = localSize.w,
+            lh = localSize.h;
+          const xs = [0, a * lw, c * lh, a * lw + c * lh];
+          const ys = [0, b * lw, d * lh, b * lw + d * lh];
+          rw = Math.max(...xs) - Math.min(...xs);
+          rh = Math.max(...ys) - Math.min(...ys);
+        } else {
+          rw = isFinite(maxX - minX) ? maxX - minX : 0;
+          rh = isFinite(maxY - minY) ? maxY - minY : 0;
+        }
+
+        return { path, width: rw, height: rh };
       }
 
       /**
@@ -1663,12 +1689,14 @@ export namespace iofigma {
             // Pre-transform path data if the node has a non-rotational transform
             let pathData = geometry.path ?? "";
             if (pathTransform && pathData) {
+              const sz = "size" in node ? node.size : undefined;
               const result = transformSvgPath(
                 pathData,
                 pathTransform.a,
                 pathTransform.c,
                 pathTransform.b,
-                pathTransform.d
+                pathTransform.d,
+                sz ? { w: sz.x, h: sz.y } : undefined
               );
               if (result) pathData = result.path;
             }
@@ -1727,12 +1755,14 @@ export namespace iofigma {
 
             let pathData = geometry.path ?? "";
             if (pathTransform && pathData) {
+              const sz = "size" in node ? node.size : undefined;
               const result = transformSvgPath(
                 pathData,
                 pathTransform.a,
                 pathTransform.c,
                 pathTransform.b,
-                pathTransform.d
+                pathTransform.d,
+                sz ? { w: sz.x, h: sz.y } : undefined
               );
               if (result) pathData = result.path;
             }
@@ -3173,19 +3203,44 @@ export namespace iofigma {
       const guid = iofigma.kiwi.guid;
 
       /**
-       * Calculate absolute bounding box from transform and size
+       * Calculate the axis-aligned bounding box of a node from its
+       * relativeTransform and local size. Transforms the four corners
+       * of the local rect (0,0,w,h) by the full 2x3 affine and
+       * returns the enclosing AABB.
        */
       function absoluteBounds(
         relativeTransform: [[number, number, number], [number, number, number]],
         size: { x: number; y: number }
       ): { x: number; y: number; width: number; height: number } {
-        const x = relativeTransform[0][2];
-        const y = relativeTransform[1][2];
+        const a = relativeTransform[0][0];
+        const c = relativeTransform[0][1];
+        const tx = relativeTransform[0][2];
+        const b = relativeTransform[1][0];
+        const d = relativeTransform[1][1];
+        const ty = relativeTransform[1][2];
+        const w = size.x;
+        const h = size.y;
+
+        // Transform the four corners of the local rect
+        const x0 = tx,
+          y0 = ty;
+        const x1 = a * w + tx,
+          y1 = b * w + ty;
+        const x2 = c * h + tx,
+          y2 = d * h + ty;
+        const x3 = a * w + c * h + tx,
+          y3 = b * w + d * h + ty;
+
+        const minX = Math.min(x0, x1, x2, x3);
+        const minY = Math.min(y0, y1, y2, y3);
+        const maxX = Math.max(x0, x1, x2, x3);
+        const maxY = Math.max(y0, y1, y2, y3);
+
         return {
-          x,
-          y,
-          width: size.x,
-          height: size.y,
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
         };
       }
 
