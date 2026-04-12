@@ -339,7 +339,7 @@ export function PlaygroundMenuContent({
   );
 }
 
-function FileMenuContent({
+export function FileMenuContent({
   onExport,
   onImportGrida,
   onImportImage,
@@ -395,7 +395,7 @@ function FileMenuContent({
   );
 }
 
-function EditMenuContent({
+export function EditMenuContent({
   hasSelection,
   backend,
   onPaste,
@@ -520,7 +520,7 @@ function EditMenuContent({
   );
 }
 
-function ViewMenuContent({
+export function ViewMenuContent({
   pixelgrid,
   ruler,
   canvas_ui_container_label,
@@ -695,7 +695,7 @@ function ViewMenuContent({
   );
 }
 
-function PreferencesMenuContent() {
+export function PreferencesMenuContent() {
   const { theme, setTheme } = useTheme();
   const resolvedTheme = theme ?? "system";
 
@@ -731,7 +731,7 @@ function PreferencesMenuContent() {
   );
 }
 
-function SettingsMenuContent({
+export function SettingsMenuContent({
   onOpenGeneral,
   onOpenKeybindings,
 }: {
@@ -755,7 +755,7 @@ function SettingsMenuContent({
   );
 }
 
-function DevelopersMenuContent() {
+export function DevelopersMenuContent() {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger className="text-xs">
@@ -819,7 +819,7 @@ function DevelopersMenuContent() {
   );
 }
 
-function TextMenuContent() {
+export function TextMenuContent() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
   const hasTextSelection = selection.some(
@@ -1212,7 +1212,7 @@ function TextMenuContent() {
   );
 }
 
-function ArrangeMenuContent() {
+export function ArrangeMenuContent() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
   const hasSelection = selection.length > 0;
@@ -1327,7 +1327,7 @@ function ArrangeMenuContent() {
   );
 }
 
-function ObjectMenuContent() {
+export function ObjectMenuContent() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
   const hasSelection = selection.length > 0;

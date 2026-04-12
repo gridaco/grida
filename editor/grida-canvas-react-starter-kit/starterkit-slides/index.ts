@@ -7,4 +7,5 @@ export {
 } from "./slide-list";
 export { SlideLayersList } from "./slide-layers";
 export { SlideSurface } from "./slide-surface";
+export { SlideMenuContent } from "./slide-menu";
 export { useSlideThumbnail } from "./use-slide-thumbnail";

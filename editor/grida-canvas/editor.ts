@@ -355,6 +355,19 @@ class EditorDocumentStore
   private readonly listeners: Set<editor.api.SubscriptionCallbackFn<this>> =
     new Set();
 
+  /**
+   * Post-dispatch hooks — invoked synchronously after state mutation,
+   * before external listeners (`emit`).
+   *
+   * Hooks may call `dispatch()` to enforce invariants (e.g. re-isolate
+   * after a document reset). The dispatch is re-entrant safe: the inner
+   * dispatch completes its own reducer → hooks → emit cycle before the
+   * outer emit fires.
+   */
+  private readonly _postDispatchHooks: Set<
+    (action: Action, state: Readonly<editor.state.IEditorState>) => void
+  > = new Set();
+
   private mstate: editor.state.IEditorState;
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
@@ -614,6 +627,11 @@ class EditorDocumentStore
 
     this._tid++;
 
+    // Post-dispatch hooks — synchronous, before external listeners.
+    for (const hook of this._postDispatchHooks) {
+      hook(lastAction!, this.mstate);
+    }
+
     this.emit(lastAction!, allPatches);
   }
 
@@ -651,6 +669,26 @@ class EditorDocumentStore
 
     this.listeners.add(wrapped);
     return () => this.listeners.delete(wrapped);
+  }
+
+  /**
+   * Register a post-dispatch hook.
+   *
+   * Hooks run synchronously after state mutation, before external
+   * listeners. Use this to enforce invariants that must hold after
+   * any state change (e.g. "a slide must always be isolated").
+   *
+   * Hooks may call `dispatch()` — re-entrant dispatch is safe because
+   * the inner dispatch completes its own reducer → hooks → emit cycle
+   * before the outer emit fires.
+   *
+   * @returns An unregister function.
+   */
+  public onPostDispatch(
+    fn: (action: Action, state: Readonly<editor.state.IEditorState>) => void
+  ): () => void {
+    this._postDispatchHooks.add(fn);
+    return () => this._postDispatchHooks.delete(fn);
   }
 
   // #region IDocumentEditorActions implementation
@@ -715,7 +753,13 @@ class EditorDocumentStore
 
     this._historyAdapter.clear();
     this._tid = 0;
-    this.emit({ type: "document/reset", document_key }, []);
+
+    const resetAction: Action = { type: "document/reset", document_key };
+    for (const hook of this._postDispatchHooks) {
+      hook(resetAction, this.mstate);
+    }
+
+    this.emit(resetAction, []);
     return this._tid;
   }
 
@@ -4446,6 +4490,27 @@ export class Editor
 
     // Export with provided config - no metadata reading/writing
     return this.exporter.exportNodeAs(node_id, format, config);
+  }
+
+  /**
+   * Export multiple nodes as a single multi-page PDF document.
+   *
+   * @param node_ids - Node IDs to export, one per page, in order.
+   * @param options - Optional export options (uniform page size, etc.)
+   * @returns Raw PDF bytes.
+   */
+  exportPdfDocument(
+    node_ids: string[],
+    options?: { pageSize?: { width: number; height: number } }
+  ): Promise<Uint8Array> {
+    if (!("exportPdfDocument" in this.exporter)) {
+      throw new Error(
+        "PDF document export is not supported by the current backend"
+      );
+    }
+    return (
+      this.exporter as unknown as editor.api.IDocumentPDFExportInterfaceProvider
+    ).exportPdfDocument(node_ids, options);
   }
   // ==============================================================
   // #endregion IExportPluginActions implementation

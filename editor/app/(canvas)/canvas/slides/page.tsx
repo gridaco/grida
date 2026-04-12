@@ -10,6 +10,7 @@ import {
   SlideLayersList,
   SlideSurface,
   SlideSidebarFocusScope,
+  SlideMenuContent,
 } from "@/grida-canvas-react-starter-kit/starterkit-slides";
 import { StandaloneDocumentEditor, useEditorState } from "@/grida-canvas-react";
 import {
@@ -40,7 +41,6 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PlaygroundMenuContent } from "@/grida-canvas-hosted/playground/uxhost-menu";
 import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import {
   ResizablePanelGroup,
@@ -52,7 +52,6 @@ import {
   type SlideEditorMode,
 } from "@/grida-canvas/modes/slide-mode";
 
-// Initial document produced by the single-source factory in slide-mode.ts.
 const SLIDES_DOCUMENT = createInitialSlidesDocument();
 
 // ---------------------------------------------------------------------------
@@ -62,6 +61,9 @@ const SLIDES_DOCUMENT = createInitialSlidesDocument();
 export default function SlidesPlaygroundPage() {
   const { editor: instance, slideMode } = useSlideEditor(SLIDES_DOCUMENT);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
+
+  // slideMode is null on the first render (constructed in useEffect for SSR safety).
+  if (!slideMode) return null;
 
   return (
     <TooltipProvider>
@@ -74,17 +76,12 @@ export default function SlidesPlaygroundPage() {
                 <PreviewProvider>
                   <SlidesHotkeys slideMode={slideMode} />
                   <div className="flex w-full h-full">
-                    {/* Left: Slide thumbnails + layers */}
                     <SlidesSidebar slideMode={slideMode} />
-
-                    {/* Center: Canvas */}
                     <SlideSurface>
                       <ToolbarPosition>
                         <PlaygroundToolbar />
                       </ToolbarPosition>
                     </SlideSurface>
-
-                    {/* Right: Inspector */}
                     <SidebarRight />
                   </div>
                 </PreviewProvider>
@@ -110,7 +107,7 @@ function SlidesSidebar({ slideMode }: { slideMode: SlideEditorMode }) {
             <DropdownMenuTrigger className="me-1 outline-none">
               <GridaLogo className="inline-block size-4" />
             </DropdownMenuTrigger>
-            <PlaygroundMenuContent />
+            <SlideMenuContent />
           </DropdownMenu>
           <span className="font-bold text-xs flex-1">Slides</span>
           <button
@@ -125,16 +122,12 @@ function SlidesSidebar({ slideMode }: { slideMode: SlideEditorMode }) {
       <SidebarContent className="p-0 overflow-hidden">
         <SlideSidebarFocusScope>
           <ResizablePanelGroup orientation="vertical">
-            {/* Slide thumbnails with D&D */}
             <ResizablePanel defaultSize={65} minSize={20}>
               <div className="h-full overflow-y-auto p-2">
                 <SlideList />
               </div>
             </ResizablePanel>
-
             <ResizableHandle />
-
-            {/* Layers for current slide */}
             <ResizablePanel defaultSize={35} minSize={10}>
               <div className="flex flex-col h-full overflow-hidden">
                 <SidebarGroupLabel className="shrink-0">
@@ -181,7 +174,7 @@ function SidebarRight() {
 }
 
 // ---------------------------------------------------------------------------
-// Slides-specific hotkeys
+// Hotkeys
 // ---------------------------------------------------------------------------
 
 function SlidesHotkeys({ slideMode }: { slideMode: SlideEditorMode }) {

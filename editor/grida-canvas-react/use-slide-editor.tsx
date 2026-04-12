@@ -4,6 +4,7 @@ import * as React from "react";
 import { Editor } from "@/grida-canvas/editor";
 import {
   SlideEditorMode,
+  deriveSlides,
   type SlideDescriptor,
   type SlideEditorModeConfig,
 } from "@/grida-canvas/modes";
@@ -20,9 +21,7 @@ const SlideEditorModeContext = React.createContext<SlideEditorMode | null>(
 
 /**
  * Retrieve the current `SlideEditorMode` from context.
- *
- * Must be used inside a `<SlideEditorModeProvider>` (or the provider set up
- * by `useSlideEditor`). Throws if no mode is found.
+ * Throws if no mode is found.
  */
 export function useSlideEditorMode(): SlideEditorMode {
   const mode = React.useContext(SlideEditorModeContext);
@@ -34,11 +33,7 @@ export function useSlideEditorMode(): SlideEditorMode {
   return mode;
 }
 
-/**
- * Provider for the slide editor mode context.
- *
- * Wraps children so that `useSlideEditorMode()` resolves to the given mode.
- */
+/** Provider for the slide editor mode context. */
 export function SlideEditorModeProvider({
   mode,
   children,
@@ -55,29 +50,30 @@ export function SlideEditorModeProvider({
 // ---------------------------------------------------------------------------
 
 /**
- * Create a canvas-backed `Editor` and attach a `SlideEditorMode` to it.
+ * Create a canvas-backed `Editor` and attach a `SlideEditorMode`.
  *
- * This is the primary entry point for slides pages. It replaces the
- * combination of `useEditor()` + `<SlideIsolationCameraFit />` +
- * `useAddSlide()` + `useSlidesHotKeys()` from the PoC.
- *
- * @returns A stable object containing `editor` and `slideMode`.
+ * The mode is constructed inside a `useEffect` (not `useState`) so its
+ * constructor — which calls `setIsolation` — only runs in the browser.
  */
 export function useSlideEditor(
   init: editor.state.IEditorStateInit,
   config?: Partial<SlideEditorModeConfig>
-): { editor: Editor; slideMode: SlideEditorMode } {
+): { editor: Editor; slideMode: SlideEditorMode | null } {
   const editorInstance = useEditor(init, "canvas");
 
-  const [slideMode] = React.useState(
-    () => new SlideEditorMode(editorInstance, config)
+  const [slideMode, setSlideMode] = React.useState<SlideEditorMode | null>(
+    null
   );
 
   React.useEffect(() => {
+    const mode = new SlideEditorMode(editorInstance, config);
+    setSlideMode(mode);
     return () => {
-      slideMode.dispose();
+      mode.dispose();
+      setSlideMode(null);
     };
-  }, [slideMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- config is a static object
+  }, [editorInstance]);
 
   return React.useMemo(
     () => ({ editor: editorInstance, slideMode }),
@@ -86,23 +82,45 @@ export function useSlideEditor(
 }
 
 // ---------------------------------------------------------------------------
-// Derived hooks
+// Selectors — pure functions over state, shared with deriveSlides
 // ---------------------------------------------------------------------------
 
+const EMPTY_SLIDES: SlideDescriptor[] = [];
+
+function selectSlides(state: editor.state.IEditorState): SlideDescriptor[] {
+  const slides = deriveSlides(state);
+  return slides.length === 0 ? EMPTY_SLIDES : slides;
+}
+
+function slidesEqual(a: SlideDescriptor[], b: SlideDescriptor[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id) return false;
+  }
+  return true;
+}
+
 /**
- * Reactively read the slide list from a `SlideEditorMode`.
- *
- * Re-renders when the slide list changes (trays added, removed, reordered).
+ * Reactively read the slide list.
+ * Re-renders when slides are added, removed, or reordered.
  */
 export function useSlides(mode: SlideEditorMode): SlideDescriptor[] {
-  return useEditorState(mode.editor, () => mode.slides);
+  return useEditorState(mode.editor, selectSlides, slidesEqual);
 }
 
 /**
  * Reactively read the currently isolated slide.
- *
- * Re-renders when `isolation_root_node_id` changes.
+ * Re-renders when isolation changes.
  */
 export function useCurrentSlide(mode: SlideEditorMode): SlideDescriptor | null {
-  return useEditorState(mode.editor, () => mode.currentSlide);
+  return useEditorState(
+    mode.editor,
+    (state) => {
+      const id = state.isolation_root_node_id;
+      if (!id) return null;
+      return selectSlides(state).find((s) => s.id === id) ?? null;
+    },
+    (a, b) => a?.id === b?.id
+  );
 }

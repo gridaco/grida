@@ -134,6 +134,17 @@ export class CanvasWasmDefaultExportInterfaceProvider
     return data.data;
   }
 
+  async exportPdfDocument(
+    node_ids: string[],
+    options?: { pageSize?: { width: number; height: number } }
+  ): Promise<Uint8Array> {
+    const result = this.surface.exportPdfDocument({
+      node_ids,
+      page_size: options?.pageSize ?? null,
+    });
+    return result.data;
+  }
+
   async exportNodeAsSVG(node_id: string): Promise<string> {
     const data = await this.surface.exportNodeAs(node_id, {
       format: "SVG",

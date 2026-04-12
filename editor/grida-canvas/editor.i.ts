@@ -236,7 +236,26 @@ export namespace editor {
 }
 
 export namespace editor.config {
+  /**
+   * The type of editing experience this editor instance provides.
+   *
+   * - `"freeform"` — standard canvas with free placement (default).
+   * - `"slides"` — presentation mode where root trays are treated as slides.
+   *
+   * This is a runtime configuration property — it does not affect the
+   * on-disk format or the document model. It informs modes (e.g.
+   * `SlideEditorMode`) and UI composition about the editing context.
+   */
+  export type EditorType = "freeform" | "slides";
+
   export interface IEditorConfig {
+    /**
+     * The type of editing experience.
+     *
+     * @default "freeform"
+     */
+    editor_type: EditorType;
+
     /**
      * when editable is false, the document definition is not editable
      * set editable false on production context - end-user-facing context
@@ -1619,7 +1638,10 @@ export namespace editor.state {
     extends
       Pick<editor.config.IEditorConfig, "editable" | "debug">,
       Partial<
-        Pick<editor.config.IEditorConfig, "flags" | "rotation_quantize_step">
+        Pick<
+          editor.config.IEditorConfig,
+          "editor_type" | "flags" | "rotation_quantize_step"
+        >
       >,
       grida.program.document.IDocumentTemplatesRepository {
     document: Pick<
@@ -1755,6 +1777,7 @@ export namespace editor.state {
       outline_mode_ignores_clips: true,
       pixelpreview: "disabled",
       pixelpreview_last: "1x",
+      editor_type: init.editor_type ?? "freeform",
       when_not_removable: "deactivate",
       document_ctx: new tree.graph.Graph(doc).lut,
       pointer_hit_testing_config: editor.config.DEFAULT_HIT_TESTING_CONFIG,
@@ -2678,6 +2701,20 @@ export namespace editor.api {
      * @returns
      */
     exportNodeAsPDF(node_id: string): Promise<Uint8Array>;
+
+    /**
+     * Export multiple nodes as a single multi-page PDF document.
+     *
+     * Each node ID becomes one page in the output PDF, rendered in order.
+     *
+     * @param node_ids - Node IDs to export, one per page, in order.
+     * @param options - Export options (uniform page size, etc.)
+     * @returns Raw PDF bytes.
+     */
+    exportPdfDocument(
+      node_ids: string[],
+      options?: { pageSize?: { width: number; height: number } }
+    ): Promise<Uint8Array>;
   }
 
   /**
