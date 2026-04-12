@@ -2842,11 +2842,15 @@ export namespace iofigma {
                     style.textDecoration as keyof typeof map.textDecorationMap
                   ] ?? "none")
                 : "none",
-              line_height: (style as { lineHeightPercentFontSize?: number })
-                .lineHeightPercentFontSize
-                ? (style as { lineHeightPercentFontSize: number })
-                    .lineHeightPercentFontSize / 100
-                : undefined,
+              line_height:
+                (style as { lineHeightUnit?: string }).lineHeightUnit ===
+                "INTRINSIC_%"
+                  ? undefined
+                  : (style as { lineHeightPercentFontSize?: number })
+                        .lineHeightPercentFontSize
+                    ? (style as { lineHeightPercentFontSize: number })
+                        .lineHeightPercentFontSize / 100
+                    : undefined,
               letter_spacing: (style.letterSpacing as number)
                 ? (style.letterSpacing as number) /
                   ((style.fontSize as number) || DEFAULT_FONT_SIZE)
@@ -2999,9 +3003,13 @@ export namespace iofigma {
               text_decoration_line: node.style.textDecoration
                 ? (map.textDecorationMap[node.style.textDecoration] ?? "none")
                 : "none",
-              line_height: node.style.lineHeightPercentFontSize
-                ? node.style.lineHeightPercentFontSize / 100
-                : 1.2,
+              line_height:
+                (node.style as { lineHeightUnit?: string }).lineHeightUnit ===
+                "INTRINSIC_%"
+                  ? undefined
+                  : node.style.lineHeightPercentFontSize
+                    ? node.style.lineHeightPercentFontSize / 100
+                    : undefined,
               // letter spacing in rest api is always in px.
               letter_spacing: node.style.letterSpacing
                 ? node.style.letterSpacing /
@@ -3991,7 +3999,7 @@ export namespace iofigma {
               ? nc.lineHeight.value
               : nc.lineHeight?.units === "RAW"
                 ? nc.lineHeight.value * 100
-                : 100,
+                : undefined,
           textAutoResize: nc.textAutoResize ?? "WIDTH_AND_HEIGHT",
           textCase:
             nc.textCase === "ORIGINAL" ? undefined : (nc.textCase ?? undefined),
