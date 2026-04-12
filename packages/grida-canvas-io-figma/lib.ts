@@ -3242,7 +3242,7 @@ export namespace iofigma {
       /**
        * Convert Kiwi figrest.Paint to Figma REST API Paint
        */
-      function paint(kiwi: figkiwi.Paint): figrest.Paint | undefined {
+      export function paint(kiwi: figkiwi.Paint): figrest.Paint | undefined {
         if (!kiwi.type) return undefined;
 
         switch (kiwi.type) {
@@ -3316,7 +3316,7 @@ export namespace iofigma {
       /**
        * Convert array of Kiwi Paints to Figma REST API Paints
        */
-      function paints(kiwiPaints?: figkiwi.Paint[]): figrest.Paint[] {
+      export function paints(kiwiPaints?: figkiwi.Paint[]): figrest.Paint[] {
         if (!kiwiPaints) return [];
         return kiwiPaints
           .map(paint)
@@ -4114,7 +4114,7 @@ export namespace iofigma {
             o0.guid === undefined &&
             o0.type === undefined &&
             o0.parentIndex?.guid === undefined &&
-            (o0 as any).guidPath === undefined;
+            o0.guidPath === undefined;
 
           if (looksLikeRootPatch) {
             // FIXME(kiwi-overrides): this assumes a single root-level patch entry.
@@ -4766,25 +4766,83 @@ export namespace iofigma {
       return out.join(" ");
     }
 
+    /**
+     * Resolve `colorVar` variable bindings on kiwi Paint objects.
+     * When a paint has `colorVar.value.alias.assetRef.key`, look up
+     * the resolved color from the variable map and replace the paint's
+     * static `color` field.
+     */
+    function resolveColorVarsInPaints(
+      paints: figkiwi.Paint[],
+      variableColors?: Map<
+        string,
+        { r: number; g: number; b: number; a: number }
+      >
+    ): figkiwi.Paint[] {
+      if (!variableColors || variableColors.size === 0) return paints;
+      return paints.map((p) => {
+        const varKey = p.colorVar?.value?.alias?.assetRef?.key;
+        if (!varKey) return p;
+        const resolved = variableColors.get(varKey);
+        if (!resolved) return p;
+        return { ...p, color: resolved };
+      });
+    }
+
     function _fmtN(n: number): string {
       return Number(n.toFixed(4)).toString();
+    }
+
+    /**
+     * Index an array of symbolOverrides into a map keyed by the
+     * target node's overrideKey GUID string (or direct guid).
+     * For guidPath-based overrides, the LAST guid in the path is used
+     * as the key (it identifies the target node).
+     */
+    function indexOverridesByTargetGuid(
+      overrides: figkiwi.NodeChange[]
+    ): Map<string, figkiwi.NodeChange> {
+      const map = new Map<string, figkiwi.NodeChange>();
+      for (const o of overrides) {
+        if (o.guid) {
+          map.set(iofigma.kiwi.guid(o.guid), o);
+        } else if (o.guidPath?.guids?.length) {
+          const guids = o.guidPath.guids;
+          map.set(iofigma.kiwi.guid(guids[guids.length - 1]), o);
+        }
+      }
+      return map;
     }
 
     function cloneTreeWithNewIdsAndFlattenInstances(params: {
       node: any;
       idPrefix: string;
       guidToNode: Map<string, AnyFigmaNode>;
+      guidToKiwi: Map<string, figkiwi.NodeChange>;
       options: BuildTreeOptions;
       componentStack: string[];
       idCounter: { n: number };
       symbolOverrideByGuid?: Map<string, figkiwi.NodeChange>;
       /** Scale factor from parent instance size / component size. */
       instanceScale?: { sx: number; sy: number };
+      /** Resolved variable colors for colorVar paint overrides. */
+      variableColors?: Map<
+        string,
+        { r: number; g: number; b: number; a: number }
+      >;
     }): any {
-      const { node, idPrefix, guidToNode, options, componentStack, idCounter } =
-        params;
+      const {
+        node,
+        idPrefix,
+        guidToNode,
+        guidToKiwi,
+        options,
+        componentStack,
+        idCounter,
+      } = params;
       const symbolOverrideByGuid = params.symbolOverrideByGuid;
       const instanceScale = params.instanceScale;
+      const variableColors = params.variableColors;
 
       const originalId = (node as any).id;
       const newId = `${idPrefix}::${idCounter.n++}::${originalId}`;
@@ -4895,48 +4953,23 @@ export namespace iofigma {
         // Opacity
         if (override.opacity !== undefined) cloned.opacity = override.opacity;
         // Fill paint overrides (e.g. cursor color).
-        // Convert kiwi paints to REST-like format inline since the
-        // factory.paints() helper is not accessible at this scope.
+        // Resolve colorVar variable bindings before converting.
         if (override.fillPaints !== undefined) {
-          cloned.fills = (override.fillPaints as figkiwi.Paint[])
-            .map((p) => {
-              if (!p.type) return undefined;
-              if (p.type === "SOLID") {
-                const c = p.color;
-                return {
-                  type: "SOLID" as const,
-                  visible: p.visible ?? true,
-                  opacity: p.opacity ?? 1,
-                  blendMode: "NORMAL" as const,
-                  color: c
-                    ? { r: c.r, g: c.g, b: c.b, a: c.a }
-                    : { r: 0, g: 0, b: 0, a: 1 },
-                };
-              }
-              return undefined;
-            })
-            .filter(Boolean);
+          cloned.fills = factory.paints(
+            resolveColorVarsInPaints(
+              override.fillPaints as figkiwi.Paint[],
+              variableColors
+            )
+          );
         }
         // Stroke paint overrides
         if (override.strokePaints !== undefined) {
-          cloned.strokes = (override.strokePaints as figkiwi.Paint[])
-            .map((p) => {
-              if (!p.type) return undefined;
-              if (p.type === "SOLID") {
-                const c = p.color;
-                return {
-                  type: "SOLID" as const,
-                  visible: p.visible ?? true,
-                  opacity: p.opacity ?? 1,
-                  blendMode: "NORMAL" as const,
-                  color: c
-                    ? { r: c.r, g: c.g, b: c.b, a: c.a }
-                    : { r: 0, g: 0, b: 0, a: 1 },
-                };
-              }
-              return undefined;
-            })
-            .filter(Boolean);
+          cloned.strokes = factory.paints(
+            resolveColorVarsInPaints(
+              override.strokePaints as figkiwi.Paint[],
+              variableColors
+            )
+          );
         }
       }
 
@@ -4949,11 +4982,13 @@ export namespace iofigma {
             node: child,
             idPrefix,
             guidToNode,
+            guidToKiwi,
             options,
             componentStack,
             idCounter,
             symbolOverrideByGuid,
             instanceScale,
+            variableColors,
           })
         );
       }
@@ -4994,23 +5029,124 @@ export namespace iofigma {
 
             const componentChildren = componentNode.children ?? [];
             const nextStack = [...componentStack, componentId];
+
+            // Build override map for nested instance children.
+            // Layer 1 (defaults): the nested instance's OWN symbolOverrides.
+            // Layer 2 (wins): multi-segment guidPath overrides from parent.
+            const nestedKiwi = guidToKiwi.get(originalId);
+            const nestedOverrideByGuid = indexOverridesByTargetGuid(
+              nestedKiwi?.symbolData?.symbolOverrides ?? []
+            );
+
+            // Forward multi-segment overrides from the parent
+            // that target this nested instance's children. The first
+            // guidPath segment identifies THIS instance (by overrideKey);
+            // the remaining segments address children inside it.
+            // Usage-site overrides WIN over component-defined defaults.
+            if (symbolOverrideByGuid) {
+              for (const [, parentOverride] of symbolOverrideByGuid) {
+                const gpGuids = parentOverride.guidPath?.guids;
+                if (gpGuids && gpGuids.length >= 2) {
+                  const first = iofigma.kiwi.guid(gpGuids[0]);
+                  if (first === originalId || first === cloned._overrideKey) {
+                    const remaining = gpGuids.slice(1);
+                    const target = remaining[remaining.length - 1];
+                    nestedOverrideByGuid.set(
+                      iofigma.kiwi.guid(target),
+                      parentOverride
+                    );
+                  }
+                }
+              }
+            }
+
             cloned.children = (componentChildren as any[]).map((child) =>
               cloneTreeWithNewIdsAndFlattenInstances({
                 node: child,
                 idPrefix,
                 guidToNode,
+                guidToKiwi,
                 options,
                 componentStack: nextStack,
                 idCounter,
-                symbolOverrideByGuid,
+                symbolOverrideByGuid: nestedOverrideByGuid,
                 instanceScale: nestedScale,
+                variableColors,
               })
             );
+
+            // Mark as flattened so flattenInstancesInPlace.visit()
+            // does not re-process this instance.
+            cloned._instanceFlattened = true;
           }
         }
       }
 
       return cloned;
+    }
+
+    /**
+     * Build a map from variable key (hash string) to resolved RGBA color.
+     * Follows alias chains: VARIABLE → alias → VARIABLE → colorValue.
+     */
+    function buildVariableColorMap(
+      guidToKiwi: Map<string, figkiwi.NodeChange>
+    ): Map<string, { r: number; g: number; b: number; a: number }> {
+      const keyToNode = new Map<string, figkiwi.NodeChange>();
+      for (const nc of guidToKiwi.values()) {
+        if (nc.type === "VARIABLE" && nc.key) {
+          keyToNode.set(nc.key, nc);
+        }
+      }
+
+      const cache = new Map<
+        string,
+        { r: number; g: number; b: number; a: number } | null
+      >();
+
+      function resolve(
+        key: string,
+        depth: number
+      ): { r: number; g: number; b: number; a: number } | null {
+        if (depth > 10) return null;
+        const cached = cache.get(key);
+        if (cached !== undefined) return cached;
+
+        const nc = keyToNode.get(key);
+        if (!nc) {
+          cache.set(key, null);
+          return null;
+        }
+        const entry = nc.variableDataValues?.entries?.[0];
+        const val = entry?.variableData?.value;
+        if (!val) {
+          cache.set(key, null);
+          return null;
+        }
+        if (val.colorValue) {
+          const c = val.colorValue;
+          const result = { r: c.r, g: c.g, b: c.b, a: c.a ?? 1 };
+          cache.set(key, result);
+          return result;
+        }
+        if (val.alias?.assetRef?.key) {
+          const result = resolve(val.alias.assetRef.key, depth + 1);
+          cache.set(key, result);
+          return result;
+        }
+        cache.set(key, null);
+        return null;
+      }
+
+      const result = new Map<
+        string,
+        { r: number; g: number; b: number; a: number }
+      >();
+      for (const key of keyToNode.keys()) {
+        const color = resolve(key, 0);
+        if (color) result.set(key, color);
+      }
+      return result;
     }
 
     function flattenInstancesInPlace(params: {
@@ -5022,31 +5158,23 @@ export namespace iofigma {
       const { rootNodes, guidToNode, guidToKiwi, options } = params;
       if (!options.flattenInstances) return;
 
+      const variableColors = buildVariableColorMap(guidToKiwi);
+
       const visit = (node: any) => {
         if (!node) return;
 
-        if (node.type === "INSTANCE" && node.componentId) {
+        if (
+          node.type === "INSTANCE" &&
+          node.componentId &&
+          !node._instanceFlattened
+        ) {
           const componentNode: any = guidToNode.get(node.componentId);
           if (componentNode?.children?.length) {
             inheritContainerPropsFromComponentIfMissing(node, componentNode);
-            const symbolOverrideByGuid = new Map<string, figkiwi.NodeChange>();
             const kiwiInstance = guidToKiwi.get(node.id);
-            const instOverrides = kiwiInstance?.symbolData?.symbolOverrides;
-            (instOverrides ?? []).forEach((o) => {
-              if (o.guid) {
-                symbolOverrideByGuid.set(iofigma.kiwi.guid(o.guid), o);
-              } else if ((o as any).guidPath?.guids?.length) {
-                // guidPath-based overrides target a specific child via
-                // a path of GUIDs. For single-depth paths, key by the
-                // last GUID (the target child).
-                const guids = (o as any).guidPath.guids as Array<{
-                  sessionID: number;
-                  localID: number;
-                }>;
-                const targetGuid = guids[guids.length - 1];
-                symbolOverrideByGuid.set(iofigma.kiwi.guid(targetGuid), o);
-              }
-            });
+            const symbolOverrideByGuid = indexOverridesByTargetGuid(
+              kiwiInstance?.symbolData?.symbolOverrides ?? []
+            );
 
             // Compute instance-to-component scale ratio so
             // cloneTreeWithNewIdsAndFlattenInstances can scale
@@ -5074,11 +5202,13 @@ export namespace iofigma {
                 node: child,
                 idPrefix: node.id,
                 guidToNode,
+                guidToKiwi,
                 options,
                 componentStack: [node.componentId],
                 idCounter,
                 symbolOverrideByGuid,
                 instanceScale,
+                variableColors,
               })
             );
           }
