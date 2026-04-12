@@ -15,7 +15,7 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { ScenesList } from "./tree-scene";
-import { NodeHierarchyList } from "./tree-node";
+import { IsolationNodeHierarchyList } from "./tree-node";
 
 export function ScenesGroup() {
   const editor = useCurrentEditor();
@@ -44,7 +44,7 @@ export function NodeHierarchyGroup() {
     <SidebarGroup className="flex-1" onContextMenu={(e) => e.preventDefault()}>
       <SidebarGroupLabel>Layers</SidebarGroupLabel>
       <SidebarGroupContent>
-        <NodeHierarchyList />
+        <IsolationNodeHierarchyList />
       </SidebarGroupContent>
     </SidebarGroup>
   );
@@ -88,7 +88,7 @@ export function DocumentHierarchy() {
             <SidebarGroupLabel>Layers</SidebarGroupLabel>
           </div>
           <SidebarGroupContent className="flex-1 min-h-0 overflow-y-auto px-2">
-            <NodeHierarchyList />
+            <IsolationNodeHierarchyList />
           </SidebarGroupContent>
         </SidebarGroup>
       </ResizablePanel>
@@ -96,4 +96,8 @@ export function DocumentHierarchy() {
   );
 }
 
-export { NodeHierarchyList };
+export {
+  NodeHierarchyList,
+  IsolationNodeHierarchyList,
+  type NodeHierarchyListProps,
+} from "./tree-node";

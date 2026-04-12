@@ -155,7 +155,28 @@ function __ContextMenuContent({
   );
 }
 
-export function NodeHierarchyList() {
+export interface NodeHierarchyListProps {
+  /** Tree root node id. The hierarchy shows this node's subtree. */
+  rootId: string;
+}
+
+/**
+ * Isolation-aware default: resolves `rootId` from editor state
+ * (`isolation_root_node_id` → scene id) so existing callers that
+ * don't manage their own root keep working.
+ */
+export function IsolationNodeHierarchyList() {
+  const editor = useCurrentEditor();
+  const sceneState = useCurrentSceneState();
+  const isolation_root_node_id = useEditorState(
+    editor,
+    (state) => state.isolation_root_node_id
+  );
+  const id = isolation_root_node_id ?? sceneState.id;
+  return <NodeHierarchyList rootId={id} />;
+}
+
+export function NodeHierarchyList({ rootId }: NodeHierarchyListProps) {
   const editor = useCurrentEditor();
   const document_ctx = useEditorState(editor, (state) => state.document_ctx);
   const nodes = useEditorState(
@@ -189,13 +210,14 @@ export function NodeHierarchyList() {
    *   a `maskRevision` when patches touch `document.nodes[*].mask` / children links.
    */
 
-  const {
-    id,
-    name,
-    children_refs: children,
-    selection,
-    hovered_node_id,
-  } = useCurrentSceneState();
+  const sceneState = useCurrentSceneState();
+
+  const id = rootId;
+  const children =
+    id !== sceneState.id
+      ? (editor.state.document.links[id] ?? document_ctx.lu_children[id] ?? [])
+      : sceneState.children_refs;
+  const { selection, hovered_node_id } = sceneState;
 
   const maskInfoMap = useMemo(
     () =>

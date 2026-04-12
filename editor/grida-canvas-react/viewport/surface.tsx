@@ -664,12 +664,21 @@ function RootFramesBarOverlay() {
   const { selection, hovered_node_id } = useSelectionState();
   const { document } = useDocumentState();
   const scene = useCurrentSceneState();
+  const _editor = useCurrentEditor();
+  const isolation_root_node_id = useEditorState(
+    _editor,
+    (state) => state.isolation_root_node_id
+  );
 
   // Mirrors Rust collect_labeled_nodes():
   //  - Trays at scene root → badge-style label
   //  - Containers at scene root → plain label
   //  - Containers that are direct children of a root Tray → plain label
   //    (they are "root-like" — tray children are treated as top-level frames)
+  //
+  // When isolation is active (e.g. slides mode focusing a single tray),
+  // only show labels for the isolated tray itself and its direct container
+  // children — sibling trays and their children are hidden.
   const labeledNodes = useMemo(() => {
     type LabelVariant = "badge" | "plain";
     type LabeledNode = {
@@ -687,6 +696,20 @@ function RootFramesBarOverlay() {
       n.type === "template_instance" ||
       n.type === "component" ||
       n.type === "instance";
+
+    // When isolation is active, only show the isolated node's own title
+    // bar — no children, no siblings.
+    if (isolation_root_node_id) {
+      const node = nodes[isolation_root_node_id];
+      if (node && node.active !== false) {
+        if (node.type === "tray") {
+          labels.push({ node, variant: "badge" });
+        } else if (isContainer(node)) {
+          labels.push({ node, variant: "plain" });
+        }
+      }
+      return labels;
+    }
 
     for (const rootId of scene.children_refs) {
       const node = nodes[rootId];
@@ -717,7 +740,12 @@ function RootFramesBarOverlay() {
     }
 
     return labels;
-  }, [scene.children_refs, document.nodes, document.links]);
+  }, [
+    scene.children_refs,
+    document.nodes,
+    document.links,
+    isolation_root_node_id,
+  ]);
 
   const isSingleMode = scene.constraints.children === "single";
 

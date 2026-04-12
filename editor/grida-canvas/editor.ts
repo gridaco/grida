@@ -753,6 +753,21 @@ class EditorDocumentStore
     });
   }
 
+  /**
+   * Set or clear isolation mode.
+   *
+   * When `nodeId` is a string, the viewport is restricted to that node's
+   * subtree. Pass `null` to clear. This dispatches the `"isolation"` action
+   * which updates `isolation_root_node_id` in state; the WASM bridge picks
+   * up the state change via subscription.
+   */
+  public setIsolation(nodeId: string | null) {
+    this.dispatch({
+      type: "isolation",
+      node_id: nodeId,
+    });
+  }
+
   public createScene(scene?: grida.program.document.SceneInit) {
     this.dispatch({
       type: "scenes/new",
@@ -2844,6 +2859,49 @@ export class Editor
   private _m_wasm_canvas_resize_observer: ResizeObserver | null = null;
 
   /**
+   * RAF id for the coalesced WASM redraw scheduler. `null` means no redraw
+   * is pending. See {@link _scheduleWasmRedraw}.
+   */
+  private _m_wasm_redraw_raf_id: number | null = null;
+
+  /**
+   * Coalesced redraw scheduler for the WASM canvas backend.
+   *
+   * Every WASM-mutating code path inside `Editor` (scene switch, transform,
+   * debug toggle, highlight, pixel preview, outline mode, patch apply,
+   * document sync) requests repaints through this method instead of calling
+   * `surface.redraw()` directly. Multiple requests within a single
+   * animation frame collapse into exactly one `redraw()`, so a burst of
+   * subscribers firing on the same dispatch (e.g. `switchScene` + camera
+   * fit + transform update) produces a single paint.
+   *
+   * No-op when the canvas backend isn't active.
+   *
+   * NOTE: Scope is limited to `Editor`. Some external modules
+   * (`backends/wasm-surface-provider.ts`, viewport text editor) still call
+   * `scene.redraw()` directly on their own cadence and are not routed
+   * through this scheduler.
+   */
+  private _scheduleWasmRedraw(): void {
+    if (this.backend !== "canvas") return;
+    if (this._m_wasm_redraw_raf_id !== null) return;
+    this._m_wasm_redraw_raf_id = requestAnimationFrame(() => {
+      this._m_wasm_redraw_raf_id = null;
+      this._m_wasm_canvas_scene?.redraw();
+    });
+  }
+
+  /**
+   * Cancel any pending WASM redraw. Called from {@link dispose}.
+   */
+  private _cancelWasmRedraw(): void {
+    if (this._m_wasm_redraw_raf_id !== null) {
+      cancelAnimationFrame(this._m_wasm_redraw_raf_id);
+      this._m_wasm_redraw_raf_id = null;
+    }
+  }
+
+  /**
    * Surface init options passed to `createWebGLCanvasSurface()`.
    * Set before calling `mount()`. Includes renderer config (e.g. `skip_layout`).
    */
@@ -3292,7 +3350,7 @@ export class Editor
     if (n !== 0) {
       this._m_wasm_canvas_scene.runtime_renderer_set_pixel_preview_stable(true);
     }
-    this._m_wasm_canvas_scene.redraw();
+    this._scheduleWasmRedraw();
   }
 
   public __runtime_renderer_set_outline_mode(
@@ -3307,7 +3365,31 @@ export class Editor
     this._m_wasm_canvas_scene.runtime_renderer_set_render_policy_flags(
       withIgnoreClips
     );
-    this._m_wasm_canvas_scene.redraw();
+    this._scheduleWasmRedraw();
+  }
+
+  /**
+   * Set or clear isolation mode on the WASM renderer.
+   *
+   * When `nodeId` is a string, only that node and its descendants are
+   * drawn and hit-tested. Pass `null` to clear isolation.
+   * Isolation is viewport-only — it does not mutate the document.
+   *
+   * Overflow dimming is always enabled: the isolation root's bounds act
+   * as a viewport and overflowing content is drawn at reduced opacity.
+   */
+  public __runtime_renderer_set_isolation_mode(nodeId: string | null) {
+    if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) return;
+    // Overflow dimming: isolation root bounds act as viewport, overflow
+    // content drawn dimmed. Flag value from Scene.ISOLATION_MODE_OVERFLOW_DIM.
+    const ISOLATION_OVERFLOW_DIM = 1 << 0;
+    this._m_wasm_canvas_scene.runtime_renderer_set_isolation_mode(
+      nodeId,
+      ISOLATION_OVERFLOW_DIM,
+      0.15
+    );
+    this._m_wasm_canvas_scene.runtime_renderer_set_isolation_stage_preset(1);
+    this._scheduleWasmRedraw();
   }
 
   /**
@@ -3366,7 +3448,7 @@ export class Editor
         );
 
         surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
-        surface.redraw();
+        this._scheduleWasmRedraw();
       };
 
       const ro = new ResizeObserver((entries) => {
@@ -3404,18 +3486,23 @@ export class Editor
         });
       }
 
-      // Guards against redundant switchScene calls from the scene_id
-      // subscriber when syncDocument already activated the same scene.
+      // Tracks which scene the WASM surface is currently showing.
       //
-      // The problem: syncDocument calls switchScene(X), then camera.fit
-      // dispatches a transform change. The nested emit re-fires ALL
-      // subscribers, including scene_id, which sees the new scene_id and
-      // calls switchScene(X) again — duplicating the expensive layout pass.
+      // Consulted only by the `scene_id` subscriber to short-circuit a
+      // redundant `switchScene` call when `syncDocument` has already
+      // activated the target scene earlier in the same dispatch chain
+      // (document/reset → syncDocument → camera.fit → transform dispatch
+      // → nested emit → scene_id subscriber).
       //
-      // The fix: syncDocument increments this counter before switchScene.
-      // The scene_id subscriber decrements and skips when > 0. The counter
-      // (not a boolean) is safe against re-entrant calls.
-      let __switchSceneGuard = 0;
+      // NOT consulted by `syncDocument` itself. Its `loadSceneGrida` +
+      // `switchScene` pair is indivisible: `loadSceneGrida` decodes new
+      // document bytes into the WASM `loaded_scenes` cache, and only
+      // `switchScene` installs the decoded scene into the live renderer.
+      // Skipping `switchScene` on a same-scene-id document mutation would
+      // leave the renderer on the previous document (stale geometry,
+      // missing nodes), so `syncDocument` always calls it and always
+      // updates the tracker.
+      let __activeWasmSceneId: string | null = null;
 
       const syncDocument = (
         surface: Scene,
@@ -3446,18 +3533,33 @@ export class Editor
           loadMs = tLoad - t0;
         }
 
-        // loadSceneGrida only decodes and stores scenes.
-        // switchScene activates the requested scene (or first if unspecified).
+        // loadSceneGrida only decodes and stores scenes. `switchScene`
+        // installs the decoded scene into the live renderer — it must
+        // ALWAYS run after loadSceneGrida, even when the scene id hasn't
+        // changed, because the underlying document bytes have. Updating
+        // `__activeWasmSceneId` here lets the scene_id subscriber skip
+        // the redundant second activation if it re-fires during a nested
+        // emit (see comment on __activeWasmSceneId).
         const targetScene =
           sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
         if (targetScene) {
-          __switchSceneGuard++;
           surface.switchScene(targetScene);
+          __activeWasmSceneId = targetScene;
+        }
+
+        // Re-apply scene-render configs that `load_scene` correctly resets.
+        // `switchScene` → `load_scene` resets all scene-scoped renderer
+        // state (isolation, etc.) because the old state references nodes
+        // from the previous scene graph. We re-apply from editor state,
+        // which is the source of truth.
+        const isolation = this.doc.state.isolation_root_node_id;
+        if (isolation) {
+          this.__runtime_renderer_set_isolation_mode(isolation);
         }
 
         const tSwitch = __DEV__ ? performance.now() : 0;
 
-        surface.redraw();
+        this._scheduleWasmRedraw();
 
         if (__DEV__) {
           const tRedraw = performance.now();
@@ -3465,7 +3567,7 @@ export class Editor
             `[syncDocument] ${Object.keys(document.nodes).length} nodes, ` +
               `scene=${targetScene ?? "(none)"} in ${(tRedraw - t0).toFixed(0)}ms` +
               ` (encode=${encodeMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
-              ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=${(tRedraw - tSwitch).toFixed(0)}ms)`
+              ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=scheduled)`
           );
         }
       };
@@ -3535,7 +3637,7 @@ export class Editor
             );
             this.log("falling back to direct sync", result);
           } else {
-            this._m_wasm_canvas_scene.redraw();
+            this._scheduleWasmRedraw();
           }
         }
       );
@@ -3544,13 +3646,20 @@ export class Editor
         (state) => state.scene_id,
         (_, scene_id) => {
           if (!this._m_wasm_canvas_scene || !scene_id) return;
-          // syncDocument already called switchScene — skip the redundant call
-          // which would repeat the expensive layout+geometry pass.
-          if (__switchSceneGuard > 0) {
-            __switchSceneGuard--;
-            return;
-          }
+          // Short-circuit if WASM is already showing this scene — prevents
+          // a redundant layout pass when syncDocument activated the scene
+          // earlier in the same dispatch.
+          if (scene_id === __activeWasmSceneId) return;
           this._m_wasm_canvas_scene.switchScene(scene_id);
+          __activeWasmSceneId = scene_id;
+          this._scheduleWasmRedraw();
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => state.isolation_root_node_id,
+        (_, nodeId) => {
+          this.__runtime_renderer_set_isolation_mode(nodeId);
         }
       );
 
@@ -3558,7 +3667,7 @@ export class Editor
         (state) => state.debug,
         (_, v) => {
           this._m_wasm_canvas_scene?.setDebug(v);
-          this._m_wasm_canvas_scene?.redraw();
+          this._scheduleWasmRedraw();
         }
       );
 
@@ -3596,7 +3705,7 @@ export class Editor
               stroke: "#00a6f4",
             },
           });
-          this._m_wasm_canvas_scene?.redraw();
+          this._scheduleWasmRedraw();
         },
         (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
       );
@@ -4492,6 +4601,7 @@ export class Editor
    */
   dispose() {
     this._stopImagePoll();
+    this._cancelWasmRedraw();
     if (this._m_wasm_canvas_resize_observer) {
       this._m_wasm_canvas_resize_observer.disconnect();
       this._m_wasm_canvas_resize_observer = null;
