@@ -12,6 +12,8 @@
     "fmt:check": "oxfmt --check",
     "generate": "turbo run generate",
     "lint": "turbo run lint",
+    "oxlint": "oxlint",
+    "oxlint:fix": "oxlint --fix",
     "publish-packages": "turbo run build lint test && changeset version && changeset publish",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"
@@ -20,6 +22,7 @@
     "@changesets/cli": "^2.29.4",
     "@types/node": "^24",
     "oxfmt": "^0.44.0",
+    "oxlint": "^1.60.0",
     "tsup": "^8.5.0",
     "tsx": "^4",
     "turbo": "^2.9.5",

@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "oxc"],
+  "categories": {
+    "correctness": "error",
+  },
+  "rules": {},
+  "env": {
+    "builtin": true,
+    "browser": true,
+    "node": true,
+    "es2024": true,
+  },
+  "ignorePatterns": [
+    ".next/**",
+    ".legacy/",
+    ".ref/",
+    "bin/",
+    "components/ui/**",
+    "worker-configuration.d.ts",
+    "database-generated.types.ts",
+  ],
+}
