@@ -12,7 +12,7 @@ In industry terms: Blender calls this "Overlays", Unity calls it "Gizmos", game 
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────┐
 │  Viewport (event target, gestures)  │
 │  ┌───────────────────────────────┐  │
@@ -80,10 +80,10 @@ The migration is incremental — each feature can move independently. The HUD ca
 ### Imperative (core)
 
 ```ts
-import { SnapGuideCanvas } from "@grida/hud";
+import { HUDCanvas } from "@grida/hud";
 
 const canvas = document.createElement("canvas");
-const hud = new SnapGuideCanvas(canvas, { color: "#e83829" });
+const hud = new HUDCanvas(canvas, { color: "#e83829" });
 
 hud.setSize(window.innerWidth, window.innerHeight);
 hud.setTransform(viewportTransform);

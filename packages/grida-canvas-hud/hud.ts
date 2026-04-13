@@ -88,13 +88,14 @@ export class HUDCanvas {
     this.color = options?.color ?? DEFAULT_COLOR;
   }
 
-  setColor(color: string) {
-    this.color = color;
+  setColor(color?: string) {
+    this.color = color ?? DEFAULT_COLOR;
   }
 
   setSize(w: number, h: number) {
-    if (this.width === w && this.height === h) return;
-    this.dpr = window.devicePixelRatio || 1;
+    const dpr = window.devicePixelRatio || 1;
+    if (this.width === w && this.height === h && this.dpr === dpr) return;
+    this.dpr = dpr;
     this.width = w;
     this.height = h;
     this.canvas.width = w * this.dpr;

@@ -19,7 +19,7 @@ export const SnapGuide: React.FC<SnapGuideProps> = (props) => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const rendererRef = React.useRef<HUDCanvas | null>(null);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!canvasRef.current) return;
     if (!rendererRef.current) {
       rendererRef.current = new HUDCanvas(canvasRef.current, {
@@ -27,16 +27,13 @@ export const SnapGuide: React.FC<SnapGuideProps> = (props) => {
       });
     }
 
-    if (props.color) rendererRef.current.setColor(props.color);
+    rendererRef.current.setColor(props.color);
     rendererRef.current.setSize(props.width, props.height);
     rendererRef.current.setTransform(props.transform);
 
     const guideData = props.snapping ? guide.plot(props.snapping) : undefined;
     const draw = snapGuideToHUDDraw(guideData);
-    const rafId = requestAnimationFrame(() => {
-      rendererRef.current?.draw(draw);
-    });
-    return () => cancelAnimationFrame(rafId);
+    rendererRef.current.draw(draw);
   }, [props.width, props.height, props.transform, props.snapping, props.color]);
 
   return (

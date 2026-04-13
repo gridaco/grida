@@ -42,7 +42,7 @@ export function SnapGuide() {
       transform={transform}
       snapping={snapping}
       color={WorkbenchColors.red}
-      className="fixed inset-0"
+      className="absolute inset-0 z-[999999]"
     />
   );
 }
