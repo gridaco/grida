@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
 import { useBackendState } from "@/grida-canvas-react/provider";
 import {

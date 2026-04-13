@@ -6,7 +6,6 @@ import { Apple } from "@/components/logos/apple";
 import { Windows } from "@/components/logos/windows";
 import { Linux } from "@/components/logos/linux";
 import { DownloadIcon } from "@radix-ui/react-icons";
-import type { downloads } from "./downloads";
 
 type OS = "mac" | "windows" | "linux";
 

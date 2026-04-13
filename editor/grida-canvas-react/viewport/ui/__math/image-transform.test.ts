@@ -1,12 +1,6 @@
 import type cg from "@grida/cg";
 import cmath from "@grida/cmath";
-import {
-  reduceImageTransform,
-  getImageRectCorners,
-  decompose,
-  compose,
-  type ImageTransformAction,
-} from "./image-transform";
+import { reduceImageTransform, getImageRectCorners } from "./image-transform";
 
 describe("Original Direction Scaling Challenge", () => {
   // NOTE: True original-direction scaling (scaling X/Y axes regardless of rotation)

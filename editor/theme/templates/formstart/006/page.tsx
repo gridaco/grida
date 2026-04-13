@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo } from "react";
+import React from "react";
 import {
   ScreenGrid,
   ScreenGridPosition,
@@ -15,11 +15,8 @@ import {
 import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
-import { FormCampaignStartPageContextProvider } from "@/theme/templates/kit/campaign";
-import type { FormStartPage } from "..";
-import { DataProvider, useData } from "../../kit/contexts/data.context";
-import { I18nextProvider, useTranslation } from "react-i18next";
-import i18next from "i18next";
+import { useData } from "../../kit/contexts/data.context";
+import { useTranslation } from "react-i18next";
 import _messages from "./messages.json";
 import { LeviLogo } from "@/components/logos/levi";
 import type grida from "@grida/schema";

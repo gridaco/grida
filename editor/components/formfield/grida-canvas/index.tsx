@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer } from "react";
+import React, { useEffect } from "react";
 import {
   SidebarRoot,
   SidebarSection,

@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useReducer, useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { useCallback, useMemo, useReducer } from "react";
 import {
   Label as ChartLabel,
   Area,
@@ -15,7 +14,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -39,7 +37,6 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSub,

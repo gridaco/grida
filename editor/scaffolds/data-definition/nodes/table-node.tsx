@@ -1,5 +1,5 @@
 import React from "react";
-import { DiamondIcon, Fingerprint, Hash, Key, Table2 } from "lucide-react";
+import { DiamondIcon, Fingerprint, Key, Table2 } from "lucide-react";
 import { Handle, Node, NodeProps } from "@xyflow/react";
 import { cn } from "@/components/lib/utils";
 import type { TableNodeData } from "./types";

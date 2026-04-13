@@ -1,7 +1,7 @@
 import { TemplateVariables } from "@/lib/templating";
 import { fmt_local_index } from "@/utils/fmt";
 import { en, ko, Faker } from "@faker-js/faker";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 const fakerlocales = {
   en: en,

@@ -26,10 +26,7 @@ import {
   useSlides,
   useCurrentSlide,
 } from "@/grida-canvas-react/use-slide-editor";
-import {
-  type SlideEditorMode,
-  slideAspectRatio,
-} from "@/grida-canvas/modes/slide-mode";
+import { slideAspectRatio } from "@/grida-canvas/modes/slide-mode";
 import type grida from "@grida/schema";
 
 // ---------------------------------------------------------------------------

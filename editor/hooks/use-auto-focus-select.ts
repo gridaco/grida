@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 /**
  * A versatile hook for input components that provides auto-focus, auto-select, and optional query separation.

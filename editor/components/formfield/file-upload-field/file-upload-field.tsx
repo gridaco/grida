@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   FileUploader,
   FileUploaderTrigger,
@@ -16,7 +16,6 @@ import { DropzoneOptions } from "react-dropzone";
 import { UploadStatus, useFileUploader } from "./use-file-uploader";
 import type { FileUploaderFn } from "./uploader";
 import Image from "next/image";
-import assert from "assert";
 
 type Accept = {
   [key: string]: string[];

@@ -3,7 +3,7 @@ import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import path from "node:path";
 import create_menu from "./menu";
-import create_main_window, { create_login_window } from "./window";
+import create_main_window from "./window";
 import { EDITOR_BASE_URL } from "./env";
 
 // #region chrome flags

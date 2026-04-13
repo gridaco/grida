@@ -2,7 +2,6 @@
 import grida from "@grida/schema";
 import { produce } from "immer";
 import { useCallback, useEffect, useMemo, useReducer } from "react";
-import { flatten, unflatten } from "flat";
 
 /**
  * Sets a value on an object using a dot-notation path.

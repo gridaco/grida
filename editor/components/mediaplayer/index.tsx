@@ -1,4 +1,4 @@
-import React, { createContext, useRef, useState, useEffect } from "react";
+import React, { createContext } from "react";
 import { useAudio } from "react-use";
 
 interface MediaState {

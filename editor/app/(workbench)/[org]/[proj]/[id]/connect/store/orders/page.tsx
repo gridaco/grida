@@ -16,7 +16,6 @@ import {
   Package2,
   PanelLeft,
   Search,
-  Settings,
   ShoppingCart,
   Truck,
   Users2,

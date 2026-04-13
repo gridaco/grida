@@ -1,13 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  ArchiveIcon,
-  ForwardIcon,
-  ReplyIcon,
-  StarIcon,
-  TrashIcon,
-} from "lucide-react";
+import { ArchiveIcon, ForwardIcon, ReplyIcon, TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Safari, SafariToolbar } from "@/components/frames/safari";

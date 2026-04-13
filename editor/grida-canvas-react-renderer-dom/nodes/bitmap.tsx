@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import queryattributes from "./utils/attributes";
 import grida from "@grida/schema";
-import assert from "assert";
 import { css } from "@/grida-canvas-utils/css";
 
 export const BitmapWidget = ({

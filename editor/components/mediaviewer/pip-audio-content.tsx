@@ -3,7 +3,7 @@
 import { MediaObject } from "@/components/mediaviewer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { DotFilledIcon, DotIcon, SlashIcon } from "@radix-ui/react-icons";
+import { SlashIcon } from "@radix-ui/react-icons";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import {
   AudioLinesIcon,

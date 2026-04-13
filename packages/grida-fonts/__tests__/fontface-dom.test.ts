@@ -1,4 +1,3 @@
-import type { GoogleWebFontListItem } from "../google";
 import { FontFaceManager as FontFaceManagerDOM } from "../fontface-dom";
 
 // Mock FontFace constructor for testing

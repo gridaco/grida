@@ -1,8 +1,4 @@
-import {
-  BlockNoteSchema,
-  defaultBlockSpecs,
-  PartialBlock,
-} from "@blocknote/core";
+import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
 const { table: _noop1, ...remainingSpecs } = defaultBlockSpecs;
 
 /**

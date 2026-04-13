@@ -1,11 +1,5 @@
 import { useClickedOutside } from "@/hooks/use-clicked-outside";
-import {
-  KeyboardEvent,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-} from "react";
+import { KeyboardEvent, ReactNode, useEffect, useRef } from "react";
 
 interface BlockKeysProps {
   children: ReactNode;

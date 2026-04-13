@@ -2,7 +2,6 @@ import produce from "immer";
 import type { DataQueryState } from "./data-query.provider";
 import type {
   DataQueryAction,
-  DataQueryRefreshAction,
   DataQueryPageLimitAction,
   DataQueryPaginateAction,
   DataQueryOrderByUpsertAction,

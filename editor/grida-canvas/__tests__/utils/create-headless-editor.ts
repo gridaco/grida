@@ -3,7 +3,7 @@
  */
 import { Editor } from "@/grida-canvas/editor";
 import type { editor } from "@/grida-canvas";
-import { MINIMAL_DOCUMENT, createDocumentWithRects } from "./fixtures";
+import { createDocumentWithRects } from "./fixtures";
 
 export interface HeadlessEditorOptions {
   document?: editor.state.IEditorStateInit["document"];

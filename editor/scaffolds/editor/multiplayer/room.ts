@@ -9,7 +9,6 @@ import type {
   ICursorNode,
 } from "./types";
 import {
-  IMultiplayerCursor,
   IMultiplayerCursorPresence,
   IMultiplayerCursorNotify,
 } from "./provider";

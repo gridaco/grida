@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  BentoGrid,
-  BentoCard,
-  BentoCardContent,
-  BentoCardCTA,
-} from "@/www/ui/bento-grid";
+import { BentoGrid, BentoCard, BentoCardContent } from "@/www/ui/bento-grid";
 import Image from "next/image";
 import { motion } from "motion/react";
 

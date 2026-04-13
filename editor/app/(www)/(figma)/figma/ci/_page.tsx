@@ -6,7 +6,6 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Image from "next/image";
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowDown, Github, Redo2Icon, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckIcon } from "lucide-react";

@@ -101,7 +101,6 @@ import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools
 import { EditorSyncPlugin } from "@/grida-canvas/plugins/sync";
 import { Editor } from "@/grida-canvas/editor";
 import { PlayerAvatar } from "@/components/multiplayer/avatar";
-import grida from "@grida/schema";
 import colors, {
   neutral_colors,
   randomcolorname,

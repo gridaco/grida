@@ -5,7 +5,6 @@ import {
   expandHexDigits,
   parseFuzzyHex,
   type RGB,
-  type FuzzyHexResult,
 } from "./color";
 
 describe("hex conversion", () => {

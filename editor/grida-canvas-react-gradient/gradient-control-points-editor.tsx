@@ -8,7 +8,6 @@ import {
   gradientPositionToScreen,
   controlPointsReducer,
   type GradientType,
-  type ControlPoints,
 } from "./gradient-reducer";
 import type cg from "@grida/cg";
 import kolor from "@grida/color";

@@ -15,7 +15,6 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/components/lib/utils";
-import { vfs } from "@/lib/vfs";
 
 type PathTokens = string[];
 

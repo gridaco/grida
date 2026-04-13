@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import PropertyTypeIcon from "@/components/property-type-icon";
 import NestedDropdownMenu, {
   NestedMenuItemProps,

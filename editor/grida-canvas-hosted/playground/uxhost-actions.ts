@@ -25,7 +25,6 @@
 
 import { KeyCode } from "@/grida-canvas/keycode";
 import {
-  type Keybinding,
   type Keybindings,
   kb,
   c,

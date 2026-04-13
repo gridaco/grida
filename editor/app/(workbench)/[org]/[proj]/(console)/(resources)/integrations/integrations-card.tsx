@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, ExternalLink } from "lucide-react";
 import { Integration } from "./data";
 import Link from "next/link";
-import { GridaLogo } from "@/components/grida-logo";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface IntegrationCardProps {

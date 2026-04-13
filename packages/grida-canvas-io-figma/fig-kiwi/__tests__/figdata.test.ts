@@ -1,15 +1,8 @@
 import { FigmaArchiveParser, FigmaArchiveWriter, readFigFile } from "../index";
 import { readFileSync, writeFileSync } from "fs";
-import {
-  compileSchema,
-  decodeBinarySchema,
-  compileSchemaTypeScript,
-  prettyPrintSchema,
-  encodeBinarySchema,
-} from "kiwi-schema";
+import { compileSchema, prettyPrintSchema } from "kiwi-schema";
 import schema from "../schema";
-import { Schema as CompiledSchema, NodeChange, Message } from "../schema";
-import { deflateSync, inflateSync } from "fflate";
+import { Schema as CompiledSchema, NodeChange } from "../schema";
 
 test.skip("this just formats the schema", () => {
   const prettySchema = prettyPrintSchema(schema);

@@ -11,7 +11,6 @@ import type {
   Preview,
   CommittedTransaction,
   Disposable,
-  Delta,
 } from "./types";
 import { StackImpl, type StackOptions } from "./stack";
 import { TransactionImpl } from "./transaction";

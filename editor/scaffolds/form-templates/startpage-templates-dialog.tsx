@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogClose,
@@ -16,8 +16,6 @@ import { Button } from "@/components/ui/button";
 import { useStep } from "usehooks-ts";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { SandboxWrapper } from "./sandbox";
-import { StandaloneDocumentEditor } from "@/grida-canvas-react";
-import grida from "@grida/schema";
 
 export function BrowseStartPageTemplatesDialog({
   defaultValue,

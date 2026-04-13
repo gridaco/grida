@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useContext } from "react";
-import type { EditorState, GDocTable, GDocTableID } from "./state";
+import type { EditorState } from "./state";
 import { useDispatch, type FlatDispatcher } from "./dispatch";
 
 import { Context } from "./provider";

@@ -1,6 +1,5 @@
 "use client";
 import { FormEditorAgentThemeProvider } from "@/scaffolds/agent-form-builder/theme";
-import { SideControl } from "@/scaffolds/sidecontrol";
 import React, { useCallback, useState } from "react";
 import {
   Sheet,
@@ -31,7 +30,6 @@ import {
 } from "@/components/ui/card";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
 import {
@@ -51,7 +49,6 @@ import {
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  StandaloneDocumentEditor,
   ViewportRoot,
   EditorSurface,
   useRootTemplateInstanceNode,

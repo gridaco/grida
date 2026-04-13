@@ -5,7 +5,6 @@ import {
   DotsHorizontalIcon,
   GearIcon,
   InputIcon,
-  MixIcon,
   Pencil1Icon,
   PlusIcon,
   TrashIcon,

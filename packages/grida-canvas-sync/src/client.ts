@@ -19,7 +19,6 @@ import type {
   DocumentDiff,
   PresenceState,
   ServerMessage,
-  ClientMessage,
   ConnectOkMessage,
   PushOkMessage,
   PatchMessage,

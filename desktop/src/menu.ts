@@ -5,7 +5,6 @@ import {
   MenuItemConstructorOptions,
   Menu,
   MenuItem,
-  dialog,
 } from "electron";
 import create_main_window, { create_canvas_playground_window } from "./window";
 import { EDITOR_BASE_URL } from "./env";

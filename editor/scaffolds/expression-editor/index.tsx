@@ -5,7 +5,6 @@ import {
   useNodesState,
   MiniMap,
 } from "@xyflow/react";
-import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 import { Handle, Position } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {

@@ -2,8 +2,6 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Mention from "@tiptap/extension-mention";
-import suggestion from "./suggestion";
 import { useEffect } from "react";
 
 export function TemplateTextEditor({

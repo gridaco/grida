@@ -1,9 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import React, { useMemo } from "react";
+import React from "react";
 import {
-  ScreenBackground,
   ScreenCenter,
   ScreenRoot,
   TextAlign,

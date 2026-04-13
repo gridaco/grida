@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
+import { useDatagridTable } from "@/scaffolds/editor";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export function TableViews() {

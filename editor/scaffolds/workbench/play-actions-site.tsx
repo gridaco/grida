@@ -4,7 +4,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ClockIcon, GlobeIcon, PlayIcon } from "@radix-ui/react-icons";
+import { ClockIcon, GlobeIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
 export function SitePlayAction() {

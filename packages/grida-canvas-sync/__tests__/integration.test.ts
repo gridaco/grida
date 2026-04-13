@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createRoom, connectAll, assertConvergence, makeNode } from "./helpers";
 import type { DocumentState } from "../src/diff";
-import type { DocumentDiff } from "../src/protocol";
 
 // ---------------------------------------------------------------------------
 // Multi-client integration tests

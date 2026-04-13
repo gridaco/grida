@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer } from "react";
+import React, { useEffect } from "react";
 import queryattributes from "@/grida-canvas-react-renderer-dom/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/enterprise/west-referral/referrer/page";
 import ShareDialog from "@/theme/templates/enterprise/west-referral/referrer/share";

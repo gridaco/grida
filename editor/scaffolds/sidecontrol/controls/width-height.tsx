@@ -1,7 +1,6 @@
 "use client";
 
 import { LockClosedIcon, LockOpen1Icon } from "@radix-ui/react-icons";
-import { Toggle } from "@/components/ui/toggle";
 import { PropertyLineLabel } from "../ui";
 import { LengthPercentageControl } from "./length-percentage";
 import * as TogglePrimitive from "@radix-ui/react-toggle";

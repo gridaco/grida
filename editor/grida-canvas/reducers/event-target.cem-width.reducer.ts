@@ -1,9 +1,7 @@
 import { type Draft } from "immer";
 
 import type {
-  EditorEventTarget_PointerMove,
   EditorEventTarget_PointerDown,
-  EditorEventTarget_Drag,
   EditorVariableWidthAddStopAction,
 } from "../action";
 import { editor } from "@/grida-canvas";

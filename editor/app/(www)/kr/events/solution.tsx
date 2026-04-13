@@ -3,7 +3,7 @@
 import Image from "next/image";
 import React from "react";
 import Link from "next/link";
-import { CaretRightIcon, CheckIcon } from "@radix-ui/react-icons";
+import { CaretRightIcon } from "@radix-ui/react-icons";
 
 export function Solutions() {
   return (
