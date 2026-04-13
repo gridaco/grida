@@ -39,6 +39,7 @@
     "@grida/color": "workspace:*",
     "@grida/fonts": "workspace:*",
     "@grida/history": "workspace:*",
+    "@grida/hud": "workspace:*",
     "@grida/io": "workspace:*",
     "@grida/io-figma": "workspace:*",
     "@grida/mixed-properties": "workspace:*",
