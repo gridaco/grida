@@ -648,9 +648,15 @@ function __self_evt_on_drag(
     if (orig.gesture.type === "idle") return;
     if (orig.gesture.type === "nudge") return;
 
+    // Type-narrow the gesture for TS. We switch on orig.gesture.type (to
+    // avoid Immer proxy creation on the draft), but TS can only narrow the
+    // variable it actually switches on. Cast once here so all case branches
+    // can access gesture-specific fields without per-line casts.
+    const g = draft.gesture as any;
+
     // These writes proxy the gesture object, but gesture is small.
-    draft.gesture.last = orig.gesture.movement;
-    draft.gesture.movement = movement;
+    g.last = orig.gesture.movement;
+    g.movement = movement;
 
     switch (orig.gesture.type) {
       case "pan": {
@@ -670,7 +676,7 @@ function __self_evt_on_drag(
         const scene = draft.document.nodes[
           draft.scene_id!
         ] as grida.program.nodes.SceneNode;
-        const { axis, idx: index, initial_offset } = draft.gesture;
+        const { axis, idx: index, initial_offset } = g;
 
         const counter = axis === "x" ? 0 : 1;
         const m = movement[counter];
@@ -694,7 +700,7 @@ function __self_evt_on_drag(
 
         const offset = cmath.quantize(translated, 1);
 
-        draft.gesture.offset = offset;
+        g.offset = offset;
         scene.guides[index].offset = offset;
         break;
       }
@@ -747,7 +753,7 @@ function __self_evt_on_drag(
         break;
       }
       case "corner-radius": {
-        const { node_id, anchor, altKey = false } = draft.gesture;
+        const { node_id, anchor, altKey = false } = g;
         const [dx, dy] = delta;
         const node = dq.__getNodeById(draft, node_id);
 
@@ -804,7 +810,7 @@ function __self_evt_on_drag(
                 sw: "rectangular_corner_radius_bottom_left",
               } as const;
 
-              const key = keyMap[anchor];
+              const key = keyMap[anchor as keyof typeof keyMap];
               const current = (node as any)[key] ?? 0;
 
               // Check if all corners have the same value
@@ -881,7 +887,7 @@ function __self_evt_on_drag(
         //
       }
       case "gap": {
-        const { layout, axis, initial_gap, min_gap } = draft.gesture;
+        const { layout, axis, initial_gap, min_gap } = g;
         const delta = movement[axis === "x" ? 0 : 1];
         const side: "layout_inset_left" | "layout_inset_top" =
           axis === "x" ? "layout_inset_left" : "layout_inset_top";
@@ -890,7 +896,7 @@ function __self_evt_on_drag(
           case "group": {
             const sorted = layout.objects
               .slice()
-              .sort((a, b) => a[axis] - b[axis]);
+              .sort((a: any, b: any) => a[axis] - b[axis]);
 
             const gap = cmath.quantize(
               Math.max(initial_gap + delta, min_gap),
@@ -901,7 +907,7 @@ function __self_evt_on_drag(
             let currentPos = sorted[0][axis];
 
             // Calculate new positions considering each rect's dimension.
-            const transformed = sorted.map((obj) => {
+            const transformed = sorted.map((obj: any) => {
               const next = { ...obj };
               next[axis] = cmath.quantize(currentPos, 1);
               currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
@@ -909,11 +915,11 @@ function __self_evt_on_drag(
             });
 
             // Update layout objects with new positions.
-            draft.gesture.layout.objects = transformed;
-            draft.gesture.gap = gap;
+            g.layout.objects = transformed;
+            g.gap = gap;
 
             // Apply transform to the actual nodes.
-            transformed.forEach((obj) => {
+            transformed.forEach((obj: any) => {
               const node = dq.__getNodeById(
                 draft,
                 obj.id
@@ -938,7 +944,7 @@ function __self_evt_on_drag(
               layout_cross_axis_gap: gap,
             });
 
-            draft.gesture.gap = gap;
+            g.gap = gap;
             break;
           }
         }
@@ -946,7 +952,7 @@ function __self_evt_on_drag(
         break;
       }
       case "padding": {
-        const { node_id, side, initial_padding, min_padding } = draft.gesture;
+        const { node_id, side, initial_padding, min_padding } = g;
         const delta = movement[side === "top" || side === "bottom" ? 1 : 0];
 
         const padding = cmath.quantize(
@@ -1001,7 +1007,7 @@ function __self_evt_on_drag(
             ...updates,
           } as NodeChangeAction);
 
-          draft.gesture.padding = padding;
+          g.padding = padding;
         }
 
         break;

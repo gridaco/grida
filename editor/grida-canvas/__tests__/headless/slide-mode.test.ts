@@ -75,8 +75,8 @@ describe("SlideEditorMode", () => {
         prototype: {
           type: "rectangle",
           name: "Rect",
-          width: 100,
-          height: 100,
+          layout_target_width: 100,
+          layout_target_height: 100,
         },
       },
       "slide-1"

@@ -23,6 +23,6 @@ export function updateState<S>(state: S, recipe: (draft: Draft<S>) => void): S {
  * a plain mutable object with a stashed `__original`), returns that.
  */
 export function safeOriginal<T>(draft: Draft<T>): T | undefined {
-  if (isDraft(draft)) return original(draft);
+  if (isDraft(draft)) return original(draft) as T | undefined;
   return (draft as any).__original as T | undefined;
 }

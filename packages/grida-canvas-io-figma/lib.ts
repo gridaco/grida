@@ -1033,12 +1033,9 @@ export namespace iofigma {
           name: node.name,
           active: node.visible ?? true,
           locked: node.locked ?? false,
-          // Figma REST API `rotation` is in radians. Store as-is; the Rust
-          // side handles the unit per node type (Container uses radians
-          // directly via AffineTransform::new; other node types with
-          // prefer_path_for_geometry bake the transform into path data and
-          // set rotation=0).
-          rotation: node.rotation ?? 0,
+          // Figma REST API `rotation` is in radians (= atan2(m10, m00)).
+          // The Grida node model stores rotation in degrees. Convert here.
+          rotation: ((node.rotation ?? 0) * 180) / Math.PI,
           opacity: node.opacity ?? 1,
           blend_mode: map.layerBlendModeMap[node.blendMode],
           z_index: 0,
@@ -3403,13 +3400,17 @@ export namespace iofigma {
       }
 
       /**
-       * Extract rotation angle in degrees from a 2x3 transform matrix
-       * For a rotation matrix: [[cos(θ), -sin(θ), tx], [sin(θ), cos(θ), ty]]
-       * We can extract θ using atan2(m10, m00)
+       * Extract rotation from a Kiwi transform matrix, returning **radians**
+       * in the same convention as the Figma REST API `rotation` field.
+       *
+       * Figma's matrix: `[[cos(θ), sin(θ), tx], [-sin(θ), cos(θ), ty]]`
+       * REST rotation:  `atan2(m10, m00)` — equals `-θ` in radians.
+       *
+       * The returned value is in radians. Downstream conversion to Grida
+       * degrees happens in `base_node_trait`.
        */
       function extractRotationFromMatrix(matrix: figkiwi.Matrix): number {
-        const radians = Math.atan2(matrix.m10, matrix.m00);
-        return (radians * 180) / Math.PI;
+        return Math.atan2(matrix.m10, matrix.m00);
       }
 
       /**
