@@ -599,14 +599,15 @@ impl LayerList {
                 // Tray renders like a simplified Container — has fills, strokes, corner_radius,
                 // explicit dimensions. No effects, no clipping, no render surface.
                 let opacity = parent_opacity * n.opacity;
-                let bounds = scene_cache
+                let local_bounds = scene_cache
                     .geometry()
-                    .get_world_bounds(id)
-                    .expect("Geometry must exist");
-                let shape = build_shape(node, &bounds);
+                    .get_entry(id)
+                    .expect("Geometry must exist")
+                    .bounding_box;
+                let shape = build_shape(node, &local_bounds);
                 let size = Size {
-                    width: bounds.width,
-                    height: bounds.height,
+                    width: local_bounds.width,
+                    height: local_bounds.height,
                 };
                 let stroke_path = Self::compute_rectangular_stroke_path(
                     &n.stroke_width,
@@ -668,14 +669,19 @@ impl LayerList {
             }
             Node::Container(n) => {
                 let opacity = parent_opacity * n.opacity;
-                let bounds = scene_cache
+                let geo_entry = scene_cache
                     .geometry()
-                    .get_world_bounds(id)
+                    .get_entry(id)
                     .expect("Geometry must exist");
-                let shape = build_shape(node, &bounds);
+                // Use LOCAL bounds for shape building (not the world AABB).
+                // The world AABB has swapped/inflated dimensions when rotated,
+                // producing the wrong shape. The local `bounding_box` gives
+                // the actual container dimensions in its own coordinate space.
+                let local_bounds = geo_entry.bounding_box;
+                let shape = build_shape(node, &local_bounds);
                 let size = Size {
-                    width: bounds.width,
-                    height: bounds.height,
+                    width: local_bounds.width,
+                    height: local_bounds.height,
                 };
                 let stroke_path = Self::compute_rectangular_stroke_path(
                     &n.stroke_width,
@@ -772,7 +778,7 @@ impl LayerList {
                     let render_bounds = scene_cache
                         .geometry()
                         .get_render_bounds(id)
-                        .unwrap_or(bounds);
+                        .unwrap_or(geo_entry.absolute_bounding_box);
 
                     // The clip_path from compute_clip_path is in the node's LOCAL
                     // coordinate space. However, draw_render_surface applies it

@@ -26,6 +26,7 @@ use crate::runtime::font_repository::FontRepository;
 use math2::rect;
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
+use math2::vector2::Vector2;
 
 // ---------------------------------------------------------------------------
 // GeoInput — layout-resolved per-node geometry for the DFS
@@ -216,50 +217,39 @@ impl GeometryCache {
         match geo.kind {
             GeoNodeKind::Group => {
                 let world_transform = parent_world.compose(&geo.transform);
-                let mut union_bounds: Option<Rectangle> = None;
+                let mut union_world_bounds: Option<Rectangle> = None;
                 let mut union_render_bounds: Option<Rectangle> = None;
+                let children = graph.get_children(id).map(|c| c.as_slice()).unwrap_or(&[]);
+                let mut child_local_corners = Vec::with_capacity(children.len() * 4);
 
-                if let Some(children) = graph.get_children(id) {
-                    for child_id in children {
-                        let child_bounds = Self::build_recursive(
-                            child_id,
-                            &world_transform,
-                            Some(*id),
-                            cache,
-                            graph,
-                            geo_inputs,
-                        );
-                        union_bounds = match union_bounds {
-                            Some(b) => Some(rect::union(&[b, child_bounds])),
-                            None => Some(child_bounds),
+                for child_id in children {
+                    let child_world_aabb = Self::build_recursive(
+                        child_id,
+                        &world_transform,
+                        Some(*id),
+                        cache,
+                        graph,
+                        geo_inputs,
+                    );
+                    union_world_bounds = match union_world_bounds {
+                        Some(b) => Some(rect::union(&[b, child_world_aabb])),
+                        None => Some(child_world_aabb),
+                    };
+                    if let Some(rb) = cache.get_render_bounds(child_id) {
+                        union_render_bounds = match union_render_bounds {
+                            Some(b) => Some(rect::union(&[b, rb])),
+                            None => Some(rb),
                         };
-                        if let Some(rb) = cache.get_render_bounds(child_id) {
-                            union_render_bounds = match union_render_bounds {
-                                Some(b) => Some(rect::union(&[b, rb])),
-                                None => Some(rb),
-                            };
-                        }
                     }
+                    collect_oriented_corners(cache, child_id, &mut child_local_corners);
                 }
 
-                let world_bounds = union_bounds.unwrap_or(Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 0.0,
-                    height: 0.0,
-                });
-
-                let local_bounds = if let Some(inv) = world_transform.inverse() {
-                    transform_rect(&world_bounds, &inv)
+                let world_bounds = union_world_bounds.unwrap_or_else(Rectangle::empty);
+                let local_bounds = if child_local_corners.is_empty() {
+                    Rectangle::empty()
                 } else {
-                    Rectangle {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 0.0,
-                        height: 0.0,
-                    }
+                    Rectangle::from_points(&child_local_corners)
                 };
-
                 let render_bounds = union_render_bounds.unwrap_or(world_bounds);
 
                 let entry = GeometryEntry {
@@ -319,41 +309,31 @@ impl GeometryCache {
 
             GeoNodeKind::BooleanOperation => {
                 let world_transform = parent_world.compose(&geo.transform);
-                let mut union_bounds: Option<Rectangle> = None;
+                let mut union_world_bounds: Option<Rectangle> = None;
+                let children = graph.get_children(id).map(|c| c.as_slice()).unwrap_or(&[]);
+                let mut child_local_corners = Vec::with_capacity(children.len() * 4);
 
-                if let Some(children) = graph.get_children(id) {
-                    for child_id in children {
-                        let child_bounds = Self::build_recursive(
-                            child_id,
-                            &world_transform,
-                            Some(*id),
-                            cache,
-                            graph,
-                            geo_inputs,
-                        );
-                        union_bounds = match union_bounds {
-                            Some(b) => Some(rect::union(&[b, child_bounds])),
-                            None => Some(child_bounds),
-                        };
-                    }
+                for child_id in children {
+                    let child_world_aabb = Self::build_recursive(
+                        child_id,
+                        &world_transform,
+                        Some(*id),
+                        cache,
+                        graph,
+                        geo_inputs,
+                    );
+                    union_world_bounds = match union_world_bounds {
+                        Some(b) => Some(rect::union(&[b, child_world_aabb])),
+                        None => Some(child_world_aabb),
+                    };
+                    collect_oriented_corners(cache, child_id, &mut child_local_corners);
                 }
 
-                let world_bounds = union_bounds.unwrap_or(Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 0.0,
-                    height: 0.0,
-                });
-
-                let local_bounds = if let Some(inv) = world_transform.inverse() {
-                    transform_rect(&world_bounds, &inv)
+                let world_bounds = union_world_bounds.unwrap_or_else(Rectangle::empty);
+                let local_bounds = if child_local_corners.is_empty() {
+                    Rectangle::empty()
                 } else {
-                    Rectangle {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 0.0,
-                        height: 0.0,
-                    }
+                    Rectangle::from_points(&child_local_corners)
                 };
                 let render_bounds = inflate_rect_sides(world_bounds, &geo.render_bounds_inflation);
 
@@ -546,6 +526,22 @@ impl GeometryCache {
 
     pub fn has(&self, id: &NodeId) -> bool {
         self.entries.contains_key(id)
+    }
+
+    /// Returns the 4 corners of the node's oriented bounding box in world space.
+    ///
+    /// The local `bounding_box` corners are transformed through `absolute_transform`,
+    /// giving oriented corners that correctly reflect rotation and skew.
+    ///
+    /// Corner order: NW, NE, SE, SW (in the node's local orientation).
+    pub fn get_world_corners(&self, id: &NodeId) -> Option<[Vector2; 4]> {
+        let entry = self.entries.get(id)?;
+        Some(
+            entry
+                .bounding_box
+                .corners()
+                .map(|c| math2::vector2::transform(c, &entry.absolute_transform)),
+        )
     }
 
     pub fn filter(&self, filter: impl Fn(&NodeId, &GeometryEntry) -> bool) -> Self {
@@ -821,6 +817,15 @@ fn resolve_layout(
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
+
+/// Appends a child's oriented bounding-box corners (in parent-local space)
+/// to `out`. Used by Group and BooleanOperation to compute tight local bounds.
+fn collect_oriented_corners(cache: &GeometryCache, child_id: &NodeId, out: &mut Vec<Vector2>) {
+    let child_entry = cache.entries.get(child_id).unwrap();
+    for corner in child_entry.bounding_box.corners() {
+        out.push(math2::vector2::transform(corner, &child_entry.transform));
+    }
+}
 
 fn transform_rect(rect: &Rectangle, t: &AffineTransform) -> Rectangle {
     rect::transform(*rect, t)
