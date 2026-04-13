@@ -1,0 +1,63 @@
+{
+  "name": "@grida/hud",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Canvas-based heads-up display for the Grida editor viewport",
+  "keywords": [
+    "canvas",
+    "design",
+    "editor",
+    "grida",
+    "hud",
+    "overlay",
+    "react",
+    "snap"
+  ],
+  "homepage": "https://grida.co/packages/@grida/hud",
+  "license": "MIT",
+  "author": "softmarshmallow",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup index.ts react.tsx --format cjs,esm --dts",
+    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grida/cmath": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "react": "^19.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  }
+}
