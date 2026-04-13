@@ -1009,6 +1009,12 @@ pub struct JSONGroupNode {
 
     #[serde(rename = "expanded")]
     pub expanded: Option<bool>,
+
+    /// Raw 2×3 affine transform `[[a, c, tx], [b, d, ty]]`.
+    /// When present, this is the authoritative transform — the decomposed
+    /// `layout_inset_left/top` + `rotation` fields in `base` are ignored.
+    #[serde(rename = "transform")]
+    pub transform: Option<[[f32; 3]; 2]>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1294,19 +1300,29 @@ fn default_image_scale() -> f32 {
 
 impl From<JSONGroupNode> for GroupNodeRec {
     fn from(node: JSONGroupNode) -> Self {
-        let transform = AffineTransform::from_box_center(
-            node.base.layout_inset_left.unwrap_or(0.0),
-            node.base.layout_inset_top.unwrap_or(0.0),
-            node.base.width.length(0.0),
-            node.base.height.length(0.0),
-            node.base.rotation,
-        );
+        // Prefer the raw 2×3 affine transform when present — it is the
+        // authoritative, lossless representation. Fall back to
+        // reconstructing from the decomposed (x, y, rotation) fields
+        // for backward compatibility (e.g. editor-created groups that
+        // don't carry a raw matrix).
+        let transform = if let Some(m) = node.transform {
+            AffineTransform { matrix: m }
+        } else {
+            // Legacy / editor-created path: groups have no intrinsic
+            // width/height, so w=0, h=0 makes the pivot offset a no-op
+            // (from_box_center with zero size ≡ simple translate+rotate).
+            AffineTransform::from_box_center(
+                node.base.layout_inset_left.unwrap_or(0.0),
+                node.base.layout_inset_top.unwrap_or(0.0),
+                0.0,
+                0.0,
+                node.base.rotation,
+            )
+        };
 
         GroupNodeRec {
             active: node.base.active,
-            // TODO: group's transform should be handled differently
             transform: Some(transform),
-            // Children populated from links after conversion
             opacity: node.base.opacity,
             blend_mode: node.base.blend_mode.into(),
             mask: node.base.mask.map(|m| m.into()),

@@ -2223,12 +2223,37 @@ export namespace grida.program.nodes {
   /**
    * Group Node
    *
+   * A group has no intrinsic width or height — its bounds are derived from
+   * its children. The only geometric truth a group carries is an affine
+   * transform (position + rotation/skew/flip as a 2×3 matrix).
+   *
+   * ## Transform representation
+   *
+   * When `transform` is present it is the authoritative 2×3 affine matrix
+   * `[[a, c, tx], [b, d, ty]]` and takes precedence over the decomposed
+   * `layout_inset_left/top` + `rotation` inherited from {@link i.IPositioning}.
+   *
+   * When `transform` is absent (e.g. groups created by the editor's "wrap"
+   * action), the Rust side falls back to reconstructing the matrix from the
+   * decomposed fields via `from_box_center(x, y, 0, 0, rotation)`.
+   *
    * [GroupNode] is not supported in the html/svg backend.
    */
   export interface GroupNode
     extends i.IBaseNode, i.ISceneNode, i.IBlend, i.IPositioning {
     type: "group";
-    //
+
+    /**
+     * Raw 2×3 affine transform matrix `[[a, c, tx], [b, d, ty]]`.
+     *
+     * When present, this is the sole source of truth for the group's
+     * position, rotation, flip, and skew. The `layout_inset_*` and
+     * `rotation` fields are ignored.
+     *
+     * The matrix layout matches Grida's convention:
+     *   `[[cos φ, -sin φ, tx], [sin φ, cos φ, ty]]` for a pure rotation.
+     */
+    transform?: [[number, number, number], [number, number, number]];
   }
 
   /**

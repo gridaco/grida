@@ -1531,36 +1531,57 @@ export namespace format {
           fbs.LayerTrait.addLayout(builder, layoutOffset);
         }
 
-        // 7. Post-layout transform (rotation as transform matrix)
-        // Only compute trig and emit the transform when rotation is non-zero.
-        const nodeWithRotation = node as grida.program.nodes.Node &
-          Partial<Pick<grida.program.nodes.UnknownNode, "rotation">>;
-        const rotationDegrees = nodeWithRotation.rotation ?? 0;
-        if (rotationDegrees !== 0) {
-          const rotationRad = (rotationDegrees * Math.PI) / 180;
-          const cos = Math.cos(rotationRad);
-          const sin = Math.sin(rotationRad);
-
+        // 7. Post-layout transform
+        // For GroupNode with a raw `transform` matrix, encode the full affine.
+        // For all other nodes, build a rotation-only matrix from `rotation`.
+        const groupTransform = (node as Partial<grida.program.nodes.GroupNode>)
+          .transform;
+        if (groupTransform) {
+          // Full affine from group's raw transform
           const postLayoutTransformOffset = structs.cgTransform2D(
             builder,
-            cos,
-            -sin,
+            groupTransform[0][0],
+            groupTransform[0][1],
             0,
-            sin,
-            cos,
+            groupTransform[1][0],
+            groupTransform[1][1],
             0
           );
           fbs.LayerTrait.addPostLayoutTransform(
             builder,
             postLayoutTransformOffset
           );
+        } else {
+          // Rotation-only path for all other node types.
+          const nodeWithRotation = node as grida.program.nodes.Node &
+            Partial<Pick<grida.program.nodes.UnknownNode, "rotation">>;
+          const rotationDegrees = nodeWithRotation.rotation ?? 0;
+          if (rotationDegrees !== 0) {
+            const rotationRad = (rotationDegrees * Math.PI) / 180;
+            const cos = Math.cos(rotationRad);
+            const sin = Math.sin(rotationRad);
 
-          // 8. Post-layout transform origin (only needed when rotation is set)
-          const transformOriginOffset = structs.alignment(builder, 0, 0);
-          fbs.LayerTrait.addPostLayoutTransformOrigin(
-            builder,
-            transformOriginOffset
-          );
+            const postLayoutTransformOffset = structs.cgTransform2D(
+              builder,
+              cos,
+              -sin,
+              0,
+              sin,
+              cos,
+              0
+            );
+            fbs.LayerTrait.addPostLayoutTransform(
+              builder,
+              postLayoutTransformOffset
+            );
+
+            // 8. Post-layout transform origin (only needed when rotation is set)
+            const transformOriginOffset = structs.alignment(builder, 0, 0);
+            fbs.LayerTrait.addPostLayoutTransformOrigin(
+              builder,
+              transformOriginOffset
+            );
+          }
         }
 
         return fbs.LayerTrait.endLayerTrait(builder);
@@ -6555,10 +6576,9 @@ export namespace format {
         /**
          * Decodes GroupNode.
          *
-         * NOTE: The FBS `post_layout_transform` may carry a full affine
-         * matrix (scale, skew) for SVG-imported groups. The TS SDK model
-         * currently only supports rotation — scale/skew are lost here.
-         * The data is preserved in the FBS file for future use.
+         * Reads the full affine from `post_layout_transform` when present
+         * and stores it as `transform` on the GroupNode. This preserves
+         * scale, skew, flip, and non-center-pivot rotations losslessly.
          */
         export function group(
           n: fbs.GroupNode,
@@ -6571,6 +6591,18 @@ export namespace format {
         ): grida.program.nodes.GroupNode {
           const baseName = systemNode.name() ?? "node";
 
+          // Extract the full affine from post_layout_transform when present.
+          let transform:
+            | [[number, number, number], [number, number, number]]
+            | undefined;
+          const plt = layer?.postLayoutTransform();
+          if (plt) {
+            transform = [
+              [plt.m00(), plt.m01(), 0],
+              [plt.m10(), plt.m11(), 0],
+            ];
+          }
+
           return {
             type: "group",
             id,
@@ -6581,6 +6613,7 @@ export namespace format {
             ...layoutFields,
             layout_positioning: layoutFields.layout_positioning ?? "relative",
             ...(effects || {}),
+            ...(transform ? { transform } : {}),
           } satisfies grida.program.nodes.GroupNode;
         }
 

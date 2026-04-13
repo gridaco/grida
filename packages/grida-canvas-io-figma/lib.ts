@@ -2738,11 +2738,33 @@ export namespace iofigma {
             // Note:
             // Group is a transparent container without layout, fills, or strokes.
             // Children of group has constraints relative to the parent of the group.
+            //
+            // Store the raw relativeTransform as the group's affine matrix.
+            // Figma's matrix layout [[m00,m01,m02],[m10,m11,m12]] is
+            // numerically identical to Grida's — the sign convention
+            // difference only affects the interpretation of the angle,
+            // not the matrix values themselves.
+            const groupTransform = node.relativeTransform
+              ? ([
+                  [
+                    node.relativeTransform[0][0],
+                    node.relativeTransform[0][1],
+                    node.relativeTransform[0][2],
+                  ],
+                  [
+                    node.relativeTransform[1][0],
+                    node.relativeTransform[1][1],
+                    node.relativeTransform[1][2],
+                  ],
+                ] as [[number, number, number], [number, number, number]])
+              : undefined;
+
             return {
               id: gridaId,
               ...base_node_trait(node),
               ...positioning_trait(node, parent),
               type: "group",
+              transform: groupTransform,
             } satisfies grida.program.nodes.GroupNode;
           }
           case "TEXT": {
