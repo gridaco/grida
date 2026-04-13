@@ -374,6 +374,15 @@ class EditorDocumentStore
     return this.mstate;
   }
 
+  /**
+   * Side-channel storage for gesture snapshots, kept outside the Immer
+   * draft tree. Gesture reducers store the snapshot here at gesture start
+   * via `context.gesture_snapshot.set()` and read it back each frame via
+   * `context.gesture_snapshot.get()`. Because this is never part of the
+   * Immer-managed state, Immer never proxies or finalizes its contents.
+   */
+  private _gesture_snapshot: editor.state.IMinimalDocumentState | null = null;
+
   private readonly _historyAdapter = new EditorHistoryAdapter();
   get historySnapshot() {
     return this._historyAdapter.snapshot;
@@ -594,6 +603,12 @@ class EditorDocumentStore
       },
       idgen: this.idgen,
       logger: this.log.bind(this),
+      gesture_snapshot: {
+        get: () => this._gesture_snapshot,
+        set: (s) => {
+          this._gesture_snapshot = s;
+        },
+      },
     };
 
     const actions = Array.isArray(action) ? action : [action];
@@ -619,7 +634,19 @@ class EditorDocumentStore
       const [nextState, patches, inversePatches] = reducer(
         this.mstate,
         action,
-        context
+        context,
+        {
+          // Only bypass Immer for the known gesture hot-loop actions where
+          // we've verified which state sub-objects get mutated and cloned them.
+          // Other "silent" actions (config changes, etc.) may write to
+          // sub-objects we haven't cloned, which would corrupt frozen state.
+          skipPatches:
+            recording === "silent" &&
+            (action.type === "event-target/event/on-drag" ||
+              action.type === "event-target/event/on-pointer-move" ||
+              action.type === "event-target/event/on-pointer-move-raycast" ||
+              action.type === "node/change/*"),
+        }
       );
       __perf_end_reducer();
 

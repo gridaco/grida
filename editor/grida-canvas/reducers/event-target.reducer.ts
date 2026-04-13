@@ -1,4 +1,5 @@
 import { type Draft } from "immer";
+import { safeOriginal } from "./utils/immer";
 import { updateState } from "./utils/immer";
 
 import type {
@@ -501,7 +502,7 @@ function __self_evt_on_drag_start(
       self_try_insert_node(draft, parent, nnode);
       self_select_tool(draft, { type: "cursor" }, context);
       self_selectNode(draft, "reset", nnode.id);
-      __self_start_gesture_insert_and_resize_draw_new_node(draft, {
+      __self_start_gesture_insert_and_resize_draw_new_node(draft, context, {
         new_node_id: nnode.id,
         new_node_rect: initial_rect,
         pending_insertion: pending,
@@ -601,6 +602,8 @@ function __self_evt_on_drag_end(
   draft.gesture = { type: "idle" };
   draft.marquee = undefined;
   draft.lasso = undefined;
+  // Clear the side-channel snapshot now that the gesture has ended.
+  context.gesture_snapshot.set(null);
 }
 
 function __self_evt_on_drag(
@@ -608,60 +611,65 @@ function __self_evt_on_drag(
   action: EditorEventTarget_Drag,
   context: ReducerContext
 ) {
-  const scene = draft.document.nodes[
-    draft.scene_id!
-  ] as grida.program.nodes.SceneNode;
+  // Read from original to avoid proxying large objects (document.nodes,
+  // gesture) until we know which branch we're in. Only access the draft
+  // for actual writes.
+  const orig = safeOriginal(draft as Draft<editor.state.IEditorState>)!;
   const {
     event: { movement, delta },
   } = <EditorEventTarget_Drag>action;
 
-  if (draft.marquee) {
-    draft.marquee.b = draft.pointer.position;
-    if (draft.content_edit_mode?.type === "vector") {
-      const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
+  if (orig.marquee) {
+    draft.marquee!.b = draft.pointer.position;
+    if (orig.content_edit_mode?.type === "vector") {
+      const mrect = cmath.rect.fromPoints([draft.marquee!.a, draft.marquee!.b]);
       self_updateVectorAreaSelection(
         draft,
         context,
         (p) => cmath.rect.containsPoint(mrect, p),
-        draft.marquee.additive ?? false,
+        orig.marquee.additive ?? false,
         mrect
       );
     }
-  } else if (draft.lasso) {
-    draft.lasso.points.push(draft.pointer.position);
+  } else if (orig.lasso) {
+    draft.lasso!.points.push(draft.pointer.position);
     if (
-      draft.content_edit_mode?.type === "vector" &&
-      draft.lasso.points.length > 2
+      orig.content_edit_mode?.type === "vector" &&
+      draft.lasso!.points.length > 2
     ) {
       self_updateVectorAreaSelection(
         draft,
         context,
         (p) => cmath.polygon.pointInPolygon(p, draft.lasso!.points),
-        draft.lasso.additive ?? false
+        orig.lasso.additive ?? false
       );
     }
   } else {
-    if (draft.gesture.type === "idle") return;
-    if (draft.gesture.type === "nudge") return;
+    if (orig.gesture.type === "idle") return;
+    if (orig.gesture.type === "nudge") return;
 
-    draft.gesture.last = draft.gesture.movement;
+    // These writes proxy the gesture object, but gesture is small.
+    draft.gesture.last = orig.gesture.movement;
     draft.gesture.movement = movement;
 
-    switch (draft.gesture.type) {
+    switch (orig.gesture.type) {
       case "pan": {
         // for panning, exceptionaly use the unscaled delta.
         const original_delta = cmath.vector2.multiply(
           action.event.delta,
-          cmath.transform.getScale(draft.transform)
+          cmath.transform.getScale(orig.transform)
         );
         // move the viewport by delta
         draft.transform = cmath.transform.translate(
-          draft.transform,
+          orig.transform,
           original_delta
         );
         break;
       }
       case "guide": {
+        const scene = draft.document.nodes[
+          draft.scene_id!
+        ] as grida.program.nodes.SceneNode;
         const { axis, idx: index, initial_offset } = draft.gesture;
 
         const counter = axis === "x" ? 0 : 1;
@@ -1025,6 +1033,7 @@ function __self_evt_on_multiple_selection_overlay_click(
 
 function __self_start_gesture_insert_and_resize_draw_new_node(
   draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext,
   {
     new_node_id,
     new_node_rect,
@@ -1038,9 +1047,10 @@ function __self_start_gesture_insert_and_resize_draw_new_node(
     } | null;
   }
 ) {
+  // Store snapshot in side-channel to keep it out of Immer's proxy tree.
+  context.gesture_snapshot.set(editor.state.snapshot(draft));
   draft.gesture = {
     type: "insert-and-resize",
-    initial_snapshot: editor.state.snapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
@@ -1062,13 +1072,14 @@ function __self_start_gesture_translate(
     (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
   );
 
+  // Store snapshot in side-channel to keep it out of Immer's proxy tree.
+  context.gesture_snapshot.set(editor.state.snapshot(draft));
   draft.gesture = {
     type: "translate",
     selection: selection,
     initial_clone_ids: selection.map(() => context.idgen.next()),
     initial_selection: selection,
     initial_rects: rects,
-    initial_snapshot: editor.state.snapshot(draft),
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
     last: cmath.vector2.zero,

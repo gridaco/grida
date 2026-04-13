@@ -1947,19 +1947,6 @@ export namespace editor.gesture {
      */
     readonly initial_selection: string[];
 
-    /**
-     * @deprecated TODO(@grida/history): Remove once gesture reducers compute
-     * deltas from the history adapter's before-snapshot instead of this inline
-     * snapshot. Currently still needed by:
-     * - translate_with_clone (transform.ts) — resets originals from snapshot
-     * - parametric scale (scale.ts) — reset-then-reapply loop each frame
-     * The history adapter's gestureBegin already captures a before-snapshot for
-     * undo, but the reducer needs per-node original positions mid-gesture, which
-     * the adapter doesn't expose. Removal requires the reducer to either receive
-     * the before-snapshot from the adapter, or compute incremental deltas instead
-     * of absolute-from-original transforms.
-     */
-    readonly initial_snapshot: editor.state.IMinimalDocumentState;
     readonly initial_clone_ids: string[];
     readonly initial_rects: cmath.Rectangle[];
 
@@ -2042,12 +2029,6 @@ export namespace editor.gesture {
     // scale (resize)
     readonly type: "scale";
     readonly selection: string[];
-    /**
-     * @deprecated TODO(@grida/history): Remove — same rationale as
-     * GestureTranslate.initial_snapshot. Scale reducer uses this for
-     * per-frame reset-then-reapply of parametric transforms.
-     */
-    readonly initial_snapshot: editor.state.IMinimalDocumentState;
     readonly initial_rects: cmath.Rectangle[];
     readonly direction: cmath.CardinalDirection;
 

@@ -1,4 +1,5 @@
-import type { Draft } from "immer";
+import { type Draft } from "immer";
+import { safeOriginal } from "../utils/immer";
 import { editor } from "@/grida-canvas";
 import { self_insertSubDocument } from "./insert";
 import { self_try_remove_node } from "./delete";
@@ -130,24 +131,40 @@ function __self_update_gesture_transform_translate(
   draft: Draft<editor.state.IEditorState>,
   context: ReducerContext
 ) {
-  assert(draft.gesture.type === "translate", "Gesture type must be translate");
   assert(draft.scene_id, "scene_id is not set");
-  const scene = draft.document.nodes[
+
+  // Use original() for read-only lookups to avoid Immer proxy creation.
+  // Immer's produceWithPatches creates a lazy proxy for every accessed draft
+  // property, then walks ALL proxied entries during finalization to detect
+  // changes and produce patches. The translate gesture stores
+  // initial_snapshot (a full document clone with 1K+ nodes) inside
+  // draft.gesture — reading it from the draft causes Immer to proxy the
+  // entire snapshot, and finalization walks all of it. By reading immutable
+  // gesture fields from original(), we avoid this entirely.
+  const orig = safeOriginal(draft)!;
+
+  const scene = orig.document.nodes[
     draft.scene_id
   ] as grida.program.nodes.SceneNode;
-  const {
-    movement: _movement,
-    initial_selection,
-    initial_rects,
-    initial_clone_ids,
-    initial_snapshot,
-  } = draft.gesture;
+
+  // Read immutable gesture fields from orig to avoid proxying the gesture
+  // object through Immer.
+  const origGesture = orig.gesture as typeof draft.gesture;
+  assert(origGesture.type === "translate", "Gesture type must be translate");
+  const { initial_selection, initial_rects, initial_clone_ids } = origGesture;
+  // Snapshot lives in the side-channel, completely outside Immer's tree.
+  const initial_snapshot = context.gesture_snapshot.get()!;
+  // Type-narrow the draft gesture for safe access to translate-specific fields.
+  const draftGesture = draft.gesture as Draft<editor.gesture.GestureTranslate>;
+  // movement is written by the event handler before this function runs,
+  // so we must read it from the draft.
+  const _movement = draftGesture.movement;
   const {
     translate_with_clone,
     tarnslate_with_axis_lock,
     translate_with_hierarchy_change,
     translate_with_force_disable_snap: __translate_with_force_disable_snap,
-  } = draft.gesture_modifiers;
+  } = orig.gesture_modifiers;
 
   const should_snap = __translate_with_force_disable_snap !== "on";
 
@@ -156,7 +173,7 @@ function __self_update_gesture_transform_translate(
   // #region [translate_with_clone]
   switch (translate_with_clone) {
     case "on": {
-      if (draft.gesture.is_currently_cloned) break; // already cloned
+      if (draftGesture.is_currently_cloned) break; // already cloned
 
       // if translate with clone is on, switch selection (if not already) to the cloned node
       // while..
@@ -202,14 +219,14 @@ function __self_update_gesture_transform_translate(
           initial_snapshot.document.nodes[node_id];
       });
 
-      draft.gesture.selection = initial_clone_ids;
+      draftGesture.selection = initial_clone_ids;
       draft.selection = initial_clone_ids;
       // now, the cloned not will be measured relative to the original selection
       draft.surface_measurement_target = initial_selection;
       draft.surface_measurement_targeting_locked = true;
 
       // set the flag
-      draft.gesture.is_currently_cloned = true;
+      draftGesture.is_currently_cloned = true;
       draft.active_duplication = {
         origins: initial_selection,
         clones: initial_clone_ids,
@@ -218,7 +235,7 @@ function __self_update_gesture_transform_translate(
       break;
     }
     case "off": {
-      if (!draft.gesture.is_currently_cloned) break;
+      if (!draftGesture.is_currently_cloned) break;
 
       try {
         initial_clone_ids.forEach((clone) => {
@@ -226,8 +243,8 @@ function __self_update_gesture_transform_translate(
         });
       } catch (e) {}
 
-      draft.gesture.is_currently_cloned = false;
-      draft.gesture.selection = initial_selection;
+      draftGesture.is_currently_cloned = false;
+      draftGesture.selection = initial_selection;
       draft.selection = initial_selection;
       draft.surface_measurement_target = undefined;
       draft.surface_measurement_targeting_locked = false;
@@ -237,7 +254,7 @@ function __self_update_gesture_transform_translate(
   }
   // #endregion
 
-  const current_selection = draft.gesture.selection;
+  const current_selection = draftGesture.selection;
 
   // #region [tarnslate_with_axis_lock]
   // axis lock movement with dominant axis
@@ -252,7 +269,9 @@ function __self_update_gesture_transform_translate(
   switch (translate_with_hierarchy_change) {
     case "on": {
       // check if the cursor finds a new parent (if it escapes the current parent or enters a new parent)
-      const hits = draft.hits.slice();
+      // Read hits from orig — hits array is set by pointer events before
+      // gesture transform runs and is not mutated here.
+      const hits = orig.hits.slice();
 
       // filter out the...
       // 1. current selection (both original and cloned) and children of the current selection, recursive (both original and cloned)
@@ -260,35 +279,55 @@ function __self_update_gesture_transform_translate(
       // the current selection will always be hit as it moves with the cursor (unless not grouped - but does not matter)
       // both original and cloned nodes are considered as the same node, unless, the cloned node will instantly be moved to the original (if its a container) - this is not the case when clone modifier is turned on after the translate has started, but does not matter.
 
-      const hierarchy_ids = [
-        ...initial_selection,
-        ...initial_selection
-          .map((node_id) => dq.getChildren(draft.document_ctx, node_id, true))
-          .flat(),
-        ...initial_clone_ids,
-        ...initial_clone_ids
-          .map((node_id) => dq.getChildren(draft.document_ctx, node_id, true))
-          .flat(),
-      ];
+      // Use document_ctx from draft (may have been updated by clone insertion above).
+      // Note: this access proxies document_ctx, but it's needed for correctness
+      // when cloning has modified the hierarchy.
+      const ctx_for_hierarchy = draft.document_ctx;
 
-      // TODO: room for performance improvement - use while loop and break when the first valid dropzone is found
-      const possible_parents = hits.filter((node_id) => {
-        // [1]
-        if (hierarchy_ids.includes(node_id)) return false;
+      // Build the hierarchy exclusion set. This collects the selection,
+      // clones, and all their descendants so that they're excluded from
+      // the dropzone search below. Use a flat collector instead of
+      // spread + flat to avoid intermediate array allocations.
+      const hierarchy_ids = new Set<string>();
+      for (const id of initial_selection) {
+        hierarchy_ids.add(id);
+        for (const child of dq.getChildren(ctx_for_hierarchy, id, true)) {
+          hierarchy_ids.add(child);
+        }
+      }
+      for (const id of initial_clone_ids) {
+        hierarchy_ids.add(id);
+        for (const child of dq.getChildren(ctx_for_hierarchy, id, true)) {
+          hierarchy_ids.add(child);
+        }
+      }
 
-        const node = dq.__getNodeById(draft, node_id);
-        // [2]
-        if (!allows_hierarchy_change(node.type)) return false;
+      // Find the first valid dropzone from hits. Short-circuit instead
+      // of filtering all hits — we only need the first match.
+      let new_parent_id: string | null = null;
+      for (const node_id of hits) {
+        if (hierarchy_ids.has(node_id)) continue;
 
-        return true;
-      });
+        // Read node type from original state to avoid Immer proxy creation.
+        // Node types are immutable during a translate gesture.
+        const node = orig.document.nodes[node_id];
+        if (!node || !allows_hierarchy_change(node.type)) continue;
 
-      const new_parent_id = possible_parents[0] ?? null;
+        new_parent_id = node_id;
+        break;
+      }
 
       // TODO: room for improvement - do a selection - parent comparison and handle at once (currently doing each comparison for each node) (this is redundant as if dropzone has changed, it will be changed for all selection)
       let is_parent_changed = false;
+      // Hoist Graph construction outside the loop — Graph holds a reference
+      // to draft.document (not a copy), so mv() mutations are visible across
+      // iterations and the generation counter ensures lut recomputes.
+      const graphInstance = new tree.graph.Graph(
+        draft.document,
+        EDITOR_GRAPH_POLICY
+      );
       // update the parent of the current selection
-      current_selection.forEach((node_id) => {
+      current_selection.forEach((node_id: string) => {
         //
         const prev_parent_id = dq.getParentId(draft.document_ctx, node_id);
 
@@ -299,28 +338,23 @@ function __self_update_gesture_transform_translate(
         if (effective_prev_parent === effective_new_parent) return;
 
         // Check if the current parent allows hierarchy changes
+        // Read node types from original state to avoid Immer proxy creation.
         if (prev_parent_id) {
-          const current_parent = dq.__getNodeById(draft, prev_parent_id);
-          if (!allows_hierarchy_change(current_parent.type)) {
+          const current_parent = orig.document.nodes[prev_parent_id];
+          if (current_parent && !allows_hierarchy_change(current_parent.type)) {
             // Current parent doesn't allow hierarchy changes, so prevent escaping
             return;
           }
         }
 
         // Tray can only be a child of Scene or another Tray
-        const moving_node = dq.__getNodeById(draft, node_id);
-        if (moving_node.type === "tray" && new_parent_id !== null) {
-          const target_node = dq.__getNodeById(draft, new_parent_id);
-          if (target_node.type !== "tray") return;
+        const moving_node = orig.document.nodes[node_id];
+        if (moving_node?.type === "tray" && new_parent_id !== null) {
+          const target_node = orig.document.nodes[new_parent_id];
+          if (target_node?.type !== "tray") return;
         }
 
         is_parent_changed = true;
-
-        // Use Graph.mv() - mutates draft.document directly (scene is now a node!)
-        const graphInstance = new tree.graph.Graph(
-          draft.document,
-          EDITOR_GRAPH_POLICY
-        );
 
         const target = new_parent_id ?? draft.scene_id!;
         graphInstance.mv(node_id, target);
@@ -344,7 +378,14 @@ function __self_update_gesture_transform_translate(
   }
   // #endregion
 
-  const snap_target_node_ids = getSnapTargets(current_selection, draft);
+  // Pass snap targeting a non-proxied view to avoid Immer overhead.
+  // document_ctx may have been updated by hierarchy change above, so read
+  // the current value from draft, but use orig.document.nodes for type checks
+  // (node types don't change during translate).
+  const snap_target_node_ids = getSnapTargets(current_selection, {
+    document_ctx: draft.document_ctx,
+    document: orig.document,
+  });
   const snap_target_node_rects = snap_target_node_ids
     .map((node_id: string) => {
       const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
@@ -373,11 +414,15 @@ function __self_update_gesture_transform_translate(
     let i = 0;
 
     for (const node_id of current_selection) {
-      const node = dq.__getNodeById(draft, node_id);
+      // Must use draft here — updateNodeTransform writes to this node.
+      const node = draft.document.nodes[node_id];
+      if (!node) continue;
       const r = translated[i++];
 
+      // Use current document_ctx (may have been updated by hierarchy change).
       const parent_id = dq.getParentId(draft.document_ctx, node_id);
-      const parent_node = parent_id ? dq.__getNodeById(draft, parent_id) : null;
+      // Read parent type from original to avoid proxying parent nodes.
+      const parent_node = parent_id ? orig.document.nodes[parent_id] : null;
       const is_scene_parent = parent_node?.type === "scene";
 
       let relative_position: cmath.Vector2;

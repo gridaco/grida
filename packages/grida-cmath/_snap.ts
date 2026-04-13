@@ -322,16 +322,26 @@ export function snapToCanvasGeometry<
   );
 
   if (anchorObjects && !Array.isArray(agent)) {
-    snap_objspc = snapToObjectsSpace(
-      cmath.rect.translate(agent, [
-        dist2delta(_sofar_bestx),
-        dist2delta(_sofar_besty),
-      ]),
-      agent,
-      anchorObjects,
-      config,
-      tolerance
-    );
+    // Distribution/spacing snap uses O(N^2) combination generation and
+    // O(N^4) forwarded-gap comparison via plotDistributionGeometry.
+    // With >64 anchor objects the cost becomes prohibitive (e.g. 999
+    // siblings → ~500K pairs → billions of comparisons) while the UX
+    // value of equal-spacing snap diminishes with many objects. Skip
+    // the spacing snap when anchor count exceeds the threshold —
+    // 9-point geometry snap still provides edge/center alignment.
+    const SPACING_SNAP_ANCHOR_LIMIT = 64;
+    if (anchorObjects.length <= SPACING_SNAP_ANCHOR_LIMIT) {
+      snap_objspc = snapToObjectsSpace(
+        cmath.rect.translate(agent, [
+          dist2delta(_sofar_bestx),
+          dist2delta(_sofar_besty),
+        ]),
+        agent,
+        anchorObjects,
+        config,
+        tolerance
+      );
+    }
   }
 
   const x = bestAxisAlignedDistance(
