@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Replaced: img Element</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+  <body>
+    <h3 style="margin: 0 0 16px 0">Local images</h3>
+    <div class="grid">
+      <!-- Basic <img> with local src and explicit dimensions -->
+      <div class="cell">
+        <div class="label">local — checker.png</div>
+        <img
+          src="../../images/checker.png"
+          width="160"
+          height="160"
+          alt="checker pattern"
+        />
+      </div>
+
+      <div class="cell">
+        <div class="label">local — stripes.png</div>
+        <img
+          src="../../images/stripes.png"
+          width="160"
+          height="160"
+          alt="stripes pattern"
+        />
+      </div>
+
+      <!-- <img> with only width (height inferred from aspect ratio) -->
+      <div class="cell">
+        <div class="label">width only (height auto)</div>
+        <img src="../../images/checker.png" width="120" alt="checker" />
+      </div>
+
+      <!-- <img> with no dimensions (intrinsic from image data) -->
+      <div class="cell">
+        <div class="label">no attrs (intrinsic size)</div>
+        <img src="../../images/checker.png" alt="checker" />
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">Remote images</h3>
+    <div class="grid">
+      <!-- Remote HTTPS image -->
+      <div class="cell">
+        <div class="label">https — picsum 200x120</div>
+        <img
+          src="https://picsum.photos/id/237/200/120"
+          width="200"
+          height="120"
+          alt="remote photo"
+        />
+      </div>
+
+      <div class="cell">
+        <div class="label">https — picsum 160x160</div>
+        <img
+          src="https://picsum.photos/id/1025/160/160"
+          width="160"
+          height="160"
+          alt="remote square"
+        />
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">object-fit specimens</h3>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">object-fit: fill (default)</div>
+        <img
+          src="../../images/checker.png"
+          width="200"
+          height="100"
+          alt="fill"
+          style="object-fit: fill; border: 1px solid #ccc"
+        />
+      </div>
+
+      <div class="cell">
+        <div class="label">object-fit: contain</div>
+        <img
+          src="../../images/checker.png"
+          width="200"
+          height="100"
+          alt="contain"
+          style="object-fit: contain; border: 1px solid #ccc"
+        />
+      </div>
+
+      <div class="cell">
+        <div class="label">object-fit: cover</div>
+        <img
+          src="../../images/checker.png"
+          width="200"
+          height="100"
+          alt="cover"
+          style="object-fit: cover; border: 1px solid #ccc"
+        />
+      </div>
+
+      <div class="cell">
+        <div class="label">object-fit: none</div>
+        <img
+          src="../../images/checker.png"
+          width="200"
+          height="100"
+          alt="none"
+          style="object-fit: none; border: 1px solid #ccc"
+        />
+      </div>
+
+      <div class="cell">
+        <div class="label">object-fit: scale-down</div>
+        <img
+          src="../../images/checker.png"
+          width="200"
+          height="100"
+          alt="scale-down"
+          style="object-fit: scale-down; border: 1px solid #ccc"
+        />
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">Edge cases</h3>
+    <div class="grid">
+      <!-- Missing image (placeholder) -->
+      <div class="cell">
+        <div class="label">missing src (placeholder)</div>
+        <img
+          src="nonexistent.png"
+          width="160"
+          height="100"
+          alt="This image is missing"
+        />
+      </div>
+
+      <!-- Empty src -->
+      <div class="cell">
+        <div class="label">empty src</div>
+        <img src="" width="160" height="100" alt="empty src" />
+      </div>
+
+      <!-- No src attribute -->
+      <div class="cell">
+        <div class="label">no src attr</div>
+        <img width="160" height="100" alt="no src attribute" />
+      </div>
+
+      <!-- <img> inside a flex container -->
+      <div class="cell">
+        <div class="label">img in flex row</div>
+        <div style="display: flex; gap: 8px">
+          <img src="../../images/checker.png" width="60" height="60" alt="a" />
+          <img src="../../images/stripes.png" width="60" height="60" alt="b" />
+        </div>
+      </div>
+
+      <!-- <img> with border-radius -->
+      <div class="cell">
+        <div class="label">img + border-radius</div>
+        <img
+          src="../../images/checker.png"
+          width="120"
+          height="120"
+          alt="rounded"
+          style="border-radius: 16px; overflow: hidden"
+        />
+      </div>
+    </div>
+  </body>
+</html>

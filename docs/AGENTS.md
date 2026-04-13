@@ -17,6 +17,17 @@ We **only actively maintain** the following docs areas:
 - `docs/wg/**` — working group docs (design notes, architecture, proposals, WIP)
 - `docs/reference/**` — reference docs (glossary, specs, stable technical references)
 
+## SEO frontmatter
+
+For docs SEO/frontmatter cleanup, start with the actively maintained areas:
+`docs/wg/**` and `docs/reference/**`. Avoid broad repo-wide churn across
+older docs sections unless the task explicitly asks for that migration.
+
+When adding or meaningfully editing an actively maintained doc page, prefer
+frontmatter with `title`, `description`, and `keywords`. For most `wg/` and
+`reference/` Markdown pages that do not use MDX/JSX features, also include
+`format: md` as described below.
+
 ## Everything else
 
 Other folders under `/docs` are **not actively managed**.

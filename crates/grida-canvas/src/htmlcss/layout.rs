@@ -28,7 +28,7 @@ pub struct LayoutBox<'a> {
     pub children: Vec<LayoutNode<'a>>,
 }
 
-/// A positioned node — either a box, text, or inline group.
+/// A positioned node — either a box, text, inline group, or replaced element.
 #[derive(Debug)]
 pub enum LayoutNode<'a> {
     Box(LayoutBox<'a>),
@@ -53,6 +53,7 @@ pub fn compute_layout<'a>(
     root: &'a StyledElement,
     available_width: f32,
     fonts: &FontRepository,
+    images: &dyn super::ImageProvider,
 ) -> LayoutBox<'a> {
     let font_collection = fonts.font_collection();
     let mut taffy: TaffyTree<TextMeasure> = TaffyTree::new();
@@ -62,7 +63,7 @@ pub fn compute_layout<'a>(
     taffy.disable_rounding();
 
     // Build Taffy tree
-    let taffy_root = build_taffy_node(&mut taffy, root, font_collection);
+    let taffy_root = build_taffy_node(&mut taffy, root, font_collection, images);
 
     // Run layout with text measurement callback
     let fc = font_collection.clone();
@@ -86,11 +87,12 @@ pub fn compute_content_height(
     root: &StyledElement,
     available_width: f32,
     fonts: &FontRepository,
+    images: &dyn super::ImageProvider,
 ) -> f32 {
     let font_collection = fonts.font_collection();
     let mut taffy: TaffyTree<TextMeasure> = TaffyTree::new();
     taffy.disable_rounding();
-    let taffy_root = build_taffy_node(&mut taffy, root, font_collection);
+    let taffy_root = build_taffy_node(&mut taffy, root, font_collection, images);
     let fc = font_collection.clone();
     let _ = taffy.compute_layout_with_measure(
         taffy_root,
@@ -113,8 +115,16 @@ fn build_taffy_node(
     taffy: &mut TaffyTree<TextMeasure>,
     el: &StyledElement,
     fonts: &FontCollection,
+    images: &dyn super::ImageProvider,
 ) -> TaffyNodeId {
-    let style = element_to_taffy_style(el);
+    let mut style = element_to_taffy_style(el);
+
+    // For replaced elements (<img>), apply intrinsic sizing where CSS
+    // didn't specify explicit dimensions. This follows the HTML spec:
+    // CSS width/height > image data dimensions > HTML attrs > 300×150 fallback.
+    if let Some(ref replaced) = el.replaced {
+        apply_replaced_intrinsic_size(&mut style, replaced, images);
+    }
 
     // Build child nodes
     let mut child_ids: Vec<TaffyNodeId> = Vec::new();
@@ -123,7 +133,7 @@ fn build_taffy_node(
         match child {
             StyledNode::Element(child_el) => {
                 if child_el.display != types::Display::None {
-                    child_ids.push(build_taffy_node(taffy, child_el, fonts));
+                    child_ids.push(build_taffy_node(taffy, child_el, fonts, images));
                 }
             }
             StyledNode::Text(run) => {
@@ -245,8 +255,84 @@ fn text_measure_func(
 }
 
 /// Convert StyledElement to Taffy Style.
+/// Apply replaced element sizing for `<img>`.
+///
+/// Per the HTML spec, the sizing priority is:
+/// 1. **CSS `width`/`height`** — already in the taffy style from `element_to_taffy_style`
+/// 2. **HTML `width`/`height` attributes** — presentational hints that act like CSS
+///    (Stylo servo-mode may not map these, so we apply them explicitly)
+/// 3. **Image natural dimensions** — used only when no size is specified at all
+/// 4. **300×150 fallback** — HTML spec default for replaced elements
+///
+/// The image's natural dimensions always contribute an **aspect ratio** so that
+/// when only one axis is constrained, Taffy computes the other proportionally.
+fn apply_replaced_intrinsic_size(
+    style: &mut taffy::Style,
+    replaced: &ReplacedContent,
+    images: &dyn super::ImageProvider,
+) {
+    let css_w_is_auto = style.size.width == Dimension::auto();
+    let css_h_is_auto = style.size.height == Dimension::auto();
+
+    // Natural aspect ratio from image data (most accurate)
+    let img_size = images.get_size(&replaced.src);
+    if let Some((nw, nh)) = img_size {
+        if nw > 0 && nh > 0 {
+            style.aspect_ratio = Some(nw as f32 / nh as f32);
+        }
+    }
+
+    // HTML width/height attributes are presentational hints — they act like
+    // CSS width/height. Apply them when CSS didn't set explicit values.
+    // This is needed because Stylo servo-mode doesn't map <img> dimension
+    // attributes to CSS properties.
+    if css_w_is_auto {
+        if let Some(aw) = replaced.attr_width {
+            style.size.width = Dimension::length(aw as f32);
+        }
+    }
+    if css_h_is_auto {
+        if let Some(ah) = replaced.attr_height {
+            style.size.height = Dimension::length(ah as f32);
+        }
+    }
+
+    // If still auto after HTML attrs, use natural image dimensions or fallback.
+    // When no intrinsic info exists at all, use 2:1 default aspect ratio
+    // (HTML spec: 300×150 default object size).
+    if img_size.is_none() && style.aspect_ratio.is_none() {
+        style.aspect_ratio = Some(2.0); // 300/150
+    }
+
+    let w_is_auto = style.size.width == Dimension::auto();
+    let h_is_auto = style.size.height == Dimension::auto();
+
+    if w_is_auto {
+        if let Some((nw, _)) = img_size {
+            style.size.width = Dimension::length(nw as f32);
+        } else if h_is_auto {
+            // No size info at all → 300×150 fallback
+            style.size.width = Dimension::length(300.0);
+        }
+        // else: width auto + height set + aspect_ratio → Taffy resolves
+    }
+
+    if style.size.height == Dimension::auto() {
+        if let Some((_, nh)) = img_size {
+            if style.aspect_ratio.is_none() {
+                style.size.height = Dimension::length(nh as f32);
+            }
+        }
+        // else: height auto + width set + aspect_ratio → Taffy resolves
+    }
+}
+
 fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
     let mut style = taffy::Style {
+        box_sizing: match el.box_sizing {
+            types::BoxSizing::ContentBox => taffy::BoxSizing::ContentBox,
+            types::BoxSizing::BorderBox => taffy::BoxSizing::BorderBox,
+        },
         display: match el.display {
             types::Display::Flex => taffy::Display::Flex,
             types::Display::Grid => taffy::Display::Grid,

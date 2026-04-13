@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Background Image</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <!-- Local image (relative path to fixtures/images/) -->
+      <div class="cell">
+        <div class="label">url() — local checker</div>
+        <div
+          style="
+            width: 200px;
+            height: 120px;
+            background-image: url(&quot;../../images/checker.png&quot;);
+            border: 1px solid #ccc;
+          "
+        ></div>
+      </div>
+
+      <div class="cell">
+        <div class="label">url() — local stripes</div>
+        <div
+          style="
+            width: 200px;
+            height: 120px;
+            background-image: url(&quot;../../images/stripes.png&quot;);
+            border: 1px solid #ccc;
+          "
+        ></div>
+      </div>
+
+      <!-- Remote image (HTTPS) -->
+      <div class="cell">
+        <div class="label">url() — remote https</div>
+        <div
+          style="
+            width: 200px;
+            height: 120px;
+            background-image: url(&quot;https://picsum.photos/id/237/200/120&quot;);
+            border: 1px solid #ccc;
+          "
+        ></div>
+      </div>
+
+      <!-- Layered: url() on top of solid color -->
+      <div class="cell">
+        <div class="label">url() + solid fallback</div>
+        <div
+          style="
+            width: 200px;
+            height: 120px;
+            background-color: #eee;
+            background-image: url(&quot;../../images/checker.png&quot;);
+            border: 1px solid #ccc;
+          "
+        ></div>
+      </div>
+
+      <!-- Layered: url() on top of gradient -->
+      <div class="cell">
+        <div class="label">url() + gradient fallback</div>
+        <div
+          style="
+            width: 200px;
+            height: 120px;
+            background:
+              url(&quot;../../images/stripes.png&quot;),
+              linear-gradient(135deg, #ff0000, #0000ff);
+            border: 1px solid #ccc;
+          "
+        ></div>
+      </div>
+
+      <!-- url() with border-radius -->
+      <div class="cell">
+        <div class="label">url() + border-radius</div>
+        <div
+          style="
+            width: 200px;
+            height: 120px;
+            background-image: url(&quot;../../images/checker.png&quot;);
+            border-radius: 16px;
+            border: 1px solid #ccc;
+            overflow: hidden;
+          "
+        ></div>
+      </div>
+
+      <!-- Missing image (placeholder behavior) -->
+      <div class="cell">
+        <div class="label">url() — missing (placeholder)</div>
+        <div
+          style="
+            width: 200px;
+            height: 120px;
+            background-image: url(&quot;nonexistent.png&quot;);
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+          "
+        ></div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -276,6 +276,7 @@ impl LayoutTree {
                             &ctx.styled_html,
                             width,
                             provider.fonts,
+                            &crate::htmlcss::NoImages,
                         )
                         .unwrap_or(0.0);
 

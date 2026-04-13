@@ -562,15 +562,29 @@ function __self_update_gesture_transform_rotate(
   draft: Draft<editor.state.IEditorState>
 ) {
   assert(draft.gesture.type === "rotate", "Gesture type must be rotate");
-  const { movement, selection } = draft.gesture;
+  const {
+    selection,
+    initial_angle,
+    initial_rotation,
+    initial_bounding_rectangle,
+  } = draft.gesture;
   const { rotate_with_quantize } = draft.gesture_modifiers;
   const { rotation_quantize_step } = draft;
 
+  // Compute the center of the node's bounding rectangle.
+  const rect = initial_bounding_rectangle!;
+  const center: cmath.Vector2 = [
+    rect.x + rect.width / 2,
+    rect.y + rect.height / 2,
+  ];
+
+  // Current angle from node center to the pointer position.
+  const current_angle = cmath.vector2.angle(center, draft.pointer.position);
+
+  // The rotation delta is the difference between the current pointer angle
+  // and the pointer angle at drag start, added to the node's original rotation.
   const _angle = cmath.principalAngle(
-    // TODO: need to store the initial angle and subtract
-    // TODO: get anchor and calculate the offset
-    // TODO: translate the movement (distance) relative to the center of the node
-    cmath.vector2.angle(cmath.vector2.zero, movement)
+    initial_rotation + (current_angle - initial_angle)
   );
 
   const _user_q =

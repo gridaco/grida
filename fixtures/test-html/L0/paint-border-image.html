@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Border Image</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+      .box {
+        width: 200px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #333;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Uses border-diamonds.png (81x81, 3x3 diamond grid) from MDN docs.
+         Natural slice boundary: 27px (81/3). -->
+
+    <h3 style="margin: 0 0 16px 0">border-image-repeat</h3>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">stretch (default)</div>
+        <div
+          class="box"
+          style="
+            border: 27px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-repeat: stretch;
+          "
+        >
+          stretch
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">repeat</div>
+        <div
+          class="box"
+          style="
+            border: 27px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-repeat: repeat;
+          "
+        >
+          repeat
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">round</div>
+        <div
+          class="box"
+          style="
+            border: 27px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-repeat: round;
+          "
+        >
+          round
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">space</div>
+        <div
+          class="box"
+          style="
+            border: 27px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-repeat: space;
+          "
+        >
+          space
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">border-image-slice</h3>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">slice: 27 (1/3 of 81px)</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-repeat: stretch;
+          "
+        >
+          27
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">slice: 40</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 40;
+            border-image-repeat: stretch;
+          "
+        >
+          40
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">slice: 27 fill</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27 fill;
+            border-image-repeat: stretch;
+          "
+        >
+          27 fill
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">slice: 33%</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 33%;
+            border-image-repeat: stretch;
+          "
+        >
+          33%
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">border-image-width</h3>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">width: 10px</div>
+        <div
+          class="box"
+          style="
+            border: 10px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-width: 10px;
+            border-image-repeat: round;
+          "
+        >
+          10px
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">width: 27px</div>
+        <div
+          class="box"
+          style="
+            border: 10px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-width: 27px;
+            border-image-repeat: round;
+          "
+        >
+          27px
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">width: auto (= slice)</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-width: auto;
+            border-image-repeat: round;
+          "
+        >
+          auto
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">border-image-outset</h3>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">outset: 0 (default)</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-outset: 0;
+            border-image-repeat: round;
+          "
+        >
+          0
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">outset: 10px</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-outset: 10px;
+            border-image-repeat: round;
+          "
+        >
+          10px
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">MDN example (border-image shorthand)</h3>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">MDN: slice 27 fill / 20px round</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image: url(&quot;../../images/border-diamonds.png&quot;) 27
+              fill / 20px round;
+          "
+        >
+          MDN example
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">shorthand: slice 27 / 27px stretch</div>
+        <div
+          class="box"
+          style="
+            border: 27px solid transparent;
+            border-image: url(&quot;../../images/border-diamonds.png&quot;) 27 /
+              27px stretch;
+          "
+        >
+          stretch
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin: 24px 0 16px 0">Edge cases</h3>
+    <div class="grid">
+      <!-- Missing image -->
+      <div class="cell">
+        <div class="label">missing image (fallback to border)</div>
+        <div
+          class="box"
+          style="
+            border: 4px solid #000;
+            border-image-source: url(&quot;nonexistent.png&quot;);
+            border-image-slice: 27;
+          "
+        >
+          fallback
+        </div>
+      </div>
+
+      <!-- Gradient as border-image -->
+      <div class="cell">
+        <div class="label">gradient border-image</div>
+        <div
+          class="box"
+          style="
+            border: 8px solid transparent;
+            border-image-source: linear-gradient(135deg, #f00, #00f);
+            border-image-slice: 1;
+          "
+        >
+          gradient
+        </div>
+      </div>
+
+      <!-- border-image + border-radius (spec: border-image wins) -->
+      <div class="cell">
+        <div class="label">border-image + border-radius</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-radius: 16px;
+            border-image-source: url(&quot;../../images/border-diamonds.png&quot;);
+            border-image-slice: 27;
+            border-image-repeat: round;
+          "
+        >
+          +radius (ignored)
+        </div>
+      </div>
+
+      <!-- With checker pattern for comparison -->
+      <div class="cell">
+        <div class="label">checker.png for comparison</div>
+        <div
+          class="box"
+          style="
+            border: 20px solid transparent;
+            border-image-source: url(&quot;../../images/checker.png&quot;);
+            border-image-slice: 30;
+            border-image-repeat: stretch;
+          "
+        >
+          checker
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

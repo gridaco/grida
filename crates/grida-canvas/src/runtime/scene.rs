@@ -1001,6 +1001,14 @@ impl Renderer {
         Some((width, height, r#type))
     }
 
+    /// Register an image by an arbitrary URL key (for htmlcss embed images).
+    ///
+    /// Unlike `add_image_with_rid` which requires `res://` prefix, this allows
+    /// any URL string as key — matching what `htmlcss::collect_image_urls()` returns.
+    pub fn add_image_by_url(&mut self, url: &str, bytes: &[u8]) -> Option<(u32, u32)> {
+        self.images.insert_bytes(url.to_string(), bytes)
+    }
+
     pub fn get_image_bytes(&self, id: &str) -> Option<Vec<u8>> {
         let rid = normalize_image_id(id);
         self.resources.get(&rid)

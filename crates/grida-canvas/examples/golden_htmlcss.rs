@@ -24,7 +24,8 @@ fn fonts() -> FontRepository {
 
 fn render_to_png(html: &str, width: f32, name: &str, out_dir: &Path) {
     let fonts = fonts();
-    let picture = htmlcss::render(html, width, 600.0, &fonts).expect("render failed");
+    let picture =
+        htmlcss::render(html, width, 600.0, &fonts, &htmlcss::NoImages).expect("render failed");
     let cull = picture.cull_rect();
     let w = cull.width().max(1.0) as i32;
     let h = cull.height().max(1.0) as i32;

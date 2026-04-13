@@ -742,9 +742,14 @@ fn resolve_layout(
                         h.max(MIN_SIZE)
                     } else {
                         let styled_html = crate::htmlcss::markdown_to_styled_html(&n.markdown);
-                        crate::htmlcss::measure_content_height(&styled_html, width, fonts)
-                            .unwrap_or(0.0)
-                            .max(MIN_SIZE)
+                        crate::htmlcss::measure_content_height(
+                            &styled_html,
+                            width,
+                            fonts,
+                            &crate::htmlcss::NoImages,
+                        )
+                        .unwrap_or(0.0)
+                        .max(MIN_SIZE)
                     };
                     (geo.schema_transform, width, height)
                 } else {

@@ -2094,6 +2094,17 @@ export namespace editor.gesture {
     readonly offset: cmath.Vector2;
 
     /**
+     * The angle (degrees) from the node center to the pointer at drag start.
+     * Used to compute the rotation delta during the gesture.
+     */
+    readonly initial_angle: number;
+
+    /**
+     * The node's rotation (degrees) when the gesture started.
+     */
+    readonly initial_rotation: number;
+
+    /**
      * the current rotation of the selection
      */
     rotation: number;
