@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import { useTransformState } from "@/grida-canvas-react/provider";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
 import { measure, Measurement } from "@grida/cmath/_measurement";
-import { MeasurementGuideRenderer } from "./measurement";
+import { MeasurementGuide as MeasurementGuideCanvas } from "@grida/hud/react";
+import { WorkbenchColors } from "@/grida-canvas-react/ui-config";
+import { useViewport } from "../context";
 import vn from "@grida/vn";
 import cmath from "@grida/cmath";
 import useVectorContentEditMode from "../../use-sub-vector-network-editor";
@@ -269,10 +271,16 @@ function useVectorMeasurement() {
 export function VectorMeasurementGuide() {
   const measurement = useVectorMeasurement();
   const { transform } = useTransformState();
-
-  if (!measurement) return <></>;
+  const viewport = useViewport();
 
   return (
-    <MeasurementGuideRenderer measurement={measurement} transform={transform} />
+    <MeasurementGuideCanvas
+      width={viewport?.clientWidth ?? 0}
+      height={viewport?.clientHeight ?? 0}
+      transform={transform}
+      measurement={measurement}
+      color={WorkbenchColors.red}
+      className="absolute inset-0 z-30"
+    />
   );
 }
