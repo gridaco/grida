@@ -41,6 +41,43 @@ export interface HUDRule {
 }
 
 /**
+ * A rectangle in document space.
+ *
+ * Stroke uses the canvas color by default. Fill is opt-in.
+ */
+export interface HUDRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Whether to stroke the outline (default: true). */
+  stroke?: boolean;
+  /** Whether to fill the interior (default: false). */
+  fill?: boolean;
+  /** Opacity of the fill color, 0–1 (default: 1). Ignored when `fill` is falsy. */
+  fillOpacity?: number;
+  /** Draw the outline with a dash pattern. */
+  dashed?: boolean;
+}
+
+/**
+ * A polyline (or closed polygon) in document space.
+ *
+ * Stroke uses the canvas color by default. Fill is opt-in.
+ */
+export interface HUDPolyline {
+  points: cmath.Vector2[];
+  /** Whether to stroke the path (default: true). */
+  stroke?: boolean;
+  /** Whether to fill the interior (default: false). */
+  fill?: boolean;
+  /** Opacity of the fill color, 0–1 (default: 1). Ignored when `fill` is falsy. */
+  fillOpacity?: number;
+  /** Draw the stroke with a dash pattern. */
+  dashed?: boolean;
+}
+
+/**
  * A complete set of draw commands for one frame.
  *
  * The HUD clears the canvas and draws everything in this struct each frame.
@@ -51,6 +88,8 @@ export interface HUDDraw {
   lines?: HUDLine[];
   rules?: HUDRule[];
   points?: cmath.Vector2[];
+  rects?: HUDRect[];
+  polylines?: HUDPolyline[];
 }
 
 export interface HUDCanvasOptions {
@@ -119,9 +158,11 @@ export class HUDCanvas {
 
     if (!commands) return;
 
-    const { lines, rules, points } = commands;
+    const { lines, rules, points, rects, polylines } = commands;
 
     if (rules && rules.length > 0) this.drawRules(rules);
+    if (rects && rects.length > 0) this.drawRects(rects);
+    if (polylines && polylines.length > 0) this.drawPolylines(polylines);
     if (lines && lines.length > 0) this.drawLines(lines);
     if (points && points.length > 0) this.drawPoints(points);
   }
@@ -242,6 +283,79 @@ export class HUDCanvas {
       // text
       ctx.fillStyle = DEFAULT_LABEL_FG;
       ctx.fillText(line.label, labelX, labelY);
+    }
+  }
+
+  private drawRects(rects: HUDRect[]) {
+    const ctx = this.ctx;
+    const zoom = this.transform[0][0];
+
+    this.applyViewTransform();
+    ctx.lineWidth = DEFAULT_LINE_WIDTH / zoom;
+
+    for (const rect of rects) {
+      const doStroke = rect.stroke !== false;
+      const doFill = rect.fill === true;
+
+      if (rect.dashed) {
+        ctx.setLineDash([4 / zoom, 3 / zoom]);
+      }
+
+      if (doFill) {
+        ctx.globalAlpha = rect.fillOpacity ?? 1;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.globalAlpha = 1;
+      }
+
+      if (doStroke) {
+        ctx.strokeStyle = this.color;
+        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+      }
+
+      if (rect.dashed) {
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  private drawPolylines(polylines: HUDPolyline[]) {
+    const ctx = this.ctx;
+    const zoom = this.transform[0][0];
+
+    this.applyViewTransform();
+    ctx.lineWidth = DEFAULT_LINE_WIDTH / zoom;
+
+    for (const poly of polylines) {
+      if (poly.points.length < 2) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(poly.points[0][0], poly.points[0][1]);
+      for (let i = 1; i < poly.points.length; i++) {
+        ctx.lineTo(poly.points[i][0], poly.points[i][1]);
+      }
+
+      const doFill = poly.fill === true;
+      const doStroke = poly.stroke !== false;
+
+      if (doFill) {
+        ctx.closePath();
+        ctx.globalAlpha = poly.fillOpacity ?? 1;
+        ctx.fillStyle = this.color;
+        ctx.fill("evenodd");
+        ctx.globalAlpha = 1;
+      }
+
+      if (doStroke) {
+        if (poly.dashed) {
+          ctx.setLineDash([4 / zoom, 3 / zoom]);
+        }
+        ctx.strokeStyle = this.color;
+        ctx.stroke();
+        if (poly.dashed) {
+          ctx.setLineDash([]);
+        }
+      }
     }
   }
 

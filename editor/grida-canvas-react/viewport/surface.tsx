@@ -35,7 +35,10 @@ import {
   supports,
 } from "@/grida-canvas/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
-import { Lasso } from "./ui/lasso/lasso";
+import {
+  Marquee as MarqueeCanvas,
+  Lasso as LassoCanvas,
+} from "@grida/hud/react";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext, useViewport } from "./context";
 import {
@@ -612,15 +615,18 @@ function MarqueeOverlay() {
   const editor = useCurrentEditor();
   const marquee = useEditorState(editor, (state) => state.marquee);
   const { transform } = useTransformState();
+  const viewport = useViewport();
 
-  if (!marquee) return null;
   return (
-    <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
-      <MarqueeArea
-        a={cmath.vector2.transform(marquee.a, transform)}
-        b={cmath.vector2.transform(marquee.b, transform)}
-      />
-    </div>
+    <MarqueeCanvas
+      width={viewport?.clientWidth ?? 0}
+      height={viewport?.clientHeight ?? 0}
+      transform={transform}
+      a={marquee?.a}
+      b={marquee?.b}
+      color={WorkbenchColors.sky}
+      className="absolute inset-0 z-50"
+    />
   );
 }
 
@@ -628,10 +634,18 @@ function LassoOverlay() {
   const editor = useCurrentEditor();
   const lasso = useEditorState(editor, (state) => state.lasso);
   const { transform } = useTransformState();
+  const viewport = useViewport();
 
-  if (!lasso) return null;
-  const points = lasso.points.map((p) => cmath.vector2.transform(p, transform));
-  return <Lasso points={points} id="lasso-container" className="fixed" />;
+  return (
+    <LassoCanvas
+      width={viewport?.clientWidth ?? 0}
+      height={viewport?.clientHeight ?? 0}
+      transform={transform}
+      points={lasso?.points}
+      color={WorkbenchColors.sky}
+      className="absolute inset-0 z-50"
+    />
+  );
 }
 
 function DropzoneOverlay(props: editor.state.DropzoneIndication) {

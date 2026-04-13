@@ -14,6 +14,7 @@ import { self_clearSelection } from "./methods/select";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import grida from "@grida/schema";
+import type vn from "@grida/vn";
 import { editor } from "@/grida-canvas";
 import { perf } from "../perf";
 
@@ -48,6 +49,20 @@ export type ReducerContext = {
 };
 
 export type ReducerResult = [editor.state.IEditorState, Patch[], Patch[]];
+
+/** Deep-clone a vector network so VectorNetworkEditor can mutate in-place. */
+function cloneVectorNetwork(network: vn.VectorNetwork): vn.VectorNetwork {
+  return {
+    vertices: network.vertices.map(
+      (v): vn.VectorNetworkVertex => [...v] as vn.VectorNetworkVertex
+    ),
+    segments: network.segments.map((s) => ({
+      ...s,
+      ta: [...s.ta] as [number, number],
+      tb: [...s.tb] as [number, number],
+    })),
+  };
+}
 
 export default function reducer(
   state: editor.state.IEditorState,
@@ -186,22 +201,82 @@ export default function reducer(
 
     // Clone each node that's in the current selection so writes to
     // layout_inset_left/top don't mutate the frozen original node.
-    const gesture = state.gesture as any;
-    if (gesture.type !== "idle" && gesture.selection) {
-      for (const id of gesture.selection as string[]) {
+    const gesture = state.gesture;
+    if (
+      gesture.type !== "idle" &&
+      "selection" in gesture &&
+      gesture.selection
+    ) {
+      for (const id of gesture.selection) {
         if (mutableNodes[id]) {
           mutableNodes[id] = { ...mutableNodes[id] };
         }
       }
     }
+
+    // Clone the content-edit-mode target node so writes to
+    // layout_inset_left/top and internal data don't mutate the frozen
+    // original during drag gestures.
+    const cem = state.content_edit_mode;
+    if (cem && mutableNodes[cem.node_id]) {
+      const vid = cem.node_id;
+      if (cem.type === "vector") {
+        // VectorNetworkEditor mutates segments in-place (e.g. updateTangent
+        // writes seg.ta/seg.tb), so deep-clone vector_network too.
+        const vnode = mutableNodes[vid] as grida.program.nodes.VectorNode;
+        mutableNodes[vid] = {
+          ...vnode,
+          vector_network: vnode.vector_network
+            ? cloneVectorNetwork(vnode.vector_network)
+            : vnode.vector_network,
+        };
+      } else {
+        // width (stroke_width_profile), bitmap (layout props), etc.
+        mutableNodes[vid] = { ...mutableNodes[vid] };
+      }
+    }
+
+    // Clone the draw gesture's target node (line/pencil/arrow).
+    // GestureDraw uses gesture.node_id, not gesture.selection.
+    if (gesture.type === "draw" && mutableNodes[gesture.node_id]) {
+      const dnode = mutableNodes[
+        gesture.node_id
+      ] as grida.program.nodes.VectorNode;
+      mutableNodes[gesture.node_id] = {
+        ...dnode,
+        vector_network: dnode.vector_network
+          ? cloneVectorNetwork(dnode.vector_network)
+          : dnode.vector_network,
+      };
+    }
+
+    // Clone all nodes in the sort/gap gesture's layout — the sort gesture
+    // rewrites layout_inset_left/top on every sibling (transform.ts:543-551),
+    // and the gap gesture does the same (event-target.reducer.ts:937-943).
+    if (
+      (gesture.type === "sort" || gesture.type === "gap") &&
+      gesture.layout?.objects
+    ) {
+      for (const obj of gesture.layout.objects) {
+        if (mutableNodes[obj.id]) {
+          mutableNodes[obj.id] = { ...mutableNodes[obj.id] };
+        }
+      }
+    }
+
+    // Clone the brush gesture's target node.
+    if (gesture.type === "brush" && mutableNodes[gesture.node_id]) {
+      mutableNodes[gesture.node_id] = { ...mutableNodes[gesture.node_id] };
+    }
+
     // Also clone the scene node for guide gesture (writes to guides[i].offset)
     if (state.scene_id && mutableNodes[state.scene_id]) {
-      const sceneNode = mutableNodes[state.scene_id] as any;
+      const snode = mutableNodes[
+        state.scene_id
+      ] as grida.program.nodes.SceneNode;
       mutableNodes[state.scene_id] = {
-        ...sceneNode,
-        guides: sceneNode.guides
-          ? sceneNode.guides.map((g: any) => ({ ...g }))
-          : undefined,
+        ...snode,
+        guides: snode.guides ? snode.guides.map((g) => ({ ...g })) : [],
       };
     }
 
@@ -218,22 +293,62 @@ export default function reducer(
       mutableLinks = state.document.links as Record<string, string[]>;
     }
 
-    const mutable: any = {
+    // Build the gesture clone. Sort/gap write to gesture.layout.objects,
+    // so deep-clone layout when present.
+    let mutableGesture: editor.gesture.GestureState;
+    if (gesture.type === "sort" || gesture.type === "gap") {
+      mutableGesture = {
+        ...gesture,
+        layout: {
+          ...gesture.layout,
+          objects: gesture.layout.objects.map((o) => ({ ...o })),
+        },
+      };
+    } else {
+      mutableGesture = { ...gesture };
+    }
+
+    // Build the content_edit_mode clone.
+    let mutableCem = cem ? { ...cem } : cem;
+    if (mutableCem?.type === "vector") {
+      mutableCem = {
+        ...mutableCem,
+        selection: { ...mutableCem.selection },
+        selection_neighbouring_vertices: [
+          ...mutableCem.selection_neighbouring_vertices,
+        ],
+      };
+    } else if (mutableCem?.type === "width") {
+      mutableCem = {
+        ...mutableCem,
+        variable_width_profile: {
+          ...mutableCem.variable_width_profile,
+          stops: mutableCem.variable_width_profile.stops.map((s) => ({ ...s })),
+        },
+      };
+    }
+
+    const mutable = {
       ...state,
       document: {
         ...state.document,
         nodes: mutableNodes,
         links: mutableLinks,
+        // Brush gesture writes to document.bitmaps[imageRef]; clone when
+        // in bitmap content-edit mode so the dict is mutable.
+        ...(cem?.type === "bitmap"
+          ? { bitmaps: { ...state.document.bitmaps } }
+          : {}),
       },
       document_ctx: { ...state.document_ctx },
-      // Clone sub-objects that on-drag mutates. Each is small (a few fields).
-      gesture: { ...state.gesture },
+      gesture: mutableGesture,
       // marquee: { a, b, additive } — .b is written during marquee drag
       marquee: state.marquee ? { ...state.marquee } : state.marquee,
       // lasso: { points, additive } — .points is pushed to during lasso drag
       lasso: state.lasso
         ? { ...state.lasso, points: [...state.lasso.points] }
         : state.lasso,
+      content_edit_mode: mutableCem,
       // pointer: read-only during on-drag but clone for safety
       pointer: { ...state.pointer },
       // hits: read (slice) during translate hierarchy check
@@ -244,12 +359,12 @@ export default function reducer(
     };
 
     // Run the recipe on the mutable object (cast as Draft for type compat)
-    recipe(mutable as Draft<editor.state.IEditorState>);
+    recipe(mutable as unknown as Draft<editor.state.IEditorState>);
 
     // Remove the stashed original before exposing as the new state
-    delete mutable.__original;
+    delete (mutable as { __original?: unknown }).__original;
 
-    nextState = mutable as editor.state.IEditorState;
+    nextState = mutable as unknown as editor.state.IEditorState;
     patches = [];
     inversePatches = [];
   } else {
