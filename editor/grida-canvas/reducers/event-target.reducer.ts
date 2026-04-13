@@ -648,15 +648,19 @@ function __self_evt_on_drag(
     if (orig.gesture.type === "idle") return;
     if (orig.gesture.type === "nudge") return;
 
-    // Type-narrow the gesture for TS. We switch on orig.gesture.type (to
-    // avoid Immer proxy creation on the draft), but TS can only narrow the
-    // variable it actually switches on. Cast once here so all case branches
-    // can access gesture-specific fields without per-line casts.
-    const g = draft.gesture as any;
+    // We switch on orig.gesture (to avoid Immer proxy creation on the
+    // draft). TS narrows orig.gesture in each case but cannot narrow
+    // draft.gesture. For the common IGesture fields (movement, last)
+    // that exist on all active gestures, we use Exclude to drop the
+    // non-IGesture members from the union.
+    type ActiveGesture = Exclude<
+      editor.gesture.GestureState,
+      editor.gesture.GestureIdle | editor.gesture.GestureVirtualNudge
+    >;
+    const draftGesture = draft.gesture as ActiveGesture;
 
-    // These writes proxy the gesture object, but gesture is small.
-    g.last = orig.gesture.movement;
-    g.movement = movement;
+    draftGesture.last = orig.gesture.movement;
+    draftGesture.movement = movement;
 
     switch (orig.gesture.type) {
       case "pan": {
@@ -676,9 +680,10 @@ function __self_evt_on_drag(
         const scene = draft.document.nodes[
           draft.scene_id!
         ] as grida.program.nodes.SceneNode;
-        const { axis, idx: index, initial_offset } = g;
+        const og = orig.gesture; // narrowed to GestureGuide
+        const dg = draft.gesture as editor.gesture.GestureGuide;
 
-        const counter = axis === "x" ? 0 : 1;
+        const counter = og.axis === "x" ? 0 : 1;
         const m = movement[counter];
 
         // [snap the guide offset]
@@ -686,8 +691,8 @@ function __self_evt_on_drag(
         // 2. to objects geometry
         const scene_children = draft.document.links[draft.scene_id!] || [];
         const { translated } = snapGuideTranslation(
-          axis,
-          initial_offset,
+          og.axis,
+          og.initial_offset,
           scene_children.map(
             (id) => context.geometry.getNodeAbsoluteBoundingRect(id)!
           ),
@@ -700,8 +705,8 @@ function __self_evt_on_drag(
 
         const offset = cmath.quantize(translated, 1);
 
-        g.offset = offset;
-        scene.guides[index].offset = offset;
+        dg.offset = offset;
+        scene.guides[og.idx].offset = offset;
         break;
       }
       // [insertion mode - resize after insertion]
@@ -753,7 +758,8 @@ function __self_evt_on_drag(
         break;
       }
       case "corner-radius": {
-        const { node_id, anchor, altKey = false } = g;
+        const og = orig.gesture; // narrowed to GestureCornerRadius
+        const { node_id, anchor, altKey = false } = og;
         const [dx, dy] = delta;
         const node = dq.__getNodeById(draft, node_id);
 
@@ -810,7 +816,7 @@ function __self_evt_on_drag(
                 sw: "rectangular_corner_radius_bottom_left",
               } as const;
 
-              const key = keyMap[anchor as keyof typeof keyMap];
+              const key = keyMap[anchor];
               const current = (node as any)[key] ?? 0;
 
               // Check if all corners have the same value
@@ -887,7 +893,9 @@ function __self_evt_on_drag(
         //
       }
       case "gap": {
-        const { layout, axis, initial_gap, min_gap } = g;
+        const og = orig.gesture; // narrowed to GestureGap
+        const dg = draft.gesture as editor.gesture.GestureGap;
+        const { layout, axis, initial_gap, min_gap } = og;
         const delta = movement[axis === "x" ? 0 : 1];
         const side: "layout_inset_left" | "layout_inset_top" =
           axis === "x" ? "layout_inset_left" : "layout_inset_top";
@@ -896,7 +904,12 @@ function __self_evt_on_drag(
           case "group": {
             const sorted = layout.objects
               .slice()
-              .sort((a: any, b: any) => a[axis] - b[axis]);
+              .sort(
+                (
+                  a: cmath.Rectangle & { id: string },
+                  b: cmath.Rectangle & { id: string }
+                ) => a[axis] - b[axis]
+              );
 
             const gap = cmath.quantize(
               Math.max(initial_gap + delta, min_gap),
@@ -907,19 +920,21 @@ function __self_evt_on_drag(
             let currentPos = sorted[0][axis];
 
             // Calculate new positions considering each rect's dimension.
-            const transformed = sorted.map((obj: any) => {
-              const next = { ...obj };
-              next[axis] = cmath.quantize(currentPos, 1);
-              currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
-              return next;
-            });
+            const transformed = sorted.map(
+              (obj: cmath.Rectangle & { id: string }) => {
+                const next = { ...obj };
+                next[axis] = cmath.quantize(currentPos, 1);
+                currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
+                return next;
+              }
+            );
 
             // Update layout objects with new positions.
-            g.layout.objects = transformed;
-            g.gap = gap;
+            dg.layout.objects = transformed;
+            dg.gap = gap;
 
             // Apply transform to the actual nodes.
-            transformed.forEach((obj: any) => {
+            transformed.forEach((obj: cmath.Rectangle & { id: string }) => {
               const node = dq.__getNodeById(
                 draft,
                 obj.id
@@ -944,7 +959,7 @@ function __self_evt_on_drag(
               layout_cross_axis_gap: gap,
             });
 
-            g.gap = gap;
+            dg.gap = gap;
             break;
           }
         }
@@ -952,7 +967,9 @@ function __self_evt_on_drag(
         break;
       }
       case "padding": {
-        const { node_id, side, initial_padding, min_padding } = g;
+        const og = orig.gesture; // narrowed to GesturePadding
+        const dg = draft.gesture as editor.gesture.GesturePadding;
+        const { node_id, side, initial_padding, min_padding } = og;
         const delta = movement[side === "top" || side === "bottom" ? 1 : 0];
 
         const padding = cmath.quantize(
@@ -1007,7 +1024,7 @@ function __self_evt_on_drag(
             ...updates,
           } as NodeChangeAction);
 
-          g.padding = padding;
+          dg.padding = padding;
         }
 
         break;
