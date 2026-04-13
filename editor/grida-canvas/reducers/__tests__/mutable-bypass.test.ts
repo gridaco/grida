@@ -137,6 +137,8 @@ const onDragAction: EditorEventTarget_Drag = {
     delta: [5, 5],
     distance: [5, 5],
     movement: [5, 5],
+    initial: [0, 0],
+    xy: [5, 5],
   },
 };
 
@@ -214,7 +216,7 @@ describe("mutable bypass (skipPatches) – vector editing", () => {
           movement: [0, 0],
           first: [0, 0],
           last: [0, 0],
-        } satisfies editor.state.GestureTranslateVectorControls,
+        } satisfies editor.gesture.GestureTranslateVectorControls,
       });
 
       expect(Object.isFrozen(state.document.nodes[VECTOR_NODE_ID])).toBe(true);
@@ -246,7 +248,7 @@ describe("mutable bypass (skipPatches) – vector editing", () => {
           movement: [0, 0],
           first: [0, 0],
           last: [0, 0],
-        } satisfies editor.state.GestureCurve,
+        } satisfies editor.gesture.GestureCurve,
       });
 
       expect(Object.isFrozen(state.document.nodes[VECTOR_NODE_ID])).toBe(true);
@@ -284,7 +286,7 @@ describe("mutable bypass (skipPatches) – vector editing", () => {
           movement: [0, 0],
           first: [0, 0],
           last: [0, 0],
-        } satisfies editor.state.GestureTranslateVectorControls,
+        } satisfies editor.gesture.GestureTranslateVectorControls,
       });
 
       const origNode = state.document.nodes[
@@ -364,7 +366,7 @@ describe("mutable bypass (skipPatches) – variable-width editing", () => {
         movement: [0, 0],
         first: [0, 0],
         last: [0, 0],
-      } satisfies editor.state.GestureTranslateVariableWidthStop,
+      } satisfies editor.gesture.GestureTranslateVariableWidthStop,
     });
 
     expect(Object.isFrozen(state.content_edit_mode)).toBe(true);
@@ -403,7 +405,7 @@ describe("mutable bypass (skipPatches) – variable-width editing", () => {
         movement: [0, 0],
         first: [0, 0],
         last: [0, 0],
-      } satisfies editor.state.GestureResizeVariableWidthStop,
+      } satisfies editor.gesture.GestureResizeVariableWidthStop,
     });
 
     expect(Object.isFrozen(state.content_edit_mode)).toBe(true);
@@ -463,10 +465,10 @@ describe("mutable bypass (skipPatches) – sort gesture", () => {
         movement: [0, 0],
         first: [0, 0],
         last: [0, 0],
-      } satisfies editor.state.GestureSort,
+      } satisfies editor.gesture.GestureSort,
     });
 
-    const sortGesture = state.gesture as editor.state.GestureSort;
+    const sortGesture = state.gesture as editor.gesture.GestureSort;
     expect(Object.isFrozen(sortGesture.layout)).toBe(true);
     expect(Object.isFrozen(state.document.nodes[RECT_B])).toBe(true);
 
@@ -522,10 +524,10 @@ describe("mutable bypass (skipPatches) – gap gesture", () => {
         movement: [0, 0],
         first: [0, 0],
         last: [0, 0],
-      } satisfies editor.state.GestureGap,
+      } satisfies editor.gesture.GestureGap,
     });
 
-    const gapGesture = state.gesture as editor.state.GestureGap;
+    const gapGesture = state.gesture as editor.gesture.GestureGap;
     expect(Object.isFrozen(gapGesture.layout)).toBe(true);
     expect(Object.isFrozen(state.document.nodes[RECT_A])).toBe(true);
 
@@ -586,7 +588,7 @@ describe("mutable bypass (skipPatches) – draw gesture", () => {
         movement: [0, 0],
         first: [0, 0],
         last: [0, 0],
-      } satisfies editor.state.GestureDraw,
+      } satisfies editor.gesture.GestureDraw,
     });
 
     expect(Object.isFrozen(state.document.nodes[DRAW_NODE_ID])).toBe(true);

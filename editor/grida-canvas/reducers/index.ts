@@ -53,11 +53,13 @@ export type ReducerResult = [editor.state.IEditorState, Patch[], Patch[]];
 /** Deep-clone a vector network so VectorNetworkEditor can mutate in-place. */
 function cloneVectorNetwork(network: vn.VectorNetwork): vn.VectorNetwork {
   return {
-    vertices: network.vertices.map((v) => [...v] as vn.VectorNetworkVertex),
+    vertices: network.vertices.map(
+      (v): vn.VectorNetworkVertex => [...v] as vn.VectorNetworkVertex
+    ),
     segments: network.segments.map((s) => ({
       ...s,
-      ta: [...s.ta] as vn.Vector2,
-      tb: [...s.tb] as vn.Vector2,
+      ta: [...s.ta] as [number, number],
+      tb: [...s.tb] as [number, number],
     })),
   };
 }
@@ -293,7 +295,7 @@ export default function reducer(
 
     // Build the gesture clone. Sort/gap write to gesture.layout.objects,
     // so deep-clone layout when present.
-    let mutableGesture: editor.state.GestureState;
+    let mutableGesture: editor.gesture.GestureState;
     if (gesture.type === "sort" || gesture.type === "gap") {
       mutableGesture = {
         ...gesture,
