@@ -130,7 +130,8 @@ async function createEditorWithWasm(
   } catch {
     scene.loadScene(JSON.stringify({ version: 4, document: doc }));
   }
-  scene.switchScene("scene");
+  const sceneId = doc.entry_scene_id ?? doc.scenes_ref[0];
+  scene.switchScene(sceneId);
   (ed as any)._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
     ed,
     scene
