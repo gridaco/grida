@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 import { motion } from "motion/react";
-import { useEditorState } from "@/scaffolds/editor";
 import { Button } from "@/components/ui/button";
 import { useStep } from "usehooks-ts";
 import { FormStartPage } from "@/theme/templates/formstart";
@@ -25,13 +24,6 @@ export function BrowseStartPageTemplatesDialog({
   defaultValue?: string;
   onValueCommit?: (value: string) => void;
 }) {
-  const [state] = useEditorState();
-
-  const {
-    form: { campaign },
-    theme: { lang },
-  } = state;
-
   const [
     step,
     { goToNextStep, goToPrevStep, canGoToNextStep, canGoToPrevStep, setStep },

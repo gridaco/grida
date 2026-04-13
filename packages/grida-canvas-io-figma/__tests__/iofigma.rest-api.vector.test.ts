@@ -146,7 +146,6 @@ describe("iofigma.restful.factory.document", () => {
 
       // Get original vector node positioning
       const originalTransform = vectorNode.relativeTransform;
-      const originalSize = vectorNode.size;
 
       // Convert
       const context: iofigma.restful.factory.FactoryContext = {

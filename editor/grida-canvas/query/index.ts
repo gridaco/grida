@@ -7,42 +7,6 @@ import { perf } from "../perf";
 type NodeID = string & {};
 
 /**
- * Creates a runtime hierarchy context from a document.
- * This builds a lookup table directly from document.links for efficient parent/child queries.
- */
-function create_nodes_repository_runtime_hierarchy_context(
-  document: grida.program.document.IDocumentDefinition
-): grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext {
-  // Build LUT directly from document.links structure
-  const lu_keys = Object.keys(document.nodes);
-  const lu_parent: Record<string, string | null> = {};
-  const lu_children: Record<string, string[]> = {};
-
-  // Initialize all nodes
-  for (const nodeId of lu_keys) {
-    lu_parent[nodeId] = null;
-    lu_children[nodeId] = [];
-  }
-
-  // Build parent-child relationships from links
-  for (const parentId in document.links) {
-    const children = document.links[parentId];
-    if (Array.isArray(children)) {
-      for (const childId of children) {
-        lu_parent[childId] = parentId;
-        lu_children[parentId].push(childId);
-      }
-    }
-  }
-
-  return {
-    lu_keys,
-    lu_parent,
-    lu_children,
-  };
-}
-
-/**
  * @internal document /design query
  */
 export namespace dq {

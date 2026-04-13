@@ -325,7 +325,7 @@ export class FormRenderTree {
       const blocks: ClientRenderBlockWithoutIndex[] = [];
 
       const _fields_as_blocks: ClientRenderBlockWithoutIndex[] = _m_fields.map(
-        (field: any, i) => {
+        (field: any) => {
           return <ClientRenderBlockWithoutIndex>{
             id: field.id,
             type: "field",

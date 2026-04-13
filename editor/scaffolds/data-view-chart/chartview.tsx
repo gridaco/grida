@@ -142,15 +142,6 @@ function reducer(state: ChartViewState, action: ChartViewAction) {
   return state;
 }
 
-const dummy_pretty_data = [
-  { month: "January", a: 214, b: 80, c: 100 },
-  { month: "February", a: 305, b: 200, c: 150 },
-  { month: "March", a: 237, b: 120, c: 200 },
-  { month: "April", a: 73, b: 190, c: 250 },
-  { month: "May", a: 209, b: 130, c: 300 },
-  { month: "June", a: 214, b: 140, c: 350 },
-];
-
 function useDataFrame() {
   const tb = useDatagridTable();
   const space = useDatagridTableSpace()!;
@@ -515,7 +506,7 @@ function MainAxisQueryControl({
 function DataChartSkeleton({ count = 20 }: { count?: number }) {
   const randbars = useMemo(
     () =>
-      Array.from({ length: count }, (_, i) => {
+      Array.from({ length: count }, (_) => {
         return Math.floor(Math.random() * 100);
       }),
     [count]

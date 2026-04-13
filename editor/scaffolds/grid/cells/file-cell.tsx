@@ -98,10 +98,10 @@ export function FileEditCell({
 
   const canAddNewFile = multiple || (Array.isArray(refs) && refs.length === 0);
 
-  const uploader = async (file: File | Blob) => {
-    // TODO: commit the changes
-    return "";
-  };
+  // const uploader = async (file: File | Blob) => {
+  //   // TODO: commit the changes
+  //   return "";
+  // };
 
   return (
     <Popover open modal>
@@ -165,7 +165,7 @@ export function FileEditCell({
               // uploader={uploader}
               open={mediaPickerOpen}
               onOpenChange={setMediaPickerOpen}
-              onUseImage={(src) => {
+              onUseImage={() => {
                 // TODO: commit the changes
                 setMediaPickerOpen(false);
                 toast.error("Not implemented yet - contact support");

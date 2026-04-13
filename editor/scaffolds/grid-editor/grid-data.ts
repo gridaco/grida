@@ -413,7 +413,7 @@ export namespace GridData {
     attributes: FormFieldDefinition[]
   ): Array<DGResponseRow> {
     return (
-      responses.map((response, index) => {
+      responses.map((response) => {
         const row: DGResponseRow = {
           __gf_id: response.id,
           __gf_display_id: fmt_local_index(response.meta.local_index),
@@ -498,7 +498,7 @@ export namespace GridData {
     fields: FormFieldDefinition[]
   ) {
     return (
-      sessions?.map((session, index) => {
+      sessions?.map((session) => {
         const row: DGResponseRow = {
           __gf_id: session.id,
           __gf_display_id: session.id,
@@ -523,7 +523,6 @@ export namespace GridData {
 
   function rows_from_x_supabase_main_table({
     pkcol,
-    form_id,
     fields,
     rows,
   }: {
@@ -541,7 +540,7 @@ export namespace GridData {
       return row[field.name];
     };
 
-    return rows.reduce((acc: DGResponseRow[], row, index) => {
+    return rows.reduce((acc: DGResponseRow[], row) => {
       const gfRow: DGResponseRow = {
         __gf_id: pkcol ? row[pkcol] : "",
         __gf_display_id: pkcol ? row[pkcol] : "",

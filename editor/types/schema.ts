@@ -135,7 +135,7 @@ export class JSONFormParser {
             : null
           : // needs validation
             (value as JSONFormRaw);
-    } catch (error) {}
+    } catch {}
   }
 
   //

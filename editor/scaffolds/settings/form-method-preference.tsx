@@ -52,7 +52,7 @@ export function FormMethodPreference() {
         error: "Failed",
       });
       reset(data); // Reset form state to the new values after successful submission
-    } catch (error) {}
+    } catch {}
   };
 
   const method = useWatch({ control, name: "method" });

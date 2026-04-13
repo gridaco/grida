@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   ChatBoxFooter,
   ChatBox,
@@ -22,7 +22,6 @@ import {
   SelectGroup,
   SelectLabel,
 } from "@/components/ui/select";
-import { GenerationImageFrame } from "./_components/image-frame";
 import {
   useImageModelConfig,
   useGenerateImage,
@@ -104,9 +103,8 @@ function CanvasConsumer() {
   const { withAuth, session } = useContinueWithAuth();
   const credits = useCredits();
   const editor = useCurrentEditor();
-  const [prompt, setPrompt] = useState("");
   const model = useImageModelConfig("openai/gpt-image-1-mini");
-  const { generate, key, loading, image, start, end } = useGenerateImage();
+  const { generate, loading } = useGenerateImage();
 
   const onCommit = (value: { text: string }) => {
     const id = editor.commands.insertNode({
@@ -116,7 +114,6 @@ function CanvasConsumer() {
       layout_target_height: model.height,
       fit: "cover",
     });
-    setPrompt(value.text);
     generate({
       model: model.modelId,
       width: model.width,
@@ -254,7 +251,7 @@ function Chat({
       vertical: [] as ai.image.SizeSpec[],
     };
     (model.card?.sizes ?? []).forEach((s) => {
-      const [w, h, r] = s;
+      const [w, h] = s;
       const key = w === h ? "square" : w > h ? "horizontal" : "vertical";
       groups[key].push(s);
     });
@@ -275,7 +272,7 @@ function Chat({
             {sizeGroups.square.length > 0 && (
               <SelectGroup>
                 <SelectLabel>Square</SelectLabel>
-                {sizeGroups.square.map(([w, h, r]) => (
+                {sizeGroups.square.map(([, , r]) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
@@ -285,7 +282,7 @@ function Chat({
             {sizeGroups.horizontal.length > 0 && (
               <SelectGroup>
                 <SelectLabel>Horizontal</SelectLabel>
-                {sizeGroups.horizontal.map(([w, h, r]) => (
+                {sizeGroups.horizontal.map(([, , r]) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>
@@ -295,7 +292,7 @@ function Chat({
             {sizeGroups.vertical.length > 0 && (
               <SelectGroup>
                 <SelectLabel>Vertical</SelectLabel>
-                {sizeGroups.vertical.map(([w, h, r]) => (
+                {sizeGroups.vertical.map(([, , r]) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>

@@ -508,7 +508,6 @@ export namespace iofigma {
 
         type CmdGroup = { cmd: string; nums: number[] };
         const groups: CmdGroup[] = [];
-        let lastIdx = 0;
         let m: RegExpExecArray | null;
 
         // Split into (command, numbers[]) pairs

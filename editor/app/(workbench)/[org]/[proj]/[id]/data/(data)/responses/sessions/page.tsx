@@ -2,12 +2,11 @@
 
 import Invalid from "@/components/invalid";
 import {
-  useDatagridTable,
   useEditorState,
   useFormFields,
 } from "@/scaffolds/editor";
 import { FormResponseSessionFeedProvider } from "@/scaffolds/editor/feed";
-import { GDocTable, GDocTableID } from "@/scaffolds/editor/state";
+import { GDocTableID } from "@/scaffolds/editor/state";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { CurrentTable } from "@/scaffolds/editor/utils/current-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
@@ -37,10 +36,9 @@ export default function FormResponsesPage() {
 }
 
 function FormResponseSessionGridEditor() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
   const { form, tablespace, datagrid_local_filter, datagrid_query } = state;
 
-  const tb = useDatagridTable<GDocTable>();
 
   const fields = useFormFields();
 
@@ -57,7 +55,7 @@ function FormResponseSessionGridEditor() {
   );
 
   // Transforming the responses into the format expected by react-data-grid
-  const { filtered, inputlength } = useMemo(() => {
+  const { filtered } = useMemo(() => {
     return GridData.rows({
       form_id: form.form_id,
       table: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,

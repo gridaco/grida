@@ -464,7 +464,7 @@ function CustomComponent_Viewer__Invitation(
 function CustomComponent_Viewer__InvitationUXOverlay(
   componentprops: ViewerComponentProps
 ) {
-  const { campaign, props, locale } = useViewerContext();
+  const { props, locale } = useViewerContext();
 
   return (
     <div

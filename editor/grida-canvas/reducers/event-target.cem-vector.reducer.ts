@@ -439,8 +439,8 @@ export function create_new_vector_node(
  */
 export function on_path_drag_start(
   draft: editor.state.IEditorState,
-  action: EditorEventTarget_DragStart,
-  context: ReducerContext
+  _action: EditorEventTarget_DragStart,
+  _context: ReducerContext
 ) {
   assert(draft.content_edit_mode?.type === "vector");
   const {

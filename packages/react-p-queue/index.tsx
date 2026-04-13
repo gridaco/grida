@@ -198,8 +198,7 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
         const results = await resolver(...tasks);
 
         // Dispatch results to update state
-        results.data?.forEach((result, index) => {
-          const task = tasks[index];
+        results.data?.forEach((result) => {
           dispatch({
             type: "result",
             result: { data: result, error: results.error },

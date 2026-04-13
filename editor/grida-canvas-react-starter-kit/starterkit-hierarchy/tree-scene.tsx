@@ -108,12 +108,6 @@ export function ScenesList() {
   });
   const scene_id = useEditorState(editor, (state) => state.scene_id);
 
-  const scenes = useMemo(() => {
-    return Object.values(scenesmap).sort((a, b) =>
-      (a.position ?? "").localeCompare(b.position ?? "")
-    );
-  }, [scenesmap]);
-
   const tree = useTree<grida.program.nodes.SceneNode>({
     rootItemId: "<document>",
     canReorder: true,
@@ -130,7 +124,7 @@ export function ScenesList() {
       if (item.getId() === "<document>") return "<document>";
       return item.getItemData().name;
     },
-    isItemFolder: (item) => false,
+    isItemFolder: (_item) => false,
     onDrop(items, target) {
       const ids = items.map((item) => item.getId());
 

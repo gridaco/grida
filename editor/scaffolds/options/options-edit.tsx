@@ -615,7 +615,6 @@ function RowItemBase({
   type,
   children,
   indent,
-  debug,
 }: React.PropsWithChildren<{
   type: "option" | "optgroup";
   id: string;
@@ -630,8 +629,6 @@ function RowItemBase({
     setActivatorNodeRef,
     transform,
     isDragging,
-    isSorting,
-    isOver,
     transition,
   } = useSortable({ id: id, data: { type, index } });
 

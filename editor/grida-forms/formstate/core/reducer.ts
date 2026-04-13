@@ -58,7 +58,7 @@ export function reducer(
           if (draft.fields[id].file) {
             draft.fields[id].file!.duration = metadata.duration;
           }
-        } catch (e) {
+        } catch {
           console.error("metadata resolved, but file was removed", metadata);
         }
       });
@@ -104,7 +104,7 @@ export function reducer(
       });
     }
     default: {
-      return produce(state, (draft) => {});
+      return produce(state, () => {});
     }
   }
 }

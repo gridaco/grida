@@ -17,7 +17,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const session = useSession();
   const [isOpen, setIsOpen] = useState(false);
-  const [pendingState, pendingHandlers] = usePendingCallback();
+  const [, pendingHandlers] = usePendingCallback();
   const hasHandledSession = useRef(false);
 
   const withAuth = <T extends (...args: any[]) => any>(callback: T) => {
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsOpen(false);
     try {
       await pendingHandlers.executeCallback();
-    } catch (error) {}
+    } catch {}
     hasHandledSession.current = true;
   };
 

@@ -83,7 +83,7 @@ import { GDocTableID, TableMenuItemData } from "../editor/state";
 export function ModeData() {
   const [state, dispatch] = useEditorState();
 
-  const { document_id, basepath, tables } = state;
+  const { document_id, basepath } = state;
 
   const newTableDialog = useDialogState<CreateNewTableDialogInit>(
     "new-table-dialog",

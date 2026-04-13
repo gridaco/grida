@@ -13,7 +13,7 @@ export function EditableDocumentTitle({
   id: string;
   defaultValue?: string;
 }) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   const [value, setValue] = useState<string>(defaultValue || "");
 

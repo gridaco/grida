@@ -227,7 +227,6 @@ export function CreateNewDocumentButton({
 }
 
 function CreateNewDatabaseDialog({
-  project_name,
   project_id,
   ...props
 }: React.ComponentProps<typeof Dialog> & {

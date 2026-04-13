@@ -2907,7 +2907,8 @@ export namespace grida.program.nodes {
         }
         case "container": {
           // Remove children from prototype before spreading to prevent leakage
-          const { children, ...prototypeWithoutChildren } = prototype as any;
+          const { children: _children, ...prototypeWithoutChildren } =
+            prototype as any;
           return {
             name: prototype.type,
             type: prototype.type,
@@ -2931,7 +2932,9 @@ export namespace grida.program.nodes {
         case "instance":
         case "template_instance": {
           // Remove children from prototype before spreading to prevent leakage
-          const { children, ...prototypeWithoutChildren } = prototype as any;
+          const { children: _children, ...prototypeWithoutChildren } =
+            prototype as any;
+
           // @ts-expect-error
           return {
             name: prototype.type,

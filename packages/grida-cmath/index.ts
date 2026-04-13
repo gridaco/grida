@@ -5730,7 +5730,7 @@ namespace cmath {
      * - The returned angle is in the range (-180, 180].
      */
     export function angle(transform: Transform): number {
-      const [[a, b, _tx], [c, d, _ty]] = transform;
+      const [[a, _b, _tx], [c, _d, _ty]] = transform;
       const radians = Math.atan2(c, a); // typical for rotation matrix: a = cosθ, c = sinθ
       const degrees = radians * (180 / Math.PI);
       return degrees;

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Layout({
-  params,
+  params: _params,
   children,
 }: Readonly<{
   children: React.ReactNode;

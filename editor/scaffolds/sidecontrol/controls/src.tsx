@@ -60,7 +60,7 @@ export function SrcControl({
   onValueChange?: (value?: tokens.StringValueExpression) => void;
 }) {
   const { uploader } = useSrcUploader();
-  const { openFilePicker, plainFiles, loading } = useFilePicker({
+  const { openFilePicker, plainFiles } = useFilePicker({
     readAs: "ArrayBuffer",
     accept: "image/*",
     multiple: false,

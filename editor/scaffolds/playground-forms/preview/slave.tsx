@@ -63,7 +63,7 @@ function useRenderer(raw?: string | JSONFormRaw | null) {
 }
 
 export default function PlaygroundPreviewSlave() {
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
 
   const [schema, setSchema] = useState<string | null>(null);
   const [variablescss, setVariablescss] = useState<string | null>(null);

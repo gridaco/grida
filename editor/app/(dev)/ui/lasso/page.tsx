@@ -10,14 +10,9 @@ import { cn } from "@/components/lib/utils";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 
 export default function LassoDemoPage() {
-  const [completed, setCompleted] = React.useState<cmath.Vector2[]>([]);
   const [targets, setTargets] = React.useState<cmath.Vector2[]>([]);
   const [selected, setSelected] = React.useState<cmath.Vector2[]>([]);
-  const { ref, points } = useLasso({
-    onComplete: (pts) => {
-      setCompleted(pts);
-    },
-  });
+  const { ref, points } = useLasso({});
   const throttledPoints = useThrottle(points, 50);
 
   React.useEffect(() => {
@@ -36,7 +31,6 @@ export default function LassoDemoPage() {
     ]);
     setTargets(pts);
     setSelected([]);
-    setCompleted([]);
   }, []);
 
   return (

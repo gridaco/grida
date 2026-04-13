@@ -186,7 +186,7 @@ export const screenToGradientPosition = (
   width: number,
   height: number
 ) => {
-  const { A, B, C } = getControlPoints(points, width, height);
+  const { A, B, C: _C } = getControlPoints(points, width, height);
 
   if (gradientType === "linear" || gradientType === "radial") {
     // Project onto A-B line for both linear and radial

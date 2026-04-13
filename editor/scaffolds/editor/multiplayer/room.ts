@@ -75,10 +75,10 @@ export function useMultiplayerRoom({
 
         onPresenceSync(cursors);
       })
-      .on("presence", { event: "join" }, ({ key, newPresences }) => {
+      .on("presence", { event: "join" }, ({ newPresences }) => {
         onJoin(newPresences.map((p) => p.cursor_id));
       })
-      .on("presence", { event: "leave" }, ({ key, leftPresences }) => {
+      .on("presence", { event: "leave" }, ({ leftPresences }) => {
         onLeave(leftPresences.map((p) => p.cursor_id));
       })
       .subscribe(async (status) => {

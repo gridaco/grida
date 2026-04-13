@@ -173,7 +173,7 @@ function useSelection() {
 }
 
 function Properties() {
-  const [state, dispatch] = useBuilderState();
+  const [, dispatch] = useBuilderState();
   const grid = useGrid();
   const [id, selection] = useSelection();
   return (

@@ -475,10 +475,7 @@ export function EditorSurface() {
                       />
                     )}
                     {content_edit_mode?.type === "width" && (
-                      <SurfaceVariableWidthEditor
-                        key="varwidth-editor"
-                        node_id={content_edit_mode.node_id}
-                      />
+                      <SurfaceVariableWidthEditor key="varwidth-editor" />
                     )}
                   </SurfaceGroup>
                 )}
@@ -1411,9 +1408,9 @@ function NodeOverlay({
 
   if (!data) return <></>;
 
-  const { node, style, size, boundingSurfaceRect } = data;
+  const { node, style, size } = data;
 
-  const { is_component_consumer, is_flex_parent } = node.meta;
+  const { is_component_consumer } = node.meta;
   // readonly = readonly || is_component_consumer;
 
   const rect_ui_width = size[0] * scaleX;
@@ -1854,7 +1851,7 @@ function Edge({
           const cy =
             n.layout_inset_top! + (n.layout_target_height as number) / 2;
           return cmath.vector2.transform([cx, cy], transform);
-        } catch (e) {}
+        } catch {}
     }
   };
 

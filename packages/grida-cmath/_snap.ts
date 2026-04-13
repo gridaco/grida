@@ -774,7 +774,7 @@ export namespace guide {
     lines: cmath.ui.Line[];
     points: cmath.Vector2[];
   } {
-    const { by_objects, anchors, delta } = context;
+    const { by_objects, anchors } = context;
     if (!by_objects) return { lines: [], points: [] };
 
     const { x, y, translated } = by_objects;

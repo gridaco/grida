@@ -78,7 +78,7 @@ function fmtsafely(txt: string, format: Data.Relation.Attribute["format"]) {
     }
 
     return txt;
-  } catch (e) {
+  } catch {
     return "ERR";
   }
 }

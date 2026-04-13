@@ -93,7 +93,7 @@ export function RichTextEditorField({
       try {
         settxtjsonvalue(JSON.stringify(content));
         onContentChange?.(editor, content);
-      } catch (e) {}
+      } catch {}
     };
     editor.onEditorContentChange(fn);
   }, [editor, onContentChange]);

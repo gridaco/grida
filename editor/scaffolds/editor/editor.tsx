@@ -403,7 +403,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren) {
  * @returns
  */
 function useRowEditorRow() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   const row = useMemo(() => {
     switch (state.doctype) {

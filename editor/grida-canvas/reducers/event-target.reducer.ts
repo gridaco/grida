@@ -1037,7 +1037,7 @@ function __self_evt_on_multiple_selection_overlay_click(
   draft: editor.state.IEditorState,
   action: EditorEventTarget_MultipleSelectionLayer_Click
 ) {
-  const { selection, node_ids_from_point, shiftKey } = action;
+  const { node_ids_from_point, shiftKey } = action;
   if (draft.gesture.type === "translate") return;
   draft.hits = node_ids_from_point;
   const { hovered_node_id } = self_updateSurfaceHoverState(draft);

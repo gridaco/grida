@@ -659,7 +659,6 @@ function Consumer({
     async () => {
       if (opfs) {
         try {
-          const snapshot = instance.getSnapshot();
           const dir = instance.archivedir();
 
           // Write images into OPFS (images/<hash>.<ext>)
@@ -693,11 +692,6 @@ function Consumer({
       preventDefault: true,
     }
   );
-
-  const onExport = () => {
-    const blob = instance.archive();
-    saveAs(blob, distro.snapshot_file_name());
-  };
 
   return (
     <AgentChatProvider>
@@ -849,7 +843,7 @@ function LocalFakeCursorChat() {
     instance.surface.updateCursorChatMessage(value);
   };
 
-  const handleValueCommit = (value: string) => {
+  const handleValueCommit = () => {
     // Clear message after commit
     instance.surface.updateCursorChatMessage(null);
   };

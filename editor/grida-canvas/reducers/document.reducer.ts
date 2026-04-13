@@ -187,7 +187,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return updateState(state, (draft) => {
         // Use Graph.rm() to remove scene and all its children
         const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
-        const removed_ids = graph.rm(scene_id);
+        const __removed_ids = graph.rm(scene_id);
 
         // Remove from scenes_ref array
         draft.document.scenes_ref = draft.document.scenes_ref.filter(
@@ -613,7 +613,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       if (state.user_clipboard.type !== "prototypes") break;
       if (!action.target) break;
       const { user_clipboard } = state;
-      const { ids, prototypes } = user_clipboard;
+      const { prototypes } = user_clipboard;
 
       const target_parents: string[] = Array.isArray(action.target)
         ? action.target

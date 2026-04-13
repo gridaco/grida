@@ -741,7 +741,7 @@ function UploadsModal() {
   );
 }
 
-function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
+function UploadItem({ file, staus, reason }: StorageEditorTask) {
   const l_type = file.name.split(".").pop();
   const l_name = file.name.replace(`.${l_type}`, "");
 

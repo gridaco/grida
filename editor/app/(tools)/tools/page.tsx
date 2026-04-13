@@ -129,7 +129,7 @@ export default function ToolsPage() {
           </header>
 
           <div className="space-y-16">
-            {categories.map((category, categoryIndex) => (
+            {categories.map((category) => (
               <section key={category.name}>
                 <div className="mb-6">
                   <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">

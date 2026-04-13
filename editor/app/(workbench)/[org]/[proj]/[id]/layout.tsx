@@ -81,7 +81,6 @@ export default async function Layout({
   // also ignore standardized endpoints like "/.well-known/**"
   if (org.startsWith("_") || org.startsWith(".")) return notFound();
 
-  const cookieStore = await cookies();
   const client = await createClient();
   const formsClient = await createFormsClient();
 

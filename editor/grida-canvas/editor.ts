@@ -5579,7 +5579,7 @@ export class EditorSurface
 
     try {
       await this.ui.clipboard?.write([item]);
-    } catch (error) {
+    } catch {
       await this.ui.clipboard?.writeText(data);
     }
 
@@ -6312,7 +6312,7 @@ export class EditorSurface
       }
       const result = await i.open();
       return result?.sRGBHex;
-    } catch (error) {
+    } catch {
       return undefined;
     }
   }
@@ -6582,7 +6582,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
             [prop]: value,
           });
           return true;
-        } catch (e) {
+        } catch {
           return false; // unknown prop
         }
       },

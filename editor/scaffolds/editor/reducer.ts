@@ -126,7 +126,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
     case "editor/assets/init": {
-      const { type, ...pref } = <InitAssetAction>action;
+      const { type: _type, ...pref } = <InitAssetAction>action;
       return produce(state, (draft) => {
         draft.assets = {
           ...draft.assets,
@@ -262,7 +262,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
     case "editor/data-grid/local-filter": {
-      const { type, ...pref } = <DataGridLocalFilterAction>action;
+      const { type: _type, ...pref } = <DataGridLocalFilterAction>action;
 
       return produce(state, (draft) => {
         draft.datagrid_local_filter = {
@@ -334,7 +334,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
 
     //
     case "editor/form/campaign/preferences": {
-      const { type, ...pref } = <FormCampaignPreferencesAction>action;
+      const { type: _type, ...pref } = <FormCampaignPreferencesAction>action;
       return produce(state, (draft) => {
         draft.form.campaign = {
           ...draft.form.campaign,
@@ -343,7 +343,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
     case "editor/form/ending/preferences": {
-      const { type, ...pref } = <FormEndingPreferencesAction>action;
+      const { type: _type, ...pref } = <FormEndingPreferencesAction>action;
       return produce(state, (draft) => {
         draft.form.ending = {
           ...draft.form.ending,
@@ -352,7 +352,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
     case "editor/form/notification_respondent_email/preferences": {
-      const { type, ...pref } = <
+      const { type: _type, ...pref } = <
         FormNotificationRespondentEmailPreferencesAction
       >action;
       return produce(state, (draft) => {

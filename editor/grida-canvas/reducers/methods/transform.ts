@@ -214,7 +214,7 @@ function __self_update_gesture_transform_translate(
       // reset the original node (these were previously the selection, moving targets.)
       // FIXME: not only reset the position, but it should also reset the hierarchy. (which current approach cannot handle) (it's more of 'undo')
       // To fix this, we actually need to reset the entire document, and move the clones.
-      initial_selection.forEach((node_id, i) => {
+      initial_selection.forEach((node_id) => {
         draft.document.nodes[node_id] =
           initial_snapshot.document.nodes[node_id];
       });
@@ -241,7 +241,7 @@ function __self_update_gesture_transform_translate(
         initial_clone_ids.forEach((clone) => {
           self_try_remove_node(draft, clone);
         });
-      } catch (e) {}
+      } catch {}
 
       draftGesture.is_currently_cloned = false;
       draftGesture.selection = initial_selection;
@@ -540,7 +540,7 @@ function __self_update_gesture_transform_translate_sort(
   };
 
   // update the position of the real nodes (except the moving node)
-  layout.objects.forEach((obj, i) => {
+  layout.objects.forEach((obj) => {
     if (obj.id === node_id) return;
     const node = dq.__getNodeById(
       draft,

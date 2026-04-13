@@ -51,6 +51,7 @@ export default function databaseRecucer(
       });
     }
     case "editor/table/space/rows/delete/selected": {
+      // oxlint-disable-next-line no-empty-pattern
       const {} = <DatabaseTableSpaceDeleteSelectedRowsAction>action;
       return produce(state, (draft) => {
         // adjust the query count
@@ -265,7 +266,6 @@ export default function databaseRecucer(
     case "editor/table/space/cell/change": {
       const {
         gdoc_table_id,
-        table_id,
         row: row_id,
         column: attribute_id,
         data,
@@ -518,7 +518,7 @@ function update_xsbtablespace(
   action: DatabaseTableSpaceCellChangeAction
 ) {
   const { row: row_pk, table_id, column, data } = action;
-  const { value, option_id } = data;
+  const { value } = data;
 
   const attributes = get_attributes(draft, table_id);
   const attribute = attributes.find((f) => f.id === column);
@@ -530,7 +530,7 @@ function update_xsbtablespace(
 
   // handle jsonpaths - partial object update
   if (FlatPostgREST.testPath(attribute.name)) {
-    const { column } = FlatPostgREST.decodePath(attribute.name);
+    // const { column } = FlatPostgREST.decodePath(attribute.name);
 
     const newrow = FlatPostgREST.update(
       row,

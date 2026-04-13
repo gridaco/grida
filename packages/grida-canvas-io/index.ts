@@ -1197,7 +1197,11 @@ export namespace io {
       schemaVersion: string = grida.program.document.SCHEMA_VERSION
     ): Uint8Array {
       // Strip non-persisted fields (images, bitmaps) before encoding
-      const { images, bitmaps, ...persistedDocument } = document;
+      const {
+        images: _images,
+        bitmaps: _bitmaps,
+        ...persistedDocument
+      } = document;
       return format.document.encode.toFlatbuffer(
         persistedDocument as GridaDocument,
         schemaVersion

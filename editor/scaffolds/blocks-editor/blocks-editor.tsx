@@ -175,7 +175,7 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
 
     updatedBlocks.forEach(async (block) => {
       try {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("form_block")
           .update({
             // Assuming these are the fields to update

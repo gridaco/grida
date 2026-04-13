@@ -133,12 +133,6 @@ function calculateIntersectingSpacing(
 }
 
 /**
- * https://eli.thegreenplace.net/2008/08/15/intersection-of-1d-segments
- */
-const segments_intersect = (x1: number, x2: number, y1: number, y2: number) =>
-  x2 >= y1 && y2 >= x1;
-
-/**
  * Calculates spacing for non-intersecting rectangles.
  */
 function calculateNonIntersectingSpacing(

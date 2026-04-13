@@ -123,7 +123,6 @@ type LogoGridCellProps = {
 const LogoGridCell = ({
   logo,
   cellSize,
-  theme,
   onClick,
   onDragStart,
 }: LogoGridCellProps) => {

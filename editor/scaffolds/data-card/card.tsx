@@ -79,7 +79,6 @@ export function DataCard({
 function ModelCard({
   media,
   title,
-  paragraph,
   lines,
 }: {
   media?: React.ReactNode;

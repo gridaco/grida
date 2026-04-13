@@ -8,7 +8,6 @@ import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
 
 export async function POST(req: NextRequest) {
-  const origin = req.nextUrl.origin;
   const data: UpdateFormUnknownFieldsHandlingStrategyRequest = await req.json();
 
   const { form_id, strategy } = data;

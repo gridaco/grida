@@ -30,12 +30,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePolicyStore } from "./store";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 
 export function AuthPolicyList() {
-  const router = useRouter();
   const { policies, deletePolicy } = usePolicyStore();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

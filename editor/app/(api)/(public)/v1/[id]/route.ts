@@ -190,12 +190,10 @@ export async function GET(
 
   const {
     title,
-
     description,
     default_page,
     fields,
     is_max_form_responses_in_total_enabled,
-    max_form_responses_in_total,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     project_id: __project_id,

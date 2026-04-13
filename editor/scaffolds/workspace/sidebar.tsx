@@ -157,8 +157,7 @@ export default function WorkspaceSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const workspace = useWorkspace();
-  const { loading, organization, organizations, projects, documents } =
-    workspace;
+  const { organization, organizations, projects, documents } = workspace;
 
   const pathName = usePathname();
 
@@ -532,7 +531,7 @@ function OrganizationSwitcher({
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Organizations
             </DropdownMenuLabel>
-            {organizations.map((org, index) => (
+            {organizations.map((org) => (
               <Link key={org.id} href={`/${org.name}`}>
                 <DropdownMenuItem className="gap-2 p-2">
                   <OrganizationAvatar

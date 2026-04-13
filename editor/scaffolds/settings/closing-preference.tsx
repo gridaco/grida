@@ -51,7 +51,7 @@ export function ClosingFormPreferences() {
 
       // Reset form state to the new values after successful submission
       reset(data);
-    } catch (error) {}
+    } catch {}
   };
 
   return (
