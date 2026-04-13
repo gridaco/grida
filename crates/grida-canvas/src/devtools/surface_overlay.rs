@@ -6,7 +6,7 @@ use crate::runtime::font_repository::FontRepository;
 use crate::sk;
 use crate::surface::gesture::SurfaceGesture;
 use crate::surface::state::SurfaceState;
-use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, PathEffect};
+use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, PathBuilder, PathEffect};
 
 /// Selection overlay color (blue).
 const SELECTION_COLOR: Color = Color::from_argb(255, 0, 120, 255);
@@ -192,13 +192,11 @@ impl SurfaceOverlay {
         canvas.draw_path(&path, &paint);
     }
 
-    /// Draw the axis-aligned bounding rect for a single node in screen space.
+    /// Draw the oriented bounding box for a single node in screen space.
     ///
-    /// For shapes whose outline *is* their bounding rect (rectangles), this
-    /// effectively draws a second outline on top — visually identical, so
-    /// there's no double-stroke artifact. For non-rectangular shapes (ellipses,
-    /// polygons, paths) the bounding rect provides the "declarative box" frame
-    /// around the shape.
+    /// For nodes with rotation or skew, this draws the actual oriented
+    /// rectangle (not the axis-aligned bounding box). For non-rotated nodes
+    /// the result is visually identical to the old AABB path.
     fn draw_node_bounding_rect(
         canvas: &Canvas,
         id: &crate::node::schema::NodeId,
@@ -207,22 +205,20 @@ impl SurfaceOverlay {
         color: Color,
         stroke_width: f32,
     ) {
-        let world_bounds = match cache.geometry.get_world_bounds(id) {
-            Some(b) => b,
+        let world_corners = match cache.geometry.get_world_corners(id) {
+            Some(c) => c,
             None => return,
         };
 
-        let p1 = view_sk.map_point((world_bounds.x, world_bounds.y));
-        let p2 = view_sk.map_point((
-            world_bounds.x + world_bounds.width,
-            world_bounds.y + world_bounds.height,
-        ));
-        let screen_rect = skia_safe::Rect::from_ltrb(
-            p1.x.min(p2.x),
-            p1.y.min(p2.y),
-            p1.x.max(p2.x),
-            p1.y.max(p2.y),
-        );
+        let screen: [skia_safe::Point; 4] = world_corners.map(|[x, y]| view_sk.map_point((x, y)));
+
+        let mut builder = PathBuilder::new();
+        builder.move_to((screen[0].x, screen[0].y));
+        builder.line_to((screen[1].x, screen[1].y));
+        builder.line_to((screen[2].x, screen[2].y));
+        builder.line_to((screen[3].x, screen[3].y));
+        builder.close();
+        let path = builder.detach();
 
         let mut paint = Paint::default();
         paint.set_color(color);
@@ -230,7 +226,7 @@ impl SurfaceOverlay {
         paint.set_stroke_width(stroke_width);
         paint.set_anti_alias(true);
 
-        canvas.draw_rect(screen_rect, &paint);
+        canvas.draw_path(&path, &paint);
     }
 
     /// Draw text baseline decoration for a node (no-op if not a text layer).

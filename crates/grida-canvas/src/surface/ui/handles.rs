@@ -14,7 +14,7 @@
 //! future gesture layer) decides what to do with that information.
 
 use crate::surface::cursor::{ResizeDirection, RotationCorner};
-use skia_safe::{Canvas, Color, Contains, Paint, PaintStyle, Rect};
+use skia_safe::{Canvas, Color, Contains, Paint, PaintStyle, Point, Rect};
 
 // ── Layout constants (logical pixels, scaled by `dpr` at draw time) ──────────
 
@@ -68,6 +68,9 @@ pub struct SelectionHandles {
     pub visible: bool,
     /// DPR-scaled corner knob half-size (for drawing the white square).
     knob_half: f32,
+    /// Orientation angle in degrees (screen space).
+    /// Knobs are rotated by this angle so they align with the selection box.
+    orientation_deg: f32,
 }
 
 impl SelectionHandles {
@@ -162,6 +165,127 @@ impl SelectionHandles {
             rotation: [rotation_nw, rotation_ne, rotation_se, rotation_sw],
             visible,
             knob_half,
+            orientation_deg: 0.0,
+        }
+    }
+
+    /// Compute handle positions from 4 screen-space corners of an oriented
+    /// bounding box. Corners are in order: NW, NE, SE, SW (in the node's
+    /// local orientation, already transformed to screen space).
+    ///
+    /// Corner resize handles are centered on each corner; side resize handles
+    /// are centered on edge midpoints; rotation handles are offset outward
+    /// from each corner.
+    ///
+    /// `dpr` scales logical constants to physical pixels.
+    pub fn from_screen_quad(corners: [Point; 4], dpr: f32) -> Self {
+        let [nw, ne, se, sw] = corners;
+
+        let knob = CORNER_KNOB_SIZE * dpr;
+        let knob_half = knob * 0.5;
+        let hit_half = (MIN_HIT_SIZE * dpr) * 0.5;
+        let side_half = hit_half; // side handles use same hit size as corners
+        let rot_off = ROTATION_OFFSET * dpr;
+        let rot_half = (ROTATION_HIT_SIZE * dpr) * 0.5;
+
+        let min_size_sq = (MIN_HANDLES_VISIBLE_SIZE * dpr).powi(2);
+        let edge_top_sq = (ne.x - nw.x).powi(2) + (ne.y - nw.y).powi(2);
+        let edge_left_sq = (sw.x - nw.x).powi(2) + (sw.y - nw.y).powi(2);
+        let visible = edge_top_sq >= min_size_sq && edge_left_sq >= min_size_sq;
+
+        let centered = |p: Point, half: f32| -> Rect {
+            Rect::from_ltrb(p.x - half, p.y - half, p.x + half, p.y + half)
+        };
+
+        let mid =
+            |a: Point, b: Point| -> Point { Point::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5) };
+
+        let n_mid = mid(nw, ne);
+        let e_mid = mid(ne, se);
+        let s_mid = mid(se, sw);
+        let w_mid = mid(sw, nw);
+
+        // ── Resize handles ───────────────────────────────────────────────
+        let resize = [
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::NW),
+                screen_rect: centered(nw, hit_half),
+            },
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::NE),
+                screen_rect: centered(ne, hit_half),
+            },
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::SE),
+                screen_rect: centered(se, hit_half),
+            },
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::SW),
+                screen_rect: centered(sw, hit_half),
+            },
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::N),
+                screen_rect: centered(n_mid, side_half),
+            },
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::E),
+                screen_rect: centered(e_mid, side_half),
+            },
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::S),
+                screen_rect: centered(s_mid, side_half),
+            },
+            HandleRect {
+                hit: HandleHit::Resize(ResizeDirection::W),
+                screen_rect: centered(w_mid, side_half),
+            },
+        ];
+
+        // ── Rotation handles ─────────────────────────────────────────────
+        // Offset each corner outward (away from the center of the quad).
+        let center = Point::new(
+            (nw.x + ne.x + se.x + sw.x) * 0.25,
+            (nw.y + ne.y + se.y + sw.y) * 0.25,
+        );
+
+        let offset_outward = |corner: Point| -> Point {
+            let dx = corner.x - center.x;
+            let dy = corner.y - center.y;
+            let len = (dx * dx + dy * dy).sqrt();
+            if len < 0.001 {
+                return corner;
+            }
+            Point::new(corner.x + dx / len * rot_off, corner.y + dy / len * rot_off)
+        };
+
+        let rotation = [
+            HandleRect {
+                hit: HandleHit::Rotate(RotationCorner::NW),
+                screen_rect: centered(offset_outward(nw), rot_half),
+            },
+            HandleRect {
+                hit: HandleHit::Rotate(RotationCorner::NE),
+                screen_rect: centered(offset_outward(ne), rot_half),
+            },
+            HandleRect {
+                hit: HandleHit::Rotate(RotationCorner::SE),
+                screen_rect: centered(offset_outward(se), rot_half),
+            },
+            HandleRect {
+                hit: HandleHit::Rotate(RotationCorner::SW),
+                screen_rect: centered(offset_outward(sw), rot_half),
+            },
+        ];
+
+        // Orientation = angle of the NW→NE (top) edge in screen space.
+        let orientation_deg = (ne.y - nw.y).atan2(ne.x - nw.x).to_degrees();
+
+        Self {
+            resize,
+            rotation,
+            visible,
+            knob_half,
+            orientation_deg,
         }
     }
 
@@ -219,17 +343,21 @@ impl SelectionHandles {
         stroke.set_anti_alias(true);
 
         // Draw the 4 corner knobs (first 4 entries in `resize`).
+        // Knobs are rotated to match the selection orientation.
+        let knob_size = self.knob_half * 2.0;
         for handle in &self.resize[..4] {
-            // The visible knob is smaller than the hit rect.
             let c = handle.screen_rect.center();
+            canvas.save();
+            canvas.rotate(self.orientation_deg, Some(c));
             let knob_rect = Rect::from_xywh(
                 c.x - self.knob_half,
                 c.y - self.knob_half,
-                self.knob_half * 2.0,
-                self.knob_half * 2.0,
+                knob_size,
+                knob_size,
             );
             canvas.draw_rect(knob_rect, &fill);
             canvas.draw_rect(knob_rect, &stroke);
+            canvas.restore();
         }
     }
 }

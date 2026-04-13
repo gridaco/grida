@@ -69,22 +69,34 @@ The schema defines over 50 node types, including:
 
 Properties we've analyzed and documented from the Kiwi schema:
 
-| Property                        | Type                              | Location                                                | Purpose                                | Usage                                                                                                                                                                                                   |
-| ------------------------------- | --------------------------------- | ------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parentIndex`                   | `ParentIndex`                     | `NodeChange.parentIndex`                                | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering)                                                                                                                       |
-| `parentIndex.position`          | `string`                          | `ParentIndex.position`                                  | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                                                                                                                                       |
-| `sortPosition`                  | `string?`                         | `NodeChange.sortPosition`                               | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types                                                                                                                                |
-| `frameMaskDisabled`             | `boolean?`                        | `NodeChange.frameMaskDisabled`                          | Frame clipping mask setting            | `true` = clipping disabled (no clip), `false` = clipping enabled (with clip), `undefined` = default (clipping enabled). `false` for GROUP-originated FRAMEs, `true` for regular FRAMEs without clipping |
-| `resizeToFit`                   | `boolean?`                        | `NodeChange.resizeToFit`                                | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                                                                                                                                         |
-| `fillPaints`                    | `Paint[]?`                        | `NodeChange.fillPaints`                                 | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
-| `strokePaints`                  | `Paint[]?`                        | `NodeChange.strokePaints`                               | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
-| `backgroundPaints`              | `Paint[]?`                        | `NodeChange.backgroundPaints`                           | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                              |
-| `isStateGroup`                  | `boolean?`                        | `NodeChange.isStateGroup`                               | Indicates state group/component set    | `true` for component set FRAMEs, `undefined` for regular FRAMEs                                                                                                                                         |
-| `componentPropDefs`             | `ComponentPropDef[]?`             | `NodeChange.componentPropDefs`                          | Component property definitions         | Present on component set FRAMEs, defines variant properties                                                                                                                                             |
-| `stateGroupPropertyValueOrders` | `StateGroupPropertyValueOrder[]?` | `NodeChange.stateGroupPropertyValueOrders`              | Variant property value orders          | Present on component set FRAMEs, defines order of variant values                                                                                                                                        |
-| `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`                           | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs                                                                                                                   |
-| `fontName`                      | `FontName?`                       | `NodeChange.fontName`                                   | Primary font reference                 | Contains `family`, `style`, `postscript`. See [Text & Font](#text--font): `style` is human-readable (e.g. "Regular", "Bold Italic"), not CSS. Prefer `fontMetaData` for import.                         |
-| `fontMetaData`                  | `FontMetaData[]?`                 | `TextData.fontMetaData`, `DerivedTextData.fontMetaData` | Canonical font style per text run      | **Authoritative** for `fontWeight` and `fontStyle` (NORMAL/ITALIC). Aligns with Figma REST API. See [Text & Font](#text--font).                                                                         |
+| Property                        | Type                              | Location                                                | Purpose                                | Usage                                                                                                                                                                                                            |
+| ------------------------------- | --------------------------------- | ------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parentIndex`                   | `ParentIndex`                     | `NodeChange.parentIndex`                                | Parent-child relationship and ordering | Contains `guid` (parent reference) and `position` (fractional index for ordering)                                                                                                                                |
+| `parentIndex.position`          | `string`                          | `ParentIndex.position`                                  | Fractional index string for ordering   | Lexicographically sortable string (e.g., `"!"`, `"Qd&"`, `"QeU"`)                                                                                                                                                |
+| `sortPosition`                  | `string?`                         | `NodeChange.sortPosition`                               | Alternative ordering field             | Typically `undefined` for CANVAS nodes, may be used for other node types                                                                                                                                         |
+| `frameMaskDisabled`             | `boolean?`                        | `NodeChange.frameMaskDisabled`                          | Frame clipping mask setting            | `true` = clipping disabled (no clip), `false` = clipping enabled (with clip), `undefined` = default (clipping enabled). `false` for GROUP-originated FRAMEs, `true` for regular FRAMEs without clipping          |
+| `resizeToFit`                   | `boolean?`                        | `NodeChange.resizeToFit`                                | Auto-resize to fit content             | `true` for GROUP-originated FRAMEs, `undefined` for real FRAMEs                                                                                                                                                  |
+| `fillPaints`                    | `Paint[]?`                        | `NodeChange.fillPaints`                                 | Fill paint array                       | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                                       |
+| `strokePaints`                  | `Paint[]?`                        | `NodeChange.strokePaints`                               | Stroke paint array                     | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                                       |
+| `backgroundPaints`              | `Paint[]?`                        | `NodeChange.backgroundPaints`                           | Background paint array                 | Empty/undefined for GROUPs, may exist for FRAMEs (used in GROUP detection)                                                                                                                                       |
+| `isStateGroup`                  | `boolean?`                        | `NodeChange.isStateGroup`                               | Indicates state group/component set    | `true` for component set FRAMEs, `undefined` for regular FRAMEs                                                                                                                                                  |
+| `componentPropDefs`             | `ComponentPropDef[]?`             | `NodeChange.componentPropDefs`                          | Component property definitions         | Present on component set FRAMEs, defines variant properties                                                                                                                                                      |
+| `stateGroupPropertyValueOrders` | `StateGroupPropertyValueOrder[]?` | `NodeChange.stateGroupPropertyValueOrders`              | Variant property value orders          | Present on component set FRAMEs, defines order of variant values                                                                                                                                                 |
+| `variantPropSpecs`              | `VariantPropSpec[]?`              | `NodeChange.variantPropSpecs`                           | Variant property specifications        | Present on SYMBOL nodes that are part of component sets, absent on standalone SYMBOLs                                                                                                                            |
+| `fontName`                      | `FontName?`                       | `NodeChange.fontName`                                   | Primary font reference                 | Contains `family`, `style`, `postscript`. See [Text & Font](#text--font): `style` is human-readable (e.g. "Regular", "Bold Italic"), not CSS. Prefer `fontMetaData` for import.                                  |
+| `fontMetaData`                  | `FontMetaData[]?`                 | `TextData.fontMetaData`, `DerivedTextData.fontMetaData` | Canonical font style per text run      | **Authoritative** for `fontWeight` and `fontStyle` (NORMAL/ITALIC). Aligns with Figma REST API. See [Text & Font](#text--font).                                                                                  |
+| `slideSpeakerNotes`             | `string?`                         | `NodeChange.slideSpeakerNotes`                          | Slide speaker notes                    | Present on SLIDE nodes in `.deck` files. Free-text presentation notes.                                                                                                                                           |
+| `isSkippedSlide`                | `boolean?`                        | `NodeChange.isSkippedSlide`                             | Skip slide in presentation             | `true` = slide is skipped during playback; `undefined` = included.                                                                                                                                               |
+| `pageType`                      | `EditorType?`                     | `NodeChange.pageType`                                   | Editor mode for a CANVAS page          | `SLIDES` (`2`) for Figma Slides pages. See [Slides / Deck format](#slides--deck-format).                                                                                                                         |
+| `overrideKey`                   | `GUID?`                           | `NodeChange.overrideKey`                                | Stable child identity for overrides    | Present on nodes inside SYMBOL definitions. Used by `symbolOverrides.guidPath` to address children across instance boundaries. NOT the same as the node's `guid`. See [Instance Overrides](#instance-overrides). |
+| `symbolData`                    | `SymbolData?`                     | `NodeChange.symbolData`                                 | Instance/component linkage             | On INSTANCE nodes: contains `symbolID` (→ SYMBOL.guid), `symbolOverrides`, `uniformScaleFactor`. See [Instance Overrides](#instance-overrides).                                                                  |
+| `derivedSymbolData`             | `NodeChange[]?`                   | `NodeChange.derivedSymbolData`                          | Resolved instance child properties     | Figma-computed resolved properties for each addressable descendant. Indexed by `guidPath`. Contains resolved sizes, transforms, etc.                                                                             |
+| `variableDataValues`            | `VariableDataValues?`             | `NodeChange.variableDataValues`                         | Variable value storage                 | On VARIABLE nodes: contains `entries[]` with per-mode values. See [Variables](#variables).                                                                                                                       |
+| `key`                           | `string?`                         | `NodeChange.key`                                        | Variable/component publish key         | A 40-character hex hash. On VARIABLE nodes: used as the stable reference key for `colorVar.value.alias.assetRef.key`. On SYMBOL nodes: the component's publish key.                                              |
+| `colorVar`                      | `VariableData?`                   | `Paint.colorVar`                                        | Variable binding on a paint color      | When present, the paint's static `color` field is the fallback; the actual color should be resolved from the referenced variable. See [Variables](#variables).                                                   |
+| `fillGeometry`                  | `Path[]?`                         | `NodeChange.fillGeometry`                               | Pre-baked fill path commands           | Array of SVG-like path data for the node's fill geometry. Each entry has `commandsBlob` (blob ID), `windingRule`, and `styleID`. Preferred over `vectorNetworkBlob` for rendering compound shapes.               |
+| `strokeGeometry`                | `Path[]?`                         | `NodeChange.strokeGeometry`                             | Pre-baked stroke path commands         | Same structure as `fillGeometry` but for strokes. Contains the expanded stroke outline, not the center line.                                                                                                     |
+| `Paint.transform`               | `Matrix?`                         | `Paint.transform`                                       | Gradient paint transform               | 2x3 affine mapping FROM node space TO gradient space (inverse of REST `gradientHandlePositions`). See [Gradient Paint Transform](#gradient-paint-transform).                                                     |
 
 ### parentIndex
 
@@ -117,22 +129,22 @@ Figma uses **fractional indexing** (also known as "orderable strings") for maint
 **Implementation:**
 
 ```typescript
-// Sort pages by parentIndex.position
+// Sort pages by parentIndex.position (codepoint comparison)
 const sortedPages = canvasNodes.sort((a, b) => {
   const aPos = a.parentIndex?.position ?? "";
   const bPos = b.parentIndex?.position ?? "";
-  return aPos.localeCompare(bPos); // Lexicographic comparison
+  return aPos < bPos ? -1 : aPos > bPos ? 1 : 0;
 });
 
 // Sort children by parentIndex.position
 const sortedChildren = children.sort((a, b) => {
   const aPos = a.parentIndex?.position ?? "";
   const bPos = b.parentIndex?.position ?? "";
-  return aPos.localeCompare(bPos);
+  return aPos < bPos ? -1 : aPos > bPos ? 1 : 0;
 });
 ```
 
-**Important:** Always use lexicographic (string) comparison with `localeCompare()`. Never try to parse these as numbers - the strings are already in the correct format for sorting.
+**Important:** Use **codepoint comparison** (`< >`), **not** `localeCompare()`. Figma's fractional index strings use ASCII characters including punctuation (`"`, `#`, `$`, `%`, `&`, `'`, etc.) whose ordering must match raw codepoint values. `localeCompare()` applies locale-aware collation that scrambles these characters — particularly visible in `.deck` files where single-character position strings are common.
 
 ### sortPosition
 
@@ -358,6 +370,105 @@ Clipboard payloads may include a canvas commonly named `"Internal Only Canvas"` 
 - `fixtures/test-fig/clipboard/component-component-set-component-instance-blue.clipboard.html`
 - `fixtures/test-fig/clipboard/component-component-set-component-instance-red.clipboard.html`
 
+### Slides / Deck format
+
+`.deck` files are Figma Slides documents. They use the same Kiwi binary
+format as `.fig` but with a different prelude string:
+
+| File type | Prelude magic |
+| --------- | ------------- |
+| `.fig`    | `"fig-kiwi"`  |
+| `.deck`   | `"fig-deck"`  |
+
+The file-level `editorType` field (`EditScope.editorType` or
+`NodeChange.editorType`) is set to `EditorType.SLIDES` (`2`) for deck
+files. Individual pages may carry `pageType?: EditorType` on their
+CANVAS `NodeChange`.
+
+#### EditorType enum
+
+```text
+enum EditorType {
+  DESIGN = 0;
+  WHITEBOARD = 1;
+  SLIDES = 2;
+  DEV_HANDOFF = 3;
+  SITES = 4;
+  COOPER = 5;
+  ILLUSTRATION = 6;
+  FIGMAKE = 7;
+}
+```
+
+#### Slide node types
+
+| Kiwi type                   | Numeric | Role                                            |
+| --------------------------- | ------- | ----------------------------------------------- |
+| `SLIDE`                     | 32      | A single slide (structurally like FRAME)        |
+| `INTERACTIVE_SLIDE_ELEMENT` | 34      | Interactive element within a slide (frame-like) |
+| `SLIDE_GRID`                | 37      | Grid container holding SLIDE_ROW nodes          |
+| `SLIDE_ROW`                 | 38      | Row container holding SLIDE nodes               |
+
+**Hierarchy (observed in `.deck` files):**
+
+```text
+CANVAS (page)
+  └─ SLIDE_GRID
+       ├─ SLIDE_ROW
+       │    ├─ SLIDE "Slide 1"
+       │    │    └─ (content nodes: FRAME, TEXT, VECTOR, ...)
+       │    ├─ SLIDE "Slide 2"
+       │    └─ ...
+       └─ SLIDE_ROW
+            └─ SLIDE "Slide N"
+```
+
+`SLIDE_GRID` and `SLIDE_ROW` are organizational wrappers that enable
+Figma's infinite canvas UX for slides. They carry standard frame
+properties (fills, layout, clips) but serve no semantic purpose for the
+slides themselves.
+
+#### Slide-specific NodeChange fields
+
+| Field                  | Type              | Location                   | Purpose                                     |
+| ---------------------- | ----------------- | -------------------------- | ------------------------------------------- |
+| `slideSpeakerNotes`    | `string?`         | `NodeChange` (on `SLIDE`)  | Speaker/presentation notes for the slide    |
+| `isSkippedSlide`       | `boolean?`        | `NodeChange` (on `SLIDE`)  | Skip this slide during presentation         |
+| `slideNumber`          | `SlideNumber?`    | `NodeChange` (on `SLIDE`)  | Slide numbering mode                        |
+| `slideNumberSeparator` | `string?`         | `NodeChange` (on `SLIDE`)  | Separator string for compound slide numbers |
+| `slideThumbnailHash`   | `string?`         | `NodeChange` (on `SLIDE`)  | Hash of the slide's cached thumbnail image  |
+| `slideThemeData`       | `SlideThemeData?` | `NodeChange`               | Theme ID + version for the slide            |
+| `slideThemeMap`        | `SlideThemeMap?`  | `NodeChange`               | Theme mapping data                          |
+| `slideTemplateFileKey` | `string?`         | `NodeChange`               | Figma file key of the template used         |
+| `pageType`             | `EditorType?`     | `NodeChange` (on `CANVAS`) | Identifies the editor mode for this page    |
+
+#### SlideNumber enum
+
+```text
+enum SlideNumber {
+  NONE = 0;
+  SLIDE = 1;
+  SECTION = 2;
+  SUBSECTION = 3;
+  TOTAL_WITHIN_DECK = 4;
+  TOTAL_WITHIN_SECTION = 5;
+}
+```
+
+#### SlideThemeData
+
+```text
+message SlideThemeData {
+  ThemeID themeID = 1;
+  string version = 2;
+}
+```
+
+**Verified in fixtures:**
+
+- `fixtures/test-fig/deck/light.deck`
+- `fixtures/test-fig/deck/local/how-to-use-figma-slides.deck`
+
 ### Vector
 
 **Node Type:** `VECTOR`
@@ -532,6 +643,237 @@ When importing Kiwi TEXT nodes to a REST-like or Grida schema:
 4. **italic** — from that same entry's `fontStyle === ITALIC`.
 
 Figma internally merges and returns these values in the REST API; using FontMetaData ensures the import matches that behavior.
+
+#### Line Height & Letter Spacing Units
+
+`NodeChange.lineHeight` and `NodeChange.letterSpacing` are `{ value: number, units: string }` objects. The `units` field determines interpretation:
+
+| units       | Meaning                        | REST API equivalent         | Conversion to REST                         |
+| ----------- | ------------------------------ | --------------------------- | ------------------------------------------ |
+| `"RAW"`     | Direct multiplier of font size | `lineHeightPercentFontSize` | `value * 100` (e.g. RAW `1.5` → `150`)     |
+| `"PERCENT"` | Percentage of font size        | `lineHeightPercentFontSize` | `value` as-is (e.g. PERCENT `150` → `150`) |
+| `"PIXELS"`  | Absolute pixel value           | `lineHeightPx`              | `value` as-is                              |
+
+**`"RAW"` is the most common unit** for line height in `.fig` / `.deck` files. It represents a unitless factor (like CSS `line-height: 1.5`). The REST API does not expose `"RAW"` — it converts to `lineHeightPercentFontSize` (percentage of font size), so `RAW 1.5` = `lineHeightPercentFontSize 150`.
+
+Letter spacing follows the same pattern: `"PERCENT"` is relative to font size, `"PIXELS"` is absolute.
+
+Style overrides (`TextData.styleOverrideTable`) carry the same `{ value, units }` shape for `lineHeight` and `letterSpacing`.
+
+### Gradient Paint Transform
+
+Gradient paints (`GRADIENT_LINEAR`, `GRADIENT_RADIAL`, `GRADIENT_ANGULAR`, `GRADIENT_DIAMOND`) carry a `transform` field that defines the gradient's orientation and position within the node's normalized (0-1) coordinate space.
+
+#### Transform direction
+
+The kiwi paint `transform` is a 2x3 affine matrix that maps FROM **node-normalized space** TO **gradient-unit space**. This is the **inverse** of Figma's REST API `gradientHandlePositions`, which describe the gradient endpoints in node space.
+
+To convert kiwi `Paint.transform` to REST-style handle positions:
+
+1. Invert the 2x3 affine matrix
+2. Apply the inverse to the canonical base control points for the gradient type
+
+#### Canonical base control points
+
+| Gradient type            | A (start)  | B (end)  | C (perpendicular) |
+| ------------------------ | ---------- | -------- | ----------------- |
+| Linear                   | (0, 0.5)   | (1, 0.5) | (0, 1)            |
+| Radial, Angular, Diamond | (0.5, 0.5) | (1, 0.5) | (0.5, 1)          |
+
+#### Gradient stops
+
+Gradient stops are stored in `Paint.stops[]`, each with:
+
+- `position: float` — normalized position along the gradient line (0 to 1)
+- `color: Color` — the stop color
+
+Stops map directly to the REST API's `gradientStops[].position` (same field, same semantics).
+
+### Instance Overrides
+
+INSTANCE nodes reference a SYMBOL (component definition) via `symbolData.symbolID`. The instance's children are structurally identical to the component's children, but individual properties can be overridden per-instance.
+
+#### SymbolData
+
+```text
+message SymbolData {
+  GUID symbolID = 1;            // References SYMBOL.guid
+  NodeChange[] symbolOverrides = 2;  // Per-child property patches
+  float uniformScaleFactor = 3;      // Uniform scale (rare)
+}
+```
+
+#### symbolOverrides
+
+An array of `NodeChange`-like objects, each carrying a `guidPath` that identifies the target child and one or more property patches.
+
+Each override entry may contain any subset of `NodeChange` properties as patches:
+
+| Patch field    | Effect                               |
+| -------------- | ------------------------------------ |
+| `visible`      | Show/hide the targeted child         |
+| `opacity`      | Override opacity                     |
+| `fillPaints`   | Replace fill paints                  |
+| `strokePaints` | Replace stroke paints                |
+| `textData`     | Replace text content (`.characters`) |
+| `size`         | Override dimensions                  |
+| `transform`    | Override position/rotation           |
+
+Paint patches (`fillPaints`, `strokePaints`) may include `colorVar` bindings that reference variables instead of using the static `color` value. See [Variables](#variables).
+
+#### overrideKey
+
+A `GUID` on each node within a SYMBOL definition that serves as a stable identifier for override targeting. This is **not** the node's `guid` (which is used for parent-child linking). The `overrideKey` is the addressing mechanism that `symbolOverrides.guidPath` uses to locate children across instance boundaries.
+
+#### guidPath
+
+```text
+message GUIDPath {
+  GUID[] guids = 1;
+}
+```
+
+An ordered path of `overrideKey` GUIDs from the instance root to the target node:
+
+- **Length 1** `[A]` — targets a direct child of this component whose `overrideKey` is `A`.
+- **Length 2+** `[A, B]` — targets a node inside a nested instance. The first GUID `A` identifies a child INSTANCE (by its `overrideKey`); the remaining GUIDs `[B]` address nodes within that nested instance's component subtree.
+
+This addressing scheme supports arbitrary nesting depth. For a 3-level override `[A, B, C]`:
+
+1. `A` identifies a child INSTANCE of the current component
+2. `B` identifies a child INSTANCE within A's component
+3. `C` identifies the target node within B's component
+
+#### derivedSymbolData
+
+An array of `NodeChange`-like objects on INSTANCE nodes, indexed by `guidPath`. Contains fully resolved properties (size, transform, stroke weight, etc.) for each addressable descendant. This is the output of Figma's server-side override resolution — the "answer key" of what the instance tree should look like after all overrides are applied.
+
+#### Override precedence
+
+When multiple levels define overrides for the same deep child:
+
+- **Component-defined overrides** (on a nested INSTANCE within a SYMBOL definition) serve as defaults.
+- **Usage-site overrides** (on the INSTANCE node in the document tree) override the defaults.
+- Usage-site overrides WIN — they are more specific.
+
+#### Override cascade example
+
+```text
+SYMBOL "cursor-multiplayer-gray" (component)
+  ├─ "Name" FRAME (overrideKey: X:100)
+  └─ "cursor-black" INSTANCE of "cursor-def" (overrideKey: X:200)
+       symbolOverrides:
+         guidPath:[Y:500], fillPaints: black   ← component-level default
+
+INSTANCE of "cursor-multiplayer-gray" (usage site)
+  symbolOverrides:
+    guidPath:[X:100], visible: false           ← hide Name
+    guidPath:[X:200, Y:500], fillPaints: blue  ← override cursor color
+```
+
+Resolution:
+
+1. `[X:100]` → hide "Name" (direct child override)
+2. `[X:200, Y:500]` → the cursor fill is **blue** (usage-site wins over the component-level black default)
+
+### Variables
+
+Figma's variable system (design tokens) is represented by `VARIABLE` and `VARIABLE_SET` node types. Variables can hold colors, numbers, strings, or booleans, and can be bound to node properties via `colorVar` (on paints) or similar binding fields.
+
+#### VARIABLE node
+
+```text
+NodeChange (type = VARIABLE)
+  key: string                    // 40-char hex hash, stable publish key
+  name: string                   // Human-readable name (e.g. "🎨/red/500")
+  variableResolvedType: COLOR | FLOAT | STRING | BOOLEAN
+  variableDataValues: VariableDataValues
+  variableSetID: VariableSetID   // Parent variable set
+```
+
+#### VariableDataValues
+
+```text
+message VariableDataValues {
+  VariableDataValuesEntry[] entries = 1;
+}
+
+message VariableDataValuesEntry {
+  GUID modeID = 1;          // Variable mode (e.g. light/dark)
+  VariableData variableData = 2;
+}
+```
+
+Each entry corresponds to a mode in the variable's parent set. A variable may have multiple mode entries (e.g., light mode and dark mode each with different values).
+
+#### VariableData and VariableAnyValue
+
+```text
+message VariableData {
+  VariableAnyValue value = 1;
+  VariableDataType dataType = 2;
+  VariableResolvedDataType resolvedDataType = 3;
+}
+
+message VariableAnyValue {
+  bool boolValue;
+  string textValue;
+  float floatValue;
+  VariableID alias;       // Reference to another variable
+  Color colorValue;       // Direct color value
+  // ... other value types
+}
+```
+
+A variable's value is either a **direct value** (e.g., `colorValue`) or an **alias** referencing another variable via `VariableID.assetRef.key`.
+
+#### Variable alias chains
+
+Variables can form alias chains where one variable references another:
+
+```text
+VARIABLE "✦/_multiplayer/grey"  (key: "abc123...")
+  value: alias → assetRef.key: "def456..."
+
+VARIABLE "✦/special/grey"  (key: "def456...")
+  value: alias → assetRef.key: "789abc..."
+
+VARIABLE "🎨/pale_blue/500"  (key: "789abc...")
+  value: colorValue: {r: 0.4, g: 0.467, b: 0.6, a: 1}
+```
+
+To resolve a variable's final value, follow the alias chain until a direct value (`colorValue`, `floatValue`, etc.) is reached. Chains are typically 1-3 levels deep.
+
+#### colorVar on paints
+
+When a `Paint` has `colorVar: VariableData`, the paint's `color` field holds a static fallback value (often black `{0,0,0,1}`), and the actual color should be resolved from the referenced variable:
+
+```text
+Paint {
+  type: SOLID
+  color: {r: 0, g: 0, b: 0, a: 1}    // Static fallback
+  colorVar: {
+    value: {
+      alias: {
+        assetRef: {
+          key: "abc123..."             // → VARIABLE.key
+        }
+      }
+    }
+    dataType: ALIAS
+    resolvedDataType: COLOR
+  }
+}
+```
+
+Resolution: look up `VARIABLE` nodes by `key` field matching `assetRef.key`, then follow alias chains to the final `colorValue`.
+
+#### Practical notes
+
+- The `key` field on VARIABLE nodes is the stable reference. It does not change when the variable is renamed.
+- The first entry in `variableDataValues.entries` typically corresponds to the default mode.
+- Variable resolution is independent of the node tree — variables are addressed by `key`, not by `guid` or parent-child relationships.
+- Variables are defined at the document level (parented to the DOCUMENT node), not within specific pages.
 
 ## External Resources
 

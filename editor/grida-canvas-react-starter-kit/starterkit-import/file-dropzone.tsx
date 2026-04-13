@@ -1,8 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { useFilePicker } from "use-file-picker";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { UploadIcon, FileIcon, LoaderIcon } from "lucide-react";
 
 interface FileDropzoneProps {
   accept: string;
@@ -11,23 +10,23 @@ interface FileDropzoneProps {
   loadingText?: string;
   dragText?: string;
   errorMessage?: string;
+  description?: string;
   validateFile?: (file: File) => boolean;
   disabled?: boolean;
   className?: string;
-  buttonClassName?: string;
 }
 
 export function FileDropzone({
   accept,
   onFileSelected,
   buttonText = "Select File or Drag & Drop",
-  loadingText = "Loading...",
+  loadingText = "Processing...",
   dragText = "Drop file here",
+  description,
   errorMessage,
   validateFile,
   disabled = false,
   className,
-  buttonClassName,
 }: FileDropzoneProps) {
   const { openFilePicker, loading, plainFiles } = useFilePicker({
     accept,
@@ -91,24 +90,42 @@ export function FileDropzone({
   const isProcessing = loading || disabled;
 
   return (
-    <Card
-      className={`flex items-center justify-center p-0 transition-colors ${
+    <button
+      type="button"
+      onClick={handleFilePickerClick}
+      disabled={isProcessing}
+      className={`group relative flex w-full h-48 flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-6 transition-all cursor-pointer ${
         isDragging
-          ? "border-2 border-primary bg-primary/5"
-          : "border-2 border-dashed border-border"
-      } ${className || ""}`}
+          ? "border-primary bg-primary/5 scale-[1.01]"
+          : "border-border hover:border-muted-foreground/40 hover:bg-muted/50"
+      } ${isProcessing ? "opacity-60 pointer-events-none" : ""} ${className || ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <Button
-        onClick={handleFilePickerClick}
-        disabled={isProcessing}
-        variant="ghost"
-        className={`w-full h-full p-10 ${buttonClassName || ""}`}
+      <div
+        className={`flex size-10 items-center justify-center rounded-full transition-colors ${
+          isDragging
+            ? "bg-primary/10 text-primary"
+            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+        }`}
       >
-        {isProcessing ? loadingText : isDragging ? dragText : buttonText}
-      </Button>
-    </Card>
+        {isProcessing ? (
+          <LoaderIcon className="size-5 animate-spin" />
+        ) : isDragging ? (
+          <FileIcon className="size-5" />
+        ) : (
+          <UploadIcon className="size-5" />
+        )}
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-sm font-medium text-foreground">
+          {isProcessing ? loadingText : isDragging ? dragText : buttonText}
+        </span>
+        {description && !isDragging && !isProcessing && (
+          <span className="text-xs text-muted-foreground">{description}</span>
+        )}
+      </div>
+    </button>
   );
 }

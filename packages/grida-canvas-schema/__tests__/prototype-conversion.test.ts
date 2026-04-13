@@ -51,6 +51,27 @@ describe("create_packed_scene_document_from_prototype", () => {
 
       expect(result.scene.children_refs).toEqual(["rect-0"]);
     });
+
+    it("should create a document with single path node", () => {
+      const prototype: grida.program.nodes.PathNodePrototype = {
+        type: "path",
+        data: "M0 0 L10 10",
+      };
+
+      const result =
+        grida.program.nodes.factory.create_packed_scene_document_from_prototype(
+          prototype,
+          (_, depth) => `path-${depth}`
+        );
+
+      expect(result.nodes["path-0"]).toMatchObject({
+        type: "path",
+        data: "M0 0 L10 10",
+        id: "path-0",
+      } satisfies Partial<grida.program.nodes.PathNode>);
+
+      expect(result.scene.children_refs).toEqual(["path-0"]);
+    });
   });
 
   describe("container with flat children", () => {

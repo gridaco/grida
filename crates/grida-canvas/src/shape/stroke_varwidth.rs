@@ -149,65 +149,95 @@ pub fn create_variable_width_stroke_from_geometry(
     width_profile: VarWidthProfile,
     samples_per_segment: usize,
 ) -> Path {
-    let sampler = VarWidthSampler::build_sampler(&width_profile);
-    let width = make_width_fn(sampler);
-
-    let mut combined_path = Path::new();
-    let total_segments = geometry.segments.len();
-
-    for (segment_idx, segment) in geometry.segments.iter().enumerate() {
-        let a = geometry.vertices[segment.a];
-        let b = geometry.vertices[segment.b];
-        let ta = segment.ta;
-        let tb = segment.tb;
-
-        // Convert to cubic Bezier control points
-        let p0 = a;
-        let p1 = (a.0 + ta.0, a.1 + ta.1);
-        let p2 = (b.0 + tb.0, b.1 + tb.1);
-        let p3 = b;
-
-        // Create sample and tangent functions for this segment
-        let sample = |t: f32| {
-            let mt = 1.0 - t;
-            let mt2 = mt * mt;
-            let t2 = t * t;
-            (
-                p0.0 * mt2 * mt + 3.0 * p1.0 * mt2 * t + 3.0 * p2.0 * mt * t2 + p3.0 * t2 * t,
-                p0.1 * mt2 * mt + 3.0 * p1.1 * mt2 * t + 3.0 * p2.1 * mt * t2 + p3.1 * t2 * t,
-            )
-        };
-        let tangent = |t: f32| {
-            let mt = 1.0 - t;
-            let mt2 = mt * mt;
-            let t2 = t * t;
-            (
-                3.0 * (p1.0 - p0.0) * mt2 + 6.0 * (p2.0 - p1.0) * mt * t + 3.0 * (p3.0 - p2.0) * t2,
-                3.0 * (p1.1 - p0.1) * mt2 + 6.0 * (p2.1 - p1.1) * mt * t + 3.0 * (p3.1 - p2.1) * t2,
-            )
-        };
-
-        // Create width function that maps segment-local u to global u
-        let segment_width = |u: f32| {
-            let global_u = (segment_idx as f32 + u) / total_segments as f32;
-            width(global_u)
-        };
-
-        // Generate stroke geometry for this segment
-        let segment_path =
-            variable_width_stroke_geometry(sample, tangent, segment_width, samples_per_segment);
-
-        // Combine with the overall path
-        if segment_idx == 0 {
-            combined_path = segment_path;
-        } else {
-            let mut builder = PathBuilder::new_path(&combined_path);
-            builder.add_path(&segment_path);
-            combined_path = builder.detach();
-        }
+    if geometry.segments.is_empty() {
+        return Path::new();
     }
 
-    combined_path
+    let sampler = VarWidthSampler::build_sampler(&width_profile);
+    let total_segments = geometry.segments.len();
+
+    // Pre-compute cubic Bezier control points for each segment
+    let cubics: Vec<[(f32, f32); 4]> = geometry
+        .segments
+        .iter()
+        .map(|seg| {
+            let a = geometry.vertices[seg.a];
+            let b = geometry.vertices[seg.b];
+            [
+                a,
+                (a.0 + seg.ta.0, a.1 + seg.ta.1),
+                (b.0 + seg.tb.0, b.1 + seg.tb.1),
+                b,
+            ]
+        })
+        .collect();
+
+    // --- Global piecewise sampling functions ---
+    // Map a global parameter g ∈ [0, total_segments] to (position, tangent)
+    // by dispatching to the correct segment's cubic Bezier.
+    let sample_global = |g: f32| -> (f32, f32) {
+        let g = g.clamp(0.0, total_segments as f32);
+        let idx = (g as usize).min(total_segments - 1);
+        let t = g - idx as f32;
+        let [p0, p1, p2, p3] = cubics[idx];
+        let mt = 1.0 - t;
+        let mt2 = mt * mt;
+        let t2 = t * t;
+        (
+            p0.0 * mt2 * mt + 3.0 * p1.0 * mt2 * t + 3.0 * p2.0 * mt * t2 + p3.0 * t2 * t,
+            p0.1 * mt2 * mt + 3.0 * p1.1 * mt2 * t + 3.0 * p2.1 * mt * t2 + p3.1 * t2 * t,
+        )
+    };
+
+    let tangent_global = |g: f32| -> (f32, f32) {
+        let g = g.clamp(0.0, total_segments as f32);
+        let idx = (g as usize).min(total_segments - 1);
+        let t = g - idx as f32;
+        let [p0, p1, p2, p3] = cubics[idx];
+        let mt = 1.0 - t;
+        let mt2 = mt * mt;
+        let t2 = t * t;
+        (
+            3.0 * (p1.0 - p0.0) * mt2 + 6.0 * (p2.0 - p1.0) * mt * t + 3.0 * (p3.0 - p2.0) * t2,
+            3.0 * (p1.1 - p0.1) * mt2 + 6.0 * (p2.1 - p1.1) * mt * t + 3.0 * (p3.1 - p2.1) * t2,
+        )
+    };
+
+    // --- Build a global arc-length LUT ---
+    let total_samples = samples_per_segment * total_segments;
+    let lut_steps = total_samples * 3; // denser for accuracy
+    let (gs, us) = build_arc_lut(|u01| sample_global(u01 * total_segments as f32), lut_steps);
+    // gs[] contains values in [0,1], but we need global-parameter space [0, N].
+    // We stored t01 in gs[] via build_arc_lut, so global_g = gs[i] * N.
+
+    // --- Sample the entire path globally ---
+    let mut left = Vec::with_capacity(total_samples + 1);
+    let mut right = Vec::with_capacity(total_samples + 1);
+
+    for i in 0..=total_samples {
+        let u = i as f32 / total_samples as f32; // arc-length fraction [0,1]
+
+        // Map u → t01 via arc-length LUT, then to global parameter
+        let t01 = u_to_t(&gs, &us, u);
+        let g = t01 * total_segments as f32;
+
+        let (x, y) = sample_global(g);
+        let (dx, dy) = tangent_global(g);
+        let len = (dx * dx + dy * dy).sqrt().max(1e-6);
+        let nx = -dy / len;
+        let ny = dx / len;
+        let w = sampler.r(u);
+        left.push((x + nx * w, y + ny * w));
+        right.push((x - nx * w, y - ny * w));
+    }
+
+    // --- Build a single closed outline from left + reversed right ---
+    let mut builder = PathBuilder::new();
+    add_catmull_segments(&mut builder, &left, false);
+    right.reverse();
+    add_catmull_segments(&mut builder, &right, true);
+    builder.close();
+    builder.detach()
 }
 
 /// Compute a smooth path representing a variable width stroke along a center path.

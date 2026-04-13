@@ -28,6 +28,7 @@ export const geometryStub: editor.api.IDocumentGeometryQuery = {
 export function createReducerContext(
   overrides?: Partial<ReducerContext>
 ): ReducerContext {
+  let _snapshot: editor.state.IMinimalDocumentState | null = null;
   return {
     geometry: geometryStub,
     vector: undefined,
@@ -35,6 +36,12 @@ export function createReducerContext(
     backend: "dom" as const,
     paint_constraints: { fill: "fill", stroke: "stroke" },
     idgen: grida.id.noop.generator,
+    gesture_snapshot: {
+      get: () => _snapshot,
+      set: (s: editor.state.IMinimalDocumentState | null) => {
+        _snapshot = s;
+      },
+    },
     ...overrides,
   };
 }

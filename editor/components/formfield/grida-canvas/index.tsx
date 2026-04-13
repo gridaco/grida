@@ -11,7 +11,7 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { NodeHierarchyList } from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
+import { IsolationNodeHierarchyList } from "@/grida-canvas-react-starter-kit/starterkit-hierarchy";
 import {
   StandaloneDocumentEditor,
   StandaloneSceneContent,
@@ -110,7 +110,7 @@ export function GridaCanvasFormField() {
                 <SidebarSectionHeaderItem>
                   <SidebarSectionHeaderLabel>Layers</SidebarSectionHeaderLabel>
                 </SidebarSectionHeaderItem>
-                <NodeHierarchyList />
+                <IsolationNodeHierarchyList />
               </SidebarSection>
             </SidebarRoot>
             <SidebarRight />

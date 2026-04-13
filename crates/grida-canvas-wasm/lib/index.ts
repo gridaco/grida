@@ -76,6 +76,21 @@ export namespace types {
   export type ExportAs = ExportAsImage | ExportAsPDF | ExportAsSVG;
   export type ExportAsPDF = { format: "PDF" };
   export type ExportAsSVG = { format: "SVG" };
+
+  /**
+   * Options for exporting multiple nodes as a single multi-page PDF document.
+   *
+   * Each node ID becomes one page in the output PDF, rendered in order.
+   */
+  export type ExportPdfDocumentOptions = {
+    /** Node IDs to export, one per page, in order. */
+    node_ids: string[];
+    /**
+     * Uniform page size in points. When `null` or `undefined`, each page
+     * is sized to the source node's render bounds.
+     */
+    page_size?: { width: number; height: number } | null;
+  };
   export type ExportAsPNG = {
     format: "PNG";
     constraints: ExportConstraints;

@@ -83,6 +83,16 @@ impl Rectangle {
         }
     }
 
+    /// Returns the 4 corners: top-left, top-right, bottom-right, bottom-left.
+    pub fn corners(&self) -> [Vector2; 4] {
+        [
+            [self.x, self.y],
+            [self.x + self.width, self.y],
+            [self.x + self.width, self.y + self.height],
+            [self.x, self.y + self.height],
+        ]
+    }
+
     /// Returns the center point of the rectangle.
     pub fn center(&self) -> Vector2 {
         [self.x + self.width / 2.0, self.y + self.height / 2.0]
@@ -607,16 +617,7 @@ pub fn get_relative_transform(a: Rectangle, b: Rectangle) -> AffineTransform {
 
 /// Applies an affine transform to the rectangle and returns the bounding box.
 pub fn transform(rect: Rectangle, t: &AffineTransform) -> Rectangle {
-    let corners = [
-        [rect.x, rect.y],
-        [rect.x + rect.width, rect.y],
-        [rect.x, rect.y + rect.height],
-        [rect.x + rect.width, rect.y + rect.height],
-    ];
-    let transformed: Vec<Vector2> = corners
-        .iter()
-        .map(|&p| super::vector2::transform(p, t))
-        .collect();
+    let transformed: [Vector2; 4] = rect.corners().map(|p| super::vector2::transform(p, t));
     Rectangle::from_points(&transformed)
 }
 

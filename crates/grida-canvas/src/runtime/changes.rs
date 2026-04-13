@@ -64,6 +64,13 @@ impl ChangeFlags {
     /// reserve the bit for a future incremental property-tree path.
     pub const NODE_TRANSFORM: Self = Self(1 << 8);
 
+    /// A render-time viewport filter changed (e.g. isolation mode).
+    ///
+    /// No cache invalidation is needed — filters are read each frame by
+    /// the draw loop and hit-tester. The flag only ensures a frame is
+    /// queued so the change becomes visible immediately.
+    pub const RENDER_FILTER: Self = Self(1 << 9);
+
     // -- helpers --
 
     pub const fn is_empty(self) -> bool {

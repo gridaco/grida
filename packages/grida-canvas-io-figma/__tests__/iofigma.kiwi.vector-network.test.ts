@@ -73,7 +73,20 @@ describe("iofigma.kiwi vectorNetworkBlob mapping", () => {
     const raw = parseVectorNetworkBlob(blobBytes)!;
     const rawB = bbox(raw.vertices)!;
 
-    const restNode = iofigma.kiwi.factory.node(nc, figData.message) as any;
+    // The Kiwi→REST converter prefers `fillGeometry` / `strokeGeometry`
+    // (commandsBlob) over `vectorNetworkBlob` whenever they exist, because
+    // only that path preserves Figma's per-region winding rules. For this
+    // scaling test we want the vectorNetworkBlob fallback, so synthesize
+    // a node stripped of all command-blob paths.
+    const ncNoCommands = {
+      ...nc,
+      fillGeometry: undefined,
+      strokeGeometry: undefined,
+    };
+    const restNode = iofigma.kiwi.factory.node(
+      ncNoCommands,
+      figData.message
+    ) as any;
     expect(restNode.type).toBe("X_VECTOR");
     const mappedB = bbox(restNode.vectorNetwork.vertices)!;
 

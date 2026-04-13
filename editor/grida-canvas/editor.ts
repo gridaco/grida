@@ -48,6 +48,7 @@ import kolor from "@grida/color";
 import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
+import { perf } from "./perf";
 
 const __DEV__ = process.env.NODE_ENV === "development";
 
@@ -355,10 +356,32 @@ class EditorDocumentStore
   private readonly listeners: Set<editor.api.SubscriptionCallbackFn<this>> =
     new Set();
 
+  /**
+   * Post-dispatch hooks — invoked synchronously after state mutation,
+   * before external listeners (`emit`).
+   *
+   * Hooks may call `dispatch()` to enforce invariants (e.g. re-isolate
+   * after a document reset). The dispatch is re-entrant safe: the inner
+   * dispatch completes its own reducer → hooks → emit cycle before the
+   * outer emit fires.
+   */
+  private readonly _postDispatchHooks: Set<
+    (action: Action, state: Readonly<editor.state.IEditorState>) => void
+  > = new Set();
+
   private mstate: editor.state.IEditorState;
   get state(): Readonly<editor.state.IEditorState> {
     return this.mstate;
   }
+
+  /**
+   * Side-channel storage for gesture snapshots, kept outside the Immer
+   * draft tree. Gesture reducers store the snapshot here at gesture start
+   * via `context.gesture_snapshot.set()` and read it back each frame via
+   * `context.gesture_snapshot.get()`. Because this is never part of the
+   * Immer-managed state, Immer never proxies or finalizes its contents.
+   */
+  private _gesture_snapshot: editor.state.IMinimalDocumentState | null = null;
 
   private readonly _historyAdapter = new EditorHistoryAdapter();
   get historySnapshot() {
@@ -580,6 +603,12 @@ class EditorDocumentStore
       },
       idgen: this.idgen,
       logger: this.log.bind(this),
+      gesture_snapshot: {
+        get: () => this._gesture_snapshot,
+        set: (s) => {
+          this._gesture_snapshot = s;
+        },
+      },
     };
 
     const actions = Array.isArray(action) ? action : [action];
@@ -588,17 +617,44 @@ class EditorDocumentStore
       return;
     }
 
+    const __perf_end_dispatch = perf.start("dispatch", {
+      action_type: actions[0]?.type,
+      batch: actions.length,
+    });
+
     let lastAction: Action;
     let allPatches: editor.history.Patch[] = [];
 
     for (const action of actions) {
       const beforeState = this.mstate;
+
+      const __perf_end_reducer = perf.start("dispatch.reducer", {
+        action_type: action.type,
+      });
       const [nextState, patches, inversePatches] = reducer(
         this.mstate,
         action,
-        context
+        context,
+        {
+          // Only bypass Immer for the known gesture hot-loop actions where
+          // we've verified which state sub-objects get mutated and cloned them.
+          // Other "silent" actions (config changes, etc.) may write to
+          // sub-objects we haven't cloned, which would corrupt frozen state.
+          skipPatches:
+            recording === "silent" &&
+            (action.type === "event-target/event/on-drag" ||
+              action.type === "event-target/event/on-pointer-move" ||
+              action.type === "event-target/event/on-pointer-move-raycast" ||
+              action.type === "node/change/*"),
+        }
       );
+      __perf_end_reducer();
+
       this.mstate = nextState;
+
+      const __perf_end_history = perf.start("dispatch.history", {
+        action_type: action.type,
+      });
       this._historyAdapter.record(
         action.type,
         beforeState,
@@ -608,13 +664,28 @@ class EditorDocumentStore
         recording,
         clearsFuture
       );
+      __perf_end_history();
+
       lastAction = action;
       allPatches = allPatches.concat(patches);
     }
 
     this._tid++;
 
+    // Post-dispatch hooks — synchronous, before external listeners.
+    const __perf_end_hooks = perf.start("dispatch.hooks");
+    for (const hook of this._postDispatchHooks) {
+      hook(lastAction!, this.mstate);
+    }
+    __perf_end_hooks();
+
+    const __perf_end_emit = perf.start("dispatch.emit", {
+      listener_count: this.listeners.size,
+    });
     this.emit(lastAction!, allPatches);
+    __perf_end_emit();
+
+    __perf_end_dispatch();
   }
 
   /**
@@ -651,6 +722,26 @@ class EditorDocumentStore
 
     this.listeners.add(wrapped);
     return () => this.listeners.delete(wrapped);
+  }
+
+  /**
+   * Register a post-dispatch hook.
+   *
+   * Hooks run synchronously after state mutation, before external
+   * listeners. Use this to enforce invariants that must hold after
+   * any state change (e.g. "a slide must always be isolated").
+   *
+   * Hooks may call `dispatch()` — re-entrant dispatch is safe because
+   * the inner dispatch completes its own reducer → hooks → emit cycle
+   * before the outer emit fires.
+   *
+   * @returns An unregister function.
+   */
+  public onPostDispatch(
+    fn: (action: Action, state: Readonly<editor.state.IEditorState>) => void
+  ): () => void {
+    this._postDispatchHooks.add(fn);
+    return () => this._postDispatchHooks.delete(fn);
   }
 
   // #region IDocumentEditorActions implementation
@@ -715,7 +806,13 @@ class EditorDocumentStore
 
     this._historyAdapter.clear();
     this._tid = 0;
-    this.emit({ type: "document/reset", document_key }, []);
+
+    const resetAction: Action = { type: "document/reset", document_key };
+    for (const hook of this._postDispatchHooks) {
+      hook(resetAction, this.mstate);
+    }
+
+    this.emit(resetAction, []);
     return this._tid;
   }
 
@@ -750,6 +847,21 @@ class EditorDocumentStore
     this.dispatch({
       type: "load",
       scene: scene_id,
+    });
+  }
+
+  /**
+   * Set or clear isolation mode.
+   *
+   * When `nodeId` is a string, the viewport is restricted to that node's
+   * subtree. Pass `null` to clear. This dispatches the `"isolation"` action
+   * which updates `isolation_root_node_id` in state; the WASM bridge picks
+   * up the state change via subscription.
+   */
+  public setIsolation(nodeId: string | null) {
+    this.dispatch({
+      type: "isolation",
+      node_id: nodeId,
     });
   }
 
@@ -2844,6 +2956,49 @@ export class Editor
   private _m_wasm_canvas_resize_observer: ResizeObserver | null = null;
 
   /**
+   * RAF id for the coalesced WASM redraw scheduler. `null` means no redraw
+   * is pending. See {@link _scheduleWasmRedraw}.
+   */
+  private _m_wasm_redraw_raf_id: number | null = null;
+
+  /**
+   * Coalesced redraw scheduler for the WASM canvas backend.
+   *
+   * Every WASM-mutating code path inside `Editor` (scene switch, transform,
+   * debug toggle, highlight, pixel preview, outline mode, patch apply,
+   * document sync) requests repaints through this method instead of calling
+   * `surface.redraw()` directly. Multiple requests within a single
+   * animation frame collapse into exactly one `redraw()`, so a burst of
+   * subscribers firing on the same dispatch (e.g. `switchScene` + camera
+   * fit + transform update) produces a single paint.
+   *
+   * No-op when the canvas backend isn't active.
+   *
+   * NOTE: Scope is limited to `Editor`. Some external modules
+   * (`backends/wasm-surface-provider.ts`, viewport text editor) still call
+   * `scene.redraw()` directly on their own cadence and are not routed
+   * through this scheduler.
+   */
+  private _scheduleWasmRedraw(): void {
+    if (this.backend !== "canvas") return;
+    if (this._m_wasm_redraw_raf_id !== null) return;
+    this._m_wasm_redraw_raf_id = requestAnimationFrame(() => {
+      this._m_wasm_redraw_raf_id = null;
+      this._m_wasm_canvas_scene?.redraw();
+    });
+  }
+
+  /**
+   * Cancel any pending WASM redraw. Called from {@link dispose}.
+   */
+  private _cancelWasmRedraw(): void {
+    if (this._m_wasm_redraw_raf_id !== null) {
+      cancelAnimationFrame(this._m_wasm_redraw_raf_id);
+      this._m_wasm_redraw_raf_id = null;
+    }
+  }
+
+  /**
    * Surface init options passed to `createWebGLCanvasSurface()`.
    * Set before calling `mount()`. Includes renderer config (e.g. `skip_layout`).
    */
@@ -3292,7 +3447,7 @@ export class Editor
     if (n !== 0) {
       this._m_wasm_canvas_scene.runtime_renderer_set_pixel_preview_stable(true);
     }
-    this._m_wasm_canvas_scene.redraw();
+    this._scheduleWasmRedraw();
   }
 
   public __runtime_renderer_set_outline_mode(
@@ -3307,7 +3462,31 @@ export class Editor
     this._m_wasm_canvas_scene.runtime_renderer_set_render_policy_flags(
       withIgnoreClips
     );
-    this._m_wasm_canvas_scene.redraw();
+    this._scheduleWasmRedraw();
+  }
+
+  /**
+   * Set or clear isolation mode on the WASM renderer.
+   *
+   * When `nodeId` is a string, only that node and its descendants are
+   * drawn and hit-tested. Pass `null` to clear isolation.
+   * Isolation is viewport-only — it does not mutate the document.
+   *
+   * Overflow dimming is always enabled: the isolation root's bounds act
+   * as a viewport and overflowing content is drawn at reduced opacity.
+   */
+  public __runtime_renderer_set_isolation_mode(nodeId: string | null) {
+    if (this.backend !== "canvas" || !this._m_wasm_canvas_scene) return;
+    // Overflow dimming: isolation root bounds act as viewport, overflow
+    // content drawn dimmed. Flag value from Scene.ISOLATION_MODE_OVERFLOW_DIM.
+    const ISOLATION_OVERFLOW_DIM = 1 << 0;
+    this._m_wasm_canvas_scene.runtime_renderer_set_isolation_mode(
+      nodeId,
+      ISOLATION_OVERFLOW_DIM,
+      0.15
+    );
+    this._m_wasm_canvas_scene.runtime_renderer_set_isolation_stage_preset(7);
+    this._scheduleWasmRedraw();
   }
 
   /**
@@ -3366,7 +3545,7 @@ export class Editor
         );
 
         surface.setMainCameraTransform(cmath.transform.invert(viewMatrix));
-        surface.redraw();
+        this._scheduleWasmRedraw();
       };
 
       const ro = new ResizeObserver((entries) => {
@@ -3404,18 +3583,23 @@ export class Editor
         });
       }
 
-      // Guards against redundant switchScene calls from the scene_id
-      // subscriber when syncDocument already activated the same scene.
+      // Tracks which scene the WASM surface is currently showing.
       //
-      // The problem: syncDocument calls switchScene(X), then camera.fit
-      // dispatches a transform change. The nested emit re-fires ALL
-      // subscribers, including scene_id, which sees the new scene_id and
-      // calls switchScene(X) again — duplicating the expensive layout pass.
+      // Consulted only by the `scene_id` subscriber to short-circuit a
+      // redundant `switchScene` call when `syncDocument` has already
+      // activated the target scene earlier in the same dispatch chain
+      // (document/reset → syncDocument → camera.fit → transform dispatch
+      // → nested emit → scene_id subscriber).
       //
-      // The fix: syncDocument increments this counter before switchScene.
-      // The scene_id subscriber decrements and skips when > 0. The counter
-      // (not a boolean) is safe against re-entrant calls.
-      let __switchSceneGuard = 0;
+      // NOT consulted by `syncDocument` itself. Its `loadSceneGrida` +
+      // `switchScene` pair is indivisible: `loadSceneGrida` decodes new
+      // document bytes into the WASM `loaded_scenes` cache, and only
+      // `switchScene` installs the decoded scene into the live renderer.
+      // Skipping `switchScene` on a same-scene-id document mutation would
+      // leave the renderer on the previous document (stale geometry,
+      // missing nodes), so `syncDocument` always calls it and always
+      // updates the tracker.
+      let __activeWasmSceneId: string | null = null;
 
       const syncDocument = (
         surface: Scene,
@@ -3446,18 +3630,33 @@ export class Editor
           loadMs = tLoad - t0;
         }
 
-        // loadSceneGrida only decodes and stores scenes.
-        // switchScene activates the requested scene (or first if unspecified).
+        // loadSceneGrida only decodes and stores scenes. `switchScene`
+        // installs the decoded scene into the live renderer — it must
+        // ALWAYS run after loadSceneGrida, even when the scene id hasn't
+        // changed, because the underlying document bytes have. Updating
+        // `__activeWasmSceneId` here lets the scene_id subscriber skip
+        // the redundant second activation if it re-fires during a nested
+        // emit (see comment on __activeWasmSceneId).
         const targetScene =
           sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
         if (targetScene) {
-          __switchSceneGuard++;
           surface.switchScene(targetScene);
+          __activeWasmSceneId = targetScene;
+        }
+
+        // Re-apply scene-render configs that `load_scene` correctly resets.
+        // `switchScene` → `load_scene` resets all scene-scoped renderer
+        // state (isolation, etc.) because the old state references nodes
+        // from the previous scene graph. We re-apply from editor state,
+        // which is the source of truth.
+        const isolation = this.doc.state.isolation_root_node_id;
+        if (isolation) {
+          this.__runtime_renderer_set_isolation_mode(isolation);
         }
 
         const tSwitch = __DEV__ ? performance.now() : 0;
 
-        surface.redraw();
+        this._scheduleWasmRedraw();
 
         if (__DEV__) {
           const tRedraw = performance.now();
@@ -3465,7 +3664,7 @@ export class Editor
             `[syncDocument] ${Object.keys(document.nodes).length} nodes, ` +
               `scene=${targetScene ?? "(none)"} in ${(tRedraw - t0).toFixed(0)}ms` +
               ` (encode=${encodeMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
-              ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=${(tRedraw - tSwitch).toFixed(0)}ms)`
+              ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=scheduled)`
           );
         }
       };
@@ -3535,7 +3734,7 @@ export class Editor
             );
             this.log("falling back to direct sync", result);
           } else {
-            this._m_wasm_canvas_scene.redraw();
+            this._scheduleWasmRedraw();
           }
         }
       );
@@ -3544,13 +3743,20 @@ export class Editor
         (state) => state.scene_id,
         (_, scene_id) => {
           if (!this._m_wasm_canvas_scene || !scene_id) return;
-          // syncDocument already called switchScene — skip the redundant call
-          // which would repeat the expensive layout+geometry pass.
-          if (__switchSceneGuard > 0) {
-            __switchSceneGuard--;
-            return;
-          }
+          // Short-circuit if WASM is already showing this scene — prevents
+          // a redundant layout pass when syncDocument activated the scene
+          // earlier in the same dispatch.
+          if (scene_id === __activeWasmSceneId) return;
           this._m_wasm_canvas_scene.switchScene(scene_id);
+          __activeWasmSceneId = scene_id;
+          this._scheduleWasmRedraw();
+        }
+      );
+
+      this.doc.subscribeWithSelector(
+        (state) => state.isolation_root_node_id,
+        (_, nodeId) => {
+          this.__runtime_renderer_set_isolation_mode(nodeId);
         }
       );
 
@@ -3558,7 +3764,7 @@ export class Editor
         (state) => state.debug,
         (_, v) => {
           this._m_wasm_canvas_scene?.setDebug(v);
-          this._m_wasm_canvas_scene?.redraw();
+          this._scheduleWasmRedraw();
         }
       );
 
@@ -3596,7 +3802,7 @@ export class Editor
               stroke: "#00a6f4",
             },
           });
-          this._m_wasm_canvas_scene?.redraw();
+          this._scheduleWasmRedraw();
         },
         (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
       );
@@ -3733,6 +3939,11 @@ export class Editor
 
   __get_image_ref(ref: string): grida.program.document.ImageRef | null {
     return this.images.get(ref) || null;
+  }
+
+  /** Snapshot of the local image byte cache (for presentation engine etc.). */
+  __get_image_bytes_snapshot(): Map<string, Uint8Array> {
+    return new Map(this._image_bytes);
   }
 
   __get_image_bytes_for_wasm(ref: string): Uint8Array | null {
@@ -4338,6 +4549,27 @@ export class Editor
     // Export with provided config - no metadata reading/writing
     return this.exporter.exportNodeAs(node_id, format, config);
   }
+
+  /**
+   * Export multiple nodes as a single multi-page PDF document.
+   *
+   * @param node_ids - Node IDs to export, one per page, in order.
+   * @param options - Optional export options (uniform page size, etc.)
+   * @returns Raw PDF bytes.
+   */
+  exportPdfDocument(
+    node_ids: string[],
+    options?: { pageSize?: { width: number; height: number } }
+  ): Promise<Uint8Array> {
+    if (!("exportPdfDocument" in this.exporter)) {
+      throw new Error(
+        "PDF document export is not supported by the current backend"
+      );
+    }
+    return (
+      this.exporter as unknown as editor.api.IDocumentPDFExportInterfaceProvider
+    ).exportPdfDocument(node_ids, options);
+  }
   // ==============================================================
   // #endregion IExportPluginActions implementation
   // ==============================================================
@@ -4492,6 +4724,7 @@ export class Editor
    */
   dispose() {
     this._stopImagePoll();
+    this._cancelWasmRedraw();
     if (this._m_wasm_canvas_resize_observer) {
       this._m_wasm_canvas_resize_observer.disconnect();
       this._m_wasm_canvas_resize_observer = null;

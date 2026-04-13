@@ -59,6 +59,34 @@ pub struct ExportAsSVG {
     // svg export does not support constraints
 }
 
+// ---------------------------------------------------------------------------
+// Multi-page PDF document export
+// ---------------------------------------------------------------------------
+
+/// Uniform page size in points for a multi-page PDF document.
+#[derive(Clone, Debug, Deserialize)]
+pub struct PdfPageSize {
+    pub width: f32,
+    pub height: f32,
+}
+
+/// Options for exporting multiple nodes as a single multi-page PDF document.
+///
+/// Each node ID becomes one page in the output PDF, rendered in order.
+/// When `page_size` is `Some`, every page uses that uniform size and the
+/// node content is rendered at its natural bounds within the page.
+/// When `None`, each page is sized to the node's render bounds.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ExportPdfDocumentOptions {
+    /// Node IDs (user-facing string IDs) to export, one per page, in order.
+    pub node_ids: Vec<String>,
+
+    /// Uniform page size. When `None`, each page uses the source node's
+    /// render bounds as the page dimensions.
+    #[serde(default)]
+    pub page_size: Option<PdfPageSize>,
+}
+
 #[derive(Clone, Deserialize)]
 #[serde(tag = "format")]
 pub enum ExportAs {

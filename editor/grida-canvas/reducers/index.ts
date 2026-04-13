@@ -2,19 +2,20 @@ import type { Action, EditorAction } from "../action";
 import {
   enablePatches,
   produceWithPatches,
-  original,
   type Draft,
   type Patch,
 } from "immer";
-import { updateState } from "./utils/immer";
+import { safeOriginal, updateState } from "./utils/immer";
 import {
   self_update_gesture_transform,
   self_updateSurfaceHoverState,
 } from "./methods";
+import { self_clearSelection } from "./methods/select";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
+import { perf } from "../perf";
 
 enablePatches();
 
@@ -29,6 +30,21 @@ export type ReducerContext = {
   };
   backend: "dom" | "canvas";
   paint_constraints: editor.config.IEditorRenderingConfig["paint_constraints"];
+
+  /**
+   * Side-channel for gesture snapshots, kept outside Immer state.
+   *
+   * Gesture reducers store a deep clone of the document here at gesture start
+   * and read it back on each frame. Because this lives outside the Immer draft
+   * tree, Immer never proxies or finalizes the snapshot data — eliminating the
+   * O(N) finalization overhead that previously dominated drag translate cost.
+   *
+   * @see editor.state.IMinimalDocumentState
+   */
+  gesture_snapshot: {
+    get(): editor.state.IMinimalDocumentState | null;
+    set(snapshot: editor.state.IMinimalDocumentState | null): void;
+  };
 };
 
 export type ReducerResult = [editor.state.IEditorState, Patch[], Patch[]];
@@ -36,7 +52,8 @@ export type ReducerResult = [editor.state.IEditorState, Patch[], Patch[]];
 export default function reducer(
   state: editor.state.IEditorState,
   action: Action,
-  context: ReducerContext
+  context: ReducerContext,
+  opts?: { skipPatches?: boolean }
 ): ReducerResult {
   if (
     state.debug &&
@@ -49,80 +66,196 @@ export default function reducer(
     context.logger?.("debug:action", action.type, action);
   }
 
-  const [nextState, patches, inversePatches] = produceWithPatches(
-    state,
-    (draft) => {
-      switch (action.type) {
-        case "__internal/webfonts#webfontList": {
-          draft.webfontlist = action.webfontlist;
-          return;
-        }
-        case "document/reset": {
-          // Special marker action - already handled by reset() method
-          // This should never actually reach the reducer, but handle it gracefully
-          return;
-        }
-        case "load": {
-          const { scene } = action;
+  const __perf_end = perf.start("reducer.immer_produce", {
+    action_type: action.type,
+  });
 
-          // Check if scene exists in scenes_ref
-          if (!state.document.scenes_ref.includes(scene)) {
-            return;
-          }
-
-          if (state.scene_id === scene) {
-            return;
-          }
-
-          draft.scene_id = scene;
-          Object.assign(draft, editor.state.__RESET_SCENE_STATE);
-          return;
-        }
-        case "transform": {
-          const { transform, sync } = action;
-          draft.transform = transform;
-          if (sync) {
-            self_updateSurfaceHoverState(draft);
-          }
-          return;
-        }
-        case "clip/color": {
-          draft.user_clipboard_color = action.color;
-          draft.brush_color = action.color;
-          return;
-        }
-        default: {
-          _reducer(draft as Draft<editor.state.IEditorState>, action, context);
-        }
+  // When patches are not needed (recording: "silent"), use produce()
+  // instead of produceWithPatches(). produce() still creates proxies but
+  // skips the patch-generation bookkeeping.
+  const recipe = (draft: Draft<editor.state.IEditorState>) => {
+    switch (action.type) {
+      case "__internal/webfonts#webfontList": {
+        draft.webfontlist = action.webfontlist;
+        return;
       }
+      case "document/reset": {
+        // Special marker action - already handled by reset() method
+        // This should never actually reach the reducer, but handle it gracefully
+        return;
+      }
+      case "load": {
+        const { scene } = action;
 
-      // ── editable guard: prevent document mutations in read-only mode ──
-      // TODO: This is a band-aid. The proper fix is a system-level redesign
-      // where the document model itself enforces immutability (e.g. a
-      // read-only proxy/wrapper around `document` that throws on write when
-      // `editable: false`), so sub-reducers never attempt mutations in the
-      // first place. Currently, all reducers run freely and we revert the
-      // document fields after the fact.
-      if (!draft.editable) {
-        const orig = original(draft)!;
-        draft.document.nodes = orig.document.nodes as Draft<
-          typeof orig.document.nodes
-        >;
-        draft.document.links = orig.document.links as Draft<
-          typeof orig.document.links
-        >;
-        draft.document.scenes_ref = orig.document.scenes_ref as Draft<
-          typeof orig.document.scenes_ref
-        >;
-        draft.document.properties = orig.document.properties as Draft<
-          typeof orig.document.properties
-        >;
-        draft.document.bitmaps = orig.document.bitmaps as Draft<
-          typeof orig.document.bitmaps
-        >;
+        // Check if scene exists in scenes_ref
+        if (!state.document.scenes_ref.includes(scene)) {
+          return;
+        }
+
+        if (state.scene_id === scene) {
+          return;
+        }
+
+        draft.scene_id = scene;
+        Object.assign(draft, editor.state.__RESET_SCENE_STATE);
+        return;
+      }
+      case "isolation": {
+        const { node_id } = action;
+        if (node_id !== null) {
+          // Validate: node must exist in the document.
+          const node = state.document.nodes[node_id];
+          if (!node) return;
+        }
+        // When isolation root changes (e.g. switching focused slide),
+        // clear the current selection so stale references don't persist.
+        if (draft.isolation_root_node_id !== node_id) {
+          self_clearSelection(draft);
+        }
+        draft.isolation_root_node_id = node_id;
+        return;
+      }
+      case "transform": {
+        const { transform, sync } = action;
+        draft.transform = transform;
+        if (sync) {
+          self_updateSurfaceHoverState(draft);
+        }
+        return;
+      }
+      case "clip/color": {
+        draft.user_clipboard_color = action.color;
+        draft.brush_color = action.color;
+        return;
+      }
+      default: {
+        _reducer(draft as Draft<editor.state.IEditorState>, action, context);
       }
     }
-  );
+
+    // ── editable guard: prevent document mutations in read-only mode ──
+    // TODO: This is a band-aid. The proper fix is a system-level redesign
+    // where the document model itself enforces immutability (e.g. a
+    // read-only proxy/wrapper around `document` that throws on write when
+    // `editable: false`), so sub-reducers never attempt mutations in the
+    // first place. Currently, all reducers run freely and we revert the
+    // document fields after the fact.
+    if (!draft.editable) {
+      const orig = safeOriginal(draft)!;
+      draft.document.nodes = orig.document.nodes as Draft<
+        typeof orig.document.nodes
+      >;
+      draft.document.links = orig.document.links as Draft<
+        typeof orig.document.links
+      >;
+      draft.document.scenes_ref = orig.document.scenes_ref as Draft<
+        typeof orig.document.scenes_ref
+      >;
+      draft.document.properties = orig.document.properties as Draft<
+        typeof orig.document.properties
+      >;
+      draft.document.bitmaps = orig.document.bitmaps as Draft<
+        typeof orig.document.bitmaps
+      >;
+    }
+  };
+
+  let nextState: editor.state.IEditorState;
+  let patches: Patch[];
+  let inversePatches: Patch[];
+
+  if (opts?.skipPatches) {
+    // ── Mutable bypass: skip Immer entirely ──
+    // Create a mutable clone of the state. The recipe runs on this clone
+    // directly — no proxies, no finalization. The clone IS the next state.
+    //
+    // Strategy: deep-clone everything EXCEPT `document.nodes` and
+    // `document.links` (which are large). For those, use shallow spread
+    // + targeted cloning of entries that will be mutated.
+    //
+    // structuredClone on the non-document parts is ~0.2ms (small objects).
+    // Spreading `nodes` (1K entries) and `links` (1K entries) is <0.01ms.
+    // Avoid spreading the entire nodes/links dicts (O(N) at 136K nodes).
+    // Instead, check if they're frozen. If already mutable (from a prior
+    // bypass dispatch), reuse them directly — only clone individual entries
+    // that will be written to.
+    const nodesFrozen = Object.isFrozen(state.document.nodes);
+    const mutableNodes = nodesFrozen
+      ? { ...state.document.nodes }
+      : state.document.nodes;
+
+    // Clone each node that's in the current selection so writes to
+    // layout_inset_left/top don't mutate the frozen original node.
+    const gesture = state.gesture as any;
+    if (gesture.type !== "idle" && gesture.selection) {
+      for (const id of gesture.selection as string[]) {
+        if (mutableNodes[id]) {
+          mutableNodes[id] = { ...mutableNodes[id] };
+        }
+      }
+    }
+    // Also clone the scene node for guide gesture (writes to guides[i].offset)
+    if (state.scene_id && mutableNodes[state.scene_id]) {
+      const sceneNode = mutableNodes[state.scene_id] as any;
+      mutableNodes[state.scene_id] = {
+        ...sceneNode,
+        guides: sceneNode.guides
+          ? sceneNode.guides.map((g: any) => ({ ...g }))
+          : undefined,
+      };
+    }
+
+    // Same strategy for links — skip the O(N) clone when already mutable.
+    const linksFrozen = Object.isFrozen(state.document.links);
+    let mutableLinks: Record<string, string[]>;
+    if (linksFrozen) {
+      mutableLinks = {};
+      for (const key in state.document.links) {
+        const arr = state.document.links[key];
+        mutableLinks[key] = arr ? [...arr] : [];
+      }
+    } else {
+      mutableLinks = state.document.links as Record<string, string[]>;
+    }
+
+    const mutable: any = {
+      ...state,
+      document: {
+        ...state.document,
+        nodes: mutableNodes,
+        links: mutableLinks,
+      },
+      document_ctx: { ...state.document_ctx },
+      // Clone sub-objects that on-drag mutates. Each is small (a few fields).
+      gesture: { ...state.gesture },
+      // marquee: { a, b, additive } — .b is written during marquee drag
+      marquee: state.marquee ? { ...state.marquee } : state.marquee,
+      // lasso: { points, additive } — .points is pushed to during lasso drag
+      lasso: state.lasso
+        ? { ...state.lasso, points: [...state.lasso.points] }
+        : state.lasso,
+      // pointer: read-only during on-drag but clone for safety
+      pointer: { ...state.pointer },
+      // hits: read (slice) during translate hierarchy check
+      hits: state.hits ? [...state.hits] : [],
+      // Stash the original frozen state so code that uses safeOriginal()
+      // can fall back to it when running outside Immer.
+      __original: state,
+    };
+
+    // Run the recipe on the mutable object (cast as Draft for type compat)
+    recipe(mutable as Draft<editor.state.IEditorState>);
+
+    // Remove the stashed original before exposing as the new state
+    delete mutable.__original;
+
+    nextState = mutable as editor.state.IEditorState;
+    patches = [];
+    inversePatches = [];
+  } else {
+    [nextState, patches, inversePatches] = produceWithPatches(state, recipe);
+  }
+  __perf_end();
 
   return [nextState, patches, inversePatches];
 }

@@ -63,12 +63,14 @@ import { nanoid } from "nanoid";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
-  ImportFromFigmaDialog,
+  ImportFromFigmaApiDialog,
+  ImportFromFigmaFileDialog,
+  ImportFromFigmaSlidesDialog,
   ImportFromGridaDialog,
 } from "@/grida-canvas-react-starter-kit/starterkit-import";
 import { canvas_examples } from "./examples";
 import { sitemap } from "@/www/data/sitemap";
-import iofigma from "@grida/io-figma";
+import iofigma, { deckBytesToSlidesDocument } from "@grida/io-figma";
 import { editor } from "@/grida-canvas";
 import { SettingsDialog } from "./uxhost-settings";
 import {
@@ -90,7 +92,9 @@ export function PlaygroundMenuContent({
   toggleMinimal?: () => void;
 } = {}) {
   const instance = useCurrentEditor();
-  const importFromFigmaDialog = useDialogState("import-from-figma");
+  const importFigmaFile = useDialogState("import-figma-file");
+  const importFigmaSlides = useDialogState("import-figma-slides");
+  const importFigmaApi = useDialogState("import-figma-api");
   const importFromGrida = useDialogState("import-from-grida", {
     refreshkey: true,
   });
@@ -176,8 +180,64 @@ export function PlaygroundMenuContent({
         }}
       />
 
-      <ImportFromFigmaDialog
-        {...importFromFigmaDialog.props}
+      <ImportFromFigmaFileDialog
+        {...importFigmaFile.props}
+        onImportFig={async (result) => {
+          const iofigma = await import("@grida/io-figma");
+          const FigImporter = iofigma.default.kiwi.FigImporter;
+
+          // Parse the .fig file
+          const buffer = await result.file.arrayBuffer();
+          const figFile = FigImporter.parseFile(new Uint8Array(buffer));
+
+          // TODO: Future enhancement - support importing entire document as single operation
+          // Currently loops per-scene for simplicity and to avoid bugs
+
+          // Process each page as a separate scene
+          for (const page of figFile.pages) {
+            const sceneId = `scene-${nanoid()}`;
+            instance.surface.surfaceCreateScene({
+              id: sceneId,
+              name: page.name,
+            });
+
+            if (page.rootNodes.length > 0) {
+              const { document: packedDoc } = FigImporter.convertPageToScene(
+                page,
+                {
+                  gradient_id_generator: () => v4(),
+                }
+              );
+              instance.surface.insert({ document: packedDoc });
+            }
+          }
+        }}
+      />
+
+      <ImportFromFigmaSlidesDialog
+        {...importFigmaSlides.props}
+        onImportFig={async (result) => {
+          const buffer = await result.file.arrayBuffer();
+          const { document, assets } = deckBytesToSlidesDocument(
+            new Uint8Array(buffer)
+          );
+
+          if (assets && Object.keys(assets).length > 0) {
+            instance.loadImages(assets);
+          }
+
+          instance.commands.reset(
+            editor.state.init({
+              editable: true,
+              document,
+            }),
+            Date.now() + ""
+          );
+        }}
+      />
+
+      <ImportFromFigmaApiDialog
+        {...importFigmaApi.props}
         onImport={async (res) => {
           const images = res.images ?? {};
           const context: iofigma.restful.factory.FactoryContext = {
@@ -215,36 +275,6 @@ export function PlaygroundMenuContent({
 
           instance.surface.insert({ document: gridaDoc });
         }}
-        onImportFig={async (result) => {
-          const iofigma = await import("@grida/io-figma");
-          const FigImporter = iofigma.default.kiwi.FigImporter;
-
-          // Parse the .fig file
-          const buffer = await result.file.arrayBuffer();
-          const figFile = FigImporter.parseFile(new Uint8Array(buffer));
-
-          // TODO: Future enhancement - support importing entire document as single operation
-          // Currently loops per-scene for simplicity and to avoid bugs
-
-          // Process each page as a separate scene
-          for (const page of figFile.pages) {
-            const sceneId = `scene-${nanoid()}`;
-            instance.surface.surfaceCreateScene({
-              id: sceneId,
-              name: page.name,
-            });
-
-            if (page.rootNodes.length > 0) {
-              const { document: packedDoc } = FigImporter.convertPageToScene(
-                page,
-                {
-                  gradient_id_generator: () => v4(),
-                }
-              );
-              instance.surface.insert({ document: packedDoc });
-            }
-          }
-        }}
       />
 
       <SettingsDialog
@@ -257,7 +287,9 @@ export function PlaygroundMenuContent({
           onExport={onExport}
           onImportGrida={importFromGrida.openDialog}
           onImportImage={handleImportImageClick}
-          onImportFigma={importFromFigmaDialog.openDialog}
+          onImportFigmaFile={importFigmaFile.openDialog}
+          onImportFigmaSlides={importFigmaSlides.openDialog}
+          onImportFigmaApi={importFigmaApi.openDialog}
         />
         <EditMenuContent
           hasSelection={hasSelection}
@@ -307,16 +339,20 @@ export function PlaygroundMenuContent({
   );
 }
 
-function FileMenuContent({
+export function FileMenuContent({
   onExport,
   onImportGrida,
   onImportImage,
-  onImportFigma,
+  onImportFigmaFile,
+  onImportFigmaSlides,
+  onImportFigmaApi,
 }: {
   onExport: () => void;
   onImportGrida: () => void;
   onImportImage: () => void;
-  onImportFigma: () => void;
+  onImportFigmaFile: () => void;
+  onImportFigmaSlides: () => void;
+  onImportFigmaApi: () => void;
 }) {
   return (
     <DropdownMenuSub>
@@ -334,16 +370,32 @@ function FileMenuContent({
           <ImageIcon className="size-3.5" />
           Import Image
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onImportFigma} className="text-xs">
-          <FigmaLogoIcon className="size-3.5" />
-          Import Figma
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            <FigmaLogoIcon className="size-3.5" />
+            Import Figma
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="min-w-40">
+            <DropdownMenuItem onClick={onImportFigmaFile} className="text-xs">
+              <FigmaLogoIcon className="size-3.5" />
+              Import .fig
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onImportFigmaSlides} className="text-xs">
+              <FigmaLogoIcon className="size-3.5" />
+              Import .deck
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onImportFigmaApi} className="text-xs">
+              <FigmaLogoIcon className="size-3.5" />
+              Import from API
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );
 }
 
-function EditMenuContent({
+export function EditMenuContent({
   hasSelection,
   backend,
   onPaste,
@@ -468,7 +520,7 @@ function EditMenuContent({
   );
 }
 
-function ViewMenuContent({
+export function ViewMenuContent({
   pixelgrid,
   ruler,
   canvas_ui_container_label,
@@ -643,7 +695,7 @@ function ViewMenuContent({
   );
 }
 
-function PreferencesMenuContent() {
+export function PreferencesMenuContent() {
   const { theme, setTheme } = useTheme();
   const resolvedTheme = theme ?? "system";
 
@@ -679,7 +731,7 @@ function PreferencesMenuContent() {
   );
 }
 
-function SettingsMenuContent({
+export function SettingsMenuContent({
   onOpenGeneral,
   onOpenKeybindings,
 }: {
@@ -703,7 +755,7 @@ function SettingsMenuContent({
   );
 }
 
-function DevelopersMenuContent() {
+export function DevelopersMenuContent() {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger className="text-xs">
@@ -767,7 +819,7 @@ function DevelopersMenuContent() {
   );
 }
 
-function TextMenuContent() {
+export function TextMenuContent() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
   const hasTextSelection = selection.some(
@@ -1160,7 +1212,7 @@ function TextMenuContent() {
   );
 }
 
-function ArrangeMenuContent() {
+export function ArrangeMenuContent() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
   const hasSelection = selection.length > 0;
@@ -1275,7 +1327,7 @@ function ArrangeMenuContent() {
   );
 }
 
-function ObjectMenuContent() {
+export function ObjectMenuContent() {
   const instance = useCurrentEditor();
   const selection = useEditorState(instance, (state) => state.selection);
   const hasSelection = selection.length > 0;

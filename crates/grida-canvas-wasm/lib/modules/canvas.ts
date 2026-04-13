@@ -575,6 +575,33 @@ export class Scene {
     };
   }
 
+  /**
+   * Export multiple nodes as a single multi-page PDF document.
+   *
+   * Each node ID in `options.node_ids` becomes one page in the output PDF.
+   * Returns the raw PDF bytes.
+   */
+  exportPdfDocument(options: types.ExportPdfDocumentOptions): {
+    data: Uint8Array;
+  } {
+    this._assertAlive();
+    const [json_ptr, json_len] = this._alloc_string(JSON.stringify(options));
+    const outptr = this.module._export_pdf_document(
+      this.appptr,
+      json_ptr,
+      json_len - 1
+    );
+    this._free_string(json_ptr, json_len);
+
+    if (outptr === 0) {
+      throw new Error("Failed to export PDF document");
+    }
+
+    return {
+      data: ffi.readLenPrefixedBytes(this.module, outptr),
+    };
+  }
+
   execCommand(command: "ZoomIn" | "ZoomOut") {
     this._assertAlive();
     this.module._command(this.appptr, ApplicationCommandID[command], 0, 0);
@@ -896,6 +923,88 @@ export class Scene {
   runtime_renderer_set_skip_layout(skip: boolean) {
     this._assertAlive();
     this.module._runtime_renderer_set_skip_layout(this.appptr, skip);
+  }
+
+  /**
+   * Bit flags for `runtime_renderer_set_isolation_mode`.
+   *
+   * - `OVERFLOW_DIM` (0x1): treat the isolation root's bounds as a
+   *   viewport — subtree content that overflows is drawn at reduced
+   *   opacity (`overflowOpacity`).
+   */
+  static readonly ISOLATION_MODE_OVERFLOW_DIM = 1 << 0;
+
+  /**
+   * Set or clear isolation mode.
+   *
+   * When `nodeId` is a string, only that node and its descendants are
+   * drawn and hit-tested. Pass `null` to clear isolation.
+   * Isolation is viewport-only — it does not mutate the document.
+   *
+   * @param nodeId  Node to isolate, or `null` to clear.
+   * @param flags   Bitmask of `Scene.ISOLATION_MODE_*` constants. Default `0`.
+   * @param overflowOpacity  Opacity for overflow-dimmed content (0–1).
+   *                         Only used when `ISOLATION_MODE_OVERFLOW_DIM` is set.
+   *                         Default `0.15`.
+   */
+  runtime_renderer_set_isolation_mode(
+    nodeId: string | null,
+    flags: number = 0,
+    overflowOpacity: number = 0.15
+  ) {
+    this._assertAlive();
+    if (nodeId === null) {
+      this.module._runtime_renderer_set_isolation_mode(this.appptr, 0, 0, 0, 0);
+      return;
+    }
+    const [ptr, len] = this._alloc_string(nodeId);
+    this.module._runtime_renderer_set_isolation_mode(
+      this.appptr,
+      ptr,
+      len - 1,
+      flags,
+      overflowOpacity
+    );
+    this._free_string(ptr, len);
+  }
+
+  /**
+   * Stage decoration preset constants for
+   * `runtime_renderer_set_isolation_stage_preset`.
+   *
+   * Maps to the Tailwind CSS `box-shadow` scale.
+   */
+  static readonly ISOLATION_STAGE_PRESET_NONE = 0;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_2XS = 1;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_XS = 2;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_SM = 3;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_MD = 4;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_LG = 5;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_XL = 6;
+  static readonly ISOLATION_STAGE_PRESET_SHADOW_2XL = 7;
+
+  /**
+   * Set the isolation mode stage decoration preset.
+   *
+   * | value | preset      |
+   * |-------|-------------|
+   * |   0   | None        |
+   * |   1   | shadow-2xs  |
+   * |   2   | shadow-xs   |
+   * |   3   | shadow-sm   |
+   * |   4   | shadow-md   |
+   * |   5   | shadow-lg   |
+   * |   6   | shadow-xl   |
+   * |   7   | shadow-2xl  |
+   *
+   * Only takes effect when isolation mode is active.
+   */
+  runtime_renderer_set_isolation_stage_preset(preset: number) {
+    this._assertAlive();
+    this.module._runtime_renderer_set_isolation_stage_preset(
+      this.appptr,
+      preset
+    );
   }
 
   runtime_renderer_set_outline_mode(enable: boolean) {

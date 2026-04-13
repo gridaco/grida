@@ -1,7 +1,11 @@
 import { readFileSync } from "fs";
 import { basename } from "node:path";
 import { unzipSync, strFromU8 } from "fflate";
-import { fig2grida, restJsonToGridaDocument } from "../fig2grida-core";
+import {
+  fig2grida,
+  restJsonToGridaDocument,
+  deckBytesToSlidesDocument,
+} from "../fig2grida-core";
 import { io } from "@grida/io";
 
 const FIXTURES_BASE = __dirname + "/../../../fixtures/test-fig";
@@ -418,6 +422,83 @@ describe("fig2grida", () => {
         },
       });
       expect(result.pageNames).toEqual(["Page"]);
+    });
+  });
+
+  describe("deckBytesToSlidesDocument (.deck → slides)", () => {
+    test("converts light.deck to slides document with tray root nodes", () => {
+      const input = new Uint8Array(
+        readFileSync(`${FIXTURES_BASE}/deck/light.deck`)
+      );
+      const result = deckBytesToSlidesDocument(input);
+
+      // Should produce a valid document
+      expect(result.document.scenes_ref.length).toBeGreaterThan(0);
+      expect(Object.keys(result.document.nodes).length).toBeGreaterThan(0);
+
+      // The scene name should be "Slides"
+      const sceneId = result.document.scenes_ref[0];
+      const sceneNode = result.document.nodes[sceneId] as any;
+      expect(sceneNode.type).toBe("scene");
+      expect(sceneNode.name).toBe("Slides");
+
+      // Root children of the scene should be tray nodes (slides)
+      const rootRefs = result.document.links[sceneId] ?? [];
+      expect(rootRefs.length).toBeGreaterThan(0);
+
+      for (const ref of rootRefs) {
+        const node = result.document.nodes[ref] as any;
+        expect(node).toBeDefined();
+        expect(node.type).toBe("tray");
+      }
+    });
+
+    test("no SLIDE_GRID or SLIDE_ROW container nodes in output", () => {
+      const input = new Uint8Array(
+        readFileSync(`${FIXTURES_BASE}/deck/light.deck`)
+      );
+      const result = deckBytesToSlidesDocument(input);
+
+      // Scene root children are all trays — no SLIDE_GRID / SLIDE_ROW
+      // wrappers should leak through the slides import path.
+      const sceneId = result.document.scenes_ref[0];
+      const rootRefs = result.document.links[sceneId] ?? [];
+      for (const ref of rootRefs) {
+        expect((result.document.nodes[ref] as any).type).toBe("tray");
+      }
+    });
+
+    test("slides have non-zero dimensions", () => {
+      const input = new Uint8Array(
+        readFileSync(`${FIXTURES_BASE}/deck/light.deck`)
+      );
+      const result = deckBytesToSlidesDocument(input);
+
+      const sceneId = result.document.scenes_ref[0];
+      const rootRefs = result.document.links[sceneId] ?? [];
+
+      for (const ref of rootRefs) {
+        const tray = result.document.nodes[ref] as any;
+        expect(tray.layout_target_width).toBeGreaterThan(0);
+        expect(tray.layout_target_height).toBeGreaterThan(0);
+      }
+    });
+
+    test("slides have children (content nodes)", () => {
+      const input = new Uint8Array(
+        readFileSync(`${FIXTURES_BASE}/deck/light.deck`)
+      );
+      const result = deckBytesToSlidesDocument(input);
+
+      const sceneId = result.document.scenes_ref[0];
+      const rootRefs = result.document.links[sceneId] ?? [];
+
+      // At least one slide should have content
+      const hasContent = rootRefs.some((ref) => {
+        const children = result.document.links[ref];
+        return children && children.length > 0;
+      });
+      expect(hasContent).toBe(true);
     });
   });
 });

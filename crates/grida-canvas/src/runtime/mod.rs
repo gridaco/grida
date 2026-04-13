@@ -4,6 +4,7 @@ pub mod config;
 pub mod cost_prediction;
 pub mod counter;
 pub mod effect_tree;
+pub mod filter;
 pub mod font_repository;
 pub mod frame_loop;
 pub mod frame_strategy;

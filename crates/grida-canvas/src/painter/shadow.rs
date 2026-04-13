@@ -2,11 +2,24 @@ use super::geometry::PainterShape;
 use crate::cg::prelude::*;
 use skia_safe::{self as sk, color_filters, image_filters, BlendMode, ColorMatrix, Paint};
 
-/// Create an image filter for drop shadow effects. (for any paint)
-/// works for primitive shapes and also text
+/// Build an image filter for a drop shadow.
+///
+/// Two paths depending on whether `spread` is non-zero:
+///
+/// - **spread ≠ 0** — `dilate`/`erode` → blur → offset.
+///   This chain does NOT colorize; the caller must set `paint.color`
+///   to the shadow color so the source pixels carry the tint.
+///
+/// - **spread = 0** — Skia's built-in `drop_shadow_only` (blur →
+///   `SrcIn` colorize → offset). The filter colorizes internally,
+///   so the caller must paint the source **opaque white** to avoid
+///   double-applying the shadow alpha.
+///
+/// See [`draw_drop_shadow`] for how the paint color is set per path.
 pub fn drop_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
     let spread = shadow.spread;
     let color: sk::Color = shadow.color.into();
+
     if spread != 0.0 {
         let mut filter = if spread > 0.0 {
             image_filters::dilate((spread, spread), None, None)
@@ -21,27 +34,34 @@ pub fn drop_shadow_image_filter(shadow: &FeShadow) -> sk::ImageFilter {
 
         image_filters::offset((shadow.dx, shadow.dy), filter, None).unwrap()
     } else {
-        // fast path using Skia's drop_shadow filter when no spread is applied
-        let image_filter = image_filters::drop_shadow_only(
+        image_filters::drop_shadow_only(
             (shadow.dx, shadow.dy),
             (shadow.blur, shadow.blur),
             color,
             None,
             None,
             None,
-        );
-
-        image_filter.unwrap()
+        )
+        .unwrap()
     }
 }
 
-/// Draw a drop shadow behind the given shape on the provided canvas.
+/// Draw a drop shadow behind the given shape.
+///
+/// The paint color differs between the two filter paths to ensure the
+/// shadow alpha is applied exactly once (see [`drop_shadow_image_filter`]).
 pub fn draw_drop_shadow(canvas: &sk::Canvas, shape: &PainterShape, shadow: &FeShadow) {
-    let color: sk::Color = shadow.color.into();
-
     let mut paint = Paint::default();
     let filter = drop_shadow_image_filter(shadow);
-    paint.set_color(color);
+
+    // Spread path: filter does not colorize → paint carries the tint.
+    // Fast path: `drop_shadow_only` colorizes via SrcIn → paint must be
+    // opaque white so source alpha is 1.0 (avoids alpha² artifact).
+    paint.set_color(if shadow.spread != 0.0 {
+        shadow.color.into()
+    } else {
+        sk::Color::WHITE
+    });
     paint.set_image_filter(filter);
     paint.set_anti_alias(true);
     shape.draw_on_canvas(canvas, &paint);

@@ -90,9 +90,10 @@ export function self_start_gesture_scale(
     }
   }
 
+  // Store snapshot in side-channel to keep it out of Immer's proxy tree.
+  context.gesture_snapshot.set(editor.state.snapshot(draft));
   draft.gesture = {
     type: "scale",
-    initial_snapshot: editor.state.snapshot(draft),
     initial_rects: rects,
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
@@ -206,10 +207,11 @@ function self_update_gesture_resize_scale(
   const {
     selection,
     direction,
-    initial_snapshot,
     movement: rawMovement,
     initial_rects,
   } = gesture;
+  // Snapshot lives in the side-channel, outside Immer's proxy tree.
+  const initial_snapshot = context.gesture_snapshot.get()!;
 
   const initial_bounding_rectangle = cmath.rect.union(initial_rects);
 
@@ -616,12 +618,13 @@ function self_update_gesture_parametric_scale(
   const {
     selection,
     direction,
-    initial_snapshot,
     initial_rects,
     movement: rawMovement,
     initial_bounding_rect: _initial_bounding_rect,
     affected_ids,
   } = draft.gesture;
+  // Snapshot lives in the side-channel, outside Immer's proxy tree.
+  const initial_snapshot = context.gesture_snapshot.get()!;
 
   assert(affected_ids, "parametric scale requires affected_ids");
 

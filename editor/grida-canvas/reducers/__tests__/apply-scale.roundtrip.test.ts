@@ -220,6 +220,7 @@ function createGeometryStub(
 function createContext(
   getState: () => editor.state.IEditorState
 ): ReducerContext {
+  let _snapshot: editor.state.IMinimalDocumentState | null = null;
   return {
     geometry: createGeometryStub(getState),
     vector: undefined,
@@ -227,6 +228,12 @@ function createContext(
     backend: "dom",
     paint_constraints: { fill: "fill", stroke: "stroke" },
     idgen: grida.id.noop.generator,
+    gesture_snapshot: {
+      get: () => _snapshot,
+      set: (s) => {
+        _snapshot = s;
+      },
+    },
   };
 }
 

@@ -1145,7 +1145,7 @@ fn decode_stroke_geometry_trait(
         None => return (StrokeStyle::default(), 0.0, None),
     };
     let style = decode_stroke_style_from_fbs(sg.stroke_style());
-    let profile = sg.stroke_width_profile().map(|p| {
+    let profile = sg.stroke_width_profile().and_then(|p| {
         let stops = p
             .stops()
             .map(|stops_vec| {
@@ -1157,10 +1157,13 @@ fn decode_stroke_geometry_trait(
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        varwidth::VarWidthProfile {
+        if stops.is_empty() {
+            return None;
+        }
+        Some(varwidth::VarWidthProfile {
             base: sg.stroke_width() * 0.5,
             stops,
-        }
+        })
     });
     (style, sg.stroke_width(), profile)
 }

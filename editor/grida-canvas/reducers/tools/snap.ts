@@ -2,6 +2,7 @@ import grida from "@grida/schema";
 import cmath from "@grida/cmath";
 import { SnapResult, snapToCanvasGeometry } from "@grida/cmath/_snap";
 import { dq } from "@/grida-canvas/query";
+import { perf } from "@/grida-canvas/perf";
 
 const q = 1;
 
@@ -150,9 +151,42 @@ export function snapObjectsTranslation(
   ];
 
   if (enabled) {
+    // Pre-filter anchors to only those near the agent. Rects whose
+    // edges are farther than `threshold` from the agent cannot produce
+    // a snap, so we can safely exclude them. This reduces the anchor
+    // count passed to snapToCanvasGeometry from O(siblings) to O(nearby),
+    // avoiding the O(N × 9) point-generation and linear-scan cost that
+    // dominates at 1K+ siblings.
+    //
+    // Pad by threshold in each direction so we catch rects that are
+    // just barely within snap distance. Use the 9-point extents: the
+    // agent's min/max x/y points (edges and center) need to be within
+    // threshold of anchor edges/center. A generous padding of
+    // threshold + max(anchor_width, anchor_height)/2 would be exact,
+    // but simply using a large-enough pad is safe and fast.
+    let filteredAnchors = anchorObjects;
+    const NEARBY_FILTER_THRESHOLD = 64;
+    if (anchorObjects.length > NEARBY_FILTER_THRESHOLD) {
+      // Pad by threshold + half the agent dimension so anchors whose
+      // center points align with agent edges are still included.
+      const pad =
+        threshold +
+        Math.max(_virtually_moved_rect.width, _virtually_moved_rect.height);
+      const minX = _virtually_moved_rect.x - pad;
+      const maxX = _virtually_moved_rect.x + _virtually_moved_rect.width + pad;
+      const minY = _virtually_moved_rect.y - pad;
+      const maxY = _virtually_moved_rect.y + _virtually_moved_rect.height + pad;
+      filteredAnchors = anchorObjects.filter((r) => {
+        const rMaxX = r.x + r.width;
+        const rMaxY = r.y + r.height;
+        // Reject if completely outside the padded region.
+        return rMaxX >= minX && r.x <= maxX && rMaxY >= minY && r.y <= maxY;
+      });
+    }
+
     result = snapToCanvasGeometry(
       _virtually_moved_rect,
-      { objects: anchorObjects, guides: anchors.guides ?? [] },
+      { objects: filteredAnchors, guides: anchors.guides ?? [] },
       {
         x: movement[0] === null ? false : threshold,
         y: movement[1] === null ? false : threshold,
@@ -191,6 +225,9 @@ export function getSnapTargets(
     document: { nodes: Record<string, grida.program.nodes.Node> };
   }
 ): string[] {
+  const __perf_end = perf.start("getSnapTargets", {
+    selection_count: selection.length,
+  });
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
     new Set(
@@ -213,5 +250,6 @@ export function getSnapTargets(
     return true;
   });
 
+  __perf_end();
   return snap_target_node_ids;
 }

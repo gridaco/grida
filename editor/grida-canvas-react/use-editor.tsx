@@ -61,7 +61,7 @@ const __DEFAULT_STATE: editor.state.IEditorStateInit = {
 
 export function useEditor(
   init?: editor.state.IEditorStateInit,
-  backend: editor.EditorContentRenderingBackend = "dom",
+  backend: editor.EditorContentRenderingBackend = "canvas",
   ui: editor.ui.UIUXProviders = {
     notify: NOTIFY,
     clipboard: navigator.clipboard,

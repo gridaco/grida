@@ -201,8 +201,13 @@ function exportAllOutputBasename(
 ): string {
   const ext = EXT_BY_FORMAT[format] ?? "png";
   const safeId = sanitizeForFilename(nodeId);
-  const safeSuffix = sanitizeForFilename(suffix);
-  const name = safeSuffix ? `${safeId}_${safeSuffix}` : safeId;
+  // Empty suffix (common in Figma export presets) must produce <id>.ext
+  // to match Figma's own Images API output. sanitizeForFilename returns "_"
+  // for empty input, so guard on the original suffix string instead.
+  const trimmedSuffix = suffix.trim();
+  const name = trimmedSuffix
+    ? `${safeId}_${sanitizeForFilename(trimmedSuffix)}`
+    : safeId;
   return `${name}.${ext}`;
 }
 

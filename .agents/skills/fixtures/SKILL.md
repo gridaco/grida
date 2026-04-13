@@ -1,4 +1,5 @@
 ---
+name: fixtures
 description: Guides authoring, organizing, and referencing test fixtures across the project. Use when creating new fixtures, writing tests that depend on fixtures, or deciding what should be checked into git.
 ---
 

@@ -4,6 +4,7 @@ use crate::node::schema::{Node, NodeId};
 use crate::painter::layer::Layer;
 use crate::sk;
 use math2::{rect, rect::Rectangle, vector2::Vector2};
+use std::collections::HashSet;
 
 // TODO: Performance optimization opportunity
 //
@@ -45,18 +46,24 @@ use math2::{rect, rect::Rectangle, vector2::Vector2};
 /// The sorted order mirrors DOM hit testing behaviour where the deepest node is
 /// evaluated first.  Step three is left as a TODO until more reliable path
 /// testing is implemented.
-#[derive(Debug)]
 pub struct HitTester<'a> {
     cache: &'a SceneCache,
     /// Optional scene graph reference for checking parent container clipping.
     /// When provided, hit testing will exclude nodes that are culled by parent containers.
     graph: Option<&'a SceneGraph>,
+    /// Optional isolation set — when present, only nodes in this set are
+    /// eligible for hit-testing. Matches the draw-loop isolation filter.
+    isolation_set: Option<&'a HashSet<NodeId>>,
 }
 
 impl<'a> HitTester<'a> {
     /// Create a new [`HitTester`] backed by the given scene cache.
     pub fn new(cache: &'a SceneCache) -> Self {
-        Self { cache, graph: None }
+        Self {
+            cache,
+            graph: None,
+            isolation_set: None,
+        }
     }
 
     /// Create a new [`HitTester`] with scene graph for culling checks.
@@ -66,7 +73,25 @@ impl<'a> HitTester<'a> {
         Self {
             cache,
             graph: Some(graph),
+            isolation_set: None,
         }
+    }
+
+    /// Attach an isolation set to this hit tester.
+    ///
+    /// When set, only nodes whose IDs are in the set will be returned by
+    /// any hit-test method. This scopes pointer interaction to the
+    /// isolated subtree, matching the draw-loop isolation filter.
+    pub fn with_isolation_set(mut self, set: Option<&'a HashSet<NodeId>>) -> Self {
+        self.isolation_set = set;
+        self
+    }
+
+    /// Returns `true` if the node passes the isolation filter (or if no
+    /// isolation is active).
+    #[inline]
+    fn passes_isolation(&self, id: &NodeId) -> bool {
+        self.isolation_set.is_none_or(|set| set.contains(id))
     }
 
     /// Check if a point is within all parent container clip bounds.
@@ -112,6 +137,9 @@ impl<'a> HitTester<'a> {
         indices.sort();
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
+            if !self.passes_isolation(&entry.id) {
+                continue;
+            }
             if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     // Check if the point is within all parent container clip bounds
@@ -131,6 +159,9 @@ impl<'a> HitTester<'a> {
         let mut out = Vec::with_capacity(indices.len());
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
+            if !self.passes_isolation(&entry.id) {
+                continue;
+            }
             if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     // Check if the point is within all parent container clip bounds
@@ -165,6 +196,9 @@ impl<'a> HitTester<'a> {
         indices.sort();
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
+            if !self.passes_isolation(&entry.id) {
+                continue;
+            }
             if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     let transform = entry.layer.transform();
@@ -204,6 +238,9 @@ impl<'a> HitTester<'a> {
         let mut out = Vec::with_capacity(indices.len());
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
+            if !self.passes_isolation(&entry.id) {
+                continue;
+            }
             if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::contains_point(&bounds, point) {
                     let shape = entry.layer.shape();
@@ -260,6 +297,9 @@ impl<'a> HitTester<'a> {
         let center_point = [rect.x + rect.width / 2.0, rect.y + rect.height / 2.0];
         for idx in indices.into_iter().rev() {
             let entry = &self.cache.layers.layers[idx];
+            if !self.passes_isolation(&entry.id) {
+                continue;
+            }
             if let Some(bounds) = self.cache.geometry.get_world_bounds(&entry.id) {
                 if rect::intersects(&bounds, rect) {
                     // Check if the rectangle center is within all parent container clip bounds
@@ -299,6 +339,10 @@ impl<'a> HitTester<'a> {
         for idx in indices {
             let entry = &self.cache.layers.layers[idx];
             let id = &entry.id;
+
+            if !self.passes_isolation(id) {
+                continue;
+            }
 
             // Quick check: does any ancestor already cover this node?
             if self.has_selected_ancestor(id, &selected_set) {

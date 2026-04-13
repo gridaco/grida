@@ -2,7 +2,9 @@ use crate::cg::color::CGColor;
 use crate::cg::types::{Paint, TextAlignVertical};
 use crate::devtools::{fps_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay};
 use crate::dummy;
-use crate::export::{export_node_as, ExportAs, Exported};
+use crate::export::{
+    export_node_as, export_pdf_document, ExportAs, ExportPdfDocumentOptions, Exported,
+};
 use crate::io::io_grida::{self, JSONFlattenResult};
 use crate::io::io_grida_patch::{self, TransactionApplyReport};
 use crate::node::schema::*;
@@ -82,6 +84,16 @@ pub trait ApplicationApi {
     /// the scene.
     fn get_node_id_path(&self, id: &str) -> Option<Vec<String>>;
     fn export_node_as(&mut self, id: &str, format: ExportAs) -> Option<Exported>;
+
+    /// Export multiple nodes as a single multi-page PDF document.
+    ///
+    /// Each node ID in `options.node_ids` becomes one page in the output.
+    /// Returns the raw PDF bytes, or `None` if no valid pages could be produced.
+    fn export_pdf_document(
+        &mut self,
+        options: &crate::export::ExportPdfDocumentOptions,
+    ) -> Option<Exported>;
+
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult>;
 
     /// Enable or disable per-node layer compositing cache.
@@ -114,6 +126,27 @@ pub trait ApplicationApi {
     /// When enabled, `load_scene` derives layout from schema positions/sizes
     /// instead of running the Taffy flexbox engine. Set **before** loading a scene.
     fn runtime_renderer_set_skip_layout(&mut self, skip: bool);
+
+    /// Set or clear isolation mode.
+    ///
+    /// When `root_user_id` is `Some`, only the identified node and its
+    /// descendants are drawn and hit-tested. Pass `None` to clear.
+    /// Isolation is viewport-only — it does not mutate the document.
+    ///
+    /// `flags` is a bitmask of [`IsolationModeFlags`] constants.
+    /// `overflow_opacity` is only read when `OVERFLOW_DIM` is set in flags.
+    fn runtime_renderer_set_isolation_mode(
+        &mut self,
+        root_user_id: Option<&str>,
+        flags: u32,
+        overflow_opacity: f32,
+    );
+
+    /// Set the isolation mode stage decoration preset.
+    ///
+    /// `preset` is a `u32` discriminant of [`IsolationModeStagePreset`].
+    /// `0` = None (clear), `1` = Slide. Unknown values map to None.
+    fn runtime_renderer_set_isolation_stage_preset(&mut self, preset: u32);
 
     /// Enable or disable rendering of tile overlays.
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool);
@@ -292,10 +325,14 @@ impl ApplicationApi for UnknownTargetApplication {
             height: height as f32,
         });
 
-        // Declare *what* changed; apply_changes() in frame() will handle
-        // the correct invalidation (viewport caches only, no full nuke).
         self.renderer.mark_changed(ChangeFlags::VIEWPORT_SIZE);
-        self.queue();
+
+        // Bypass queue() — render immediately so the caller never sees a
+        // stale canvas. The frame loop is invalidated+completed inside
+        // render_immediate(), so the next RAF poll returns idle.
+        let now = self.clock.now();
+        self.frame_loop.invalidate(now);
+        self.render_immediate();
     }
 
     fn redraw_requested(&mut self) {
@@ -522,6 +559,34 @@ impl ApplicationApi for UnknownTargetApplication {
         None
     }
 
+    fn export_pdf_document(&mut self, options: &ExportPdfDocumentOptions) -> Option<Exported> {
+        let scene = self.renderer.scene.as_ref()?;
+        let geometry = &self.renderer.get_cache().geometry;
+
+        // Resolve user IDs → internal NodeIds → render bounds.
+        // Nodes that don't exist or have no bounds are silently skipped.
+        let rects: Vec<math2::Rectangle> = options
+            .node_ids
+            .iter()
+            .filter_map(|user_id| {
+                let internal_id = self.user_id_to_internal(user_id)?;
+                geometry.get_render_bounds(&internal_id)
+            })
+            .collect();
+
+        if rects.is_empty() {
+            return None;
+        }
+
+        export_pdf_document(
+            scene,
+            &self.renderer.fonts,
+            &self.renderer.images,
+            &rects,
+            options,
+        )
+    }
+
     fn to_vector_network(&mut self, id: &str) -> Option<JSONFlattenResult> {
         let internal_id = self.user_id_to_internal(id)?;
         if let Some(scene) = self.renderer.scene.as_ref() {
@@ -644,6 +709,46 @@ impl ApplicationApi for UnknownTargetApplication {
 
     fn runtime_renderer_set_skip_layout(&mut self, skip: bool) {
         self.renderer.set_skip_layout(skip);
+    }
+
+    fn runtime_renderer_set_isolation_mode(
+        &mut self,
+        root_user_id: Option<&str>,
+        flags: u32,
+        overflow_opacity: f32,
+    ) {
+        use crate::runtime::filter::{
+            IsolationModeDimStyle, IsolationModeFlags, IsolationModeOutside,
+        };
+
+        let mode = root_user_id.and_then(|id| {
+            let internal = self.user_id_to_internal(id)?;
+            let outside = if flags & IsolationModeFlags::OVERFLOW_DIM != 0 {
+                IsolationModeOutside::Viewport(IsolationModeDimStyle {
+                    opacity: overflow_opacity.clamp(0.0, 1.0),
+                })
+            } else {
+                IsolationModeOutside::Hidden
+            };
+            Some(crate::runtime::filter::IsolationMode {
+                root: internal,
+                outside,
+                stage_preset: crate::runtime::filter::IsolationModeStagePreset::None,
+            })
+        });
+        self.renderer.set_isolation_mode(mode);
+        self.renderer
+            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+        self.queue();
+    }
+
+    fn runtime_renderer_set_isolation_stage_preset(&mut self, preset: u32) {
+        self.renderer.set_isolation_stage_preset(
+            crate::runtime::filter::IsolationModeStagePreset::from_u32(preset),
+        );
+        self.renderer
+            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+        self.queue();
     }
 
     fn devtools_rendering_set_show_tiles(&mut self, debug: bool) {
@@ -865,14 +970,17 @@ impl UnknownTargetApplication {
         &mut self,
         event: crate::surface::SurfaceEvent,
     ) -> crate::surface::SurfaceResponse {
+        let iso_set = self.renderer.isolation_set();
         let (_hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(iso_set);
             let r = self
                 .surface
                 .dispatch(event, &ht, &scene.graph, &self.ui_hit_regions);
             (ht, r)
         } else {
-            let ht = crate::hittest::HitTester::new(self.renderer.get_cache());
+            let ht = crate::hittest::HitTester::new(self.renderer.get_cache())
+                .with_isolation_set(iso_set);
             let r = self
                 .surface
                 .dispatch(event, &ht, &NoHierarchy, &self.ui_hit_regions);
@@ -893,7 +1001,8 @@ impl UnknownTargetApplication {
     /// Returns the topmost node ID at that point, or `None`.
     pub fn hit_test_point(&self, canvas_point: [f32; 2]) -> Option<crate::node::schema::NodeId> {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(self.renderer.isolation_set());
             ht.hit_first(canvas_point)
         } else {
             None
@@ -904,7 +1013,8 @@ impl UnknownTargetApplication {
     /// Returns the topmost ancestors that intersect the rect.
     pub fn hit_test_rect(&self, rect: &math2::rect::Rectangle) -> Vec<crate::node::schema::NodeId> {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(self.renderer.isolation_set());
             ht.intersects_topmost(rect)
         } else {
             Vec::new()
@@ -944,7 +1054,8 @@ impl UnknownTargetApplication {
         ids: &[crate::node::schema::NodeId],
     ) -> bool {
         if let Some(scene) = self.renderer.scene.as_ref() {
-            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph);
+            let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
+                .with_isolation_set(self.renderer.isolation_set());
             ht.point_in_selection_bounds(point, ids)
         } else {
             false
@@ -1399,6 +1510,35 @@ impl UnknownTargetApplication {
         true
     }
 
+    /// Render a single complete frame synchronously, bypassing the frame
+    /// loop scheduler. Used by [`resize`] so the caller never sees a stale
+    /// canvas between surface recreation and the next RAF tick.
+    fn render_immediate(&mut self) {
+        let __frame_start = std::time::Instant::now();
+
+        let camera_change = self.renderer.camera.change_kind();
+        let _content_changed = self.renderer.apply_changes(camera_change, true);
+        self.renderer.camera.warm_cache();
+
+        let rect = self.renderer.camera.rect();
+        let zoom = self.renderer.camera.get_zoom();
+        let plan = self
+            .renderer
+            .build_frame_plan(rect, zoom, true, camera_change);
+        self.renderer.camera.consume_change();
+        let stats = self.renderer.flush_with_plan(plan);
+
+        let __render_time = __frame_start.elapsed();
+        if let Some(ref stats) = stats {
+            self.update_stats(stats, __render_time);
+        }
+        self.draw_and_flush_devtools_overlay();
+
+        // Complete the frame loop so the next RAF poll returns None (idle).
+        self.frame_loop.complete(FrameQuality::Stable);
+        self.last_frame_time = __frame_start;
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     fn process_image_queue(&mut self) {
         let mut updated = false;
@@ -1488,13 +1628,14 @@ impl UnknownTargetApplication {
         println!("✅ Font repository information printed");
     }
 
-    fn get_hit_tester(&mut self) -> crate::hittest::HitTester<'_> {
+    fn get_hit_tester(&self) -> crate::hittest::HitTester<'_> {
         // Pass the scene graph if available to enable culling checks
-        if let Some(scene) = self.renderer.scene.as_ref() {
+        let base = if let Some(scene) = self.renderer.scene.as_ref() {
             crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
         } else {
             crate::hittest::HitTester::new(self.renderer.get_cache())
-        }
+        };
+        base.with_isolation_set(self.renderer.isolation_set())
     }
 
     fn verbose(&self, msg: &str) {
@@ -1542,16 +1683,25 @@ impl UnknownTargetApplication {
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.renderer.add_font(family, data);
         self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+        self.queue();
     }
 
     /// Register image bytes with the renderer and return metadata.
     pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
-        self.renderer.add_image(data)
+        let result = self.renderer.add_image(data);
+        self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+        self.queue();
+        result
     }
 
     /// Register image bytes under a caller-specified RID (res:// or system://).
     pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
-        self.renderer.add_image_with_rid(data, rid)
+        let result = self.renderer.add_image_with_rid(data, rid);
+        if result.is_some() {
+            self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+            self.queue();
+        }
+        result
     }
 
     /// Perform a redraw and print diagnostic information.

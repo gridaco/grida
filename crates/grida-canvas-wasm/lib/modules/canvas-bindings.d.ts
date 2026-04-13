@@ -155,6 +155,12 @@ declare namespace canvas {
       fmt_len: number
     ): Ptr;
 
+    _export_pdf_document(
+      state: GridaCanvasApplicationPtr,
+      json_ptr: number,
+      json_len: number
+    ): Ptr;
+
     _to_vector_network(
       state: GridaCanvasApplicationPtr,
       id_ptr: number,
@@ -265,6 +271,19 @@ declare namespace canvas {
     _runtime_renderer_set_skip_layout(
       state: GridaCanvasApplicationPtr,
       skip: boolean
+    ): void;
+
+    _runtime_renderer_set_isolation_mode(
+      state: GridaCanvasApplicationPtr,
+      id_ptr: number,
+      id_len: number,
+      flags: number,
+      overflow_opacity: number
+    ): void;
+
+    _runtime_renderer_set_isolation_stage_preset(
+      state: GridaCanvasApplicationPtr,
+      preset: number
     ): void;
 
     _runtime_renderer_set_outline_mode(

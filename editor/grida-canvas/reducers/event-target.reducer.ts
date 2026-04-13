@@ -1,4 +1,5 @@
 import { type Draft } from "immer";
+import { safeOriginal } from "./utils/immer";
 import { updateState } from "./utils/immer";
 
 import type {
@@ -501,7 +502,7 @@ function __self_evt_on_drag_start(
       self_try_insert_node(draft, parent, nnode);
       self_select_tool(draft, { type: "cursor" }, context);
       self_selectNode(draft, "reset", nnode.id);
-      __self_start_gesture_insert_and_resize_draw_new_node(draft, {
+      __self_start_gesture_insert_and_resize_draw_new_node(draft, context, {
         new_node_id: nnode.id,
         new_node_rect: initial_rect,
         pending_insertion: pending,
@@ -601,6 +602,8 @@ function __self_evt_on_drag_end(
   draft.gesture = { type: "idle" };
   draft.marquee = undefined;
   draft.lasso = undefined;
+  // Clear the side-channel snapshot now that the gesture has ended.
+  context.gesture_snapshot.set(null);
 }
 
 function __self_evt_on_drag(
@@ -608,63 +611,79 @@ function __self_evt_on_drag(
   action: EditorEventTarget_Drag,
   context: ReducerContext
 ) {
-  const scene = draft.document.nodes[
-    draft.scene_id!
-  ] as grida.program.nodes.SceneNode;
+  // Read from original to avoid proxying large objects (document.nodes,
+  // gesture) until we know which branch we're in. Only access the draft
+  // for actual writes.
+  const orig = safeOriginal(draft as Draft<editor.state.IEditorState>)!;
   const {
     event: { movement, delta },
   } = <EditorEventTarget_Drag>action;
 
-  if (draft.marquee) {
-    draft.marquee.b = draft.pointer.position;
-    if (draft.content_edit_mode?.type === "vector") {
-      const mrect = cmath.rect.fromPoints([draft.marquee.a, draft.marquee.b]);
+  if (orig.marquee) {
+    draft.marquee!.b = draft.pointer.position;
+    if (orig.content_edit_mode?.type === "vector") {
+      const mrect = cmath.rect.fromPoints([draft.marquee!.a, draft.marquee!.b]);
       self_updateVectorAreaSelection(
         draft,
         context,
         (p) => cmath.rect.containsPoint(mrect, p),
-        draft.marquee.additive ?? false,
+        orig.marquee.additive ?? false,
         mrect
       );
     }
-  } else if (draft.lasso) {
-    draft.lasso.points.push(draft.pointer.position);
+  } else if (orig.lasso) {
+    draft.lasso!.points.push(draft.pointer.position);
     if (
-      draft.content_edit_mode?.type === "vector" &&
-      draft.lasso.points.length > 2
+      orig.content_edit_mode?.type === "vector" &&
+      draft.lasso!.points.length > 2
     ) {
       self_updateVectorAreaSelection(
         draft,
         context,
         (p) => cmath.polygon.pointInPolygon(p, draft.lasso!.points),
-        draft.lasso.additive ?? false
+        orig.lasso.additive ?? false
       );
     }
   } else {
-    if (draft.gesture.type === "idle") return;
-    if (draft.gesture.type === "nudge") return;
+    if (orig.gesture.type === "idle") return;
+    if (orig.gesture.type === "nudge") return;
 
-    draft.gesture.last = draft.gesture.movement;
-    draft.gesture.movement = movement;
+    // We switch on orig.gesture (to avoid Immer proxy creation on the
+    // draft). TS narrows orig.gesture in each case but cannot narrow
+    // draft.gesture. For the common IGesture fields (movement, last)
+    // that exist on all active gestures, we use Exclude to drop the
+    // non-IGesture members from the union.
+    type ActiveGesture = Exclude<
+      editor.gesture.GestureState,
+      editor.gesture.GestureIdle | editor.gesture.GestureVirtualNudge
+    >;
+    const draftGesture = draft.gesture as ActiveGesture;
 
-    switch (draft.gesture.type) {
+    draftGesture.last = orig.gesture.movement;
+    draftGesture.movement = movement;
+
+    switch (orig.gesture.type) {
       case "pan": {
         // for panning, exceptionaly use the unscaled delta.
         const original_delta = cmath.vector2.multiply(
           action.event.delta,
-          cmath.transform.getScale(draft.transform)
+          cmath.transform.getScale(orig.transform)
         );
         // move the viewport by delta
         draft.transform = cmath.transform.translate(
-          draft.transform,
+          orig.transform,
           original_delta
         );
         break;
       }
       case "guide": {
-        const { axis, idx: index, initial_offset } = draft.gesture;
+        const scene = draft.document.nodes[
+          draft.scene_id!
+        ] as grida.program.nodes.SceneNode;
+        const og = orig.gesture; // narrowed to GestureGuide
+        const dg = draft.gesture as editor.gesture.GestureGuide;
 
-        const counter = axis === "x" ? 0 : 1;
+        const counter = og.axis === "x" ? 0 : 1;
         const m = movement[counter];
 
         // [snap the guide offset]
@@ -672,8 +691,8 @@ function __self_evt_on_drag(
         // 2. to objects geometry
         const scene_children = draft.document.links[draft.scene_id!] || [];
         const { translated } = snapGuideTranslation(
-          axis,
-          initial_offset,
+          og.axis,
+          og.initial_offset,
           scene_children.map(
             (id) => context.geometry.getNodeAbsoluteBoundingRect(id)!
           ),
@@ -686,8 +705,8 @@ function __self_evt_on_drag(
 
         const offset = cmath.quantize(translated, 1);
 
-        draft.gesture.offset = offset;
-        scene.guides[index].offset = offset;
+        dg.offset = offset;
+        scene.guides[og.idx].offset = offset;
         break;
       }
       // [insertion mode - resize after insertion]
@@ -739,7 +758,8 @@ function __self_evt_on_drag(
         break;
       }
       case "corner-radius": {
-        const { node_id, anchor, altKey = false } = draft.gesture;
+        const og = orig.gesture; // narrowed to GestureCornerRadius
+        const { node_id, anchor, altKey = false } = og;
         const [dx, dy] = delta;
         const node = dq.__getNodeById(draft, node_id);
 
@@ -873,7 +893,9 @@ function __self_evt_on_drag(
         //
       }
       case "gap": {
-        const { layout, axis, initial_gap, min_gap } = draft.gesture;
+        const og = orig.gesture; // narrowed to GestureGap
+        const dg = draft.gesture as editor.gesture.GestureGap;
+        const { layout, axis, initial_gap, min_gap } = og;
         const delta = movement[axis === "x" ? 0 : 1];
         const side: "layout_inset_left" | "layout_inset_top" =
           axis === "x" ? "layout_inset_left" : "layout_inset_top";
@@ -882,7 +904,12 @@ function __self_evt_on_drag(
           case "group": {
             const sorted = layout.objects
               .slice()
-              .sort((a, b) => a[axis] - b[axis]);
+              .sort(
+                (
+                  a: cmath.Rectangle & { id: string },
+                  b: cmath.Rectangle & { id: string }
+                ) => a[axis] - b[axis]
+              );
 
             const gap = cmath.quantize(
               Math.max(initial_gap + delta, min_gap),
@@ -893,19 +920,21 @@ function __self_evt_on_drag(
             let currentPos = sorted[0][axis];
 
             // Calculate new positions considering each rect's dimension.
-            const transformed = sorted.map((obj) => {
-              const next = { ...obj };
-              next[axis] = cmath.quantize(currentPos, 1);
-              currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
-              return next;
-            });
+            const transformed = sorted.map(
+              (obj: cmath.Rectangle & { id: string }) => {
+                const next = { ...obj };
+                next[axis] = cmath.quantize(currentPos, 1);
+                currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
+                return next;
+              }
+            );
 
             // Update layout objects with new positions.
-            draft.gesture.layout.objects = transformed;
-            draft.gesture.gap = gap;
+            dg.layout.objects = transformed;
+            dg.gap = gap;
 
             // Apply transform to the actual nodes.
-            transformed.forEach((obj) => {
+            transformed.forEach((obj: cmath.Rectangle & { id: string }) => {
               const node = dq.__getNodeById(
                 draft,
                 obj.id
@@ -930,7 +959,7 @@ function __self_evt_on_drag(
               layout_cross_axis_gap: gap,
             });
 
-            draft.gesture.gap = gap;
+            dg.gap = gap;
             break;
           }
         }
@@ -938,7 +967,9 @@ function __self_evt_on_drag(
         break;
       }
       case "padding": {
-        const { node_id, side, initial_padding, min_padding } = draft.gesture;
+        const og = orig.gesture; // narrowed to GesturePadding
+        const dg = draft.gesture as editor.gesture.GesturePadding;
+        const { node_id, side, initial_padding, min_padding } = og;
         const delta = movement[side === "top" || side === "bottom" ? 1 : 0];
 
         const padding = cmath.quantize(
@@ -993,7 +1024,7 @@ function __self_evt_on_drag(
             ...updates,
           } as NodeChangeAction);
 
-          draft.gesture.padding = padding;
+          dg.padding = padding;
         }
 
         break;
@@ -1025,6 +1056,7 @@ function __self_evt_on_multiple_selection_overlay_click(
 
 function __self_start_gesture_insert_and_resize_draw_new_node(
   draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext,
   {
     new_node_id,
     new_node_rect,
@@ -1038,9 +1070,10 @@ function __self_start_gesture_insert_and_resize_draw_new_node(
     } | null;
   }
 ) {
+  // Store snapshot in side-channel to keep it out of Immer's proxy tree.
+  context.gesture_snapshot.set(editor.state.snapshot(draft));
   draft.gesture = {
     type: "insert-and-resize",
-    initial_snapshot: editor.state.snapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
@@ -1062,13 +1095,14 @@ function __self_start_gesture_translate(
     (node_id) => context.geometry.getNodeAbsoluteBoundingRect(node_id)!
   );
 
+  // Store snapshot in side-channel to keep it out of Immer's proxy tree.
+  context.gesture_snapshot.set(editor.state.snapshot(draft));
   draft.gesture = {
     type: "translate",
     selection: selection,
     initial_clone_ids: selection.map(() => context.idgen.next()),
     initial_selection: selection,
     initial_rects: rects,
-    initial_snapshot: editor.state.snapshot(draft),
     movement: cmath.vector2.zero,
     first: cmath.vector2.zero,
     last: cmath.vector2.zero,
@@ -1252,7 +1286,7 @@ function __get_insertion_target(
   const hits = state.hits.slice();
   for (const hit of hits) {
     const node = dq.__getNodeById(state, hit);
-    if (node.type === "container") return hit;
+    if (node.type === "container" || node.type === "tray") return hit;
   }
   return null;
 }

@@ -27,6 +27,7 @@ export namespace sitemap {
     forms: "/forms",
     forms_ai: "/forms/ai",
     canvas: "/canvas",
+    slides: "/canvas/slides",
     west: "/west",
     cookies: "/cookies-policy",
     signin: "/sign-in",
@@ -101,6 +102,12 @@ export namespace sitemap {
       title: "Canvas",
       href: links.canvas,
       description: "Design Components and Websites",
+    } satisfies Item,
+    slides: {
+      icon: "slides",
+      title: "Slides",
+      href: "/slides",
+      description: "Presentations on a real canvas",
     } satisfies Item,
     library: {
       icon: "folder",

@@ -2,6 +2,7 @@ import { editor } from "..";
 import type grida from "@grida/schema";
 import assert from "assert";
 import cg from "@grida/cg";
+import { perf } from "../perf";
 
 type NodeID = string & {};
 
@@ -349,20 +350,26 @@ export namespace dq {
     context: grida.program.document.internal.INodesRepositoryRuntimeHierarchyContext,
     node_id: string
   ): NodeID[] {
+    const __perf_end = perf.start("dq.getSiblings");
     const parent_id = getParentId(context, node_id);
 
     if (!parent_id) {
       // FIXME: this is not scoped by the scene - may result unexpected behavior.
       // If the node has no parent, it is at the root level, and all nodes without parents are its "siblings."
-      return Object.keys(context.lu_parent).filter(
+      // NOTE: lu_children has no entry for null, so we must scan lu_parent here.
+      const result = Object.keys(context.lu_parent).filter(
         (id) => context.lu_parent[id] === null
       );
+      __perf_end();
+      return result;
     }
 
-    // Filter all nodes that share the same parent but exclude the input node itself.
-    return Object.keys(context.lu_parent).filter(
-      (id) => context.lu_parent[id] === parent_id && id !== node_id
+    // Use the precomputed lu_children map for O(children) lookup instead of O(N) scan.
+    const result = (context.lu_children[parent_id] || []).filter(
+      (id) => id !== node_id
     );
+    __perf_end();
+    return result;
   }
 
   /**
@@ -400,20 +407,31 @@ export namespace dq {
     node_id: string,
     recursive = false
   ): NodeID[] {
-    const { lu_parent } = context;
-    const directChildren = Object.keys(lu_parent).filter(
-      (id) => lu_parent[id] === node_id
-    );
+    const __perf_end = perf.start("dq.getChildren", { recursive });
+    const directChildren = context.lu_children[node_id] || [];
 
     if (!recursive) {
+      __perf_end();
       return directChildren;
     }
 
-    const allChildren = [...directChildren];
-    for (const child of directChildren) {
-      allChildren.push(...getChildren(context, child, true));
+    // Use an iterative approach with a stack instead of recursive
+    // spread to avoid O(N²) array copies in deep trees. Each node is
+    // visited exactly once and pushed onto the result array directly.
+    const result: NodeID[] = [];
+    const stack = directChildren.slice();
+    while (stack.length > 0) {
+      const child = stack.pop()!;
+      result.push(child);
+      const grandChildren = context.lu_children[child];
+      if (grandChildren) {
+        for (let i = grandChildren.length - 1; i >= 0; i--) {
+          stack.push(grandChildren[i]);
+        }
+      }
     }
-    return allChildren;
+    __perf_end();
+    return result;
   }
 
   // FIXME: this is not scoped by the scene - may result unexpected behavior.

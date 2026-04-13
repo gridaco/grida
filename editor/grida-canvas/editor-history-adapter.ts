@@ -40,6 +40,7 @@ export type DispatchRecording =
 const DOCUMENT_KEYS = [
   "selection",
   "scene_id",
+  "isolation_root_node_id",
   "document",
   "document_ctx",
   "content_edit_mode",
@@ -63,6 +64,7 @@ function captureDocumentSnapshot(
   return {
     selection: state.selection,
     scene_id: state.scene_id,
+    isolation_root_node_id: state.isolation_root_node_id,
     document: state.document,
     document_ctx: state.document_ctx,
     content_edit_mode: state.content_edit_mode,
@@ -78,6 +80,7 @@ function applyDocumentSnapshot(
     ...state,
     selection: snapshot.selection,
     scene_id: snapshot.scene_id,
+    isolation_root_node_id: snapshot.isolation_root_node_id,
     document: snapshot.document,
     document_ctx: snapshot.document_ctx,
     content_edit_mode: snapshot.content_edit_mode,

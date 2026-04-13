@@ -11,7 +11,7 @@ fn main() {
     let effects = vec![
         (
             FeNoiseEffect {
-                noise_size: 2.0,
+                noise_size: 4.0,
                 density: 0.5,
                 num_octaves: 3,
                 seed: 8539.0,
@@ -25,13 +25,13 @@ fn main() {
         ),
         (
             FeNoiseEffect {
-                noise_size: 2.0,
+                noise_size: 4.0,
                 density: 0.5,
                 num_octaves: 3,
                 seed: 8539.0,
                 coloring: NoiseEffectColors::Duo {
                     color1: CGColor::from_rgba(255, 0, 4, 255), // red pattern
-                    color2: CGColor::from_rgba(255, 255, 255, 64), // 25% opacity white base
+                    color2: CGColor::from_rgba(0, 0, 255, 255), // blue pattern
                 },
                 active: true,
                 blend_mode: BlendMode::Normal,
@@ -40,7 +40,7 @@ fn main() {
         ),
         (
             FeNoiseEffect {
-                noise_size: 2.0,
+                noise_size: 4.0,
                 density: 0.5,
                 num_octaves: 3,
                 seed: 8539.0,

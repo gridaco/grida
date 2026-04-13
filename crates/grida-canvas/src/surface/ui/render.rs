@@ -182,8 +182,12 @@ impl SurfaceUI {
         }
     }
 
-    /// Compute the screen-space bounding rect for the current selection,
+    /// Compute the screen-space bounding box for the current selection,
     /// draw handles, and register their hit regions.
+    ///
+    /// For a single selected node the handles follow the oriented bounding
+    /// box (correct for rotation / skew). For multi-selection the handles
+    /// wrap the axis-aligned union of all selected nodes.
     fn draw_selection_handles(
         canvas: &Canvas,
         surface: &SurfaceState,
@@ -192,37 +196,47 @@ impl SurfaceUI {
         hit_regions: &mut HitRegions,
         dpr: f32,
     ) {
-        // Compute union of all selected nodes' world bounds.
-        let rects: Vec<math2::rect::Rectangle> = surface
-            .selection
-            .iter()
-            .filter_map(|id| cache.geometry.get_world_bounds(id))
-            .collect();
-
-        if rects.is_empty() {
-            return;
-        }
-
-        let world_rect = math2::rect::union(&rects);
         let view = camera.view_matrix();
+        let view_sk = crate::sk::sk_matrix(view.matrix);
 
-        // Transform world-space bounds to screen-space.
-        let tl = math2::vector2::transform([world_rect.x, world_rect.y], &view);
-        let br = math2::vector2::transform(
-            [
-                world_rect.x + world_rect.width,
-                world_rect.y + world_rect.height,
-            ],
-            &view,
-        );
-        let screen_rect = Rect::from_ltrb(
-            tl[0].min(br[0]),
-            tl[1].min(br[1]),
-            tl[0].max(br[0]),
-            tl[1].max(br[1]),
-        );
+        let handles = if surface.selection.len() == 1 {
+            // Single selection: use oriented bounding box.
+            let id = surface.selection.iter().next().unwrap();
+            let world_corners = match cache.geometry.get_world_corners(id) {
+                Some(c) => c,
+                None => return,
+            };
+            let screen_corners = world_corners.map(|[x, y]| view_sk.map_point((x, y)));
+            SelectionHandles::from_screen_quad(screen_corners, dpr)
+        } else {
+            // Multi-selection: use AABB union (standard editor behaviour).
+            let rects: Vec<math2::rect::Rectangle> = surface
+                .selection
+                .iter()
+                .filter_map(|id| cache.geometry.get_world_bounds(id))
+                .collect();
 
-        let handles = SelectionHandles::from_screen_rect(screen_rect, dpr);
+            if rects.is_empty() {
+                return;
+            }
+
+            let world_rect = math2::rect::union(&rects);
+            let tl = math2::vector2::transform([world_rect.x, world_rect.y], &view);
+            let br = math2::vector2::transform(
+                [
+                    world_rect.x + world_rect.width,
+                    world_rect.y + world_rect.height,
+                ],
+                &view,
+            );
+            let screen_rect = Rect::from_ltrb(
+                tl[0].min(br[0]),
+                tl[1].min(br[1]),
+                tl[0].max(br[0]),
+                tl[1].max(br[1]),
+            );
+            SelectionHandles::from_screen_rect(screen_rect, dpr)
+        };
 
         // Draw visible parts (corner knobs).
         handles.draw(canvas);
@@ -248,6 +262,10 @@ impl SurfaceUI {
     }
 
     /// Draw a dimension label pill below the selection bounding box.
+    ///
+    /// For a single selected node the label is oriented along the bottom edge
+    /// of the oriented box and offset perpendicular to it. For multi-selection
+    /// it uses the AABB union (horizontal pill, offset straight down).
     fn draw_size_meter(
         canvas: &Canvas,
         surface: &SurfaceState,
@@ -255,33 +273,58 @@ impl SurfaceUI {
         cache: &SceneCache,
         dpr: f32,
     ) {
-        // Compute union of all selected nodes' world bounds
-        let rects: Vec<math2::rect::Rectangle> = surface
-            .selection
-            .iter()
-            .filter_map(|id| cache.geometry.get_world_bounds(id))
-            .collect();
-
-        if rects.is_empty() {
-            return;
-        }
-
-        let world_rect = math2::rect::union(&rects);
-
-        // World-space dimensions (what the user cares about)
-        let w = world_rect.width;
-        let h = world_rect.height;
-        let text = format!("{:.0} x {:.0}", w, h);
-
-        // Transform bottom-center of world rect to screen space
         let view = camera.view_matrix();
-        let bottom_center = math2::vector2::transform(
-            [
-                world_rect.x + world_rect.width * 0.5,
-                world_rect.y + world_rect.height,
-            ],
-            &view,
-        );
+        let view_sk = crate::sk::sk_matrix(view.matrix);
+
+        let (w, h, bottom_center, angle_deg, outward) = if surface.selection.len() == 1 {
+            let id = surface.selection.iter().next().unwrap();
+            let entry = match cache.geometry.get_entry(id) {
+                Some(e) => e,
+                None => return,
+            };
+            let lw = entry.bounding_box.width;
+            let lh = entry.bounding_box.height;
+            let world_corners = entry
+                .bounding_box
+                .corners()
+                .map(|c| math2::vector2::transform(c, &entry.absolute_transform));
+            let se = view_sk.map_point((world_corners[2][0], world_corners[2][1]));
+            let sw = view_sk.map_point((world_corners[3][0], world_corners[3][1]));
+            let bc = Point::new((se.x + sw.x) * 0.5, (se.y + sw.y) * 0.5);
+            let dx = se.x - sw.x;
+            let dy = se.y - sw.y;
+            let len = (dx * dx + dy * dy).sqrt().max(0.001);
+            let angle = dy.atan2(dx).to_degrees();
+            let out = Point::new(-dy / len, dx / len);
+            (lw, lh, bc, angle, out)
+        } else {
+            let rects: Vec<math2::rect::Rectangle> = surface
+                .selection
+                .iter()
+                .filter_map(|id| cache.geometry.get_world_bounds(id))
+                .collect();
+            if rects.is_empty() {
+                return;
+            }
+            let world_rect = math2::rect::union(&rects);
+            let bc_world = math2::vector2::transform(
+                [
+                    world_rect.x + world_rect.width * 0.5,
+                    world_rect.y + world_rect.height,
+                ],
+                &view,
+            );
+            let bc = Point::new(bc_world[0], bc_world[1]);
+            (
+                world_rect.width,
+                world_rect.height,
+                bc,
+                0.0,
+                Point::new(0.0, 1.0),
+            )
+        };
+
+        let text = format!("{:.0} x {:.0}", w, h);
 
         FONT_SIZE_METER.with(|base_font| {
             let font = scaled_font(base_font, dpr);
@@ -296,19 +339,27 @@ impl SurfaceUI {
 
             let pill_w = text_width + pad_x * 2.0;
             let pill_h = text_height + pad_y * 2.0;
-            let pill_x = bottom_center[0] - pill_w * 0.5;
-            let pill_y = bottom_center[1] + offset_y - pill_h * 0.5;
 
-            let pill_rect = Rect::from_xywh(pill_x, pill_y, pill_w, pill_h);
+            // Offset the pill center along the outward perpendicular.
+            let cx = bottom_center.x + outward.x * offset_y;
+            let cy = bottom_center.y + outward.y * offset_y;
+
+            // Draw the pill rotated to match the bottom edge.
+            canvas.save();
+            canvas.rotate(angle_deg, Some(Point::new(cx, cy)));
+
+            let pill_rect = Rect::from_xywh(cx - pill_w * 0.5, cy - pill_h * 0.5, pill_w, pill_h);
             let rrect = RRect::new_rect_xy(pill_rect, radius, radius);
 
             ACCENT_FILL.with(|bg| canvas.draw_rrect(rrect, bg));
 
             WHITE_TEXT.with(|tp| {
-                let text_x = pill_x + pad_x;
-                let text_y = pill_y + pad_y - metrics.1.ascent;
+                let text_x = cx - pill_w * 0.5 + pad_x;
+                let text_y = cy - pill_h * 0.5 + pad_y - metrics.1.ascent;
                 canvas.draw_str(&text, Point::new(text_x, text_y), &font, tp);
             });
+
+            canvas.restore();
         });
     }
 
