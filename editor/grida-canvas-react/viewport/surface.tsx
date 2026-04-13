@@ -230,7 +230,7 @@ export function EditorSurface() {
       et.removeEventListener("pointermove", handlePointerMove, {
         capture: true,
       });
-  }, [eventTargetRef.current]);
+  }, []);
 
   // Register window blur handler
   // This is the single source of blur handling for the editor surface.

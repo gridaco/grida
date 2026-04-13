@@ -724,7 +724,7 @@ function ConnectFormXSupabaseTable({
   const {
     supabase_project_id,
     sb_schema_definitions,
-    sb_schema_names: sb_schema_names,
+    sb_schema_names,
     sb_project_url,
     sb_anon_key,
   } = connection;

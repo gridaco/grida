@@ -79,7 +79,7 @@ export namespace FlatPostgREST {
   }
 
   export function encodePath(column: string, ...path: string[]): string {
-    return `${column}.\$.${path.join(".")}`;
+    return `${column}.$.${path.join(".")}`;
   }
 
   export function unflatten(

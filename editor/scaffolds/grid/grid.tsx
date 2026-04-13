@@ -85,7 +85,7 @@ export function DataGrid({
   local_cursor_id,
   systemcolumns: _systemcolumns,
   columns,
-  rows: rows,
+  rows,
   selectionDisabled,
   readonly,
   loading,

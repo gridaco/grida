@@ -143,7 +143,7 @@ export function useUxMapFocus(
         clearTimeout(debounceRef.current);
       }
     };
-  }, [lastPointRef.current, map, zoomInterval]);
+  }, [map, zoomInterval]);
 
   return throttledFlyTo;
 }

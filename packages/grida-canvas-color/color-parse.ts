@@ -110,14 +110,14 @@ function parse(cstr: string | number): ParseResult {
   // color space
   else if (
     (m =
-      /^((?:rgba?|hs[lvb]a?|hwba?|cmyk?|xy[zy]|gray|lab|lchu?v?|[ly]uv|lms|oklch|oklab|color))\s*\(([^\)]*)\)/.exec(
+      /^((?:rgba?|hs[lvb]a?|hwba?|cmyk?|xy[zy]|gray|lab|lchu?v?|[ly]uv|lms|oklch|oklab|color))\s*\(([^)]*)\)/.exec(
         cstrLower
       ))
   ) {
     const name = m[1];
     space = name.replace(/a$/, "") as Space;
     const dims = space === "cmyk" ? 4 : space === "gray" ? 1 : 3;
-    const partsStr = m[2].trim().split(/\s*[,\/]\s*|\s+/);
+    const partsStr = m[2].trim().split(/\s*[,/]\s*|\s+/);
 
     // color(srgb-linear x x x) -> srgb-linear(x x x)
     if (space === "color") {

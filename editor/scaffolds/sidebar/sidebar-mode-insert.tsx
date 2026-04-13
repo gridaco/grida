@@ -43,7 +43,7 @@ export function ModeInsertBlocks() {
       addBlock(block);
       close();
     },
-    [addBlock, close]
+    [addBlock]
   );
 
   const handleAddFieldBlock = useCallback(
@@ -51,7 +51,7 @@ export function ModeInsertBlocks() {
       addFieldBlock(type);
       close();
     },
-    [addFieldBlock, close]
+    [addFieldBlock]
   );
 
   return (
