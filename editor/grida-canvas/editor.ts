@@ -3941,6 +3941,11 @@ export class Editor
     return this.images.get(ref) || null;
   }
 
+  /** Snapshot of the local image byte cache (for presentation engine etc.). */
+  __get_image_bytes_snapshot(): Map<string, Uint8Array> {
+    return new Map(this._image_bytes);
+  }
+
   __get_image_bytes_for_wasm(ref: string): Uint8Array | null {
     assert(this._m_wasm_canvas_scene, "WASM canvas scene is not initialized");
     const data = this._m_wasm_canvas_scene.getImageBytes(ref);

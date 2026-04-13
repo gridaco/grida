@@ -2,6 +2,8 @@ import type { Editor } from "@/grida-canvas/editor";
 import type { editor } from "@/grida-canvas";
 import type grida from "@grida/schema";
 import kolor from "@grida/color";
+import { io } from "@grida/io";
+import type { PresentationEngineOptions } from "@/grida-canvas/presentation-engine";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -379,6 +381,35 @@ export class SlideEditorMode {
       this.editor.doc.setIsolation(first.id);
       this._fitCamera(first.id);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Presentation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Extract the data needed to launch a presentation.
+   *
+   * The returned object is self-contained — it can be passed directly to
+   * `PresentationEngine` in the same tab, or serialized for a new tab.
+   */
+  getPresentationData(): PresentationEngineOptions {
+    const bytes = io.GRID.encode(this.editor.state.document);
+    const slides = this.slides;
+    const currentIndex = Math.max(
+      0,
+      slides.findIndex((s) => s.id === this.editor.state.isolation_root_node_id)
+    );
+    const sceneId =
+      this.editor.state.scene_id ?? this.editor.state.document.scenes_ref?.[0];
+
+    return {
+      documentBytes: bytes,
+      slideIds: slides.map((s) => s.id),
+      sceneId: sceneId!,
+      images: this.editor.__get_image_bytes_snapshot(),
+      startSlide: currentIndex,
+    };
   }
 
   // ---------------------------------------------------------------------------

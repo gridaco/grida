@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   Selection,
   Zoom,
@@ -32,10 +32,10 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { PlusIcon } from "@radix-ui/react-icons";
-import {
-  PreviewProvider,
-  PreviewButton,
-} from "@/grida-canvas-react-starter-kit/starterkit-preview";
+import { PlayIcon } from "lucide-react";
+import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
+import { PresentationOverlay } from "@/grida-canvas-react/presentation-overlay";
+import type { PresentationEngineOptions } from "@/grida-canvas/presentation-engine";
 import { GridaLogo } from "@/components/grida-logo";
 import {
   DropdownMenu,
@@ -61,6 +61,17 @@ const SLIDES_DOCUMENT = createInitialSlidesDocument();
 export default function SlidesPlaygroundPage() {
   const { editor: instance, slideMode } = useSlideEditor(SLIDES_DOCUMENT);
   const fonts = useEditorState(instance, (state) => state.webfontlist.items);
+  const [presentationData, setPresentationData] =
+    useState<PresentationEngineOptions | null>(null);
+
+  const onPresent = useCallback(() => {
+    if (!slideMode) return;
+    setPresentationData(slideMode.getPresentationData());
+  }, [slideMode]);
+
+  const onExitPresentation = useCallback(() => {
+    setPresentationData(null);
+  }, []);
 
   // slideMode is null on the first render (constructed in useEffect for SSR safety).
   if (!slideMode) return null;
@@ -82,9 +93,15 @@ export default function SlidesPlaygroundPage() {
                         <PlaygroundToolbar />
                       </ToolbarPosition>
                     </SlideSurface>
-                    <SidebarRight />
+                    <SidebarRight onPresent={onPresent} />
                   </div>
                 </PreviewProvider>
+                {presentationData && (
+                  <PresentationOverlay
+                    {...presentationData}
+                    onExit={onExitPresentation}
+                  />
+                )}
               </main>
             </SidebarProvider>
           </SlideEditorModeProvider>
@@ -149,20 +166,27 @@ function SlidesSidebar({ slideMode }: { slideMode: SlideEditorMode }) {
 // Right sidebar
 // ---------------------------------------------------------------------------
 
-function SidebarRight() {
+function SidebarRight({ onPresent }: { onPresent: () => void }) {
   return (
     <Sidebar side="right">
       <SidebarHeader className="border-b p-0">
         <header className="flex h-11 px-2 justify-between items-center gap-2">
           <div className="flex-1" />
-          <div className="flex items-center">
+          <div className="flex items-center gap-1">
             <Zoom
               className={cn(
                 WorkbenchUI.inputVariants({ variant: "input", size: "xs" }),
                 "w-auto"
               )}
             />
-            <PreviewButton />
+            <button
+              onClick={onPresent}
+              className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Present"
+              title="Present (fullscreen)"
+            >
+              <PlayIcon className="size-3.5" />
+            </button>
           </div>
         </header>
       </SidebarHeader>
