@@ -1,8 +1,10 @@
 import { tree as lib } from "../src/lib";
 
+type FlatNode = { children?: string[]; [k: string]: unknown };
+
 describe("rm", () => {
   it("removes a standalone node", () => {
-    const nodes = { a: {} as any, b: {} as any };
+    const nodes: Record<string, FlatNode> = { a: {}, b: {} };
     const removed = lib.flat_with_children.rm(nodes, "a");
     expect(removed).toEqual(["a"]);
     expect(nodes).toEqual({ b: {} });
@@ -14,7 +16,7 @@ describe("rm", () => {
       b: { children: ["c"] },
       c: {},
       d: {},
-    } as Record<string, any>;
+    } as Record<string, FlatNode>;
     const removed = lib.flat_with_children.rm(nodes, "a");
     expect(removed).toEqual(["c", "b", "a"]);
     expect(nodes).toEqual({ d: {} });
@@ -26,7 +28,7 @@ describe("rm", () => {
       x: { children: ["z"] },
       y: {},
       z: {},
-    } as Record<string, any>;
+    } as Record<string, FlatNode>;
     const removed = lib.flat_with_children.rm(nodes, "x");
     expect(removed).toEqual(["z", "x"]);
     expect(nodes.root.children).toEqual(["y"]);
@@ -36,7 +38,7 @@ describe("rm", () => {
   });
 
   it("throws if id does not exist", () => {
-    const nodes = { a: {} as any };
+    const nodes: Record<string, FlatNode> = { a: {} };
     expect(() => lib.flat_with_children.rm(nodes, "missing")).toThrow(
       /rm: cannot remove 'missing': No such node/
     );
@@ -46,7 +48,7 @@ describe("rm", () => {
     const nodes = {
       a: {},
       b: { foo: "bar" },
-    } as Record<string, any>;
+    } as Record<string, FlatNode>;
     const removed = lib.flat_with_children.rm(nodes, "a");
     expect(removed).toEqual(["a"]);
     expect(nodes).toEqual({ b: { foo: "bar" } });
@@ -58,7 +60,7 @@ describe("rm", () => {
       b: { children: [] },
       c: { children: ["d"] },
       d: {},
-    } as Record<string, any>;
+    } as Record<string, FlatNode>;
     const removed = lib.flat_with_children.rm(nodes, "b");
     expect(removed).toEqual(["b"]);
     expect(Object.keys(nodes).sort()).toEqual(["a", "c", "d"]);
@@ -81,7 +83,7 @@ describe("rm:advanced", () => {
       b2a: {},
       b2b: {},
       c: {},
-    } as Record<string, any>;
+    } as Record<string, FlatNode>;
 
     let removed = lib.flat_with_children.rm(nodes, "a2");
     expect(removed).toEqual(["a2"]);

@@ -35,7 +35,7 @@ interface ColorEntry {
  * Flatten nested color objects into flat entries
  */
 function flattenColors(
-  obj: Record<string, any>,
+  obj: Record<string, unknown>,
   prefix = ""
 ): Array<[string, string]> {
   const result: Array<[string, string]> = [];

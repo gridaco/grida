@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import type Typr from "../typr";
 import { Parser } from "../parse";
 
 describe("STAT parsing", () => {
@@ -14,13 +15,13 @@ describe("STAT parsing", () => {
     const opsz = stat.axes.find((a) => a.tag === "opsz");
     expect(
       opsz?.values.map((v) =>
-        "value" in v ? v.value : (v as any).nominalValue
+        "value" in v ? v.value : (v as Typr.STATAxisValueFormat2).nominalValue
       )
     ).toEqual(expect.arrayContaining([8, 9, 10]));
     const wght = stat.axes.find((a) => a.tag === "wght");
     const boldMap = wght?.values.find(
       (v) => "linkedValue" in v && v.linkedValue === 700
-    ) as any;
+    ) as Typr.STATAxisValueFormat3 | undefined;
     expect(boldMap?.value).toBe(400);
   });
 });

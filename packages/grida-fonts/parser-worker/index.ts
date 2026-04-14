@@ -12,16 +12,22 @@ export class FontParserWorker {
   private id = 0;
   private readonly callbacks = new Map<
     number,
-    { resolve: (value: any) => void; reject: (reason: any) => void }
+    { resolve: (value: unknown) => void; reject: (reason: unknown) => void }
   >();
 
   constructor() {
     const workerUrl =
-      typeof import.meta !== "undefined" && (import.meta as any).url
-        ? new URL("./worker.js", (import.meta as any).url)
+      typeof import.meta !== "undefined" &&
+      (import.meta as unknown as { url?: string }).url
+        ? new URL(
+            "./worker.js",
+            (import.meta as unknown as { url: string }).url
+          )
         : new URL("./worker.js", `file://${__dirname}/`);
     this.worker = new Worker(workerUrl, { type: "module" });
-    this.worker.onmessage = (ev: MessageEvent<any>) => {
+    this.worker.onmessage = (
+      ev: MessageEvent<{ id: number; result?: unknown; error?: unknown }>
+    ) => {
       const { id, result, error } = ev.data;
       const cb = this.callbacks.get(id);
       if (!cb) return;
@@ -38,7 +44,7 @@ export class FontParserWorker {
    * Parses a font buffer and returns the full Typr parsed result.
    * @param buffer Font data as an ArrayBuffer
    */
-  async parse(buffer: ArrayBuffer): Promise<any> {
+  async parse(buffer: ArrayBuffer): Promise<unknown> {
     return this.call("parse", buffer);
   }
 
@@ -62,6 +68,7 @@ export class FontParserWorker {
     this.worker.terminate();
   }
 
+  // oxlint-disable-next-line typescript/no-explicit-any
   private call(type: string, buffer: ArrayBuffer): Promise<any> {
     return new Promise((resolve, reject) => {
       const id = ++this.id;

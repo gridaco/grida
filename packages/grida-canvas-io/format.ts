@@ -3117,7 +3117,7 @@ export namespace format {
           const stackItem = props.get(i);
           if (stackItem) {
             const paintType = stackItem.paintType();
-            const paintValue = unionToPaint(paintType, (obj: any) =>
+            const paintValue = unionToPaint(paintType, (obj) =>
               stackItem.paint(obj)
             );
             if (paintValue) {
@@ -5535,6 +5535,7 @@ export namespace format {
             const stackItem = n.fillPaints(i);
             if (stackItem) {
               const paintType = stackItem.paintType();
+              // oxlint-disable-next-line typescript/no-explicit-any
               const paintValue = unionToPaint(paintType, (obj: any) =>
                 stackItem.paint(obj)
               );
@@ -5552,7 +5553,7 @@ export namespace format {
             const stackItem = n.strokePaints(i);
             if (stackItem) {
               const paintType = stackItem.paintType();
-              const paintValue = unionToPaint(paintType, (obj: any) =>
+              const paintValue = unionToPaint(paintType, (obj) =>
                 stackItem.paint(obj)
               );
               if (paintValue) {
@@ -6743,7 +6744,7 @@ export namespace format {
           if (nodeType === fbs.Node.NONE) continue;
 
           // Unwrap NodeSlot to get the typed node table
-          const typedNode = unionToNode(nodeType, (obj: any) => slot.node(obj));
+          const typedNode = unionToNode(nodeType, (obj) => slot.node(obj));
           if (!typedNode) continue;
 
           // SceneNode is special - it doesn't use LayerTrait

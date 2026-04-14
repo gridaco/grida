@@ -2,10 +2,10 @@ import { FontFaceManager as FontFaceManagerDOM } from "../fontface-dom";
 
 // Mock FontFace constructor for testing
 const MockFontFace = vi.fn().mockImplementation(function (
-  this: any,
+  this: Record<string, unknown>,
   family: string,
   src: string,
-  descriptors: any
+  descriptors: Record<string, string>
 ) {
   this.family = family;
   this.src = src;
@@ -27,8 +27,8 @@ import mockInter from "./inter.json";
 describe("FontFaceManagerDOM - DOM-specific functionality", () => {
   beforeEach(() => {
     MockFontFace.mockClear();
-    (document.fonts.add as any).mockClear();
-    (document.fonts.check as any).mockClear();
+    vi.mocked(document.fonts.add).mockClear();
+    vi.mocked(document.fonts.check).mockClear();
   });
 
   describe("Static Methods", () => {

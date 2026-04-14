@@ -743,7 +743,7 @@ export class Scene {
     ids: string[],
     target: "fill" | "stroke" = "fill",
     options?: { recursive?: boolean; limit?: number }
-  ): Array<{ paint: any; node_ids: string[] }> {
+  ): Array<{ paint: Record<string, unknown>; node_ids: string[] }> {
     this._assertAlive();
     const recursive = options?.recursive ?? true;
     const limit = options?.limit ?? 0;
@@ -764,7 +764,7 @@ export class Scene {
     if (ptr === 0) return [];
     const str = ffi.readLenPrefixedString(this.module, ptr);
     const raw = JSON.parse(str) as Array<{
-      paint: Record<string, any>;
+      paint: Record<string, unknown>;
       node_ids: string[];
     }>;
     return raw.map((g) => ({
@@ -1402,12 +1402,14 @@ function convertStop(stop: { offset: number; color: number[] }): {
  * Rust: `{ "Solid": { active: true, color: [255, 0, 0, 255], blend_mode: "normal" } }`
  * JS:   `{ type: "solid", active: true, color: { r: 1, g: 0, b: 0, a: 1 }, blend_mode: "normal" }`
  */
-function convertRustPaintToJS(paint: Record<string, any>): any {
+function convertRustPaintToJS(
+  paint: Record<string, unknown>
+): Record<string, unknown> {
   const variant = Object.keys(paint)[0];
-  const data = paint[variant];
+  const data = paint[variant] as Record<string, unknown>;
   const type = PAINT_TYPE_MAP[variant] ?? variant.toLowerCase();
 
-  const result: any = { type, ...data };
+  const result: Record<string, unknown> = { type, ...data };
 
   // Convert colors from u8 arrays to RGBA32F objects
   if (data.color && Array.isArray(data.color)) {

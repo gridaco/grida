@@ -245,7 +245,7 @@ describe("REST API TEXT → AttributedTextNode", () => {
         "1": {
           fontWeight: 700,
           fills: [{ type: "SOLID", color: { r: 0.133, g: 0, b: 1, a: 1 } }],
-        } as any,
+        } as Partial<figrest.TypeStyle>,
       });
 
       const attrib = findAttribNode(doc);

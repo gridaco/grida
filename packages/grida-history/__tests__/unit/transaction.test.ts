@@ -2,6 +2,7 @@ import {
   TransactionImpl,
   __resetTransactionIdCounter,
 } from "../../src/transaction";
+import type { CommittedTransaction } from "../../src/types";
 import { counterDelta, failingRevertDelta } from "../helpers";
 
 beforeEach(() => __resetTransactionIdCounter());
@@ -85,7 +86,7 @@ describe("Transaction", () => {
 
   describe("Invariant 6: nesting", () => {
     it("inner commit merges deltas into outer", () => {
-      const committed: any[] = [];
+      const committed: CommittedTransaction[] = [];
       const outer = new TransactionImpl("outer", {}, null);
       outer.onCommit = (tx) => committed.push(tx);
 
@@ -129,7 +130,7 @@ describe("Transaction", () => {
     });
 
     it("three levels deep: all commit → one flat list", () => {
-      const committed: any[] = [];
+      const committed: CommittedTransaction[] = [];
       const c = { value: 0 };
 
       const outer = new TransactionImpl("outer", {}, null);

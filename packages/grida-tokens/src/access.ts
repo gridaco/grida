@@ -33,6 +33,7 @@ export namespace access {
   type Prev = [never, 0, 1, 2, 3, 4, 5];
 
   export type ScopedIdentifiersContext = {
+    // oxlint-disable-next-line typescript/no-explicit-any
     scopedIdentifiers: { [key: string]: KeyPath<any> };
   };
 
@@ -127,6 +128,7 @@ export namespace access {
     obj: T,
     path: P,
     context?: ScopedIdentifiersContext
+    // oxlint-disable-next-line typescript/no-explicit-any
   ): any {
     // Resolve the path using context if provided
     const resolvedPath = context
@@ -140,6 +142,7 @@ export namespace access {
     // Traverse the resolved path
     return resolvedPath.reduce((acc, part) => {
       if (acc && typeof acc === "object" && part in acc) {
+        // oxlint-disable-next-line typescript/no-explicit-any
         return (acc as any)[part];
       }
       return undefined;
@@ -156,15 +159,19 @@ export namespace access {
    * @returns A merged object containing the selected values.
    */
   export function select<
+    // oxlint-disable-next-line typescript/no-explicit-any
     T extends object = any,
+    // oxlint-disable-next-line typescript/no-explicit-any
     P extends string[] | KeyPath<T> = any,
   >(obj: T, paths: P[], context?: ScopedIdentifiersContext): Partial<T> {
+    // oxlint-disable-next-line typescript/no-explicit-any
     const result: any = {};
 
     paths.forEach((path) => {
       const resolvedPath = context
         ? resolvePath(path as string[], context)
         : (path as string[]);
+      // oxlint-disable-next-line typescript/no-explicit-any
       const value = access(obj, resolvedPath as any, context);
 
       if (value !== undefined) {

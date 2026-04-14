@@ -894,6 +894,7 @@ export namespace io {
    * - no normalization/conversion
    */
   export namespace snapshot {
+    // oxlint-disable-next-line typescript/no-explicit-any
     export function parse(content: string | any): any {
       return typeof content === "string" ? JSON.parse(content) : content;
     }

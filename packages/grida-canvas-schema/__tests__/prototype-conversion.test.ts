@@ -418,6 +418,7 @@ describe("create_packed_scene_document_from_prototype", () => {
             layout_positioning: "absolute",
             layout_inset_left: 0,
             layout_inset_top: 0,
+            // oxlint-disable-next-line typescript/no-explicit-any
           } satisfies Partial<grida.program.nodes.ContainerNode> as any,
           child1: {
             id: "child1",
@@ -429,6 +430,7 @@ describe("create_packed_scene_document_from_prototype", () => {
             layout_positioning: "absolute",
             layout_inset_left: 10,
             layout_inset_top: 10,
+            // oxlint-disable-next-line typescript/no-explicit-any
           } satisfies Partial<grida.program.nodes.TextSpanNode> as any,
           child2: {
             id: "child2",
@@ -440,6 +442,7 @@ describe("create_packed_scene_document_from_prototype", () => {
             layout_positioning: "absolute",
             layout_inset_left: 10,
             layout_inset_top: 40,
+            // oxlint-disable-next-line typescript/no-explicit-any
           } satisfies Partial<grida.program.nodes.TextSpanNode> as any,
         },
         links: {

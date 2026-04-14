@@ -12,7 +12,7 @@ interface RequestMessage {
 
 interface ResponseMessage {
   id: number;
-  result?: any;
+  result?: unknown;
   error?: string;
 }
 
@@ -44,7 +44,7 @@ self.onmessage = (ev: MessageEvent<RequestMessage>) => {
     }
 
     self.postMessage({ id, error: "Unknown message type" });
-  } catch (error: any) {
-    self.postMessage({ id, error: error?.message ?? String(error) });
+  } catch (error: unknown) {
+    self.postMessage({ id, error: (error as Error)?.message ?? String(error) });
   }
 };

@@ -237,7 +237,7 @@ export class UnifiedFontManager {
       this.unregister(victim, {
         family,
         weight: w,
-        style: s as any,
+        style: s as "normal" | "italic" | "oblique",
         stretch: st,
       });
       // optionally also trim bytes cache when very large:

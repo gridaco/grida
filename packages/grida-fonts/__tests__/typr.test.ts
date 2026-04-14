@@ -26,6 +26,7 @@ describe("Typr font parsing", () => {
     const font = loadFont(
       "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
     );
+    // oxlint-disable-next-line typescript/no-explicit-any
     const axes = font.fvar?.[0]?.map((a: any) => a[0]) || [];
     expect(axes).toEqual(expect.arrayContaining(["wght", "opsz", "wdth"]));
   });
@@ -40,6 +41,7 @@ describe("Typr font parsing", () => {
 
   it("parses Geist variable font", () => {
     const font = loadFont("Geist/Geist-VariableFont_wght.ttf");
+    // oxlint-disable-next-line typescript/no-explicit-any
     const axes = font.fvar?.[0]?.map((a: any) => a[0]) || [];
     expect(axes).toContain("wght");
   });
@@ -90,6 +92,7 @@ describe("Typr font parsing", () => {
         expect(Array.isArray(font.STAT.designAxes)).toBe(true);
 
         // Each design axis should have required properties
+        // oxlint-disable-next-line typescript/no-explicit-any
         font.STAT.designAxes.forEach((axis: any) => {
           expect(axis).toHaveProperty("tag");
           expect(axis).toHaveProperty("name");
@@ -140,6 +143,7 @@ describe("Typr font parsing", () => {
 
         // Design axes should be properly structured
         if (font.STAT.designAxes) {
+          // oxlint-disable-next-line typescript/no-explicit-any
           font.STAT.designAxes.forEach((axis: any) => {
             expect(axis.tag).toMatch(/^[a-zA-Z]{4}$/); // 4-character tag
             expect(typeof axis.name).toBe("string");
@@ -149,6 +153,7 @@ describe("Typr font parsing", () => {
 
         // Axis values should have proper format
         if (font.STAT.axisValues) {
+          // oxlint-disable-next-line typescript/no-explicit-any
           font.STAT.axisValues.forEach((value: any) => {
             expect(value).toHaveProperty("format");
             expect(value).toHaveProperty("flags");
@@ -173,6 +178,7 @@ describe("Typr font parsing", () => {
     expect(instances.length).toBe(64);
 
     // Validate specific Recursive font instances
+    // oxlint-disable-next-line typescript/no-explicit-any
     instances.forEach((instance: any) => {
       expect(instance).toHaveLength(4); // [name, flags, coordinates, postScriptName]
       expect(typeof instance[0]).toBe("string"); // name
@@ -181,12 +187,14 @@ describe("Typr font parsing", () => {
       expect(instance[2].length).toBe(5); // Should have 5 coordinates for 5 axes
 
       // Validate coordinate values are numbers
+      // oxlint-disable-next-line typescript/no-explicit-any
       instance[2].forEach((coord: any) => {
         expect(typeof coord).toBe("number");
       });
     });
 
     // Check for specific named instances
+    // oxlint-disable-next-line typescript/no-explicit-any
     const instanceNames = instances.map((instance: any) => instance[0]);
     expect(instanceNames).toContain("Mono Linear");
     expect(instanceNames).toContain("Mono Linear Italic");
@@ -197,11 +205,14 @@ describe("Typr font parsing", () => {
 
     // Find and validate the Mono Linear instance (equivalent to Regular)
     const monoLinearInstance = instances.find(
+      // oxlint-disable-next-line typescript/no-explicit-any
       (instance: any) => instance[0] === "Mono Linear"
     );
     expect(monoLinearInstance).toBeDefined();
     if (monoLinearInstance) {
+      // oxlint-disable-next-line typescript/no-explicit-any
       expect((monoLinearInstance as any)[1]).toBe(0); // flags should be 0 for Regular
+      // oxlint-disable-next-line typescript/no-explicit-any
       const coords = (monoLinearInstance as any)[2];
       expect(coords).toHaveLength(5); // Should have 5 coordinates
       // Validate that coordinates are numbers
@@ -214,10 +225,12 @@ describe("Typr font parsing", () => {
 
     // Find and validate a Light instance
     const lightInstance = instances.find(
+      // oxlint-disable-next-line typescript/no-explicit-any
       (instance: any) => instance[0] === "Mono Linear Light"
     );
     expect(lightInstance).toBeDefined();
     if (lightInstance) {
+      // oxlint-disable-next-line typescript/no-explicit-any
       const coords = (lightInstance as any)[2];
       expect(coords).toHaveLength(5);
       expect(typeof coords[4]).toBe("number"); // wght should be a number
@@ -225,22 +238,27 @@ describe("Typr font parsing", () => {
 
     // Find and validate a Medium instance
     const mediumInstance = instances.find(
+      // oxlint-disable-next-line typescript/no-explicit-any
       (instance: any) => instance[0] === "Mono Linear Medium"
     );
     expect(mediumInstance).toBeDefined();
     if (mediumInstance) {
+      // oxlint-disable-next-line typescript/no-explicit-any
       const coords = (mediumInstance as any)[2];
       expect(coords).toHaveLength(5);
       expect(typeof coords[4]).toBe("number"); // wght should be a number
     }
 
     // Validate coordinate structure and types
+    // oxlint-disable-next-line typescript/no-explicit-any
     const allCoordinates = instances.map((instance: any) => instance[2]);
 
     // All coordinates should be arrays of numbers
+    // oxlint-disable-next-line typescript/no-explicit-any
     allCoordinates.forEach((coords: any) => {
       expect(Array.isArray(coords)).toBe(true);
       expect(coords).toHaveLength(5);
+      // oxlint-disable-next-line typescript/no-explicit-any
       coords.forEach((coord: any) => {
         expect(typeof coord).toBe("number");
       });
@@ -248,6 +266,7 @@ describe("Typr font parsing", () => {
 
     // Validate that we have different coordinate values (indicating variation)
     const uniqueCoords = new Set(
+      // oxlint-disable-next-line typescript/no-explicit-any
       allCoordinates.map((coords: any) => JSON.stringify(coords))
     );
     expect(uniqueCoords.size).toBeGreaterThan(1); // Should have at least 2 different coordinate sets

@@ -1,10 +1,13 @@
 // Shared test setup for this package (Vitest).
 
 // Mock FontFace constructor for testing
+// oxlint-disable-next-line typescript/no-explicit-any
 const MockFontFace: any = vi.fn().mockImplementation(function (
+  // oxlint-disable-next-line typescript/no-explicit-any
   this: any,
   family: string,
   src: string | ArrayBuffer,
+  // oxlint-disable-next-line typescript/no-explicit-any
   descriptors: any
 ) {
   this.family = family;
@@ -18,6 +21,7 @@ const MockFontFace: any = vi.fn().mockImplementation(function (
 });
 
 // Mock global FontFace
+// oxlint-disable-next-line typescript/no-explicit-any
 (globalThis as any).FontFace = MockFontFace;
 
 // Mock document.fonts
@@ -33,6 +37,7 @@ Object.defineProperty(globalThis, "document", {
 });
 
 // Mock fetch
+// oxlint-disable-next-line typescript/no-explicit-any
 (globalThis as any).fetch = vi.fn().mockImplementation((_url: string) => {
   return Promise.resolve({
     ok: true,
@@ -42,7 +47,9 @@ Object.defineProperty(globalThis, "document", {
 });
 
 // Mock window for Typr library
+// oxlint-disable-next-line typescript/no-explicit-any
 const NativeTextDecoder = (globalThis as any).TextDecoder;
+// oxlint-disable-next-line typescript/no-explicit-any
 (globalThis as any).window = {
   TextDecoder: NativeTextDecoder,
 };

@@ -7,7 +7,7 @@ import type { markdown } from "./markdown-bindings";
 export class MarkdownAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
 
-  constructor(module: any) {
+  constructor(module: createGridaCanvas.GridaCanvasWasmBindings) {
     this.module = module;
   }
 

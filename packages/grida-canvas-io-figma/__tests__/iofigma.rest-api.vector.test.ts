@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import { iofigma } from "../lib";
 import type * as figrest from "@figma/rest-api-spec";
 import type grida from "@grida/schema";
+import type cg from "@grida/cg";
 
 const FIXTURES_BASE = __dirname + "/../../../fixtures/test-figma/rest-api/L0";
 const VECTOR_FRAME_FIXTURE = FIXTURES_BASE + "/vector-frame.response.json";
@@ -592,7 +593,7 @@ describe("iofigma.restful.factory.document", () => {
         prefer_path_for_geometry: true,
         preserve_figma_ids: true,
       };
-      return iofigma.restful.factory.document(node as any, {}, ctx);
+      return iofigma.restful.factory.document(node, {}, ctx);
     }
 
     it("no fillOverrideTable — all paths get node-level fills", () => {
@@ -661,7 +662,7 @@ describe("iofigma.restful.factory.document", () => {
       expect(overriddenPath).toBeDefined();
       expect(overriddenPath!.fill_paints).toBeDefined();
       expect(overriddenPath!.fill_paints!.length).toBe(1);
-      const paint = overriddenPath!.fill_paints![0] as any;
+      const paint = overriddenPath!.fill_paints![0] as cg.SolidPaint;
       expect(paint.type).toBe("solid");
       // Grida schema uses 0.0-1.0 float color (r=1.0 means fully red)
       expect(paint.color.r).toBeGreaterThan(0.5);
@@ -671,7 +672,7 @@ describe("iofigma.restful.factory.document", () => {
       const normalPath = paths.find((p) => p.name.includes("Fill 2"));
       expect(normalPath).toBeDefined();
       expect(normalPath!.fill_paints).toBeDefined();
-      const normalPaint = normalPath!.fill_paints![0] as any;
+      const normalPaint = normalPath!.fill_paints![0] as cg.SolidPaint;
       expect(normalPaint.color.r).toBeLessThan(0.1);
     });
 
@@ -734,11 +735,15 @@ describe("iofigma.restful.factory.document", () => {
 
       // Fill 2: overrideID=2 → red fill
       expect(fill2.fill_paints).toBeDefined();
-      expect((fill2.fill_paints![0] as any).color.r).toBeGreaterThan(0.5);
+      expect((fill2.fill_paints![0] as cg.SolidPaint).color.r).toBeGreaterThan(
+        0.5
+      );
 
       // Fill 3: no overrideID → node-level black fill
       expect(fill3.fill_paints).toBeDefined();
-      expect((fill3.fill_paints![0] as any).color.r).toBeLessThan(0.1);
+      expect((fill3.fill_paints![0] as cg.SolidPaint).color.r).toBeLessThan(
+        0.1
+      );
     });
   });
 });

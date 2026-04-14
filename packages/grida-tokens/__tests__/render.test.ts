@@ -123,7 +123,9 @@ describe("tokens.render.any", () => {
   });
 
   it("should handle unknown token types gracefully", () => {
-    const unknownToken = { kind: "UnknownToken" } as any;
+    const unknownToken = {
+      kind: "UnknownToken",
+    } as unknown as tokens.PropertyAccessExpression;
     const result = render.any(unknownToken, context, false);
     expect(result).toEqual(unknownToken);
   });

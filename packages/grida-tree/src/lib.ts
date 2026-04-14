@@ -1550,7 +1550,7 @@ export namespace tree {
      *
      * @see {@link IGraphPolicy} for creating custom policies
      */
-    export const DEFAULT_POLICY_INFINITE: IGraphPolicy<any> = {
+    export const DEFAULT_POLICY_INFINITE: IGraphPolicy<unknown> = {
       max_out_degree: () => Infinity,
       can_link: () => true,
       can_be_parent: () => true,
@@ -2390,6 +2390,7 @@ export namespace tree {
           "id" in (node as Record<string, unknown>) &&
           typeof (node as Record<string, unknown>).id === "string"
         ) {
+          // oxlint-disable-next-line typescript/no-explicit-any
           mapped = { ...(node as any), id: newKey } as T;
         }
         nodes[newKey] = mapped;

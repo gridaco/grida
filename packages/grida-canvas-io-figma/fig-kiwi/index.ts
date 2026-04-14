@@ -89,7 +89,7 @@ export interface FigmaMeta {
 
 export interface ParsedFigma {
   header: Header;
-  schema: any; // Raw schema definitions (from decodeBinarySchema), not compiled
+  schema: unknown; // Raw schema definitions (from decodeBinarySchema), not compiled
   message: Message;
 }
 
@@ -528,7 +528,7 @@ export function getThumbnail(
  */
 export function getMeta(
   zipFiles: { [key: string]: Uint8Array } | undefined
-): any | undefined {
+): unknown {
   const metaBytes = zipFiles?.["meta.json"];
   if (!metaBytes) return undefined;
 

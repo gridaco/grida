@@ -482,7 +482,7 @@ namespace cmath {
       frequency[num] = (frequency[num] || 0) + 1;
     });
 
-    let mostFrequent: [number, number] = [undefined as any, 0];
+    let mostFrequent: [number, number] = [undefined as unknown as number, 0];
 
     for (const key in frequency) {
       const count = frequency[key];
@@ -5093,10 +5093,15 @@ namespace cmath {
             ) {
               // keep the better (smaller residual) if available
               if ((item.residual ?? 1e9) < (h.residual ?? 1e9)) {
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).a_t = item.a_t;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).b_t = item.b_t;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).p = item.p;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).residual = item.residual;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).kind = item.kind;
               }
               return;

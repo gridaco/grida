@@ -13,6 +13,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { format } from "../format";
+import type grida from "@grida/schema";
+import type cg from "@grida/cg";
 import fs from "fs";
 import path from "path";
 
@@ -73,19 +75,19 @@ describe.skipIf(!hasGeneratedDir())(
         (n) =>
           (n.type === "vector" || n.type === "path") &&
           "fill_paints" in n &&
-          Array.isArray((n as any).fill_paints) &&
-          (n as any).fill_paints.length > 0
-      ) as any;
+          Array.isArray(n.fill_paints) &&
+          n.fill_paints.length > 0
+      ) as grida.program.nodes.VectorNode | undefined;
       expect(vector).toBeDefined();
 
-      const paint = vector.fill_paints[0];
+      const paint = vector!.fill_paints![0] as cg.LinearGradientPaint;
       expect(paint.type).toBe("linear_gradient");
       expect(paint.xy1).toBeDefined();
       expect(paint.xy2).toBeDefined();
-      expect(paint.xy1[0]).toBeCloseTo(-1, 1);
-      expect(paint.xy1[1]).toBeCloseTo(-1, 1);
-      expect(paint.xy2[0]).toBeCloseTo(-1, 1);
-      expect(paint.xy2[1]).toBeCloseTo(1, 1);
+      expect(paint.xy1![0]).toBeCloseTo(-1, 1);
+      expect(paint.xy1![1]).toBeCloseTo(-1, 1);
+      expect(paint.xy2![0]).toBeCloseTo(-1, 1);
+      expect(paint.xy2![1]).toBeCloseTo(1, 1);
     });
 
     // TODO: gradient transform normalization produces non-identity
@@ -95,9 +97,9 @@ describe.skipIf(!hasGeneratedDir())(
         (n) =>
           n.type === "vector" &&
           "fill_paints" in n &&
-          (n as any).fill_paints?.length > 0
-      ) as any;
-      const t = vector.fill_paints[0].transform;
+          (n.fill_paints?.length ?? 0) > 0
+      ) as grida.program.nodes.VectorNode;
+      const t = (vector.fill_paints![0] as cg.LinearGradientPaint).transform;
       expect(t[0][0]).toBeCloseTo(1, 2);
       expect(t[0][1]).toBeCloseTo(0, 2);
       expect(t[1][0]).toBeCloseTo(0, 2);
@@ -109,28 +111,26 @@ describe.skipIf(!hasGeneratedDir())(
       const groups = Object.values(doc.nodes).filter((n) => n.type === "group");
       expect(groups.length).toBeGreaterThanOrEqual(3);
       const hasTranslate = groups.some(
-        (g: any) =>
+        (g) =>
           Math.abs((g.layout_inset_left ?? 0) - 250) < 1 &&
           Math.abs((g.layout_inset_top ?? 0) - 250) < 1
       );
       expect(hasTranslate).toBe(true);
     });
 
-    // Known limitation: TS SDK only supports rotation on groups.
-    // Scale/skew preserved in FBS but lost in TS model.
-    it.fails("transforms-nested: group with scale(0.8, 1.2)", () => {
-      const doc = loadGolden("transforms-nested");
-      const groups = Object.values(doc.nodes).filter(
-        (n) => n.type === "group"
-      ) as any[];
-      const hasScale = groups.some(
-        (g: any) =>
-          g.post_layout_transform &&
-          Math.abs(g.post_layout_transform[0][0] - 0.8) < 0.01 &&
-          Math.abs(g.post_layout_transform[1][1] - 1.2) < 0.01
-      );
-      expect(hasScale).toBe(true);
-    });
+    // // Known limitation: TS SDK only supports rotation on groups.
+    // // Scale/skew preserved in FBS but lost in TS model.
+    // it.fails("transforms-nested: group with scale(0.8, 1.2)", () => {
+    //   const doc = loadGolden("transforms-nested");
+    //   const groups = Object.values(doc.nodes).filter((n) => n.type === "group");
+    //   const hasScale = groups.some(
+    //     (g) =>
+    //       g.post_layout_transform &&
+    //       Math.abs(g!.post_layout_transform[0][0] - 0.8) < 0.01 &&
+    //       Math.abs(g!.post_layout_transform[1][1] - 1.2) < 0.01
+    //   );
+    //   expect(hasScale).toBe(true);
+    // });
 
     it("stroke-dasharray: stroked vectors exist", () => {
       const doc = loadGolden("stroke-dasharray");
@@ -138,8 +138,8 @@ describe.skipIf(!hasGeneratedDir())(
         (n) =>
           (n.type === "vector" || n.type === "path") &&
           "stroke_paints" in n &&
-          Array.isArray((n as any).stroke_paints) &&
-          (n as any).stroke_paints.length > 0
+          Array.isArray(n.stroke_paints) &&
+          n.stroke_paints.length > 0
       );
       expect(hasStroke).toBe(true);
     });
@@ -150,11 +150,11 @@ describe.skipIf(!hasGeneratedDir())(
         (n) =>
           (n.type === "vector" || n.type === "path") &&
           "stroke_paints" in n &&
-          (n as any).stroke_paints?.length > 0
-      ) as any;
+          (n.stroke_paints?.length ?? 0) > 0
+      ) as grida.program.nodes.VectorNode;
       expect(vector).toBeDefined();
       expect(vector.stroke_dash_array).toBeDefined();
-      expect(vector.stroke_dash_array.length).toBeGreaterThan(0);
+      expect(vector.stroke_dash_array!.length).toBeGreaterThan(0);
     });
   }
 );

@@ -137,17 +137,17 @@ describe("collectExportsFromDocument", () => {
   it("returns empty array when document has no pages", () => {
     const items = collectExportsFromDocument({
       document: { children: [] },
-    } as any);
+    });
     expect(items).toEqual([]);
   });
 
   it("returns empty array when no node has exportSettings", () => {
-    const items = collectExportsFromDocument(MINIMAL_REST_FIXTURE as any);
+    const items = collectExportsFromDocument(MINIMAL_REST_FIXTURE);
     expect(items).toEqual([]);
   });
 
   it("returns one item per (node, setting) for nodes with exportSettings", () => {
-    const doc = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE)) as any;
+    const doc = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE));
     doc.document.children[0].children[0].exportSettings = [
       { suffix: "@2x", format: "PNG", constraint: { type: "SCALE", value: 2 } },
       { suffix: "", format: "SVG", constraint: { type: "WIDTH", value: 200 } },
@@ -175,7 +175,7 @@ describe("collectExportsFromDocument", () => {
     }
     const bytes = new Uint8Array(readFileSync(figPath));
     const restDoc = figBytesToRestLikeDocument(bytes);
-    const items = collectExportsFromDocument(restDoc as any);
+    const items = collectExportsFromDocument(restDoc);
     expect(items.length).toBeGreaterThan(0);
     expect(items[0]).toHaveProperty("nodeId");
     expect(items[0]).toHaveProperty("setting");
@@ -192,7 +192,7 @@ describe("exportSettingToRenderOptions", () => {
       format: "PNG" as const,
       constraint: { type: "SCALE" as const, value: 2 },
     };
-    const opts = exportSettingToRenderOptions(node as any, setting);
+    const opts = exportSettingToRenderOptions(node, setting);
     expect(opts.format).toBe("png");
     expect(opts.scale).toBe(2);
   });
@@ -204,7 +204,7 @@ describe("exportSettingToRenderOptions", () => {
       format: "SVG" as const,
       constraint: { type: "WIDTH" as const, value: 200 },
     };
-    const opts = exportSettingToRenderOptions(node as any, setting);
+    const opts = exportSettingToRenderOptions(node, setting);
     expect(opts.format).toBe("svg");
     expect(opts.width).toBe(200);
     expect(opts.height).toBe(100); // 200 * (50/100)
@@ -217,7 +217,7 @@ describe("exportSettingToRenderOptions", () => {
       format: "PDF" as const,
       constraint: { type: "HEIGHT" as const, value: 100 },
     };
-    const opts = exportSettingToRenderOptions(node as any, setting);
+    const opts = exportSettingToRenderOptions(node, setting);
     expect(opts.format).toBe("pdf");
     expect(opts.height).toBe(100);
     expect(opts.width).toBe(200); // 100 * (100/50)
@@ -243,7 +243,7 @@ describe("@grida/refig (real render)", () => {
   });
 
   it("listFontFamilies returns empty when no text nodes", () => {
-    const docNoText = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE)) as any;
+    const docNoText = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE));
     docNoText.document.children[0].children[0].children = [];
     const doc = new FigmaDocument(docNoText);
     const families = doc.listFontFamilies();
@@ -251,7 +251,7 @@ describe("@grida/refig (real render)", () => {
   });
 
   it("listFontFamilies traverses all pages when rootNodeId is omitted", () => {
-    const multiPage = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE)) as any;
+    const multiPage = JSON.parse(JSON.stringify(MINIMAL_REST_FIXTURE));
     multiPage.document.children.push({
       id: "0:2",
       type: "CANVAS",
@@ -613,7 +613,7 @@ describe("@grida/refig (real render)", () => {
       },
     };
 
-    const renderer = new FigmaRenderer(figmaFileJson as any, {
+    const renderer = new FigmaRenderer(figmaFileJson, {
       loadFigmaDefaultFonts: false,
     });
     try {

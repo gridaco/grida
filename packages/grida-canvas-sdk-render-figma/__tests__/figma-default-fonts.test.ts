@@ -5,12 +5,13 @@ import {
   ensureFigmaDefaultFonts,
   FIGMA_DEFAULT_FALLBACK_ORDER,
   FIGMA_DEFAULT_FONT_ENTRIES,
+  type FigmaDefaultFontsCanvas,
 } from "../figma-default-fonts";
 
 describe("figma-default-fonts", () => {
   const addFont = vi.fn();
   const setFallbackFonts = vi.fn();
-  const mockCanvas = { addFont, setFallbackFonts } as any;
+  const mockCanvas: FigmaDefaultFontsCanvas = { addFont, setFallbackFonts };
 
   beforeEach(() => {
     addFont.mockClear();

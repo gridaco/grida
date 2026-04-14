@@ -7,7 +7,7 @@ import type { svg } from "./svg-bindings";
 export class SVGAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
 
-  constructor(module: any) {
+  constructor(module: createGridaCanvas.GridaCanvasWasmBindings) {
     this.module = module;
   }
 

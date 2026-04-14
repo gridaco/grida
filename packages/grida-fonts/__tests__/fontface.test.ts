@@ -4,10 +4,10 @@ import type { GoogleWebFontListItem } from "../google";
 
 // Mock FontFace constructor for testing
 const MockFontFace = vi.fn().mockImplementation(function (
-  this: any,
+  this: Record<string, unknown>,
   family: string,
   src: string | ArrayBuffer,
-  descriptors: any
+  descriptors: Record<string, string>
 ) {
   this.family = family;
   this.src = src;
