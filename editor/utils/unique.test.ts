@@ -47,7 +47,7 @@ describe("unique function", () => {
   });
 
   it("should handle an empty array", () => {
-    const arr: any[] = [];
+    const arr: unknown[] = [];
     const result = unique(arr);
     expect(result).toEqual([]);
   });
