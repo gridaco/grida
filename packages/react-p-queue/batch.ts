@@ -3,6 +3,7 @@
  * This ensures that both task and result types have the same identifier property.
  */
 interface Identifiable {
+  // oxlint-disable-next-line typescript/no-explicit-any
   [key: string]: any;
 }
 /**
@@ -25,7 +26,7 @@ class BatchQueue<
   private buffer: {
     task: T;
     resolve: (result: R) => void;
-    reject: (error: any) => void;
+    reject: (error: unknown) => void;
   }[];
   private timeout: NodeJS.Timeout | null;
 
@@ -106,7 +107,7 @@ class BatchQueue<
     batch: {
       task: T;
       resolve: (result: R) => void;
-      reject: (error: any) => void;
+      reject: (error: unknown) => void;
     }[]
   ): Promise<void> {
     try {

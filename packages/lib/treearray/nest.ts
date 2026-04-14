@@ -8,6 +8,7 @@
  * @returns
  */
 export function nest(
+  // oxlint-disable-next-line typescript/no-explicit-any
   items: any[],
   id = null,
   link = "parent",
