@@ -854,8 +854,7 @@ function CampaignPublicDataFields({
           >
         );
       } finally {
-        if (cancelled) return;
-        setFormsLoading(false);
+        if (!cancelled) setFormsLoading(false);
       }
     })();
 

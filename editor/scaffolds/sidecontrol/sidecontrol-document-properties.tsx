@@ -345,9 +345,8 @@ function PropertyDefinitionValueInput<T = unknown>({
           value={(value as boolean).toString() as "true" | "false"}
           placeholder={placeholder}
           onValueChange={(v) => {
-            v === "true"
-              ? onValueChange(true as unknown as T)
-              : onValueChange(false as unknown as T);
+            if (v === "true") onValueChange(true as unknown as T);
+            else onValueChange(false as unknown as T);
           }}
           enum={[
             {

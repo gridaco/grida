@@ -300,7 +300,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren) {
         data: init.data,
       };
 
-      process.env.NODE_ENV === "development" &&
+      if (process.env.NODE_ENV === "development")
         console.log("[EDITOR] saving..", data);
 
       const promise = fetch(`/private/editor/${db_table_id}/fields`, {

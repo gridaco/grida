@@ -179,7 +179,6 @@ export default async function CustomerPortalSessionPage({
           </header>
           {iam_referrers?.length === 0 && <Empty />}
           {iam_referrers?.map((r) => {
-            r.campaign.www_route_path;
             // FIXME: tenant url
             const link = `${r.campaign.www_route_path}/t/${r.code}`;
             return (

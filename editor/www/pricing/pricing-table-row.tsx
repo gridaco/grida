@@ -21,7 +21,7 @@ export const PricingTableRowDesktop = (props: any) => {
           scope="colgroup"
         >
           <div className="flex items-center gap-4">
-            {props.icon && props.icon}
+            {props.icon}
             <h4 className="m-0 text-base font-normal">{category.title}</h4>
           </div>
         </th>
@@ -116,7 +116,7 @@ export const PricingTableRowMobile = (props: any) => {
     >
       <caption className="bg-background border-default divide-border dark:divide-border/25 dark:border-white/25 border-t border-b px-4 py-3 text-left text-sm font-medium text-foreground">
         <span className="flex items-center gap-2">
-          {props.icon && props.icon}
+          {props.icon}
           <span className="text-foreground font-normal">{category.title}</span>
         </span>
       </caption>

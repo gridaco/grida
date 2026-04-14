@@ -109,38 +109,32 @@ export namespace SupabasePostgRESTOpenApi {
     sb_schema_definitions: { [schema: string]: { [key: string]: any } };
     sb_project_url: string;
   }> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const u = new URL(url);
-        const projectref = u.hostname.split(".")[0];
-        const route = build_supabase_openapi_url(url, anonKey);
+    const u = new URL(url);
+    const projectref = u.hostname.split(".")[0];
+    const route = build_supabase_openapi_url(url, anonKey);
 
-        const schema_definitions: { [schema: string]: any } = {};
-        const schema_apidocs: { [schema: string]: any } = {};
+    const schema_definitions: { [schema: string]: any } = {};
+    const schema_apidocs: { [schema: string]: any } = {};
 
-        // can be optimized
-        for (const schema of schemas) {
-          const apidoc = await fetch_swagger(route, schema);
-          // validate
-          if (!apidoc || !("definitions" in apidoc)) {
-            return reject();
-          }
-          schema_apidocs[schema] = apidoc;
-          schema_definitions[schema] = apidoc.definitions;
-        }
-
-        return resolve({
-          sb_anon_key: anonKey,
-          sb_project_reference_id: projectref,
-          sb_schema_openapi_docs: schema_apidocs,
-          sb_schema_definitions: schema_definitions,
-          sb_schema_names: schemas,
-          sb_project_url: url,
-        });
-      } catch (e) {
-        reject(e);
+    // can be optimized
+    for (const schema of schemas) {
+      const apidoc = await fetch_swagger(route, schema);
+      // validate
+      if (!apidoc || !("definitions" in apidoc)) {
+        throw new Error("Invalid OpenAPI document");
       }
-    });
+      schema_apidocs[schema] = apidoc;
+      schema_definitions[schema] = apidoc.definitions;
+    }
+
+    return {
+      sb_anon_key: anonKey,
+      sb_project_reference_id: projectref,
+      sb_schema_openapi_docs: schema_apidocs,
+      sb_schema_definitions: schema_definitions,
+      sb_schema_names: schemas,
+      sb_project_url: url,
+    };
   }
 
   async function fetch_swagger(url: string, schema = "public") {

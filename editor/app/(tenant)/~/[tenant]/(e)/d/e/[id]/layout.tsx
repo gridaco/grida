@@ -44,7 +44,7 @@ export async function generateMetadata({
     .single();
 
   if (!formdoc) {
-    formdoc_err && console.error("ERR: ", formdoc_err);
+    if (formdoc_err) console.error("ERR: ", formdoc_err);
     return notFound();
   }
 

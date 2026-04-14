@@ -178,7 +178,7 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  error && console.error("v1init", id, error);
+  if (error) console.error("v1init", id, error);
 
   if (!data) {
     return notFound();

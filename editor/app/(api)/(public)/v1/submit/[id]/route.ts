@@ -921,7 +921,7 @@ async function submit({
 
         // check if the field is a valid table field not a abstract render-only field
         // TODO: this is also a good place to validate type - only `text` or `text[]` is supported
-        if (!!!sb_table_schema.properties[field.name]) {
+        if (!sb_table_schema.properties[field.name]) {
           return acc;
         }
 

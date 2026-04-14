@@ -99,7 +99,7 @@ const FilePickerProvider: React.FC<FilePickerProviderProps> = ({
             ? prev.filter((n) => n !== node)
             : [...prev, node]
           : [node];
-        onValueChange && onValueChange(next);
+        if (onValueChange) onValueChange(next);
         return next;
       });
     },

@@ -403,6 +403,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
 
 function PropertyField({
   definition,
+  // oxlint-disable-next-line oxc(only-used-in-recursion) -- name is part of the component interface, forwarded to recursive calls
   name,
   value,
   onValueChange,

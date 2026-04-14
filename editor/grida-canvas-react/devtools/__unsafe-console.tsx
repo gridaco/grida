@@ -56,6 +56,7 @@ export function __UNSAFE_CONSOLE() {
     // THIS IS THE ONLY POINT IN THIS APPLICATION WHERE EVAL IS EXPOSED.
     //
     try {
+      // oxlint-disable-next-line no-eval -- intentional: devtools debug console
       const output = eval(value);
       setEntries((prev) => [
         ...prev,

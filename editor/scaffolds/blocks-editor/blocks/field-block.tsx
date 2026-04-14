@@ -281,7 +281,7 @@ export function FieldBlock({
           <FormFieldPreview
             readonly
             preview
-            disabled={!!!form_field}
+            disabled={!form_field}
             name={form_field?.name ?? ""}
             label={form_field?.label ?? ""}
             type={form_field?.type ?? "text"}

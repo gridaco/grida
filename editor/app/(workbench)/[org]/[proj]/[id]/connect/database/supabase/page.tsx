@@ -940,7 +940,7 @@ function NewCustomSchemaDialog({
     setTesting(true);
     onUse(custom)
       .then((res) => {
-        if (!!res) {
+        if (res) {
           props.onOpenChange?.(false);
         }
       })
