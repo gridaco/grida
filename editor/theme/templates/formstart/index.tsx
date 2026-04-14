@@ -17,7 +17,7 @@ import { I18nextProvider } from "react-i18next";
 export namespace FormStartPage {
   type ClientTemplateDefinition =
     grida.program.document.template.TemplateDocumentDefinition & {
-      component: React.ComponentType<any>;
+      component: React.ComponentType<Record<string, unknown>>;
       resources: Resource;
     };
 
@@ -61,7 +61,7 @@ export namespace FormStartPage {
   type ResourceKey =
     | string
     | {
-        [key: string]: any;
+        [key: string]: unknown;
       };
 
   interface ResourceLanguage {

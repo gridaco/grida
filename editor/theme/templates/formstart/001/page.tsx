@@ -39,6 +39,7 @@ export default function _001() {
 }
 
 function Consumer() {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t } = useTranslation<any>();
   const data = useData<UserProps>();
 

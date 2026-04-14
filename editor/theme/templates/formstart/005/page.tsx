@@ -82,7 +82,7 @@ function Media() {
   });
 
   // TODO: fixme - wrong type
-  const media = props.media as any as FileIO.GridaAsset[];
+  const media = props.media as unknown as FileIO.GridaAsset[];
   // grida.program.objects.ImageSource[];
 
   return (
@@ -109,6 +109,7 @@ function Media() {
 }
 
 function CTAFooter() {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t } = useTranslation<any>();
   const { onClick } = useCTAContext();
 
@@ -200,6 +201,7 @@ function CTAFooter() {
  * if the event is closed (by time or by capacity), it displays the event is closed.
  */
 function NextEventState({ className }: { className?: string }) {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t, i18n } = useTranslation<any>();
   const lang = i18n.language;
   const { is_scheduling_enabled, scheduling_close_at, scheduling_open_at } =

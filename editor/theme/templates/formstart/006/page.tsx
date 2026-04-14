@@ -32,6 +32,7 @@ export default function _006() {
 }
 
 function Consumer() {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t } = useTranslation<any>();
   const data = useData();
 
@@ -116,7 +117,8 @@ function Consumer() {
             </motion.div>
             <video
               className="absolute inset-0 w-full h-full object-cover z-[-1]"
-              src={data.background?.[0]?.publicUrl || t("background_video")}
+              // @ts-expect-error - demo - temporary
+              src={data?.background?.[0]?.publicUrl || t("background_video")}
               playsInline
               autoPlay
               muted
