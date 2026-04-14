@@ -49,6 +49,7 @@ export {
 
 // Re-export kiwi-schema utilities for consumers
 export { compileSchema, prettyPrintSchema } from "kiwi-schema";
+export type { Schema as KiwiSchema } from "kiwi-schema";
 
 // --- Constants ---
 

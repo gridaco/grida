@@ -5,15 +5,15 @@ import { useMemo, useState } from "react";
 import {
   type FigmaMeta,
   type Header,
+  type KiwiSchema,
   type Message,
   type ParsedFigmaArchive,
   type ParsedFigmaHTML,
   type Schema as CompiledSchema,
-  getThumbnail,
   compileSchema,
+  getThumbnail,
   prettyPrintSchema,
 } from "@grida/io-figma/fig-kiwi";
-import type { Schema as KiwiSchema } from "kiwi-schema";
 import type { GUID, NodeChange } from "@grida/io-figma/fig-kiwi/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
