@@ -1,4 +1,5 @@
 "use client";
+// oxlint-disable typescript-eslint/no-explicit-any --- (blocknote will be removed)
 
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteViewProps } from "@blocknote/react";

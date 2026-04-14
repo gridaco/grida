@@ -2,7 +2,7 @@ import React, { createContext } from "react";
 import { useAudio } from "react-use";
 
 interface MediaState {
-  buffered: any[];
+  buffered: { start: number; end: number }[];
   duration: number;
   paused: boolean;
   muted: boolean;

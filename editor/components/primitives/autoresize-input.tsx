@@ -36,7 +36,7 @@ const INPUT_PROPS_BLACKLIST = [
   "placeholderIsMinWidth",
 ] as const;
 
-const cleanInputProps = (inputProps: Record<string, any>) => {
+const cleanInputProps = (inputProps: Record<string, unknown>) => {
   INPUT_PROPS_BLACKLIST.forEach((field) => delete inputProps[field]);
   return inputProps;
 };

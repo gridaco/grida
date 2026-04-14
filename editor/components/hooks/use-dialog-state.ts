@@ -4,7 +4,7 @@ import { useState } from "react";
 
 type DialogProps = React.ComponentProps<typeof DialogPrimitive.Root>;
 
-export function useDialogState<T = any>(
+export function useDialogState<T = unknown>(
   name = "dialog",
   config?: { refreshkey?: boolean; defaultOpen?: boolean }
 ): {

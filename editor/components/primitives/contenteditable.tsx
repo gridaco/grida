@@ -35,7 +35,7 @@ function replaceCaret(el: HTMLElement) {
  */
 export default class ContentEditable extends React.Component<Props> {
   lastHtml: string = this.props.html;
-  el: any =
+  el: React.RefObject<HTMLElement | null> =
     typeof this.props.innerRef === "function"
       ? { current: null }
       : React.createRef<HTMLElement>();
@@ -112,7 +112,7 @@ export default class ContentEditable extends React.Component<Props> {
     replaceCaret(el);
   }
 
-  emitChange = (originalEvt: React.SyntheticEvent<any>) => {
+  emitChange = (originalEvt: React.SyntheticEvent<HTMLDivElement>) => {
     const el = this.getEl();
     if (!el) return;
 

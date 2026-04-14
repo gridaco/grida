@@ -113,7 +113,10 @@ export function createHttpEmailChallengeProvider({
     const t = await res.json().catch(() => null);
     if (!res.ok) {
       const msg =
-        (t && typeof t === "object" && "error" in t && (t as any).error) ||
+        (t &&
+          typeof t === "object" &&
+          "error" in t &&
+          (t as { error: unknown }).error) ||
         `Request failed (${res.status})`;
       throw new Error(String(msg));
     }

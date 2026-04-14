@@ -171,29 +171,17 @@ export function SidebarMenuLink({
   return (
     <Link href={href}>
       {/* override selected prop */}
-      {React.cloneElement(children as any, { selected })}
+      {React.cloneElement(
+        children as React.ReactElement<{ selected?: boolean }>,
+        { selected }
+      )}
     </Link>
   );
 }
 
-export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
-  {
-    expandable,
-    expanded,
-    icon,
-    level,
-    muted,
-    selected,
-    hovered,
-    className,
-    disabled,
-    children,
-    onSelect,
-    onExpandChange,
-    onPointerDown,
-    onPointerEnter,
-    onPointerLeave,
-  }: React.PropsWithChildren<{
+export const SidebarMenuItem = React.forwardRef<
+  HTMLDivElement,
+  React.PropsWithChildren<{
     expandable?: boolean;
     expanded?: boolean;
     level?: number;
@@ -212,13 +200,31 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
     onPointerDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
     onPointerEnter?: () => void;
     onPointerLeave?: () => void;
-  }>,
+  }>
+>(function SidebarMenuItem(
+  {
+    expandable,
+    expanded,
+    icon,
+    level,
+    muted,
+    selected,
+    hovered,
+    className,
+    disabled,
+    children,
+    onSelect,
+    onExpandChange,
+    onPointerDown,
+    onPointerEnter,
+    onPointerLeave,
+  },
   forwardedRef
 ) {
   const has_icon_slot = icon !== undefined || expandable;
   return (
     <div
-      ref={forwardedRef as any}
+      ref={forwardedRef}
       data-level={level}
       data-muted={muted}
       onPointerDown={onPointerDown}
@@ -386,24 +392,19 @@ export function SidebarMenuItemActions({
   );
 }
 
-export const SidebarMenuItemAction = React.forwardRef(
-  function SidebarMenuItemAction(
-    {
-      children,
-      ...props
-    }: React.PropsWithChildren<React.ComponentProps<typeof Button>>,
-    forwardedRef
-  ) {
-    return (
-      <Button
-        ref={forwardedRef as any}
-        {...props}
-        variant="ghost"
-        size="sm"
-        className={cn("size-5 p-0", props.className)}
-      >
-        {children}
-      </Button>
-    );
-  }
-);
+export const SidebarMenuItemAction = React.forwardRef<
+  HTMLButtonElement,
+  React.PropsWithChildren<React.ComponentProps<typeof Button>>
+>(function SidebarMenuItemAction({ children, ...props }, forwardedRef) {
+  return (
+    <Button
+      ref={forwardedRef}
+      {...props}
+      variant="ghost"
+      size="sm"
+      className={cn("size-5 p-0", props.className)}
+    >
+      {children}
+    </Button>
+  );
+});

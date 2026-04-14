@@ -144,7 +144,13 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren) {
           </header>
           <PipPlayerContent
             mediaSrc={mediaSrc}
-            contentType={contentType as any}
+            contentType={
+              contentType as
+                | `audio/${string}`
+                | `video/${string}`
+                | undefined
+                | "unknwon"
+            }
           />
           {/* <Button variant="outline" size="icon">
               <PlayIcon />

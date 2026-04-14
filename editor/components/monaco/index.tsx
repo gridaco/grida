@@ -16,7 +16,7 @@ export function useMonacoTheme(
     fetch("/monaco-themes/grida-dark.json")
       .then((res) => res.json())
       .then((data) => {
-        monaco.editor.defineTheme("dark", data as any);
+        monaco.editor.defineTheme("dark", data as editor.IStandaloneThemeData);
         monaco.editor.setTheme(theme === "dark" ? "dark" : "light");
         setThemeLoaded(true);
       });
