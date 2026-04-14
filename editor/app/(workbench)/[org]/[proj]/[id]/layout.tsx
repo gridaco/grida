@@ -10,12 +10,17 @@ import {
 import { EditorSidebar } from "@/scaffolds/sidebar/sidebar";
 import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
 import { GridaXSupabaseService } from "@/services/x-supabase";
-import type { CanvasDocumentSnapshotSchema } from "@/types";
+import type {
+  CanvasDocumentSnapshotSchema,
+  SchemaTableConnectionXSupabaseMainTableJoint,
+  GridaXSupabase,
+} from "@/types";
 import type {
   Form,
   FormFieldDefinition,
   FormBlock,
   EndingPageTemplateID,
+  EndingPageI18nOverrides,
   FormPageBackgroundSchema,
   FormStyleSheetV1Schema,
 } from "@/grida-forms-hosted/types";
@@ -169,9 +174,9 @@ export default async function Layout({
 
       const { form: _form } = data;
       assert(_form);
-      const form = _form as any as Form & {
-        supabase_connection: any;
-        store_connection: any;
+      const form = _form as unknown as Form & {
+        supabase_connection: SchemaTableConnectionXSupabaseMainTableJoint | null;
+        store_connection: { store_id: number } | null;
         fields: FormFieldDefinition[];
       };
 
@@ -256,7 +261,7 @@ export default async function Layout({
                   ending_page_template_id:
                     data.ending_page_template_id as EndingPageTemplateID,
                   ending_page_i18n_overrides:
-                    data.ending_page_i18n_overrides as any,
+                    data.ending_page_i18n_overrides as unknown as EndingPageI18nOverrides | null,
                 },
                 document_id: masterdoc_ref.id,
                 document_title: masterdoc_ref.title,
@@ -331,7 +336,8 @@ export default async function Layout({
           sb_table_id,
           sb_schema_name: t.sb_schema_name,
           sb_table_name: t.sb_table_name,
-          sb_table_schema: t.sb_table_schema as any,
+          sb_table_schema:
+            t.sb_table_schema as unknown as GridaXSupabase.JSONSChema,
           sb_postgrest_methods: t.sb_postgrest_methods,
         });
       };

@@ -85,7 +85,8 @@ export async function POST(
         error:
           process.env.VERCEL === "1"
             ? "Internal server error"
-            : ((error as any)?.message ?? "Internal server error"),
+            : ((error instanceof Error ? error.message : null) ??
+              "Internal server error"),
       },
       { status: 500 }
     );

@@ -50,6 +50,7 @@ export default function PhoneNumberTool() {
       try {
         const parsedNumber = parsePhoneNumberFromString(
           phoneNumber,
+          // oxlint-disable-next-line typescript-eslint/no-explicit-any -- libphonenumber-js CountryCode type
           country as any
         );
 

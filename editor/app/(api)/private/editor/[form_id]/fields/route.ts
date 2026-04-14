@@ -66,6 +66,7 @@ export async function POST(
       data: safe_data_field({
         type: init.type,
         data: init.data,
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK column type mismatch
       }) as any,
       accept: init.accept,
       multiple: init.multiple,
@@ -123,6 +124,7 @@ export async function POST(
 
   // upsert optgroups
   // upserted & inserted optgroups (for response)
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK response type
   const upserted_optgroups: any[] = [];
   // input id (draftid | db id) -> db id
   const upserted_optgroups_id_map = new Map<string, string>();
@@ -168,6 +170,7 @@ export async function POST(
     upserted_optgroups.push(...upserted);
   }
 
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK response type
   let upserted_options: any[] | undefined = undefined;
 
   if (options) {

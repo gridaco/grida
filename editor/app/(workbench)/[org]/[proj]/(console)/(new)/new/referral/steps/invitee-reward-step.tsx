@@ -3,17 +3,20 @@
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Gift } from "lucide-react";
+import { Platform } from "@/lib/platform";
 
 interface InviteeRewardStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Platform.WEST.Referral.Wizard.CampaignData;
+  updateData: (
+    data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => void;
 }
 
 export function InviteeRewardStep({
   data,
   updateData,
 }: InviteeRewardStepProps) {
-  const updateInviteeReward = (field: string, value: any) => {
+  const updateInviteeReward = (field: string, value: string | number) => {
     updateData({
       invitee_onboarding_reward: {
         ...data.invitee_onboarding_reward,

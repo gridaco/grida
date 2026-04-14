@@ -13,6 +13,7 @@ import {
   compileSchema,
   prettyPrintSchema,
 } from "@grida/io-figma/fig-kiwi";
+import type { Schema as KiwiSchema } from "kiwi-schema";
 import type { GUID, NodeChange } from "@grida/io-figma/fig-kiwi/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,7 @@ export function FigmaFile({ data }: { data: FileContents }) {
             </Card>
           )}
           {navSelection.type === "schema" && "header" in data && (
-            <Schema schema={data.schema as any} header={data.header} />
+            <Schema schema={data.schema as KiwiSchema} header={data.header} />
           )}
           {navSelection.type === "preview" && (
             <Card>
@@ -157,7 +158,7 @@ export function FigmaFile({ data }: { data: FileContents }) {
           {node && (
             <NodeContent
               node={node}
-              schema={data.schema as any}
+              schema={data.schema as KiwiSchema}
               href={
                 "meta" in data
                   ? figmaUrl(data.meta.fileKey, node.guid!)
@@ -377,7 +378,7 @@ const SidebarItem = React.forwardRef<
 
 SidebarItem.displayName = "SidebarItem";
 
-function Schema({ schema, header }: { schema: any; header: Header }) {
+function Schema({ schema, header }: { schema: KiwiSchema; header: Header }) {
   return (
     <Card>
       <CardHeader>
@@ -430,13 +431,12 @@ function NodeContent({
   href,
 }: {
   node: NodeChange;
-  schema: any;
+  schema: KiwiSchema;
   href?: string;
 }) {
   const compiledSchema: CompiledSchema = useMemo(() => {
     // Schema is raw definitions from fig-kiwi, compile it
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return compileSchema(schema as any) as CompiledSchema;
+    return compileSchema(schema) as CompiledSchema;
   }, [schema]);
   const data = useMemo(() => {
     if (!node.guid) return;
@@ -516,7 +516,7 @@ function hex(bytes: Uint8Array, pad?: string): string {
   return hex;
 }
 
-function replacerForHex(_key: string, value: any) {
+function replacerForHex(_key: string, value: unknown) {
   if (value instanceof Uint8Array) {
     if (value.length === 20) return `sha1(${hex(value)})`;
     if (value.length === 32) return `sha256(${hex(value)})`;

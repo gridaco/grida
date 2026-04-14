@@ -203,7 +203,9 @@ export async function POST(
  * Since, user can make a mistake with the configuration, we return only include `metadata` field by default, and other are not included.
  */
 type ScopedCustomerData = {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic customer data from DB
   [key: string]: any;
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- JSON column from DB
   metadata: any;
 };
 

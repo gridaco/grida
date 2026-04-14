@@ -75,6 +75,7 @@ export function TagFormDialog({
   };
 
   const form = useForm<TagFormValues>({
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- zodResolver type mismatch with react-hook-form
     resolver: zodResolver(tagFormSchema) as any,
     defaultValues,
   });

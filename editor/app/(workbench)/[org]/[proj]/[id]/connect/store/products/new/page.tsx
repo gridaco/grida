@@ -308,6 +308,7 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
   ) => {
     if (e.key === "Enter" && !hasDraftValue) {
       const newValues = [...values, { __draft: true }];
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- draft value shape mismatch
       setValues(newValues as any);
       setLastAddedDraft(true);
     }

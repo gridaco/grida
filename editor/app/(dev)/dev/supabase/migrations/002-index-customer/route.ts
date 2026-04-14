@@ -24,6 +24,7 @@ export async function POST() {
 
       const { email_provisional, phone_provisional } =
         // FIXME: no any
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- migration script
         process_response_provisional_info(responses as any);
 
       // update customer

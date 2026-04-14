@@ -13,6 +13,7 @@ export async function sbconn_insert({
   data,
   connection,
 }: {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic form data record
   data: Record<string, any>;
   connection: SchemaTableConnectionXSupabaseMainTableJoint;
 }) {
@@ -31,6 +32,7 @@ export async function sbconn_insert({
   const connection_table: GridaXSupabase.SupabaseTable | undefined =
     supabase_project!.tables.find(
       (t) => t.id === connection.main_supabase_table_id
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK type mismatch
     ) as any;
 
   if (!connection_table) {
@@ -66,7 +68,9 @@ export async function sbconn_update(
     NEW,
     pks,
   }: {
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic record from Supabase
     OLD: Record<string, any>;
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic record from Supabase
     NEW: Record<string, any>;
     pks: string[];
   },
@@ -87,6 +91,7 @@ export async function sbconn_update(
   const connection_table: GridaXSupabase.SupabaseTable | undefined =
     supabase_project!.tables.find(
       (t) => t.id === connection.main_supabase_table_id
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK type mismatch
     ) as any;
 
   if (!connection_table) {
@@ -108,6 +113,7 @@ export async function sbconn_update(
 }
 
 function asTableRowData(
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic form data record
   data: Record<string, any>,
   {
     schema,
@@ -118,9 +124,11 @@ function asTableRowData(
   //
 
   // data contains only recognized keys
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic row data
   const row: { [key: string]: any } = {};
 
   Object.keys(schema.properties).forEach((key) => {
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic parsed value
     let parsedvalue: any;
 
     const { scalar_format: format, array } =
@@ -178,14 +186,14 @@ function asTableRowData(
 
           if (
             typeof value === "undefined" &&
-            Object.keys(constructedjson).length === 0
+            Object.keys(constructedjson as object).length === 0
           ) {
             // if the value is undefined and the constructed json is empty, we use undefined
             parsedvalue = undefined;
             break;
           }
 
-          parsedvalue = constructedjson as any;
+          parsedvalue = constructedjson;
           break;
         }
         parsedvalue = value || undefined;
@@ -209,7 +217,7 @@ function asTableRowData(
   return row;
 }
 
-function toArray(value: any) {
+function toArray(value: unknown) {
   if (Array.isArray(value)) {
     return value;
   }

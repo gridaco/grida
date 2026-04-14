@@ -127,6 +127,7 @@ export async function POST(
     const { count, error } = await ciamClient
       .from("customer_with_tags")
       .insert(
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK view insert type mismatch
         data! satisfies Platform.Customer.CustomerInsertionWithTags[] as any,
         {
           count: "exact",

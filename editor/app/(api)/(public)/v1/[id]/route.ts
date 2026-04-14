@@ -152,9 +152,9 @@ export async function GET(
   let system_keys: GFKeys = {};
   try {
     system_keys = parseGFKeys(searchParams);
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("error while parsing system keys:", e);
-    response.error = e;
+    response.error = e as FormClientFetchResponseError;
   }
 
   // TODO: strict with permissions
@@ -546,7 +546,7 @@ export async function GET(
   return NextResponse.json(response);
 }
 
-function merge<A = any, B = any>(a: A, b: B): A & B {
+function merge<A = unknown, B = unknown>(a: A, b: B): A & B {
   return { ...a, ...b };
 }
 

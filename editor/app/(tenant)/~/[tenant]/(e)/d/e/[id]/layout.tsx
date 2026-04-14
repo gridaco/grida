@@ -107,7 +107,8 @@ export default async function Layout({
     ? CustomCSS.vanilla(stylesheet?.custom)
     : undefined;
   const palettecss = stylesheet?.palette
-    ? stringfyThemeVariables(palettes[stylesheet.palette] as any)
+    ? // oxlint-disable-next-line typescript-eslint/no-explicit-any -- palette key dynamic lookup
+      stringfyThemeVariables(palettes[stylesheet.palette] as any)
     : undefined;
   const appearance = stylesheet?.appearance || "system";
 

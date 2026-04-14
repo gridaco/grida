@@ -51,14 +51,19 @@ export async function POST(
   const _provisionals = response.response_fields.reduce(
     (info, field) => {
       const fieldType = field.form_field!.type;
-      const value = (response.raw as any)[field.form_field!.name];
+      const value = (response.raw as Record<string, unknown>)?.[
+        field.form_field!.name
+      ];
 
       if (fieldType === "email") {
-        if (validator.isEmail(value)) {
+        if (typeof value === "string" && validator.isEmail(value)) {
           info.provisional_email.push(value);
         }
       } else if (fieldType === "tel") {
-        if (validator.isMobilePhone(value, "any")) {
+        if (
+          typeof value === "string" &&
+          validator.isMobilePhone(value, "any")
+        ) {
           info.provisional_phone.push(value);
         }
       }
@@ -87,6 +92,7 @@ export async function POST(
 
   const { email_provisional, phone_provisional } =
     // FIXME: no any
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK response type mismatch
     process_response_provisional_info([response as any]);
 
   const { error } = await service_role.workspace

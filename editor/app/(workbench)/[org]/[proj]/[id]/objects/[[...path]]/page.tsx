@@ -712,6 +712,7 @@ function UploadsModal() {
       <CollapsibleContent className="min-h-96 border-t">
         <Tabs
           value={tab}
+          // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Tabs component type mismatch
           onValueChange={setTab as any}
           className="w-full h-full p-4"
         >

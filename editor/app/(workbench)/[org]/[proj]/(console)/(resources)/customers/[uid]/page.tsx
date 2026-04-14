@@ -122,10 +122,15 @@ function useCustomer(project_id: number, uid: string) {
     [uid, supabase]
   );
 
-  const _update_metadata = async (metadata: any) => {
+  const _update_metadata = async (metadata: Record<string, unknown> | null) => {
     const { error } = await supabase
       .from("customer")
-      .update({ metadata })
+      .update({
+        metadata: metadata as unknown as Record<
+          string,
+          string | number | boolean
+        >,
+      })
       .eq("uid", uid)
       .select("*")
       .single();
@@ -288,7 +293,9 @@ export default function CustomerDetailPage(props0: {
     return success;
   };
 
-  const onUpdateCustomerMetadata = async (metadata: any) => {
+  const onUpdateCustomerMetadata = async (
+    metadata: Record<string, unknown> | null
+  ) => {
     const success = await actions.update_metadata(metadata);
     mutate(key);
     if (success) {
@@ -744,7 +751,7 @@ export default function CustomerDetailPage(props0: {
             </div>
             {customer.metadata ? (
               <KVTable
-                data={customer.metadata}
+                data={customer.metadata as Record<string, unknown>}
                 className="max-h-[300px] overflow-auto"
               />
             ) : (
@@ -765,7 +772,7 @@ function KVTable({
   data,
   className,
 }: {
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   className?: string;
 }) {
   return (
@@ -794,7 +801,7 @@ function MetadataEditDialog({
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   defaultValue: unknown;
-  onSave: (data: Record<string, any> | null) => Promise<boolean>;
+  onSave: (data: Record<string, unknown> | null) => Promise<boolean>;
 }) {
   const [edit, setEdit] = useState<string | null | undefined>(null);
 

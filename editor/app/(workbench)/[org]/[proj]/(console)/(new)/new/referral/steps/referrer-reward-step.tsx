@@ -6,10 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Users } from "lucide-react";
+import { Platform } from "@/lib/platform";
+
+type MilestoneReward =
+  Platform.WEST.Referral.Wizard.CampaignData["referrer_milestone_rewards"][number];
 
 interface ReferrerRewardStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Platform.WEST.Referral.Wizard.CampaignData;
+  updateData: (
+    data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => void;
 }
 
 export function ReferrerRewardStep({
@@ -27,7 +33,11 @@ export function ReferrerRewardStep({
     });
   };
 
-  const updateMilestone = (index: number, field: string, value: any) => {
+  const updateMilestone = (
+    index: number,
+    field: string,
+    value: string | number
+  ) => {
     const updatedMilestones = [...data.referrer_milestone_rewards];
     updatedMilestones[index] = {
       ...updatedMilestones[index],
@@ -53,7 +63,7 @@ export function ReferrerRewardStep({
 
   const removeMilestone = (index: number) => {
     const updatedMilestones = data.referrer_milestone_rewards.filter(
-      (_: any, i: number) => i !== index
+      (_: unknown, i: number) => i !== index
     );
     updateData({ referrer_milestone_rewards: updatedMilestones });
   };
@@ -144,7 +154,7 @@ export function ReferrerRewardStep({
 
           <div className="space-y-4">
             {data.referrer_milestone_rewards.map(
-              (milestone: any, index: number) => (
+              (milestone: MilestoneReward, index: number) => (
                 <div key={index} className="space-y-3 p-4 border rounded-md">
                   <div className="flex items-center justify-between">
                     <Label>Milestone {index + 1}</Label>

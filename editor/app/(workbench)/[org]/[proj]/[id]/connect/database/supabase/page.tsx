@@ -863,9 +863,9 @@ function DBSchemaSelect({
 }: {
   value: string;
   options: string[];
-  onTestConnection: (schema: string) => Promise<false | any>;
+  onTestConnection: (schema: string) => Promise<false | unknown>;
   onChange: (schema: string) => void;
-  onUse: (schema: string) => Promise<false | any>;
+  onUse: (schema: string) => Promise<false | unknown>;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -914,8 +914,8 @@ function NewCustomSchemaDialog({
   onTestConnection,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  onUse: (schema: string) => Promise<false | any>;
-  onTestConnection: (schema: string) => Promise<false | any>;
+  onUse: (schema: string) => Promise<false | unknown>;
+  onTestConnection: (schema: string) => Promise<false | unknown>;
 }) {
   const [isvalid, setIsValid] = useState(false);
   const [testing, setTesting] = useState(false);

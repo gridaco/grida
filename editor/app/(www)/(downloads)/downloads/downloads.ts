@@ -270,6 +270,7 @@ export namespace downloads {
         assert(assets.length === 1);
         return assets[0];
       } catch {
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- fallback for missing asset
         return null as any;
       }
     }

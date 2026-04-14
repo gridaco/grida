@@ -26,9 +26,14 @@ import {
 } from "lucide-react";
 import { Platform } from "@/lib/platform";
 
+type Challenge =
+  Platform.WEST.Referral.Wizard.CampaignData["challenges"][number];
+
 interface GoalsStepProps {
   data: Platform.WEST.Referral.Wizard.CampaignData;
-  updateData: (data: any) => void;
+  updateData: (
+    data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => void;
 }
 
 export function GoalsStep({ data, updateData }: GoalsStepProps) {
@@ -53,7 +58,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
   const addGoal = () => {
     const newIndex =
       data.challenges.length > 0
-        ? Math.max(...data.challenges.map((c: any) => c.index)) + 1
+        ? Math.max(...data.challenges.map((c: Challenge) => c.index)) + 1
         : 0;
 
     updateData({
@@ -71,12 +76,16 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
 
   const removeGoal = (index: number) => {
     const updatedGoals = data.challenges.filter(
-      (_: any, i: number) => i !== index
+      (_: unknown, i: number) => i !== index
     );
     updateData({ challenges: updatedGoals });
   };
 
-  const updateGoal = (index: number, field: string, value: any) => {
+  const updateGoal = (
+    index: number,
+    field: keyof Challenge,
+    value: Challenge[keyof Challenge]
+  ) => {
     const updatedGoals = [...data.challenges];
     updatedGoals[index] = {
       ...updatedGoals[index],
@@ -110,7 +119,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
       return "No goals defined yet. Add goals to create a conversion path for your invitees.";
     }
 
-    const goalNames = data.challenges.map((goal: any, index: number) => {
+    const goalNames = data.challenges.map((goal: Challenge, index: number) => {
       const trigger = data.triggers.find((t) => t.name === goal.trigger_name);
       return trigger ? trigger.name : `Goal ${index + 1}`;
     });
@@ -130,7 +139,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
     const updatedTriggers = data.triggers.filter((t) => t.name !== name);
 
     // Also update any goals that were using this trigger
-    const updatedGoals = data.challenges.map((goal: any) => {
+    const updatedGoals = data.challenges.map((goal: Challenge) => {
       if (goal.trigger_name === name) {
         return { ...goal, trigger_name: "" };
       }
@@ -364,7 +373,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                 </p>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  {data.challenges.map((goal: any, index: number) => {
+                  {data.challenges.map((goal: Challenge, index: number) => {
                     const trigger = data.triggers.find(
                       (t) => t.name === goal.trigger_name
                     );
@@ -394,7 +403,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {data.challenges.map((goal: any, index: number) => (
+                {data.challenges.map((goal: Challenge, index: number) => (
                   <div key={index} className="p-4 border rounded-md relative">
                     <Button
                       variant="ghost"
@@ -453,7 +462,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                                 </SelectItem>
                                 {data.challenges
                                   .slice(0, index)
-                                  .map((prevGoal: any, i: number) => (
+                                  .map((prevGoal: Challenge, i: number) => (
                                     <SelectItem
                                       key={i}
                                       value={prevGoal.index.toString()}
@@ -611,7 +620,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                 </p>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  {data.challenges.map((goal: any, index: number) => {
+                  {data.challenges.map((goal: Challenge, index: number) => {
                     const trigger = data.triggers.find(
                       (t) => t.name === goal.trigger_name
                     );
@@ -641,7 +650,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {data.challenges.map((goal: any, index: number) => (
+                {data.challenges.map((goal: Challenge, index: number) => (
                   <div key={index} className="p-4 border rounded-md relative">
                     <Button
                       variant="ghost"
@@ -700,7 +709,7 @@ export function GoalsStep({ data, updateData }: GoalsStepProps) {
                                 </SelectItem>
                                 {data.challenges
                                   .slice(0, index)
-                                  .map((prevGoal: any, i: number) => (
+                                  .map((prevGoal: Challenge, i: number) => (
                                     <SelectItem
                                       key={i}
                                       value={prevGoal.index.toString()}

@@ -55,6 +55,12 @@ interface EventTotal {
   total: number;
 }
 
+interface ChartBucket {
+  date: Date;
+  bucket: string;
+  [eventName: string]: Date | string | number;
+}
+
 function generateChartConfig(data: AnalyzedData) {
   if (!data.events.length) return {};
 
@@ -68,7 +74,7 @@ function generateChartConfig(data: AnalyzedData) {
     "var(--chart-4)",
   ];
 
-  const config: Record<string, any> = {};
+  const config: Record<string, { label: string; color: string }> = {};
 
   eventNames.forEach((name, index) => {
     config[name] = {
@@ -229,7 +235,7 @@ export default function Overview() {
 }
 
 function MainChart({ data }: { data: AnalyzedData }) {
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<Array<ChartBucket>>([]);
 
   function processData(data: AnalyzedData) {
     if (!data.events.length) return;
@@ -258,13 +264,13 @@ function MainChart({ data }: { data: AnalyzedData }) {
 
         return acc;
       },
-      {} as Record<string, any>
+      {} as Record<string, ChartBucket>
     );
 
     data.events.forEach((event) => {
       const iso = new Date(event.bucket).toISOString();
       if (!buckets[iso]) return;
-      buckets[iso][event.name] += event.count;
+      (buckets[iso][event.name] as number) += event.count;
     });
 
     const chartData = Object.values(buckets).sort(

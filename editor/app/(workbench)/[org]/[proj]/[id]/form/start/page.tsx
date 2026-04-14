@@ -32,6 +32,7 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
+import type { FileIO } from "@/lib/file";
 import {
   CMSImageAssetField,
   CMSRichText,
@@ -41,6 +42,7 @@ import { SandboxWrapper } from "@/scaffolds/form-templates/sandbox";
 import { BrowseStartPageTemplatesDialog } from "@/scaffolds/form-templates/startpage-templates-dialog";
 import { ErrorBoundary } from "react-error-boundary";
 import grida from "@grida/schema";
+import type { tokens } from "@grida/tokens";
 import {
   Collapsible,
   CollapsibleContent,
@@ -353,8 +355,11 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               {keys.map((key) => {
                 const def = rootProperties[key];
 
-                const change = (value: any) => {
-                  changeRootProps(key, value);
+                const change = (value: grida.program.schema.Value) => {
+                  changeRootProps(
+                    key,
+                    value as tokens.StringValueExpression | undefined
+                  );
                 };
 
                 const value = rootProps[key];
@@ -409,8 +414,8 @@ function PropertyField({
   onValueChange,
 }: {
   definition: grida.program.schema.PropertyDefinition;
-  value: any;
-  onValueChange: (value: any) => void;
+  value: grida.program.schema.Value | undefined;
+  onValueChange: (value: grida.program.schema.Value) => void;
   name: string;
 }) {
   const { uploadPublic } = useDocumentAssetUpload();
@@ -419,7 +424,7 @@ function PropertyField({
     case "richtext": {
       return (
         <CMSRichText
-          value={value}
+          value={value as string}
           uploader={uploadPublic}
           onValueChange={onValueChange}
           placeholder={"Enter text here"}
@@ -432,7 +437,7 @@ function PropertyField({
       return (
         <Input
           // TODO: support tokens
-          value={value}
+          value={value as string}
           onChange={(e) => {
             onValueChange(e.target.value);
           }}
@@ -445,11 +450,11 @@ function PropertyField({
         <CMSImageAssetField
           uploader={uploadPublic}
           // TODO: currently, video and image fields accepts array value
-          value={value as any}
+          value={value as FileIO.GridaAsset[] | undefined}
           // TODO: currently, video and image fields accepts array value
           onValueChange={(assets) => {
             // FIXME: match signature
-            onValueChange(assets);
+            onValueChange(assets as unknown as grida.program.schema.Value);
           }}
         />
       );
@@ -458,11 +463,11 @@ function PropertyField({
         <CMSVideoAssetField
           uploader={uploadPublic}
           // TODO: currently, video and image fields accepts array value
-          value={value as any}
+          value={value as FileIO.GridaAsset[] | undefined}
           // TODO: currently, video and image fields accepts array value
           onValueChange={(asset) => {
             // FIXME: match signature
-            onValueChange(asset);
+            onValueChange(asset as unknown as grida.program.schema.Value);
           }}
         />
       );
@@ -498,9 +503,9 @@ function PropertyField({
                 type: t,
               } as grida.program.schema.PropertyDefinition
             }
-            value={value?.[0]}
+            value={(value as grida.program.schema.Value[] | undefined)?.[0]}
             onValueChange={(v) => {
-              onValueChange([v]);
+              onValueChange([v] as unknown as grida.program.schema.Value);
             }}
           />
         );

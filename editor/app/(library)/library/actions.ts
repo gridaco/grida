@@ -119,7 +119,7 @@ export async function _similar(
   options: { range: [number, number] } = { range: [0, PAGE - 1] }
 ): Promise<{
   data: Library.ObjectDetail[] | null;
-  error: any | null;
+  error: unknown;
 }> {
   const client = await createLibraryClient();
   const { data, error } = await client
