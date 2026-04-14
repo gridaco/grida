@@ -277,12 +277,14 @@ const SlideRow = React.forwardRef<
         style={{ aspectRatio }}
       >
         {thumbnailSrc && (
-          <img
-            src={thumbnailSrc}
-            alt={`Slide ${index + 1}`}
-            className="absolute inset-0 w-full h-full object-contain"
-            draggable={false}
-          />
+          <picture>
+            <img
+              src={thumbnailSrc}
+              alt={`Slide ${index + 1}`}
+              className="absolute inset-0 w-full h-full object-contain"
+              draggable={false}
+            />
+          </picture>
         )}
       </div>
     </div>
