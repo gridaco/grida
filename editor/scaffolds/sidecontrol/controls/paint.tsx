@@ -81,7 +81,7 @@ function getNextPaintForType(
   const opacity = current
     ? current.type === "solid"
       ? current.color.a
-      : (current as any).opacity || 1
+      : current.opacity || 1
     : 1;
 
   switch (current?.type) {
@@ -242,7 +242,7 @@ export function PaintControl({
       <ComputedPaintControl
         value={value as ComputedPaint}
         onValueChange={onValueChange}
-        onValueAdd={onValueAdd as any}
+        onValueAdd={onValueAdd}
         onOpenChange={onOpenChange}
         selectedGradientStop={selectedGradientStop}
         onSelectedGradientStopChange={onSelectedGradientStopChange}
@@ -335,7 +335,7 @@ function TokenizedPaintControl({
     <Popover modal={false} onOpenChange={onOpenChange}>
       <PopoverTrigger>
         <PaintInputContainer>
-          <PaintChip paint={computed.value as any as ComputedPaint} />
+          <PaintChip paint={computed.value as unknown as ComputedPaint} />
           <span className="text-xs text-muted-foreground ms-2">
             {factory.strfy.stringValueExpression(
               identifier as tokens.PropertyAccessExpression
@@ -708,7 +708,7 @@ function PaintPopoverContent({
             ? "gradient"
             : value?.type
         }
-        onValueChange={onTypeChange as any}
+        onValueChange={onTypeChange as (value: string) => void}
       >
         <PaintTabsHeader value={value} onValueChange={onValueChange} />
         <PaintTabsContent
@@ -757,7 +757,7 @@ function PaintTabsHeader({
               onValueChange?.({
                 ...value,
                 blend_mode,
-              } as any);
+              } as ComputedPaint);
             }
           }}
         />
@@ -872,7 +872,7 @@ function GradientControls({
             onValueChange?.({
               ...value,
               type: gradientType,
-            } as any);
+            } as cg.GradientPaint);
           }}
           className="w-24"
         />
@@ -904,7 +904,7 @@ function GradientActions({
       <Button
         onClick={() => {
           const flippedStops = value.stops
-            .map((stop: any, _index: number) => ({
+            .map((stop: cg.GradientStop, _index: number) => ({
               ...stop,
               offset: 1 - stop.offset,
             }))

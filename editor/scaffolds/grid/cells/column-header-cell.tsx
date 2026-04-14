@@ -37,7 +37,7 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
     readonly,
     onEditClick,
     onDeleteClick,
-  }: RenderHeaderCellProps<any> & {
+  }: RenderHeaderCellProps<unknown> & {
     type: FormInputType;
     pk: boolean;
     fk:

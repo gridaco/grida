@@ -49,7 +49,7 @@ export const CreateNewAttributeColumn: Column<DGResponseRow> = {
 
 function NewFieldHeaderCell({
   onClick,
-}: RenderHeaderCellProps<any> & {
+}: RenderHeaderCellProps<DGResponseRow> & {
   onClick?: () => void;
 }) {
   return (

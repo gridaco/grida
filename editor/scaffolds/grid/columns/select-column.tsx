@@ -17,18 +17,22 @@ type ExpandRowContextState<TRow> = {
   onExpandClick?: (row: TRow) => void;
 };
 
-const ExpandRowContext = React.createContext<ExpandRowContextState<any> | null>(
-  {
+const ExpandRowContext =
+  React.createContext<ExpandRowContextState<unknown> | null>({
     onExpandClick: () => {},
-  }
-);
+  });
 
 export function ExpandRowProvider<TRow>({
   onExpandClick,
   children,
 }: React.PropsWithChildren<ExpandRowContextState<TRow>>) {
   return (
-    <ExpandRowContext.Provider value={{ onExpandClick }}>
+    <ExpandRowContext.Provider
+      value={{
+        onExpandClick:
+          onExpandClick as ExpandRowContextState<unknown>["onExpandClick"],
+      }}
+    >
       {children}
     </ExpandRowContext.Provider>
   );
@@ -43,7 +47,7 @@ function stopPropagation(event: SyntheticEvent) {
   event.stopPropagation();
 }
 
-export const SelectColumn: CalculatedColumn<any, any> = {
+export const SelectColumn: CalculatedColumn<DGResponseRow, unknown> = {
   key: "__rdg__select",
   name: "",
   idx: 0,
@@ -52,7 +56,7 @@ export const SelectColumn: CalculatedColumn<any, any> = {
   resizable: false,
   sortable: false,
   frozen: true,
-  renderHeaderCell: (props: RenderHeaderCellProps<unknown>) => {
+  renderHeaderCell: (props: RenderHeaderCellProps<DGResponseRow>) => {
     const { column } = props;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();

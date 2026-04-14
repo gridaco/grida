@@ -82,7 +82,9 @@ export function RowEditPanel({
                   {row.meta.customer_id && (
                     <SectionResponseCustomerDetails response={row} />
                   )}
-                  <SectionResponseMetadataJson json={row.meta} />
+                  <SectionResponseMetadataJson
+                    json={row.meta as unknown as Record<string, unknown>}
+                  />
                 </>
               )}
               <EditRowForm
@@ -141,7 +143,9 @@ export function RowEditPanel({
                 {row.meta.customer_id && (
                   <SectionResponseCustomerDetails response={row} />
                 )}
-                <SectionResponseMetadataJson json={row.meta} />
+                <SectionResponseMetadataJson
+                  json={row.meta as unknown as Record<string, unknown>}
+                />
               </>
             )}
             <PanelPropertySection>
@@ -324,7 +328,11 @@ function SectionResponseCustomerDetails({
   );
 }
 
-function SectionResponseMetadataJson({ json }: { json: Record<string, any> }) {
+function SectionResponseMetadataJson({
+  json,
+}: {
+  json: Record<string, unknown>;
+}) {
   return (
     <PanelPropertySection>
       <PanelPropertySectionTitle>RAW</PanelPropertySectionTitle>

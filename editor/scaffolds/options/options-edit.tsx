@@ -25,6 +25,7 @@ import {
   closestCorners,
   useSensor,
   useSensors,
+  type DragEndEvent,
 } from "@dnd-kit/core";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
@@ -429,11 +430,13 @@ export function OptionsEdit({
     </DndContext>
   );
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      onSort?.(active.data.current.index, over.data.current.index);
+      const activeIndex = (active.data.current as { index: number }).index;
+      const overIndex = (over.data.current as { index: number }).index;
+      onSort?.(activeIndex, overIndex);
     }
   }
 }

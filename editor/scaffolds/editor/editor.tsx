@@ -189,12 +189,12 @@ function HostedGridaCanvasDocumentProvider({
 
   const save = useCallback(() => {
     setSaving(true);
-    const json = editor.getDocumentJson();
-    return saveHostedGridaCanvasDocument(document_id, json as any).finally(
-      () => {
-        setSaving(false);
-      }
-    );
+    const json = editor.getDocumentJson() as
+      | grida.program.document.Document
+      | undefined;
+    return saveHostedGridaCanvasDocument(document_id, json).finally(() => {
+      setSaving(false);
+    });
   }, [editor, document_id, setSaving]);
 
   const debouncedSave = useDebounceCallback(save, 1000);

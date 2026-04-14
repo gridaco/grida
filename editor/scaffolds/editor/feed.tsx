@@ -9,6 +9,7 @@ import type { GridaXSupabase } from "@/types";
 import type {
   FormResponse,
   FormResponseField,
+  FormResponseWithFields,
 } from "@/grida-forms-hosted/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
@@ -30,7 +31,7 @@ import type { Database } from "@app/database";
 
 type RealtimeTableChangeData = {
   id: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 const useDebouncedDatagridQuery = (): Data.Relation.QueryState | null => {
@@ -192,11 +193,14 @@ function useUpdateCell() {
   const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
-    async (id: string, payload: { value: any; option_id?: string | null }) => {
+    async (
+      id: string,
+      payload: { value: unknown; option_id?: string | null }
+    ) => {
       const { data, error } = await supabase
         .from("response_field")
         .update({
-          value: payload.value,
+          value: payload.value as string | number | boolean | null,
           form_field_option_id: payload.option_id,
           // TODO:
           // 'storage_object_paths': []
@@ -340,7 +344,7 @@ function useXSBUpdateRow({
   pk: string | undefined;
 }) {
   return useCallback(
-    async (key: number | string, value: Record<string, any>) => {
+    async (key: number | string, value: Record<string, unknown>) => {
       if (!sb_table_id) return;
       if (!pk) return;
 
@@ -392,7 +396,7 @@ function useResolveTransactions(
     onTransactionQueued,
   }: {
     operators: {
-      update: (key: string, data: Record<string, any>) => Promise<any>;
+      update: (key: string, data: Record<string, unknown>) => Promise<unknown>;
     };
     onTransactionFinally?: (digest: string) => void;
     onTransactionQueued?: (digest: string) => void;
@@ -471,7 +475,7 @@ export function FormResponseFeedProvider({
           table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
           type: "editor/table/space/feed",
           count: count ?? 0,
-          data: data as any,
+          data: data as unknown as FormResponseWithFields[],
           reset: true,
         });
       })
@@ -498,7 +502,7 @@ export function FormResponseFeedProvider({
             dispatch({
               table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
               type: "editor/table/space/feed",
-              data: [data as any],
+              data: [data as unknown as FormResponseWithFields],
             });
           }
         );
@@ -515,7 +519,7 @@ export function FormResponseFeedProvider({
         dispatch({
           table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
           type: "editor/table/space/feed",
-          data: [data as any],
+          data: [data as unknown as FormResponseWithFields],
         });
       });
     },
@@ -575,7 +579,7 @@ export function FormResponseSessionFeedProvider({
       .then(({ data, count }) => {
         dispatch({
           type: "editor/table/space/feed/sessions",
-          data: data as any,
+          data: data as unknown as FormResponse[],
           reset: true,
           count: count!,
         });
@@ -603,13 +607,13 @@ export function FormResponseSessionFeedProvider({
     onInsert: (data) => {
       dispatch({
         type: "editor/table/space/feed/sessions",
-        data: [data as any],
+        data: [data as unknown as FormResponse],
       });
     },
     onUpdate: (data) => {
       dispatch({
         type: "editor/table/space/feed/sessions",
-        data: [data as any],
+        data: [data as unknown as FormResponse],
       });
     },
     onDelete: (_data) => {
@@ -800,7 +804,7 @@ export function GridaSchemaTableFeedProvider({
         dispatch({
           type: "editor/table/space/feed",
           table_id: table_id,
-          data: data as any,
+          data: data as unknown as FormResponseWithFields[],
           reset: true,
           count: count!,
         });
@@ -826,7 +830,7 @@ export function GridaSchemaTableFeedProvider({
             dispatch({
               table_id: table_id,
               type: "editor/table/space/feed",
-              data: [data as any],
+              data: [data as unknown as FormResponseWithFields],
             });
           }
         );
@@ -843,7 +847,7 @@ export function GridaSchemaTableFeedProvider({
         dispatch({
           table_id: table_id,
           type: "editor/table/space/feed",
-          data: [data as any],
+          data: [data as unknown as FormResponseWithFields],
         });
       });
     },

@@ -108,13 +108,14 @@ function columnFromData(col: ColumnData) {
     frozen: false,
     width: col.width,
     renderHeaderCell: HeaderCell,
-    renderCell: ({ row, column: _column }: RenderCellProps<any>) => {
+    renderCell: ({ row, column: _column }: RenderCellProps<XSBUserRow>) => {
       const masker = useMasking();
 
       const val = row[col.key as keyof XSBUserRow];
 
+      const valStr = String(val ?? "");
       const formatted =
-        col.format === "timestamp" ? new Date(val).toLocaleString() : val;
+        col.format === "timestamp" ? new Date(valStr).toLocaleString() : valStr;
 
       const { highlightTokens } = useDataGridState();
 
@@ -225,7 +226,7 @@ export function XSBAuthUsersGrid({
   );
 }
 
-function HeaderCell({ column }: RenderHeaderCellProps<any>) {
+function HeaderCell({ column }: RenderHeaderCellProps<XSBUserRow>) {
   const { name, key } = column;
 
   return (

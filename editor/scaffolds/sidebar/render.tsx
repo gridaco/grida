@@ -53,7 +53,7 @@ export function renderMenuGroup<T extends TMenuData>(
               return <hr key={i} />;
             }
             return (
-              <SidebarMenuItem key={item.id.toString()}>
+              <SidebarMenuItem key={String(item.id)}>
                 {renderMenuItem ? (
                   renderMenuItem({ item, onSelect: () => onSelect?.(item) })
                 ) : (

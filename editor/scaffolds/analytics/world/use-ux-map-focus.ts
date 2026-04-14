@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef } from "react";
 import type { MapRef } from "react-map-gl";
 import type { PaddingOptions } from "mapbox-gl";
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- generic callback constraint requires any[] for Parameters<T> to work
 function useThrottledWithInitialTrigger<T extends (...args: any[]) => void>(
   callback: T,
   interval: number

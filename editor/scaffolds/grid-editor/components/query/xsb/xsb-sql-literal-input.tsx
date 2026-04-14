@@ -3,6 +3,8 @@
 import React from "react";
 import { XSBSQLForeignKeySearchInput } from "./xsb-sql-fk-search-input";
 import { SQLLiteralInput } from "../sql-literal-input";
+import type { SQLLiteralInputValue } from "../types";
+import type { Data } from "@/lib/data";
 
 export function XSBSQLLiteralInput({
   value,
@@ -23,9 +25,9 @@ export function XSBSQLLiteralInput({
       relation,
       className,
     }: {
-      value: any;
-      onValueChange: (value: any) => void;
-      relation: any;
+      value: SQLLiteralInputValue;
+      onValueChange: (value: SQLLiteralInputValue) => void;
+      relation: Data.Relation.NonCompositeRelationship;
       className?: string;
     }) {
       return (

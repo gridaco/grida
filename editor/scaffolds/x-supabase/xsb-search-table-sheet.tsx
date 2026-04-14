@@ -87,7 +87,9 @@ export function XSBSearchTableSheet({
                 supabase_schema_name={supabase_schema_name}
                 supabase_table_name={relation.referenced_table}
                 onRowDoubleClick={(row) => {
-                  onValueChange?.(row[relation.referenced_column]);
+                  onValueChange?.(
+                    row[relation.referenced_column] as SQLForeignKeyValue
+                  );
                   props.onOpenChange?.(false);
                 }}
               />

@@ -211,7 +211,7 @@ function PropertyDefinitionBlock({
                 onDefinitionChange?.({
                   ...definition,
                   type: v,
-                  default: (initial_values as any)[v],
+                  default: (initial_values as Record<string, unknown>)[v],
                 } as grida.program.schema.PropertyDefinition);
               }}
               enum={["string", "number", "boolean", "image", "rgbaf"]}
@@ -363,6 +363,7 @@ function PropertyDefinitionValueInput<T = unknown>({
     case "rgbaf":
       return (
         <RGBA32FColorControl
+          // oxlint-disable-next-line typescript-eslint/no-explicit-any -- color value type cast
           value={value as unknown as any}
           onValueChange={(v) => onValueChange(v as unknown as T)}
         />

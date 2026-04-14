@@ -545,7 +545,7 @@ function DataChart({
   className,
 }: {
   type: DataChartRendererType;
-  data: Array<any>;
+  data: Array<Record<string, unknown>>;
   dataKey: string;
   defs: DataGroupDef;
   curve?: DataChartCurveType;
@@ -753,7 +753,7 @@ function DataChart({
 //   { group: "June", value: 287, fill: "#e76e50" },
 // ];
 
-function transformdata_pie<T = any>(
+function transformdata_pie<T = unknown>(
   data: Array<T>,
   {
     defs,

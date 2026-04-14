@@ -136,7 +136,7 @@ export function JsonPopupEditorCell({
 }
 
 function safeStringifyJson(
-  json: any,
+  json: unknown,
   replacer?: (number | string)[] | null,
   space?: string | number
 ) {

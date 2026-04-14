@@ -84,7 +84,7 @@ function SelectedFormBlockProperties() {
 
   const _v_hidden_set = !!block?.v_hidden;
 
-  const onSave = (e: any) => {
+  const onSave = (e: React.MouseEvent) => {
     const [l, op, r] = condition_v_hidden || [];
 
     if (!l || !op || !r) {

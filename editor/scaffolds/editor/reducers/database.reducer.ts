@@ -87,7 +87,7 @@ export default function databaseRecucer(
               ];
 
             space.stream = space.stream?.filter(
-              (row) => !state.datagrid_selected_rows.has(row[pk])
+              (row) => !state.datagrid_selected_rows.has(row[pk] as string)
             );
 
             break;
@@ -107,7 +107,7 @@ export default function databaseRecucer(
               assert(space, "Table space not found");
 
               space.stream = space.stream?.filter(
-                (response) => !ids.includes(response.id)
+                (response) => !ids.includes((response as { id: string }).id)
               );
             } else {
               throw new Error(
@@ -129,7 +129,9 @@ export default function databaseRecucer(
           return;
         }
 
-        space.stream = space.stream?.filter((row) => row.id !== id);
+        space.stream = space.stream?.filter(
+          (row) => (row as { id: string }).id !== id
+        );
 
         // also remove from selected_responses
         const new_selected_responses = new Set(state.datagrid_selected_rows);
@@ -176,17 +178,26 @@ export default function databaseRecucer(
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
         // { [id] : row}
-        const existing_rows_id_map = space.stream?.reduce((acc: any, row) => {
-          acc[row.id] = row;
-          return acc;
-        }, {});
+        const existing_rows_id_map =
+          space.stream?.reduce((acc: Record<string, unknown>, row) => {
+            acc[row.id] = row;
+            return acc;
+          }, {}) ?? {};
 
         let cnt_added = 0;
 
         virtualized.forEach((newRow) => {
-          if (existing_rows_id_map.hasOwnProperty(newRow.id)) {
+          if (
+            Object.prototype.hasOwnProperty.call(
+              existing_rows_id_map,
+              newRow.id
+            )
+          ) {
             // Update existing response
-            Object.assign((existing_rows_id_map as any)[newRow.id], newRow);
+            Object.assign(
+              existing_rows_id_map[newRow.id] as Record<string, unknown>,
+              newRow
+            );
           } else {
             // Add new response if id does not exist
             space.stream?.push(newRow);
@@ -234,7 +245,7 @@ export default function databaseRecucer(
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
         const existingSessionsById = session_space.stream.reduce(
-          (acc: any, session) => {
+          (acc: Record<string, unknown>, session) => {
             acc[session.id] = session;
             return acc;
           },
@@ -244,10 +255,15 @@ export default function databaseRecucer(
         let cnt_added = 0;
 
         data.forEach((newSession) => {
-          if (existingSessionsById.hasOwnProperty(newSession.id)) {
+          if (
+            Object.prototype.hasOwnProperty.call(
+              existingSessionsById,
+              newSession.id
+            )
+          ) {
             // Update existing response
             Object.assign(
-              (existingSessionsById as any)[newSession.id],
+              existingSessionsById[newSession.id] as Record<string, unknown>,
               newSession
             );
           } else {
@@ -533,7 +549,7 @@ function update_xsbtablespace(
     // const { column } = FlatPostgREST.decodePath(attribute.name);
 
     const newrow = FlatPostgREST.update(
-      row,
+      row as Record<string, Record<string, unknown>>,
       attribute.name,
       value
     ) as GridaXSupabase.XDataRow;
@@ -641,11 +657,11 @@ function has_waiting_block_for_new_field(draft: Draft<EditorState>) {
 }
 
 function rowdiff(
-  prevRow: Record<string, any>,
-  newRow: Record<string, any>,
+  prevRow: Record<string, unknown>,
+  newRow: Record<string, unknown>,
   ignoreKey?: (key: string) => boolean
 ) {
-  const changedFields: Record<string, any> = {};
+  const changedFields: Record<string, unknown> = {};
   for (const key in newRow) {
     if (ignoreKey && ignoreKey(key)) {
       continue;

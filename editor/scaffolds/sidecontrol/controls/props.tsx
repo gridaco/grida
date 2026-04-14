@@ -17,7 +17,7 @@ export function PropsControl({
 }: {
   properties: grida.program.schema.Properties;
   props: grida.program.schema.Props;
-  onValueChange: (key: string, value: any) => void;
+  onValueChange: (key: string, value: unknown) => void;
 }) {
   return (
     <>

@@ -6,7 +6,13 @@ import React, {
 } from "react";
 import { cn } from "@/components/lib/utils";
 
-const MentionList = forwardRef(function MentionList(props: any, ref) {
+const MentionList = forwardRef(function MentionList(
+  props: {
+    items: { id: string; label: string }[];
+    command: (item: { id: string; label: string }) => void;
+  },
+  ref
+) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const selectItem = (index: number) => {
@@ -14,7 +20,7 @@ const MentionList = forwardRef(function MentionList(props: any, ref) {
 
     if (item) {
       console.log("item", item);
-      props.command({ id: item });
+      props.command(item);
     }
   };
 
@@ -61,7 +67,7 @@ const MentionList = forwardRef(function MentionList(props: any, ref) {
   return (
     <div className="relative bg-background shadow-sm rounded-sm overflow-hidden p-1">
       {props.items.length ? (
-        props.items.map((item: any, index: number) => (
+        props.items.map((item, index: number) => (
           <button
             className={cn(
               "bg-transparent rounded-xs m-0 py-1 px-2 text-left w-full",
@@ -70,7 +76,7 @@ const MentionList = forwardRef(function MentionList(props: any, ref) {
             key={index}
             onClick={() => selectItem(index)}
           >
-            {item}
+            {item.label}
           </button>
         ))
       ) : (

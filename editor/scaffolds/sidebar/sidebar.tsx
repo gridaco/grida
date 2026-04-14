@@ -33,7 +33,7 @@ export function EditorSidebar() {
   const onSidebarModeChange = (mode: string) => {
     dispatch({
       type: "editor/sidebar/mode",
-      mode: mode as any,
+      mode: mode as "project" | "build" | "data" | "connect",
     });
   };
 

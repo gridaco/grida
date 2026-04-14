@@ -16,6 +16,7 @@ interface AboutVariable {
 }
 
 function flattenSchema(
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic Zod schema shape
   schema: any,
   parentKey = "",
   result: AboutVariable[] = []

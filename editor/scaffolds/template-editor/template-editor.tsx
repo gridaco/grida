@@ -59,7 +59,9 @@ export function TemplateEditor({
   context?: Partial<TemplateVariables.FormResponseContext>;
   defaultTemplateId?: string;
   defaultTexts?: Record<string, string>;
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic component props
   getComponent: (template_id: string) => React.ComponentType<any>;
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic Zod schema
   getPropTypes: (template_id: string) => z.ZodObject<any>;
   lang?: string;
   t?: i18n["t"];

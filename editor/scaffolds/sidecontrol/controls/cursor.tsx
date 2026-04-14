@@ -23,7 +23,10 @@ export function CursorControl({
   onValueChange?: (value: MouseCursor) => void;
 }) {
   const mixed = value === grida.mixed;
-  const cursor = (cursors as any)[value ?? "default"] || cursors["default"];
+  const cursorKey = mixed ? "default" : (value ?? "default");
+  const cursor =
+    (cursors as Record<string, { src: string; label: string }>)[cursorKey] ||
+    cursors["default"];
 
   return (
     <Select value={mixed ? undefined : value} onValueChange={onValueChange}>

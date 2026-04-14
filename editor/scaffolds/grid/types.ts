@@ -78,7 +78,7 @@ export type DGColumn = {
 
 export type GFResponseFieldData = {
   type?: FormInputType;
-  value: any;
+  value: unknown;
   readonly: boolean;
   multiple: boolean;
   option_id?: string | null;
@@ -94,7 +94,7 @@ export type DGResponseRow = {
   __gf_created_at?: string;
   __gf_customer_id?: string | null;
   fields: Record<string, GFResponseFieldData>;
-  raw: Record<string, any> | null;
+  raw: Record<string, unknown> | null;
 };
 
 export type DGCustomerRow = {

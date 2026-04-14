@@ -159,7 +159,7 @@ function NumericBinaryExpressionNode() {
   );
 }
 
-function PropertyNode({ data: _data }: any) {
+function PropertyNode({ data: _data }: { data: unknown }) {
   return (
     <div className="px-4 py-2 shadow-md rounded-md border">
       <div>

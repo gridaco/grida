@@ -71,7 +71,9 @@ export function XSBListUsersSheet({
               <XSBSearchTableDataGrid
                 supabase_project_id={supabase_project_id}
                 onRowDoubleClick={(row) => {
-                  onValueChange?.(row[relation.referenced_column]);
+                  onValueChange?.(
+                    row[relation.referenced_column] as SQLForeignKeyValue
+                  );
                   props.onOpenChange?.(false);
                 }}
               />

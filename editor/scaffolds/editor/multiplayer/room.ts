@@ -52,7 +52,7 @@ export function useMultiplayerRoom({
   const [broadcast, setBroadcast] = useState<
     | ((
         event: "LOCATION" | "POS" | "MESSAGE" | "NODE" | "NOTIFY",
-        payload: any
+        payload: object | undefined
       ) => void)
     | undefined
   >();
@@ -152,13 +152,13 @@ export function useMultiplayerRoom({
     );
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        setBroadcast(() => (event: string, payload: any) => {
+        setBroadcast(() => (event: string, payload: object | undefined) => {
           ch.send({
             type: "broadcast",
             event: event,
             payload: {
               cursor_id: cursor_id,
-              ...payload,
+              ...(payload as Record<string, unknown>),
             },
           });
         });

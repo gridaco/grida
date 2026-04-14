@@ -1,4 +1,4 @@
-export function serialize<T extends Record<string, any>>(
+export function serialize<T extends Record<string, unknown>>(
   data: Array<T>,
   {
     from,
@@ -26,8 +26,11 @@ export function serialize<T extends Record<string, any>>(
   // Step 2: Populate the map with actual data
   data.forEach((item) => {
     const dateValue = item[dateKey];
-    if (typeof dateValue === "string" || (dateValue as any) instanceof Date) {
-      const date = new Date(dateValue).toISOString();
+    if (
+      typeof dateValue === "string" ||
+      (dateValue as unknown) instanceof Date
+    ) {
+      const date = new Date(dateValue as string | Date).toISOString();
       const roundedDate = new Date(
         Math.floor(new Date(date).getTime() / intervalMs) * intervalMs
       ).toISOString();

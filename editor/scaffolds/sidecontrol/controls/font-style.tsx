@@ -84,7 +84,7 @@ export function FontStyleControl({
 
   return (
     <PropertyEnumV2
-      value={(preview.committedValue ?? value) as any}
+      value={(preview.committedValue ?? value) as string}
       placeholder={placeholderText(description)}
       enum={options}
       onOpenChange={(open) => {

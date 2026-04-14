@@ -11,6 +11,7 @@ type WWWLayout = {
   document_id: string;
   document_type: GDocumentType;
   id: string;
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase JSON column
   metadata: any;
   name: string;
   parent_layout_id: string | null;

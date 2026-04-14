@@ -492,7 +492,7 @@ export function CustomerGrid({
         frozen: col.frozen,
         width: col.width,
         renderHeaderCell: DataHeaderCell,
-        renderCell: ({ row }: RenderCellProps<any>) => {
+        renderCell: ({ row }: RenderCellProps<DGCustomerRow>) => {
           const val = row[col.key as keyof DGCustomerRow];
 
           if (col.type === "array") {
@@ -524,7 +524,7 @@ export function CustomerGrid({
             );
           }
         },
-      }) as Column<any>
+      }) as Column<DGCustomerRow>
   );
 
   // Custom header cell supporting indeterminate when estimatedCount is provided.
@@ -532,7 +532,7 @@ export function CustomerGrid({
     estimatedCount != null
       ? {
           ...SelectColumn,
-          renderHeaderCell: (props: RenderHeaderCellProps<unknown>) => {
+          renderHeaderCell: (props: RenderHeaderCellProps<DGCustomerRow>) => {
             const { column } = props;
             // eslint-disable-next-line react-hooks/rules-of-hooks
             const [, onRowSelectionChange] = useRowSelection();
@@ -574,7 +574,7 @@ export function CustomerGrid({
         }
       : SelectColumn;
 
-  columns.unshift(selectColumn);
+  columns.unshift(selectColumn as unknown as Column<DGCustomerRow>);
 
   const rows: DGCustomerRow[] = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
@@ -628,12 +628,15 @@ export function CustomerGrid({
   );
 }
 
-function DataHeaderCell({ column }: RenderHeaderCellProps<any>) {
+function DataHeaderCell({ column }: RenderHeaderCellProps<DGCustomerRow>) {
   const { name, key } = column;
 
   return (
     <CellRoot className="flex items-center gap-1.5">
-      <CustomerPropertyIcon property={key as any} className="size-3.5" />
+      <CustomerPropertyIcon
+        property={key as keyof DGCustomerRow}
+        className="size-3.5"
+      />
       <span className="font-normal">{name}</span>
     </CellRoot>
   );

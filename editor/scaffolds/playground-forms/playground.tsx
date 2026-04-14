@@ -101,7 +101,7 @@ export function Playground({
 
   // debugger
   const [logs, setLogs] = useState<
-    { id: string; data: any[]; method: "info" }[]
+    { id: string; data: unknown[]; method: "info" }[]
   >([]);
 
   const [formstate, setFormstate] = useState<FormAgentState>();
@@ -450,7 +450,7 @@ function transform(formstate: FormAgentState) {
       acc[key] = formstate.fields[key].value;
       return acc;
     },
-    {} as Record<string, any>
+    {} as Record<string, unknown>
   );
 
   return FlatPostgREST.unflatten(raw);
@@ -466,7 +466,7 @@ type EditorFileName =
   // | "theme.json"
   | "variables.css"
   | "custom.css";
-type EditorFile<_T extends EditorFileName = any> = {
+type EditorFile<_T extends EditorFileName = EditorFileName> = {
   name: EditorFileName;
   language: "json" | "css";
   value?: string;

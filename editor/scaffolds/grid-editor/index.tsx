@@ -199,7 +199,7 @@ export function GridEditor({
           });
         });
 
-      toast.promise(deleting as Promise<any>, {
+      toast.promise(deleting as Promise<unknown>, {
         loading: "Deleting...",
         success: "Field deleted",
         error: "Failed to delete field",
@@ -460,7 +460,7 @@ function SelectionExport() {
 
     const headers = columns.map((col) => col.name);
 
-    const csvstrfycell = (cell: any) => {
+    const csvstrfycell = (cell: unknown) => {
       if (cell === null || cell === undefined) {
         return "";
       }
@@ -504,7 +504,9 @@ function SelectionExport() {
 
         const rows = space.stream
           .filter((row) =>
-            datagrid_selected_rows.has(row[tb.x_sb_main_table_connection.pk!])
+            datagrid_selected_rows.has(
+              row[tb.x_sb_main_table_connection.pk!] as string
+            )
           )
           .map((row) => {
             // [col0, col1, col2, col3] by col.id
@@ -688,7 +690,7 @@ function useDeleteSelectedSchemaTableRows() {
         });
       });
 
-    toast.promise(deleting as Promise<any>, {
+    toast.promise(deleting as Promise<unknown>, {
       loading: `Deleting...`,
       success: "Deleted",
       error: "", // this won't be shown (supabase does not return error for delete operation)

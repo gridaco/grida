@@ -201,7 +201,7 @@ export function CornerRadius4Control({
           {mode === "all" && (
             <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
               <PropertyEnumV2
-                value={(preview.committedValue ?? stringValue) as any}
+                value={(preview.committedValue ?? stringValue) as string}
                 enum={radiusEnumItems}
                 className="border-none shadow-none bg-transparent h-6 w-6 min-w-0 p-0 justify-center"
                 renderTriggerValue={() => null}

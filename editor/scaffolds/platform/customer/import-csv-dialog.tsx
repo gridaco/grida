@@ -39,7 +39,7 @@ export function ImportCSVDialog({
   const [step, setStep] = useState<ImportStep>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<unknown | null>(null);
-  const [csv, setCsv] = useState<any[]>([]);
+  const [csv, setCsv] = useState<Record<string, unknown>[]>([]);
 
   const handleFileSelected = (selectedFile: File) => {
     setFile(selectedFile);

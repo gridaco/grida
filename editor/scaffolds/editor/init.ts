@@ -497,6 +497,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             href: tablehref(
               basepath,
               document_id,
+              // oxlint-disable-next-line typescript-eslint/no-explicit-any -- symbol-keyed property access
               (tables as any)[
                 EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
               ]
@@ -521,6 +522,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             href: tablehref(
               basepath,
               document_id,
+              // oxlint-disable-next-line typescript-eslint/no-explicit-any -- symbol-keyed property access
               (tables as any)[
                 EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
               ]
@@ -543,6 +545,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             href: tablehref(
               basepath,
               document_id,
+              // oxlint-disable-next-line typescript-eslint/no-explicit-any -- symbol-keyed property access
               (tables as any)[
                 EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
               ]
@@ -565,6 +568,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             href: tablehref(
               basepath,
               document_id,
+              // oxlint-disable-next-line typescript-eslint/no-explicit-any -- symbol-keyed property access
               (tables as any)[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]
             ),
           },
@@ -581,6 +585,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       ];
 
   const tableids = Object.getOwnPropertySymbols(tables);
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- symbol-keyed property access
   const values = tableids.map((id) => (tables as any)[id]);
 
   return {

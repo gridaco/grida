@@ -37,7 +37,7 @@ type StorageEditorDeletingTask = _BaseFileTask & {
 type StorageEditorTask = StorageEditorUploadingTask | StorageEditorDeletingTask;
 
 type StorageApi = StorageFileApi & {
-  rmrf: (path: string) => Promise<any>;
+  rmrf: (path: string) => Promise<unknown>;
 };
 
 interface StorageEditorState {
@@ -301,14 +301,14 @@ function reducer(
 interface IStorageEditor extends Omit<StorageEditorState, "objects" | "api"> {
   root: vfs.EntityNode[];
   nodes: vfs.EntityNode[];
-  upload: (file: File) => Promise<any>;
-  mkdir: (name: string) => Promise<any>;
+  upload: (file: File) => Promise<unknown>;
+  mkdir: (name: string) => Promise<unknown>;
   cd: (dir: string) => void;
-  mv: (path: string, newPath: string) => Promise<any>;
-  // download: (path: string) => Promise<any>;
-  list: (path: string | string[]) => Promise<any>;
+  mv: (path: string, newPath: string) => Promise<unknown>;
+  // download: (path: string) => Promise<unknown>;
+  list: (path: string | string[]) => Promise<unknown>;
   refresh: () => void;
-  rm: (path: string, recursive?: boolean) => Promise<any>;
+  rm: (path: string, recursive?: boolean) => Promise<unknown>;
   getPublicUrl: (path: string) => string;
 }
 

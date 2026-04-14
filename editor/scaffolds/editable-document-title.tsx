@@ -62,6 +62,7 @@ export function EditableDocumentTitle({
   );
 }
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- generic callback constraint requires any[] for Parameters<F> to work
 function debounce<F extends (...args: any[]) => void>(
   func: F,
   wait: number

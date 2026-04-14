@@ -48,6 +48,7 @@ import { Button } from "@/components/ui/button";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { toast } from "sonner";
 import { FormValue } from "@/services/form";
+import type { JSONValue } from "@/types";
 import {
   Select,
   SelectContent,
@@ -212,9 +213,9 @@ export function DataGrid({
             minWidth: col.pk ? 100 : 160,
             maxWidth: columns.length <= 1 ? undefined : 640,
             width: undefined,
-            renderHeaderCell: (props) => (
+            renderHeaderCell: (props: RenderHeaderCellProps<RenderingRow>) => (
               <ColumnHeaderCell
-                {...props}
+                {...(props as RenderHeaderCellProps<unknown>)}
                 type={col.type as FormInputType}
                 pk={col.pk}
                 fk={col.fk}
@@ -230,7 +231,7 @@ export function DataGrid({
             renderCell: FieldCell,
             renderEditCell:
               !readonly && !col.readonly ? FieldEditCell : undefined,
-          }) as Column<any>
+          }) as Column<RenderingRow>
       )
     )
     .concat(CreateNewAttributeColumn);
@@ -243,7 +244,9 @@ export function DataGrid({
     let val: string | undefined;
     if (e.sourceColumnKey.startsWith("__gf_")) {
       // copy value as is
-      val = (e.sourceRow as any)[e.sourceColumnKey];
+      val = (e.sourceRow as Record<string, unknown>)[e.sourceColumnKey] as
+        | string
+        | undefined;
     } else {
       // copy value from fields
       const field = e.sourceRow.fields[e.sourceColumnKey];
@@ -345,7 +348,9 @@ export function DataGrid({
   );
 }
 
-function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
+function GFSystemPropertyHeaderCell({
+  column,
+}: RenderHeaderCellProps<RenderingRow>) {
   const { name, key } = column;
 
   const rootprops = useCellRootProps(-1, key);
@@ -654,7 +659,10 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
             />
           </span>
           {fk && (
-            <ReferencedRowLookupPopover relation={fk} value={value}>
+            <ReferencedRowLookupPopover
+              relation={fk}
+              value={value as string | number | undefined}
+            >
               <FloatingIconButton onClick={onFKClick}>
                 <ArrowRightIcon className="size-3" />
               </FloatingIconButton>
@@ -672,7 +680,7 @@ function MediaCellContent({
   resolver,
 }: {
   identifier: CellIdentifier;
-  rowdata: Record<string, any> | null;
+  rowdata: Record<string, unknown> | null;
   resolver?: DataGridCellFileRefsResolver;
   type: "audio" | "video";
 }) {
@@ -731,7 +739,7 @@ function FileCellContent({
   resolver,
 }: {
   identifier: CellIdentifier;
-  rowdata: Record<string, any> | null;
+  rowdata: Record<string, unknown> | null;
   resolver?: DataGridCellFileRefsResolver;
   type: "file" | "audio" | "video";
 }) {
@@ -766,7 +774,7 @@ function ImageCellContent({
   resolver,
 }: {
   identifier: CellIdentifier;
-  rowdata: Record<string, any> | null;
+  rowdata: Record<string, unknown> | null;
   resolver?: DataGridCellFileRefsResolver;
 }) {
   const refs = useFileRefs(identifier, rowdata, resolver);
@@ -847,7 +855,10 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
       }
     };
 
-    const commit = (change: { value: any; option_id?: string }) => {
+    const commit = (change: {
+      value: GFResponseFieldData["value"];
+      option_id?: string;
+    }) => {
       props.onRowChange(
         {
           ...row,
@@ -869,7 +880,8 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
         | React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
         | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
-      let val: any = ref.current?.value;
+      let val: string | number | boolean | null | undefined =
+        ref.current?.value;
       switch (e.currentTarget.type) {
         case "checkbox": {
           val = (e.currentTarget as HTMLInputElement).checked;
@@ -877,11 +889,11 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
         }
         case "number":
           if (!val) val = null;
-          else val = parseFloat(val);
+          else val = parseFloat(val as string);
           break;
         case "datetime-local": {
           try {
-            const date = new Date(val);
+            const date = new Date(val as string | number);
             val = date.toISOString();
           } catch {
             // when user leaves the field empty
@@ -897,7 +909,7 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
       return (
         <XSBForeignKeyPopupEditCell
           relation={fk}
-          value={value}
+          value={value as string | number | undefined}
           onCommitValue={(v) => {
             commit({ value: v });
           }}
@@ -1091,7 +1103,7 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
       console.error(e);
       return (
         <JsonPopupEditorCell
-          value={value}
+          value={value as JSONValue}
           onCommitValue={(v) => {
             commit({ value: v });
           }}

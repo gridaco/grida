@@ -1,8 +1,8 @@
 import Fuse from "fuse.js";
 
-type DataGetter<T> = ((row: T) => any) | keyof T;
+type DataGetter<T> = ((row: T) => unknown) | keyof T;
 
-function getRpwData<T>(row: T, datakey?: DataGetter<T>): any {
+function getRpwData<T>(row: T, datakey?: DataGetter<T>): unknown {
   if (datakey === undefined) return row;
   if (typeof datakey === "function") {
     return datakey(row);
@@ -16,7 +16,7 @@ export namespace GridFilter {
     empty_data_hidden: boolean;
   };
 
-  export function filter<T extends { [key: string]: any }>(
+  export function filter<T extends { [key: string]: unknown }>(
     rows: Array<T>,
     filter: LocalFilter,
     datakey?: DataGetter<T>,
@@ -40,7 +40,7 @@ export namespace GridFilter {
     return filterWithMultipleFilters(rows, filters);
   }
 
-  function filter_empty_data_hidden<T extends { [key: string]: any }>(
+  function filter_empty_data_hidden<T extends { [key: string]: unknown }>(
     rows: Array<T>,
     datakey?: DataGetter<T>
   ): number[] {
@@ -59,7 +59,7 @@ export namespace GridFilter {
       .map(({ index }) => index);
   }
 
-  function filter_full_text_search<T extends { [key: string]: any }>(
+  function filter_full_text_search<T extends { [key: string]: unknown }>(
     rows: Array<T>,
     localsearch: string,
     datakey?: DataGetter<T>,

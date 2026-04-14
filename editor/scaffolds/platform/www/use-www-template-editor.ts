@@ -4,6 +4,7 @@ import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { nanoid } from "nanoid";
 import { FileIO } from "@/lib/file";
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- generic constraint for JSON-like data
 export interface WWWTemplateEditorInstance<T extends Record<string, any>> {
   data: T | null;
   set: (data: T | null) => void;
@@ -15,7 +16,7 @@ export interface WWWTemplateEditorInstance<T extends Record<string, any>> {
   error: Error | null;
 }
 
-type WWWTemplate<T = any> = {
+type WWWTemplate<T = unknown> = {
   id: string;
   data: T;
   is_public: boolean;
@@ -23,6 +24,7 @@ type WWWTemplate<T = any> = {
   www_id: string;
 };
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- generic constraint for JSON-like data
 export function useWWWTemplate<T extends Record<string, any>>(
   id: string
 ): WWWTemplateEditorInstance<T> {
@@ -46,7 +48,7 @@ export function useWWWTemplate<T extends Record<string, any>>(
     if (error) {
       setError(error);
     } else {
-      setTemplate(result satisfies WWWTemplate<any> as WWWTemplate<T>);
+      setTemplate(result satisfies WWWTemplate<unknown> as WWWTemplate<T>);
       setData(result.data as T);
     }
 
@@ -68,6 +70,7 @@ export function useWWWTemplate<T extends Record<string, any>>(
     setSaving(true);
     const { error } = await client
       .from("template")
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase JSON column
       .update({ data: data as any })
       .eq("id", id);
 

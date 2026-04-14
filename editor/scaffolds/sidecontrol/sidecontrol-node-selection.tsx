@@ -1908,7 +1908,14 @@ function SectionProps({ node_id }: { node_id: string }) {
           <PropsControl
             properties={properties}
             props={computed.props || {}}
-            onValueChange={actions.value}
+            onValueChange={(key, value) =>
+              actions.value(
+                key,
+                value as
+                  | import("@grida/tokens").tokens.StringValueExpression
+                  | undefined
+              )
+            }
           />
         </PropertySectionContent>
       ) : (
