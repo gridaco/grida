@@ -74,41 +74,61 @@ function buildVariants(
   return Object.fromEntries(entries);
 }
 
+/** Extract the first array-valued key from an unknown JSON payload. */
+const extractRawList = (payload: unknown, keys: string[]): unknown[] => {
+  if (Array.isArray(payload)) return payload as unknown[];
+  if (payload && typeof payload === "object") {
+    const obj = payload as Record<string, unknown>;
+    for (const key of keys) {
+      if (Array.isArray(obj[key])) return obj[key] as unknown[];
+    }
+  }
+  return [];
+};
+
 const normalizeIcons = (
-  rawList: any[],
+  rawList: unknown[],
   allowedVendors?: Set<IconVendorId>
 ): IconsBrowserItem[] => {
   const hasAllowed = allowedVendors ? allowedVendors.size > 0 : false;
+  type RawIcon = Record<string, unknown> & {
+    properties?: Record<string, unknown>;
+  };
   return rawList
-    .map((item, index) => {
+    .map((raw, index) => {
+      const item = raw as RawIcon | null | undefined;
       const download = item?.download;
       if (!download) return null;
-      const vendor = item?.vendor || item?.host || item?.family || "";
+      const vendor = (item?.vendor ||
+        item?.host ||
+        item?.family ||
+        "") as string;
       if (hasAllowed && allowedVendors && !allowedVendors.has(vendor)) {
         return null;
       }
-      const baseName =
-        item?.name ||
+      const baseName = (item?.name ||
         item?.title ||
         item?.id ||
         item?.family ||
-        `icon-${index}`;
-      const variant =
-        item?.variant ||
+        `icon-${index}`) as string;
+      const variant = (item?.variant ||
         item?.properties?.style ||
         item?.style ||
-        item?.properties?.variant;
-      const size = item?.properties?.size || item?.size;
+        item?.properties?.variant) as string | undefined;
+      const size = (item?.properties?.size || item?.size) as
+        | string
+        | number
+        | undefined;
       const friendlyBase = toTitleCase(baseName);
       const metaParts = [variant, size ? `${size}px` : null]
         .filter(Boolean)
         .join(", ");
       const name =
         metaParts.length > 0 ? `${friendlyBase} (${metaParts})` : friendlyBase;
-      const tags = Array.isArray(item?.tags)
-        ? item.tags
+      const tags: unknown[] = Array.isArray(item?.tags)
+        ? (item.tags as unknown[])
         : Array.isArray(item?.keywords)
-          ? item.keywords
+          ? (item.keywords as unknown[])
           : [];
       return {
         id: String(
@@ -122,7 +142,7 @@ const normalizeIcons = (
           vendor,
           variant,
           size ? `${size}px` : null,
-          ...tags.map((t: any) => String(t)),
+          ...tags.map((t: unknown) => String(t)),
         ].filter(Boolean) as string[],
         vendor,
       } satisfies IconsBrowserItem;
@@ -130,21 +150,28 @@ const normalizeIcons = (
     .filter(Boolean) as IconsBrowserItem[];
 };
 
-const parseVendorPayload = (payload: any): IconVendor[] => {
+const parseVendorPayload = (payload: unknown): IconVendor[] => {
+  const p = payload as Record<string, unknown> | null | undefined;
   const list: IconVendor[] =
-    (payload?.items as any[])?.flatMap((v) => {
-      const rawVendor = v?.vendor ?? v?.id ?? "";
+    (p?.items as unknown[] | undefined)?.flatMap((raw: unknown) => {
+      const v = raw as Record<string, unknown> | null | undefined;
+      const rawVendor = (v?.vendor ?? v?.id ?? "") as string;
       if (!rawVendor) return [];
       return [
         {
-          id: v?.id ?? rawVendor,
-          name: v?.name ?? rawVendor,
+          id: (v?.id as string) ?? rawVendor,
+          name: (v?.name as string) ?? rawVendor,
           vendor: rawVendor as IconVendorId,
           count: Number(v?.count ?? 0),
           categories: Array.isArray(v?.categories)
             ? (v.categories as GridaIconsLibraryCategory[])
             : [],
-          variants: buildVariants(v?.variants),
+          variants: buildVariants(
+            v?.variants as Record<
+              string,
+              { title?: string; default?: string; enum?: string[] }
+            >
+          ),
         },
       ];
     }) ?? [];
@@ -161,7 +188,7 @@ export async function fetchIconVendors(): Promise<IconVendor[]> {
   if (!res.ok) {
     throw new Error(`Failed to load vendors (${res.status})`);
   }
-  const payload = await res.json();
+  const payload: unknown = await res.json();
   return parseVendorPayload(payload);
 }
 
@@ -188,13 +215,12 @@ export async function fetchIcons({
   if (!res.ok) {
     throw new Error(`Failed to load icons (${res.status})`);
   }
-  const payload = await res.json();
-  const rawList: any[] =
-    (Array.isArray(payload) && payload) ||
-    payload?.items ||
-    payload?.icons ||
-    payload?.data ||
-    [];
+  const payload: unknown = await res.json();
+  const rawList: unknown[] = extractRawList(payload, [
+    "items",
+    "icons",
+    "data",
+  ]);
   const allowedSet = allowedVendors
     ? new Set<IconVendorId>(allowedVendors)
     : undefined;
@@ -228,13 +254,12 @@ export async function fetchLogos({
   if (!res.ok) {
     throw new Error(`Failed to load logos (${res.status})`);
   }
-  const payload = await res.json();
-  const rawList: any[] =
-    (Array.isArray(payload) && payload) ||
-    payload?.items ||
-    payload?.logos ||
-    payload?.icons ||
-    payload?.data ||
-    [];
+  const payload: unknown = await res.json();
+  const rawList: unknown[] = extractRawList(payload, [
+    "items",
+    "logos",
+    "icons",
+    "data",
+  ]);
   return normalizeIcons(rawList);
 }

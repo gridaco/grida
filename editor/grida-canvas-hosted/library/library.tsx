@@ -16,7 +16,7 @@ import cmath from "@grida/cmath";
 import { datatransfer } from "@/grida-canvas/data-transfer";
 
 function TabButton({
-  value,
+  value: _value,
   active,
   onClick,
   children,
