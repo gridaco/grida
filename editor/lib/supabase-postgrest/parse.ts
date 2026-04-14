@@ -54,6 +54,7 @@ export namespace SupabasePostgRESTOpenApi {
       | "array"
       | undefined;
     enum?: string[];
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- JSONSchemaType from ajv requires any
     items: JSONSchemaType<any>;
   };
 
@@ -61,6 +62,7 @@ export namespace SupabasePostgRESTOpenApi {
    * A.k.a Table Schema
    */
   export type SupabaseOpenAPIDefinitionJSONSchema = JSONSchemaType<
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- JSONSchemaType from ajv requires any
     Record<string, any>
   > & {
     properties: {
@@ -77,7 +79,7 @@ export namespace SupabasePostgRESTOpenApi {
       [key: string]: SupabaseOpenAPIDefinitionJSONSchema;
     };
     host: string;
-    parameters: any;
+    parameters: unknown;
     produces: string[];
     schemes: string[];
     swagger: string;
@@ -106,15 +108,19 @@ export namespace SupabasePostgRESTOpenApi {
     sb_project_reference_id: string;
     sb_schema_names: string[];
     sb_schema_openapi_docs: { [schema: string]: SupabaseOpenAPIDocument };
-    sb_schema_definitions: { [schema: string]: { [key: string]: any } };
+    sb_schema_definitions: {
+      [schema: string]: { [key: string]: SupabaseOpenAPIDefinitionJSONSchema };
+    };
     sb_project_url: string;
   }> {
     const u = new URL(url);
     const projectref = u.hostname.split(".")[0];
     const route = build_supabase_openapi_url(url, anonKey);
 
-    const schema_definitions: { [schema: string]: any } = {};
-    const schema_apidocs: { [schema: string]: any } = {};
+    const schema_definitions: {
+      [schema: string]: SupabaseOpenAPIDocument["definitions"];
+    } = {};
+    const schema_apidocs: { [schema: string]: SupabaseOpenAPIDocument } = {};
 
     // can be optimized
     for (const schema of schemas) {

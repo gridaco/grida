@@ -7,7 +7,7 @@ import { useMemo } from "react";
  * primative compute operation
  * compute condition with resolved primative values
  */
-function op<T = any>(
+function op<T = unknown>(
   ...[l, o, r]:
     | tokens.ShorthandBinaryExpression<number, number>
     | tokens.ShorthandBooleanBinaryExpression<
@@ -61,7 +61,7 @@ function resolveJsonRefPath(ref: tokens.JSONRef): string[] {
 }
 
 function _access(
-  data: any,
+  data: object,
   exp?: tokens.TValueExpression | undefined | null
 ): tokens.Primitive | undefined | null {
   if (exp === undefined) return undefined;
@@ -77,9 +77,10 @@ function _access(
   if (tokens.is.inferredShorthandBinaryExpression(exp)) {
     const [l, o, r] = exp;
 
-    const left: any = _access(data, l);
-    const right: any = _access(data, r);
-    return op(left, o!, right);
+    const left = _access(data, l);
+    const right = _access(data, r);
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic expression evaluation with runtime-resolved operands
+    return op(...([left, o, right] as any));
   }
 
   // unhandled expression

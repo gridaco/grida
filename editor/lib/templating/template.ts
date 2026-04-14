@@ -53,6 +53,7 @@ export function getRenderedTexts({
   overrides,
   config,
 }: {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Zod shape type requires any
   shape: z.ZodObject<any>["shape"];
   overrides: Record<string, string> | null | undefined;
   config: {
@@ -61,7 +62,10 @@ export function getRenderedTexts({
       t: i18n["t"];
       basePath?: ObjectPath<Translation> | (() => ObjectPath<Translation>);
     };
-    renderer: (source: string, context: any) => string;
+    renderer: (
+      source: string,
+      context: TemplateVariables.FormResponseContext
+    ) => string;
     merge?: boolean;
   };
 }): Record<string, string> {
@@ -72,8 +76,10 @@ export function getRenderedTexts({
           ? config.i18n.basePath()
           : config.i18n.basePath;
 
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- i18next t() expects loosely typed interpolation values
       return config.i18n.t(`${path}.${key}`, config.context as any);
     }
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- i18next t() expects loosely typed interpolation values
     return config.i18n.t(key, config.context as any);
   };
 
@@ -123,17 +129,21 @@ export function getPropTypes(t: Record<string, string>) {
 }
 
 export function getDefaultTexts(
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Zod shape type requires any
   shape: z.ZodObject<any>["shape"],
   defaultTexts?: Record<string, string>
 ) {
-  const defaults = Object.keys(shape).reduce((acc: any, key) => {
-    return {
-      ...acc,
-      [key]:
-        defaultTexts?.[key] ??
-        shape[key as keyof typeof shape]._def.defaultValue(),
-    };
-  }, {});
+  const defaults = Object.keys(shape).reduce(
+    (acc: Record<string, string>, key) => {
+      return {
+        ...acc,
+        [key]:
+          defaultTexts?.[key] ??
+          shape[key as keyof typeof shape]._def.defaultValue(),
+      };
+    },
+    {}
+  );
 
   return defaults;
 }

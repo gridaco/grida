@@ -2,14 +2,14 @@ import ms from "ms";
 import { format } from "date-fns";
 
 export namespace Analytics {
-  export type EventStream<T = any> = {
+  export type EventStream<T = unknown> = {
     name: string;
     description: string;
     data: AnyEvent<T>[];
     showonmap: boolean;
   };
 
-  export type AnyEvent<T = any> = {
+  export type AnyEvent<T = unknown> = {
     id: string;
     at: Date;
     raw: T;
@@ -46,7 +46,7 @@ export namespace Analytics {
    * @param options.intervalMs - Interval in milliseconds to group data.
    * @returns Array of objects with `date` and `count`, including zero-count intervals.
    */
-  export function serialize<T extends Record<string, any>>(
+  export function serialize<T extends Record<string, unknown>>(
     data: Array<T>,
     {
       from,
@@ -62,7 +62,7 @@ export namespace Analytics {
   ) {
     if (!from || !to) {
       const dates = data
-        .map((item) => new Date(item[dateKey]))
+        .map((item) => new Date(item[dateKey] as string | number | Date))
         .filter((d) => !isNaN(d.getTime()));
       if (!dates.length) return [];
       dates.sort((a, b) => a.getTime() - b.getTime());
@@ -88,7 +88,7 @@ export namespace Analytics {
     // Step 2: Populate the map with actual data
     data.forEach((item) => {
       const dateValue = item[dateKey];
-      if (typeof dateValue === "string" || (dateValue as any) instanceof Date) {
+      if (typeof dateValue === "string" || dateValue instanceof Date) {
         const date = new Date(dateValue).toISOString();
         const roundedDate = new Date(
           Math.floor(new Date(date).getTime() / intervalMs) * intervalMs

@@ -86,6 +86,7 @@ const __create_service_role_client = <
     process.env.SUPABASE_SECRET_KEY!,
     {
       db: {
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK db.schema expects a looser type than our branded SchemaName
         schema: schema as any,
       },
     }
