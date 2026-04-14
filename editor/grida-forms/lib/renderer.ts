@@ -202,7 +202,7 @@ export class FormRenderTree {
         ?.map((block: FormBlock) => {
           const is_field = block.type === "field";
           const field = is_field
-            ? (_m_fields.find((f: any) => f.id === block.form_field_id) ?? null)
+            ? (_m_fields.find((f) => f.id === block.form_field_id) ?? null)
             : null;
 
           const shared: Partial<BaseRenderBlock> = {
@@ -325,7 +325,7 @@ export class FormRenderTree {
       const blocks: ClientRenderBlockWithoutIndex[] = [];
 
       const _fields_as_blocks: ClientRenderBlockWithoutIndex[] = _m_fields.map(
-        (field: any) => {
+        (field: FormFieldDefinition) => {
           return <ClientRenderBlockWithoutIndex>{
             id: field.id,
             type: "field",

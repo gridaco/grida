@@ -73,7 +73,7 @@ export class FormDataFaker {
 
   formdata() {
     //
-    const data: any = {};
+    const data: Record<string, string | number> = {};
 
     for (const field of this.schema.fields({ render: true })) {
       const { id, name, type } = field;

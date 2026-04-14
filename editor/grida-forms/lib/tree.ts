@@ -88,7 +88,7 @@ export function blockstreeflat(
 
   // Organize items by their parent_id
   const itemsByParentId: Record<string, EditorFlatFormBlock[]> = items.reduce(
-    (acc: any, item) => {
+    (acc: Record<string, EditorFlatFormBlock[]>, item) => {
       const parentId = item.parent_id || "root";
       if (!acc[parentId]) {
         acc[parentId] = [];

@@ -132,7 +132,7 @@ export class JSONFrom2DB {
         accept: f.accept,
         // 'alt': f.alt,
         autocomplete: toArrayOf(f.autocomplete),
-        data: f.data as any,
+        data: f.data as Database["grida_forms"]["Tables"]["attribute"]["Insert"]["data"],
         // 'description': f.description,
         form_id: this.form_id!,
         help_text: f.help_text,

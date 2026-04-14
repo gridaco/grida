@@ -20,7 +20,7 @@ export interface SimulationPlan {
 type ResponseCallback = (id: string, response: SimulatorSubmission) => void;
 type EndCallback = () => void;
 
-export interface SimulatorSubmission<T = any> {
+export interface SimulatorSubmission<T = unknown> {
   __id: string;
   bot_id: string;
   requestedAt: Date;
@@ -248,7 +248,11 @@ export class Simulator {
   }
 }
 
-async function submit(form_id: string, data: any, headers: any = {}) {
+async function submit(
+  form_id: string,
+  data: Record<string, string>,
+  headers: Record<string, string> = {}
+) {
   const formdata = new FormData();
   for (const key in data) {
     formdata.append(key, data[key]);

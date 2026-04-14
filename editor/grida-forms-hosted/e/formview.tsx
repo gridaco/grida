@@ -61,7 +61,7 @@ import { supported_form_page_languages } from "@/k/supported_languages";
 
 const html_form_id = "form";
 
-type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData | any;
+type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData;
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -272,13 +272,17 @@ function Providers({
   );
 }
 
+interface FormStylesheet {
+  section?: string;
+}
+
 type FormBodyProps = {
   translation?: FormViewTranslation;
   config: {
     is_powered_by_branding_enabled: boolean;
     optimize_for_cjk?: boolean;
   };
-  stylesheet?: any;
+  stylesheet?: FormStylesheet;
 };
 
 const GridaFormBody = FormBody;
@@ -507,7 +511,7 @@ function BlockRenderer({
   context = { is_root: true, is_in_current_section: false },
 }: {
   block: ClientRenderBlock;
-  stylesheet?: any;
+  stylesheet?: FormStylesheet;
   // e.g. (key) => defaultValues?.[key]
   getDefaultValue?: (key: string) => string | undefined;
   emailChallengeTranslation: FormViewTranslation["email_challenge"];

@@ -44,6 +44,7 @@ export interface FormAgentState {
   is_submitting: boolean;
   sections: ClientSectionRenderBlock[];
   //
+  // oxlint-disable-next-line no-explicit-any -- form values are untyped at runtime
   defaultValues?: Record<string, any>;
 }
 
@@ -78,6 +79,7 @@ export function init({
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
+  // oxlint-disable-next-line no-explicit-any -- form values are untyped at runtime
   defaultValues?: Record<string, any>;
 }): FormAgentState {
   const sections = tree.children.filter(
