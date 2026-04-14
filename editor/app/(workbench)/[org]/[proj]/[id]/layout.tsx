@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import {
   service_role,
   createClient,
@@ -53,7 +52,7 @@ export async function generateMetadata({
   const { id, proj } = await params;
   const client = await createClient();
 
-  const { data, error } = await client
+  const { data } = await client
     .from("document")
     .select(`title`)
     .eq("id", id)

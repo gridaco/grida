@@ -114,7 +114,7 @@ const testSupabaseConnection = async ({
     });
 
     return await parsing;
-  } catch (e) {
+  } catch {
     return false;
   }
 };
@@ -157,7 +157,7 @@ function ConnectSupabase() {
           const data = res.data.data;
           ondata(data);
         })
-        .catch((err) => {
+        .catch(() => {
           setXSBProject(null);
         });
       return;
@@ -168,7 +168,7 @@ function ConnectSupabase() {
         const data = res.data.data;
         ondata(data);
       })
-      .catch((err) => {
+      .catch(() => {
         setXSBProject(null);
       });
   }, [project_id, existing_connection]);

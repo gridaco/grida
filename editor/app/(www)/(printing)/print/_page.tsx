@@ -221,20 +221,6 @@ function Hero() {
   );
 }
 
-function Globe({
-  className,
-  ...props
-}: React.HtmlHTMLAttributes<HTMLDivElement>) {
-  return (
-    <iframe
-      {...props}
-      src="https://bg.grida.co/embed/globe"
-      className={cn("w-full h-full border-none bg-transparent", className)}
-      allowFullScreen
-    />
-  );
-}
-
 const MarqueeCard = ({ image, name }: { image: string; name: string }) => {
   return (
     <figure

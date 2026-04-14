@@ -1,5 +1,6 @@
 import type { Database } from "@app/database";
 
+// oxlint-disable-next-line no-unused-vars
 const schema = "grida_forms" as const;
 
 type SchemaKey = keyof Database;

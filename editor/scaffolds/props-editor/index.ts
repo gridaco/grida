@@ -46,6 +46,7 @@ function setByPath(obj: any, path: string, value: unknown) {
  * const value = getByPath(obj, "foo.bar.baz");
  * console.log(value); // 42
  */
+// oxlint-disable-next-line no-unused-vars
 function getByPath(obj: any, path: string): any {
   return path.split(".").reduce((acc, part) => acc?.[part], obj);
 }

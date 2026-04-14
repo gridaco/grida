@@ -32,12 +32,12 @@ import { AdminMediaPicker } from "@/scaffolds/mediapicker";
 
 export function ImageBlock({
   id,
-  type,
-  form_field_id,
+  type: _type,
+  form_field_id: _form_field_id,
   src,
   data,
 }: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [focused, setFocus] = useBlockFocus(id);
   const deleteBlock = useDeleteBlock();

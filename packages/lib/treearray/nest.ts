@@ -11,7 +11,7 @@ export function nest(
   items: any[],
   id = null,
   link = "parent",
-  sort: (a, b) => number = (a, b) => 0,
+  sort: (a, b) => number = (_a, _b) => 0,
   depth = 0
 ) {
   return items

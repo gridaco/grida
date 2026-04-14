@@ -466,7 +466,7 @@ type EditorFileName =
   // | "theme.json"
   | "variables.css"
   | "custom.css";
-type EditorFile<T extends EditorFileName = any> = {
+type EditorFile<_T extends EditorFileName = any> = {
   name: EditorFileName;
   language: "json" | "css";
   value?: string;

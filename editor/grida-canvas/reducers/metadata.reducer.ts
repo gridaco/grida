@@ -15,7 +15,7 @@ export default function metadataReducer(
         },
       };
     case "node-metadata/remove":
-      const { [action.namespace]: removed, ...rest } =
+      const { [action.namespace]: _removed, ...rest } =
         state[action.node_id] || {};
       const newState = { ...state };
       if (Object.keys(rest).length > 0) {

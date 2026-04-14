@@ -3,11 +3,12 @@ import { useData } from "@/grida-react-program-context/data-context";
 import { TemplateValueProperties } from "../template-builder/with-template";
 import { type tokens, factory, render } from "@grida/tokens";
 
+// oxlint-disable-next-line no-unused-vars
 function extractAccessIdentifiersDependencyArrayFromProps<
   P extends Record<string, any>,
 >(props?: TemplateValueProperties<P, tokens.StringValueExpression>) {
   return Object.entries(props || {})
-    .map(([key, value]) => {
+    .map(([_key, value]) => {
       return factory.getStringValueExpressionAccessIdentifiersDependencyArray(
         value
       );

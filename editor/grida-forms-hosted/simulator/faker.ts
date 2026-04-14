@@ -76,7 +76,7 @@ export class FormDataFaker {
     const data: any = {};
 
     for (const field of this.schema.fields({ render: true })) {
-      const { id, name, options, type } = field;
+      const { id, name, type } = field;
 
       if (FieldSupports.options(type)) {
         data[name] = this.randoption(id);

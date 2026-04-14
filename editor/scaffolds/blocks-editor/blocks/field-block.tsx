@@ -50,9 +50,9 @@ import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 
 export function FieldBlock({
   id,
-  type,
+  type: _type,
   form_field_id,
-  data,
+  data: _data,
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
@@ -311,7 +311,7 @@ export function FormFieldBlockMenuItems({
   block_id: string;
   form_field_id?: string | null;
 }) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   const onFieldEditClick = useCallback(() => {
     dispatch({

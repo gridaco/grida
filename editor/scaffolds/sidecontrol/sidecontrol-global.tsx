@@ -506,7 +506,7 @@ function Background() {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="none">None</SelectItem>
-          {backgrounds.map((background, i) => (
+          {backgrounds.map((background) => (
             <SelectItem key={background.embed} value={background.embed}>
               <div>
                 <Image

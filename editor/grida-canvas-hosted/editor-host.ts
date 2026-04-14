@@ -66,7 +66,7 @@ export class GridaCanvasEditorSelfHostedWindowHost {
     {
       el,
       doc,
-      webfontslist = "eager",
+      webfontslist: _webfontslist = "eager",
     }: {
       el: HTMLCanvasElement;
       doc: ResourceLoader<editor.state.IEditorStateInit>;

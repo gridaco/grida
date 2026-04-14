@@ -72,7 +72,7 @@ function reducer(state: State, action: Action): State {
       });
     }
   }
-  return produce(state, (draft) => {});
+  return produce(state, (_draft) => {});
 }
 
 export const useDispatch = (): FlatDispatcher => {

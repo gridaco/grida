@@ -39,7 +39,6 @@ export type GDocEditorRouteParams = {
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
-const ISDEV = process.env.NODE_ENV === "development";
 
 export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
   id: string | DraftID;

@@ -263,7 +263,7 @@ export default function CreateViewerLinkDialog({
                     setViewer((v) => create_viewer(v!, { app: app as any }));
                   }}
                 >
-                  {viewer_pdf_options.map((option, index) => (
+                  {viewer_pdf_options.map((option, _index) => (
                     <ToggleGroupItem key={option.value} value={option.value}>
                       <option.Icon className="me-2 w-4 aspect-square" />
                       {option.label}

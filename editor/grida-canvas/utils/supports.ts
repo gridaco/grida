@@ -3,11 +3,6 @@ import type grida from "@grida/schema";
 
 type NodeType = grida.program.nodes.NodeType;
 
-type Renderer =
-  | "grida-canvas-wasm"
-  | "grida-canvas-dom"
-  | "grida-canvas-dom-svg";
-
 type NodeFeatureProperty =
   | "arcData"
   | "cornerRadius"
@@ -26,36 +21,6 @@ type NodeFeatureProperty =
   | "strokeWidth4"
   | "pointCount"
   | "boolean";
-
-type INodePropertiesConfig = {
-  opacity: boolean;
-  blend_mode: boolean;
-  corner_radius: boolean;
-  css_border: boolean;
-  css_stroke: boolean;
-  children: boolean;
-  strokes: boolean;
-  stroke_cap: boolean;
-  effects: {
-    multiple: boolean;
-    box_shadow: boolean;
-  };
-};
-
-const GRIDA_TCANVAS_RECTANGLE_NODE: INodePropertiesConfig = {
-  opacity: true,
-  blend_mode: true,
-  corner_radius: true,
-  css_border: false,
-  css_stroke: true,
-  children: false,
-  strokes: true,
-  stroke_cap: false,
-  effects: {
-    multiple: true,
-    box_shadow: true,
-  },
-};
 
 const dom_supports: Record<NodeFeatureProperty, ReadonlyArray<NodeType>> = {
   arcData: [],

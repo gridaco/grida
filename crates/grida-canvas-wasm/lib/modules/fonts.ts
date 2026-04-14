@@ -95,7 +95,7 @@ export class FontsAPI {
         const face = fontFaces[i];
 
         // Allocate face ID string
-        const [faceIdPtr, faceIdLen] = this._alloc_string(face.faceId);
+        const [faceIdPtr, _faceIdLen] = this._alloc_string(face.faceId);
         faceIdPtrs.push(faceIdPtr);
 
         // Allocate font data

@@ -35,7 +35,7 @@ export async function GET(
     return NextResponse.redirect(redirectUrl, {
       status: 301,
     });
-  } catch (error) {
+  } catch {
     return notFound();
   }
 }

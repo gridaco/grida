@@ -184,7 +184,7 @@ export function TossPaymentsPayButton({
             successUrl: successUrl + window.location.search,
             failUrl: failUrl + window.location.search,
           });
-        } catch (error) {
+        } catch {
           // TODO: 에러 처리
         }
       }}

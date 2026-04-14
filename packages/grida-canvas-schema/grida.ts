@@ -529,6 +529,7 @@ export namespace grida {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace grida.program.document {
   export const SCHEMA_VERSION = "0.91.0-beta+20260311";
 
@@ -1083,6 +1084,7 @@ export namespace grida.program.document {
 /**
  * Supported CSS properties and types
  */
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace grida.program.css {
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/length
@@ -1212,6 +1214,7 @@ export namespace grida.program.css {
   >;
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace grida.program.nodes {
   export type NodeID = id.NodeIdentifier;
   export type NodeType = Node["type"];

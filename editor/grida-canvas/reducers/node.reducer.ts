@@ -35,32 +35,6 @@ function normalizePaintValue(paint: PaintValue): PaintValue {
 }
 
 // TODO: LEGACY_PAINT_MODEL
-function readPaints(
-  draft: grida.program.nodes.UnknownNodeProperties,
-  key: "fill" | "stroke"
-): PaintValue[] {
-  const pluralKey = key === "fill" ? "fill_paints" : "stroke_paints";
-  const paints: PaintValue[] = [];
-  const existing = (draft as any)[pluralKey] as PaintValue[] | undefined;
-
-  if (Array.isArray(existing) && existing.length > 0) {
-    for (const paint of existing) {
-      if (paint) {
-        paints.push(normalizePaintValue(paint));
-      }
-    }
-    return paints;
-  }
-
-  const single = (draft as any)[key] as PaintValue | undefined;
-  if (single) {
-    paints.push(normalizePaintValue(single));
-  }
-
-  return paints;
-}
-
-// TODO: LEGACY_PAINT_MODEL
 function writePaints(
   draft: grida.program.nodes.UnknownNodeProperties,
   key: "fill" | "stroke",

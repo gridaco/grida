@@ -26,12 +26,12 @@ import { PDFViewer } from "@/components/pdf-viewer";
 
 export function PdfBlock({
   id,
-  type,
-  form_field_id,
+  type: _type,
+  form_field_id: _form_field_id,
   src,
-  data,
+  data: _data,
 }: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
 
   const deleteBlock = useDeleteBlock();

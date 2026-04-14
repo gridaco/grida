@@ -185,7 +185,6 @@ async function submit({
     store_connection,
     supabase_connection,
     default_page,
-    options,
   } = form_reference;
 
   const {
@@ -1008,7 +1007,7 @@ async function submit({
 
   const response_field_with_resolved_file_upserts = Object.keys(
     field_file_uploads
-  ).map((field_id, i) => {
+  ).map((field_id) => {
     const field = v_form_fields!.find((f) => f.id === field_id);
     if (!field) {
       throw new Error(
@@ -1598,6 +1597,7 @@ function error(
   //
 }
 
+// oxlint-disable-next-line no-unused-vars
 async function hook_notifications({ form_id }: { form_id: string }) {
   // FIXME: DEV MODE
 

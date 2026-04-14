@@ -119,7 +119,7 @@ function XSBSearchTableDataGrid({
   const { predicates, isPredicatesSet, isOrderbySet } = query;
   const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
 
-  const { data, error, isLoading } = useXSBTableSearch({
+  const { data, isLoading } = useXSBTableSearch({
     supabase_project_id,
     supabase_table_name,
     supabase_schema_name,

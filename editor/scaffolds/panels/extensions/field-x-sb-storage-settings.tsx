@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useEditorState } from "@/scaffolds/editor";
 import { SupabaseLogo } from "@/components/logos";
 import { Spinner } from "@/components/ui/spinner";
 import { PrivateEditorApi } from "@/lib/private";
@@ -46,7 +45,6 @@ export function SupabaseStorageSettings({
     supabase_project_id: number;
   };
 }) {
-  const [state] = useEditorState();
   const [buckets, setBuckets] = useState<GridaXSupabase.SupabaseBucket[]>();
   const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
   const [path, setPath] = useState<string | undefined>(value?.path);

@@ -49,13 +49,13 @@ export namespace editor {
   ): T {
     let inThrottle: boolean;
     let lastArgs: Parameters<T> | null = null;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let _timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     return function (this: any, ...args: Parameters<T>) {
       if (!inThrottle) {
         func.apply(this, args);
         inThrottle = true;
-        timeoutId = setTimeout(() => {
+        _timeoutId = setTimeout(() => {
           inThrottle = false;
           if (options.trailing && lastArgs) {
             func.apply(this, lastArgs);
@@ -236,6 +236,7 @@ export namespace editor {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.config {
   /**
    * The type of editing experience this editor instance provides.
@@ -574,6 +575,7 @@ export namespace editor.config {
   export const DEFAULT_MAX_LIQUID_GLASS_BLUR_RADIUS = 50; // Renamed from radius
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.font_spec {
   export type FontStyleKey = {
     fontFamily: string;
@@ -720,6 +722,7 @@ export namespace editor.font_spec {
   };
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.state {
   /**
    * used for "repeated duplicate", where accumulating the delta between the original and the clone, forwarding that delta to the next clone.
@@ -1817,6 +1820,7 @@ export namespace editor.state {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.gesture {
   /**
    * Sanpshot used for arrangement.
@@ -2302,6 +2306,7 @@ export namespace editor.gesture {
   };
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.history {
   export interface Patch {
     op: "replace" | "remove" | "add";
@@ -2310,6 +2315,7 @@ export namespace editor.history {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.a11y {
   export type EscapeStep =
     | "escape-tool"
@@ -2331,6 +2337,7 @@ export namespace editor.a11y {
   } as const;
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.multiplayer {
   export type AwarenessPayload = {
     /**
@@ -2390,6 +2397,7 @@ export namespace editor.multiplayer {
   };
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.api {
   /**
    * api protocol with json patch
@@ -4766,6 +4774,7 @@ export namespace editor.api {
  * Internal export types and utilities.
  * Centralizes all export-related types to avoid duplication and ensure consistency.
  */
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.internal.export_settings {
   /**
    * All supported export formats
@@ -4895,6 +4904,7 @@ export namespace editor.internal.export_settings {
  *
  * @note below are technically not 'ascii' characters, we keep the module name as-is, to avoid confusion.
  */
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.ascii {
   export namespace chars {
     export const symbol_container_26F6 = "⛶";
@@ -4918,6 +4928,7 @@ export namespace editor.ascii {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace editor.ui {
   /**
    *

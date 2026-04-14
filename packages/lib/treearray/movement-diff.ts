@@ -143,7 +143,7 @@ export function __insert<T extends ISortItem = any, O = any>({
     };
 
     const _shiftUntil = shiftUntil(cursorItem);
-    sorted.slice(0, _shiftUntil).map((item, i) => {
+    sorted.slice(0, _shiftUntil).map((item, _i) => {
       let newsort = item.sort + small;
       shifted.push(item);
       item.sort = newsort;

@@ -26,8 +26,7 @@ export default function InvitationPage({
   client: Platform.WEST.Referral.WestReferralClient;
   template: TemplateData.West_Referrral__Duo_001;
 }) {
-  const { is_claimed, referrer_name: _referrer_name } = context;
-  const referrer_name = _referrer_name || "?";
+  const { is_claimed } = context;
   const is_first_time = !is_claimed;
   const [open, setOpen] = React.useState(is_first_time);
 

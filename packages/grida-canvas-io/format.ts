@@ -3411,8 +3411,8 @@ export namespace format {
          */
         export function shapeRectangular(
           builder: Builder,
-          width: number,
-          height: number
+          _width: number,
+          _height: number
         ): { type: fbs.CanonicalLayerShape; offset: flatbuffers.Offset } {
           fbs.CanonicalShapeRectangular.startCanonicalShapeRectangular(builder);
           const offset =

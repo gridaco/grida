@@ -48,7 +48,7 @@ export async function POST(
   }
 
   // Extract customer info based on form_field type
-  const provisionals = response.response_fields.reduce(
+  const _provisionals = response.response_fields.reduce(
     (info, field) => {
       const fieldType = field.form_field!.type;
       const value = (response.raw as any)[field.form_field!.name];

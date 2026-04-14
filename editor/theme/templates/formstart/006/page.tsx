@@ -21,12 +21,8 @@ import _messages from "./messages.json";
 import { LeviLogo } from "@/components/logos/levi";
 import type grida from "@grida/schema";
 
-type Messages = typeof _messages;
-
 const userprops =
   {} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
-
-type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 const image =
   "https://www.levi.co.kr/on/demandware.static/-/Sites-LeviKR-Library/default/dwe83fbc3c/images/redtabimg/images/RedTab-Header.jpg";

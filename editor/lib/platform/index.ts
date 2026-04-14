@@ -25,6 +25,7 @@ export namespace Platform {
 /**
  * the supported csv features and implementations
  */
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace Platform.CSV {
   /**
    * default csv parser configuration
@@ -40,7 +41,7 @@ export namespace Platform.CSV {
     header: true,
     skipEmptyLines: true,
     comments: "#",
-    transform: (value: string, field: string) => {
+    transform: (value: string, _field: string) => {
       if (value === "") return undefined;
       return value;
     },
@@ -174,6 +175,7 @@ export namespace Platform.CSV {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace Platform.Tag {
   export type TagNameAndColor = {
     name: string;
@@ -212,6 +214,7 @@ export namespace Platform.Tag {
   };
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace Platform.Customer {
   export const TYPE = "grida.platform.customer";
 
@@ -620,6 +623,7 @@ export namespace Platform.Customer {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace Platform.CustomerAuthPolicy {
   export interface CustomerAuthPolicy {
     id: string;
@@ -633,6 +637,7 @@ export namespace Platform.CustomerAuthPolicy {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace Platform.WEST.Referral {
   export const TEST_CODE_REFERRER = "test_referrer";
   export const TEST_CODE_INVITATION = "test_invitation";
@@ -845,6 +850,7 @@ export namespace Platform.WEST.Referral {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace Platform.WEST.Referral.Wizard {
   export type RewardType = "double-sided" | "referrer-only" | "invitee-only";
   export type RewardCurrencyType =

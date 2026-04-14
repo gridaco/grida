@@ -6,7 +6,7 @@ import { css } from "@/grida-canvas-utils/css";
 
 export function SVGLineWidget({
   layout_target_width: width,
-  layout_target_height: height,
+  layout_target_height: _height,
   stroke,
   stroke_width,
   stroke_cap,

@@ -83,6 +83,7 @@ function hexToRgba(hex: string): string {
 /**
  * Convert hex color to RGB array [r, g, b] (0-255)
  */
+// oxlint-disable-next-line no-unused-vars
 function hexToRgbArray(hex: string): [number, number, number] {
   try {
     const color = new Color(hex);

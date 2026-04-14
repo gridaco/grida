@@ -11,7 +11,7 @@ export async function ssr_page_init_i18n(init: InitWith) {
     lng = init.lng;
   } else {
     const { form_id } = init;
-    const { data, error } = await service_role.forms
+    const { data } = await service_role.forms
       .from("form_document")
       .select(
         `

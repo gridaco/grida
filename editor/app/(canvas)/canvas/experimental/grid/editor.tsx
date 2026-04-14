@@ -74,7 +74,7 @@ function App() {
           onMarqueeEnd={() => {
             dispatch({ type: "ui/insert-panel/open", open: true });
           }}
-          onBlockDoubleClick={(block) => {
+          onBlockDoubleClick={(_block) => {
             //
           }}
         />
@@ -175,7 +175,7 @@ function useSelection() {
 function Properties() {
   const [, dispatch] = useBuilderState();
   const grid = useGrid();
-  const [id, selection] = useSelection();
+  const [id] = useSelection();
   return (
     <aside className="grow max-w-md border-s p-4">
       {id && (
@@ -220,7 +220,7 @@ function Properties() {
 const typography = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "small"];
 
 function PropertyBody() {
-  const [state, dispatch] = useBuilderState();
+  const [, dispatch] = useBuilderState();
   const [id, selection] = useSelection();
   const playgroundUploader = useDummyPublicUpload();
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);

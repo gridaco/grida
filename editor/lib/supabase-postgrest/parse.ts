@@ -345,6 +345,7 @@ export namespace SupabasePostgRESTOpenApi {
    * //   ]
    * // }
    */
+  // oxlint-disable-next-line no-unused-vars
   function parse_supabase_postgrest_schema_properties_description(
     schema: SupabaseOpenAPIDefinitionJSONSchema
   ) {
@@ -362,7 +363,6 @@ export namespace SupabasePostgRESTOpenApi {
           columnName,
           columnDetails.description
         );
-        const description = columnDetails.description;
 
         if (pk) {
           result.pks.push(columnName);

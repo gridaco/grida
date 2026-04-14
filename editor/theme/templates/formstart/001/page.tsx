@@ -26,8 +26,6 @@ import { useTranslation } from "react-i18next";
 import _messages from "./messages.json";
 import type grida from "@grida/schema";
 
-type Messages = typeof _messages;
-
 const userprops = {
   title: { type: "string" },
   subtitle: { type: "string" },

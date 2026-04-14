@@ -66,7 +66,7 @@ export function useTableSpaceInstance<T>(
   useEffect(
     () => {
       setLoading(true);
-      init.fetcher(query).then(({ data, error, count }) => {
+      init.fetcher(query).then(({ data, count }) => {
         setLoading(false);
 
         if (data) {

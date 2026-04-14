@@ -58,7 +58,6 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { saveAs } from "file-saver";
 import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Badge } from "@/components/ui/badge";

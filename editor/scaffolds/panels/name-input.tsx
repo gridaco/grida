@@ -10,7 +10,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { useState } from "react";
-import { useDatagridTable, useEditorState } from "../editor";
+import { useDatagridTable } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
 import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
@@ -69,7 +69,6 @@ export function NameInput({
     typeof CommandPrimitive.Input
   > | null>(null);
 
-  const [state] = useEditorState();
   const [open, setOpen] = useState<boolean>(false);
   const [focus, setFocus] = useState<boolean>(false);
 
@@ -213,6 +212,7 @@ export function NameInput({
   );
 }
 
+// oxlint-disable-next-line no-unused-vars
 function XSupabaseAuthUsersTableProperties({
   onSelect,
 }: {

@@ -21,6 +21,7 @@ class RendererNotFound extends Error {
   }
 }
 
+// oxlint-disable-next-line no-unused-vars
 interface NodeElementProps<P extends Record<string, any>> {
   node_id: string;
   component?: TemplateComponent;
@@ -169,7 +170,7 @@ export function NodeElement<P extends Record<string, any>>({
 
   if (!node.active) return <></>;
 
-  const { opacity, z_index, ...props } = renderprops;
+  const { opacity: _opacity, z_index: _z_index, ...props } = renderprops;
 
   return (
     <HrefWrapper href={computed.href} target={node.target}>

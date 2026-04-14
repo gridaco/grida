@@ -468,11 +468,11 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return false; // Will fail here
         },
-        can_be_parent: (node) => {
+        can_be_parent: (_node) => {
           checks.push("can_be_parent");
           return true;
         },
@@ -505,11 +505,11 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return true;
         },
-        can_be_parent: (node) => {
+        can_be_parent: (_node) => {
           checks.push("can_be_parent");
           return false; // Will fail here
         },
@@ -541,15 +541,15 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return true;
         },
-        can_be_parent: (node) => {
+        can_be_parent: (_node) => {
           checks.push("can_be_parent");
           return true;
         },
-        max_out_degree: (node) => {
+        max_out_degree: (_node) => {
           checks.push("max_out_degree");
           return 0; // Will fail here
         },
@@ -585,15 +585,15 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return true;
         },
-        can_be_parent: (node) => {
+        can_be_parent: (_node) => {
           checks.push("can_be_parent");
           return true;
         },
-        max_out_degree: (node) => {
+        max_out_degree: (_node) => {
           checks.push("max_out_degree");
           return Infinity;
         },
@@ -630,15 +630,15 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return true;
         },
-        can_be_parent: (node) => {
+        can_be_parent: (_node) => {
           checks.push("can_be_parent");
           return true;
         },
-        max_out_degree: (node) => {
+        max_out_degree: (_node) => {
           checks.push("max_out_degree");
           return Infinity;
         },
@@ -751,11 +751,11 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return true;
         },
-        can_be_parent: (node) => {
+        can_be_parent: (_node) => {
           checks.push("can_be_parent");
           return true;
         },
@@ -794,7 +794,7 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return true;
         },
@@ -828,7 +828,7 @@ describe("tree.graph with IGraphPolicy", () => {
       const checks: string[] = [];
 
       const policy: tree.graph.IGraphPolicy<DesignNode> = {
-        can_be_child: (node) => {
+        can_be_child: (_node) => {
           checks.push("can_be_child");
           return true;
         },

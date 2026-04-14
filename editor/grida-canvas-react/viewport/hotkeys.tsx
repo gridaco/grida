@@ -892,17 +892,17 @@ export function useEditorHotKeys() {
     toast.success(`opacity: ${o}`);
   });
 
-  useHotkeys("shift+0", (e) => {
+  useHotkeys("shift+0", (_e) => {
     editor.camera.scale(1, "center");
     toast.success(`Zoom to 100%`);
   });
 
-  useHotkeys("shift+1, shift+9", (e) => {
+  useHotkeys("shift+1, shift+9", (_e) => {
     editor.camera.fit("<scene>", { margin: 64 });
     toast.success(`Zoom to fit`);
   });
 
-  useHotkeys("shift+2", (e) => {
+  useHotkeys("shift+2", (_e) => {
     editor.camera.fit("selection", { margin: 64, animate: true });
     toast.success(`Zoom to selection`);
   });
@@ -923,7 +923,7 @@ export function useEditorHotKeys() {
     { preventDefault: true }
   );
 
-  useHotkeys("]", (e) => {
+  useHotkeys("]", (_e) => {
     if (tool.type === "brush") {
       editor.commands.changeBrushSize({ type: "delta", value: 1 });
     } else {
@@ -931,7 +931,7 @@ export function useEditorHotKeys() {
     }
   });
 
-  useHotkeys("[", (e) => {
+  useHotkeys("[", (_e) => {
     if (tool.type === "brush") {
       editor.commands.changeBrushSize({ type: "delta", value: -1 });
     } else {
@@ -978,15 +978,15 @@ export function useEditorHotKeys() {
     editor.surface.a11yAlign({ horizontal: "center" });
   });
 
-  useHotkeys("alt+ctrl+v", (e) => {
+  useHotkeys("alt+ctrl+v", (_e) => {
     editor.commands.distributeEvenly("selection", "x");
   });
 
-  useHotkeys("alt+ctrl+h", (e) => {
+  useHotkeys("alt+ctrl+h", (_e) => {
     editor.commands.distributeEvenly("selection", "y");
   });
 
-  useHotkeys("shift+a", (e) => {
+  useHotkeys("shift+a", (_e) => {
     editor.commands.autoLayout("selection");
   });
 
@@ -1023,12 +1023,12 @@ export function useEditorHotKeys() {
     editor.commands.contain("selection");
   });
 
-  useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {
+  useHotkeys("alt+meta+k, alt+ctrl+k", (_e) => {
     // TODO:
     toast.error("[create component] is not implemented yet");
   });
 
-  useHotkeys("alt+meta+b, alt+ctrl+b", (e) => {
+  useHotkeys("alt+meta+b, alt+ctrl+b", (_e) => {
     // TODO:
     toast.error("[eject component] is not implemented yet");
   });

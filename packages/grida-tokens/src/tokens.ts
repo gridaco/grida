@@ -315,7 +315,7 @@ export namespace tokens {
       | tokens.ShorthandBinaryExpression {
       const is_array_constructed_well = Array.isArray(exp) && exp.length === 3;
       if (is_array_constructed_well) {
-        const [l, op, r] = exp;
+        const [_l, op, _r] = exp;
         if (typeof op === "string" && BINARY_OPERATORS.includes(op as any)) {
           return true;
         }

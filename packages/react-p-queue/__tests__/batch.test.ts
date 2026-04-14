@@ -72,7 +72,7 @@ describe("BatchQueue", () => {
   });
 
   it("should reject the promises if resolver fails", async () => {
-    const errorResolver = async (batch: Task[]): Promise<Result[]> => {
+    const errorResolver = async (_batch: Task[]): Promise<Result[]> => {
       throw new Error("Resolver failed");
     };
 

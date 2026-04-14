@@ -3,7 +3,7 @@
 import React from "react";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
-import { ArrowRight, GiftIcon, Link2, Percent, Star } from "lucide-react";
+import { ArrowRight, GiftIcon, Link2, Percent } from "lucide-react";
 import { sitemap } from "@/www/data/sitemap";
 import { GridaLogo } from "@/components/grida-logo";
 import { Button as FancyButton } from "@/www/ui/button";
@@ -12,7 +12,6 @@ import FooterWithCTA from "@/www/footer-with-cta";
 import Header from "@/www/header";
 import Image from "next/image";
 import Link from "next/link";
-
 import {
   Card,
   CardContent,
@@ -44,14 +43,6 @@ export default function WestPage() {
 }
 
 function HeroSection() {
-  const [email, setEmail] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Email submitted:", email);
-    setEmail("");
-  };
-
   return (
     <section className="relative overflow-hidden py-40 md:py-60">
       <div className="absolute inset-0 -z-10 pointer-events-none dark:hidden">
@@ -273,43 +264,6 @@ function HowItWorksSection() {
   );
 }
 
-function TestimonialsSection() {
-  return (
-    <section id="testimonials" className="py-20">
-      <div className="container">
-        <div className="mx-auto mb-16 max-w-2xl text-center">
-          <div className="inline-block rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-800">
-            Testimonials
-          </div>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-            Tales from the trail
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Hear from pioneers whove struck gold with Grida WEST.
-          </p>
-        </div>
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          <TestimonialCard
-            quote="Grida WEST transformed our referral program. We've seen a 300% increase in referrals since implementing their platform."
-            author="Sarah Johnson"
-            company="Marketing Director, TechStart"
-          />
-          <TestimonialCard
-            quote="The gamification features have completely changed how our customers interact with our brand. Engagement is through the roof!"
-            author="Michael Chen"
-            company="CEO, Engage Solutions"
-          />
-          <TestimonialCard
-            quote="Setting up quests for our onboarding process has reduced our churn rate by 40%. The ROI has been incredible."
-            author="Jessica Williams"
-            company="Product Manager, SaaS Innovators"
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function FeatureCard({
   icon,
   title,
@@ -380,33 +334,6 @@ function StepCard({
   );
 }
 
-function TestimonialCard({
-  quote,
-  author,
-  company,
-}: {
-  quote: string;
-  author: string;
-  company: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-6 shadow-sm">
-      <div className="flex mb-4 text-slate-600">
-        <Star className="size-5 fill-current" />
-        <Star className="size-5 fill-current" />
-        <Star className="size-5 fill-current" />
-        <Star className="size-5 fill-current" />
-        <Star className="size-5 fill-current" />
-      </div>
-      <p className="mb-4 italic text-muted-foreground">&quot;{quote}&quot;</p>
-      <div>
-        <p className="font-semibold">{author}</p>
-        <p className="text-sm text-muted-foreground">{company}</p>
-      </div>
-    </div>
-  );
-}
-
 function InteractiveCardDemo() {
   const [activeCard, setActiveCard] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -448,10 +375,6 @@ function InteractiveCardDemo() {
     setTimeout(() => {
       setActiveCard((prev) => (prev - 1 + cards.length) % cards.length);
     }, 300);
-  };
-
-  const handleFlip = () => {
-    setFlipped(!flipped);
   };
 
   return (

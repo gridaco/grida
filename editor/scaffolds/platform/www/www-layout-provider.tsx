@@ -52,7 +52,7 @@ export function WWWLayoutProvider({
   id,
   children,
 }: React.PropsWithChildren<{ id: string }>) {
-  const { data, loading, error } = __useWWWLayoutData(id);
+  const { data, loading } = __useWWWLayoutData(id);
   if (loading) {
     return <Spinner />;
   }

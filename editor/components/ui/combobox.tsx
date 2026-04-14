@@ -274,7 +274,7 @@ function ComboboxChip({
 
 function ComboboxChipsInput({
   className,
-  children,
+  children: _children,
   ...props
 }: ComboboxPrimitive.Input.Props) {
   return (

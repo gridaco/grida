@@ -251,8 +251,8 @@ export default function DegreeControl({
     [rotation, getVisualAngle]
   );
   const handleAngle = (visualAngle - 90) * (Math.PI / 180);
-  const handleX = center + radius * Math.cos(handleAngle);
-  const handleY = center + radius * Math.sin(handleAngle);
+  const _handleX = center + radius * Math.cos(handleAngle);
+  const _handleY = center + radius * Math.sin(handleAngle);
 
   // Render the control
   const renderControl = useCallback(

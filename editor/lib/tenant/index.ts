@@ -1,3 +1,4 @@
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace Tenant.www.metadata {
   export function getOpenGraphImages(src: string | null) {
     const images = [];

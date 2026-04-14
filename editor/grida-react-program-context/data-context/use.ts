@@ -26,7 +26,7 @@ export const useValue = <T = any>(key?: access.KeyPath<T>): any => {
   });
 };
 
-export const useSelectValue = <T>({
+export const useSelectValue = ({
   keys,
 }: {
   keys: Array<Array<string>>;

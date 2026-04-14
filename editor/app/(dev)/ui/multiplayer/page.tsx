@@ -27,7 +27,6 @@ import { Badge } from "@/components/ui/badge";
 function MultiplayerDemoContent() {
   const [messages, setMessages] = useState<string[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [bubblePosition, setBubblePosition] = useState({ x: 0, y: 0 });
 
   // Global store
   const { state } = useMultiplayerStore();
@@ -40,7 +39,7 @@ function MultiplayerDemoContent() {
 
   const { showEffect } = useChatEffects();
 
-  const handleValueChange = (value: string) => {
+  const handleValueChange = (_value: string) => {
     // Handle typing events if needed
   };
 
@@ -50,8 +49,8 @@ function MultiplayerDemoContent() {
     showEffect(
       value,
       {
-        x: bubblePosition.x + 28,
-        y: bubblePosition.y + 24,
+        x: 28,
+        y: 24,
       },
       {
         fill: "#3b82f6",

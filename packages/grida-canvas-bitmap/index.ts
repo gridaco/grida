@@ -118,8 +118,6 @@ export type BitmapEditorRuntimeBrush = IBitmapEditorBrush & {
  * This type is used as a configuration option to control how the layer behaves when a paint
  * operation extends beyond its current boundaries.
  */
-type OverflowMode = "clip" | "auto";
-
 /**
  * [BitmapLayerEditor] is a class that provides a simple API for editing a bitmap layer.
  *

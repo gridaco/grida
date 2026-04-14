@@ -142,7 +142,7 @@ function Ready() {
  */
 
 function SetupStartPage() {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const dialog = useDialogState("browse-start-page-templates");
 
   const setupStartPage = useCallback(
@@ -194,6 +194,7 @@ function SetupStartPage() {
   );
 }
 
+// oxlint-disable-next-line no-unused-vars
 function StartPageEditor({ template_id }: { template_id: string }) {
   const [edit, setEdit] = useState(false);
 
@@ -241,7 +242,7 @@ function StartPageEditor({ template_id }: { template_id: string }) {
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProps, rootProperties, rootProps } =
     useRootTemplateInstanceNode("page");
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   // const { uploadPublic } = useDocumentAssetUpload();
   // const debouncedRichTextHtmlChange = useDebounceCallback(

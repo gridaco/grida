@@ -20,7 +20,7 @@ export async function GET(
 
   const avatar_url = PublicUrls.organization_avatar_url(client);
 
-  const { data: organizations, error: organizations_err } = await client
+  const { data: organizations, error: __organizations_err } = await client
     .from("organization")
     .select("*");
 
@@ -28,7 +28,7 @@ export async function GET(
     return notFound();
   }
 
-  const { data: projects, error: projects_err } = await client
+  const { data: projects, error: __projects_err } = await client
     .from("project")
     .select("*")
     .eq("organization_id", organization_id);

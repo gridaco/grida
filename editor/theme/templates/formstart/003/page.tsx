@@ -18,8 +18,6 @@ const userprops = {
   background: { type: "image" },
 } satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
-type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
-
 export default function _003() {
   return <Consumer />;
 }

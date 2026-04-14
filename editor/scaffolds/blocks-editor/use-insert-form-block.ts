@@ -25,7 +25,7 @@ import Fuse from "fuse.js";
  */
 export default function useInsertFormBlockMenu() {
   const [search, setSearch] = React.useState("");
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   const addBlock = useCallback(
     (block: FormBlockType, index?: number) => {

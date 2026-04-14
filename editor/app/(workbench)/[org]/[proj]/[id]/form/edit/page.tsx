@@ -39,7 +39,7 @@ function CanvasEventTarget({
 }: React.PropsWithChildren<{
   className?: string;
 }>) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   const clearselection = () => dispatch({ type: "blocks/blur" });
 
@@ -59,12 +59,9 @@ function CanvasOverlay() {
 }
 
 function CurrentPageCanvas() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
-  const {
-    theme: { lang },
-    selected_page_id,
-  } = state;
+  const { selected_page_id } = state;
 
   switch (selected_page_id) {
     case "form":

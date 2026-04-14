@@ -42,7 +42,7 @@ export async function exportAsImage(
 
       // Exclude nodes that match the XPath query
       filter = (domNode) => excludedNodes.has(domNode as HTMLElement);
-    } catch (error) {
+    } catch {
       throw new Error("Invalid XPath");
     }
   }

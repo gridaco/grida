@@ -52,7 +52,7 @@ const useDebouncedDatagridQuery = (): Data.Relation.QueryState | null => {
 };
 
 const useRefresh = () => {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   return useCallback(() => {
     dispatch({
@@ -175,7 +175,7 @@ function useFetchResponseSessions(form_id: string) {
 }
 
 function useChangeDatagridLoading() {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   return useCallback(
     (loading: boolean) => {
@@ -223,7 +223,6 @@ function useSyncCellChangesEffect(
 
   useEffect(() => {
     current?.forEach((r) => {
-      r.data;
       Object.keys(r.data).forEach((attrkey) => {
         const cell = r.data[attrkey];
         const prevcell = prev?.find((pr) => pr.id === r.id)?.data[attrkey];
@@ -236,11 +235,11 @@ function useSyncCellChangesEffect(
             value: cell.value,
             option_id: cell.form_field_option_id,
           })
-            .then((data) => {
+            .then((_data) => {
               // TODO:
               // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
             })
-            .catch((error) => {
+            .catch((_error) => {
               // else revert the change
             });
 
@@ -267,7 +266,7 @@ function useXSBTableFeed(
   },
   dpes?: React.DependencyList
 ) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const enabled = !!sb_table_id;
 
   const datagrid_query = useDebouncedDatagridQuery();
@@ -368,7 +367,7 @@ function useXSBUpdateRow({
         }
       ).then((res) => res.json());
 
-      const { data, error } = res;
+      const { error } = res;
       if (error) {
         console.error(error, {
           key,
@@ -405,7 +404,7 @@ function useResolveTransactions(
     if (tobequeued.length === 0) return;
 
     for (const q of tobequeued) {
-      const { row, column, data } = q;
+      const { row, data } = q;
       const fn = async () => {
         operators.update(row, data).finally(() => {
           onTransactionFinally?.(q.digest);
@@ -613,7 +612,7 @@ export function FormResponseSessionFeedProvider({
         data: [data as any],
       });
     },
-    onDelete: (data) => {
+    onDelete: (_data) => {
       // this cant happen
     },
     enabled: realtime_sessions_enabled,
@@ -869,7 +868,7 @@ export function GridaSchemaXSBTableFeedProvider({
   table_id: string;
   sb_table_id: number;
 }) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   useXSBTableFeed({
     table_id: table_id,

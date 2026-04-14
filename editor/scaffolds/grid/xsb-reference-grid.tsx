@@ -55,7 +55,7 @@ export function XSBReferenceTableGrid<
             </CellRoot>
           );
         },
-        renderCell: ({ row, column }: RenderCellProps<any>) => {
+        renderCell: ({ row, column: _column }: RenderCellProps<any>) => {
           const val = row[col.key as keyof GridDataXSBUnknown.DataGridRow];
           const display = masked
             ? val

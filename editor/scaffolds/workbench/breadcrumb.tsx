@@ -24,7 +24,7 @@ export function Breadcrumbs() {
     doctype,
   } = state;
 
-  const [__org, __proj, id, ...paths] = pathname.split("/").slice(1);
+  const [__org, __proj, __id, ...paths] = pathname.split("/").slice(1);
 
   return (
     <Breadcrumb>

@@ -75,30 +75,6 @@ import {
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { RenameDialog } from "@/components/dialogs/rename-dialog";
 
-function SidebarMenuLinkButton({
-  href,
-  layout,
-  children,
-  ...props
-}: React.ComponentProps<typeof SidebarMenuButton> & {
-  href: string;
-  /**
-   * If true, the this is a layout link, and also stays selected when the path is a subpath of the href
-   */
-  layout?: boolean;
-}) {
-  const pathName = usePathname();
-
-  const selected =
-    pathName === href || (layout && pathName.startsWith(href + "/"));
-
-  return (
-    <SidebarMenuButton {...props} asChild isActive={selected}>
-      <Link href={href}>{children}</Link>
-    </SidebarMenuButton>
-  );
-}
-
 const menu = {
   navMain: [
     // // TODO:
@@ -217,7 +193,6 @@ function PricingTierCard({
   const { display_plan: tier, members } = organization;
   const ENTERPRISE_DEFAULT_SEATS = 5;
   const label = Labels.priceTier(tier);
-  const isFree = tier === "free";
   const isEnterprise = tier === "v0_enterprise";
   const isTeam = tier === "v0_team";
   const canUpgrade = !isEnterprise && !isTeam;

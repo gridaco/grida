@@ -17,15 +17,12 @@ import {
   DataProvider,
   ProgramDataContextHost,
 } from "@/grida-react-program-context/data-context/context";
-import type { Action } from "@/grida-canvas/action";
 import equal from "fast-deep-equal";
 import { is_direct_component_consumer } from "@/grida-canvas/utils/supports";
 import { Editor } from "@/grida-canvas/editor";
 import { EditorContext, useCurrentEditor, useEditorState } from "./use-editor";
 import assert from "assert";
 import { cursors } from "../components/cursor/cursor-data";
-
-type Dispatcher = (action: Action) => void;
 
 export function StandaloneDocumentEditor({
   editor,

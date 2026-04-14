@@ -283,7 +283,7 @@ export function DataGrid({
             rows={rows}
             rowHeight={32}
             headerRowHeight={36}
-            onCellDoubleClick={({ column, row }) => {
+            onCellDoubleClick={({ column, row: _row }) => {
               if (readonly) {
                 //
                 toast("This table is readonly", { icon: "🔒" });
@@ -405,7 +405,7 @@ function DefaultPropertyCustomerCell({
   column,
   row,
 }: RenderCellProps<RenderingRow>) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   const data = row.__gf_customer_id;
 
@@ -830,7 +830,6 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
       e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
       if (e.key === "Enter") {
-        const val = ref.current?.value;
         onCommit(e);
       }
       if (e.key === "Escape") {
@@ -884,7 +883,7 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
           try {
             const date = new Date(val);
             val = date.toISOString();
-          } catch (e) {
+          } catch {
             // when user leaves the field empty
             return;
           }
@@ -1057,7 +1056,7 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
               </SelectTrigger>
               <SelectContent>
                 {options &&
-                  Object.keys(options)?.map((key, i) => {
+                  Object.keys(options)?.map((key, _i) => {
                     const opt = options[key];
                     return (
                       <SelectItem key={key} value={key}>

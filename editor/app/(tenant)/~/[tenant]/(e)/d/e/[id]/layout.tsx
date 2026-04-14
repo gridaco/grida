@@ -82,7 +82,7 @@ export default async function Layout({
 }>) {
   const { id } = await params;
 
-  const { data, error } = await service_role.forms
+  const { data } = await service_role.forms
     .from("form_document")
     .select(
       `

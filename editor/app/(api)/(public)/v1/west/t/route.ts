@@ -2,10 +2,10 @@ import { Platform } from "@/lib/platform";
 import { service_role } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import assert from "assert";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const headersList = await headers();
   const campaign_id = headersList.get(
     Platform.headers["x-grida-west-campaign-id"]

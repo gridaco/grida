@@ -357,7 +357,7 @@ function CustomComponent_Viewer__Referrer(
 function CustomComponent_Viewer__ReferrerShare(
   componentprops: ViewerComponentProps
 ) {
-  const { campaign, props, locale } = useViewerContext();
+  const { props, locale } = useViewerContext();
 
   return (
     <div
@@ -385,7 +385,7 @@ function CustomComponent_Viewer__ReferrerShare(
 function CustomComponent_Viewer__ReferrerShareMessage(
   componentprops: ViewerComponentProps
 ) {
-  const { campaign, props, locale } = useViewerContext();
+  const { props } = useViewerContext();
 
   const message = props?.components?.["referrer-share-message"]?.message;
 

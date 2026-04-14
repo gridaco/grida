@@ -99,7 +99,7 @@ function __self_evt_on_click(
   action: EditorEventTarget_Click,
   context: ReducerContext
 ) {
-  const { node_ids_from_point, shiftKey } = <EditorEventTarget_Click>action;
+  const { node_ids_from_point } = <EditorEventTarget_Click>action;
   draft.hits = node_ids_from_point;
 
   // Handle deferred selection operations using the testable decision function
@@ -201,11 +201,7 @@ function __self_evt_on_double_click(draft: editor.state.IEditorState) {
   // - DOES NOT "enter content edit mode" - this is handled by its own action.
   if (draft.gesture.type !== "idle") return; // ignore when gesture is active
 
-  const {
-    document_ctx,
-    selection,
-    hits: surface_raycast_detected_node_ids,
-  } = draft;
+  const { selection, hits: surface_raycast_detected_node_ids } = draft;
   // #region [nested selection]
   // - focus on the next descendant (next deep) hit node (if any) relative to the selection
 
@@ -243,7 +239,7 @@ function __self_evt_on_double_click(draft: editor.state.IEditorState) {
 function __self_pointer_down_selection_like_cursor(
   draft: editor.state.IEditorState,
   shiftKey: boolean,
-  context: ReducerContext
+  _context: ReducerContext
 ) {
   const { hovered_node_id } = self_updateSurfaceHoverState(draft);
 

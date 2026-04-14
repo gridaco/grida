@@ -12,7 +12,7 @@ export function IntegrationsSearch() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();

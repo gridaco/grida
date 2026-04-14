@@ -28,10 +28,10 @@ export function EditValueExpression() {
 export function EditBinaryExpression<
   ResolvedType extends "boolean" | "number" | "string",
 >({
-  defaultValue,
+  defaultValue: _defaultValue,
   onValueChange,
   leftOptions,
-  resolvedType,
+  resolvedType: _resolvedType,
   rightOptions: resolveRightOptions,
 }: {
   resolvedType: ResolvedType;

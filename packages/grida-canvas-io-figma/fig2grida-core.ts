@@ -220,23 +220,6 @@ function buildMergedDocument(
   };
 }
 
-function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
-  const archiveBytes = io.archive.pack(
-    merged.document,
-    merged.imageRecord,
-    undefined,
-    undefined,
-    { level: 0, snapshot: false, skip_sort: true }
-  );
-
-  return {
-    bytes: archiveBytes,
-    pageNames: merged.pageNames,
-    nodeCount: merged.nodeCount,
-    imageCount: Object.keys(merged.imageRecord).length,
-  };
-}
-
 /**
  * Pack a {@link GridaDocumentResult} into a `.grida` archive.
  * Bridges the in-memory API to the archive API.

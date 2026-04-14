@@ -21,7 +21,7 @@ export function CMSVideoAssetField({
   uploader,
   onValueChange,
 }: ImageAssetFieldProps) {
-  const { openFilePicker, plainFiles, loading } = useFilePicker({
+  const { openFilePicker, plainFiles } = useFilePicker({
     readAs: "ArrayBuffer",
     accept: "video/*",
     multiple: false,
@@ -67,7 +67,7 @@ export function CMSImageAssetField({
   uploader,
   onValueChange,
 }: ImageAssetFieldProps) {
-  const { openFilePicker, plainFiles, loading } = useFilePicker({
+  const { openFilePicker, plainFiles } = useFilePicker({
     readAs: "ArrayBuffer",
     accept: "image/*",
     multiple: false,
@@ -113,7 +113,7 @@ export function CMSImageField({
   uploader,
   onValueChange,
 }: BucketFileFieldProps) {
-  const { openFilePicker, plainFiles, loading } = useFilePicker({
+  const { openFilePicker, plainFiles } = useFilePicker({
     readAs: "ArrayBuffer",
     accept: "image/*",
     multiple: false,

@@ -275,7 +275,7 @@ type UseQueueReturnType<T, P> = {
 };
 // #endregion hook
 
-function useQueueStore<T, P>(): PQResolverResult<T, any>[] {
+function useQueueStore<T, _P>(): PQResolverResult<T, any>[] {
   const state = useContext(PQueueContext);
   if (!state) throw new Error("QueueProvider not provided");
   const { store } = state;

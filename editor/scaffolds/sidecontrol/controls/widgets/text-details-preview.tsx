@@ -136,8 +136,8 @@ function BasicsPreview({ style }: { style?: React.CSSProperties }) {
 
 function AxesPreview({
   axes,
-  fontVariations = {},
-  fontWeight,
+  fontVariations: _fontVariations = {},
+  fontWeight: _fontWeight,
   fontFamily,
   hoveredAxis,
 }: AxesPreviewProps & {

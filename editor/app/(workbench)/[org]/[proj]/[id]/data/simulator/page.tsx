@@ -570,9 +570,7 @@ function WillStartSoon({ at, onExpire }: { at: Date; onExpire?: () => void }) {
     hours,
     days,
     isRunning,
-    start,
     pause,
-    resume,
     restart,
   } = useTimer({
     // +10 seconds

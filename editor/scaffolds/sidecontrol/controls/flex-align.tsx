@@ -156,12 +156,10 @@ export function FlexAlignControl({
   onValueChange,
   className,
 }: FlexAlignControlProps) {
-  const isMixed = value === grida.mixed;
   const hasValue = value && value !== grida.mixed;
 
   const mainAxisAlignment = hasValue ? value.mainAxisAlignment : undefined;
   const crossAxisAlignment = hasValue ? value.crossAxisAlignment : undefined;
-  const isHorizontal = direction === "horizontal";
 
   // Define the 3x3 grid combinations
   const mainAxisOptions: MainAxisAlignment[] = ["start", "center", "end"];

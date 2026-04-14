@@ -54,7 +54,7 @@ const initialNodes = [
 const initialEdges = [{ id: "e1-2", source: "v", target: "o" }];
 
 export function ExpressionEditor() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, _setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const nodeTypes = useMemo(
@@ -159,7 +159,7 @@ function NumericBinaryExpressionNode() {
   );
 }
 
-function PropertyNode({ data }: any) {
+function PropertyNode({ data: _data }: any) {
   return (
     <div className="px-4 py-2 shadow-md rounded-md border">
       <div>

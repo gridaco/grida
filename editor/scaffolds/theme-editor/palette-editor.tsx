@@ -17,7 +17,6 @@ import palettes from "@/theme/palettes";
 export function ThemePalette({
   dark: _dark,
   value,
-  preset,
   onPresetChange,
   onValueChange,
   onDarkChange,

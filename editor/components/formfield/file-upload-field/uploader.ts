@@ -1,6 +1,4 @@
-import { createBrowserFormsClient } from "@/lib/supabase/client";
 import {
-  GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
   GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
 } from "@/k/env";
@@ -49,6 +47,7 @@ export function makeUploader(strategy?: FileUploadStrategy) {
   }
 }
 
+/*
 async function makeSignedUrlUploader({
   signed_urls,
 }: {
@@ -68,10 +67,9 @@ async function makeSignedUrlUploader({
     return { path: uploaded?.path };
   };
 }
+ */
 
 function makeRequestUrlUploader({ request_url }: { request_url: string }) {
-  const supabase = createBrowserFormsClient();
-
   return async (file: File) => {
     const res = await fetch(request_url, {
       method: "PUT",
@@ -90,7 +88,7 @@ function makeRequestUrlUploader({ request_url }: { request_url: string }) {
       (await res.json()) as FormsApiResponse<SessionSignedUploadUrlData>;
 
     if (data) {
-      const { signedUrl, path, token } = data;
+      const { signedUrl } = data;
 
       // const { data: uploaded } = await supabase.storage
       //   .from(GRIDA_FORMS_RESPONSE_BUCKET)

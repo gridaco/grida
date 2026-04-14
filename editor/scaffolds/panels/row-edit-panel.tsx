@@ -62,7 +62,7 @@ export function RowEditPanel({
     row: TVirtualRow<FormResponseField, FormResponse>;
   }>;
 }) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const { row } = init ?? {};
 
   const [advanced, setAdvanced] = useState<boolean>(mode === "update");
@@ -186,7 +186,7 @@ function FormViewProvider({
   const { session, clearSessionStorage } = useRequestFormSession(form_id);
   const {
     data: res,
-    error: servererror,
+    error: __servererror,
     isLoading,
   } = useFormSession(form_id, {
     mode: "signed",
@@ -201,7 +201,7 @@ function FormViewProvider({
     };
   }, []);
 
-  const { data, error } = res || {};
+  const { data } = res || {};
 
   if (isLoading || !session || !data) {
     return (
@@ -294,7 +294,7 @@ function SectionResponseCustomerDetails({
 }: {
   response: ResponseRow;
 }) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   const onViewCustomerDetailsClick = useCallback(
     (customer_id: string) => {

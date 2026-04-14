@@ -148,15 +148,6 @@ function PlayerTrigger({
   );
 }
 
-function PlayerPlayTrigger({ children }: React.PropsWithChildren) {
-  const { play } = useMediaSession();
-  return (
-    <Button onClick={play} variant="ghost" size="icon">
-      {children}
-    </Button>
-  );
-}
-
 function PlayerNextTrigger({
   children,
   ...props

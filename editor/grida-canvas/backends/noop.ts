@@ -5,16 +5,18 @@ import type { editor } from "..";
 export class NoopGeometryQueryInterfaceProvider
   implements editor.api.IDocumentGeometryInterfaceProvider
 {
-  getNodeIdsFromPoint(point: cmath.Vector2): string[] {
+  getNodeIdsFromPoint(_point: cmath.Vector2): string[] {
     return [];
   }
-  getNodeIdsFromEnvelope(envelope: cmath.Rectangle): string[] {
+  getNodeIdsFromEnvelope(_envelope: cmath.Rectangle): string[] {
     return [];
   }
-  getNodeAbsoluteBoundingRect(node_id: string): cmath.Rectangle | null {
+  getNodeAbsoluteBoundingRect(_node_id: string): cmath.Rectangle | null {
     return null;
   }
-  getNodeIdsFromPointerEvent(event: editor.api.events.IPointerEvent): string[] {
+  getNodeIdsFromPointerEvent(
+    _event: editor.api.events.IPointerEvent
+  ): string[] {
     return [];
   }
 }

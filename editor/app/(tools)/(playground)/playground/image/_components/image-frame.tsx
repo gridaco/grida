@@ -7,10 +7,10 @@ import { cn } from "@/components/lib/utils";
 export function GenerationImageFrame({
   image,
   className,
-  width,
-  height,
+  width: _width,
+  height: _height,
   start,
-  end,
+  end: _end,
 }: {
   image: {
     src: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import {
   Tree,

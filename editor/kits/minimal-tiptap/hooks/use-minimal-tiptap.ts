@@ -179,7 +179,7 @@ export const useMinimalTiptapEditor = ({
   extensions,
   onUpdate,
   onBlur,
-  uploader,
+  uploader: _uploader,
   ...props
 }: UseMinimalTiptapEditorProps) => {
   const throttledSetValue = useThrottle(

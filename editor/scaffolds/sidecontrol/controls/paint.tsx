@@ -370,7 +370,7 @@ function ContextVariableColors({
 }) {
   const schema = useSchema();
   const colors = Object.entries(schema?.properties ?? {}).filter(
-    ([key, def]) => {
+    ([_key, def]) => {
       return def.type === "rgbaf";
     }
   );
@@ -904,7 +904,7 @@ function GradientActions({
       <Button
         onClick={() => {
           const flippedStops = value.stops
-            .map((stop: any, index: number) => ({
+            .map((stop: any, _index: number) => ({
               ...stop,
               offset: 1 - stop.offset,
             }))

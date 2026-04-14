@@ -52,7 +52,7 @@ export function TemplateEditor({
   getComponent,
   getPropTypes,
   lang,
-  t,
+  t: _t,
   onSave,
   onCancel,
 }: {
@@ -139,7 +139,7 @@ export function TemplateEditor({
           ...acc,
           [key]: render(text, context),
         };
-      } catch (e) {
+      } catch {
         return acc;
       }
     }, {});

@@ -679,23 +679,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
   };
 }
 
-function sitedocumentpagesinit({
-  basepath,
-  document_id,
-}: {
-  basepath: string;
-  document_id: string;
-}): MenuGroup<{ id: string }>[] {
-  // {
-  //   id: "site",
-  //   label: "home",
-  //   link: {
-  //     href: `/${basepath}/${document_id}/design`,
-  //   },
-  // },
-  return [];
-}
-
 function formdocumentpagesinit({
   basepath,
   document_id,

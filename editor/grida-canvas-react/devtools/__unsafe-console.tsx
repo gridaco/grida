@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
 import { AutoHeightThemedMonacoEditor } from "@/components/monaco";
 import { toast } from "sonner";
@@ -151,15 +151,3 @@ const serialize = (value: string) => {
     return e.message;
   }
 };
-
-function SafeSerialized({ value }: { value: any }) {
-  const txt = useMemo(() => {
-    try {
-      return JSON.stringify(value);
-    } catch (e: any) {
-      return e.message;
-    }
-  }, [value]);
-
-  return <>{txt}</>;
-}

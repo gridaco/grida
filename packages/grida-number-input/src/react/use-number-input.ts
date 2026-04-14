@@ -443,17 +443,11 @@ export function useNumberInput<MIXED = "mixed">({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const txt = e.target.value;
 
-      // For inputs with suffix, show raw user input until commit
+      // Always show the raw user input until commit.
       // This prevents the "1%2" issue when typing "12" in a percentage input
-      if (suffix) {
-        setInternalValue(txt);
-      } else {
-        // For inputs without suffix, parse and show the value
-        const value = n.parseValueWithScaling(txt, type, suffix, scale);
-        setInternalValue(txt);
-      }
+      // (the suffix sits in the middle of the string mid-edit).
+      setInternalValue(txt);
 
-      // Always parse the value for callbacks, even if we don't display it
       const value = n.parseValueWithScaling(txt, type, suffix, scale);
 
       switch (mode) {

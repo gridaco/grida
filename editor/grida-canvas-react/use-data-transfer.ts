@@ -557,7 +557,7 @@ export function useDataTransferEventTarget() {
         // No clipboard items, fallback to local clipboard
         instance.surface.a11yPaste();
       }
-    } catch (e) {
+    } catch {
       // Clipboard API may fail (permissions, etc.), fallback to local clipboard
       instance.surface.a11yPaste();
     }

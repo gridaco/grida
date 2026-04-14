@@ -23,7 +23,7 @@ export async function PUT(
   let body = {};
   try {
     body = await req.json();
-  } catch (e) {
+  } catch {
     // when body is empty and only query params are present (this is ok.)
   }
 

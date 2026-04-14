@@ -18,8 +18,6 @@ import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 import { motion } from "motion/react";
 import useMergedRef from "@/hooks/use-merged-ref";
 
-type TransformOrigin = [0 | 1, 0 | 1];
-
 /**
  * [x1 y1 x2 y2]
  */
@@ -650,7 +648,7 @@ function reducer(state: State, action: Action): State {
       });
     }
   }
-  return produce(state, (draft) => {});
+  return produce(state, () => {});
 }
 
 const useDispatch = (): FlatDispatcher => {
@@ -739,7 +737,7 @@ export function GridEditor({
   onBlockDoubleClick,
   renderer,
 }: EditorProps) {
-  const [state, dispatch] = useGridState();
+  const [state] = useGridState();
 
   const [col, row] = state.size;
 
@@ -796,7 +794,6 @@ export function GridEditor({
 function GridGuide({
   col,
   row,
-  debug,
 }: {
   col: number;
   row: number;
@@ -820,7 +817,7 @@ function GridGuide({
   //   }}
   // ></div>
 
-  const [state, dispatch] = useGridState();
+  const [state] = useGridState();
 
   const { width, height } = state;
 
@@ -852,8 +849,8 @@ function GridGuide({
 }
 
 function Cell({ pos, index }: { pos: GridPosition; index: number }) {
-  const [state, dispatch] = useGridState();
-  const [col, row] = state.size;
+  const [state] = useGridState();
+  const [col] = state.size;
   const [_mx1, _my1, _mx2, _my2] = state.area ?? [-1, -1, -1, -1];
 
   const is_in_marquee =

@@ -43,7 +43,7 @@ export function FormAgentGlobalWindowMessagingInterface({
       });
     };
 
-    const cb_popstate = (ev: PopStateEvent) => {
+    const cb_popstate = (_ev: PopStateEvent) => {
       FormAgentMessagingInterface.emit({ type: "popstate" });
     };
 

@@ -42,7 +42,7 @@ function SectionGeometry({ node_id }: { node_id: string }) {
   const {
     value: mirroring,
     setValue: setMirroring,
-    disabled: mirroringDisabled,
+    // disabled: mirroringDisabled,
   } = useTangentMirroring(
     node_id,
     vectorNetwork,

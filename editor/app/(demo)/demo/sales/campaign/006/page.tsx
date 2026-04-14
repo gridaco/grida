@@ -2,7 +2,7 @@ import _006 from "@/theme/templates/formstart/006/page";
 import _messages from "@/theme/templates/formstart/006/messages.json";
 import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 
-const dummy = {
+const _dummy = {
   meta: {
     max_form_responses_by_customer: 100,
     is_max_form_responses_by_customer_enabled: true,

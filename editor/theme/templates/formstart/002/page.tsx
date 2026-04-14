@@ -41,8 +41,6 @@ import { ACME } from "@/components/logos/acme";
 const userprops =
   {} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
-type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
-
 export default function _002() {
   return (
     <ScreenRoot>

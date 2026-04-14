@@ -612,7 +612,7 @@ function TableQueryToggles() {
 }
 
 function TableMod() {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   const openNewTuplePanel = useCallback(() => {
     dispatch({

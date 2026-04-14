@@ -25,8 +25,8 @@ export function IntegrationCard({
   integration,
   isConnected,
 }: IntegrationCardProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState(isConnected);
+  const [isLoading, _setIsLoading] = useState(false);
+  const [connectionStatus, _setConnectionStatus] = useState(isConnected);
 
   // const Icon = iconMap[integration.icon];
 

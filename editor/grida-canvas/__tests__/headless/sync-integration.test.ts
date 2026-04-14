@@ -129,7 +129,7 @@ class MockServer {
     if (!session) return;
     switch (msg.type) {
       case "connect":
-        this._handleConnect(session, msg);
+        this._handleConnect(session);
         break;
       case "push":
         this._handlePush(session, msg);
@@ -140,10 +140,7 @@ class MockServer {
     }
   }
 
-  private _handleConnect(
-    session: MockSession,
-    msg: { schema: string; lastClock: number }
-  ): void {
+  private _handleConnect(session: MockSession): void {
     session.transport.deliver({
       type: "connect_ok",
       clock: this.clock.value,

@@ -3568,7 +3568,7 @@ export class Editor
       // Safari doesn't support the "device-pixel-content-box" box option
       try {
         ro.observe(el, { box: "device-pixel-content-box" });
-      } catch (e) {
+      } catch {
         // Fallback for browsers that don't support device-pixel-content-box (e.g., Safari)
         ro.observe(el);
       }
@@ -5274,7 +5274,7 @@ export class EditorSurface
     });
   }
 
-  surfacePointerUp(event: editor.api.events.IPointerEvent) {
+  surfacePointerUp(_event: editor.api.events.IPointerEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-pointer-up",
     });
@@ -5302,7 +5302,7 @@ export class EditorSurface
     });
   }
 
-  surfaceDoubleClick(event: editor.api.events.IPointerEvent) {
+  surfaceDoubleClick(_event: editor.api.events.IPointerEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-double-click",
     });
@@ -5530,7 +5530,7 @@ export class EditorSurface
 
   public async writeClipboardMedia(
     target: "selection" | editor.NodeID,
-    format: "png"
+    _format: "png"
   ): Promise<boolean> {
     assert(
       this._editor.backend === "canvas",

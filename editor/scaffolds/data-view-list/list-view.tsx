@@ -46,13 +46,10 @@ export function DataListView({
 
   assert(definition);
 
-  const {
-    normalpropertykeys,
-    prioritiezed_virtual_media_columns,
-    primary_virtual_media_column,
-  } = useMemo(() => {
-    return analyze({ definition, fields: fields });
-  }, [definition, fields]);
+  const { normalpropertykeys, prioritiezed_virtual_media_columns } =
+    useMemo(() => {
+      return analyze({ definition, fields: fields });
+    }, [definition, fields]);
 
   // Memoized Row function
   const Row = useCallback(

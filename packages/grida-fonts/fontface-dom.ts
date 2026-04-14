@@ -30,7 +30,7 @@ export class DomFontAdapter implements FontAdapter {
     return { id: face };
   }
 
-  onUnregister(handle: FontAdapterHandle, v: FontVariant): void {
+  onUnregister(handle: FontAdapterHandle, _v: FontVariant): void {
     const face = handle.id as FontFace;
     this.d.fonts.delete(face);
   }

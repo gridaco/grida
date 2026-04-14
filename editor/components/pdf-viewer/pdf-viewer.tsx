@@ -78,10 +78,6 @@ function PDFDocumentCurrentPage() {
   return <Page pageNumber={page} loading={<Spinner />} />;
 }
 
-function PDFDocumentPage({ pageNumber }: { pageNumber: number }) {
-  return <Page pageNumber={pageNumber} loading={<Spinner />} />;
-}
-
 function PDFPagination({ ...props }: React.HTMLAttributes<HTMLDivElement>) {
   const { pages, page, setPage } = usePDFDocument();
   return (

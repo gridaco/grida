@@ -72,7 +72,7 @@ describe("Unified Font Manager - Core Functionality", () => {
 
       // Find the regular variant FontFace
       const regularCall = fontFaceCalls.find((call) => {
-        const [family, src, descriptor] = call;
+        const [family, _src, descriptor] = call;
         return family === "Inter" && descriptor.style === "normal";
       });
 
@@ -88,7 +88,7 @@ describe("Unified Font Manager - Core Functionality", () => {
 
       // Find the italic variant FontFace
       const italicCall = fontFaceCalls.find((call) => {
-        const [family, src, descriptor] = call;
+        const [family, _src, descriptor] = call;
         return family === "Inter" && descriptor.style === "italic";
       });
 

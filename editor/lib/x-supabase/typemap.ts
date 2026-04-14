@@ -9,8 +9,6 @@ export namespace PostgresTypeTools {
    * - `suggested` - The field is suggested and likely to be used.
    * - `allowed` - The field is allowed, yet not likely to be suggested.
    */
-  type SuggestionType = keyof SuggestionMap;
-
   type SuggestionMap = {
     default: FormInputType;
     suggested: FormInputType[];

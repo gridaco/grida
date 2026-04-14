@@ -285,7 +285,7 @@ describe("create_packed_scene_document_from_prototype", () => {
       const result =
         grida.program.nodes.factory.create_packed_scene_document_from_prototype(
           prototype,
-          (data) => {
+          (_data) => {
             // Generator should be bypassed for nodes with _$id
             return `auto-${counter++}`;
           }

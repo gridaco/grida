@@ -23,7 +23,7 @@ function validate(value: string | undefined): any | false {
     // check if object (not array)
     assert(parsed && typeof parsed === "object" && !Array.isArray(parsed));
     return parsed;
-  } catch (e) {
+  } catch {
     return false;
   }
 }

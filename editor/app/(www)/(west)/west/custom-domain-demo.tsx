@@ -188,7 +188,7 @@ const initialNodes: Node[] = [
 ];
 
 function ReferralTree() {
-  const [nodes, setNodes] = useState<Node[]>(initialNodes);
+  const [nodes, _setNodes] = useState<Node[]>(initialNodes);
   const [connections, setConnections] = useState<Connection[]>([]);
   const svgRef = useRef<SVGSVGElement>(null);
   const [animationKey, setAnimationKey] = useState(0);

@@ -42,7 +42,6 @@ export function FigmaFile({ data }: { data: FileContents }) {
     navSelection.type === "layer" && selectedNode(data.message, navSelection);
   const { message } = data;
   const {
-    nodeChanges = [],
     isCut,
     pasteID,
     pasteFileKey,

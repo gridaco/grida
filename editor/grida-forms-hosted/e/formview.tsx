@@ -286,7 +286,7 @@ const GridaFormBody = FormBody;
 export function FormBody({
   onSubmit,
   onAfterSubmit,
-  className,
+  className: _className,
   translation: translationProp,
   config,
   stylesheet,

@@ -102,7 +102,7 @@ function Ready({
   const { background } = data;
 
   const pages = useMemo(() => {
-    const { start_page, lang, campaign } = data;
+    const { start_page } = data;
     return {
       start: start_page
         ? null
@@ -214,18 +214,13 @@ function FormPage({
 }) {
   const {
     //
-    start_page,
-    title,
     method,
     blocks,
     tree,
     fields,
     default_values,
     options,
-    lang,
     stylesheet,
-    background,
-    campaign,
   } = data;
 
   const { clearSessionStorage } = useRequestFormSession(form_id);

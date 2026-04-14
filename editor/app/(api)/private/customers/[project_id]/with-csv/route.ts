@@ -102,7 +102,6 @@ export async function POST(
   const formdata = await request.formData();
   const searchParams = request.nextUrl.searchParams;
   const dryrun = qboolean(searchParams.get("dryrun"));
-  const client = await createClient();
   const csvf = formdata.get("csv") as File;
   assert(csvf, "CSV file is required");
 

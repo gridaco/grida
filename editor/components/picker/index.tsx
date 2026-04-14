@@ -16,8 +16,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 
-type PathTokens = string[];
-
 type FileNode = {
   type: "file";
   name: string;

@@ -56,7 +56,7 @@ function AudioMediaSessionProvider({
 }: React.PropsWithChildren<{
   session: MediaSessionState;
 }>) {
-  const [audio, state, controls, ref] = useAudio({
+  const [audio, state, controls, _ref] = useAudio({
     src: session.src,
     autoPlay: session.autoplay,
     playsInline: true,

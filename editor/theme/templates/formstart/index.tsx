@@ -98,7 +98,7 @@ export namespace FormStartPage {
           resources: template.resources,
           lng: lang,
         },
-        (err, t) => {
+        (err, _t) => {
           if (err) return console.log("something went wrong loading", err);
         }
       );
