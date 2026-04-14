@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-type Fn = (...args: any[]) => any;
+type Fn = (...args: never[]) => unknown;
 
 /**
  * State for managing a pending callback
