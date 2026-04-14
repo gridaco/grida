@@ -9,14 +9,17 @@ import React, {
 import { type access } from "@grida/tokens";
 
 interface RootDataContextProps {
-  rootData: Record<string, any>;
-  updateRootData: (namespace: string, value: any) => void;
+  rootData: Record<string, unknown>;
+  updateRootData: (namespace: string, value: unknown) => void;
   addTransformer: (key: string, transformer: TransformerFunction) => void;
   transformers: Record<string, TransformerFunction>;
   namespaces: string[];
 }
 
-type TransformerFunction = (path: string, data: Record<string, any>) => any;
+type TransformerFunction = (
+  path: string,
+  data: Record<string, unknown>
+) => unknown;
 
 const RootDataContext = createContext<RootDataContextProps | undefined>(
   undefined
@@ -29,13 +32,13 @@ interface RootDataContextProviderProps {
 export const ProgramDataContextHost: FC<RootDataContextProviderProps> = ({
   children,
 }) => {
-  const [rootData, setRootData] = useState<Record<string, any>>({});
+  const [rootData, setRootData] = useState<Record<string, unknown>>({});
   const [transformers, setTransformers] = useState<
     Record<string, TransformerFunction>
   >({});
   const [namespaces, setNamespaces] = useState<string[]>([]);
 
-  const updateRootData = (namespace: string, value: any) => {
+  const updateRootData = (namespace: string, value: unknown) => {
     setRootData((prevData) => ({
       ...prevData,
       [namespace]: value,
@@ -75,14 +78,14 @@ export const DataContext = createContext<DataContextProps | undefined>(
 );
 
 interface DataContextProps {
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   transformers: Record<string, TransformerFunction>;
   namespaces: string[];
 }
 
 interface DataProviderProps {
   namespace?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   children: ReactNode;
 }
 
@@ -128,7 +131,7 @@ export const ScopedVariableContext = createContext<
 >(undefined);
 
 interface ScopedVariableContextProps {
-  variablePaths: Record<string, access.KeyPath<any>>;
+  variablePaths: access.ScopedIdentifiersContext["scopedIdentifiers"];
 }
 
 /**
@@ -137,7 +140,7 @@ interface ScopedVariableContextProps {
  */
 export const ScopedVariableBoundary: FC<{
   identifier: string;
-  expression: access.KeyPath<any>;
+  expression: access.ScopedIdentifiersContext["scopedIdentifiers"][string];
   children: ReactNode;
 }> = ({ identifier, expression, children }) => {
   const parentScopedContext = useContext(ScopedVariableContext);

@@ -1,11 +1,15 @@
 import React from "react";
+import { type access } from "@grida/tokens";
 import { useValue } from "./use";
 import { ScopedVariableBoundary } from "./context";
+
+type ScopedExpression =
+  access.ScopedIdentifiersContext["scopedIdentifiers"][string];
 
 interface ArrayMapProps {
   identifier: string;
   expression: string[];
-  children: (data: any, index: number) => React.ReactNode;
+  children: (data: unknown, index: number) => React.ReactNode;
 }
 
 const ArrayMap: React.FC<ArrayMapProps> = ({
@@ -13,15 +17,15 @@ const ArrayMap: React.FC<ArrayMapProps> = ({
   expression,
   children,
 }) => {
-  const arrayData = useValue(expression as any) || [];
+  const arrayData: unknown[] = useValue(expression as ScopedExpression) || [];
 
   return (
     <>
-      {arrayData.map((item: any, index: number) => (
+      {arrayData.map((item: unknown, index: number) => (
         <ScopedVariableBoundary
           key={index}
           identifier={identifier}
-          expression={expression.concat([index.toString()]) as any}
+          expression={expression.concat([index.toString()]) as ScopedExpression}
         >
           {children(item, index)}
         </ScopedVariableBoundary>

@@ -1,3 +1,4 @@
+// oxlint-disable typescript-eslint/no-explicit-any
 import { useContext, useMemo } from "react";
 import { DataContext, ScopedVariableContext } from "./context";
 import { access } from "@grida/tokens";
