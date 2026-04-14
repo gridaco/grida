@@ -73,7 +73,9 @@ describe("lib/tenant-url", () => {
     rpcMock.mockImplementation(async (fn: string, args: unknown) => {
       expect(fn).toBe("www_get_canonical_hostname");
 
-      const tenant = (args as any)?.p_www_name as string | undefined;
+      const tenant = (args as Record<string, unknown>)?.p_www_name as
+        | string
+        | undefined;
       const canonical = tenant ? (canonicalByTenant[tenant] ?? null) : null;
 
       return {

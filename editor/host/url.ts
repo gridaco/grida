@@ -342,7 +342,7 @@ export interface FormLinkURLParams {
   };
   complete: { rid: string };
   developererror?: {};
-  badrequest?: {};
+  badrequest: { error?: string };
   formclosed: {
     oops?:
       | typeof ERR.FORM_CLOSED_WHILE_RESPONDING.code
@@ -362,7 +362,9 @@ type FormLinkParams<T extends keyof FormLinkURLParams> =
 export function formlink<T extends keyof FormLinkURLParams>(
   ...[host, form_id, state, params]: FormLinkParams<T>
 ) {
-  const q = params ? new URLSearchParams(params as any).toString() : null;
+  const q = params
+    ? new URLSearchParams(params as Record<string, string>).toString()
+    : null;
   let url = state
     ? `${host}/d/e/${form_id}/${state}`
     : `${host}/d/e/${form_id}`;
@@ -373,7 +375,7 @@ export function formlink<T extends keyof FormLinkURLParams>(
 export function formerrorlink(
   host: string,
   code: FormSubmitErrorCode,
-  data: { form_id: string; [key: string]: any }
+  data: { form_id: string; [key: string]: string | undefined }
 ) {
   const { form_id } = data;
 
@@ -417,7 +419,7 @@ export function formerrorlink(
     case "CHALLENGE_EMAIL_NOT_VERIFIED":
       return formlink(host, form_id, "badrequest", {
         error: "CHALLENGE_EMAIL_NOT_VERIFIED",
-      } as any);
+      });
   }
 }
 
