@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { cn } from "@/components/lib/utils";
+import { type DeepPartial } from "ai";
 import { type PortableNode } from "../schema";
 
 const DEFAULT_IFRAME_HTML = `
@@ -22,7 +23,9 @@ export function Canvas({
   node,
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & { node: any }) {
+}: React.HTMLAttributes<HTMLDivElement> & {
+  node: DeepPartial<PortableNode> | undefined;
+}) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export function Canvas({
   );
 }
 
-function renderJSONToHTML(node: PortableNode | string): string {
+function renderJSONToHTML(node: DeepPartial<PortableNode> | string): string {
   if (typeof node === "string") {
     return node;
   }
@@ -98,7 +101,13 @@ function renderJSONToHTML(node: PortableNode | string): string {
     ? text
     : typeof children === "string"
       ? children
-      : children.map(renderJSONToHTML).join("");
+      : (children as (DeepPartial<PortableNode> | undefined)[])
+          .filter(
+            (c): c is DeepPartial<PortableNode> => c !== undefined && c !== null
+          )
+          .map(renderJSONToHTML)
+          .join("");
 
+  if (!tag) return childrenHTML;
   return `<${tag} ${attributes_str}>${childrenHTML}</${tag}>`;
 }

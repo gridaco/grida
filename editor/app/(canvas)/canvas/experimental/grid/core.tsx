@@ -8,10 +8,7 @@ import React, {
 import produce from "immer";
 import { State, initial } from "./core/state";
 import { Action } from "./core/action";
-import type {
-  GridaGridTypographyBlock,
-  GridaGridImageBlock,
-} from "./blocks";
+import type { GridaGridTypographyBlock, GridaGridImageBlock } from "./blocks";
 
 const Context = React.createContext<State | undefined>(undefined);
 

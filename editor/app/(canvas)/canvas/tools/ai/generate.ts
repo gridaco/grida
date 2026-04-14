@@ -3,6 +3,7 @@
 import {
   streamText,
   Output,
+  type DeepPartial,
   type UserModelMessage,
   type UserContent,
   type TextPart,
@@ -10,7 +11,7 @@ import {
   type ImagePart,
 } from "ai";
 import { createStreamableValue } from "@ai-sdk/rsc";
-import { request_schema } from "./schema";
+import { request_schema, type StreamingResponse } from "./schema";
 import { gateway, model as tieredModel } from "@/lib/ai/models";
 import assert from "assert";
 
@@ -90,7 +91,7 @@ export async function generate({
     };
   }
 
-  const stream = createStreamableValue({});
+  const stream = createStreamableValue<DeepPartial<StreamingResponse>>({});
   (async () => {
     const { partialOutputStream } = streamText({
       model,
@@ -103,7 +104,7 @@ export async function generate({
     });
 
     for await (const partialObject of partialOutputStream) {
-      stream.update(partialObject as any);
+      stream.update(partialObject);
     }
 
     stream.done();
