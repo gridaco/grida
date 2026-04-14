@@ -1,10 +1,20 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "oxc"],
+  "plugins": [
+    "typescript",
+    "oxc",
+    // TODO:
+    // "react",
+    // "unicorn",
+    // "nextjs",
+    // "jsdoc",
+  ],
   "categories": {
     "correctness": "error",
   },
-  "rules": {},
+  "rules": {
+    "typescript/no-explicit-any": "error",
+  },
   "env": {
     "builtin": true,
     "browser": true,
@@ -12,11 +22,12 @@
     "es2024": true,
   },
   "ignorePatterns": [
-    ".next/**",
+    "third_party/externals/",
     ".legacy/",
     ".ref/",
+    "data/",
     "bin/",
-    "components/ui/**",
+    "library/",
     "worker-configuration.d.ts",
     "database-generated.types.ts",
   ],

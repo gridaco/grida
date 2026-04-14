@@ -1,5 +1,6 @@
 {
   "extends": ["../.oxlintrc.jsonc"],
+  "plugins": ["nextjs"],
   "ignorePatterns": [
     // shadcn / generated UI (no control over code):
     "components/ui/**",
