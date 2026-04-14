@@ -10,8 +10,9 @@ import type { Bucket } from "@supabase/storage-js";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export namespace GridaXSupabase {
-  export type XSBQueryResult<T extends Record<string, any> = any> =
-    PostgrestSingleResponse<GridaXSupabase.XDataRow<T>[]>;
+  export type XSBQueryResult<
+    T extends Record<string, unknown> = Record<string, unknown>,
+  > = PostgrestSingleResponse<GridaXSupabase.XDataRow<T>[]>;
 
   type XSBSearchMeta<X = {}> = {
     schema_name: string;
@@ -24,13 +25,15 @@ export namespace GridaXSupabase {
   };
 
   export type XSBSearchResult<
-    T extends Record<string, any> = any,
+    T extends Record<string, unknown> = Record<string, unknown>,
     X = {},
   > = XSBQueryResult<T> & { meta: XSBSearchMeta<X> | null };
 
   export type XSBPostgrestMethod = "get" | "post" | "delete" | "patch";
 
-  export type XDataRow<T extends Record<string, any> = Record<string, any>> = T;
+  export type XDataRow<
+    T extends Record<string, unknown> = Record<string, unknown>,
+  > = T;
 
   export type JSONSChema =
     SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema;

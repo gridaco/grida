@@ -28,7 +28,7 @@ export type FormFieldUpsert = IFormField & {
   options_inventory?: { [option_id: string]: InventoryLevelCommit };
 };
 
-export type EditorApiResponse<T, E = any> = (
+export type EditorApiResponse<T, E = unknown> = (
   | {
       data: null;
       error: E;
@@ -40,9 +40,9 @@ export type EditorApiResponse<T, E = any> = (
  * use this type when api returns ok without data or throws error
  * 200 or 500 without additional data
  */
-export type EditorApiResponseOk<E = any> = EditorApiResponse<null, E>;
+export type EditorApiResponseOk<E = unknown> = EditorApiResponse<null, E>;
 
-export type FormsApiResponse<T, E = any> = (
+export type FormsApiResponse<T, E = unknown> = (
   | {
       data: null;
       error: E;
