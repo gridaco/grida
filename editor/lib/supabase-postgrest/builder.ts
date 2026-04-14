@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-explicit-any
 import {
   PostgrestQueryBuilder,
   type PostgrestFilterBuilder,

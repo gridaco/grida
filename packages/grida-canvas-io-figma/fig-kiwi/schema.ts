@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-explicit-any
 /**
  * This file is generated from a .fig file using the fig2kiwi.ts extraction tool.
  *
