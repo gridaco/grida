@@ -42,8 +42,8 @@ function approxEqual(a: unknown, b: unknown, eps = 1e-9): boolean {
       if (ak[i] !== bk[i]) return false;
     }
     for (const k of ak) {
-      const av = (a as any)[k];
-      const bv = (b as any)[k];
+      const av = (a as Record<string, unknown>)[k];
+      const bv = (b as Record<string, unknown>)[k];
       if (!approxEqual(av, bv, eps)) return false;
     }
     return true;
@@ -87,7 +87,12 @@ function firstMismatch(
       if (ak[i] !== bk[i]) return { path: path.join("."), a, b };
     }
     for (const k of ak) {
-      const m = firstMismatch((a as any)[k], (b as any)[k], eps, [...path, k]);
+      const m = firstMismatch(
+        (a as Record<string, unknown>)[k],
+        (b as Record<string, unknown>)[k],
+        eps,
+        [...path, k]
+      );
       if (m) return m;
     }
     return null;
@@ -100,7 +105,7 @@ function firstMismatch(
 // numeric left/top/width/height so geometry is deterministic.
 function createGeometryStub(
   getState: () => editor.state.IEditorState
-): editor.api.IDocumentGeometryQuery | any {
+): editor.api.IDocumentGeometryQuery {
   function parentMapFromLinks(
     links: Record<string, string[]>
   ): Record<string, string> {
@@ -186,11 +191,15 @@ function createGeometryStub(
 
   function getAbsRect(node_id: string) {
     const state = getState();
-    const node = (state.document.nodes as any)[node_id];
+    const node = state.document.nodes[
+      node_id
+    ] as grida.program.nodes.UnknownNode;
     const local = getLocalRect(node);
     if (!local) return null;
 
-    const parents = parentMapFromLinks(state.document.links as any);
+    const parents = parentMapFromLinks(
+      state.document.links as Record<string, string[]>
+    );
     let x = local.x;
     let y = local.y;
     let p = parents[node_id];
@@ -287,7 +296,7 @@ function initEditorStateFromFixture(args: {
   });
   state = dispatch(
     state,
-    { type: "load", scene: args.scene_id } as any,
+    { type: "load", scene: args.scene_id },
     createContext(() => state)
   );
   return state;
@@ -319,7 +328,7 @@ function getDescendants(
 }
 
 function getRootContainerIds(doc: grida.program.document.Document): string[] {
-  const nodes = doc.nodes as Record<string, any>;
+  const nodes = doc.nodes;
   const links = doc.links as Record<string, string[]>;
   const scene_id = doc.entry_scene_id ?? doc.scenes_ref?.[0];
   if (!scene_id) throw new Error("fixture document has no entry scene id");
@@ -378,7 +387,7 @@ function getTrackableSubtreeNodeIds(args: {
   doc: grida.program.document.Document;
   root_id: string;
 }): string[] {
-  const nodes = args.doc.nodes as Record<string, any>;
+  const nodes = args.doc.nodes;
   const links = args.doc.links as Record<string, string[]>;
   const descendants = getDescendants(links, args.root_id);
   return [args.root_id, ...descendants].filter((id) =>
@@ -499,7 +508,10 @@ describe.skip("apply-scale round-trip (accuracy)", () => {
         "root container: %s",
         (root_container_id) => {
           it("subtree round-trips for 0.01x then 100x (include_subtree=true)", () => {
-            const nodes = document.nodes as Record<string, any>;
+            const nodes = document.nodes as Record<
+              string,
+              grida.program.nodes.UnknownNode
+            >;
             const rootNode = nodes[root_container_id];
             if (!hasNumericAbsoluteBox(rootNode)) {
               throw new Error(
@@ -603,7 +615,7 @@ it("origin semantics: auto overrides root left/top but global does not", () => {
   });
   state = dispatch(
     state,
-    { type: "load", scene: scene_id } as any,
+    { type: "load", scene: scene_id },
     createContext(() => state)
   );
 

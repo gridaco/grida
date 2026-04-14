@@ -103,6 +103,8 @@ export function self_flattenNode<S extends editor.state.IEditorState>(
   return { node: vectornode, delta };
 }
 
+type UN = grida.program.nodes.UnknownNodeProperties;
+
 /**
  * FIXME: the safe and correct way is to "recreate" rather then reusing the existing one.
  */
@@ -112,26 +114,26 @@ function __dangerously_delete_non_vector_properties(
   // Remove primitive-only properties that should not persist on vector nodes.
 
   // star / polygon
-  delete (node as any).point_count;
-  delete (node as any).inner_radius;
+  delete (node as UN).point_count;
+  delete (node as UN).inner_radius;
 
   // rectangle (per-corner radius & per-side stroke width)
-  delete (node as any).rectangular_corner_radius_top_left;
-  delete (node as any).rectangular_corner_radius_top_right;
-  delete (node as any).rectangular_corner_radius_bottom_left;
-  delete (node as any).rectangular_corner_radius_bottom_right;
-  delete (node as any).corner_smoothing;
-  delete (node as any).rectangular_stroke_width_top;
-  delete (node as any).rectangular_stroke_width_right;
-  delete (node as any).rectangular_stroke_width_bottom;
-  delete (node as any).rectangular_stroke_width_left;
+  delete (node as UN).rectangular_corner_radius_top_left;
+  delete (node as UN).rectangular_corner_radius_top_right;
+  delete (node as UN).rectangular_corner_radius_bottom_left;
+  delete (node as UN).rectangular_corner_radius_bottom_right;
+  delete (node as UN).corner_smoothing;
+  delete (node as UN).rectangular_stroke_width_top;
+  delete (node as UN).rectangular_stroke_width_right;
+  delete (node as UN).rectangular_stroke_width_bottom;
+  delete (node as UN).rectangular_stroke_width_left;
 
   // ellipse (arc data)
-  delete (node as any).angle;
-  delete (node as any).angle_offset;
+  delete (node as UN).angle;
+  delete (node as UN).angle_offset;
 
   // text
-  delete (node as any).text;
+  delete (node as UN).text;
 }
 
 function toVectorNetworkFallback(

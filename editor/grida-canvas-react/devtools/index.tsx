@@ -372,7 +372,7 @@ function RecorderPanel() {
 type PatchEvent = {
   timestamp: number;
   patches: editor.history.Patch[];
-  action?: any;
+  action?: { type?: string };
 };
 
 function EventsPanel() {

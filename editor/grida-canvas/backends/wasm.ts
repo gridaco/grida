@@ -1,4 +1,5 @@
 import cmath from "@grida/cmath";
+import type cg from "@grida/cg";
 import type { editor } from "..";
 import type { Editor } from "../editor";
 import type { Scene } from "@grida/canvas-wasm";
@@ -61,7 +62,7 @@ export class CanvasWasmPropertiesQueryProvider
   ): editor.api.PaintGroup[] {
     const groups = this.surface.queryPaintGroups(ids, target, options);
     return groups.map((g) => ({
-      value: g.paint,
+      value: g.paint as unknown as cg.Paint,
       ids: g.node_ids,
     }));
   }
@@ -88,7 +89,7 @@ export class CanvasWasmDefaultExportInterfaceProvider
     _node_id: string,
     format: grida.program.document.NodeExportSettings["format"] | (string & {})
   ): boolean {
-    return this.formats.includes(format as any);
+    return (this.formats as readonly string[]).includes(format);
   }
 
   async exportNodeAsImage(

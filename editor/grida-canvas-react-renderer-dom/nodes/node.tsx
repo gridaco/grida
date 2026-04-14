@@ -22,7 +22,7 @@ class RendererNotFound extends Error {
 }
 
 // oxlint-disable-next-line no-unused-vars
-interface NodeElementProps<P extends Record<string, any>> {
+interface NodeElementProps<P extends Record<string, unknown>> {
   node_id: string;
   component?: TemplateComponent;
   style?: grida.program.css.ExplicitlySupportedCSSProperties;
@@ -38,7 +38,7 @@ interface NodeElementProps<P extends Record<string, any>> {
   fill?: cg.Paint;
 }
 
-export function NodeElement<P extends Record<string, any>>({
+export function NodeElement<P extends Record<string, unknown>>({
   node_id,
   component: USER_COMPONENT,
   children: USER_CHILDREN,
@@ -145,7 +145,8 @@ export function NodeElement<P extends Record<string, any>>({
     layout_inset_left: DEFAULT_LEFT ?? node.layout_inset_left,
     layout_inset_top: DEFAULT_TOP ?? node.layout_inset_top,
     layout_target_width: DEFAULT_WIDTH ?? node.layout_target_width,
-    layout_target_height: (DEFAULT_HEIGHT ?? node.layout_target_height) as any,
+    layout_target_height: (DEFAULT_HEIGHT ??
+      node.layout_target_height) as grida.program.nodes.i.ICSSDimension["layout_target_height"],
     fill_rule: node.fill_rule,
     stroke: node.stroke,
     stroke_width: node.stroke_width,
@@ -174,8 +175,8 @@ export function NodeElement<P extends Record<string, any>>({
 
   return (
     <HrefWrapper href={computed.href} target={node.target}>
-      {React.createElement<any>(
-        renderer,
+      {React.createElement(
+        renderer as React.ElementType,
         {
           ...props,
           ...({
@@ -202,7 +203,7 @@ export function NodeElement<P extends Record<string, any>>({
                 : undefined,
             ...override?.style,
           } satisfies React.CSSProperties,
-        } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
+        },
         computedchildren
       )}
     </HrefWrapper>

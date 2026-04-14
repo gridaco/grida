@@ -43,14 +43,14 @@ function writePaints(
   const pluralKey = key === "fill" ? "fill_paints" : "stroke_paints";
 
   if (!paints || paints.length === 0) {
-    (draft as any)[pluralKey] = undefined;
-    (draft as any)[key] = undefined;
+    (draft as Record<string, unknown>)[pluralKey] = undefined;
+    (draft as Record<string, unknown>)[key] = undefined;
     return;
   }
 
   const normalized = paints.map((paint) => normalizePaintValue(paint));
-  (draft as any)[pluralKey] = normalized;
-  (draft as any)[key] = normalized[0];
+  (draft as Record<string, unknown>)[pluralKey] = normalized;
+  (draft as Record<string, unknown>)[key] = normalized[0];
 }
 
 function defineNodeProperty<
@@ -66,22 +66,19 @@ function defineNodeProperty<
   return handlers;
 }
 
+interface SafePropertyHandler<V = unknown> {
+  assert?: (node: grida.program.nodes.UnknownNode) => boolean;
+  apply: (
+    draft: grida.program.nodes.UnknownNodeProperties,
+    value: V,
+    prev?: V
+  ) => void;
+}
+
 /**
  * properties without side effects (re-layout)
  */
-const safe_properties: Partial<
-  Omit<
-    grida.program.nodes.UnknownNodeProperties<{
-      assert?: (node: grida.program.nodes.UnknownNode) => boolean;
-      apply: (
-        draft: grida.program.nodes.UnknownNodeProperties,
-        value: any,
-        prev?: any
-      ) => void;
-    }>,
-    "type"
-  >
-> = {
+const safe_properties: Record<string, SafePropertyHandler<never>> = {
   active: defineNodeProperty<"active">({
     assert: (node) => typeof node.active === "boolean",
     apply: (draft, value) => {
@@ -824,9 +821,13 @@ function applyNodeProperty<K extends keyof grida.program.nodes.UnknownNode>(
   if (!(key in safe_properties)) {
     throw new Error(`property handler not found: "${key}"`);
   }
-  const property = safe_properties[key as keyof typeof safe_properties];
+  const property = safe_properties[key] as
+    | SafePropertyHandler<grida.program.nodes.UnknownNode[K]>
+    | undefined;
   if (property) {
-    const prev = (draft as any)[key];
+    const prev = (draft as Record<string, unknown>)[key] as
+      | grida.program.nodes.UnknownNode[K]
+      | undefined;
     // TODO: assert - decide pre or after
     property.apply(draft, value, prev);
   }

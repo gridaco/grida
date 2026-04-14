@@ -85,9 +85,12 @@ export function ScenesList() {
   const editor = useCurrentEditor();
   const { scenesmap, scenes_ref } = useEditorState(editor, (state) => {
     // Build scenes map from scenes_ref for backward compatibility
-    const scenesmap: Record<string, grida.program.nodes.SceneNode> =
+    type SceneEntry = grida.program.nodes.SceneNode & {
+      children_refs: string[];
+    };
+    const scenesmap: Record<string, SceneEntry> =
       state.document.scenes_ref.reduce(
-        (acc: any, scene_id: string) => {
+        (acc: Record<string, SceneEntry>, scene_id: string) => {
           const scene_node = state.document.nodes[
             scene_id
           ] as grida.program.nodes.SceneNode;
@@ -98,7 +101,7 @@ export function ScenesList() {
           };
           return acc;
         },
-        {} as { [key: string]: grida.program.nodes.SceneNode }
+        {} as Record<string, SceneEntry>
       );
 
     return {

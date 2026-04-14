@@ -18,7 +18,7 @@ export interface SurfaceNodeObject {
 
 // type SurfaceSelection = SurfaceSingleSelection | SurfaceSelectionGroup;
 
-interface SurfaceSingleSelection {
+export interface SurfaceSingleSelection {
   type: "single";
 
   /**

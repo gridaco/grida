@@ -1,6 +1,7 @@
 import { describeDocumentTree } from "../cmd-tree";
 import { editor } from "../../editor.i";
 import type grida from "@grida/schema";
+import type tree from "@grida/tree";
 import kolor from "@grida/color";
 
 const chars = editor.ascii.chars;
@@ -130,7 +131,7 @@ describe("describeDocumentTree", () => {
     properties: {},
   } satisfies grida.program.document.Document;
 
-  const context = {
+  const context: tree.lut.ITreeLUT = {
     lu_keys: Object.keys(document.nodes),
     lu_parent: {
       scene: null,
@@ -147,7 +148,7 @@ describe("describeDocumentTree", () => {
   };
 
   it("renders the document root tree", () => {
-    const tree = describeDocumentTree(document as any, context as any, {
+    const result = describeDocumentTree(document, context, {
       chars,
     });
 
@@ -158,11 +159,11 @@ describe("describeDocumentTree", () => {
       "      └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8",
     ].join("\n");
 
-    expect(tree).toBe(expected);
+    expect(result).toBe(expected);
   });
 
   it("renders from an entry node downwards", () => {
-    const tree = describeDocumentTree(document as any, context as any, {
+    const result = describeDocumentTree(document, context, {
       chars,
       entryId: "frame",
     });
@@ -173,15 +174,15 @@ describe("describeDocumentTree", () => {
       "   └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8",
     ].join("\n");
 
-    expect(tree).toBe(expected);
+    expect(result).toBe(expected);
   });
 
   it("reports missing nodes", () => {
-    const tree = describeDocumentTree(document as any, context as any, {
+    const result = describeDocumentTree(document, context, {
       chars,
       entryId: "missing",
     });
 
-    expect(tree).toBe('└─ Missing node "missing"');
+    expect(result).toBe('└─ Missing node "missing"');
   });
 });

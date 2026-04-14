@@ -13,6 +13,7 @@ import useVectorContentEditMode, {
   VectorContentEditor,
 } from "@/grida-canvas-react/use-sub-vector-network-editor";
 import { useCurrentEditor } from "@/grida-canvas-react";
+import type { editor } from "@/grida-canvas";
 import { VectorRegion } from "./vector-region";
 import { Curve } from "./vector-cubic-curve";
 
@@ -276,7 +277,7 @@ function Segment({
   tb: cmath.Vector2;
   hovered: boolean;
   ve: VectorContentEditor;
-  tool: any;
+  tool: editor.state.IEditorState["tool"];
 }) {
   const instance = useCurrentEditor();
   const selected = ve.selected_segments.includes(segmentIndex);
@@ -533,7 +534,7 @@ function MiddlePoint({
   point: cmath.Vector2;
   segmentIndex: number;
   ve: VectorContentEditor;
-  tool: any;
+  tool: editor.state.IEditorState["tool"];
 }) {
   const bind = useGesture({
     onPointerDown: ({ event }) => {
@@ -562,7 +563,7 @@ function VertexPoint({
   point: cmath.Vector2;
   index: number;
   ve: VectorContentEditor;
-  tool: any;
+  tool: editor.state.IEditorState["tool"];
 }) {
   const instance = useCurrentEditor();
   const selected = ve.selected_vertices.includes(index);

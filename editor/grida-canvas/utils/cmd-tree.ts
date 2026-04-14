@@ -1,6 +1,7 @@
 import * as treeify from "../libs/treefy";
 import type { TreeObject } from "../libs/treefy";
 import type grida from "@grida/schema";
+import type cg from "@grida/cg";
 import tree from "@grida/tree";
 
 type Document = grida.program.document.Document;
@@ -9,7 +10,7 @@ type DocumentContext =
 type Node = grida.program.nodes.Node;
 
 interface TreeBranch {
-  [label: string]: TreeBranch | null;
+  [label: string]: TreeBranch | "";
 }
 
 const RADIUS_ELIGIBLE = new Set<Node["type"]>(["rectangle", "container"]);
@@ -83,9 +84,7 @@ export function describeDocumentTree(
     return "";
   }
 
-  return treeify
-    .asTree(branch as unknown as TreeObject, false, false)
-    .trimEnd();
+  return treeify.asTree(branch as TreeObject, false, false).trimEnd();
 }
 
 function buildDocumentBranch(
@@ -104,14 +103,14 @@ function buildDocumentBranch(
         .childrenOf(rootId)
         .map((childId) =>
           buildNodeBranch(document, treeLUT, childId, chars, visited)
-        )
-        .filter((branch): branch is TreeBranch => Boolean(branch));
+        );
       childBranches.push(...sceneChildren);
       continue;
     }
 
-    const branch = buildNodeBranch(document, treeLUT, rootId, chars, visited);
-    if (branch) childBranches.push(branch);
+    childBranches.push(
+      buildNodeBranch(document, treeLUT, rootId, chars, visited)
+    );
   }
 
   const label = formatDocumentLabel(document, chars, childBranches.length);
@@ -125,15 +124,15 @@ function buildNodeBranch(
   nodeId: string,
   chars: TreeAsciiChars,
   visited: Set<string>
-): TreeBranch | null {
+): TreeBranch {
   const node = document.nodes[nodeId];
   if (!node) {
-    return { [`Missing node "${nodeId}"`]: null };
+    return { [`Missing node "${nodeId}"`]: "" };
   }
 
   const label = formatNodeLabel(node, chars);
   if (visited.has(nodeId)) {
-    return { [`${label}  (circular)`]: null };
+    return { [`${label}  (circular)`]: "" };
   }
 
   visited.add(nodeId);
@@ -141,16 +140,15 @@ function buildNodeBranch(
     .childrenOf(nodeId)
     .map((childId) =>
       buildNodeBranch(document, treeLUT, childId, chars, visited)
-    )
-    .filter((branch): branch is TreeBranch => Boolean(branch));
+    );
   visited.delete(nodeId);
 
   return { [label]: mergeChildren(children) };
 }
 
-function mergeChildren(children: TreeBranch[]): TreeBranch | null {
+function mergeChildren(children: TreeBranch[]): TreeBranch | "" {
   if (!children.length) {
-    return null;
+    return "";
   }
 
   return children.reduce(
@@ -294,24 +292,24 @@ function formatFill(node: Node): string | null {
 
   if (paint.type === "solid" && paint.color) {
     const hex = colorToHex(paint.color);
-    if (!hex) return null;
-
     const alpha = extractAlpha(paint.color);
-    return alpha !== undefined && alpha < 1
-      ? `${hex}@${formatNumber(alpha)}`
-      : hex;
+    return alpha < 1 ? `${hex}@${formatNumber(alpha)}` : hex;
   }
 
-  return typeof paint.type === "string" ? paint.type : null;
+  return paint.type;
 }
 
-function resolvePaint(node: Node): any | null {
-  const fill = (node as any).fill;
-  if (fill && typeof fill === "object") return fill;
+function resolvePaint(node: Node): cg.Paint | null {
+  const n = node as grida.program.nodes.UnknownNodeProperties;
+  const fill = n.fill;
+  if (fill && typeof fill === "object" && "type" in fill) {
+    return fill as cg.Paint;
+  }
 
-  const fills = (node as any).fill_paints;
-  if (Array.isArray(fills) && fills.length) {
-    return fills.find((entry: any) => entry?.active !== false) ?? fills[0];
+  const fills = n.fill_paints;
+  if (Array.isArray(fills) && fills.length > 0) {
+    const paints = fills as cg.Paint[];
+    return paints.find((entry) => entry.active !== false) ?? paints[0];
   }
 
   return null;
@@ -347,17 +345,18 @@ function formatCornerRadius(node: Node): string | null {
 }
 
 function extractText(node: Node): string | null {
-  const raw = (node as any).text;
+  const raw = (node as grida.program.nodes.UnknownNodeProperties).text;
   if (!raw) return null;
 
   let value: string | null = null;
   if (typeof raw === "string") {
     value = raw;
-  } else if (typeof raw === "object") {
-    if (typeof raw.value === "string") {
-      value = raw.value;
-    } else if (typeof raw.text === "string") {
-      value = raw.text;
+  } else if (typeof raw === "object" && raw !== null) {
+    const obj = raw as { value?: string; text?: string };
+    if (typeof obj.value === "string") {
+      value = obj.value;
+    } else if (typeof obj.text === "string") {
+      value = obj.text;
     }
   }
 
@@ -365,28 +364,18 @@ function extractText(node: Node): string | null {
   return truncate(normalizeWhitespace(value), 64).replace(/"/g, "'");
 }
 
-function colorToHex(color: any): string | null {
-  const r = normalizeColorComponent(color?.r ?? color?.red);
-  const g = normalizeColorComponent(color?.g ?? color?.green);
-  const b = normalizeColorComponent(color?.b ?? color?.blue);
-
-  if (r === undefined || g === undefined || b === undefined) {
-    return null;
-  }
-
+function colorToHex(color: cg.RGBA32F): string {
+  const r = normalizeColorComponent(color.r);
+  const g = normalizeColorComponent(color.g);
+  const b = normalizeColorComponent(color.b);
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-function extractAlpha(color: any): number | undefined {
-  const raw = color?.a ?? color?.alpha;
-  if (typeof raw !== "number") return undefined;
-
-  if (raw <= 1) return clamp(raw, 0, 1);
-  return clamp(raw / 255, 0, 1);
+function extractAlpha(color: cg.RGBA32F): number {
+  return clamp(color.a, 0, 1);
 }
 
-function normalizeColorComponent(value: any): number | undefined {
-  if (typeof value !== "number") return undefined;
+function normalizeColorComponent(value: number): number {
   if (value <= 1) return clamp(Math.round(value * 255), 0, 255);
   return clamp(Math.round(value), 0, 255);
 }
@@ -399,7 +388,7 @@ function readNumber(
   node: Node,
   key: keyof grida.program.nodes.UnknownNode
 ): number | undefined {
-  const value = (node as any)[key];
+  const value = (node as grida.program.nodes.UnknownNodeProperties)[key];
   return typeof value === "number" ? value : undefined;
 }
 
@@ -407,7 +396,7 @@ function readString(
   node: Node,
   key: keyof grida.program.nodes.UnknownNode
 ): string | undefined {
-  const value = (node as any)[key];
+  const value = (node as grida.program.nodes.UnknownNodeProperties)[key];
   return typeof value === "string" && value.length ? value : undefined;
 }
 

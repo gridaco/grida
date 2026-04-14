@@ -5,7 +5,7 @@ import { type tokens, factory, render } from "@grida/tokens";
 
 // oxlint-disable-next-line no-unused-vars
 function extractAccessIdentifiersDependencyArrayFromProps<
-  P extends Record<string, any>,
+  P extends Record<string, unknown>,
 >(props?: TemplateValueProperties<P, tokens.StringValueExpression>) {
   return Object.entries(props || {})
     .map(([_key, value]) => {
@@ -17,7 +17,7 @@ function extractAccessIdentifiersDependencyArrayFromProps<
 }
 
 // TODO: needs optimization
-export function useComputed<P extends Record<string, any>>(
+export function useComputed<P extends Record<string, unknown>>(
   props?: TemplateValueProperties<P, tokens.StringValueExpression>,
   recursive: boolean = false
 ): P {
@@ -33,7 +33,7 @@ export function useComputed<P extends Record<string, any>>(
 
   // const computed = useMemo(() => {
   //   return Object.entries(props || {}).reduce(
-  //     (acc: Record<string, any>, [key, value]) => {
+  //     (acc: Record<string, unknown>, [key, value]) => {
   //       acc[key] = tokens.render.any(value, contextdata, recursive);
   //       return acc;
   //     },
@@ -46,7 +46,7 @@ export function useComputed<P extends Record<string, any>>(
 
   const computed = useMemo(() => {
     return Object.entries(props || {}).reduce(
-      (acc: Record<string, any>, [key, value]) => {
+      (acc: Record<string, unknown>, [key, value]) => {
         acc[key] = render.any(value, data, recursive);
         return acc;
       },

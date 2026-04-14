@@ -11,6 +11,8 @@ import { createHeadlessEditor } from "@/grida-canvas/__tests__/utils";
 import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
 import type grida from "@grida/schema";
 
+type UnknownNode = grida.program.nodes.UnknownNode;
+
 function createDoc(): grida.program.document.Document {
   return {
     scenes_ref: ["scene1"],
@@ -33,7 +35,10 @@ describe("Time-bucketed recording", () => {
     vi.useFakeTimers();
     ed = createHeadlessEditor({ document: createDoc() });
     // Use a short bucket timeout for testing
-    (ed.doc as any)._historyAdapter.bucketTimeoutMs = 100;
+    // Access private field for testing — set a short bucket timeout
+    (
+      ed.doc as unknown as { _historyAdapter: { bucketTimeoutMs: number } }
+    )._historyAdapter.bucketTimeoutMs = 100;
   });
 
   afterEach(() => {
@@ -48,7 +53,7 @@ describe("Time-bucketed recording", () => {
 
     // Before timeout: bucket is pending, not yet on stack
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("C");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("C");
 
     // After timeout: bucket flushes as one step
     vi.advanceTimersByTime(200);
@@ -61,11 +66,11 @@ describe("Time-bucketed recording", () => {
     ed.doc.dispatch({ type: "node/change/*", node_id: "rect1", name: "C" });
     vi.advanceTimersByTime(200);
 
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("C");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("C");
 
     ed.doc.undo();
     // Reverts to original — not to "B" or "A"
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
   });
 
   test("different action type flushes previous bucket", () => {
@@ -92,7 +97,7 @@ describe("Time-bucketed recording", () => {
     // Undo flushes the bucket first, then undoes it
     ed.doc.undo();
 
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
     expect(ed.doc.historySnapshot.future).toHaveLength(1);
   });
@@ -103,10 +108,10 @@ describe("Time-bucketed recording", () => {
     vi.advanceTimersByTime(200);
 
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
 
     ed.doc.redo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("B");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("B");
   });
 
   test("keyboard arrow nudge simulation: rapid same-type = one step", () => {
@@ -123,7 +128,7 @@ describe("Time-bucketed recording", () => {
     expect(ed.doc.historySnapshot.past).toHaveLength(1);
 
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
   });
 
   test("slow dispatches (gap > timeout) create separate steps", () => {
@@ -136,10 +141,10 @@ describe("Time-bucketed recording", () => {
     expect(ed.doc.historySnapshot.past).toHaveLength(2);
 
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("A");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("A");
 
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
   });
 
   test("gesture begin flushes pending bucket", () => {

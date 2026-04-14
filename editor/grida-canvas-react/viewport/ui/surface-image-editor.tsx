@@ -2,7 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import cmath from "@grida/cmath";
 import type cg from "@grida/cg";
 import { useCurrentEditor } from "@/grida-canvas-react";
-import { useSingleSelection } from "../surface-hooks";
+import {
+  useSingleSelection,
+  type SurfaceSingleSelection,
+} from "../surface-hooks";
 import {
   useContentEditModeState,
   useEditorFlagsState,
@@ -120,7 +123,7 @@ function _ImagePaintEditor({
   paintTarget,
 }: {
   node_id: string;
-  selection: any;
+  selection: SurfaceSingleSelection;
   paint: cg.ImagePaint;
   paintIndex: number;
   paintTarget: "fill" | "stroke";

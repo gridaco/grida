@@ -813,7 +813,8 @@ function __self_evt_on_drag(
               } as const;
 
               const key = keyMap[anchor];
-              const current = (node as any)[key] ?? 0;
+              const current =
+                (node as grida.program.nodes.UnknownNode)[key] ?? 0;
 
               // Check if all corners have the same value
               const tl = node.rectangular_corner_radius_top_left ?? 0;

@@ -10,7 +10,7 @@ import { useMeasure } from "@uidotdev/usehooks";
 import kolor from "@grida/color";
 import grida from "@grida/schema";
 
-type CustomComponent = React.ComponentType<any>;
+type CustomComponent = React.ElementType;
 
 const UserCustomTemplatesContext = React.createContext<
   Record<string, CustomComponent>

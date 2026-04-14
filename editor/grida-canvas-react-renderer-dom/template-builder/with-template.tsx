@@ -5,11 +5,11 @@ import grida from "@grida/schema";
 const TEMPLATE_TYPE_KEY = "type";
 const TEMPLATE_DEFINITION_KEY = "definition";
 
-export type TemplateValueProperties<P extends Record<string, any>, T> = {
+export type TemplateValueProperties<P extends Record<string, unknown>, T> = {
   [K in keyof P]: P[K] | T;
 };
 
-export type TemplateComponent = React.FC<any> & {
+export type TemplateComponent = React.FC<Record<string, unknown>> & {
   [TEMPLATE_TYPE_KEY]: string;
   [TEMPLATE_DEFINITION_KEY]: grida.program.schema.Properties;
 };
@@ -24,8 +24,11 @@ export function withTemplateDefinition<P>(
   };
 
   WrappedComponent.displayName = `withTemplate(${Component.displayName || Component.name || "Component"})`;
-  (WrappedComponent as any)[TEMPLATE_DEFINITION_KEY] = definition;
-  (WrappedComponent as any)[TEMPLATE_TYPE_KEY] = type;
+  (WrappedComponent as unknown as Record<string, unknown>)[
+    TEMPLATE_DEFINITION_KEY
+  ] = definition;
+  (WrappedComponent as unknown as Record<string, unknown>)[TEMPLATE_TYPE_KEY] =
+    type;
 
   TemplateComponents.registerComponent(WrappedComponent as TemplateComponent);
 

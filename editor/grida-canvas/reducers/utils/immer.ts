@@ -8,7 +8,7 @@ export function updateState<S>(state: S, recipe: (draft: Draft<S>) => void): S {
 
   // Mutable bypass: if the state has __original, it's a mutable clone
   // being used outside Immer. Apply the recipe directly.
-  if ((state as any).__original) {
+  if ((state as unknown as { __original?: unknown }).__original) {
     recipe(state as Draft<S>);
     return state;
   }
@@ -24,5 +24,5 @@ export function updateState<S>(state: S, recipe: (draft: Draft<S>) => void): S {
  */
 export function safeOriginal<T>(draft: Draft<T>): T | undefined {
   if (isDraft(draft)) return original(draft) as T | undefined;
-  return (draft as any).__original as T | undefined;
+  return (draft as unknown as { __original?: T }).__original as T | undefined;
 }

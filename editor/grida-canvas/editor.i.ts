@@ -40,7 +40,7 @@ export namespace editor {
    * // logs: 3 (because trailing is true)
    * ```
    */
-  export function throttle<T extends (...args: any[]) => void>(
+  export function throttle<T extends (...args: never[]) => void>(
     func: T,
     limit: number,
     options: {
@@ -51,7 +51,7 @@ export namespace editor {
     let lastArgs: Parameters<T> | null = null;
     let _timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    return function (this: any, ...args: Parameters<T>) {
+    return function (this: unknown, ...args: Parameters<T>) {
       if (!inThrottle) {
         func.apply(this, args);
         inThrottle = true;
@@ -1740,7 +1740,12 @@ export namespace editor.state {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       scenes: _scenes,
       ...rest
-    } = input_doc as any;
+    } = input_doc as grida.program.document.Document & {
+      scenes?: unknown;
+      bitmaps?: Record<string, string>;
+      images?: Record<string, string>;
+      properties?: Record<string, grida.program.schema.PropertyDefinition>;
+    };
 
     const doc: grida.program.document.Document = {
       ...rest,
@@ -2311,7 +2316,7 @@ export namespace editor.history {
   export interface Patch {
     op: "replace" | "remove" | "add";
     path: (string | number)[];
-    value?: any;
+    value?: unknown;
   }
 }
 
@@ -2433,13 +2438,13 @@ export namespace editor.api {
     }
   }
 
-  export type SubscriptionCallbackFn<T = any> = (
+  export type SubscriptionCallbackFn<T = unknown> = (
     editor: T,
     action?: Action,
     patches?: editor.history.Patch[]
   ) => void;
 
-  export type SubscriptionWithSelectorCallbackFn<T, E = any> = (
+  export type SubscriptionWithSelectorCallbackFn<T, E = unknown> = (
     editor: E,
     selected: T,
     previous: T,
@@ -2448,8 +2453,8 @@ export namespace editor.api {
   ) => void;
 
   export class EditorConsumerVerboseError extends Error {
-    context: any;
-    constructor(message: string, context: any) {
+    context: unknown;
+    constructor(message: string, context: unknown) {
       super(message); // Pass message to the parent Error class
       this.name = this.constructor.name; // Set the error name
       this.context = context; // Attach the context object
@@ -3700,7 +3705,7 @@ export namespace editor.api {
     changeNodePropertyStyle(
       node_id: NodeID,
       key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
-      value: any
+      value: string | number | undefined
     ): void;
     changeNodePropertyMouseCursor(
       node_id: NodeID,
@@ -4620,7 +4625,10 @@ export namespace editor.api {
       key: string,
       definition: grida.program.schema.PropertyDefinition
     ): void;
-    schemaPutProperty(key: string, value: any): void;
+    schemaPutProperty(
+      key: string,
+      value: grida.program.schema.PropertyDefinition
+    ): void;
     schemaDeleteProperty(key: string): void;
   }
 

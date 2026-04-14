@@ -238,7 +238,9 @@ export function PlaygroundMenuContent({
           };
           const { document: gridaDoc, imageRefsUsed } =
             iofigma.restful.factory.document(
-              res.document as any,
+              res.document as unknown as Parameters<
+                typeof iofigma.restful.factory.document
+              >[0],
               images,
               context
             );

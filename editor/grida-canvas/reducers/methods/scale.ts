@@ -252,9 +252,8 @@ function self_update_gesture_resize_scale(
       const first_node = draft.document.nodes[
         selection[0]
       ] as grida.program.nodes.Node;
-      const target_ratio = (first_node as any).layout_target_aspect_ratio as
-        | [number, number]
-        | undefined;
+      const target_ratio = (first_node as grida.program.nodes.UnknownNode)
+        .layout_target_aspect_ratio as [number, number] | undefined;
       if (target_ratio) {
         snap_target_aspect_ratio = target_ratio;
       }
@@ -318,9 +317,8 @@ function self_update_gesture_resize_scale(
     if (!is_scalable) continue;
 
     // Check if node has layout_target_aspect_ratio set
-    const targetAspectRatio = (node as any).layout_target_aspect_ratio as
-      | [number, number]
-      | undefined;
+    const targetAspectRatio = (node as grida.program.nodes.UnknownNode)
+      .layout_target_aspect_ratio as [number, number] | undefined;
 
     // Aspect ratio should be preserved if:
     // - Shift key is pressed (transform_with_preserve_aspect_ratio === "on"), OR

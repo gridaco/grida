@@ -155,7 +155,8 @@ function WasmTextEditorRelay({ node_id }: { node_id: string }) {
   useEffect(() => {
     if (!scene || !node) return;
 
-    const originalText = ((node as any).text as string) ?? "";
+    const originalText =
+      ((node as grida.program.nodes.UnknownNode).text as string) ?? "";
 
     let entered = false;
     try {
@@ -561,7 +562,7 @@ function DOMTextEditorOverlay({ node_id }: { node_id: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
   const styles = css.toReactTextStyle(
-    node as grida.program.nodes.TextSpanNode as any as grida.program.nodes.ComputedTextSpanNode
+    node as grida.program.nodes.TextSpanNode as unknown as grida.program.nodes.ComputedTextSpanNode
   );
 
   // Focus and select all text on mount

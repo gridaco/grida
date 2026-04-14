@@ -222,7 +222,7 @@ export function SlideMenuContent() {
                         constraints: { type: "scale" as const, value: 1 },
                       }
                     : {}),
-                } as any);
+                } as unknown as editor.api.ExportConfigOf<typeof format>);
                 const ext = format.toLowerCase();
                 const mime = format === "PNG" ? "image/png" : "image/svg+xml";
                 const blob = new Blob([data as BlobPart], { type: mime });
@@ -241,7 +241,7 @@ export function SlideMenuContent() {
                             constraints: { type: "scale" as const, value: 1 },
                           }
                         : {}),
-                    } as any
+                    } as unknown as editor.api.ExportConfigOf<typeof format>
                   );
                   const ext = format.toLowerCase();
                   const bytes =

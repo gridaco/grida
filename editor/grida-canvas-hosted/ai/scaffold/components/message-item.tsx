@@ -1,7 +1,33 @@
 "use client";
 
 import type { CanvasDesignAgentMessage } from "@/grida-canvas-hosted/ai/agent/server-agent";
-import { getToolName, type ToolUIPart } from "ai";
+import { getToolName, type DynamicToolUIPart, type ToolUIPart } from "ai";
+
+/**
+ * The AI SDK streams parts with types like "text-delta", "reasoning-delta",
+ * "reasoning-start" etc that are not included in the finalized `UIMessagePart`
+ * union. This local type covers both finalized and streaming part shapes.
+ */
+interface StreamingMessagePart {
+  type: string;
+  text?: string;
+  delta?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * `ToolUIPart` with default `UITools` can resolve to `never` in some TS
+ * versions. This structural type covers the fields accessed at runtime.
+ */
+interface ToolPartData {
+  type: string;
+  toolCallId?: string;
+  toolName?: string;
+  state?: string;
+  input: unknown;
+  output: unknown;
+  errorText?: string;
+}
 import {
   Reasoning,
   ReasoningContent,
@@ -30,6 +56,15 @@ import { TreeToolUI } from "./tool-ui-tree";
 import { ArtboardSizesToolUI } from "./tool-ui-artboard-sizes";
 import { GenerateImageToolUI } from "./tool-ui-generate-image";
 import { MarkdownToolUI } from "./tool-ui-markdown";
+import type {
+  SvgInput,
+  SvgOutput,
+  TreeOutput,
+  MarkdownInput,
+  MarkdownOutput,
+  GenerateImageInput,
+  GenerateImageOutput,
+} from "./tool-ui-shared";
 
 export interface BaseMessageProps {
   message: CanvasDesignAgentMessage;
@@ -75,8 +110,12 @@ export function AssistantMessage({
   isStreaming,
   className,
 }: AssistantMessageProps) {
-  const parts = Array.isArray((message as any).parts)
-    ? ((message as any).parts as any[])
+  const msg = message as CanvasDesignAgentMessage & {
+    parts?: StreamingMessagePart[];
+    content?: string | { text?: string }[];
+  };
+  const parts: StreamingMessagePart[] = Array.isArray(msg.parts)
+    ? msg.parts
     : [];
 
   // Group consecutive reasoning / text parts so they render as single blocks
@@ -87,13 +126,13 @@ export function AssistantMessage({
   const hasRenderedContent = groupedParts.some((group) => {
     if (group.kind === "reasoning") {
       const text = group.items
-        .map((p: any) => p.text ?? p.delta ?? "")
+        .map((p: StreamingMessagePart) => p.text ?? p.delta ?? "")
         .join("");
       return !!text;
     }
     if (group.kind === "text") {
       const text = group.items
-        .map((p: any) => p.text ?? p.delta ?? "")
+        .map((p: StreamingMessagePart) => p.text ?? p.delta ?? "")
         .join("");
       return !!text;
     }
@@ -107,7 +146,7 @@ export function AssistantMessage({
     // ── Reasoning group ──────────────────────────────────────────────
     if (group.kind === "reasoning") {
       const reasoningText = group.items
-        .map((p: any) => p.text ?? p.delta ?? "")
+        .map((p: StreamingMessagePart) => p.text ?? p.delta ?? "")
         .join("");
       if (!reasoningText) return null;
 
@@ -117,7 +156,8 @@ export function AssistantMessage({
       //     (text or tool) follows this reasoning group — meaning the
       //     reasoning block is still the active stream frontier.
       const hasDeltaParts = group.items.some(
-        (p: any) => p.type === "reasoning-delta" || p.type === "reasoning-start"
+        (p: StreamingMessagePart) =>
+          p.type === "reasoning-delta" || p.type === "reasoning-start"
       );
       const isLastGroup = groupIndex === groupedParts.length - 1;
       const nothingFollows =
@@ -137,7 +177,7 @@ export function AssistantMessage({
     // ── Text group ────────────────────────────────────────────────────
     if (group.kind === "text") {
       const textContent = group.items
-        .map((p: any) => p.text ?? p.delta ?? "")
+        .map((p: StreamingMessagePart) => p.text ?? p.delta ?? "")
         .join("");
       if (!textContent) return null;
 
@@ -177,31 +217,38 @@ export function AssistantMessage({
 // ToolPart — dispatches to custom UIs or falls back to generic Tool chrome
 // ---------------------------------------------------------------------------
 
-function ToolPart({ part }: { part: any }) {
-  const toolName = getToolName(part);
-  const state: ToolUIPart["state"] =
-    part.state ?? (part.output ? "output-available" : "input-available");
-  const input = part.input;
-  const output = part.output;
+function ToolPart({ part }: { part: ToolPartData }) {
+  const toolName = getToolName(part as DynamicToolUIPart);
+  const state: DynamicToolUIPart["state"] =
+    (part.state as DynamicToolUIPart["state"]) ??
+    (part.output ? "output-available" : "input-available");
   const errorText: string | undefined = part.errorText;
 
   // ── Custom tool UIs ────────────────────────────────────────────────
+  // ToolUIPart.input/output are `unknown`; each tool UI expects specific
+  // types so we cast at the dispatch boundary.
   switch (toolName) {
     case canvas_use.tools_spec.name_make_from_svg:
       return (
         <SvgToolUI
-          input={input}
-          output={output}
+          input={part.input as SvgInput}
+          output={part.output as SvgOutput | undefined}
           state={state}
           errorText={errorText}
         />
       );
     case canvas_use.tools_spec.name_tree:
-      return <TreeToolUI output={output} state={state} errorText={errorText} />;
+      return (
+        <TreeToolUI
+          output={part.output as TreeOutput | undefined}
+          state={state}
+          errorText={errorText}
+        />
+      );
     case canvas_use.tools_spec.name_data_artboard_sizes:
       return (
         <ArtboardSizesToolUI
-          output={output}
+          output={part.output as Record<string, unknown[]> | undefined}
           state={state}
           errorText={errorText}
         />
@@ -209,8 +256,8 @@ function ToolPart({ part }: { part: any }) {
     case canvas_use.tools_spec.name_make_from_markdown:
       return (
         <MarkdownToolUI
-          input={input}
-          output={output}
+          input={part.input as MarkdownInput}
+          output={part.output as MarkdownOutput | undefined}
           state={state}
           errorText={errorText}
         />
@@ -218,8 +265,8 @@ function ToolPart({ part }: { part: any }) {
     case canvas_use.tools_spec.name_platform_sys_tool_ai_generate_image:
       return (
         <GenerateImageToolUI
-          input={input}
-          output={output}
+          input={part.input as GenerateImageInput}
+          output={part.output as GenerateImageOutput | undefined}
           state={state}
           errorText={errorText}
         />
@@ -234,11 +281,18 @@ function ToolPart({ part }: { part: any }) {
           state !== "input-streaming" && state !== "approval-requested"
         }
       >
-        <ToolHeader title={toolName} type={part.type} state={state} />
+        <ToolHeader
+          title={toolName}
+          type={part.type as unknown as ToolUIPart["type"]}
+          state={state as unknown as ToolUIPart["state"]}
+        />
         <ToolContent>
-          {input !== undefined && <ToolInput input={input} />}
-          {(output !== undefined || errorText) && (
-            <ToolOutput output={output} errorText={errorText ?? undefined} />
+          {part.input !== undefined && <ToolInput input={part.input} />}
+          {(part.output !== undefined || errorText) && (
+            <ToolOutput
+              output={part.output}
+              errorText={errorText ?? undefined}
+            />
           )}
         </ToolContent>
       </Tool>
@@ -251,15 +305,15 @@ function ToolPart({ part }: { part: any }) {
 // ===========================================================================
 
 type GroupedPart =
-  | { kind: "reasoning"; items: any[] }
-  | { kind: "text"; items: any[] }
-  | { kind: "tool"; items: [any] };
+  | { kind: "reasoning"; items: StreamingMessagePart[] }
+  | { kind: "text"; items: StreamingMessagePart[] }
+  | { kind: "tool"; items: [ToolPartData] };
 
 /**
  * Groups consecutive parts of the same kind (text or reasoning) so they
  * render as a single block, while tool parts remain individual.
  */
-function groupConsecutiveParts(parts: any[]): GroupedPart[] {
+function groupConsecutiveParts(parts: StreamingMessagePart[]): GroupedPart[] {
   const groups: GroupedPart[] = [];
 
   for (const part of parts) {
@@ -269,7 +323,7 @@ function groupConsecutiveParts(parts: any[]): GroupedPart[] {
     const partKind = getPartKind(type);
 
     if (partKind === "tool") {
-      groups.push({ kind: "tool", items: [part] });
+      groups.push({ kind: "tool", items: [part as unknown as ToolPartData] });
     } else if (partKind === "text" || partKind === "reasoning") {
       const last = groups[groups.length - 1];
       if (last && last.kind === partKind) {
@@ -306,8 +360,12 @@ function getPartKind(type: string): "text" | "reasoning" | "tool" | "unknown" {
 
 /** Extract all text from a message's parts (or fall back to .content). */
 function getTextFromParts(message: CanvasDesignAgentMessage): string {
-  const parts = Array.isArray((message as any).parts)
-    ? ((message as any).parts as any[])
+  const msg = message as CanvasDesignAgentMessage & {
+    parts?: StreamingMessagePart[];
+    content?: string | { text?: string }[];
+  };
+  const parts: StreamingMessagePart[] = Array.isArray(msg.parts)
+    ? msg.parts
     : [];
 
   const texts: string[] = [];
@@ -328,7 +386,7 @@ function getTextFromParts(message: CanvasDesignAgentMessage): string {
   if (joined) return joined;
 
   // Fallback: read .content directly
-  const rawContent = (message as any).content;
+  const rawContent = msg.content;
   if (typeof rawContent === "string") return rawContent;
   if (Array.isArray(rawContent)) {
     return rawContent

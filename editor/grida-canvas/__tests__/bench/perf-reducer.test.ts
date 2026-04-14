@@ -15,6 +15,8 @@
  */
 import { describe, test, beforeAll, afterAll } from "vitest";
 import { Editor } from "@/grida-canvas/editor";
+import type { editor } from "@/grida-canvas";
+import type { Action } from "@/grida-canvas/action";
 import { CanvasWasmGeometryQueryInterfaceProvider } from "@/grida-canvas/backends/wasm";
 import { perf } from "@/grida-canvas/perf";
 import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
@@ -27,7 +29,9 @@ import type { Scene } from "@grida/canvas-wasm";
 // ---------------------------------------------------------------------------
 
 if (typeof globalThis.reportError === "undefined") {
-  (globalThis as any).reportError = (_err: any) => {};
+  (
+    globalThis as unknown as { reportError: (err: unknown) => void }
+  ).reportError = (_err: unknown) => {};
 }
 
 // ---------------------------------------------------------------------------
@@ -36,7 +40,7 @@ if (typeof globalThis.reportError === "undefined") {
 
 function generateLargeDocument(n: number): grida.program.document.Document {
   const children: string[] = [];
-  const nodes: Record<string, any> = {
+  const nodes: Record<string, grida.program.nodes.Node> = {
     scene: sceneNode("scene", "Scene"),
   };
   const cols = Math.ceil(Math.sqrt(n));
@@ -103,7 +107,7 @@ function logBench(label: string, r: ReturnType<typeof bench>) {
 // WASM bootstrap
 // ---------------------------------------------------------------------------
 
-let _createCanvas: (opts: any) => Promise<any>;
+let _createCanvas: typeof import("@grida/canvas-wasm").createCanvas;
 
 beforeAll(async () => {
   const pkg = await import("@grida/canvas-wasm");
@@ -112,7 +116,11 @@ beforeAll(async () => {
 
 async function createEditorWithWasm(
   doc: grida.program.document.Document
-): Promise<{ ed: Editor; canvas: any; scene: Scene }> {
+): Promise<{
+  ed: Editor;
+  canvas: import("@grida/canvas-wasm").Canvas;
+  scene: Scene;
+}> {
   const ed = Editor.createHeadless(
     { document: doc, editable: true, debug: false },
     { viewport: { width: 4096, height: 4096 } }
@@ -123,7 +131,7 @@ async function createEditorWithWasm(
     height: 4096,
     useEmbeddedFonts: true,
   });
-  const scene: Scene = (canvas as any)._scene;
+  const scene: Scene = (canvas as unknown as { _scene: Scene })._scene;
   try {
     const bytes = io.GRID.encode(doc);
     scene.loadSceneGrida(bytes);
@@ -132,10 +140,9 @@ async function createEditorWithWasm(
   }
   const sceneId = doc.entry_scene_id ?? doc.scenes_ref[0];
   scene.switchScene(sceneId);
-  (ed as any)._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
-    ed,
-    scene
-  );
+  (
+    ed as unknown as { _m_geometry: CanvasWasmGeometryQueryInterfaceProvider }
+  )._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(ed, scene);
   return { ed, canvas, scene };
 }
 
@@ -145,7 +152,7 @@ async function createEditorWithWasm(
 
 describe("E2E perf: 1K nodes (WASM geometry)", () => {
   let ed: Editor;
-  let canvas: any;
+  let canvas: import("@grida/canvas-wasm").Canvas;
 
   beforeAll(async () => {
     perf.enable();
@@ -172,7 +179,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
         type: "event-target/event/on-pointer-down",
         node_ids_from_point: ["r0"],
         shiftKey: false,
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
     ed.doc.dispatch(
@@ -180,7 +187,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
         type: "event-target/event/on-drag-start",
         shiftKey: false,
         event: { movement: [0, 0], delta: [0, 0] },
-      } as any,
+      } as unknown as Action,
       { recording: "begin-gesture" }
     );
 
@@ -191,7 +198,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
         {
           type: "event-target/event/on-drag",
           event: { movement: [dx, 0], delta: [1, 0] },
-        } as any,
+        } as unknown as Action,
         { recording: "silent" }
       );
     }, 10);
@@ -202,7 +209,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
         shiftKey: false,
         node_ids_from_area: undefined,
         event: { movement: [dx, 0], delta: [0, 0] },
-      } as any,
+      } as unknown as Action,
       { recording: "end-gesture" }
     );
 
@@ -215,7 +222,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
       {
         type: "surface/gesture/start",
         gesture: { type: "scale", selection: ["r1"], direction: "se" },
-      } as any,
+      } as unknown as Action,
       { recording: "begin-gesture" }
     );
 
@@ -226,7 +233,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
         {
           type: "event-target/event/on-drag",
           event: { movement: [dy, dy], delta: [1, 1] },
-        } as any,
+        } as unknown as Action,
         { recording: "silent" }
       );
     }, 10);
@@ -237,7 +244,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
         shiftKey: false,
         node_ids_from_area: undefined,
         event: { movement: [dy, dy], delta: [0, 0] },
-      } as any,
+      } as unknown as Action,
       { recording: "end-gesture" }
     );
 
@@ -256,7 +263,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
             color: { r: Math.random(), g: Math.random(), b: 0, a: 1 },
             active: true,
           },
-        } as any,
+        } as unknown as Action,
         { recording: "silent" }
       );
     });
@@ -271,7 +278,7 @@ describe("E2E perf: 1K nodes (WASM geometry)", () => {
           type: "node/change/*",
           node_id: "r0",
           opacity: Math.random(),
-        } as any,
+        } as unknown as Action,
         { recording: "silent" }
       );
     });
@@ -287,8 +294,18 @@ import { produceWithPatches, enablePatches } from "immer";
 describe("Immer isolation: pure overhead measurement", () => {
   enablePatches();
 
+  interface BenchNode {
+    id: string;
+    type: string;
+    layout_inset_left: number;
+    layout_inset_top: number;
+    layout_target_width: number;
+    layout_target_height: number;
+    opacity: number;
+  }
+
   function make1KState() {
-    const nodes: Record<string, any> = {};
+    const nodes: Record<string, BenchNode> = {};
     for (let i = 0; i < 1000; i++) {
       nodes[`r${i}`] = {
         id: `r${i}`,
@@ -310,7 +327,7 @@ describe("Immer isolation: pure overhead measurement", () => {
     Object.freeze(state);
 
     const result = bench(() => {
-      const [next] = produceWithPatches(state, (draft: any) => {
+      const [next] = produceWithPatches(state, (draft) => {
         draft.nodes["r0"].layout_inset_left += 1;
         draft.nodes["r0"].layout_inset_top += 1;
       });
@@ -371,7 +388,7 @@ describe("Immer bypass comparison (real 1K state)", () => {
         type: "event-target/event/on-pointer-down",
         node_ids_from_point: ["r0"],
         shiftKey: false,
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
     r.ed.doc.dispatch(
@@ -379,19 +396,23 @@ describe("Immer bypass comparison (real 1K state)", () => {
         type: "event-target/event/on-drag-start",
         shiftKey: false,
         event: { movement: [0, 0], delta: [0, 0] },
-      } as any,
+      } as unknown as Action,
       { recording: "begin-gesture" }
     );
 
-    let state = r.ed.doc.state;
+    let state: editor.state.IEditorState = r.ed.doc.state;
 
     // Test produceWithPatches
     const pwpResult = bench(() => {
-      const [next] = produceWithPatches(state, (draft: any) => {
-        draft.document.nodes["r0"].layout_inset_left += 1;
-        draft.document.nodes["r0"].layout_inset_top += 1;
-        draft.gesture.movement = [1, 0];
-        draft.surface_snapping = undefined;
+      const [next] = produceWithPatches(state, (draft) => {
+        const node = draft.document.nodes[
+          "r0"
+        ] as grida.program.nodes.UnknownNode;
+        node.layout_inset_left = (node.layout_inset_left ?? 0) + 1;
+        node.layout_inset_top = (node.layout_inset_top ?? 0) + 1;
+        (draft.gesture as unknown as Record<string, unknown>).movement = [1, 0];
+        (draft as unknown as Record<string, unknown>).surface_snapping =
+          undefined;
       });
       state = next;
     });
@@ -399,11 +420,15 @@ describe("Immer bypass comparison (real 1K state)", () => {
 
     // Test produce (no patches)
     const pResult = bench(() => {
-      const next = produce(state, (draft: any) => {
-        draft.document.nodes["r0"].layout_inset_left += 1;
-        draft.document.nodes["r0"].layout_inset_top += 1;
-        draft.gesture.movement = [1, 0];
-        draft.surface_snapping = undefined;
+      const next = produce(state, (draft) => {
+        const node = draft.document.nodes[
+          "r0"
+        ] as grida.program.nodes.UnknownNode;
+        node.layout_inset_left = (node.layout_inset_left ?? 0) + 1;
+        node.layout_inset_top = (node.layout_inset_top ?? 0) + 1;
+        (draft.gesture as unknown as Record<string, unknown>).movement = [1, 0];
+        (draft as unknown as Record<string, unknown>).surface_snapping =
+          undefined;
       });
       state = next;
     });
@@ -411,11 +436,13 @@ describe("Immer bypass comparison (real 1K state)", () => {
 
     // Test direct mutation + shallow spread
     const dmResult = bench(() => {
-      const node = state.document.nodes["r0"] as any;
+      const node = state.document.nodes[
+        "r0"
+      ] as grida.program.nodes.UnknownNode;
       const nextNode = {
         ...node,
-        layout_inset_left: node.layout_inset_left + 1,
-        layout_inset_top: node.layout_inset_top + 1,
+        layout_inset_left: (node.layout_inset_left ?? 0) + 1,
+        layout_inset_top: (node.layout_inset_top ?? 0) + 1,
       };
       state = {
         ...state,
@@ -423,30 +450,37 @@ describe("Immer bypass comparison (real 1K state)", () => {
           ...state.document,
           nodes: { ...state.document.nodes, r0: nextNode },
         },
-        gesture: { ...(state as any).gesture, movement: [1, 0] },
+        gesture: {
+          ...(state.gesture as unknown as Record<string, unknown>),
+          movement: [1, 0],
+        },
         surface_snapping: undefined,
-      } as any;
+      } as unknown as editor.state.IEditorState;
     });
     logBench("direct spread (real 1K state)", dmResult);
 
     // Test structuredClone + mutate
     const scResult = bench(() => {
-      const next = structuredClone(state) as any;
-      next.document.nodes["r0"].layout_inset_left += 1;
-      next.document.nodes["r0"].layout_inset_top += 1;
-      next.gesture.movement = [1, 0];
-      next.surface_snapping = undefined;
+      const next = structuredClone(state);
+      const node = next.document.nodes["r0"] as grida.program.nodes.UnknownNode;
+      node.layout_inset_left = (node.layout_inset_left ?? 0) + 1;
+      node.layout_inset_top = (node.layout_inset_top ?? 0) + 1;
+      (next.gesture as unknown as Record<string, unknown>).movement = [1, 0];
+      (next as unknown as Record<string, unknown>).surface_snapping = undefined;
       state = next;
     });
     logBench("structuredClone + mutate (real 1K)", scResult);
 
     // Test JSON round-trip + mutate
     const jResult = bench(() => {
-      const next = JSON.parse(JSON.stringify(state)) as any;
-      next.document.nodes["r0"].layout_inset_left += 1;
-      next.document.nodes["r0"].layout_inset_top += 1;
-      next.gesture.movement = [1, 0];
-      next.surface_snapping = undefined;
+      const next = JSON.parse(
+        JSON.stringify(state)
+      ) as editor.state.IEditorState;
+      const node = next.document.nodes["r0"] as grida.program.nodes.UnknownNode;
+      node.layout_inset_left = (node.layout_inset_left ?? 0) + 1;
+      node.layout_inset_top = (node.layout_inset_top ?? 0) + 1;
+      (next.gesture as unknown as Record<string, unknown>).movement = [1, 0];
+      (next as unknown as Record<string, unknown>).surface_snapping = undefined;
       state = next;
     });
     logBench("JSON clone + mutate (real 1K)", jResult);
@@ -470,7 +504,7 @@ const HAS_FIXTURE = fs.existsSync(FIXTURE_PATH);
 
 describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
   let ed: Editor;
-  let canvas: any;
+  let canvas: import("@grida/canvas-wasm").Canvas;
   let nodeCount: number;
   let firstNodeId: string;
 
@@ -491,7 +525,7 @@ describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
     firstNodeId = queue[0]; // fallback
     while (queue.length > 0) {
       const id = queue.shift()!;
-      const node = doc.nodes[id] as any;
+      const node = doc.nodes[id] as grida.program.nodes.UnknownNode;
       // Pick a simple, absolutely-positioned node with geometry
       const draggable = new Set([
         "rectangle",
@@ -512,7 +546,7 @@ describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
       if (kids) queue.push(...kids);
     }
     console.log(
-      `  scene=${sceneId}, test node=${firstNodeId} (${(doc.nodes[firstNodeId] as any)?.type})`
+      `  scene=${sceneId}, test node=${firstNodeId} (${doc.nodes[firstNodeId]?.type})`
     );
 
     const r = await createEditorWithWasm(doc);
@@ -548,7 +582,7 @@ describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
         type: "event-target/event/on-pointer-down",
         node_ids_from_point: [firstNodeId],
         shiftKey: false,
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
     ed.doc.dispatch(
@@ -556,7 +590,7 @@ describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
         type: "event-target/event/on-drag-start",
         shiftKey: false,
         event: { movement: [0, 0], delta: [0, 0] },
-      } as any,
+      } as Action,
       { recording: "begin-gesture" }
     );
 
@@ -567,7 +601,7 @@ describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
         {
           type: "event-target/event/on-drag",
           event: { movement: [dx, 0], delta: [1, 0] },
-        } as any,
+        } as Action,
         { recording: "silent" }
       );
     }, 5); // fewer iterations — each frame is expensive at 135K nodes
@@ -579,7 +613,7 @@ describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
         shiftKey: false,
         node_ids_from_area: undefined,
         event: { movement: [dx, 0], delta: [0, 0] },
-      } as any,
+      } as Action,
       { recording: "end-gesture" }
     );
   });
@@ -594,7 +628,7 @@ describe.skipIf(!HAS_FIXTURE)("Real fixture: 135K nodes (local only)", () => {
             type: "solid",
             color: { r: Math.random(), g: 0, b: 0, a: 1 },
           },
-        } as any,
+        } as Action,
         { recording: "silent" }
       );
     });

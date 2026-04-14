@@ -92,13 +92,13 @@ export function useNodeActions(node_id: string | undefined) {
         instance.commands.changeNodePropertyText(node_id, text),
       style: (
         key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
-        value: any
+        value: grida.program.css.ExplicitlySupportedCSSProperties[keyof grida.program.css.ExplicitlySupportedCSSProperties]
       ) => instance.commands.changeNodePropertyStyle(node_id, key, value),
-      value: (key: string, value: any) =>
+      value: (key: string, value: tokens.StringValueExpression | undefined) =>
         instance.commands.changeNodePropertyProps(node_id, key, value),
       // attributes
-      userdata: (value: any) =>
-        instance.setUserData(node_id, value as Record<string, unknown> | null),
+      userdata: (value: Record<string, unknown> | null) =>
+        instance.setUserData(node_id, value),
       name: (name: string) => {
         node.name = name;
       },
@@ -715,7 +715,7 @@ export function useRootTemplateInstanceNode(root_id: string) {
   const rootDefault = templates![rootnode.template_id].default || {};
 
   const changeRootProps = useCallback(
-    (key: string, value: any) => {
+    (key: string, value: tokens.StringValueExpression | undefined) => {
       editor.commands.changeNodePropertyProps(root_id, key, value);
     },
     [editor, root_id]
@@ -896,5 +896,9 @@ export function useNodeMetadata<NS extends "export_settings" | "userdata">(
   return useEditorState(
     editor,
     (state) => state.document.metadata?.[node_id]?.[namespace]
-  ) as any;
+  ) as NS extends "export_settings"
+    ? grida.program.document.NodeExportSettings[] | undefined
+    : NS extends "userdata"
+      ? Record<string, unknown> | null | undefined
+      : never;
 }

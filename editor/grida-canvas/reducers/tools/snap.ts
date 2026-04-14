@@ -80,7 +80,7 @@ export function snapMovement(
       : cmath.rect.translate(agent_q, normalized);
 
     snapping = snapToCanvasGeometry(
-      moved_agent as any,
+      moved_agent as cmath.Rectangle | cmath.Vector2[],
       {
         objects: anchor_objects,
         guides: anchors.guides,

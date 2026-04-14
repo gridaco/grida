@@ -26,7 +26,7 @@ type GridPosition = [number, number];
 type GridSize = [number, number];
 type GridBlockId = string;
 
-export type GridBlock<T = any> = {
+export type GridBlock<T = unknown> = {
   id: GridBlockId;
   x: GridPosition;
   y: GridPosition;

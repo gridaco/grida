@@ -119,7 +119,7 @@ export function self_update_gesture_transform<
       }
       default:
         throw new Error(
-          `Gesture type not supported: ${(draft.gesture as any).type}`
+          `Gesture type not supported: ${(draft.gesture as unknown as { type: string }).type}`
         );
     }
   } finally {

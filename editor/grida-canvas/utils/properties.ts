@@ -36,16 +36,16 @@ function cornerRadius(
  * Gets the mode value for fill from a collection of nodes.
  */
 // TODO: LEGACY_PAINT_MODEL
-function fill(...nodes: grida.program.nodes.Node[]): any {
+function fill(
+  ...nodes: grida.program.nodes.Node[]
+): grida.program.nodes.i.props.PropsPaintValue | undefined {
   for (const node of nodes) {
-    if (
-      Array.isArray((node as any).fill_paints) &&
-      (node as any).fill_paints.length > 0
-    ) {
-      return (node as any).fill_paints[0];
+    const un = node as grida.program.nodes.UnknownNode;
+    if (Array.isArray(un.fill_paints) && un.fill_paints.length > 0) {
+      return un.fill_paints[0];
     }
-    if ("fill" in node && node.fill !== undefined) {
-      return node.fill;
+    if (un.fill !== undefined) {
+      return un.fill;
     }
   }
 
@@ -56,16 +56,16 @@ function fill(...nodes: grida.program.nodes.Node[]): any {
  * Gets the mode value for stroke from a collection of nodes.
  */
 // TODO: LEGACY_PAINT_MODEL
-function stroke(...nodes: grida.program.nodes.Node[]): any {
+function stroke(
+  ...nodes: grida.program.nodes.Node[]
+): grida.program.nodes.i.props.PropsPaintValue | undefined {
   for (const node of nodes) {
-    if (
-      Array.isArray((node as any).stroke_paints) &&
-      (node as any).stroke_paints.length > 0
-    ) {
-      return (node as any).stroke_paints[0];
+    const un = node as grida.program.nodes.UnknownNode;
+    if (Array.isArray(un.stroke_paints) && un.stroke_paints.length > 0) {
+      return un.stroke_paints[0];
     }
-    if ("stroke" in node && node.stroke !== undefined) {
-      return node.stroke;
+    if (un.stroke !== undefined) {
+      return un.stroke;
     }
   }
 

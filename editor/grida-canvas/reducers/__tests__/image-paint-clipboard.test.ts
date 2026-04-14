@@ -1,7 +1,10 @@
 import documentReducer from "../document.reducer";
-import grida from "@grida/schema";
+import type { DocumentAction } from "@/grida-canvas/action";
+import type { editor } from "@/grida-canvas";
+import type { ReducerContext } from "@/grida-canvas/reducers";
+import type grida from "@grida/schema";
 
-function createImagePaint(overrides: Record<string, any> = {}) {
+function createImagePaint(overrides: Record<string, unknown> = {}) {
   return {
     type: "image",
     visible: true,
@@ -14,7 +17,7 @@ function createImagePaint(overrides: Record<string, any> = {}) {
 }
 
 function createDocument(
-  nodes: Record<string, any>
+  nodes: Record<string, unknown>
 ): grida.program.document.Document {
   const scene_children = Object.keys(nodes);
   return {
@@ -73,12 +76,12 @@ describe("document reducer - image paint clipboard", () => {
         paint_target: "fill",
         paint_index: 0,
       },
-    } as any;
+    } as unknown as editor.state.IEditorState;
 
     const next = documentReducer(
       state,
-      { type: "copy", target: "selection" } as any,
-      {} as any
+      { type: "copy", target: "selection" } as DocumentAction,
+      {} as ReducerContext
     );
 
     expect(next.user_clipboard).toBeDefined();
@@ -146,28 +149,36 @@ describe("document reducer - image paint clipboard", () => {
         paint_target: "fill",
         paint_index: 0,
       },
-    } as any;
+    } as unknown as editor.state.IEditorState;
 
-    const next = documentReducer(state, { type: "paste" } as any, {} as any);
+    const next = documentReducer(
+      state,
+      { type: "paste" } as DocumentAction,
+      {} as ReducerContext
+    );
 
     expect(next.user_clipboard).toEqual(state.user_clipboard);
 
-    const first = next.document.nodes[nodeWithPaint];
+    const first = next.document.nodes[
+      nodeWithPaint
+    ] as grida.program.nodes.UnknownNode;
     // With the new implementation, we push to the end, so there should be 2 paints
     expect(first.fill_paints).toHaveLength(2);
-    expect(first.fill_paints[0]).toEqual(
+    expect(first.fill_paints![0]).toEqual(
       createImagePaint({ transform: [2, 0, 0, 2, 0, 0] })
     ); // Original paint
-    expect(first.fill_paints[1]).toEqual(clipboardPaint); // New pasted paint
-    expect(first.fill_paints[1]).not.toBe(clipboardPaint);
-    expect(first.fill).toEqual(first.fill_paints[0]); // fill should still point to the first paint
+    expect(first.fill_paints![1]).toEqual(clipboardPaint); // New pasted paint
+    expect(first.fill_paints![1]).not.toBe(clipboardPaint);
+    expect(first.fill).toEqual(first.fill_paints![0]); // fill should still point to the first paint
 
-    const second = next.document.nodes[nodeWithoutPaint];
+    const second = next.document.nodes[
+      nodeWithoutPaint
+    ] as grida.program.nodes.UnknownNode;
     expect(Array.isArray(second.fill_paints)).toBe(true);
     expect(second.fill_paints).toHaveLength(1);
-    expect(second.fill_paints[0]).toEqual(clipboardPaint);
-    expect(second.fill_paints[0]).not.toBe(clipboardPaint);
-    expect(second.fill).toEqual(second.fill_paints[0]);
+    expect(second.fill_paints![0]).toEqual(clipboardPaint);
+    expect(second.fill_paints![0]).not.toBe(clipboardPaint);
+    expect(second.fill).toEqual(second.fill_paints![0]);
   });
 
   test("pasting ignores clipboard from another document", () => {
@@ -209,11 +220,18 @@ describe("document reducer - image paint clipboard", () => {
         paint_target: "fill",
         paint_index: 0,
       },
-    } as any;
+    } as unknown as editor.state.IEditorState;
 
-    const next = documentReducer(state, { type: "paste" } as any, {} as any);
+    const next = documentReducer(
+      state,
+      { type: "paste" } as DocumentAction,
+      {} as ReducerContext
+    );
 
-    expect(next.document.nodes[nodeId].fill_paints?.[0]).toBe(originalPaint);
+    expect(
+      (next.document.nodes[nodeId] as grida.program.nodes.UnknownNode)
+        .fill_paints?.[0]
+    ).toBe(originalPaint);
     expect(next.user_clipboard).toEqual(state.user_clipboard);
   });
 });

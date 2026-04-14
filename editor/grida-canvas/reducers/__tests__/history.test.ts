@@ -9,6 +9,8 @@ import { createHeadlessEditor } from "@/grida-canvas/__tests__/utils";
 import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
 import type grida from "@grida/schema";
 
+type UnknownNode = grida.program.nodes.UnknownNode;
+
 function createHistoryDocument(): grida.program.document.Document {
   return {
     scenes_ref: ["scene1"],
@@ -206,7 +208,9 @@ describe("History Management", () => {
 
       // Undo the edit
       ed.doc.undo();
-      expect((ed.state.document.nodes.rect1 as any).name).toBe("Rectangle 1");
+      expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+        "Rectangle 1"
+      );
       expect(ed.doc.historySnapshot.future).toHaveLength(1);
 
       // Select something (uses clearsFuture: false)
@@ -218,7 +222,9 @@ describe("History Management", () => {
 
       // Redo the edit
       ed.doc.redo();
-      expect((ed.state.document.nodes.rect1 as any).name).toBe("Edited");
+      expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+        "Edited"
+      );
     });
 
     test("edit → undo → blur → redo restores the edit", () => {
@@ -239,7 +245,9 @@ describe("History Management", () => {
       expect(ed.doc.historySnapshot.future).toHaveLength(1);
 
       ed.doc.redo();
-      expect((ed.state.document.nodes.rect1 as any).name).toBe("Edited");
+      expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+        "Edited"
+      );
     });
   });
 });

@@ -7,6 +7,8 @@ import { createHeadlessEditor } from "@/grida-canvas/__tests__/utils";
 import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
 import type grida from "@grida/schema";
 
+type UnknownNode = grida.program.nodes.UnknownNode;
+
 function createPreviewDocument(): grida.program.document.Document {
   return {
     scenes_ref: ["scene1"],
@@ -46,7 +48,9 @@ describe("Preview (headless)", () => {
     });
     ed.doc.previewSet();
 
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview A");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "Preview A"
+    );
     // Not on the undo stack
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
 
@@ -62,7 +66,9 @@ describe("Preview (headless)", () => {
       name: "Preview A",
     });
     ed.doc.previewSet();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview A");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "Preview A"
+    );
 
     ed.doc.dispatch({
       type: "node/change/*",
@@ -70,7 +76,9 @@ describe("Preview (headless)", () => {
       name: "Preview B",
     });
     ed.doc.previewSet();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview B");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "Preview B"
+    );
 
     // Still not on the undo stack
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
@@ -79,7 +87,7 @@ describe("Preview (headless)", () => {
   });
 
   test("preview discard reverts to original state", () => {
-    const originalName = (ed.state.document.nodes.rect1 as any).name;
+    const originalName = (ed.state.document.nodes.rect1 as UnknownNode).name;
 
     ed.doc.previewStart("test");
 
@@ -98,12 +106,14 @@ describe("Preview (headless)", () => {
     ed.doc.previewSet();
 
     ed.doc.previewDiscard();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe(originalName);
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      originalName
+    );
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
   });
 
   test("preview commit creates one undo step", () => {
-    const originalName = (ed.state.document.nodes.rect1 as any).name;
+    const originalName = (ed.state.document.nodes.rect1 as UnknownNode).name;
 
     ed.doc.previewStart("test");
 
@@ -116,12 +126,16 @@ describe("Preview (headless)", () => {
 
     ed.doc.previewCommit();
 
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Committed");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "Committed"
+    );
     expect(ed.doc.historySnapshot.past).toHaveLength(1);
 
     // Undo reverts to original
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe(originalName);
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      originalName
+    );
   });
 
   test("isPreviewActive reflects preview state", () => {
@@ -133,7 +147,7 @@ describe("Preview (headless)", () => {
   });
 
   test("commit with final dispatch: previewSet before previewCommit captures last value", () => {
-    const originalName = (ed.state.document.nodes.rect1 as any).name;
+    const originalName = (ed.state.document.nodes.rect1 as UnknownNode).name;
 
     ed.doc.previewStart("test");
 
@@ -144,7 +158,9 @@ describe("Preview (headless)", () => {
       name: "Preview A",
     });
     ed.doc.previewSet();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Preview A");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "Preview A"
+    );
 
     // Final commit dispatches to B, then captures via previewSet + previewCommit.
     // This mirrors the real pattern: onCommit calls apply(B) then previewSet() + previewCommit().
@@ -156,30 +172,36 @@ describe("Preview (headless)", () => {
     ed.doc.previewSet();
     ed.doc.previewCommit();
 
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Final B");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Final B");
     expect(ed.doc.historySnapshot.past).toHaveLength(1);
 
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe(originalName);
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      originalName
+    );
 
     ed.doc.redo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Final B");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Final B");
   });
 
   test("commit without any seek: undo is a no-op", () => {
     // previewStart → previewCommit with no set() in between.
     // _currentDelta is null so commit pushes nothing to the real stack.
-    const originalName = (ed.state.document.nodes.rect1 as any).name;
+    const originalName = (ed.state.document.nodes.rect1 as UnknownNode).name;
 
     ed.doc.previewStart("test");
     ed.doc.previewCommit();
 
     // State unchanged — nothing was seeked.
-    expect((ed.state.document.nodes.rect1 as any).name).toBe(originalName);
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      originalName
+    );
 
     // Undo should be a no-op (nothing real on the stack).
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe(originalName);
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      originalName
+    );
   });
 
   test("dispatch during active preview is silent for history", () => {
@@ -194,7 +216,7 @@ describe("Preview (headless)", () => {
     });
 
     // State is mutated...
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Silent");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Silent");
     // ...but NOT recorded on the undo stack.
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
 
@@ -225,7 +247,9 @@ describe("Preview (headless)", () => {
     // ran inline). The bucket uses setTimeout so we flush manually.
     // For headless tests the adapter uses default bucketing, so we
     // check state rather than undo stack length here.
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("After Preview");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "After Preview"
+    );
   });
 
   test("normal dispatch works after preview discard", () => {
@@ -246,6 +270,8 @@ describe("Preview (headless)", () => {
       node_id: "rect1",
       name: "After Discard",
     });
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("After Discard");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "After Discard"
+    );
   });
 });

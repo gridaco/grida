@@ -8,7 +8,7 @@ import mixed, {
 } from "@grida/mixed-properties";
 import type cg from "@grida/cg";
 
-type WithId<T extends Record<string, any>> = T & { id: string };
+type WithId<T extends Record<string, unknown>> = T & { id: string };
 
 /**
  * Mixed (multi-selection) properties hook (selector-first).
@@ -26,7 +26,7 @@ type WithId<T extends Record<string, any>> = T & { id: string };
  *   `.value`, `.mixed`, `.partial`, `.ids`, `.values`.
  * - Use `options.isEqual` if you need tighter control over re-render behavior for large selections.
  */
-export function useMixedProperties<T extends Record<string, any>>(
+export function useMixedProperties<T extends Record<string, unknown>>(
   ids: string[],
   selector: (node: grida.program.nodes.UnknownNode) => T,
   options?: {

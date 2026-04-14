@@ -24,7 +24,7 @@ export type ReducerContext = {
   idgen: grida.id.INodeIdGenerator<string>;
   geometry: editor.api.IDocumentGeometryQuery;
   vector?: editor.api.IDocumentVectorInterfaceActions | null;
-  logger?: (...args: any[]) => void;
+  logger?: (...args: unknown[]) => void;
   viewport: {
     width: number;
     height: number;

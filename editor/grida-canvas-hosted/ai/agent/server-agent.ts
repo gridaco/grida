@@ -31,7 +31,7 @@ const tools = {
   // Provider-executed tool — the webSearch schema uses an internal symbol from
   // a different @ai-sdk/provider-utils version, which breaks the ToolSet
   // constraint.  The cast is safe because the tool is executed by the provider.
-  web_search: openai.tools.webSearch({}) as any,
+  web_search: openai.tools.webSearch({}) as unknown as ToolSet[string],
 } satisfies ToolSet;
 
 /**

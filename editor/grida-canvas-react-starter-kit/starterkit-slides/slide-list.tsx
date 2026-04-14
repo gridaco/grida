@@ -211,7 +211,7 @@ type SlideRowProps = {
   /** CSS aspect-ratio value derived from slide config, e.g. `"1920 / 1080"`. */
   aspectRatio: string;
   /** Props from headless-tree item.getProps() for D&D + a11y */
-  itemProps: Record<string, any>;
+  itemProps: Record<string, unknown>;
 };
 
 const SlideRow = React.forwardRef<

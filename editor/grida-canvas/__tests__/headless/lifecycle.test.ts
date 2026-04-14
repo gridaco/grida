@@ -46,7 +46,7 @@ describe("Editor Lifecycle (headless)", () => {
   });
 
   test("getDocumentJson returns only the document", () => {
-    const json = ed.getDocumentJson() as any;
+    const json = ed.getDocumentJson() as Record<string, unknown>;
     expect(json.scenes_ref).toBeDefined();
     expect(json.nodes).toBeDefined();
   });
