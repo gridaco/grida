@@ -54,7 +54,9 @@ export function renderRespondentEmail({
   const htmlSource = body_html_template.trim();
 
   return {
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- contextVars is a custom template context not in TemplateVariables.Context union
     subject: render(subjectSource, contextVars as any),
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- contextVars is a custom template context not in TemplateVariables.Context union
     html: render(htmlSource, contextVars as any),
     context: contextVars,
   };

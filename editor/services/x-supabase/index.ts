@@ -25,7 +25,9 @@ import { unique } from "@/utils/unique";
  */
 export async function createXSupabaseClient(
   supabase_project_id: number,
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK generic param
   config?: SupabaseClientOptions<any> & { service_role?: boolean }
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK generic params
 ): Promise<SupabaseClient<any, any>> {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
@@ -169,10 +171,12 @@ export class GridaXSupabaseService {
       supabase_project:
         supabase_project! as {} as GridaXSupabase.SupabaseProject,
       main_supabase_table_id,
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase query result type mismatch with domain type
       tables: supabase_project!.tables as any as GridaXSupabase.SupabaseTable[],
       main_supabase_table:
         (supabase_project!.tables.find(
           (t) => t.id === main_supabase_table_id
+          // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase query result type mismatch with domain type
         ) as any as GridaXSupabase.SupabaseTable) || null,
     };
   }
@@ -181,6 +185,7 @@ export class GridaXSupabaseService {
 export namespace XSupabase {
   //
   //
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK generic params for dynamic client
   export type Client = SupabaseClient<any, any>;
 
   export namespace Storage {
@@ -339,7 +344,10 @@ export namespace XSupabase {
 
       constructor(public readonly storage: SupabaseClient["storage"]) {}
 
-      async exists(storage: XSupabaseStorageSchema, row: Record<string, any>) {
+      async exists(
+        storage: XSupabaseStorageSchema,
+        row: Record<string, unknown>
+      ) {
         assert(storage.type === "x-supabase");
         const { bucket, path: pathtemplate } = storage;
         const renderedpath = renderpath(pathtemplate, {
@@ -356,7 +364,7 @@ export namespace XSupabase {
       }
 
       createSignedUrl(
-        row: Record<string, any>,
+        row: Record<string, unknown>,
         storage: XSupabaseStorageSchema
       ) {
         assert(storage.type === "x-supabase");
@@ -371,7 +379,7 @@ export namespace XSupabase {
       }
 
       async createSignedUrls(
-        row: Record<string, any>,
+        row: Record<string, unknown>,
         fields: (XSupabaseStorageSchema & { id: string })[]
       ): Promise<Record<string, SignedBucketObjectPath[]>> {
         const buckets: BucketWithUnknownProperties[] = Array.from(
@@ -428,6 +436,7 @@ export namespace XSupabase {
     }
 
     export function renderpath<
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- TemplateVariables.XSupabase generic constraint uses Record<string, any>
       R extends Record<string, any> = Record<string, any>,
     >(
       pathtemplate: string,

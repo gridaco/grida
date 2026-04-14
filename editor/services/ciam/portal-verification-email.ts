@@ -44,7 +44,9 @@ export function renderPortalVerificationEmail({
   const htmlSource = body_html_template.trim();
 
   return {
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- vars is a custom template context not in TemplateVariables.Context union
     subject: render(subjectSource, vars as any),
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- vars is a custom template context not in TemplateVariables.Context union
     html: render(htmlSource, vars as any),
   };
 }

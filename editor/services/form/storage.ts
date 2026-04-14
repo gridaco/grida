@@ -183,6 +183,7 @@ export namespace SessionStorageServices {
   }) {
     if (field.storage) {
       const { type, mode, bucket, path } =
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- field.storage JSON column type mismatch with domain type
         field.storage as any as FormFieldStorageSchema;
 
       switch (type) {
@@ -254,6 +255,7 @@ export namespace SessionStorageServices {
   }) {
     //
     if (field.storage) {
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- field.storage JSON column type mismatch with domain type
       const { type, bucket } = field.storage as any as FormFieldStorageSchema;
 
       switch (type) {
