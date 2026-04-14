@@ -462,7 +462,7 @@ export function useNumberInput<MIXED = "mixed">({
           break;
       }
     },
-    [type, mode, onValueChange, suffix, scale, precision]
+    [type, mode, onValueChange, suffix, scale]
   );
 
   // Global pointer down listener to commit pending changes when the input is

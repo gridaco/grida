@@ -15,39 +15,38 @@ export const TransparencyGrid: React.FC<TransparencyProps> = (props) => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const gridRef = React.useRef<TransparencyGridCanvas | null>(null);
 
+  const { backend, width, height, transform } = props;
+  const t00 = transform[0][0];
+  const t01 = transform[0][1];
+  const t02 = transform[0][2];
+  const t10 = transform[1][0];
+  const t11 = transform[1][1];
+  const t12 = transform[1][2];
+
   React.useEffect(() => {
     if (!canvasRef.current) return;
     if (
       !gridRef.current ||
-      (props.backend && gridRef.current.backend !== props.backend)
+      (backend && gridRef.current.backend !== backend)
     ) {
       // Create once (or re-create if backend changes)
       gridRef.current = new TransparencyGridCanvas(
         canvasRef.current,
         {
-          transform: props.transform,
+          transform,
           color: props.color,
         },
-        props.backend
+        backend
       );
     }
 
-    gridRef.current.setSize(props.width, props.height);
-    gridRef.current.updateTransform(props.transform);
+    gridRef.current.setSize(width, height);
+    gridRef.current.updateTransform(transform);
     requestAnimationFrame(() => {
       gridRef.current!.draw();
     });
-  }, [
-    props.backend,
-    props.width,
-    props.height,
-    props.transform[0][0],
-    props.transform[0][1],
-    props.transform[0][2],
-    props.transform[1][0],
-    props.transform[1][1],
-    props.transform[1][2],
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using extracted scalar values for value-level comparison; transform ref excluded to avoid re-running on new array references; color only used in constructor
+  }, [backend, width, height, t00, t01, t02, t10, t11, t12]);
 
   return (
     <canvas
