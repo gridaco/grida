@@ -8,6 +8,10 @@ import React, {
 import produce from "immer";
 import { State, initial } from "./core/state";
 import { Action } from "./core/action";
+import type {
+  GridaGridTypographyBlock,
+  GridaGridImageBlock,
+} from "./blocks";
 
 const Context = React.createContext<State | undefined>(undefined);
 
@@ -39,15 +43,16 @@ function reducer(state: State, action: Action): State {
     case "block/tag": {
       const { id, tag } = action;
       return produce(state, (draft) => {
-        draft.blocks[id].tag = tag;
+        (draft.blocks[id] as GridaGridTypographyBlock).tag =
+          tag as GridaGridTypographyBlock["tag"];
       });
     }
     case "block/style": {
       console.log("block/style", action);
       const { id, style } = action;
       return produce(state, (draft) => {
-        const block = draft.blocks[id];
-        draft.blocks[id].style = {
+        const block = draft.blocks[id] as GridaGridTypographyBlock;
+        block.style = {
           ...block.style,
           ...style,
         };
@@ -56,19 +61,20 @@ function reducer(state: State, action: Action): State {
     case "block/media/src": {
       const { id, src } = action;
       return produce(state, (draft) => {
-        draft.blocks[id].src = src;
+        (draft.blocks[id] as GridaGridImageBlock).src = src;
       });
     }
     case "block/media/object-fit": {
       const { id, objectFit } = action;
       return produce(state, (draft) => {
-        draft.blocks[id].objectFit = objectFit;
+        (draft.blocks[id] as unknown as { objectFit: string }).objectFit =
+          objectFit;
       });
     }
     case "block/text/data": {
       const { id, data } = action;
       return produce(state, (draft) => {
-        draft.blocks[id].data = data;
+        (draft.blocks[id] as GridaGridTypographyBlock).data = data;
       });
     }
   }
