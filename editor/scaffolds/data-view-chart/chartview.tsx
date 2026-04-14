@@ -447,7 +447,7 @@ function MainAxisQueryControl({
               case "week":
               case "time":
                 return (
-                  <DropdownMenuSub>
+                  <DropdownMenuSub key={name}>
                     <DropdownMenuSubTrigger>{name}</DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuRadioGroup

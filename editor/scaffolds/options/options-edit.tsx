@@ -375,6 +375,7 @@ export function OptionsEdit({
                   case "optgroup":
                     return (
                       <OptgroupEditItem
+                        key={item.id}
                         id={item.id}
                         index={index}
                         mode={mode}
