@@ -6,13 +6,15 @@
     "oxc",
     "react",
     "react-perf",
+    "import",
+
     // TODO:
     // "vitest",
     // "jsdoc",
   ],
   "categories": {
     "correctness": "error",
-    "perf": "warn",
+    // "perf": "warn",
     // "restriction": "error",
   },
   "rules": {
@@ -20,11 +22,18 @@
     // grida-specific overrides:
     "no-namespace": "off",
 
+    // ======================================
     // restriction
     "no-explicit-any": "error",
     "no-import-type-side-effects": "error",
     "no-var": "error",
+    // <planned>
+    // "no-invalid-void-type": "error",
+    // "no-empty-function": "error",
+    // "no-optional-chaining": "error",
+    // "no-alert": "error",
     // "default-case": "error",
+    // </planned>
   },
   "env": {
     "builtin": true,
