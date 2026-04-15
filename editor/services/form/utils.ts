@@ -151,10 +151,12 @@ export namespace RichTextStagedFileUtils {
   export const TMP_PREFIX_SCHEMA = "grida-tmp://";
   export const TMP_SUFFIX_QUERY = "?grida-tmp=true";
 
-  // Define the prefix and suffix regex patterns
+  // Define the prefix and suffix regex patterns. The path capture must be
+  // non-greedy (`.+?`) so that a doc containing multiple staged URLs does
+  // not match across them (greedy `.+` backtracks to the last suffix).
   const _TMP_PREFIX_REGEXP = /grida-tmp:\/\//;
   const _TMP_SUFFIX_REGEXP = /\?grida-tmp=true/;
-  const _PATH_REGEXP = /grida-tmp:\/\/(.+)\?grida-tmp=true/g;
+  const _PATH_REGEXP = /grida-tmp:\/\/(.+?)\?grida-tmp=true/g;
 
   export function encodeTmpUrl(path: string) {
     return TMP_PREFIX_SCHEMA + path + TMP_SUFFIX_QUERY;
@@ -220,12 +222,13 @@ export namespace RichTextStagedFileUtils {
     // Ensure the document is a string
     let docString = typeof doc === "string" ? doc : JSON.stringify(doc);
 
-    // Define the formatter function
-    const formatter = (
-      match: string,
-      ps: { prefix: string; suffix: string }
-    ) => {
-      return files[match].publicUrl || `${ps.prefix}${match}${ps.suffix}`;
+    // Return the resolved publicUrl, or preserve the original tmp URL if the
+    // caller didn't provide a mapping for this path (or the mapping has an
+    // empty publicUrl). Must rebuild from the literal prefix/suffix constants
+    // rather than `ps.prefix`/`ps.suffix`, which are raw regex sources with
+    // escaped slashes that produce invalid JSON when spliced back in.
+    const formatter = (match: string) => {
+      return files[match]?.publicUrl || encodeTmpUrl(match);
     };
 
     // Replace the placeholders in the document string
@@ -237,6 +240,52 @@ export namespace RichTextStagedFileUtils {
     );
 
     return JSON.parse(docString);
+  }
+
+  /**
+   * Client-side async variant of {@link renderDocument} that resolves
+   * `grida-tmp://…?grida-tmp=true` paths on demand via a resolver callback.
+   *
+   * Used by the richtext form field to rewrite staged URLs back to public URLs
+   * when loading `initialContent` into the editor, so previously-uploaded
+   * images render correctly on form re-open before the server has a chance
+   * to rewrite them via {@link renderDocument}.
+   *
+   * Each unique path is resolved at most once. Unresolved paths are left in
+   * place (the editor will render them as broken images, matching native
+   * browser behavior) so callers can decide how to surface the failure.
+   */
+  export async function resolveDocument<T extends object | string>(
+    doc: T,
+    resolver: (file: {
+      path: string;
+    }) => Promise<{ publicUrl: string } | null> | { publicUrl: string }
+  ): Promise<T> {
+    const { staged_file_paths } = parseDocument(doc);
+    if (staged_file_paths.length === 0) return doc;
+
+    const uniquePaths = Array.from(new Set(staged_file_paths));
+    const entries = await Promise.all(
+      uniquePaths.map(async (path) => {
+        try {
+          const resolved = await resolver({ path });
+          return [path, resolved?.publicUrl] as const;
+        } catch {
+          return [path, undefined] as const;
+        }
+      })
+    );
+
+    // renderDocument crashes if files[path] is missing, so provide an entry
+    // for every staged path. Unresolved paths get an empty publicUrl so the
+    // formatter's `|| fallback` branch preserves the original grida-tmp URL.
+    const files: Record<string, { path: string; publicUrl: string }> = {};
+    for (const [path, publicUrl] of entries) {
+      files[path] = { path, publicUrl: publicUrl ?? "" };
+    }
+
+    const rendered = renderDocument(doc, { files });
+    return (typeof doc === "string" ? JSON.stringify(rendered) : rendered) as T;
   }
 }
 

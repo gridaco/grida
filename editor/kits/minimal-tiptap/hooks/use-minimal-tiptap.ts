@@ -24,6 +24,20 @@ import { fileToBase64, getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
 import { toast } from "sonner";
 
+/**
+ * Build an image node attrs object from a File. Uses a blob URL so the
+ * ImageViewBlock's upload effect can pick it up and route through the
+ * configured `uploadFn`. This keeps drop / paste / toolbar flows unified —
+ * all three insert blob URLs and upload through one path.
+ */
+const imageAttrsFromFile = (file: File) => ({
+  id: randomId(),
+  src: URL.createObjectURL(file),
+  alt: file.name,
+  title: file.name,
+  fileName: file.name,
+});
+
 export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   value?: Content;
   output?: "html" | "json" | "text";
@@ -78,21 +92,10 @@ const createExtensions = ({
     onToggle(editor, files, pos) {
       editor.commands.insertContentAt(
         pos,
-        files.map((image) => {
-          const blobUrl = URL.createObjectURL(image);
-          const id = randomId();
-
-          return {
-            type: "image",
-            attrs: {
-              id,
-              src: blobUrl,
-              alt: image.name,
-              title: image.name,
-              fileName: image.name,
-            },
-          };
-        })
+        files.map((file) => ({
+          type: "image",
+          attrs: imageAttrsFromFile(file),
+        }))
       );
     },
     onImageRemoved({ id, src }) {
@@ -134,22 +137,21 @@ const createExtensions = ({
     allowedMimeTypes: ["image/*"],
     maxFileSize: 5 * 1024 * 1024,
     onDrop: (editor, files, pos) => {
-      files.forEach(async (file) => {
-        const src = await fileToBase64(file);
-        editor.commands.insertContentAt(pos, {
+      editor.commands.insertContentAt(
+        pos,
+        files.map((file) => ({
           type: "image",
-          attrs: { src },
-        });
-      });
+          attrs: imageAttrsFromFile(file),
+        }))
+      );
     },
     onPaste: (editor, files) => {
-      files.forEach(async (file) => {
-        const src = await fileToBase64(file);
-        editor.commands.insertContent({
+      editor.commands.insertContent(
+        files.map((file) => ({
           type: "image",
-          attrs: { src },
-        });
-      });
+          attrs: imageAttrsFromFile(file),
+        }))
+      );
     },
     onValidationError: (errors) => {
       errors.forEach((error) => {
