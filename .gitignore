@@ -9,6 +9,7 @@
 
 ## Local dev env
 --ignoreme
+lefthook-local.yml
 
 # generated sitemaps
 **/sitemap*.xml

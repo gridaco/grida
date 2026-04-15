@@ -1,0 +1,20 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: oxfmt
+      glob: "*.{ts,tsx,js,jsx,json,css,md,html}"
+      run: npx oxfmt {staged_files}
+      stage_fixed: true
+
+    - name: oxlint
+      glob: "*.{ts,tsx,js,jsx}"
+      run: npx oxlint --fix {staged_files}
+      stage_fixed: true
+
+    - name: cargo-fmt
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+
+    - name: clippy
+      glob: "*.rs"
+      run: cargo clippy --no-deps -- -D warnings
