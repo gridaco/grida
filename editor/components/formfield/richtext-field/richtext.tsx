@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Content } from "@tiptap/react";
 import { MinimalTiptapEditor, toTiptapContent } from "@/kits/minimal-tiptap";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,8 +17,22 @@ type FileHandler =
       resolver: FileResolverFn;
     };
 
-const serialize = (content: Content): string =>
-  typeof content === "string" ? content : JSON.stringify(content);
+/**
+ * Compute the hidden-input string form of a Content value, always passing
+ * object content through {@link RichTextStagedFileUtils.restageDocument} so
+ * image srcs with a staged-path marker in their `id` attr are rewritten back
+ * to `grida-tmp://…` form. This keeps the form-submission payload consistent
+ * with what the server expects regardless of whether the editor has fired
+ * `onUpdate` yet (covers initial mount, resolver success, resolver failure,
+ * and post-update handleChange calls uniformly).
+ */
+const computeSerialized = (value: Content | undefined): string => {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(
+    RichTextStagedFileUtils.restageDocument(value as object)
+  );
+};
 
 const noop = () => {};
 
@@ -46,6 +60,9 @@ export function RichTextEditorField({
   initialContent?: unknown;
   onContentChange?: (serialized: string) => void;
 } & FileHandler) {
+  // `initialContent` and `resolver` are contractually fixed at mount; the
+  // effect below transitions `initial.status` exactly once, so referring to
+  // the props directly (rather than snapshotting into refs) is safe.
   const [initial, setInitial] = useState<InitialValueState>(() => {
     const raw = toTiptapContent(initialContent);
     // No staged-url resolution needed unless a resolver is provided and the
@@ -54,55 +71,51 @@ export function RichTextEditorField({
     return { status: "pending" };
   });
   const [serialized, setSerialized] = useState<string>(() => {
-    if (initial.status === "ready" && initial.value != null)
-      return serialize(initial.value);
+    if (initial.status === "ready") return computeSerialized(initial.value);
     return "";
   });
 
-  // Resolve staged grida-tmp URLs in initialContent before mounting the editor.
-  // This only runs when a resolver is provided; otherwise initial state starts
-  // as `ready` synchronously (see above) and this effect is a no-op.
+  // Resolve staged grida-tmp URLs in initialContent before mounting the
+  // editor. Synchronous resolver-less path exits via the lazy useState init
+  // above; this effect only runs when `initial.status === "pending"`.
   useEffect(() => {
     if (initial.status !== "pending") return;
     let cancelled = false;
     (async () => {
       const raw = toTiptapContent(initialContent);
       if (!resolver || raw == null || typeof raw !== "object") {
-        if (!cancelled) setInitial({ status: "ready", value: raw });
+        if (!cancelled) {
+          setInitial({ status: "ready", value: raw });
+          setSerialized(computeSerialized(raw));
+        }
         return;
       }
       try {
-        const resolved = await RichTextStagedFileUtils.resolveDocument(
+        const resolved = (await RichTextStagedFileUtils.resolveDocument(
           raw as object,
           resolver
-        );
+        )) as Content;
         if (cancelled) return;
-        const value = resolved as Content;
-        setInitial({ status: "ready", value });
-        setSerialized(serialize(value));
+        setInitial({ status: "ready", value: resolved });
+        // computeSerialized restages the resolved value back to grida-tmp
+        // via the staged-id marker, so an unedited submit still carries a
+        // commit-eligible payload.
+        setSerialized(computeSerialized(resolved));
       } catch {
         if (cancelled) return;
-        // On resolver failure, fall through with the unresolved content —
-        // broken images are better than a blocked form.
+        // Fall through with unresolved content — broken <img> is better
+        // than a blocked form.
         setInitial({ status: "ready", value: raw });
+        setSerialized(computeSerialized(raw));
       }
     })();
     return () => {
       cancelled = true;
     };
-    // Only runs on the initial mount; resolver / initialContent are not
-    // supported to change after mount for this field.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Tracks `displayUrl → stagedPath` for every file uploaded in this session.
-  // Populated by wrappedUploader after a successful upload + resolve, consumed
-  // by handleChange to rewrite those display URLs back to grida-tmp form on
-  // serialize so the server's submit pipeline can find and commit them.
-  const stagedPathByUrl = useRef(new Map<string, string>());
+  }, [initial.status]);
 
   const wrappedUploader = useCallback(
-    async (file: File): Promise<string> => {
+    async (file: File): Promise<{ src: string; id: string }> => {
       const result = await uploader!(file);
       // FileUploaderFn types both `path` and `fullPath` as optional. Prefer
       // `path` (the bucket-relative key used by the resolver/render pipeline)
@@ -120,40 +133,35 @@ export function RichTextEditorField({
       // resolver we fall back to the grida-tmp URL — the image will show
       // broken, but the submission path still works end-to-end (matching
       // BlockNote's behavior on forms without a file-resolver strategy).
-      let displayUrl: string;
+      let displaySrc: string;
       if (resolver) {
         try {
           const resolved = await resolver({ path: uploadPath });
-          displayUrl =
+          displaySrc =
             resolved?.publicUrl ??
             RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
         } catch {
-          displayUrl = RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
+          displaySrc = RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
         }
       } else {
-        displayUrl = RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
+        displaySrc = RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
       }
 
-      stagedPathByUrl.current.set(displayUrl, uploadPath);
-      return displayUrl;
+      // The staged path rides along on the node's `id` attr so restage is
+      // stateless across draft saves and reloads. See STAGED_PATH_ID_PREFIX.
+      return {
+        src: displaySrc,
+        id: RichTextStagedFileUtils.encodeStagedIdAttr(uploadPath),
+      };
     },
     [uploader, resolver]
   );
 
   const handleChange = useCallback(
     (content: Content) => {
-      // Rewrite session-uploaded display URLs back to grida-tmp:// form so
-      // the submit pipeline can discover and commit the staged files. URLs
-      // not produced by this session (external images, already-committed
-      // URLs from a previous submission) are left untouched.
-      const restaged =
-        content != null && typeof content === "object"
-          ? (RichTextStagedFileUtils.restageDocument(
-              content as object,
-              stagedPathByUrl.current
-            ) as Content)
-          : content;
-      const next = serialize(restaged);
+      // computeSerialized handles the restage walk + string fallthrough so
+      // hidden input + onContentChange always see the submission form.
+      const next = computeSerialized(content);
       setSerialized(next);
       onContentChange?.(next);
     },

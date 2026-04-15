@@ -19,8 +19,9 @@ import {
   ResetMarksOnEnter,
   FileHandler,
 } from "../extensions";
+import type { UploadReturnType } from "../extensions/image/image";
 import { cn } from "@/components/lib/utils";
-import { fileToBase64, getOutput, randomId } from "../utils";
+import { getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
 import { toast } from "sonner";
 
@@ -46,20 +47,14 @@ export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   throttleDelay?: number;
   onUpdate?: (content: Content) => void;
   onBlur?: (content: Content) => void;
-  uploader?: (file: File) => Promise<string>;
+  /**
+   * Handles uploading a dropped / pasted / picked image file. Return a
+   * string to use directly as `<img src>`, or an object to also set
+   * additional image node attrs like `id` (useful for carrying a bucket
+   * path alongside the display URL).
+   */
+  uploader?: (file: File) => Promise<UploadReturnType>;
   extensions?: Extensions;
-}
-
-async function fakeuploader(file: File): Promise<string> {
-  // NOTE: This is a fake upload function. Replace this with your own upload logic.
-  // This function should return the uploaded image URL.
-
-  // wait 3s to simulate upload
-  await new Promise((resolve) => setTimeout(resolve, 3000));
-
-  const src = await fileToBase64(file);
-
-  return src;
 }
 
 const createExtensions = ({
@@ -67,7 +62,7 @@ const createExtensions = ({
   uploader,
 }: {
   placeholder: string;
-  uploader?: (file: File) => Promise<string>;
+  uploader?: (file: File) => Promise<UploadReturnType>;
 }) => [
   StarterKit.configure({
     horizontalRule: false,
@@ -86,9 +81,12 @@ const createExtensions = ({
     allowedMimeTypes: ["image/*"],
     maxFileSize: 5 * 1024 * 1024,
     allowBase64: true,
-    uploadFn: async (file: File) => {
-      return uploader ? await uploader(file) : await fakeuploader(file);
-    },
+    // When no uploader is wired, leave `uploadFn` undefined so ImageViewBlock
+    // falls through to its built-in base64 path (immediate, no artificial
+    // delay). Consumers without an uploader — the event description dialog
+    // and the dev/demo pages — then match their pre-migration behavior of
+    // embedding dropped images as data URLs synchronously at drop time.
+    uploadFn: uploader,
     onToggle(editor, files, pos) {
       editor.commands.insertContentAt(
         pos,

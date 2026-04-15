@@ -243,25 +243,80 @@ export namespace RichTextStagedFileUtils {
   }
 
   /**
-   * Inverse of {@link renderDocument} used by the richtext form field on
-   * serialize. Given a map of `displayUrl → stagedPath` collected from the
-   * session's successful uploads, walks a tiptap doc and rewrites any image
-   * node whose `src` is a known display URL back to
-   * `grida-tmp://{stagedPath}?grida-tmp=true` form, so the server's submit
-   * pipeline (parseDocument → commitStagedFile → renderDocument) can find
-   * and commit the staged files.
+   * Prefix stashed in an image node's `id` attribute to carry the
+   * bucket-relative staged path alongside a browser-fetchable display src,
+   * so {@link restageDocument} can rewrite `src` back to grida-tmp form
+   * without session-local state.
    *
-   * URLs not present in the map (external images the user pasted, URLs from
-   * previous sessions) are left untouched.
+   * Trade-off: the HTML `id` attribute is reused as a data carrier. Paths
+   * contain `/`, which is HTML5-legal in ids but unusual; two images with
+   * the same path also produce duplicate ids. Neither bites us in practice
+   * (upload paths include a timestamp, and the kit doesn't use `#id` CSS
+   * selectors), but a follow-up could move this onto a custom tiptap
+   * attribute if either constraint starts mattering.
    */
-  export function restageDocument<T extends object | string>(
-    doc: T,
-    pathByUrl: ReadonlyMap<string, string>
-  ): T {
-    if (pathByUrl.size === 0) return doc;
+  export const STAGED_PATH_ID_PREFIX = "__grida_staged_path__";
 
-    const walk = (node: unknown): unknown => {
-      if (Array.isArray(node)) return node.map(walk);
+  /**
+   * Build an image node's `id` attribute value carrying a staged path.
+   * Consumed by {@link restageDocument} on serialize.
+   */
+  export function encodeStagedIdAttr(path: string): string {
+    return STAGED_PATH_ID_PREFIX + path;
+  }
+
+  /**
+   * Extract a staged path from an image node's `id` attribute, or null if
+   * the id doesn't carry a staged marker.
+   */
+  export function decodeStagedIdAttr(id: unknown): string | null {
+    if (typeof id !== "string") return null;
+    if (!id.startsWith(STAGED_PATH_ID_PREFIX)) return null;
+    return id.slice(STAGED_PATH_ID_PREFIX.length);
+  }
+
+  /**
+   * Sentinel returned by the restage walker to mark "drop this node". Using
+   * a symbol (rather than `undefined`) keeps the drop semantic distinct from
+   * legitimately-undefined property values that exist elsewhere in a node.
+   */
+  const DROP = Symbol("restage.drop");
+  type WalkResult = unknown | typeof DROP;
+
+  /**
+   * Inverse of {@link renderDocument} used by the richtext form field on
+   * serialize. Walks a tiptap doc and:
+   *
+   *   1. For every image node carrying a staged-path marker in its `id`
+   *      attribute, rewrites `src` back to `grida-tmp://{path}?grida-tmp=true`
+   *      so the server's submit pipeline (parseDocument → commitStagedFile →
+   *      renderDocument) can find and commit the staged files.
+   *
+   *   2. Drops any image node whose `src` is a local `blob:` URL — those
+   *      references are per-window and dead the moment the page navigates,
+   *      so persisting them into a draft is always a bug.
+   *
+   * The walker is copy-on-write: when nothing downstream changed, the
+   * original node is returned by reference so image-free documents do not
+   * allocate at all. This runs on every keystroke via richtext-field's
+   * `handleChange`, so the zero-allocation fast path matters.
+   */
+  export function restageDocument<T extends object | string>(doc: T): T {
+    const walk = (node: unknown): WalkResult => {
+      if (Array.isArray(node)) {
+        let changed = false;
+        const out: unknown[] = [];
+        for (const child of node) {
+          const walked = walk(child);
+          if (walked === DROP) {
+            changed = true;
+            continue;
+          }
+          if (walked !== child) changed = true;
+          out.push(walked);
+        }
+        return changed ? out : node;
+      }
       if (node && typeof node === "object") {
         const obj = node as Record<string, unknown>;
         if (
@@ -270,27 +325,37 @@ export namespace RichTextStagedFileUtils {
           typeof obj.attrs === "object"
         ) {
           const attrs = obj.attrs as Record<string, unknown>;
-          if (typeof attrs.src === "string") {
-            const path = pathByUrl.get(attrs.src);
-            if (path) {
-              return {
-                ...obj,
-                attrs: { ...attrs, src: encodeTmpUrl(path) },
-              };
-            }
+          const src = typeof attrs.src === "string" ? attrs.src : "";
+          if (src.startsWith("blob:")) return DROP;
+          const stagedPath = decodeStagedIdAttr(attrs.id);
+          if (stagedPath) {
+            const rewrittenSrc = encodeTmpUrl(stagedPath);
+            if (src === rewrittenSrc) return node;
+            return { ...obj, attrs: { ...attrs, src: rewrittenSrc } };
           }
         }
-        const copy: Record<string, unknown> = {};
+        let changed = false;
+        let copy: Record<string, unknown> | null = null;
         for (const key of Object.keys(obj)) {
-          copy[key] = walk(obj[key]);
+          const walked = walk(obj[key]);
+          // DROP is only meaningful inside content arrays — at object-prop
+          // level it never fires because image nodes are always array-nested.
+          // Preserve the original value (including undefined) if nothing
+          // changed, to avoid corrupting legitimately-undefined props.
+          if (walked === DROP || walked === obj[key]) continue;
+          changed = true;
+          if (!copy) copy = { ...obj };
+          copy[key] = walked;
         }
-        return copy;
+        return changed && copy ? copy : node;
       }
       return node;
     };
 
     const parsed = typeof doc === "string" ? JSON.parse(doc as string) : doc;
-    const rewritten = walk(parsed);
+    const walked = walk(parsed);
+    const rewritten = walked === DROP ? parsed : walked;
+    if (rewritten === parsed) return doc;
     return (
       typeof doc === "string" ? JSON.stringify(rewritten) : rewritten
     ) as T;
