@@ -103,7 +103,7 @@ export async function PUT(
     });
 
   if (signerr) {
-    console.error("session/sign-upload-urls", error);
+    console.error("session/sign-upload-urls", signerr);
     return NextResponse.error();
   }
 
