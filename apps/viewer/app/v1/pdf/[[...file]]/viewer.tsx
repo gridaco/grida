@@ -29,6 +29,7 @@ export default function PDFViewer({
       return (
         <main className="w-dvw h-dvh">
           <object
+            aria-label={title}
             title={title}
             data={file}
             type="application/pdf"

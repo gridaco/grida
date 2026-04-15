@@ -9,13 +9,15 @@
     "import",
 
     // TODO:
+    // "jsx-a11y",
     // "vitest",
     // "jsdoc",
   ],
   "categories": {
     "correctness": "error",
-    // "perf": "warn",
+    // "suspicious": "error",
     // "restriction": "error",
+    // "perf": "warn",
   },
   "rules": {
     // ======================================

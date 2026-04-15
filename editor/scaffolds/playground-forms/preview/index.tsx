@@ -78,5 +78,13 @@ export default function PlaygroundPreview({
     };
   }, [onMessage]);
 
-  return <iframe ref={ref} width="100%" height="100%" src="/preview" />;
+  return (
+    <iframe
+      title="Form preview"
+      ref={ref}
+      width="100%"
+      height="100%"
+      src="/preview"
+    />
+  );
 }

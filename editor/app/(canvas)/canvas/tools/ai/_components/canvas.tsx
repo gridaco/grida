@@ -51,6 +51,7 @@ export function Canvas({
   return (
     <div className={cn("w-full h-full", className)} {...props}>
       <iframe
+        title="AI canvas preview"
         ref={iframeRef}
         srcDoc={DEFAULT_IFRAME_HTML}
         style={{

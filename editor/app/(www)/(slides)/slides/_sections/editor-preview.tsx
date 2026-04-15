@@ -37,6 +37,7 @@ export default function EditorPreview() {
             className="w-full h-full pointer-events-none data-[locked='false']:pointer-events-auto"
           >
             <iframe
+              title="Slides editor preview"
               src="/canvas/slides"
               className="w-full h-full"
               loading="lazy"

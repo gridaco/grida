@@ -324,6 +324,7 @@ export function StandaloneMediaView({
       case "pdf": {
         return (
           <object
+            aria-label="PDF preview"
             data={mediaSrc?.src}
             type="application/pdf"
             className="w-full h-full"

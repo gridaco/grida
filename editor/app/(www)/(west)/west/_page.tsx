@@ -47,6 +47,7 @@ function HeroSection() {
     <section className="relative overflow-hidden py-40 md:py-60">
       <div className="absolute inset-0 -z-10 pointer-events-none dark:hidden">
         <iframe
+          title="Aurora background"
           loading="eager"
           className="w-full h-full"
           src="https://bg.grida.co/embed/aurora"

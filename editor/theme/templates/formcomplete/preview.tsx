@@ -13,6 +13,7 @@ export function EndingPageEmbeddedPreview({
     case "receipt01": {
       return (
         <iframe
+          title={title}
           key={template}
           src={
             Env.web.HOST +
@@ -26,6 +27,7 @@ export function EndingPageEmbeddedPreview({
     case "default": {
       return (
         <iframe
+          title={title}
           key={template}
           src={
             Env.web.HOST +
