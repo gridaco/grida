@@ -2,18 +2,23 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": [
     "typescript",
+    "react",
     "oxc",
     // TODO:
-    // "react",
+    // "vitest",
     // "unicorn",
     // "nextjs",
     // "jsdoc",
   ],
   "categories": {
     "correctness": "error",
+    "perf": "warn",
   },
   "rules": {
     "typescript/no-explicit-any": "error",
+    // ======================================
+    // grida-specific overrides:
+    "typescript/no-namespace": "off",
   },
   "env": {
     "builtin": true,
