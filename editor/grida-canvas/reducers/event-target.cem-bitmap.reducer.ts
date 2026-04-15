@@ -1,4 +1,4 @@
-import { type Draft } from "immer";
+import type { Draft } from "immer";
 import kolor from "@grida/color";
 import { editor } from "@/grida-canvas";
 import { dq } from "@/grida-canvas/query";

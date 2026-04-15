@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
-import { type tokens } from "@grida/tokens";
+import type { tokens } from "@grida/tokens";
 import { toast } from "sonner";
 import { FormExpression } from "@/grida-forms/lib/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";

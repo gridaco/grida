@@ -22,7 +22,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useGridaFontsSearch } from "@/hooks/use-grida-fonts-search";
 import { cn } from "@/components/lib/utils";
 import grida from "@grida/schema";
-import { type GoogleWebFontListItem } from "@grida/fonts/google";
+import type { GoogleWebFontListItem } from "@grida/fonts/google";
 import * as google from "@grida/fonts/google";
 import {
   useCurrentEditor,

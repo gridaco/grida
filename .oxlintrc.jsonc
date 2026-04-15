@@ -13,12 +13,17 @@
   "categories": {
     "correctness": "error",
     "perf": "warn",
+    // "restriction": "error",
   },
   "rules": {
     "typescript/no-explicit-any": "error",
     // ======================================
     // grida-specific overrides:
     "typescript/no-namespace": "off",
+
+    // restriction
+    "no-import-type-side-effects": "error",
+    // "default-case": "error",
   },
   "env": {
     "builtin": true,

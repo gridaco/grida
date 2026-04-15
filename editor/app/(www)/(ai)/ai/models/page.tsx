@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { type Metadata } from "next";
+import type { Metadata } from "next";
 import ai from "@/lib/ai";
 import {
   Card,

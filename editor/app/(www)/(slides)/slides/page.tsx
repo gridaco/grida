@@ -1,4 +1,4 @@
-import { type Metadata } from "next";
+import type { Metadata } from "next";
 import { Section } from "@/www/ui/section";
 import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";

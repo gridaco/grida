@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { type VariantProps } from "class-variance-authority";
+import type { VariantProps } from "class-variance-authority";
 import { TagPopover } from "./tag-popover";
 import { TagList } from "./tag-list";
 import { tagVariants } from "./tag";

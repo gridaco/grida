@@ -1,4 +1,4 @@
-import { type Draft } from "immer";
+import type { Draft } from "immer";
 import { safeOriginal } from "../utils/immer";
 import { editor } from "@/grida-canvas";
 import { self_insertSubDocument } from "./insert";

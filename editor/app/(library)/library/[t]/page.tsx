@@ -1,5 +1,5 @@
 import React from "react";
-import { type Metadata } from "next";
+import type { Metadata } from "next";
 import { getCategory, search } from "../actions";
 import { notFound } from "next/navigation";
 import Categories from "../_components/categories";

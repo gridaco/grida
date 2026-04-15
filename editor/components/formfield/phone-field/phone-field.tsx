@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { PhoneInput } from "@/components/extension/phone-input";
-import { type CountryCode } from "libphonenumber-js/core";
+import type { CountryCode } from "libphonenumber-js/core";
 
 const PhoneFieldDefaultCountryContext = React.createContext<
   CountryCode | undefined
