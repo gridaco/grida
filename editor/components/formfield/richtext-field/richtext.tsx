@@ -97,8 +97,18 @@ export function RichTextEditorField({
 
   const wrappedUploader = useCallback(
     async (file: File): Promise<string> => {
-      const { path } = await uploader!(file);
-      return RichTextStagedFileUtils.encodeTmpUrl(path!);
+      const result = await uploader!(file);
+      // FileUploaderFn types both `path` and `fullPath` as optional. Prefer
+      // `path` (the bucket-relative key used by the resolver/render pipeline)
+      // and fall back to `fullPath` so uploaders that only produce the latter
+      // still yield a working staged URL instead of `grida-tmp://undefined`.
+      const uploadPath = result.path ?? result.fullPath;
+      if (!uploadPath) {
+        throw new Error(
+          "richtext uploader returned neither `path` nor `fullPath`"
+        );
+      }
+      return RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
     },
     [uploader]
   );
