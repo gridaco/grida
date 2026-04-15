@@ -16,13 +16,14 @@
     // "restriction": "error",
   },
   "rules": {
-    "typescript/no-explicit-any": "error",
     // ======================================
     // grida-specific overrides:
-    "typescript/no-namespace": "off",
+    "no-namespace": "off",
 
     // restriction
+    "no-explicit-any": "error",
     "no-import-type-side-effects": "error",
+    "no-var": "error",
     // "default-case": "error",
   },
   "env": {

@@ -13,7 +13,7 @@
   }
 })(this, function () {
   function makePrefix(key, last) {
-    var str = last ? "└" : "├";
+    let str = last ? "└" : "├";
     if (key) {
       str += "─ ";
     } else {
@@ -23,8 +23,8 @@
   }
 
   function filterKeys(obj, hideFunctions) {
-    var keys = [];
-    for (var branch in obj) {
+    const keys = [];
+    for (let branch in obj) {
       // always exclude anything in the object's prototype
       if (!obj.hasOwnProperty(branch)) {
         continue;
@@ -47,7 +47,7 @@
     hideFunctions,
     callback
   ) {
-    var line = "",
+    let line = "",
       index = 0,
       lastKey,
       circular,
@@ -82,7 +82,7 @@
 
     // can we descend into the next item?
     if (!circular && typeof root === "object") {
-      var keys = filterKeys(root, hideFunctions);
+      const keys = filterKeys(root, hideFunctions);
       keys.forEach(function (branch) {
         // the last key is always printed with a different prefix, so we'll need to know if we have it
         lastKey = ++index === keys.length;
@@ -103,7 +103,7 @@
 
   // --------------------
 
-  var Treeify = {};
+  const Treeify = {};
 
   // Treeify.asLines
   // --------------------
@@ -111,7 +111,7 @@
 
   Treeify.asLines = function (obj, showValues, hideFunctions, lineCallback) {
     /* hideFunctions and lineCallback are curried, which means we don't break apps using the older form */
-    var hideFunctionsArg =
+    const hideFunctionsArg =
       typeof hideFunctions !== "function" ? hideFunctions : false;
     growBranch(
       ".",
@@ -129,7 +129,7 @@
   // Outputs the entire tree, returning it as a string with line breaks.
 
   Treeify.asTree = function (obj, showValues, hideFunctions) {
-    var tree = "";
+    let tree = "";
     growBranch(".", obj, false, [], showValues, hideFunctions, function (line) {
       tree += line + "\n";
     });
