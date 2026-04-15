@@ -87,8 +87,10 @@ export function initialOptionsEditState(init: {
     (a, b) => (a.index || -1) - (b.index || -1)
   );
   const allitems = [
-    ...sorted_options.map((_) => ({ type: "option" as const, ..._ })),
-    ...sorted_optgroups.map((_) => ({ type: "optgroup" as const, ..._ })),
+    ...sorted_options.map((_) => Object.assign({ type: "option" as const }, _)),
+    ...sorted_optgroups.map((_) =>
+      Object.assign({ type: "optgroup" as const }, _)
+    ),
   ].map((_, i) => ({ ..._, index: i }));
   const indexed_options: Option[] = allitems.filter(
     (_) => _.type === "option"
@@ -297,8 +299,12 @@ export function OptionsEdit({
   const items: RowItem[] = useMemo(
     () =>
       [
-        ...(optgroups || []).map((o) => ({ type: "optgroup" as const, ...o })),
-        ...(options || []).map((o) => ({ type: "option" as const, ...o })),
+        ...(optgroups || []).map((o) =>
+          Object.assign({ type: "optgroup" as const }, o)
+        ),
+        ...(options || []).map((o) =>
+          Object.assign({ type: "option" as const }, o)
+        ),
       ].sort((a, b) => (a.index || 0) - (b.index || 0)),
     [options, optgroups]
   );
