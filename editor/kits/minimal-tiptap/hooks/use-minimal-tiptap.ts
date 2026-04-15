@@ -180,7 +180,7 @@ export const useMinimalTiptapEditor = ({
   extensions,
   onUpdate,
   onBlur,
-  uploader: _uploader,
+  uploader,
   ...props
 }: UseMinimalTiptapEditorProps) => {
   const throttledSetValue = useThrottle(
@@ -208,7 +208,9 @@ export const useMinimalTiptapEditor = ({
   );
 
   const editor = useEditor({
-    extensions: extensions ? extensions : createExtensions({ placeholder }),
+    extensions: extensions
+      ? extensions
+      : createExtensions({ placeholder, uploader }),
     editorProps: {
       attributes: {
         autocomplete: "off",

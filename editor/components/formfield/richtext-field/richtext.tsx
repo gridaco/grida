@@ -19,6 +19,8 @@ type FileHandler =
 const serialize = (content: Content): string =>
   typeof content === "string" ? content : JSON.stringify(content);
 
+const noop = () => {};
+
 export function RichTextEditorField({
   name,
   required,
@@ -70,13 +72,20 @@ export function RichTextEditorField({
         uploader={uploader ? wrappedUploader : undefined}
         editorClassName="focus:outline-none prose dark:prose-invert max-w-none min-h-[120px]"
       />
+      {/*
+        The sr-only input carries the serialized richtext value into the
+        native form submission and gates required-field validation.
+        It must NOT be `readOnly` — HTML spec bars readonly inputs from
+        constraint validation, which would silently disable `required`.
+        The no-op onChange satisfies React's controlled-input contract.
+       */}
       <input
         type="text"
         name={name}
         value={serialized}
+        onChange={noop}
         required={required}
         className="sr-only"
-        readOnly
         tabIndex={-1}
         aria-hidden="true"
       />
