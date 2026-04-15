@@ -99,8 +99,8 @@ export function RichTextEditCell({
 
   const stopEnterPropagation = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
-      // prevent grid exit on enter
-      e.stopPropagation();
+      // prevent grid exit on enter — let other keys propagate to the Dialog
+      if (e.key === "Enter") e.stopPropagation();
     },
     []
   );

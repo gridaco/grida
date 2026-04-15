@@ -77,6 +77,8 @@ export function RichTextEditorField({
         required={required}
         className="sr-only"
         readOnly
+        tabIndex={-1}
+        aria-hidden="true"
       />
     </div>
   );

@@ -50,11 +50,13 @@ export const toTiptapContent = (value: unknown): Content | undefined => {
   if (value == null) return undefined;
   if (typeof value === "string") {
     const trimmed = value.trim();
-    if (trimmed.startsWith("{")) {
+    // JSON-shaped strings must parse and match a known shape, otherwise discard
+    // (malformed JSON would render literally as HTML, which is wrong).
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
       try {
         return toTiptapContent(JSON.parse(trimmed));
       } catch {
-        // fall through — treat as HTML
+        return undefined;
       }
     }
     return value;
