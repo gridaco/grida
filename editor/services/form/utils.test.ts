@@ -256,4 +256,208 @@ describe("RichTextStagedFileUtils", () => {
       expect(parsed.content[0].attrs.src).toBe("https://cdn.example/x.png");
     });
   });
+
+  describe("restageDocument", () => {
+    it("rewrites known display URLs back to grida-tmp form", () => {
+      const doc = {
+        type: "doc",
+        content: [
+          {
+            type: "image",
+            attrs: { src: "https://cdn.example/uploads/cat.png" },
+          },
+          {
+            type: "image",
+            attrs: { src: "https://cdn.example/uploads/dog.png" },
+          },
+        ],
+      };
+      const pathByUrl = new Map([
+        ["https://cdn.example/uploads/cat.png", "uploads/cat.png"],
+        ["https://cdn.example/uploads/dog.png", "uploads/dog.png"],
+      ]);
+      const restaged = RichTextStagedFileUtils.restageDocument(doc, pathByUrl);
+      expect(restaged).toEqual({
+        type: "doc",
+        content: [
+          { type: "image", attrs: { src: tmp("uploads/cat.png") } },
+          { type: "image", attrs: { src: tmp("uploads/dog.png") } },
+        ],
+      });
+    });
+
+    it("leaves unknown URLs untouched", () => {
+      const doc = {
+        type: "doc",
+        content: [
+          {
+            type: "image",
+            attrs: { src: "https://external.example/photo.png" },
+          },
+          {
+            type: "image",
+            attrs: { src: "https://cdn.example/uploads/known.png" },
+          },
+        ],
+      };
+      const pathByUrl = new Map([
+        ["https://cdn.example/uploads/known.png", "uploads/known.png"],
+      ]);
+      const restaged = RichTextStagedFileUtils.restageDocument(doc, pathByUrl);
+      expect((restaged as typeof doc).content[0].attrs.src).toBe(
+        "https://external.example/photo.png"
+      );
+      expect((restaged as typeof doc).content[1].attrs.src).toBe(
+        tmp("uploads/known.png")
+      );
+    });
+
+    it("is a no-op when the map is empty", () => {
+      const doc = {
+        type: "doc",
+        content: [
+          {
+            type: "image",
+            attrs: { src: "https://cdn.example/uploads/any.png" },
+          },
+        ],
+      };
+      const restaged = RichTextStagedFileUtils.restageDocument(doc, new Map());
+      expect(restaged).toBe(doc);
+    });
+
+    it("does not touch non-image nodes with matching src-like attrs", () => {
+      // Sanity check: a hypothetical node type that happens to carry a `src`
+      // attribute should not be rewritten — only `type: "image"` is in scope.
+      const doc = {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "hi" }] },
+          {
+            type: "custom-embed",
+            attrs: { src: "https://cdn.example/uploads/a.png" },
+          },
+        ],
+      };
+      const pathByUrl = new Map([
+        ["https://cdn.example/uploads/a.png", "uploads/a.png"],
+      ]);
+      const restaged = RichTextStagedFileUtils.restageDocument(
+        doc,
+        pathByUrl
+      ) as typeof doc;
+      expect(restaged.content[1].attrs!.src).toBe(
+        "https://cdn.example/uploads/a.png"
+      );
+    });
+
+    it("walks nested structures (image inside a wrapper node)", () => {
+      const doc = {
+        type: "doc",
+        content: [
+          {
+            type: "blockquote",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  {
+                    type: "image",
+                    attrs: { src: "https://cdn.example/uploads/nested.png" },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const pathByUrl = new Map([
+        ["https://cdn.example/uploads/nested.png", "uploads/nested.png"],
+      ]);
+      const restaged = RichTextStagedFileUtils.restageDocument(
+        doc,
+        pathByUrl
+      ) as typeof doc;
+      const imgNode = restaged.content[0].content![0].content![0];
+      expect(imgNode.attrs!.src).toBe(tmp("uploads/nested.png"));
+    });
+
+    it("preserves other image attrs when rewriting src", () => {
+      const doc = {
+        type: "doc",
+        content: [
+          {
+            type: "image",
+            attrs: {
+              src: "https://cdn.example/uploads/a.png",
+              alt: "a cat",
+              title: "cat.png",
+              width: 400,
+              height: 300,
+              id: "img_1",
+            },
+          },
+        ],
+      };
+      const pathByUrl = new Map([
+        ["https://cdn.example/uploads/a.png", "uploads/a.png"],
+      ]);
+      const restaged = RichTextStagedFileUtils.restageDocument(
+        doc,
+        pathByUrl
+      ) as typeof doc;
+      expect(restaged.content[0].attrs).toEqual({
+        src: tmp("uploads/a.png"),
+        alt: "a cat",
+        title: "cat.png",
+        width: 400,
+        height: 300,
+        id: "img_1",
+      });
+    });
+
+    it("accepts and returns a serialized string when input is a string", () => {
+      const doc = {
+        type: "doc",
+        content: [
+          {
+            type: "image",
+            attrs: { src: "https://cdn.example/uploads/s.png" },
+          },
+        ],
+      };
+      const pathByUrl = new Map([
+        ["https://cdn.example/uploads/s.png", "uploads/s.png"],
+      ]);
+      const restaged = RichTextStagedFileUtils.restageDocument(
+        JSON.stringify(doc),
+        pathByUrl
+      );
+      expect(typeof restaged).toBe("string");
+      const parsed = JSON.parse(restaged as string);
+      expect(parsed.content[0].attrs.src).toBe(tmp("uploads/s.png"));
+    });
+
+    it("round-trips with resolveDocument (restage then resolve = original display URLs)", async () => {
+      const displayUrl = "https://cdn.example/uploads/rt.png";
+      const path = "uploads/rt.png";
+      const doc = {
+        type: "doc",
+        content: [{ type: "image", attrs: { src: displayUrl } }],
+      };
+      const pathByUrl = new Map([[displayUrl, path]]);
+      const restaged = RichTextStagedFileUtils.restageDocument(
+        doc,
+        pathByUrl
+      ) as typeof doc;
+      const resolver = async (file: { path: string }) => ({
+        publicUrl: `https://cdn.example/${file.path}`,
+      });
+      const resolved = (await RichTextStagedFileUtils.resolveDocument(
+        restaged,
+        resolver
+      )) as typeof doc;
+      expect(resolved.content[0].attrs.src).toBe(displayUrl);
+    });
+  });
 });

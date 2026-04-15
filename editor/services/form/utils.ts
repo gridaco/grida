@@ -243,6 +243,60 @@ export namespace RichTextStagedFileUtils {
   }
 
   /**
+   * Inverse of {@link renderDocument} used by the richtext form field on
+   * serialize. Given a map of `displayUrl → stagedPath` collected from the
+   * session's successful uploads, walks a tiptap doc and rewrites any image
+   * node whose `src` is a known display URL back to
+   * `grida-tmp://{stagedPath}?grida-tmp=true` form, so the server's submit
+   * pipeline (parseDocument → commitStagedFile → renderDocument) can find
+   * and commit the staged files.
+   *
+   * URLs not present in the map (external images the user pasted, URLs from
+   * previous sessions) are left untouched.
+   */
+  export function restageDocument<T extends object | string>(
+    doc: T,
+    pathByUrl: ReadonlyMap<string, string>
+  ): T {
+    if (pathByUrl.size === 0) return doc;
+
+    const walk = (node: unknown): unknown => {
+      if (Array.isArray(node)) return node.map(walk);
+      if (node && typeof node === "object") {
+        const obj = node as Record<string, unknown>;
+        if (
+          obj.type === "image" &&
+          obj.attrs &&
+          typeof obj.attrs === "object"
+        ) {
+          const attrs = obj.attrs as Record<string, unknown>;
+          if (typeof attrs.src === "string") {
+            const path = pathByUrl.get(attrs.src);
+            if (path) {
+              return {
+                ...obj,
+                attrs: { ...attrs, src: encodeTmpUrl(path) },
+              };
+            }
+          }
+        }
+        const copy: Record<string, unknown> = {};
+        for (const key of Object.keys(obj)) {
+          copy[key] = walk(obj[key]);
+        }
+        return copy;
+      }
+      return node;
+    };
+
+    const parsed = typeof doc === "string" ? JSON.parse(doc as string) : doc;
+    const rewritten = walk(parsed);
+    return (
+      typeof doc === "string" ? JSON.stringify(rewritten) : rewritten
+    ) as T;
+  }
+
+  /**
    * Client-side async variant of {@link renderDocument} that resolves
    * `grida-tmp://…?grida-tmp=true` paths on demand via a resolver callback.
    *

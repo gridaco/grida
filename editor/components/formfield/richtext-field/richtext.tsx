@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Content } from "@tiptap/react";
 import { MinimalTiptapEditor, toTiptapContent } from "@/kits/minimal-tiptap";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,6 +95,12 @@ export function RichTextEditorField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Tracks `displayUrl → stagedPath` for every file uploaded in this session.
+  // Populated by wrappedUploader after a successful upload + resolve, consumed
+  // by handleChange to rewrite those display URLs back to grida-tmp form on
+  // serialize so the server's submit pipeline can find and commit them.
+  const stagedPathByUrl = useRef(new Map<string, string>());
+
   const wrappedUploader = useCallback(
     async (file: File): Promise<string> => {
       const result = await uploader!(file);
@@ -108,14 +114,46 @@ export function RichTextEditorField({
           "richtext uploader returned neither `path` nor `fullPath`"
         );
       }
-      return RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
+
+      // Obtain a browser-fetchable URL for the freshly-uploaded file so the
+      // editor can actually render the <img> during composition. Without a
+      // resolver we fall back to the grida-tmp URL — the image will show
+      // broken, but the submission path still works end-to-end (matching
+      // BlockNote's behavior on forms without a file-resolver strategy).
+      let displayUrl: string;
+      if (resolver) {
+        try {
+          const resolved = await resolver({ path: uploadPath });
+          displayUrl =
+            resolved?.publicUrl ??
+            RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
+        } catch {
+          displayUrl = RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
+        }
+      } else {
+        displayUrl = RichTextStagedFileUtils.encodeTmpUrl(uploadPath);
+      }
+
+      stagedPathByUrl.current.set(displayUrl, uploadPath);
+      return displayUrl;
     },
-    [uploader]
+    [uploader, resolver]
   );
 
   const handleChange = useCallback(
     (content: Content) => {
-      const next = serialize(content);
+      // Rewrite session-uploaded display URLs back to grida-tmp:// form so
+      // the submit pipeline can discover and commit the staged files. URLs
+      // not produced by this session (external images, already-committed
+      // URLs from a previous submission) are left untouched.
+      const restaged =
+        content != null && typeof content === "object"
+          ? (RichTextStagedFileUtils.restageDocument(
+              content as object,
+              stagedPathByUrl.current
+            ) as Content)
+          : content;
+      const next = serialize(restaged);
       setSerialized(next);
       onContentChange?.(next);
     },
