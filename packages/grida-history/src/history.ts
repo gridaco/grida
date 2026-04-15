@@ -296,7 +296,7 @@ export class HistoryImpl implements History {
 
   private _discardAllPreviews(): void {
     // Copy the set since discard modifies it
-    for (const p of [...this._activePreviews]) {
+    for (const p of Array.from(this._activePreviews)) {
       if (p.state === "active") {
         p.discard();
       }

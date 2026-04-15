@@ -95,9 +95,7 @@ export namespace GridFilter {
     for (let i = 1; i < filters.length; i++) {
       const currentIndices = new Set<number>(filters[i](inputArray));
       filteredIndices = new Set(
-        [...Array.from(filteredIndices)].filter((index) =>
-          currentIndices.has(index)
-        )
+        Array.from(filteredIndices).filter((index) => currentIndices.has(index))
       );
 
       // Early exit if no common indices

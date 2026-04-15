@@ -180,14 +180,14 @@ export class JSONFrom2DB {
 
     const options = this.renderer
       .fields()
-      .map((f) =>
-        f.options?.map((o, i) => ({
-          ...o,
-          index: o.index || i,
-          _field: f,
-        }))
+      .flatMap(
+        (f) =>
+          f.options?.map((o, i) => ({
+            ...o,
+            index: o.index || i,
+            _field: f,
+          })) ?? []
       )
-      .flat()
       .filter((o) => !!o);
 
     const rows: FormFieldOptionInsertion[] = options.map((o) => {

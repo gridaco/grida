@@ -166,7 +166,7 @@ export class DocumentFontManager {
     }
 
     const currAxesValues = {
-      ...(description.fontVariations || {}),
+      ...description.fontVariations,
       ...(description.fontWeight !== undefined
         ? { wght: description.fontWeight }
         : {}),

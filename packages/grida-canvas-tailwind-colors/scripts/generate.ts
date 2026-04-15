@@ -17,7 +17,13 @@ import colors from "npm:tailwindcss@^4/colors";
 import Color from "npm:colorjs.io@^0.5.0";
 
 // Colors to ignore (deprecated/renamed in v4)
-const ignore = ["lightBlue", "trueGray", "coolGray", "warmGray", "blueGray"];
+const ignore = new Set([
+  "lightBlue",
+  "trueGray",
+  "coolGray",
+  "warmGray",
+  "blueGray",
+]);
 
 interface ColorEntry {
   name: string;
@@ -178,7 +184,7 @@ function normalizeHex(hex: string): string {
 const colorEntries: ColorEntry[] = [];
 
 for (const colorName in colors) {
-  if (ignore.includes(colorName)) continue;
+  if (ignore.has(colorName)) continue;
   if (typeof colors[colorName] !== "object") continue;
 
   const entries = flattenColors(colors[colorName], `${colorName}-`);

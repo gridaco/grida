@@ -148,6 +148,7 @@ export namespace tree {
       // remove children first
       const childrenList = nodes[id][key];
       if (childrenList) {
+        // oxlint-disable-next-line no-useless-spread -- childrenList is mutated via splice during recursion
         for (const child of [...childrenList]) {
           removed.push(...rm(nodes, child, key));
         }
@@ -1871,6 +1872,7 @@ export namespace tree {
         // Remove children first (depth-first)
         const children = this.graph.links[key];
         if (children && children.length > 0) {
+          // oxlint-disable-next-line no-useless-spread -- children array is mutated via splice during recursion
           for (const child of [...children]) {
             removed.push(...this.rm(child));
           }

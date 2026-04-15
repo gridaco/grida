@@ -23,9 +23,11 @@ export function layout(
   const maintable = tables.find((table) => table.name === mainTableKey);
   assert(maintable, `Main table ${mainTableKey} not found`);
 
-  const referenced_table_names = maintable.fks.map((fk) => fk.referenced_table);
+  const referenced_table_names = new Set(
+    maintable.fks.map((fk) => fk.referenced_table)
+  );
   const referenced_tables = tables.filter((table) =>
-    referenced_table_names.includes(table.name)
+    referenced_table_names.has(table.name)
   );
 
   const nodes: Node<TableNodeData>[] = [maintable, ...referenced_tables].map(

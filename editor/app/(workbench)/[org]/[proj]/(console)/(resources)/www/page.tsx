@@ -121,12 +121,10 @@ function useSiteSettings() {
       if (upload_err) return false;
       const { error } = await update({
         favicon: {
-          ...{
-            ...(data.favicon || {}),
-            // src is always required.
-            src: data.favicon?.src ?? uploaded.path,
-            [name]: uploaded.path,
-          },
+          ...data.favicon,
+          // src is always required.
+          src: data.favicon?.src ?? uploaded.path,
+          [name]: uploaded.path,
         },
       });
       if (error) return false;

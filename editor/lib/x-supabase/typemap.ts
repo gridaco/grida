@@ -286,13 +286,13 @@ export namespace PostgresTypeTools {
     interval: undefined,
   };
 
-  const supports_postgrest_text_search: PGSupportedColumnType[] = [
+  const supports_postgrest_text_search = new Set<PGSupportedColumnType>([
     "text",
     "varchar",
     "character varying",
     "citext",
     "tsvector",
-  ];
+  ]);
 
   export function supportsTextSearch(
     type: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType
@@ -305,8 +305,6 @@ export namespace PostgresTypeTools {
       return false;
     }
 
-    return supports_postgrest_text_search.includes(
-      type as PGSupportedColumnType
-    );
+    return supports_postgrest_text_search.has(type as PGSupportedColumnType);
   }
 }

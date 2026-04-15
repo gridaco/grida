@@ -28,7 +28,7 @@ export class EventEmitter<Events extends Record<string, Fn>> {
     const set = this.listeners.get(event);
     if (set) {
       // Snapshot to avoid issues if a handler adds/removes listeners during emit
-      for (const handler of [...set]) {
+      for (const handler of Array.from(set)) {
         handler(...args);
       }
     }

@@ -84,7 +84,7 @@ export function applyFauxList(input: FauxListInput): FauxListResult | null {
   const { text, lineTypes, lineIndentations } = input;
 
   // Fast path: nothing to do.
-  if (lineTypes.length === 0 || lineTypes.every((t) => t === "NONE")) {
+  if (lineTypes.every((t) => t === "NONE")) {
     return null;
   }
 

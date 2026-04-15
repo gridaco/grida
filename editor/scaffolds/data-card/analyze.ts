@@ -25,7 +25,7 @@ const media_col_sort_fn = (a: FormFieldDefinition, b: FormFieldDefinition) => {
   return media_col_sort_priority(a) - media_col_sort_priority(b);
 };
 
-const devonly_types: PGSupportedColumnType[] = [
+const devonly_types = new Set<PGSupportedColumnType>([
   "uuid",
   "json",
   "jsonb",
@@ -41,7 +41,7 @@ const devonly_types: PGSupportedColumnType[] = [
   "tstzrange",
   "tsvector",
   "xml",
-];
+]);
 
 export function analyze({
   definition,
@@ -54,7 +54,7 @@ export function analyze({
 
   const devpropertykeys = keys.filter(
     (key) =>
-      devonly_types.includes(definition.properties[key].scalar_format) ||
+      devonly_types.has(definition.properties[key].scalar_format) ||
       !!definition.properties[key].fk ||
       definition.properties[key].pk
   );

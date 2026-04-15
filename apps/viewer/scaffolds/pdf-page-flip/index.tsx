@@ -238,7 +238,7 @@ const PDFViewer = ({
                 drawShadow={true}
                 autoSize={false}
               >
-                {Array.from(new Array(numPages), (_, index) => (
+                {Array.from({ length: numPages }, (_, index) => (
                   <FlipPage
                     key={index}
                     width={cachedDimensions.width}

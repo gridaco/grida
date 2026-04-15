@@ -3,13 +3,12 @@ pre-commit:
   jobs:
     - name: oxfmt
       glob: "*.{ts,tsx,js,jsx,json,css,md,html}"
-      run: npx oxfmt {staged_files}
+      run: pnpm oxfmt {staged_files}
       stage_fixed: true
 
     - name: oxlint
       glob: "*.{ts,tsx,js,jsx}"
-      run: npx oxlint --fix {staged_files}
-      stage_fixed: true
+      run: pnpm oxlint {staged_files}
 
     - name: cargo-fmt
       glob: "*.rs"

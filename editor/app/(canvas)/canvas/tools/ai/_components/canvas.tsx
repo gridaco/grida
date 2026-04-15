@@ -85,8 +85,8 @@ function renderJSONToHTML(node: DeepPartial<PortableNode> | string): string {
     class: _class,
     style,
     d,
-    ...(attributes ?? {}),
-    ...(otherAttributes ?? {}),
+    ...attributes,
+    ...otherAttributes,
   };
 
   const attributes_str = Object.entries(__attributes_map)

@@ -75,10 +75,10 @@ export async function GET(
 
   // #region 1 prevalidate request form data (query)
   const __keys = Array.from(req.nextUrl.searchParams.keys());
-  const system_gf_keys = __keys.filter((key) =>
-    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
+  const system_gf_keys = new Set(
+    __keys.filter((key) => key.startsWith(SYSTEM_GF_KEY_STARTS_WITH))
   );
-  const keys = __keys.filter((key) => !system_gf_keys.includes(key));
+  const keys = __keys.filter((key) => !system_gf_keys.has(key));
 
   if (!keys.length) {
     return NextResponse.json(
@@ -479,7 +479,7 @@ async function submit({
     const inventory_keys = Object.keys(options_inventory);
 
     // TODO: this may conflict the validation policy since v1/load uses render fields.
-    const options = form_reference.fields.map((f) => f.options).flat();
+    const options = form_reference.fields.flatMap((f) => f.options);
 
     // TODO: now we only support one inventory option selection per form
     const data_present_option_fields = fields.filter((f) => {

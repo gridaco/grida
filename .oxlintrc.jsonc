@@ -2,12 +2,12 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": [
     "typescript",
-    "react",
+    "unicorn",
     "oxc",
+    "react",
+    "react-perf",
     // TODO:
     // "vitest",
-    // "unicorn",
-    // "nextjs",
     // "jsdoc",
   ],
   "categories": {

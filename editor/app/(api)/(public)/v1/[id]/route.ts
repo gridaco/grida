@@ -51,7 +51,7 @@ import { RawdataProcessing } from "@/grida-forms/lib/rawdata";
 
 type Params = { id: string };
 
-const cjk = ["ko", "ja"];
+const cjk = new Set(["ko", "ja"]);
 
 interface FormClientFetchResponse {
   data: FormAgentPrefetchData | null;
@@ -407,8 +407,7 @@ export async function GET(
     // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
     const render_options = renderer
       .fields({ render: true })
-      .map((f) => f.options ?? [])
-      .flat();
+      .flatMap((f) => f.options ?? []);
     const inventory_access_error = await validate_options_inventory({
       inventory: options_inventory,
       options: render_options,
@@ -498,7 +497,7 @@ export async function GET(
     lang: lang,
     options: {
       is_powered_by_branding_enabled,
-      optimize_for_cjk: cjk.includes(lang),
+      optimize_for_cjk: cjk.has(lang),
     },
     background: (data.default_page as unknown as FormDocument | null)
       ?.background,

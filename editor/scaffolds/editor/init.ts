@@ -186,7 +186,7 @@ function initialDatabaseEditorState(
 ): EditorState {
   const base = initialBaseDocumentEditorState(init);
 
-  const tables: GDocTable[] = [...init.tables.map(schematableinit)];
+  const tables: GDocTable[] = init.tables.map(schematableinit);
 
   const sb_auth_users = {
     provider: "x-supabase-auth",

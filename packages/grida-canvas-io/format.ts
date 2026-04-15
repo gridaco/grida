@@ -5592,7 +5592,7 @@ export namespace format {
             stroke_join: strokeJoin,
             ...(fillPaints.length > 0 ? { fill_paints: fillPaints } : {}),
             ...(strokePaints.length > 0 ? { stroke_paints: strokePaints } : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies Partial<grida.program.nodes.UnknownNode>;
 
           // Shape-specific fields
@@ -5744,7 +5744,7 @@ export namespace format {
             clips_content: clipsContent ?? false,
             ...layoutFields,
             rotation: layoutFields.rotation ?? 0,
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.ContainerNode;
         }
 
@@ -5975,7 +5975,7 @@ export namespace format {
             ...(textProps?.maxLines() !== undefined && textProps.maxLines() > 0
               ? { max_lines: textProps.maxLines() }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.TextSpanNode;
         }
 
@@ -6170,7 +6170,7 @@ export namespace format {
             corner_smoothing: cornerRadiusProps.corner_smoothing,
             ...layoutFields,
             rotation: layoutFields.rotation ?? 0,
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.MarkdownNode;
         }
 
@@ -6278,7 +6278,7 @@ export namespace format {
             ...(props?.maxLines() !== undefined && props.maxLines() > 0
               ? { max_lines: props.maxLines() }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.AttributedTextNode;
         }
 
@@ -6346,7 +6346,7 @@ export namespace format {
                     strokeGeometryProps.stroke_width_profile,
                 }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.LineNode;
         }
 
@@ -6433,7 +6433,7 @@ export namespace format {
                     strokeGeometryProps.stroke_width_profile,
                 }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.VectorNode;
         }
 
@@ -6504,7 +6504,7 @@ export namespace format {
               : {}),
             data: n.data() ?? "",
             fill_rule: fillRule,
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.PathNode;
         }
 
@@ -6570,7 +6570,7 @@ export namespace format {
                     strokeGeometryProps.stroke_width_profile,
                 }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.BooleanPathOperationNode;
         }
 
@@ -6613,7 +6613,7 @@ export namespace format {
             opacity,
             ...layoutFields,
             layout_positioning: layoutFields.layout_positioning ?? "relative",
-            ...(effects || {}),
+            ...effects,
             ...(transform ? { transform } : {}),
           } satisfies grida.program.nodes.GroupNode;
         }
@@ -6677,7 +6677,7 @@ export namespace format {
               strokeGeometryProps.rectangular_stroke_width_left,
             ...layoutFields,
             layout_positioning: layoutFields.layout_positioning ?? "relative",
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.TrayNode;
         }
       }

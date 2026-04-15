@@ -2893,7 +2893,6 @@ export namespace iofigma {
             ).styleOverrideTable;
             const hasRichText =
               charOverrides &&
-              charOverrides.length > 0 &&
               charOverrides.some((id: number) => id !== 0) &&
               overrideTable;
 

@@ -61,14 +61,14 @@ export default function databaseRecucer(
 
         switch (draft.datagrid_table_id) {
           case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
-            const ids = Array.from(state.datagrid_selected_rows);
+            const ids = new Set(state.datagrid_selected_rows);
 
             const response_space =
               draft.tablespace[
                 EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
               ];
             response_space.stream = response_space.stream?.filter(
-              (response) => !ids.includes(response.id)
+              (response) => !ids.has(response.id)
             );
 
             break;
@@ -102,12 +102,12 @@ export default function databaseRecucer(
               //
               const space = get_current_tablespace_feed(draft);
 
-              const ids = Array.from(state.datagrid_selected_rows);
+              const ids = new Set(state.datagrid_selected_rows);
 
               assert(space, "Table space not found");
 
               space.stream = space.stream?.filter(
-                (response) => !ids.includes((response as { id: string }).id)
+                (response) => !ids.has((response as { id: string }).id)
               );
             } else {
               throw new Error(

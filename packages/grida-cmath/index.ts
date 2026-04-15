@@ -2716,16 +2716,19 @@ namespace cmath {
       const gapSize = (totalSize - totalRectSize) / (rectangles.length - 1);
 
       // Sort rectangles by position along the specified axis
-      const sortedIndexes = [...rectangles.map((_, index) => index)].sort(
-        (a, b) =>
+      const sortedIndexes = rectangles
+        .map((_, index) => index)
+        .sort((a, b) =>
           axis === "x"
             ? rectangles[a].x - rectangles[b].x
             : rectangles[a].y - rectangles[b].y
-      );
+        );
 
       // Distribute rectangles evenly along the axis
       let currentPosition = start;
-      const distributed = new Array(rectangles.length);
+      const distributed: Rectangle[] = Array.from({
+        length: rectangles.length,
+      }) as Rectangle[];
       for (const index of sortedIndexes) {
         const rect = rectangles[index];
         distributed[index] = {

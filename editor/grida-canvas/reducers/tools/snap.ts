@@ -30,14 +30,12 @@ export function snapGuideTranslation(
   movement: number,
   threshold: number
 ): { translated: number } {
-  const anchorPoints = anchors
-    .map((rect) => {
-      rect = cmath.rect.quantize(rect, q);
-      const [a, b] = cmath.range.fromRectangle(rect, axis);
-      const c = cmath.mean(a, b);
-      return [a, b, c];
-    })
-    .flat();
+  const anchorPoints = anchors.flatMap((rect) => {
+    rect = cmath.rect.quantize(rect, q);
+    const [a, b] = cmath.range.fromRectangle(rect, axis);
+    const c = cmath.mean(a, b);
+    return [a, b, c];
+  });
 
   const v = agent + movement;
 
@@ -231,13 +229,11 @@ export function getSnapTargets(
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
     new Set(
-      selection
-        .map((node_id) =>
-          dq
-            .getSiblings(document_ctx, node_id)
-            .concat(dq.getParentId(document_ctx, node_id) ?? [])
-        )
-        .flat()
+      selection.flatMap((node_id) =>
+        dq
+          .getSiblings(document_ctx, node_id)
+          .concat(dq.getParentId(document_ctx, node_id) ?? [])
+      )
     )
   ).filter((node_id) => {
     // Exclude selection

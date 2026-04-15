@@ -79,7 +79,7 @@ export function useImageModelConfig(defaultModel: ai.image.ImageModelId) {
     }
 
     setConfig((c) => ({
-      ...(c || {}),
+      ...c,
       width: width ?? undefined,
       height: height ?? undefined,
       aspect_ratio: aspect_ratio ?? undefined,

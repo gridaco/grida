@@ -464,6 +464,7 @@ class KeyCodeStrMap {
 const uiMap = new KeyCodeStrMap();
 const userSettingsUSMap = new KeyCodeStrMap();
 const userSettingsGeneralMap = new KeyCodeStrMap();
+// oxlint-disable-next-line unicorn/no-new-array
 export const EVENT_KEY_CODE_MAP: { [keyCode: number]: KeyCode } = new Array(
   230
 );

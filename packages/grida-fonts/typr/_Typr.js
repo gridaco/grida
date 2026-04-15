@@ -2432,6 +2432,7 @@ Typr["T"].HVAR = {
           deltaData.push(ri < dcnt ? bin.readShort(data, off) : i8[off]);
           off += ri < dcnt ? 2 : 1;
         }
+        // oxlint-disable-next-line unicorn/no-new-array
         var dd = new Array(regs.length);
         dd.fill(0);
         vdata.push(dd);

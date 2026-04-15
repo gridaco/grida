@@ -348,7 +348,7 @@ export namespace css {
 
     let ffs = font_features ? { ...font_features } : undefined;
     if (typeof font_kerning === "boolean") {
-      ffs = { ...(ffs ?? {}), kern: font_kerning };
+      ffs = { ...ffs, kern: font_kerning };
     }
 
     let fvs = font_variations ? { ...font_variations } : undefined;
@@ -356,10 +356,10 @@ export namespace css {
       delete (fvs as Record<string, unknown>).wght;
     }
     if (typeof font_width === "number") {
-      fvs = { ...(fvs ?? {}), wdth: font_width };
+      fvs = { ...fvs, wdth: font_width };
     }
     if (typeof font_optical_sizing === "number") {
-      fvs = { ...(fvs ?? {}), opsz: font_optical_sizing };
+      fvs = { ...fvs, opsz: font_optical_sizing };
     }
 
     return {

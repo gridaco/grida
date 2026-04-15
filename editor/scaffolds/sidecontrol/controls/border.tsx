@@ -96,7 +96,7 @@ export function BorderControl({
                 value={value.border_color}
                 onValueChange={(v) => {
                   onValueChange?.({
-                    ...(value || {}),
+                    ...value,
                     border_color: v,
                   });
                 }}
@@ -127,7 +127,7 @@ export function BorderControl({
                 value={value.border_style}
                 onValueChange={(v) => {
                   onValueChange?.({
-                    ...(value || {}),
+                    ...value,
                     border_style: v,
                   });
                 }}

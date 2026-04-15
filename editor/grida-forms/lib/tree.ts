@@ -2,7 +2,7 @@ import type { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import type { FormBlockTree } from "./types";
 import type { FormBlockType } from "@/grida-forms-hosted/types";
 
-const folder_types = ["section", "group"];
+const folder_types = new Set(["section", "group"]);
 
 type WithChildren<T> = T & { children: T[] };
 
@@ -24,7 +24,7 @@ export function blockstree<
   };
 
   const folders: WithChildren<T>[] = blocks
-    .filter((block) => folder_types.includes(block.type))
+    .filter((block) => folder_types.has(block.type))
     .sort((a, b) => a.local_index - b.local_index)
     .map((block) => ({
       ...block,
@@ -32,7 +32,7 @@ export function blockstree<
     }));
 
   const items = blocks
-    .filter((block) => !folder_types.includes(block.type))
+    .filter((block) => !folder_types.has(block.type))
     .sort((a, b) => a.local_index - b.local_index);
 
   // assign folders to tree if any
@@ -72,15 +72,15 @@ export function blockstree<
 export function blockstreeflat(
   blocks: EditorFlatFormBlock[]
 ): EditorFlatFormBlock[] {
-  const folder_types = ["section", "group"];
+  const folder_types_local = new Set(["section", "group"]);
   const result: EditorFlatFormBlock[] = [];
 
   // First, separate folder blocks and item blocks
   const folders: EditorFlatFormBlock[] = blocks.filter((block) =>
-    folder_types.includes(block.type)
+    folder_types_local.has(block.type)
   );
   const items: EditorFlatFormBlock[] = blocks.filter(
-    (block) => !folder_types.includes(block.type)
+    (block) => !folder_types_local.has(block.type)
   );
 
   // Sort folders by their local_index to maintain the hierarchy order

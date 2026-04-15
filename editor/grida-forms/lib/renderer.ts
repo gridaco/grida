@@ -306,12 +306,12 @@ export class FormRenderTree {
       {} as Record<string, Option[]>
     );
 
-    const _render_field_ids = _field_blocks.map(
-      (b: ClientFieldRenderBlock) => b.field.id
+    const _render_field_ids = new Set(
+      _field_blocks.map((b: ClientFieldRenderBlock) => b.field.id)
     );
 
     this._m_render_fields = _m_fields.filter((f) =>
-      _render_field_ids.includes(f.id)
+      _render_field_ids.has(f.id)
     );
 
     // if no blocks, render a simple form based on fields

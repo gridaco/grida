@@ -7,13 +7,11 @@ import { type tokens, factory, render } from "@grida/tokens";
 function extractAccessIdentifiersDependencyArrayFromProps<
   P extends Record<string, unknown>,
 >(props?: TemplateValueProperties<P, tokens.StringValueExpression>) {
-  return Object.entries(props || {})
-    .map(([_key, value]) => {
-      return factory.getStringValueExpressionAccessIdentifiersDependencyArray(
-        value
-      );
-    })
-    .flat();
+  return Object.entries(props || {}).flatMap(([_key, value]) => {
+    return factory.getStringValueExpressionAccessIdentifiersDependencyArray(
+      value
+    );
+  });
 }
 
 // TODO: needs optimization
