@@ -1,16 +1,8 @@
 "use client";
 
-import { RichTextContent } from "@/components/richtext";
-import { useCreateBlockNote } from "@blocknote/react";
-import {
-  Block,
-  BlockNoteEditor,
-  BlockNoteSchema,
-  defaultBlockSpecs,
-} from "@blocknote/core";
-import { en } from "@blocknote/core/locales";
-
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import type { Content } from "@tiptap/react";
+import { MinimalTiptapEditor, toTiptapContent } from "@/kits/minimal-tiptap";
 import type { FileResolverFn, FileUploaderFn } from "../file-upload-field";
 import { RichTextStagedFileUtils } from "@/services/form";
 
@@ -24,11 +16,8 @@ type FileHandler =
       resolver: FileResolverFn;
     };
 
-// https://github.com/TypeCellOS/BlockNote/issues/881#issuecomment-2197197942
-const { table: _noop1, ...remainingSpecs } = defaultBlockSpecs;
-const schema = BlockNoteSchema.create({
-  blockSpecs: remainingSpecs,
-});
+const serialize = (content: Content): string =>
+  typeof content === "string" ? content : JSON.stringify(content);
 
 export function RichTextEditorField({
   name,
@@ -37,96 +26,58 @@ export function RichTextEditorField({
   initialContent,
   onContentChange,
   uploader,
-  resolver,
 }: {
   name?: string;
   required?: boolean;
   placeholder?: string;
-  initialContent?: Block[] | string;
-  onContentChange?: (
-    editor: BlockNoteEditor<
-      typeof schema.blockSchema,
-      typeof schema.inlineContentSchema,
-      typeof schema.styleSchema
-    >,
-    content: Block[]
-  ) => void;
+  initialContent?: unknown;
+  onContentChange?: (serialized: string) => void;
 } & FileHandler) {
-  const [txtjsonvalue, settxtjsonvalue] = useState<string | undefined>(
-    undefined
+  const [initialValue] = useState<Content | undefined>(() =>
+    toTiptapContent(initialContent)
+  );
+  const [serialized, setSerialized] = useState<string>(() =>
+    initialValue == null ? "" : serialize(initialValue)
   );
 
-  const editor = useCreateBlockNote({
-    schema: schema,
-    // @ts-expect-error - BlockNote initialContent type mismatch
-    initialContent: initialContent,
-    // disableExtensions: [],
-    dictionary: {
-      ...en,
-      placeholders: {
-        ...en.placeholders,
-        default: placeholder || en.placeholders.default,
-      },
+  const wrappedUploader = useCallback(
+    async (file: File): Promise<string> => {
+      const { path } = await uploader!(file);
+      return RichTextStagedFileUtils.encodeTmpUrl(path!);
     },
-    animations: false,
-    // https://github.com/TypeCellOS/BlockNote/issues/884
-    // trailingBlock: false,
-    uploadFile: uploader
-      ? async (file) => {
-          const { path } = await uploader(file);
-          // https://github.com/TypeCellOS/BlockNote/issues/886
-          return RichTextStagedFileUtils.encodeTmpUrl(path!);
-        }
-      : undefined,
-    resolveFileUrl: resolver
-      ? async (url) => {
-          const decoded = RichTextStagedFileUtils.decodeTmpUrl(url);
-          switch (decoded.type) {
-            case "url":
-              return decoded.url;
-            case "grida-tmp":
-              const resolved = await resolver?.({
-                path: decoded.path,
-              });
-              return resolved!.publicUrl;
-          }
-        }
-      : undefined,
-  });
+    [uploader]
+  );
 
-  useEffect(() => {
-    const fn = () => {
-      const content = editor.document;
-      try {
-        settxtjsonvalue(JSON.stringify(content));
-        onContentChange?.(editor, content);
-      } catch {}
-    };
-    editor.onEditorContentChange(fn);
-  }, [editor, onContentChange]);
+  const handleChange = useCallback(
+    (content: Content) => {
+      const next = serialize(content);
+      setSerialized(next);
+      onContentChange?.(next);
+    },
+    [onContentChange]
+  );
 
   return (
-    <div
-      className="shadow-sm h-full w-full py-10 rounded-md border border-input bg-transparent text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-      onClick={(event) => {
-        // ignore when input
-
-        if (event.target instanceof HTMLInputElement) {
-          return;
-        }
-
-        editor.focus();
-      }}
-    >
-      <RichTextContent editor={editor}>
-        <input
-          type="text"
-          name={name}
-          value={txtjsonvalue}
-          required={required}
-          className="sr-only"
-        />
-      </RichTextContent>
+    <div className="shadow-sm h-full w-full rounded-md border border-input bg-transparent text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 overflow-hidden">
+      <MinimalTiptapEditor
+        value={initialValue}
+        onChange={handleChange}
+        className="w-full border-0 shadow-none rounded-none"
+        editorContentClassName="px-5 py-10 w-full"
+        output="json"
+        placeholder={placeholder}
+        immediatelyRender={false}
+        uploader={uploader ? wrappedUploader : undefined}
+        editorClassName="focus:outline-none prose dark:prose-invert max-w-none min-h-[120px]"
+      />
+      <input
+        type="text"
+        name={name}
+        value={serialized}
+        required={required}
+        className="sr-only"
+        readOnly
+      />
     </div>
   );
 }

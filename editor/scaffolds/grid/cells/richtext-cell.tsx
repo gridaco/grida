@@ -1,10 +1,8 @@
 "use client";
 
-import {
-  RichTextContent,
-  schema,
-  safeInitialContent,
-} from "@/components/richtext";
+import { useCallback, useState, type KeyboardEvent } from "react";
+import type { Content } from "@tiptap/react";
+import { MinimalTiptapEditor, toTiptapContent } from "@/kits/minimal-tiptap";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,13 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui-editor/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useCreateBlockNote } from "@blocknote/react";
 import { useDatabaseTableId } from "@/scaffolds/editor";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { PrivateEditorApi } from "@/lib/private";
 import { filemeta } from "@/utils/file";
-import { useCallback } from "react";
 
 function useUploader({
   db_table_id,
@@ -94,17 +89,21 @@ export function RichTextEditCell({
   const db_table_id = useDatabaseTableId();
   const uploader = useUploader({ db_table_id, field_id, row_id });
 
-  const editor = useCreateBlockNote({
-    schema: schema,
-    initialContent: safeInitialContent(defaultValue),
-    uploadFile: uploader,
-    animations: false,
-  });
+  const [value, setValue] = useState<Content | undefined>(() =>
+    toTiptapContent(defaultValue)
+  );
 
-  const onSaveClick = () => {
-    const content = editor.document;
-    onValueCommit?.(content);
-  };
+  const onSaveClick = useCallback(() => {
+    onValueCommit?.(value);
+  }, [onValueCommit, value]);
+
+  const stopEnterPropagation = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>) => {
+      // prevent grid exit on enter
+      e.stopPropagation();
+    },
+    []
+  );
 
   return (
     <Dialog defaultOpen>
@@ -112,17 +111,22 @@ export function RichTextEditCell({
         <DialogHeader>
           <DialogTitle>Edit Content</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 min-h-0" onClick={() => editor.focus()}>
-          <div className="prose dark:prose-invert mx-auto w-full">
-            <RichTextContent
-              onKeyDown={(e) => {
-                // this is required for preventing exit on enter pressed
-                e.stopPropagation();
-              }}
-              editor={editor}
-            />
-          </div>
-        </ScrollArea>
+        <div
+          className="flex-1 min-h-0 flex flex-col"
+          onKeyDown={stopEnterPropagation}
+        >
+          <MinimalTiptapEditor
+            value={value}
+            onChange={setValue}
+            className="flex-1 min-h-0 w-full h-full rounded-none border-0 shadow-none"
+            editorContentClassName="flex-1 min-h-0 w-full overflow-y-auto"
+            output="json"
+            placeholder="Write something…"
+            immediatelyRender={false}
+            uploader={uploader}
+            editorClassName="focus:outline-none prose dark:prose-invert max-w-2xl mx-auto w-full py-10 px-5"
+          />
+        </div>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="ghost">Close</Button>

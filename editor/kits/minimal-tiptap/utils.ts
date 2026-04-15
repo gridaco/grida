@@ -1,4 +1,4 @@
-import type { Editor } from "@tiptap/react";
+import type { Content, Editor } from "@tiptap/react";
 import type { MinimalTiptapProps } from "./minimal-tiptap";
 
 type ShortcutKeyResult = {
@@ -39,6 +39,31 @@ export const getShortcutKey = (key: string): ShortcutKeyResult =>
 
 export const getShortcutKeys = (keys: string[]): ShortcutKeyResult[] =>
   keys.map(getShortcutKey);
+
+/**
+ * Coerce an arbitrary persisted value into tiptap `Content`.
+ *
+ * Accepts HTML strings, JSON-serialized tiptap docs, and tiptap JSON objects.
+ * Anything else (legacy BlockNote block arrays, malformed values) is discarded.
+ */
+export const toTiptapContent = (value: unknown): Content | undefined => {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        return toTiptapContent(JSON.parse(trimmed));
+      } catch {
+        // fall through — treat as HTML
+      }
+    }
+    return value;
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    if ((value as { type?: string }).type === "doc") return value as Content;
+  }
+  return undefined;
+};
 
 export const getOutput = (
   editor: Editor,
