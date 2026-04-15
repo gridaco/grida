@@ -892,6 +892,139 @@ describe("format roundtrip", () => {
     });
   });
 
+  describe("cg.StrokeAlign", () => {
+    it.each([
+      ["inside", "inside"],
+      ["center", "center"],
+      ["outside", "outside"],
+    ] as const)("roundtrips stroke_align: %s", (align, expected) => {
+      const encoded = format.styling.encode.strokeAlign(
+        align satisfies cg.StrokeAlign
+      );
+      const decoded = format.styling.decode.strokeAlign(encoded);
+      expect(decoded).toBe(expected);
+    });
+
+    // Full scene roundtrip tests: prove the encoders actually emit the
+    // node's stroke_align through the pipeline (not hardcoded to Inside).
+    // Covers BasicShapeNode (rectangle/ellipse), path/vector, line, and
+    // rectangular stroke (container).
+    it.each(["inside", "center", "outside"] as const)(
+      "roundtrips rectangle.stroke_align=%s through scene encode",
+      (align) => {
+        const sceneId = "0-1";
+        const nodeId = "0-2";
+        const doc = createDocument(sceneId, {
+          [nodeId]: {
+            ...baseRectangle(nodeId),
+            stroke_width: 4,
+            stroke_align: align,
+          },
+        });
+        roundtripTest<grida.program.nodes.RectangleNode>(
+          doc,
+          nodeId,
+          "rectangle",
+          (node) => {
+            expect(node.stroke_align).toBe(align);
+          }
+        );
+      }
+    );
+
+    it.each(["inside", "center", "outside"] as const)(
+      "roundtrips ellipse.stroke_align=%s through scene encode",
+      (align) => {
+        const sceneId = "0-1";
+        const nodeId = "0-2";
+        const doc = createDocument(sceneId, {
+          [nodeId]: {
+            ...baseEllipse(nodeId),
+            stroke_width: 4,
+            stroke_align: align,
+          },
+        });
+        roundtripTest<grida.program.nodes.EllipseNode>(
+          doc,
+          nodeId,
+          "ellipse",
+          (node) => {
+            expect(node.stroke_align).toBe(align);
+          }
+        );
+      }
+    );
+
+    it.each(["inside", "center", "outside"] as const)(
+      "roundtrips path.stroke_align=%s through scene encode",
+      (align) => {
+        const sceneId = "0-1";
+        const nodeId = "0-2";
+        const doc = createDocument(sceneId, {
+          [nodeId]: {
+            ...basePath(nodeId),
+            stroke_width: 4,
+            stroke_align: align,
+          },
+        });
+        roundtripTest<grida.program.nodes.PathNode>(
+          doc,
+          nodeId,
+          "path",
+          (node) => {
+            expect(node.stroke_align).toBe(align);
+          }
+        );
+      }
+    );
+
+    it.each(["inside", "center", "outside"] as const)(
+      "roundtrips line.stroke_align=%s through scene encode",
+      (align) => {
+        const sceneId = "0-1";
+        const nodeId = "0-2";
+        const doc = createDocument(sceneId, {
+          [nodeId]: {
+            ...baseLine(nodeId),
+            stroke_width: 4,
+            stroke_align: align,
+          },
+        });
+        roundtripTest<grida.program.nodes.LineNode>(
+          doc,
+          nodeId,
+          "line",
+          (node) => {
+            expect(node.stroke_align).toBe(align);
+          }
+        );
+      }
+    );
+
+    it.each(["inside", "center", "outside"] as const)(
+      "roundtrips container.stroke_align=%s through scene encode (rectangular)",
+      (align) => {
+        const sceneId = "0-1";
+        const nodeId = "0-2";
+        const doc = createDocument(sceneId, {
+          [nodeId]: {
+            ...baseContainer(nodeId),
+            stroke_width: 4,
+            stroke_align: align,
+          },
+        });
+        roundtripTest<grida.program.nodes.ContainerNode>(
+          doc,
+          nodeId,
+          "container",
+          (node) => {
+            expect(node.stroke_align).toBe(align);
+          }
+        );
+      }
+    );
+  });
+
   describe("cg.BoxFit", () => {
     it.each([
       ["contain", "contain"],

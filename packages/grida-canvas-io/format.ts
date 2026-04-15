@@ -206,6 +206,24 @@ export namespace format {
       [fbs.StrokeJoin.Miter, "miter"],
     ]);
 
+    export const STROKE_ALIGN_ENCODE = new Map<
+      cg.StrokeAlign | undefined,
+      fbs.StrokeAlign
+    >([
+      ["inside", fbs.StrokeAlign.Inside],
+      ["center", fbs.StrokeAlign.Center],
+      ["outside", fbs.StrokeAlign.Outside],
+      [undefined, fbs.StrokeAlign.Inside],
+    ]);
+
+    export const STROKE_ALIGN_DECODE = new Map<fbs.StrokeAlign, cg.StrokeAlign>(
+      [
+        [fbs.StrokeAlign.Inside, "inside"],
+        [fbs.StrokeAlign.Center, "center"],
+        [fbs.StrokeAlign.Outside, "outside"],
+      ]
+    );
+
     export const STROKE_MARKER_PRESET_ENCODE = new Map<
       cg.StrokeMarkerPreset | undefined,
       fbs.StrokeMarkerPreset
@@ -732,6 +750,11 @@ export namespace format {
       ): fbs.StrokeJoin =>
         enums.STROKE_JOIN_ENCODE.get(join) ?? fbs.StrokeJoin.Miter;
 
+      export const strokeAlign = (
+        align: cg.StrokeAlign | undefined
+      ): fbs.StrokeAlign =>
+        enums.STROKE_ALIGN_ENCODE.get(align) ?? fbs.StrokeAlign.Inside;
+
       export const textDecorationLine = (
         line: cg.TextDecorationLine | undefined
       ): fbs.TextDecorationLine =>
@@ -758,6 +781,9 @@ export namespace format {
 
       export const strokeJoin = (join: fbs.StrokeJoin): cg.StrokeJoin =>
         enums.STROKE_JOIN_DECODE.get(join) ?? "miter";
+
+      export const strokeAlign = (align: fbs.StrokeAlign): cg.StrokeAlign =>
+        enums.STROKE_ALIGN_DECODE.get(align) ?? "inside";
 
       export const textDecorationLine = (
         line: fbs.TextDecorationLine
@@ -1006,6 +1032,7 @@ export namespace format {
             builder,
             {
               stroke_width: node.stroke_width ?? 0,
+              stroke_align: node.stroke_align,
             }
           );
 
@@ -1331,6 +1358,7 @@ export namespace format {
             builder,
             {
               stroke_width: node.stroke_width ?? 0,
+              stroke_align: node.stroke_align,
             }
           );
 
@@ -1833,7 +1861,10 @@ export namespace format {
             builder,
             styling.encode.strokeJoin(shapeNode.stroke_join)
           );
-          fbs.StrokeStyle.addStrokeAlign(builder, fbs.StrokeAlign.Inside);
+          fbs.StrokeStyle.addStrokeAlign(
+            builder,
+            styling.encode.strokeAlign(shapeNode.stroke_align)
+          );
           fbs.StrokeStyle.addStrokeMiterLimit(builder, 4.0);
           // Skip empty dash array vector — decoder reads null as no dashes
           const strokeStyleOffset = fbs.StrokeStyle.endStrokeStyle(builder);
@@ -1956,6 +1987,7 @@ export namespace format {
               format.shape.encode.rectangularStrokeGeometryTrait(builder, {
                 stroke_cap: containerNode.stroke_cap,
                 stroke_join: containerNode.stroke_join,
+                stroke_align: containerNode.stroke_align,
                 stroke_width: containerNode.stroke_width,
                 stroke_dash_array: containerNode.stroke_dash_array,
                 rectangular_stroke_width_top:
@@ -2019,6 +2051,7 @@ export namespace format {
                 stroke_width: lineNode.stroke_width,
                 stroke_cap: lineNode.stroke_cap,
                 stroke_join: lineNode.stroke_join,
+                stroke_align: lineNode.stroke_align,
                 stroke_dash_array: lineNode.stroke_dash_array,
                 stroke_width_profile: lineNode.stroke_width_profile,
               });
@@ -2143,6 +2176,7 @@ export namespace format {
                 stroke_width: vectorNode.stroke_width,
                 stroke_cap: vectorNode.stroke_cap,
                 stroke_join: vectorNode.stroke_join,
+                stroke_align: vectorNode.stroke_align,
                 stroke_dash_array: vectorNode.stroke_dash_array,
                 stroke_width_profile: vectorNode.stroke_width_profile,
               });
@@ -2208,6 +2242,7 @@ export namespace format {
                 stroke_width: pathNode.stroke_width,
                 stroke_cap: pathNode.stroke_cap,
                 stroke_join: pathNode.stroke_join,
+                stroke_align: pathNode.stroke_align,
                 stroke_dash_array: pathNode.stroke_dash_array,
                 stroke_width_profile: pathNode.stroke_width_profile,
               });
@@ -2256,6 +2291,7 @@ export namespace format {
                 stroke_width: booleanNode.stroke_width,
                 stroke_cap: booleanNode.stroke_cap,
                 stroke_join: booleanNode.stroke_join,
+                stroke_align: booleanNode.stroke_align,
                 stroke_dash_array: booleanNode.stroke_dash_array,
                 stroke_width_profile: booleanNode.stroke_width_profile,
               });
@@ -2331,6 +2367,7 @@ export namespace format {
               format.shape.encode.rectangularStrokeGeometryTrait(builder, {
                 stroke_cap: trayNode.stroke_cap,
                 stroke_join: trayNode.stroke_join,
+                stroke_align: trayNode.stroke_align,
                 stroke_width: trayNode.stroke_width,
                 stroke_dash_array: trayNode.stroke_dash_array,
                 rectangular_stroke_width_top:
@@ -3202,6 +3239,7 @@ export namespace format {
         builder: Builder,
         strokeCap: cg.StrokeCap | undefined,
         strokeJoin: cg.StrokeJoin | undefined,
+        strokeAlign: cg.StrokeAlign | undefined,
         strokeDashArray?: number[]
       ): flatbuffers.Offset {
         const dashArrayOffset = fbs.StrokeStyle.createStrokeDashArrayVector(
@@ -3217,7 +3255,10 @@ export namespace format {
           builder,
           styling.encode.strokeJoin(strokeJoin)
         );
-        fbs.StrokeStyle.addStrokeAlign(builder, fbs.StrokeAlign.Inside);
+        fbs.StrokeStyle.addStrokeAlign(
+          builder,
+          styling.encode.strokeAlign(strokeAlign)
+        );
         fbs.StrokeStyle.addStrokeMiterLimit(builder, 4.0);
         fbs.StrokeStyle.addStrokeDashArray(builder, dashArrayOffset);
         return fbs.StrokeStyle.endStrokeStyle(builder);
@@ -3232,6 +3273,7 @@ export namespace format {
           stroke_width?: number;
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
+          stroke_align?: cg.StrokeAlign;
           stroke_dash_array?: number[];
           stroke_width_profile?: cg.VariableWidthProfile;
         }>
@@ -3240,6 +3282,7 @@ export namespace format {
           builder,
           node.stroke_cap,
           node.stroke_join,
+          node.stroke_align,
           node.stroke_dash_array
         );
 
@@ -3288,6 +3331,7 @@ export namespace format {
         node: Partial<{
           stroke_cap?: cg.StrokeCap;
           stroke_join?: cg.StrokeJoin;
+          stroke_align?: cg.StrokeAlign;
           stroke_width?: number;
           stroke_dash_array?: number[];
           rectangular_stroke_width_top?: number;
@@ -3300,6 +3344,7 @@ export namespace format {
           builder,
           node.stroke_cap,
           node.stroke_join,
+          node.stroke_align,
           node.stroke_dash_array
         );
 
@@ -3618,6 +3663,7 @@ export namespace format {
         rectangular_stroke_width_left: number;
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
+        stroke_align: cg.StrokeAlign;
         stroke_dash_array?: number[];
       } {
         if (!trait) {
@@ -3628,6 +3674,7 @@ export namespace format {
             rectangular_stroke_width_left: 0,
             stroke_cap: "butt",
             stroke_join: "miter",
+            stroke_align: "inside",
           };
         }
 
@@ -3638,6 +3685,9 @@ export namespace format {
         const join = strokeStyle
           ? styling.decode.strokeJoin(strokeStyle.strokeJoin())
           : "miter";
+        const align = strokeStyle
+          ? styling.decode.strokeAlign(strokeStyle.strokeAlign())
+          : "inside";
 
         // Decode dash array
         let stroke_dash_array: number[] | undefined;
@@ -3660,6 +3710,7 @@ export namespace format {
           rectangular_stroke_width_left: strokeWidth?.strokeLeftWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
+          stroke_align: align,
           ...(stroke_dash_array ? { stroke_dash_array } : {}),
         };
       }
@@ -3705,6 +3756,7 @@ export namespace format {
         stroke_width: number;
         stroke_cap: cg.StrokeCap;
         stroke_join: cg.StrokeJoin;
+        stroke_align: cg.StrokeAlign;
         stroke_dash_array?: number[];
         stroke_width_profile?: cg.VariableWidthProfile;
       } {
@@ -3713,6 +3765,7 @@ export namespace format {
             stroke_width: 0,
             stroke_cap: "butt",
             stroke_join: "miter",
+            stroke_align: "inside",
           };
         }
 
@@ -3723,6 +3776,9 @@ export namespace format {
         const join = strokeStyle
           ? styling.decode.strokeJoin(strokeStyle.strokeJoin())
           : "miter";
+        const align = strokeStyle
+          ? styling.decode.strokeAlign(strokeStyle.strokeAlign())
+          : "inside";
 
         // Decode dash array
         let stroke_dash_array: number[] | undefined;
@@ -3755,6 +3811,7 @@ export namespace format {
           stroke_width: trait.strokeWidth() ?? 0,
           stroke_cap: cap,
           stroke_join: join,
+          stroke_align: align,
           ...(stroke_dash_array ? { stroke_dash_array } : {}),
           ...(stroke_width_profile ? { stroke_width_profile } : {}),
         };
@@ -5520,6 +5577,9 @@ export namespace format {
           const strokeJoin = strokeStyle
             ? format.styling.decode.strokeJoin(strokeStyle.strokeJoin())
             : "miter";
+          const strokeAlign = strokeStyle
+            ? format.styling.decode.strokeAlign(strokeStyle.strokeAlign())
+            : "inside";
           const strokeWidth = n.strokeWidth();
 
           // Decode corner_radius and rectangular properties
@@ -5590,6 +5650,7 @@ export namespace format {
             stroke_width: strokeWidth,
             stroke_cap: strokeCap,
             stroke_join: strokeJoin,
+            stroke_align: strokeAlign,
             ...(fillPaints.length > 0 ? { fill_paints: fillPaints } : {}),
             ...(strokePaints.length > 0 ? { stroke_paints: strokePaints } : {}),
             ...effects,
@@ -5721,6 +5782,7 @@ export namespace format {
               format.shape.decode.deriveStrokeWidth(strokeGeometryProps),
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            stroke_align: strokeGeometryProps.stroke_align,
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
               : {}),
@@ -5945,6 +6007,7 @@ export namespace format {
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             stroke_width: strokeGeometryProps.stroke_width,
+            stroke_align: strokeGeometryProps.stroke_align,
             // geometry via layout
             ...layoutFields,
             // text content and properties
@@ -6275,6 +6338,7 @@ export namespace format {
             ...(fillPaints ? { fill_paints: fillPaints } : {}),
             ...(strokePaints ? { stroke_paints: strokePaints } : {}),
             stroke_width: strokeGeometryProps.stroke_width,
+            stroke_align: strokeGeometryProps.stroke_align,
             ...(props?.maxLines() !== undefined && props.maxLines() > 0
               ? { max_lines: props.maxLines() }
               : {}),
@@ -6331,6 +6395,7 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            stroke_align: strokeGeometryProps.stroke_align,
             marker_start_shape:
               enums.STROKE_MARKER_PRESET_DECODE.get(n.markerStartShape()) ??
               "none",
@@ -6417,6 +6482,7 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            stroke_align: strokeGeometryProps.stroke_align,
             marker_start_shape:
               enums.STROKE_MARKER_PRESET_DECODE.get(n.markerStartShape()) ??
               "none",
@@ -6493,6 +6559,7 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            stroke_align: strokeGeometryProps.stroke_align,
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
               : {}),
@@ -6561,6 +6628,7 @@ export namespace format {
             stroke_width: strokeGeometryProps.stroke_width,
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            stroke_align: strokeGeometryProps.stroke_align,
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
               : {}),
@@ -6655,6 +6723,7 @@ export namespace format {
               format.shape.decode.deriveStrokeWidth(strokeGeometryProps),
             stroke_cap: strokeGeometryProps.stroke_cap,
             stroke_join: strokeGeometryProps.stroke_join,
+            stroke_align: strokeGeometryProps.stroke_align,
             ...(strokeGeometryProps.stroke_dash_array
               ? { stroke_dash_array: strokeGeometryProps.stroke_dash_array }
               : {}),
