@@ -72,6 +72,7 @@ Grida heavily relies on Supabase (PostgreSQL).
 
 - Turborepo - monorepo build orchestration
 - oxfmt (oxc) - code formatter (JS/TS)
+- oxlint (oxc) - linter (JS/TS), replaces ESLint
 - cargo fmt (rustfmt) - code formatter (Rust)
 - just - command runner (see `justfile` at repo root)
 
@@ -199,8 +200,8 @@ pnpm dev:packages
 # run tests except for rust crates
 turbo test --filter='!./crates/*'
 
-# run lint (CI enforces lint for Next.js apps)
-turbo lint
+# run lint (oxlint)
+pnpm lint
 
 # run build (all, not recommended)
 turbo build
