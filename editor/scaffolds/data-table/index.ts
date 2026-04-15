@@ -47,7 +47,7 @@ interface TableSpaceInstanceInit<T> extends Pick<
   subscriber?: (callbacks: {
     onInsert?: (data: T) => void;
     onUpdate?: (data: T) => void;
-    onDelete?: (data: T | { [key: string]: any }) => void;
+    onDelete?: (data: T | { [key: string]: unknown }) => void;
   }) => SubscriptionDisposer;
 }
 
@@ -66,7 +66,7 @@ export function useTableSpaceInstance<T>(
   useEffect(
     () => {
       setLoading(true);
-      init.fetcher(query).then(({ data, error, count }) => {
+      init.fetcher(query).then(({ data, count }) => {
         setLoading(false);
 
         if (data) {
@@ -91,7 +91,9 @@ export function useTableSpaceInstance<T>(
           setStream((prev) => {
             if (!prev) return prev;
             return prev.filter(
-              (item) => item[init.identifier] !== (data as any)[init.identifier]
+              (item) =>
+                item[init.identifier] !==
+                (data as Record<string, unknown>)[init.identifier as string]
             );
           });
         },

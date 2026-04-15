@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, context: Context) {
   const body: XSBStorageBulkResolverRequest = await req.json();
 
   try {
-    const { grida_table, main_supabase_table, x_client, x_storage_client } =
+    const { grida_table, main_supabase_table, x_storage_client } =
       await get_grida_table_x_supabase_table_connector({
         form_id,
         sb_table_id: sb_table_id,

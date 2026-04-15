@@ -53,9 +53,11 @@ function useSessionStorage(key: string) {
   }, [key]);
 
   const set = React.useCallback(
-    (value: any) => {
+    (value: string | null) => {
       setState(value);
-      sessionStorage.setItem(key, value);
+      if (value !== null) {
+        sessionStorage.setItem(key, value);
+      }
     },
     [key]
   );

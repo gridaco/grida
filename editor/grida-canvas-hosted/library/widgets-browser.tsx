@@ -12,6 +12,7 @@ import { useDebounce } from "@uidotdev/usehooks";
 import { ButtonIcon } from "@radix-ui/react-icons";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { toast } from "sonner";
+import type grida from "@grida/schema";
 import { prototypes } from "../playground/widgets";
 
 export type WidgetAsset = {
@@ -125,7 +126,12 @@ export function WidgetsBrowser({ onDragStart }: WidgetsBrowserProps) {
   const handleInsert = useCallback(
     async (widget: WidgetAsset) => {
       const task = (async () => {
-        const prototype = (prototypes as any)[widget.type];
+        const prototype = (
+          prototypes as Record<
+            string,
+            grida.program.nodes.NodePrototype | undefined
+          >
+        )[widget.type];
         if (!prototype) {
           throw new Error(`Widget "${widget.type}" not found`);
         }

@@ -31,14 +31,16 @@ export namespace vfs {
     return path;
   };
 
-  export function tree(
-    objects: Record<string, FileNode>
-  ): Array<
-    EntityNode & { children?: Array<EntityNode & { children?: any[] }> }
-  > {
-    const result: any[] = [];
+  type TreeNode = EntityNode & { children?: TreeNode[] };
 
-    const getFolder = (nodes: any[], name: string, tokens: string[]): any => {
+  export function tree(objects: Record<string, FileNode>): TreeNode[] {
+    const result: TreeNode[] = [];
+
+    const getFolder = (
+      nodes: TreeNode[],
+      name: string,
+      tokens: string[]
+    ): TreeNode => {
       let folder = nodes.find((n) => n.type === "folder" && n.name === name);
       if (!folder) {
         folder = {
@@ -67,7 +69,7 @@ export namespace vfs {
         } else {
           // Folder token: get or create folder node
           const folder = getFolder(current, token, tokens.slice(0, i + 1));
-          current = folder.children;
+          current = folder.children!;
         }
       }
     }

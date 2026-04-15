@@ -31,13 +31,8 @@ export function useCampaignMeta() {
 
   const { campaign } = context;
 
-  const {
-    is_force_closed,
-    is_scheduling_enabled,
-    scheduling_close_at,
-    scheduling_open_at,
-    scheduling_tz,
-  } = campaign ?? {};
+  const { is_scheduling_enabled, scheduling_close_at, scheduling_open_at } =
+    campaign ?? {};
 
   const is_schedule_in_range = useMemo(() => {
     if (!is_scheduling_enabled) return false;

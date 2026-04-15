@@ -1,5 +1,5 @@
 import { PreviewImpl, __resetPreviewIdCounter } from "../../src/preview";
-import type { Delta } from "../../src/types";
+import type { CommittedTransaction, Delta } from "../../src/types";
 
 beforeEach(() => __resetPreviewIdCounter());
 
@@ -118,7 +118,7 @@ describe("Preview", () => {
     it("set, commit → state persisted", () => {
       const c = { value: 0 };
       const p = new PreviewImpl("test");
-      let result: any = null;
+      let result: CommittedTransaction | null = null;
       p.onCommit = (tx) => {
         result = tx;
       };
@@ -126,7 +126,7 @@ describe("Preview", () => {
       p.commit();
       expect(c.value).toBe(1);
       expect(result).not.toBeNull();
-      expect(result.deltas.length).toBe(1);
+      expect(result!.deltas.length).toBe(1);
     });
   });
 });

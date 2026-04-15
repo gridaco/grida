@@ -22,7 +22,7 @@ import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-
 import { useEditorState } from "@/scaffolds/editor";
 
 export default function FormDashboard() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   const { form } = state;
 

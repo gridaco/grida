@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo } from "react";
+import React from "react";
 import {
   ScreenGrid,
   ScreenGridPosition,
@@ -15,21 +15,14 @@ import {
 import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
-import { FormCampaignStartPageContextProvider } from "@/theme/templates/kit/campaign";
-import type { FormStartPage } from "..";
-import { DataProvider, useData } from "../../kit/contexts/data.context";
-import { I18nextProvider, useTranslation } from "react-i18next";
-import i18next from "i18next";
+import { useData } from "../../kit/contexts/data.context";
+import { useTranslation } from "react-i18next";
 import _messages from "./messages.json";
 import { LeviLogo } from "@/components/logos/levi";
 import type grida from "@grida/schema";
 
-type Messages = typeof _messages;
-
 const userprops =
   {} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
-
-type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 const image =
   "https://www.levi.co.kr/on/demandware.static/-/Sites-LeviKR-Library/default/dwe83fbc3c/images/redtabimg/images/RedTab-Header.jpg";
@@ -39,6 +32,7 @@ export default function _006() {
 }
 
 function Consumer() {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t } = useTranslation<any>();
   const data = useData();
 
@@ -123,7 +117,8 @@ function Consumer() {
             </motion.div>
             <video
               className="absolute inset-0 w-full h-full object-cover z-[-1]"
-              src={data.background?.[0]?.publicUrl || t("background_video")}
+              // @ts-expect-error - demo - temporary
+              src={data?.background?.[0]?.publicUrl || t("background_video")}
               playsInline
               autoPlay
               muted

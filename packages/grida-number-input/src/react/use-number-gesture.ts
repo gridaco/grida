@@ -285,7 +285,7 @@ export function useNumberGesture<MODE extends "auto" | "fixed" = "auto">({
   );
 
   const bind = useDrag(
-    ({ first, last, movement: [mx, my], memo = [0, 0], event }) => {
+    ({ first, last, movement: [mx, my], memo: _memo = [0, 0], event }) => {
       if (first) {
         // Store the starting value when drag begins
         startValueRef.current = value;

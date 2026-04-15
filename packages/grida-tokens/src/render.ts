@@ -4,14 +4,14 @@ import { tokens } from "./tokens";
 export namespace render {
   export function propertyAccessExpression(
     expression: tokens.PropertyAccessExpression,
-    context: any
+    context: Record<string, unknown>
   ) {
-    return access.access(context, expression.expression as any);
+    return access.access(context, expression.expression as string[]);
   }
 
   export function templateExpression(
     expression: tokens.TemplateExpression,
-    context: any
+    context: Record<string, unknown>
   ) {
     return expression.templateSpans
       .map((span) => {
@@ -21,7 +21,7 @@ export namespace render {
           case "Identifier":
             return context[span.name]?.toString() || "";
           case "PropertyAccessExpression":
-            const value = access.access(context, span.expression as any);
+            const value = access.access(context, span.expression as string[]);
             return value !== undefined ? value.toString() : "";
           default:
             return "";
@@ -30,11 +30,11 @@ export namespace render {
       .join("");
   }
 
-  export function any<T = any>(
+  export function any<T = unknown>(
     value: T,
-    contextdata: Record<string, any>,
+    contextdata: Record<string, unknown>,
     recursive: boolean
-  ): any {
+  ): unknown {
     if (tokens.is.propertyAccessExpression(value)) {
       return propertyAccessExpression(value, contextdata);
     } else if (tokens.is.templateExpression(value)) {
@@ -49,7 +49,7 @@ export namespace render {
           acc[key] = any(nestedValue, contextdata, recursive);
           return acc;
         },
-        {} as Record<string, any>
+        {} as Record<string, unknown>
       );
     } else {
       return value;

@@ -1,9 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import React, { useMemo } from "react";
+import React from "react";
 import {
-  ScreenBackground,
   ScreenCenter,
   ScreenRoot,
   TextAlign,
@@ -18,8 +17,6 @@ const userprops = {
   subtitle: { type: "string" },
   background: { type: "image" },
 } satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
-
-type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 export default function _003() {
   return <Consumer />;

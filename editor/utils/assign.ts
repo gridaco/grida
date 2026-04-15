@@ -29,17 +29,24 @@
  * //   c: { nested: { value: "changed" } }
  * // }
  */
-export function deepAssign(target: any, source: any): any {
+export function deepAssign<T extends Record<string, unknown>>(
+  target: T,
+  source: Record<string, unknown>
+): T {
   for (const key in source) {
     if (
       source[key] &&
       typeof source[key] === "object" &&
       !Array.isArray(source[key])
     ) {
-      target[key] = target[key] || {};
-      deepAssign(target[key], source[key]);
+      (target as Record<string, unknown>)[key] =
+        (target as Record<string, unknown>)[key] || {};
+      deepAssign(
+        (target as Record<string, unknown>)[key] as Record<string, unknown>,
+        source[key] as Record<string, unknown>
+      );
     } else {
-      target[key] = source[key];
+      (target as Record<string, unknown>)[key] = source[key];
     }
   }
   return target;

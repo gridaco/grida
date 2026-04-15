@@ -148,6 +148,7 @@ export namespace tree {
       // remove children first
       const childrenList = nodes[id][key];
       if (childrenList) {
+        // oxlint-disable-next-line no-useless-spread -- childrenList is mutated via splice during recursion
         for (const child of [...childrenList]) {
           removed.push(...rm(nodes, child, key));
         }
@@ -1550,7 +1551,7 @@ export namespace tree {
      *
      * @see {@link IGraphPolicy} for creating custom policies
      */
-    export const DEFAULT_POLICY_INFINITE: IGraphPolicy<any> = {
+    export const DEFAULT_POLICY_INFINITE: IGraphPolicy<unknown> = {
       max_out_degree: () => Infinity,
       can_link: () => true,
       can_be_parent: () => true,
@@ -1871,6 +1872,7 @@ export namespace tree {
         // Remove children first (depth-first)
         const children = this.graph.links[key];
         if (children && children.length > 0) {
+          // oxlint-disable-next-line no-useless-spread -- children array is mutated via splice during recursion
           for (const child of [...children]) {
             removed.push(...this.rm(child));
           }
@@ -2390,6 +2392,7 @@ export namespace tree {
           "id" in (node as Record<string, unknown>) &&
           typeof (node as Record<string, unknown>).id === "string"
         ) {
+          // oxlint-disable-next-line typescript/no-explicit-any
           mapped = { ...(node as any), id: newKey } as T;
         }
         nodes[newKey] = mapped;

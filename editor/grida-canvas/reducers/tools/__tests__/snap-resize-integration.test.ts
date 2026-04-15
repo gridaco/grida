@@ -1,5 +1,4 @@
 import { snapObjectsResize } from "../snap-resize";
-import cmath from "@grida/cmath";
 
 describe("snapObjectsResize integration", () => {
   it("calculates resized bounding rect correctly for visual guides", () => {

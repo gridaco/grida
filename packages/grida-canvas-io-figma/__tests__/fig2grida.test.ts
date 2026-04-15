@@ -7,6 +7,7 @@ import {
   deckBytesToSlidesDocument,
 } from "../fig2grida-core";
 import { io } from "@grida/io";
+import type grida from "@grida/schema";
 
 const FIXTURES_BASE = __dirname + "/../../../fixtures/test-fig";
 /** REST API ZIP archives: `document.json` + `images/` — see `fixtures/test-figma/community/README.md`. */
@@ -388,7 +389,8 @@ describe("fig2grida", () => {
         `${FIGMA_COMMUNITY_REST}/784448220678228461-figma-auto-layout-playground.zip`
       );
       // Pass just the document node, not the full response
-      const docNode = (documentJson as any).document;
+      const docNode = (documentJson as Record<string, unknown>)
+        .document as object;
       const result = fig2grida(docNode);
       expect(result.bytes.length).toBeGreaterThan(0);
       expect(result.pageNames.length).toBeGreaterThan(0);
@@ -438,7 +440,7 @@ describe("fig2grida", () => {
 
       // The scene name should be "Slides"
       const sceneId = result.document.scenes_ref[0];
-      const sceneNode = result.document.nodes[sceneId] as any;
+      const sceneNode = result.document.nodes[sceneId];
       expect(sceneNode.type).toBe("scene");
       expect(sceneNode.name).toBe("Slides");
 
@@ -447,7 +449,7 @@ describe("fig2grida", () => {
       expect(rootRefs.length).toBeGreaterThan(0);
 
       for (const ref of rootRefs) {
-        const node = result.document.nodes[ref] as any;
+        const node = result.document.nodes[ref];
         expect(node).toBeDefined();
         expect(node.type).toBe("tray");
       }
@@ -464,7 +466,7 @@ describe("fig2grida", () => {
       const sceneId = result.document.scenes_ref[0];
       const rootRefs = result.document.links[sceneId] ?? [];
       for (const ref of rootRefs) {
-        expect((result.document.nodes[ref] as any).type).toBe("tray");
+        expect(result.document.nodes[ref].type).toBe("tray");
       }
     });
 
@@ -478,7 +480,7 @@ describe("fig2grida", () => {
       const rootRefs = result.document.links[sceneId] ?? [];
 
       for (const ref of rootRefs) {
-        const tray = result.document.nodes[ref] as any;
+        const tray = result.document.nodes[ref] as grida.program.nodes.TrayNode;
         expect(tray.layout_target_width).toBeGreaterThan(0);
         expect(tray.layout_target_height).toBeGreaterThan(0);
       }

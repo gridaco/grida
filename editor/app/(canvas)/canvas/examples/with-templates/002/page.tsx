@@ -1,10 +1,15 @@
 "use client";
 
 import React from "react";
+import type grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 import Editor from "../../../editor";
 import queryattributes from "@/grida-canvas-react-renderer-dom/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/enterprise/west-referral/referrer/page";
+
+type TemplateRenderProps<P = Record<string, unknown>> =
+  grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P> &
+    grida.program.document.INodeHtmlDocumentQueryDataAttributes;
 
 const document: editor.state.IEditorStateInit = {
   editable: true,
@@ -250,7 +255,16 @@ export default function FileExamplePage() {
   );
 }
 
-function CustomComponent__Referrer(componentprops: any) {
+interface ReferrerProps {
+  title: string;
+  description: string;
+  article: { html: string } | undefined;
+  image: string;
+}
+
+function CustomComponent__Referrer(
+  componentprops: TemplateRenderProps<ReferrerProps>
+) {
   console.log("props", componentprops);
   return (
     <div
@@ -316,7 +330,7 @@ function CustomComponent__Referrer(componentprops: any) {
   );
 }
 
-function CustomComponent__Tabs(props: any) {
+function CustomComponent__Tabs(props: TemplateRenderProps) {
   return (
     <div
       className="rounded-sm shadow border"
@@ -330,7 +344,7 @@ function CustomComponent__Tabs(props: any) {
   );
 }
 
-function CustomComponent__Join_Main(props: any) {
+function CustomComponent__Join_Main(props: TemplateRenderProps) {
   return (
     <div
       className="rounded-sm shadow border"
@@ -351,7 +365,7 @@ function CustomComponent__Join_Main(props: any) {
   );
 }
 
-function CustomComponent__Join_Hello(props: any) {
+function CustomComponent__Join_Hello(props: TemplateRenderProps) {
   return (
     <div
       className="rounded-sm shadow border"
@@ -373,7 +387,7 @@ function CustomComponent__Join_Hello(props: any) {
   );
 }
 
-function CustomComponent__Portal(props: any) {
+function CustomComponent__Portal(props: TemplateRenderProps) {
   return (
     <div
       className="rounded-sm shadow border"

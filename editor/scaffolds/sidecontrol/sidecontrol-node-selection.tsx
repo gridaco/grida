@@ -107,10 +107,7 @@ import {
   useMixedPaints,
 } from "@/grida-canvas-react/use-mixed-properties";
 import { editor } from "@/grida-canvas";
-import {
-  CurrentFontProvider,
-  useCurrentFontFamily,
-} from "./controls/context/font";
+import { CurrentFontProvider } from "./controls/context/font";
 import { PropertyLineLabelWithNumberGesture } from "./ui/label-with-number-gesture";
 import { MaskTypeControl } from "./controls/mask-type";
 import { dq } from "@/grida-canvas/query";
@@ -120,7 +117,6 @@ import cg from "@grida/cg";
 
 function FontStyleControlScaffold({ selection }: { selection: string[] }) {
   const editor = useCurrentEditor();
-  const f = useCurrentFontFamily();
 
   const handleChange = React.useCallback(
     (key: editor.font_spec.FontStyleKey) => {
@@ -573,10 +569,10 @@ function ModeNodeProperties({
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
+  // const is_container = type === "container";
   const is_templateinstance = type === "template_instance";
   const is_text = type === "tspan";
   const is_image = type === "image";
-  const is_container = type === "container";
   const is_stylable = type !== "template_instance";
 
   return (
@@ -1291,7 +1287,7 @@ function SectionLayoutMixed({
 function SectionText({ node_id }: { node_id: string }) {
   const actions = useNodeActions(node_id)!;
   const {
-    text,
+    // text,
     font_family,
     font_weight,
     font_style_italic,
@@ -1509,7 +1505,7 @@ function SectionMixedText({ ids }: { ids: string[] }) {
     font_weight,
     font_style_italic,
     font_variations,
-    font_optical_sizing,
+    // font_optical_sizing,
     font_size,
     line_height,
     letter_spacing,
@@ -1912,7 +1908,14 @@ function SectionProps({ node_id }: { node_id: string }) {
           <PropsControl
             properties={properties}
             props={computed.props || {}}
-            onValueChange={actions.value}
+            onValueChange={(key, value) =>
+              actions.value(
+                key,
+                value as
+                  | import("@grida/tokens").tokens.StringValueExpression
+                  | undefined
+              )
+            }
           />
         </PropertySectionContent>
       ) : (

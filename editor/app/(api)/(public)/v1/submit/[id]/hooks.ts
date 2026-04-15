@@ -85,7 +85,6 @@ export namespace OnSubmit {
 export namespace OnSubmitProcessors {
   export async function send_email({
     type,
-    form_id,
     from,
     to,
   }: {
@@ -112,9 +111,9 @@ export namespace OnSubmitProcessors {
   }
 
   export async function send_sms({
-    form_id,
+    form_id: _form_id,
     to,
-    lang,
+    lang: _lang,
     ...rest
   }: (
     | { type: "formcomplete" }

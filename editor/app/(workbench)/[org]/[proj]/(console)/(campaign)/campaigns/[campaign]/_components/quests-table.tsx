@@ -28,7 +28,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Infinity,
+  InfinityIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -261,7 +261,7 @@ export function QuestsTable() {
                         {max_invitations_per_referrer !== null ? (
                           <span>{max_invitations_per_referrer}</span>
                         ) : (
-                          <Infinity className="size-4 text-muted-foreground" />
+                          <InfinityIcon className="size-4 text-muted-foreground" />
                         )}
                       </div>
                     </div>

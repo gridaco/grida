@@ -23,6 +23,7 @@ export function parseFvarTable(font: Typr.FontData): FvarData {
   const fvar = font.fvar;
   if (!fvar) return { axes, instances };
 
+  // oxlint-disable-next-line typescript/no-explicit-any
   const axisRecords = fvar[0] as any[];
   for (const axis of axisRecords) {
     const [tag, min, def, max, flg, axisName] = axis as [
@@ -36,8 +37,10 @@ export function parseFvarTable(font: Typr.FontData): FvarData {
     axes[tag] = { tag, min, def, max, flg, name: axisName } as Typr.FVARAxis;
   }
 
+  // oxlint-disable-next-line typescript/no-explicit-any
   const tags = axisRecords.map((a: any) => a[0]) as string[];
   const nameTable = font.name || {};
+  // oxlint-disable-next-line typescript/no-explicit-any
   for (const inst of fvar[1] as any[]) {
     const [instName, flg, coords, pnid] = inst as [
       string,

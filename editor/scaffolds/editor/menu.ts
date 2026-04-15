@@ -1,6 +1,8 @@
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 
-export type TMenuData<T extends Record<string, any> = Record<string, any>> = T;
+export type TMenuData<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = T;
 
 /**
  *

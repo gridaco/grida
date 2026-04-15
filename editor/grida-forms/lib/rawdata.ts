@@ -2,10 +2,10 @@ import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 
 export namespace RawdataProcessing {
   export function idkeytonamekey(
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     fields: Pick<FormFieldDefinition, "id" | "name">[]
   ) {
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const key in data) {
       const field = fields.find((f) => f.id === key);
       if (field) {
@@ -16,10 +16,10 @@ export namespace RawdataProcessing {
   }
 
   export function namekeytoidkey(
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     fields: Pick<FormFieldDefinition, "id" | "name">[]
   ) {
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const key in data) {
       const field = fields.find((f) => f.name === key);
       if (field) {

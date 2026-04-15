@@ -14,6 +14,7 @@ import { MinimalChatBox } from "@/components/chat";
 import { readStreamableValue } from "@ai-sdk/rsc";
 import { Canvas } from "./_components/canvas";
 import { generate, type UserAttachment } from "./generate";
+import { type DeepPartial } from "ai";
 import { type StreamingResponse } from "./schema";
 import { Toggle } from "@/components/ui/toggle";
 import { CodeIcon } from "@radix-ui/react-icons";
@@ -51,7 +52,7 @@ export default function PlaygroundPage() {
   const uploader = useDummyPublicUpload();
 
   const [response, setResponse] = useState<
-    StreamingResponse | null | undefined
+    DeepPartial<StreamingResponse> | null | undefined
   >(null);
 
   const [streamBusy, setStreamBusy] = useState(false);
@@ -64,7 +65,7 @@ export default function PlaygroundPage() {
     generate({ modelId, system, user, maxOutputTokens: 16384, temperature: 1 })
       .then(async ({ output }) => {
         for await (const delta of readStreamableValue(output)) {
-          setResponse(delta as any);
+          setResponse(delta);
         }
       })
       .finally(() => {

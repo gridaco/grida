@@ -911,7 +911,7 @@ export function TextDetails({
 
 interface OpticalSizeAxisProps {
   label: string;
-  axis: any;
+  axis: editor.font_spec.UIFontFaceAxis;
   fontSize: number;
   fontOpticalSizing: cg.OpticalSizing;
   onFontOpticalSizingChange?: (value: cg.OpticalSizing) => void;
@@ -1015,7 +1015,10 @@ function OpticalSizeAxis({
  * Places "opsz" (optical sizing) last since it has additional controls.
  * Other axes are sorted alphabetically.
  */
-const axes_ux_sort = ([a]: [string, any], [b]: [string, any]): number => {
+const axes_ux_sort = (
+  [a]: [string, unknown],
+  [b]: [string, unknown]
+): number => {
   // Sort "opsz" to come last
   if (a === "opsz") return 1;
   if (b === "opsz") return -1;

@@ -1,6 +1,5 @@
 import {
   AsteriskSquareIcon,
-  BoltIcon,
   BracesIcon,
   BracketsIcon,
   CircleOffIcon,
@@ -11,7 +10,6 @@ import {
 
 import {
   CalendarIcon,
-  CookieIcon,
   DotIcon,
   ImageIcon,
   LockClosedIcon,

@@ -38,7 +38,7 @@ export function ListItem({
   }, [data, properties]);
 
   const lines = useMemo(() => {
-    return filteredProperties.map((prop, i) => {
+    return filteredProperties.map((prop, _i) => {
       const value = data.raw![prop.name];
 
       return (

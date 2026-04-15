@@ -37,7 +37,7 @@ type StorageEditorDeletingTask = _BaseFileTask & {
 type StorageEditorTask = StorageEditorUploadingTask | StorageEditorDeletingTask;
 
 type StorageApi = StorageFileApi & {
-  rmrf: (path: string) => Promise<any>;
+  rmrf: (path: string) => Promise<unknown>;
 };
 
 interface StorageEditorState {
@@ -301,14 +301,14 @@ function reducer(
 interface IStorageEditor extends Omit<StorageEditorState, "objects" | "api"> {
   root: vfs.EntityNode[];
   nodes: vfs.EntityNode[];
-  upload: (file: File) => Promise<any>;
-  mkdir: (name: string) => Promise<any>;
+  upload: (file: File) => Promise<unknown>;
+  mkdir: (name: string) => Promise<unknown>;
   cd: (dir: string) => void;
-  mv: (path: string, newPath: string) => Promise<any>;
-  // download: (path: string) => Promise<any>;
-  list: (path: string | string[]) => Promise<any>;
+  mv: (path: string, newPath: string) => Promise<unknown>;
+  // download: (path: string) => Promise<unknown>;
+  list: (path: string | string[]) => Promise<unknown>;
   refresh: () => void;
-  rm: (path: string, recursive?: boolean) => Promise<any>;
+  rm: (path: string, recursive?: boolean) => Promise<unknown>;
   getPublicUrl: (path: string) => string;
 }
 
@@ -372,7 +372,7 @@ function useStorageEditor(): IStorageEditor {
       const key = _dir ? `${_dir}/${file.name}` : file.name;
       __task_push_uploading(key, file);
 
-      const { data, error } = await api.upload(abspath(key), file);
+      const { error } = await api.upload(abspath(key), file);
       if (error) {
         __task_fail_uploading(key, error.message);
       } else {
@@ -422,7 +422,7 @@ function useStorageEditor(): IStorageEditor {
 
   const mv = useCallback(
     async (from: string, to: string) => {
-      const { data, error } = await api.move(abspath(from), abspath(to));
+      await api.move(abspath(from), abspath(to));
       const file = __all_nodes[from];
       if (!file) return;
       __add(to, file);
@@ -432,7 +432,7 @@ function useStorageEditor(): IStorageEditor {
   );
 
   const rm = useCallback(
-    async (key: string, recursive?: boolean) => {
+    async (key: string, _recursive?: boolean) => {
       const file = __all_nodes[key];
 
       if (!file || file.type !== "file") return;
@@ -442,7 +442,7 @@ function useStorageEditor(): IStorageEditor {
         type: file.type,
       });
 
-      const { data, error } = await api.remove([abspath(key)]);
+      const { error } = await api.remove([abspath(key)]);
 
       if (error) {
         __task_fail_deleting(key);
@@ -546,7 +546,7 @@ function useStorageEditor(): IStorageEditor {
 
 export function useSeedList() {
   const { __set_loading } = __useDispatch();
-  const { loading, list, refreshkey, dir } = useStorageEditor();
+  const { list, refreshkey, dir } = useStorageEditor();
   // #region lifecycle hooks
   useEffect(() => {
     // [list & seed]

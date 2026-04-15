@@ -2,7 +2,6 @@ import { FormDocumentSetupAssistantService } from "@/services/new";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const origin = request.nextUrl.origin;
   const project_id = Number(request.nextUrl.searchParams.get("project_id"));
   const template_name = String(request.nextUrl.searchParams.get("template"));
 

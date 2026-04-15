@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-type Fn = (...args: any[]) => any;
+type Fn = (...args: never[]) => unknown;
 
 /**
  * State for managing a pending callback
@@ -60,9 +60,6 @@ function usePendingCallback<T extends Fn = Fn>(): [
     try {
       setState((prev) => ({ ...prev, isExecuting: true }));
       await state.callback();
-    } catch (error) {
-      // Let the error propagate up
-      throw error;
     } finally {
       setState({ callback: null, isExecuting: false });
     }

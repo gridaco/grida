@@ -4,7 +4,6 @@ import { Point } from "./point";
 import { useState } from "react";
 
 export function VariableWidthStop({
-  u,
   p,
   angle,
   r,

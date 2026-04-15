@@ -25,6 +25,7 @@ import {
   closestCorners,
   useSensor,
   useSensors,
+  type DragEndEvent,
 } from "@dnd-kit/core";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
@@ -375,6 +376,7 @@ export function OptionsEdit({
                   case "optgroup":
                     return (
                       <OptgroupEditItem
+                        key={item.id}
                         id={item.id}
                         index={index}
                         mode={mode}
@@ -428,11 +430,13 @@ export function OptionsEdit({
     </DndContext>
   );
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      onSort?.(active.data.current.index, over.data.current.index);
+      const activeIndex = (active.data.current as { index: number }).index;
+      const overIndex = (over.data.current as { index: number }).index;
+      onSort?.(activeIndex, overIndex);
     }
   }
 }
@@ -615,7 +619,6 @@ function RowItemBase({
   type,
   children,
   indent,
-  debug,
 }: React.PropsWithChildren<{
   type: "option" | "optgroup";
   id: string;
@@ -630,8 +633,6 @@ function RowItemBase({
     setActivatorNodeRef,
     transform,
     isDragging,
-    isSorting,
-    isOver,
     transition,
   } = useSortable({ id: id, data: { type, index } });
 

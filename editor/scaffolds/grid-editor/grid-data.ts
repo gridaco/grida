@@ -54,7 +54,7 @@ export namespace GridData {
             table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
             data: {
               pks: string[];
-              rows: any[];
+              rows: GridaXSupabase.XDataRow[];
             };
           }
       ))
@@ -315,12 +315,13 @@ export namespace GridData {
           filtered: input.sessions
             ? rows_from_sessions(
                 GridFilter.filter(
-                  input.sessions,
+                  input.sessions as (FormResponseSession &
+                    Record<string, unknown>)[],
                   toLocalFilter(input.filter),
                   "raw",
                   // session raw is saved with id: value
                   input.fields.map((f) => f.id)
-                ),
+                ) as FormResponseSession[],
                 input.fields
               )
             : [],
@@ -349,7 +350,8 @@ export namespace GridData {
           type: "customer",
           inputlength: input.data.rows.length,
           filtered: GridFilter.filter(
-            input.data.rows,
+            input.data.rows as (Platform.Customer.CustomerWithTags &
+              Record<string, unknown>)[],
             toLocalFilter(input.filter),
             undefined,
             [
@@ -360,7 +362,7 @@ export namespace GridData {
               "created_at",
               "last_seen_at",
             ]
-          ),
+          ) as Platform.Customer.CustomerWithTags[],
         };
       }
       case "v0_schema_table": {
@@ -413,7 +415,7 @@ export namespace GridData {
     attributes: FormFieldDefinition[]
   ): Array<DGResponseRow> {
     return (
-      responses.map((response, index) => {
+      responses.map((response) => {
         const row: DGResponseRow = {
           __gf_id: response.id,
           __gf_display_id: fmt_local_index(response.meta.local_index),
@@ -498,7 +500,7 @@ export namespace GridData {
     fields: FormFieldDefinition[]
   ) {
     return (
-      sessions?.map((session, index) => {
+      sessions?.map((session) => {
         const row: DGResponseRow = {
           __gf_id: session.id,
           __gf_display_id: session.id,
@@ -523,7 +525,6 @@ export namespace GridData {
 
   function rows_from_x_supabase_main_table({
     pkcol,
-    form_id,
     fields,
     rows,
   }: {
@@ -532,7 +533,10 @@ export namespace GridData {
     fields: FormFieldDefinition[];
     rows: GridaXSupabase.XDataRow[];
   }) {
-    const valuefn = (row: Record<string, any>, field: FormFieldDefinition) => {
+    const valuefn = (
+      row: Record<string, unknown>,
+      field: FormFieldDefinition
+    ) => {
       // jsonpath field
       if (FlatPostgREST.testPath(field.name)) {
         return FlatPostgREST.get(field.name, row);
@@ -541,10 +545,10 @@ export namespace GridData {
       return row[field.name];
     };
 
-    return rows.reduce((acc: DGResponseRow[], row, index) => {
+    return rows.reduce((acc: DGResponseRow[], row) => {
       const gfRow: DGResponseRow = {
-        __gf_id: pkcol ? row[pkcol] : "",
-        __gf_display_id: pkcol ? row[pkcol] : "",
+        __gf_id: pkcol ? String(row[pkcol]) : "",
+        __gf_display_id: pkcol ? String(row[pkcol]) : "",
         raw: row,
         fields: {}, // populated below
       };

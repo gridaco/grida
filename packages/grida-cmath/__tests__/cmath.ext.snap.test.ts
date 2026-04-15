@@ -1,4 +1,3 @@
-import cmath from "..";
 import { snapToCanvasGeometry } from "../_snap";
 
 describe("snap", () => {

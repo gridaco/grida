@@ -164,6 +164,7 @@ function buildMergedDocument(
 
     for (const rootNode of canvas.children) {
       const result = iofigma.restful.factory.document(
+        // oxlint-disable-next-line typescript/no-explicit-any
         rootNode as any,
         {},
         sharedContext
@@ -187,7 +188,12 @@ function buildMergedDocument(
       background_color,
     };
 
-    (sharedNodes as any)[sceneId] = sceneNode;
+    (
+      sharedNodes as Record<
+        string,
+        grida.program.nodes.Node | grida.program.nodes.SceneNode
+      >
+    )[sceneId] = sceneNode;
     sharedLinks[sceneId] = childrenRefs;
     scenesRef.push(sceneId);
     pageNames.push(canvas.name);
@@ -217,23 +223,6 @@ function buildMergedDocument(
     imageRefsUsed: sharedImageRefsUsed,
     pageNames,
     nodeCount,
-  };
-}
-
-function packMergedDocument(merged: MergedDocument): Fig2GridaResult {
-  const archiveBytes = io.archive.pack(
-    merged.document,
-    merged.imageRecord,
-    undefined,
-    undefined,
-    { level: 0, snapshot: false, skip_sort: true }
-  );
-
-  return {
-    bytes: archiveBytes,
-    pageNames: merged.pageNames,
-    nodeCount: merged.nodeCount,
-    imageCount: Object.keys(merged.imageRecord).length,
   };
 }
 
@@ -345,7 +334,7 @@ function mergeFigPages(
   imageProvider: (ref: string) => Uint8Array | undefined
 ): MergedDocument {
   const allImageRefsUsed = new Set<string>();
-  const mergedNodes: Record<string, any> = {};
+  const mergedNodes: Record<string, grida.program.nodes.Node> = {};
   const mergedLinks: Record<string, string[] | undefined> = {};
   const scenesRef: string[] = [];
   let nodeCount = 0;
@@ -448,13 +437,13 @@ function extractCanvases(json: unknown): Array<{
 
   // Handle `GET /v1/files/:key/nodes` response: `{ nodes: { "id": { document, … } } }`
   // Flatten all node entries and recursively extract canvases from each.
-  const nodesMap = (obj as any).nodes;
+  const nodesMap = obj.nodes;
   if (
     nodesMap &&
     typeof nodesMap === "object" &&
     !Array.isArray(nodesMap) &&
-    !(obj as any).document &&
-    !(obj as any).children
+    !obj.document &&
+    !obj.children
   ) {
     const result: Array<{
       name?: string;
@@ -471,33 +460,39 @@ function extractCanvases(json: unknown): Array<{
   }
 
   // Resolve the node to inspect — unwrap `{ document: ... }` wrapper if present
-  const docNode = (obj as any).document;
-  const node = docNode && typeof docNode === "object" ? docNode : obj;
+  const docNode = obj.document;
+  const node = (
+    docNode && typeof docNode === "object" ? docNode : obj
+  ) as Record<string, unknown>;
 
   // If the node itself is a CANVAS, treat it as a single page
-  if (
-    (node as any).type === "CANVAS" &&
-    Array.isArray((node as any).children)
-  ) {
+  if (node.type === "CANVAS" && Array.isArray(node.children)) {
     return [
       {
-        name: (node as any).name,
-        backgroundColor: (node as any).backgroundColor,
-        children: (node as any).children,
+        name: node.name as string | undefined,
+        backgroundColor: node.backgroundColor as
+          | { r: number; g: number; b: number; a: number }
+          | undefined,
+        children: node.children as Array<Record<string, unknown>>,
       },
     ];
   }
 
   const children: Array<Record<string, unknown>> | undefined = Array.isArray(
-    (node as any).children
+    node.children
   )
-    ? (node as any).children
+    ? (node.children as Array<Record<string, unknown>>)
     : undefined;
 
   if (!children || children.length === 0) {
     // Single node with no children — treat the node itself as the only root
-    if ((node as any).type && (node as any).id) {
-      return [{ name: (node as any).name ?? "Page", children: [node as any] }];
+    if (node.type && node.id) {
+      return [
+        {
+          name: (node.name as string | undefined) ?? "Page",
+          children: [node as Record<string, unknown>],
+        },
+      ];
     }
     throw new Error("fig2grida: input JSON has no document.children");
   }
@@ -512,7 +507,7 @@ function extractCanvases(json: unknown): Array<{
 
   // If no CANVAS nodes found, treat all top-level children as a single page
   if (canvases.length === 0) {
-    return [{ name: (node as any).name ?? "Page", children }];
+    return [{ name: (node.name as string | undefined) ?? "Page", children }];
   }
 
   return canvases;
@@ -669,6 +664,7 @@ export function restJsonToGridaDocument(
     };
 
     const { document: packed, imageRefsUsed } =
+      // oxlint-disable-next-line typescript/no-explicit-any
       iofigma.restful.factory.document(node as any, {}, context);
     const fullDoc =
       grida.program.nodes.factory.packed_scene_document_to_full_document(
@@ -875,7 +871,9 @@ export function deckBytesToSlidesDocument(
   // Rename the single scene to "Slides" for clarity in the slides app.
   if (merged.document.scenes_ref.length === 1) {
     const sceneId = merged.document.scenes_ref[0];
-    const sceneNode = merged.document.nodes[sceneId] as any;
+    const sceneNode = merged.document.nodes[sceneId] as
+      | { name?: string }
+      | undefined;
     if (sceneNode) {
       sceneNode.name = "Slides";
     }

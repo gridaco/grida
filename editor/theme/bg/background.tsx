@@ -36,7 +36,7 @@ export function PageBackgroundIframe({ src }: { src: string }) {
         url.searchParams.set("dark", "1");
       }
       return url.toString();
-    } catch (e) {
+    } catch {
       return src;
     }
   }, [isdark, src]);

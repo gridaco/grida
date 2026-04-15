@@ -19,10 +19,10 @@ import {
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { Button } from "@/components/ui/button";
-import { ThemedMonacoEditor, useMonacoTheme } from "@/components/monaco";
+import { ThemedMonacoEditor } from "@/components/monaco";
 
 export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
   const onEditBody = useCallback(
     (html: string) => {

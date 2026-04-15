@@ -9,6 +9,7 @@ import type { GridaXSupabase } from "@/types";
 import type {
   FormResponse,
   FormResponseField,
+  FormResponseWithFields,
 } from "@/grida-forms-hosted/types";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
@@ -30,7 +31,7 @@ import type { Database } from "@app/database";
 
 type RealtimeTableChangeData = {
   id: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 const useDebouncedDatagridQuery = (): Data.Relation.QueryState | null => {
@@ -52,7 +53,7 @@ const useDebouncedDatagridQuery = (): Data.Relation.QueryState | null => {
 };
 
 const useRefresh = () => {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   return useCallback(() => {
     dispatch({
@@ -175,7 +176,7 @@ function useFetchResponseSessions(form_id: string) {
 }
 
 function useChangeDatagridLoading() {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   return useCallback(
     (loading: boolean) => {
@@ -192,11 +193,14 @@ function useUpdateCell() {
   const supabase = useMemo(() => createBrowserFormsClient(), []);
 
   return useCallback(
-    async (id: string, payload: { value: any; option_id?: string | null }) => {
+    async (
+      id: string,
+      payload: { value: unknown; option_id?: string | null }
+    ) => {
       const { data, error } = await supabase
         .from("response_field")
         .update({
-          value: payload.value,
+          value: payload.value as string | number | boolean | null,
           form_field_option_id: payload.option_id,
           // TODO:
           // 'storage_object_paths': []
@@ -223,7 +227,6 @@ function useSyncCellChangesEffect(
 
   useEffect(() => {
     current?.forEach((r) => {
-      r.data;
       Object.keys(r.data).forEach((attrkey) => {
         const cell = r.data[attrkey];
         const prevcell = prev?.find((pr) => pr.id === r.id)?.data[attrkey];
@@ -236,11 +239,11 @@ function useSyncCellChangesEffect(
             value: cell.value,
             option_id: cell.form_field_option_id,
           })
-            .then((data) => {
+            .then((_data) => {
               // TODO:
               // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
             })
-            .catch((error) => {
+            .catch((_error) => {
               // else revert the change
             });
 
@@ -267,7 +270,7 @@ function useXSBTableFeed(
   },
   dpes?: React.DependencyList
 ) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const enabled = !!sb_table_id;
 
   const datagrid_query = useDebouncedDatagridQuery();
@@ -341,7 +344,7 @@ function useXSBUpdateRow({
   pk: string | undefined;
 }) {
   return useCallback(
-    async (key: number | string, value: Record<string, any>) => {
+    async (key: number | string, value: Record<string, unknown>) => {
       if (!sb_table_id) return;
       if (!pk) return;
 
@@ -368,7 +371,7 @@ function useXSBUpdateRow({
         }
       ).then((res) => res.json());
 
-      const { data, error } = res;
+      const { error } = res;
       if (error) {
         console.error(error, {
           key,
@@ -393,7 +396,7 @@ function useResolveTransactions(
     onTransactionQueued,
   }: {
     operators: {
-      update: (key: string, data: Record<string, any>) => Promise<any>;
+      update: (key: string, data: Record<string, unknown>) => Promise<unknown>;
     };
     onTransactionFinally?: (digest: string) => void;
     onTransactionQueued?: (digest: string) => void;
@@ -405,7 +408,7 @@ function useResolveTransactions(
     if (tobequeued.length === 0) return;
 
     for (const q of tobequeued) {
-      const { row, column, data } = q;
+      const { row, data } = q;
       const fn = async () => {
         operators.update(row, data).finally(() => {
           onTransactionFinally?.(q.digest);
@@ -472,7 +475,7 @@ export function FormResponseFeedProvider({
           table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
           type: "editor/table/space/feed",
           count: count ?? 0,
-          data: data as any,
+          data: data as unknown as FormResponseWithFields[],
           reset: true,
         });
       })
@@ -499,7 +502,7 @@ export function FormResponseFeedProvider({
             dispatch({
               table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
               type: "editor/table/space/feed",
-              data: [data as any],
+              data: [data as unknown as FormResponseWithFields],
             });
           }
         );
@@ -516,7 +519,7 @@ export function FormResponseFeedProvider({
         dispatch({
           table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
           type: "editor/table/space/feed",
-          data: [data as any],
+          data: [data as unknown as FormResponseWithFields],
         });
       });
     },
@@ -576,7 +579,7 @@ export function FormResponseSessionFeedProvider({
       .then(({ data, count }) => {
         dispatch({
           type: "editor/table/space/feed/sessions",
-          data: data as any,
+          data: data as unknown as FormResponse[],
           reset: true,
           count: count!,
         });
@@ -604,16 +607,16 @@ export function FormResponseSessionFeedProvider({
     onInsert: (data) => {
       dispatch({
         type: "editor/table/space/feed/sessions",
-        data: [data as any],
+        data: [data as unknown as FormResponse],
       });
     },
     onUpdate: (data) => {
       dispatch({
         type: "editor/table/space/feed/sessions",
-        data: [data as any],
+        data: [data as unknown as FormResponse],
       });
     },
-    onDelete: (data) => {
+    onDelete: (_data) => {
       // this cant happen
     },
     enabled: realtime_sessions_enabled,
@@ -801,7 +804,7 @@ export function GridaSchemaTableFeedProvider({
         dispatch({
           type: "editor/table/space/feed",
           table_id: table_id,
-          data: data as any,
+          data: data as unknown as FormResponseWithFields[],
           reset: true,
           count: count!,
         });
@@ -827,7 +830,7 @@ export function GridaSchemaTableFeedProvider({
             dispatch({
               table_id: table_id,
               type: "editor/table/space/feed",
-              data: [data as any],
+              data: [data as unknown as FormResponseWithFields],
             });
           }
         );
@@ -844,7 +847,7 @@ export function GridaSchemaTableFeedProvider({
         dispatch({
           table_id: table_id,
           type: "editor/table/space/feed",
-          data: [data as any],
+          data: [data as unknown as FormResponseWithFields],
         });
       });
     },
@@ -869,7 +872,7 @@ export function GridaSchemaXSBTableFeedProvider({
   table_id: string;
   sb_table_id: number;
 }) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   useXSBTableFeed({
     table_id: table_id,

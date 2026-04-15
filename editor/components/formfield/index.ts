@@ -1,2 +1,2 @@
 export * from "./form-field";
-export { default as default } from "./form-field";
+export { default } from "./form-field";

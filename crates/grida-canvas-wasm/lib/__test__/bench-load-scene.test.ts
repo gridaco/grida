@@ -23,6 +23,7 @@ import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { Scene } from "../modules/canvas";
 import { io } from "../../../../packages/grida-canvas-io/index";
+import type createGridaCanvas from "../bin/grida-canvas-wasm";
 
 /** Directory for local (gitignored) benchmark fixtures. */
 const LOCAL_FIXTURES_DIR = resolve(__dirname, "fixtures/local");
@@ -33,11 +34,13 @@ const SHARED_FIXTURES_DIR = resolve(
   "../../../../fixtures/test-grida"
 );
 
-let module: any;
+let module: createGridaCanvas.GridaCanvasWasmBindings;
 
 beforeAll(async () => {
   const pkg = require("../../dist/index.js") as {
-    default: (opts?: unknown) => Promise<any>;
+    default: (
+      opts?: unknown
+    ) => Promise<{ module: createGridaCanvas.GridaCanvasWasmBindings }>;
   };
   const factory = await pkg.default();
   module = factory.module;
@@ -48,7 +51,7 @@ function createRasterScene(width = 1000, height = 1000): Scene {
     1, // BACKEND_ID.Raster
     width,
     height,
-    1, // useEmbeddedFonts = true
+    true, // useEmbeddedFonts
     0 // configFlags
   );
   return new Scene(module, appptr);

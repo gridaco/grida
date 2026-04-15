@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { editorlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CaretDownIcon,
   CheckCircledIcon,
@@ -91,15 +91,6 @@ import { useQueryState } from "@/utils/use-query-state";
 import CreateViewerLinkDialog from "@/scaffolds/storage/dialog-create-sharable-link";
 import { vfs } from "@/lib/vfs";
 import { createBrowserClient } from "@/lib/supabase/client";
-
-/**
- * function to return a value from a list of options or a fallback value
- *
- * often used with optional query parameters
- */
-function q<T>(s: string | null, options: T[], fallback: T): T {
-  return options.includes(s as any) ? (s as any) : fallback;
-}
 
 const __tools_card_classes =
   "flex flex-col justify-between bg-background border p-4 rounded-lg shadow-sm h-20 aspect-video select-none cursor-pointer";
@@ -200,7 +191,6 @@ function Folder() {
 
   const paths = useMemo(() => vfs.generatePaths(dir.split("/")), [dir]);
   const router = useRouter();
-  const pathname = usePathname();
 
   const createQueryString = useCallback(
     (name: string, value: string) => {
@@ -590,7 +580,7 @@ function FilePreviewSidebar({
 
 function CreateFolderDialog({ ...props }: React.ComponentProps<typeof Dialog>) {
   const [name, setName] = useState("");
-  const { mkdir, cd } = useStorageEditor();
+  const { mkdir } = useStorageEditor();
 
   return (
     <Dialog {...props}>
@@ -722,6 +712,7 @@ function UploadsModal() {
       <CollapsibleContent className="min-h-96 border-t">
         <Tabs
           value={tab}
+          // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Tabs component type mismatch
           onValueChange={setTab as any}
           className="w-full h-full p-4"
         >
@@ -741,7 +732,7 @@ function UploadsModal() {
   );
 }
 
-function UploadItem({ file, staus, reason, progress }: StorageEditorTask) {
+function UploadItem({ file, staus, reason }: StorageEditorTask) {
   const l_type = file.name.split(".").pop();
   const l_name = file.name.replace(`.${l_type}`, "");
 

@@ -112,7 +112,7 @@ export namespace TemplateVariables {
 
   export namespace XSupabase {
     export interface PostgresQuerySelectContext<
-      R extends Record<string, any> = Record<string, any>,
+      R extends Record<string, unknown> = Record<string, unknown>,
     > extends GlobalContext {
       TABLE: {
         pks: string[];
@@ -121,14 +121,14 @@ export namespace TemplateVariables {
     }
 
     export interface PostgresQueryInsertSelectContext<
-      R extends Record<string, any> = Record<string, any>,
+      R extends Record<string, unknown> = Record<string, unknown>,
     > extends PostgresQuerySelectContext<R> {
       NEW: R;
     }
   }
 
   export interface FormConnectedDatasourcePostgresTransactionCompleteContext<
-    R extends Record<string, any> = Record<string, any>,
+    R extends Record<string, unknown> = Record<string, unknown>,
   >
     extends FormResponseContext, XSupabase.PostgresQueryInsertSelectContext<R> {
     NEW: R;
@@ -311,6 +311,7 @@ export namespace TemplateVariables {
     connected_datasource_postgres_transaction_complete: z.object({}),
   };
 
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Zod ZodObject requires any for generic parameter
   type ZodSchema = z.ZodObject<any>;
 
   export function createContext<K extends keyof ContextMap = keyof ContextMap>(

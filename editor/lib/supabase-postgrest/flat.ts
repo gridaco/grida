@@ -79,20 +79,20 @@ export namespace FlatPostgREST {
   }
 
   export function encodePath(column: string, ...path: string[]): string {
-    return `${column}.\$.${path.join(".")}`;
+    return `${column}.$.${path.join(".")}`;
   }
 
   export function unflatten(
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     options?: FlattenOptions,
     {
       value: valuefn,
       key: keyfilterfn,
     }: {
       key?: (key: string) => boolean;
-      value?: (key: string, value?: any) => any;
+      value?: (key: string, value?: unknown) => unknown;
     } = {}
-  ): any {
+  ): unknown {
     const keys = Object.keys(data);
 
     const jsonpath_data = keys.reduce(
@@ -105,13 +105,13 @@ export namespace FlatPostgREST {
         }
         return acc;
       },
-      {} as Record<string, any>
+      {} as Record<string, unknown>
     );
 
     return _unflatten(jsonpath_data, options);
   }
 
-  export function get<T = any>(
+  export function get<T = unknown>(
     fullpath: string,
     row: Record<string, T>
   ): T | undefined {
@@ -127,7 +127,7 @@ export namespace FlatPostgREST {
     return undefined;
   }
 
-  export function update<T = any>(
+  export function update<T = unknown>(
     row: Record<string, Record<string, T>>,
     fullpath: string,
     value: T

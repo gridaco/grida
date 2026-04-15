@@ -12,6 +12,6 @@ export namespace FormAgentMessagingInterface {
           "*"
         );
       }
-    } catch (e) {}
+    } catch {}
   }
 }

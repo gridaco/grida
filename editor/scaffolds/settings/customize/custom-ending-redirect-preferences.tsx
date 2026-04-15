@@ -61,7 +61,7 @@ export function EndingRedirectPreferences() {
 
       // Reset form state to the new values after successful submission
       reset(data);
-    } catch (error) {}
+    } catch {}
   };
 
   const enabled = useWatch({

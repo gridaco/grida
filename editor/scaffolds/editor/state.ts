@@ -39,7 +39,6 @@ export type GDocEditorRouteParams = {
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
-const ISDEV = process.env.NODE_ENV === "development";
 
 export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
   id: string | DraftID;
@@ -270,7 +269,10 @@ interface TGlobalEditorDialogState<T = never> {
 }
 
 export type TVirtualRowData<T> = { [attributekey: string]: T };
-export type TVirtualRow<T = Record<string, any>, M = Record<string, any>> = {
+export type TVirtualRow<
+  T = Record<string, unknown>,
+  M = Record<string, unknown>,
+> = {
   id: string;
   data: TVirtualRowData<T>;
   meta: M;
@@ -299,7 +301,7 @@ export type TablespaceTransaction = {
 };
 
 export type TTablespace =
-  | TCustomDataTablespace<any>
+  | TCustomDataTablespace<unknown>
   | TXSupabaseDataTablespace
   | TGridaDataTablespace;
 

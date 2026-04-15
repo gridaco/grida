@@ -238,8 +238,8 @@ export namespace css {
 
     if (config.hasTextStyle && max_lines && max_lines > 0) {
       result.display = "-webkit-box";
-      (result as any).WebkitLineClamp = max_lines;
-      (result as any).WebkitBoxOrient = "vertical";
+      (result as Record<string, unknown>).WebkitLineClamp = max_lines;
+      (result as Record<string, unknown>).WebkitBoxOrient = "vertical";
       result.overflow = "hidden";
     }
 
@@ -348,18 +348,18 @@ export namespace css {
 
     let ffs = font_features ? { ...font_features } : undefined;
     if (typeof font_kerning === "boolean") {
-      ffs = { ...(ffs ?? {}), kern: font_kerning };
+      ffs = { ...ffs, kern: font_kerning };
     }
 
     let fvs = font_variations ? { ...font_variations } : undefined;
     if (typeof font_weight === "number" && fvs) {
-      delete (fvs as any).wght;
+      delete (fvs as Record<string, unknown>).wght;
     }
     if (typeof font_width === "number") {
-      fvs = { ...(fvs ?? {}), wdth: font_width };
+      fvs = { ...fvs, wdth: font_width };
     }
     if (typeof font_optical_sizing === "number") {
-      fvs = { ...(fvs ?? {}), opsz: font_optical_sizing };
+      fvs = { ...fvs, opsz: font_optical_sizing };
     }
 
     return {
@@ -521,7 +521,11 @@ export namespace css {
     // in css, the default is top-center-to-bottom-center (which cg default is center-left-to-center-right)
     // so we need to add 90 degrees to the angle to make it match the css default
     const deg =
-      cmath.transform.angle(transform ?? cmath.transform.identity) + 90;
+      cmath.transform.angle(
+        Array.isArray(transform) && Array.isArray(transform[0])
+          ? transform
+          : cmath.transform.identity
+      ) + 90;
 
     const gradientStops = stops
       .map((stop) => {
@@ -546,8 +550,9 @@ export namespace css {
   ): string {
     const { stops } = paint;
 
-    const tx = paint.transform?.[0][2] ?? 0.5;
-    const ty = paint.transform?.[1][2] ?? 0.5;
+    const _t = Array.isArray(paint.transform) ? paint.transform : undefined;
+    const tx = _t?.[0]?.[2] ?? 0.5;
+    const ty = _t?.[1]?.[2] ?? 0.5;
 
     const gradientStops = stops
       .map((stop) => {
@@ -571,17 +576,18 @@ export namespace css {
     const { stops, transform } = paint;
 
     // Extract origin offset from transform matrix (similar to radial gradient)
-    const tx = paint.transform?.[0][2] ?? 0.5;
-    const ty = paint.transform?.[1][2] ?? 0.5;
+    const _t = Array.isArray(transform) ? transform : undefined;
+    const tx = _t?.[0]?.[2] ?? 0.5;
+    const ty = _t?.[1]?.[2] ?? 0.5;
 
     // Calculate starting angle from transform matrix
     // For conic gradients, we need to extract the rotation angle from the transform
     // The angle represents where the gradient starts (0deg = top, 90deg = right, etc.)
     let startAngle = 0;
-    if (transform) {
+    if (_t) {
       // Extract the rotation angle from the transform matrix
       // This is similar to how linear gradients handle angle calculation
-      startAngle = cmath.transform.angle(transform);
+      startAngle = cmath.transform.angle(_t);
 
       // CSS conic gradients start from the top (0deg) by default
       // We need to adjust the angle to match the expected behavior

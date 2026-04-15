@@ -3117,7 +3117,7 @@ export namespace format {
           const stackItem = props.get(i);
           if (stackItem) {
             const paintType = stackItem.paintType();
-            const paintValue = unionToPaint(paintType, (obj: any) =>
+            const paintValue = unionToPaint(paintType, (obj) =>
               stackItem.paint(obj)
             );
             if (paintValue) {
@@ -3411,8 +3411,8 @@ export namespace format {
          */
         export function shapeRectangular(
           builder: Builder,
-          width: number,
-          height: number
+          _width: number,
+          _height: number
         ): { type: fbs.CanonicalLayerShape; offset: flatbuffers.Offset } {
           fbs.CanonicalShapeRectangular.startCanonicalShapeRectangular(builder);
           const offset =
@@ -5535,6 +5535,7 @@ export namespace format {
             const stackItem = n.fillPaints(i);
             if (stackItem) {
               const paintType = stackItem.paintType();
+              // oxlint-disable-next-line typescript/no-explicit-any
               const paintValue = unionToPaint(paintType, (obj: any) =>
                 stackItem.paint(obj)
               );
@@ -5552,7 +5553,7 @@ export namespace format {
             const stackItem = n.strokePaints(i);
             if (stackItem) {
               const paintType = stackItem.paintType();
-              const paintValue = unionToPaint(paintType, (obj: any) =>
+              const paintValue = unionToPaint(paintType, (obj) =>
                 stackItem.paint(obj)
               );
               if (paintValue) {
@@ -5591,7 +5592,7 @@ export namespace format {
             stroke_join: strokeJoin,
             ...(fillPaints.length > 0 ? { fill_paints: fillPaints } : {}),
             ...(strokePaints.length > 0 ? { stroke_paints: strokePaints } : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies Partial<grida.program.nodes.UnknownNode>;
 
           // Shape-specific fields
@@ -5743,7 +5744,7 @@ export namespace format {
             clips_content: clipsContent ?? false,
             ...layoutFields,
             rotation: layoutFields.rotation ?? 0,
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.ContainerNode;
         }
 
@@ -5974,7 +5975,7 @@ export namespace format {
             ...(textProps?.maxLines() !== undefined && textProps.maxLines() > 0
               ? { max_lines: textProps.maxLines() }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.TextSpanNode;
         }
 
@@ -6169,7 +6170,7 @@ export namespace format {
             corner_smoothing: cornerRadiusProps.corner_smoothing,
             ...layoutFields,
             rotation: layoutFields.rotation ?? 0,
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.MarkdownNode;
         }
 
@@ -6277,7 +6278,7 @@ export namespace format {
             ...(props?.maxLines() !== undefined && props.maxLines() > 0
               ? { max_lines: props.maxLines() }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.AttributedTextNode;
         }
 
@@ -6345,7 +6346,7 @@ export namespace format {
                     strokeGeometryProps.stroke_width_profile,
                 }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.LineNode;
         }
 
@@ -6432,7 +6433,7 @@ export namespace format {
                     strokeGeometryProps.stroke_width_profile,
                 }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.VectorNode;
         }
 
@@ -6503,7 +6504,7 @@ export namespace format {
               : {}),
             data: n.data() ?? "",
             fill_rule: fillRule,
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.PathNode;
         }
 
@@ -6569,7 +6570,7 @@ export namespace format {
                     strokeGeometryProps.stroke_width_profile,
                 }
               : {}),
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.BooleanPathOperationNode;
         }
 
@@ -6612,7 +6613,7 @@ export namespace format {
             opacity,
             ...layoutFields,
             layout_positioning: layoutFields.layout_positioning ?? "relative",
-            ...(effects || {}),
+            ...effects,
             ...(transform ? { transform } : {}),
           } satisfies grida.program.nodes.GroupNode;
         }
@@ -6676,7 +6677,7 @@ export namespace format {
               strokeGeometryProps.rectangular_stroke_width_left,
             ...layoutFields,
             layout_positioning: layoutFields.layout_positioning ?? "relative",
-            ...(effects || {}),
+            ...effects,
           } satisfies grida.program.nodes.TrayNode;
         }
       }
@@ -6743,7 +6744,7 @@ export namespace format {
           if (nodeType === fbs.Node.NONE) continue;
 
           // Unwrap NodeSlot to get the typed node table
-          const typedNode = unionToNode(nodeType, (obj: any) => slot.node(obj));
+          const typedNode = unionToNode(nodeType, (obj) => slot.node(obj));
           if (!typedNode) continue;
 
           // SceneNode is special - it doesn't use LayerTrait

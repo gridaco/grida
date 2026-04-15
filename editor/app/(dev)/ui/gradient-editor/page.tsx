@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +13,6 @@ import {
 import { Trash2 } from "lucide-react";
 import {
   GradientControlPointsEditor,
-  getPointsFromTransform,
   getTransformFromPoints,
   type GradientType,
 } from "@/grida-canvas-react-gradient";

@@ -2,7 +2,7 @@ import { dq } from "../index";
 import tree from "@grida/tree";
 
 describe("query selectors", () => {
-  const doc = {
+  const doc: tree.graph.IGraph<{ type: string; id: string; name: string }> = {
     nodes: {
       root: { type: "container", id: "root", name: "root" },
       a: { type: "container", id: "a", name: "a" },
@@ -21,7 +21,7 @@ describe("query selectors", () => {
       a2: [],
       b1: [],
     },
-  } as any;
+  };
 
   const ctx = new tree.graph.Graph(doc).lut;
 

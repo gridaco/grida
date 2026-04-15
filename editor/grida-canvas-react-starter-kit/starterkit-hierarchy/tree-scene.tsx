@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import {
   Tree,
@@ -85,9 +85,12 @@ export function ScenesList() {
   const editor = useCurrentEditor();
   const { scenesmap, scenes_ref } = useEditorState(editor, (state) => {
     // Build scenes map from scenes_ref for backward compatibility
-    const scenesmap: Record<string, grida.program.nodes.SceneNode> =
+    type SceneEntry = grida.program.nodes.SceneNode & {
+      children_refs: string[];
+    };
+    const scenesmap: Record<string, SceneEntry> =
       state.document.scenes_ref.reduce(
-        (acc: any, scene_id: string) => {
+        (acc: Record<string, SceneEntry>, scene_id: string) => {
           const scene_node = state.document.nodes[
             scene_id
           ] as grida.program.nodes.SceneNode;
@@ -98,7 +101,7 @@ export function ScenesList() {
           };
           return acc;
         },
-        {} as { [key: string]: grida.program.nodes.SceneNode }
+        {} as Record<string, SceneEntry>
       );
 
     return {
@@ -107,12 +110,6 @@ export function ScenesList() {
     };
   });
   const scene_id = useEditorState(editor, (state) => state.scene_id);
-
-  const scenes = useMemo(() => {
-    return Object.values(scenesmap).sort((a, b) =>
-      (a.position ?? "").localeCompare(b.position ?? "")
-    );
-  }, [scenesmap]);
 
   const tree = useTree<grida.program.nodes.SceneNode>({
     rootItemId: "<document>",
@@ -130,7 +127,7 @@ export function ScenesList() {
       if (item.getId() === "<document>") return "<document>";
       return item.getItemData().name;
     },
-    isItemFolder: (item) => false,
+    isItemFolder: (_item) => false,
     onDrop(items, target) {
       const ids = items.map((item) => item.getId());
 

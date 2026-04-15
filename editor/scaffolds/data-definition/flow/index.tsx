@@ -3,15 +3,10 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  Edge,
   MiniMap,
-  Node,
-  Position,
-  ReactFlowProvider,
   useReactFlow,
 } from "@xyflow/react";
 import { TableNode, TABLE_NODE_TYPE } from "../nodes";
-import { useTheme } from "next-themes";
 import { Data } from "@/lib/data";
 import { layout } from "./layout";
 

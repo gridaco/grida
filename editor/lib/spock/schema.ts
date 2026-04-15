@@ -69,7 +69,7 @@ export function accessSchema<T extends object>(
 }
 
 const inferType = (
-  value: any
+  value: unknown
 ):
   | "string"
   | "number"
@@ -112,7 +112,7 @@ const inferType = (
  * @deprecated
  */
 export const inferSchemaFromData = (
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   currentPath: string[] = [],
   options = {
     transformthis: false,
@@ -120,10 +120,10 @@ export const inferSchemaFromData = (
   }
 ): TSchema => {
   const transform = (
-    obj: Record<string, any>,
+    obj: Record<string, unknown>,
     path: string[] = []
   ): TSchema => {
-    const properties: { [key: string]: any } = {};
+    const properties: { [key: string]: TProperty | TRef<object> } = {};
 
     Object.keys(obj).forEach((key: string) => {
       const value = obj[key];
@@ -132,7 +132,10 @@ export const inferSchemaFromData = (
       const propertyPath = `#/properties/${newPath.join("/properties/")}`;
 
       if (type === "object") {
-        const defaultproperties = transform(value, newPath).properties;
+        const defaultproperties = transform(
+          value as Record<string, unknown>,
+          newPath
+        ).properties;
         properties[key] = {
           type: "object",
           properties: options.transformthis
@@ -144,13 +147,13 @@ export const inferSchemaFromData = (
               }
             : defaultproperties,
         };
-      } else {
+      } else if (type !== "unknown") {
         properties[key] = {
           type,
         };
 
         if (options.keepvalue) {
-          properties[key].value = value;
+          (properties[key] as TProperty & { value?: unknown }).value = value;
         }
       }
     });

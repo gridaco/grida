@@ -225,10 +225,10 @@ function EditorPanel() {
   const editor = useCurrentEditor();
   const state = useEditorState(editor, (state) => state);
   const {
-    document,
-    document_ctx,
-    fontfaces: googlefonts,
-    user_clipboard,
+    document: _document,
+    document_ctx: _document_ctx,
+    fontfaces: _googlefonts,
+    user_clipboard: _user_clipboard,
     ...state_without_document
   } = state;
   return <JSONContent value={state_without_document} />;
@@ -372,7 +372,7 @@ function RecorderPanel() {
 type PatchEvent = {
   timestamp: number;
   patches: editor.history.Patch[];
-  action?: any;
+  action?: { type?: string };
 };
 
 function EventsPanel() {

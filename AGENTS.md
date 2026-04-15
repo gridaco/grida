@@ -72,8 +72,10 @@ Grida heavily relies on Supabase (PostgreSQL).
 
 - Turborepo - monorepo build orchestration
 - oxfmt (oxc) - code formatter (JS/TS)
+- oxlint (oxc) - linter (JS/TS), replaces ESLint
 - cargo fmt (rustfmt) - code formatter (Rust)
 - just - command runner (see `justfile` at repo root)
+- lefthook - git hooks (`lefthook.yml`)
 
 ## Documentation
 
@@ -199,8 +201,8 @@ pnpm dev:packages
 # run tests except for rust crates
 turbo test --filter='!./crates/*'
 
-# run lint (CI enforces lint for Next.js apps)
-turbo lint
+# run lint (oxlint)
+pnpm lint
 
 # run build (all, not recommended)
 turbo build
@@ -227,7 +229,7 @@ cargo build
 cargo fmt --all
 ```
 
-> **Important for agents:** Always run `just fmt` before creating commits. Both `oxfmt` (JS/TS) and `cargo fmt` (Rust) are enforced in CI — PRs will fail format checks if code is not formatted.
+> **Important for agents:** Formatting and linting run automatically on commit via lefthook pre-commit hooks (`oxfmt`, `oxlint`, `cargo fmt`, `clippy`). You can also run `just fmt` manually. Both `oxfmt` (JS/TS) and `cargo fmt` (Rust) are enforced in CI — PRs will fail format checks if code is not formatted.
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
 To handle this, you can build the `/packages/*`, then run typecheck.

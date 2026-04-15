@@ -14,7 +14,6 @@ import {
 } from "@/scaffolds/editor/feed";
 import {
   GDocFormsXSBTable,
-  GDocTable,
   GDocTableID,
 } from "@/scaffolds/editor/state";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
@@ -77,7 +76,7 @@ function SwitchGridEditor() {
 }
 
 function FormResponseGridEditor() {
-  const [state, dispatch] = useEditorState();
+  const [state, ] = useEditorState();
   const {
     form,
     tablespace,
@@ -86,7 +85,6 @@ function FormResponseGridEditor() {
     datagrid_table_id,
   } = state;
 
-  const tb = useDatagridTable<GDocTable>();
 
   const fields = useFormFields();
 
@@ -103,10 +101,11 @@ function FormResponseGridEditor() {
   );
 
   // Transforming the responses into the format expected by react-data-grid
-  const { filtered, inputlength } = useMemo(() => {
+  const { filtered } = useMemo(() => {
     return GridData.rows({
       form_id: form.form_id,
       // TODO: types with symbols not working ?
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- symbol table_id type mismatch
       table: datagrid_table_id as any,
       fields: fields,
       filter: {
@@ -140,7 +139,7 @@ function FormResponseGridEditor() {
 }
 
 function ModeXSBMainTable() {
-  const [state, dispatch] = useEditorState();
+  const [state,] = useEditorState();
 
   const {
     form,

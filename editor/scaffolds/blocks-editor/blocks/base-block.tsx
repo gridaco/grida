@@ -9,7 +9,7 @@ import { ArrowUpIcon, ArrowDownIcon } from "@radix-ui/react-icons";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export function useDeleteBlock() {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const supabase = createBrowserFormsClient();
 
   const deleteBlock = useCallback(

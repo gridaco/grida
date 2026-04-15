@@ -2,7 +2,7 @@ import type { JSONValue } from "@/types";
 import type { FormInputType } from "@/grida-forms-hosted/types";
 
 export function unwrapFeildValue(
-  value: any,
+  value: unknown,
   type?: FormInputType
 ): JSONValue | string | number | boolean | undefined | null {
   if (value === null) return null;
@@ -14,14 +14,14 @@ export function unwrapFeildValue(
     case "text":
     case "number":
     case "textarea":
-      return value;
+      return value as JSONValue;
     case "password":
-      return "●".repeat(value.length);
+      return "●".repeat(String(value).length);
     case "switch":
     case "checkbox":
-      return parseCheckboxValue(value);
+      return parseCheckboxValue(value as "on" | "off" | boolean);
     default:
-      return value;
+      return value as JSONValue;
   }
 }
 

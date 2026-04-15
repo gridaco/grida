@@ -43,7 +43,14 @@ export function RichTextEditorField({
   required?: boolean;
   placeholder?: string;
   initialContent?: Block[] | string;
-  onContentChange?: (editor: BlockNoteEditor<any>, content: Block[]) => void;
+  onContentChange?: (
+    editor: BlockNoteEditor<
+      typeof schema.blockSchema,
+      typeof schema.inlineContentSchema,
+      typeof schema.styleSchema
+    >,
+    content: Block[]
+  ) => void;
 } & FileHandler) {
   const [txtjsonvalue, settxtjsonvalue] = useState<string | undefined>(
     undefined
@@ -93,7 +100,7 @@ export function RichTextEditorField({
       try {
         settxtjsonvalue(JSON.stringify(content));
         onContentChange?.(editor, content);
-      } catch (e) {}
+      } catch {}
     };
     editor.onEditorContentChange(fn);
   }, [editor, onContentChange]);

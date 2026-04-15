@@ -80,7 +80,7 @@ export default function UIDEV() {
               return property_to_menu_item(key, property);
             });
           }}
-          renderMenuItem={(path, item) => <>{path.join(".")}</>}
+          renderMenuItem={(path) => <>{path.join(".")}</>}
         >
           <Button>Nested Dropdown Menu</Button>
         </NestedDropdownMenu>

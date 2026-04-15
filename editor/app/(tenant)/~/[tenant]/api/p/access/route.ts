@@ -63,6 +63,7 @@ export async function POST(
   const origin = req.nextUrl.origin;
   const next = req.nextUrl.searchParams.get("next");
   // NOTE: [tenant] is a dynamic route segment for this handler, even if we don't use it directly yet.
+  // oxlint-disable-next-line no-unused-vars
   const { tenant } = await params;
   const headerslist = await headers();
   const accept = haccept(headerslist.get("accept"));
@@ -202,7 +203,9 @@ export async function POST(
  * Since, user can make a mistake with the configuration, we return only include `metadata` field by default, and other are not included.
  */
 type ScopedCustomerData = {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic customer data from DB
   [key: string]: any;
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- JSON column from DB
   metadata: any;
 };
 

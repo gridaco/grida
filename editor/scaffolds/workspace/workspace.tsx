@@ -56,7 +56,7 @@ const WorkspaceContext = createContext<{
   state: __WorkspaceState;
   dispatch: React.Dispatch<WorkspaceAction>;
 }>({
-  state: null as any,
+  state: null as unknown as __WorkspaceState,
   dispatch: () => null,
 });
 

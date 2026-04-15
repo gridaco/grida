@@ -42,7 +42,7 @@ export default function Page() {
     setIsLoading(true);
 
     // Simulate API call
-    const { data, error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email: email,
       options: {
         shouldCreateUser: false,
@@ -61,10 +61,7 @@ export default function Page() {
 
   const handleOtp = async (otp: string) => {
     setIsLoading(true);
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       email,
       token: otp,
       type: "email",

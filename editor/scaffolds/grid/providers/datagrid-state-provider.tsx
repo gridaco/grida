@@ -3,7 +3,6 @@ import { DataFormat } from "@/scaffolds/data-format";
 import type { DataGridCellSelectionCursor } from "../types";
 import type { DataGridCellRootProps } from "../cells";
 import { MarkerConfig, mask } from "../grid-text-mask";
-import assert from "assert";
 
 type State = {
   masking_enabled?: boolean;

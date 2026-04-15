@@ -22,7 +22,6 @@ import {
 
 function PricingMobileHeader({
   plans,
-  description,
   priceDescription,
   price,
   plan,

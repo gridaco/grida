@@ -78,28 +78,6 @@ export function parseVariant(variant: string, family: string): FontVariant {
 }
 
 /**
- * Determines the font format from a URL
- */
-function getFontFormat(url: string): string {
-  const extension = url.split(".").pop()?.toLowerCase();
-
-  switch (extension) {
-    case "woff2":
-      return "woff2";
-    case "woff":
-      return "woff";
-    case "ttf":
-      return "truetype";
-    case "otf":
-      return "opentype";
-    case "eot":
-      return "embedded-opentype";
-    default:
-      return "truetype"; // fallback
-  }
-}
-
-/**
  * Creates FontVariant objects for a static font family
  */
 export function createStaticFontVariants(
@@ -259,7 +237,7 @@ export class UnifiedFontManager {
       this.unregister(victim, {
         family,
         weight: w,
-        style: s as any,
+        style: s as "normal" | "italic" | "oblique",
         stretch: st,
       });
       // optionally also trim bytes cache when very large:

@@ -86,6 +86,7 @@ function PaletteProvider({
   }, [appearance]);
 
   useVariablesCSS(
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- palette value type mismatch with stringfyThemeVariables
     palette ? stringfyThemeVariables(palettes[palette] as any) : undefined
   );
 

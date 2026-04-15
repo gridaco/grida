@@ -59,6 +59,7 @@ export function useXSBTableSearch({
       supabase_schema_name,
     ],
     // @see https://github.com/vercel/swr/discussions/545#discussioncomment-10740463
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- SWR fetcher type cast
     x_table_search_swr_fetcher as BareFetcher<any>
   );
 }

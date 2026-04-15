@@ -180,7 +180,6 @@ export function PaddingOverlay({
 }
 
 function PaddingEdgeRegion({
-  side,
   rect,
   isHovered,
   ...props
@@ -220,7 +219,6 @@ function PaddingEdgeRegion({
 function PaddingHandle({
   side,
   rect,
-  isHovered,
   onPaddingGestureStart,
   ...props
 }: React.ComponentProps<"button"> & {

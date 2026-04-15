@@ -20,22 +20,23 @@ export default function CampaignsPage() {
   const client = createBrowserWestReferralClient();
   const { id: project_id } = useProject();
 
-  const { data: campaigns, isLoading } = useSWR<
-    Platform.WEST.Referral.Campaign[]
-  >([project_id], {
-    fetcher: async () => {
-      const { data: campaigns, error } = await client
-        .from("campaign")
-        .select("*")
-        .eq("project_id", project_id);
+  const { data: campaigns } = useSWR<Platform.WEST.Referral.Campaign[]>(
+    [project_id],
+    {
+      fetcher: async () => {
+        const { data: campaigns, error } = await client
+          .from("campaign")
+          .select("*")
+          .eq("project_id", project_id);
 
-      if (error) {
-        throw new Error(error.message);
-      }
+        if (error) {
+          throw new Error(error.message);
+        }
 
-      return campaigns;
-    },
-  });
+        return campaigns;
+      },
+    }
+  );
 
   console.log("campaigns", campaigns);
 

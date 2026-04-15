@@ -44,7 +44,7 @@ export async function generateMetadata({
     .single();
 
   if (!formdoc) {
-    formdoc_err && console.error("ERR: ", formdoc_err);
+    if (formdoc_err) console.error("ERR: ", formdoc_err);
     return notFound();
   }
 
@@ -82,7 +82,7 @@ export default async function Layout({
 }>) {
   const { id } = await params;
 
-  const { data, error } = await service_role.forms
+  const { data } = await service_role.forms
     .from("form_document")
     .select(
       `
@@ -107,7 +107,8 @@ export default async function Layout({
     ? CustomCSS.vanilla(stylesheet?.custom)
     : undefined;
   const palettecss = stylesheet?.palette
-    ? stringfyThemeVariables(palettes[stylesheet.palette] as any)
+    ? // oxlint-disable-next-line typescript-eslint/no-explicit-any -- palette key dynamic lookup
+      stringfyThemeVariables(palettes[stylesheet.palette] as any)
     : undefined;
   const appearance = stylesheet?.appearance || "system";
 

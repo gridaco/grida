@@ -265,7 +265,7 @@ function ExportNodeControl({
       // Multiple files: create zip
       const files: Record<string, Uint8Array> = {};
 
-      const tasks = exportConfigs.map(async (config, index) => {
+      const tasks = exportConfigs.map(async (config, _index) => {
         if (!config?.format) return null;
 
         const format = config.format;
@@ -760,7 +760,7 @@ export function ExportMultipleLayers({
 
       const tasks = nodesWithConfigs.flatMap((node_id) => {
         const configs = editor.getExportConfigs(node_id);
-        return configs.map(async (config, configIndex) => {
+        return configs.map(async (config, _configIndex) => {
           if (!config?.format) return null;
 
           const format = config.format;

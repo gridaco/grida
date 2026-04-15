@@ -8,7 +8,7 @@ import { ComponentDemo } from "../component-demo";
 export default function DegreeControlPage() {
   const [rotation, setRotation] = useState(0);
   const [constrainedRotation, setConstrainedRotation] = useState(0);
-  const [disabledRotation, setDisabledRotation] = useState(45);
+  const [disabledRotation] = useState(45);
 
   return (
     <TooltipPrimitive.Provider>

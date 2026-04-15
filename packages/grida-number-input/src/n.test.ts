@@ -501,3 +501,92 @@ describe("Integration tests", () => {
     expect(formattedValue).toBe("75%");
   });
 });
+
+/**
+ * Tests for the "1%2" mid-edit suffix scenario.
+ *
+ * When a user edits a percentage input showing "1%", the browser cursor sits
+ * before the "%" and typing "2" produces the raw string "1%2".
+ * During editing we store the raw string; at commit time we parse and
+ * re-format. These tests verify that the parse → format round-trip produces
+ * correct results for the kinds of mid-edit strings a browser can generate.
+ */
+describe("Suffix mid-edit parsing (the '1%2' scenario)", () => {
+  test("should parse '1%2' as 1 (suffix in the middle is a malformed input)", () => {
+    // The browser may produce "1%2" when the user types "2" after "1%".
+    // parseValueWithSuffix strips a trailing "%" only — "1%2" does not end
+    // with "%", so parseFloat("1%2") returns 1 (stops at the "%").
+    const parsed = n.parseValueWithSuffix("1%2", "number", "%");
+    expect(parsed).toBe(1);
+  });
+
+  test("should parse clean user input '12' correctly when suffix is '%'", () => {
+    // If the input shows the raw user text "12" (no suffix mid-edit),
+    // parsing with suffix="%" should yield 12.
+    const parsed = n.parseValueWithSuffix("12", "number", "%");
+    expect(parsed).toBe(12);
+  });
+
+  test("should parse raw digits with inverse scaling for percentages", () => {
+    // User types "12" in a percentage input (scale=100) → internal value 0.12
+    const parsed = n.parseValueWithScaling("12", "number", "%", 100);
+    expect(parsed).toBe(0.12);
+  });
+
+  test("should parse '12%' with inverse scaling for percentages", () => {
+    // At commit time the value may already have the suffix: "12%" → 0.12
+    const parsed = n.parseValueWithScaling("12%", "number", "%", 100);
+    expect(parsed).toBe(0.12);
+  });
+
+  test("mid-edit round-trip: raw '12' → parse → format = '12%'", () => {
+    // Simulate: user typed "12" in a percentage input, then commits.
+    const raw = "12";
+    const internal = n.parseValueWithScaling(raw, "number", "%", 100);
+    expect(internal).toBe(0.12);
+    const display = n.formatValueWithSuffix(
+      internal,
+      "%",
+      100,
+      0.01,
+      "number",
+      1
+    );
+    expect(display).toBe("12%");
+  });
+
+  test("mid-edit round-trip: raw '75' → parse → format = '75%'", () => {
+    const raw = "75";
+    const internal = n.parseValueWithScaling(raw, "number", "%", 100);
+    expect(internal).toBe(0.75);
+    const display = n.formatValueWithSuffix(
+      internal,
+      "%",
+      100,
+      0.01,
+      "number",
+      1
+    );
+    expect(display).toBe("75%");
+  });
+
+  test("mid-edit with px suffix: raw '16' → parse → format = '16px'", () => {
+    const raw = "16";
+    const internal = n.parseValueWithScaling(raw, "number", "px", undefined);
+    expect(internal).toBe(16);
+    const display = n.formatValueWithSuffix(internal, "px");
+    expect(display).toBe("16px");
+  });
+
+  test("should handle empty string during mid-edit", () => {
+    // User selects all and deletes — raw input is ""
+    const parsed = n.parseValueWithScaling("", "number", "%", 100);
+    expect(parsed).toBeNaN();
+  });
+
+  test("should handle partial input with just suffix during mid-edit", () => {
+    // Edge case: user deletes digits, leaving only "%"
+    const parsed = n.parseValueWithScaling("%", "number", "%", 100);
+    expect(parsed).toBeNaN();
+  });
+});

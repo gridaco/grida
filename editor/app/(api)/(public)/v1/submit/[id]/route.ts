@@ -75,10 +75,10 @@ export async function GET(
 
   // #region 1 prevalidate request form data (query)
   const __keys = Array.from(req.nextUrl.searchParams.keys());
-  const system_gf_keys = __keys.filter((key) =>
-    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
+  const system_gf_keys = new Set(
+    __keys.filter((key) => key.startsWith(SYSTEM_GF_KEY_STARTS_WITH))
   );
-  const keys = __keys.filter((key) => !system_gf_keys.includes(key));
+  const keys = __keys.filter((key) => !system_gf_keys.has(key));
 
   if (!keys.length) {
     return NextResponse.json(
@@ -185,7 +185,6 @@ async function submit({
     store_connection,
     supabase_connection,
     default_page,
-    options,
   } = form_reference;
 
   const {
@@ -193,6 +192,7 @@ async function submit({
     redirect_after_response_uri,
     is_ending_page_enabled,
     ending_page_template_id,
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK nested join type
   } = (default_page as any) || {};
 
   const entries = formdata.entries();
@@ -428,9 +428,10 @@ async function submit({
     for (const f of required_challenge_email_fields) {
       const key = `__challenge_email__${f.id}`;
       const obj = session_raw?.[key];
+      const objRecord = obj as Record<string, unknown> | null | undefined;
       const state =
-        obj && typeof obj === "object" && "state" in (obj as any)
-          ? String((obj as any).state)
+        obj && typeof obj === "object" && objRecord && "state" in objRecord
+          ? String(objRecord.state)
           : "idle";
 
       if (state !== "challenge-success") {
@@ -439,8 +440,8 @@ async function submit({
 
       // Ensure the verified email matches submitted email for this field.
       const verified_email =
-        obj && typeof obj === "object" && "email" in (obj as any)
-          ? String((obj as any).email ?? "")
+        obj && typeof obj === "object" && objRecord && "email" in objRecord
+          ? String(objRecord.email ?? "")
           : "";
 
       const submitted = qval(formdata.get(f.name) as string);
@@ -478,7 +479,7 @@ async function submit({
     const inventory_keys = Object.keys(options_inventory);
 
     // TODO: this may conflict the validation policy since v1/load uses render fields.
-    const options = form_reference.fields.map((f) => f.options).flat();
+    const options = form_reference.fields.flatMap((f) => f.options);
 
     // TODO: now we only support one inventory option selection per form
     const data_present_option_fields = fields.filter((f) => {
@@ -639,11 +640,11 @@ async function submit({
   // group by existing and new fields
   const v_form_fields = fields.slice();
   const known_names = nonsystem_keys.filter((key) => {
-    return v_form_fields!.some((field: any) => field.name === key);
+    return v_form_fields!.some((field) => field.name === key);
   });
 
   const unknown_names = nonsystem_keys.filter((key) => {
-    return !v_form_fields!.some((field: any) => field.name === key);
+    return !v_form_fields!.some((field) => field.name === key);
   });
   const ignored_names: string[] = [];
   const target_names: string[] = [];
@@ -703,6 +704,7 @@ async function submit({
   // ==================================================
   // region user supabase connection
 
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic form data record
   let RECORD: Record<string, any> | undefined = undefined;
   let X_SUPABASE_MAIN_TABLE_PKS: string[] = [];
   if (supabase_connection && supabase_connection.main_supabase_table_id) {
@@ -723,6 +725,7 @@ async function submit({
           }).value,
         ];
       });
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic form data record
       const data: Record<string, any> = Object.fromEntries(entries);
 
       const { pks, insertion } = await sbconn_insert({
@@ -817,8 +820,9 @@ async function submit({
               );
           } else if (FieldSupports.richtext(type)) {
             // 1. parse the tmp files
-            const { staged_file_paths } =
-              RichTextStagedFileUtils.parseDocument(value);
+            const { staged_file_paths } = RichTextStagedFileUtils.parseDocument(
+              value as object | string
+            );
 
             // console.log("submit/richtext/files", staged_file_paths);
 
@@ -842,7 +846,7 @@ async function submit({
           response_id: response_reference_obj!.id,
           form_field_id: field.id,
           form_id: form_id,
-          value: value,
+          value: value as InsertDto<"grida_forms", "response_field">["value"],
           form_field_option_id: enum_id,
           form_field_option_ids: enum_ids,
         };
@@ -850,12 +854,13 @@ async function submit({
         if (type === "challenge_email") {
           const key = `__challenge_email__${field.id}`;
           const challenge_state =
-            session_raw && key in session_raw
-              ? (session_raw as any)[key]
-              : null;
+            session_raw && key in session_raw ? session_raw[key] : null;
           return {
             ...base,
-            challenge_state,
+            challenge_state: challenge_state as InsertDto<
+              "grida_forms",
+              "response_field"
+            >["challenge_state"],
           } satisfies InsertDto<"grida_forms", "response_field">;
         }
 
@@ -922,7 +927,7 @@ async function submit({
 
         // check if the field is a valid table field not a abstract render-only field
         // TODO: this is also a good place to validate type - only `text` or `text[]` is supported
-        if (!!!sb_table_schema.properties[field.name]) {
+        if (!sb_table_schema.properties[field.name]) {
           return acc;
         }
 
@@ -975,6 +980,7 @@ async function submit({
 
         return acc;
       },
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic form data record
       {} as Record<string, any>
     );
 
@@ -1008,7 +1014,7 @@ async function submit({
 
   const response_field_with_resolved_file_upserts = Object.keys(
     field_file_uploads
-  ).map((field_id, i) => {
+  ).map((field_id) => {
     const field = v_form_fields!.find((f) => f.id === field_id);
     if (!field) {
       throw new Error(
@@ -1048,7 +1054,7 @@ async function submit({
       );
 
       const document = value
-        ? RichTextStagedFileUtils.renderDocument(value, {
+        ? RichTextStagedFileUtils.renderDocument(value as object | string, {
             files: field_file_processor.file_commits[field_id],
           })
         : undefined;
@@ -1145,6 +1151,7 @@ async function submit({
       // ==================================================
 
       // build info
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic response info object
       const info: any = {};
 
       // if there are new fields
@@ -1154,7 +1161,7 @@ async function submit({
             "There were new unknown fields in the request and the definitions are created automatically. To disable them, set 'unknown_field_handling_strategy' to 'ignore' or 'reject' in the form settings.",
           data: {
             keys: needs_to_be_created,
-            fields: v_form_fields!.filter((field: any) =>
+            fields: v_form_fields!.filter((field) =>
               needs_to_be_created!.includes(field.name)
             ),
           },
@@ -1162,6 +1169,7 @@ async function submit({
       }
 
       // build warning
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic response warning object
       const warning: any = {};
 
       // if there are ignored fields
@@ -1242,7 +1250,7 @@ type SupabaseStorageUploadReturnType =
     }
   | {
       data: null;
-      error: any;
+      error: unknown;
     };
 
 // region file upload
@@ -1495,6 +1503,7 @@ function error(
 
   data: {
     form_id: string;
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic error data shape
     [key: string]: any;
   },
   meta: {
@@ -1548,7 +1557,7 @@ function error(
       }
     }
   } else {
-    const data: any = null;
+    const data: unknown = null;
     switch (code) {
       case 404: {
         return NextResponse.json({ error: "Form not found" }, { status: 404 });
@@ -1598,6 +1607,7 @@ function error(
   //
 }
 
+// oxlint-disable-next-line no-unused-vars
 async function hook_notifications({ form_id }: { form_id: string }) {
   // FIXME: DEV MODE
 
@@ -1631,8 +1641,8 @@ async function hook_notifications({ form_id }: { form_id: string }) {
 
 function isObjectEmpty(obj: object | null | undefined) {
   try {
-    return Object.keys(obj as any).length === 0;
-  } catch (e) {
+    return Object.keys(obj as object).length === 0;
+  } catch {
     return true;
   }
 }

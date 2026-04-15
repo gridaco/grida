@@ -319,8 +319,8 @@ export function self_wrapNodesAsBooleanOperation<
       layout_positioning: "absolute",
       op: op,
       corner_radius: modeProperties.cornerRadius(...nodes),
-      fill: modeProperties.fill(...nodes),
-      stroke: modeProperties.stroke(...nodes),
+      fill: modeProperties.fill(...nodes) as cg.Paint | undefined,
+      stroke: modeProperties.stroke(...nodes) as cg.Paint | undefined,
       stroke_width: modeProperties.strokeWidth(...nodes),
     } satisfies grida.program.nodes.BooleanPathOperationNodePrototype;
 

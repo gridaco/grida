@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useEditorState, useCurrentEditor } from "@/grida-canvas-react";
 import { useBackendState } from "@/grida-canvas-react/provider";
 import {
@@ -222,7 +222,7 @@ export function SlideMenuContent() {
                         constraints: { type: "scale" as const, value: 1 },
                       }
                     : {}),
-                } as any);
+                } as unknown as editor.api.ExportConfigOf<typeof format>);
                 const ext = format.toLowerCase();
                 const mime = format === "PNG" ? "image/png" : "image/svg+xml";
                 const blob = new Blob([data as BlobPart], { type: mime });
@@ -241,7 +241,7 @@ export function SlideMenuContent() {
                             constraints: { type: "scale" as const, value: 1 },
                           }
                         : {}),
-                    } as any
+                    } as unknown as editor.api.ExportConfigOf<typeof format>
                   );
                   const ext = format.toLowerCase();
                   const bytes =

@@ -508,7 +508,6 @@ export namespace iofigma {
 
         type CmdGroup = { cmd: string; nums: number[] };
         const groups: CmdGroup[] = [];
-        let lastIdx = 0;
         let m: RegExpExecArray | null;
 
         // Split into (command, numbers[]) pairs
@@ -1123,8 +1122,11 @@ export namespace iofigma {
         node:
           | (figrest.HasLayoutTrait & Partial<__ir.HasLayoutTraitIR>)
           | {
+              // oxlint-disable-next-line typescript/no-explicit-any
               relativeTransform?: any;
+              // oxlint-disable-next-line typescript/no-explicit-any
               size?: any;
+              // oxlint-disable-next-line typescript/no-explicit-any
               absoluteBoundingBox?: any;
             },
         parent?: {
@@ -1508,6 +1510,7 @@ export namespace iofigma {
       /**
        * Style properties - ICSSStylable
        */
+      // oxlint-disable-next-line typescript/no-explicit-any
       function style_trait(style: Record<string, any>) {
         return { style };
       }
@@ -2890,7 +2893,6 @@ export namespace iofigma {
             ).styleOverrideTable;
             const hasRichText =
               charOverrides &&
-              charOverrides.length > 0 &&
               charOverrides.some((id: number) => id !== 0) &&
               overrideTable;
 
@@ -5027,7 +5029,9 @@ export namespace iofigma {
     }
 
     function inheritContainerPropsFromComponentIfMissing(
+      // oxlint-disable-next-line typescript/no-explicit-any
       instanceNode: any,
+      // oxlint-disable-next-line typescript/no-explicit-any
       componentNode: any
     ) {
       // This is a conservative copy: only fill missing/empty fields on the instance.
@@ -5208,10 +5212,11 @@ export namespace iofigma {
       const newId = `${idPrefix}::${idCounter.n++}::${originalId}`;
 
       // Shallow mutable clone (union is readonly; mutations below need this).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       const cloned: Record<string, any> & AnyFigmaNode = {
         ...node,
         id: newId,
+        // oxlint-disable-next-line typescript/no-explicit-any
       } as Record<string, any> & AnyFigmaNode;
 
       // Apply parent instance scale to this node's size and position.
@@ -5339,6 +5344,7 @@ export namespace iofigma {
       // Pass the same instanceScale so all descendants at this
       // nesting level are scaled uniformly.
       if ("children" in cloned && Array.isArray(cloned.children)) {
+        // oxlint-disable-next-line typescript/no-explicit-any
         cloned.children = cloned.children.map((child: any) =>
           cloneTreeWithNewIdsAndFlattenInstances({
             node: child,
@@ -5524,6 +5530,7 @@ export namespace iofigma {
 
       const variableColors = buildVariableColorMap(guidToKiwi);
 
+      // oxlint-disable-next-line typescript/no-explicit-any
       const visit = (node: Record<string, any> & AnyFigmaNode) => {
         if (!node) return;
 

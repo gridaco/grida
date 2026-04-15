@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer } from "react";
+import React, { useEffect } from "react";
 import queryattributes from "@/grida-canvas-react-renderer-dom/nodes/utils/attributes";
 import ReferrerPageTemplate from "@/theme/templates/enterprise/west-referral/referrer/page";
 import ShareDialog from "@/theme/templates/enterprise/west-referral/referrer/share";
@@ -357,7 +357,7 @@ function CustomComponent_Viewer__Referrer(
 function CustomComponent_Viewer__ReferrerShare(
   componentprops: ViewerComponentProps
 ) {
-  const { campaign, props, locale } = useViewerContext();
+  const { props, locale } = useViewerContext();
 
   return (
     <div
@@ -385,7 +385,7 @@ function CustomComponent_Viewer__ReferrerShare(
 function CustomComponent_Viewer__ReferrerShareMessage(
   componentprops: ViewerComponentProps
 ) {
-  const { campaign, props, locale } = useViewerContext();
+  const { props } = useViewerContext();
 
   const message = props?.components?.["referrer-share-message"]?.message;
 
@@ -464,7 +464,7 @@ function CustomComponent_Viewer__Invitation(
 function CustomComponent_Viewer__InvitationUXOverlay(
   componentprops: ViewerComponentProps
 ) {
-  const { campaign, props, locale } = useViewerContext();
+  const { props, locale } = useViewerContext();
 
   return (
     <div

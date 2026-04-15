@@ -7,14 +7,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CodeIcon, CommitIcon, GearIcon } from "@radix-ui/react-icons";
-import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { Badge } from "@/components/ui/badge";
@@ -146,7 +144,7 @@ const _view_types = [
 ] as const;
 
 function _LayoutMenuContent() {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const tb = useDatagridTable();
 
   const onLayoutChange = useCallback(
@@ -283,7 +281,7 @@ function _TimeZone() {
 }
 
 function _DoctypeFormsSimulator() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   const tb = useDatagridTable();
 
@@ -350,13 +348,4 @@ function _DoctypeFormsCampaignTZ() {
       )}
     </DropdownMenuRadioItem>
   );
-}
-
-function s2Hmm(s: number) {
-  const now = new Date();
-  const startOfDayDate = startOfDay(now);
-  const updatedDate = addSeconds(startOfDayDate, s);
-  const formattedTime = format(updatedDate, "H:mm");
-
-  return formattedTime;
 }

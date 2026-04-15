@@ -223,7 +223,7 @@ export namespace tokens {
      * const plainValue = 42;
      * console.log(tokens.is.tokenized(plainValue)); // Output: false
      */
-    export function tokenized<T = any>(value: T): boolean {
+    export function tokenized<T = unknown>(value: T): boolean {
       if (value == null) {
         return false; // Null or undefined is not tokenized
       }
@@ -259,7 +259,7 @@ export namespace tokens {
     }
 
     export function primitive(
-      value?: any,
+      value?: unknown,
       checknull = true
     ): value is Primitive {
       return (
@@ -315,7 +315,8 @@ export namespace tokens {
       | tokens.ShorthandBinaryExpression {
       const is_array_constructed_well = Array.isArray(exp) && exp.length === 3;
       if (is_array_constructed_well) {
-        const [l, op, r] = exp;
+        const [_l, op, _r] = exp;
+        // oxlint-disable-next-line typescript/no-explicit-any
         if (typeof op === "string" && BINARY_OPERATORS.includes(op as any)) {
           return true;
         }

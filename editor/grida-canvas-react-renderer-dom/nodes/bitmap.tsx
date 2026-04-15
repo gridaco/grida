@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import queryattributes from "./utils/attributes";
 import grida from "@grida/schema";
-import assert from "assert";
 import { css } from "@/grida-canvas-utils/css";
 
 export const BitmapWidget = ({
@@ -12,7 +11,11 @@ export const BitmapWidget = ({
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.BitmapNode>) => {
-  const { objectFit, objectPosition, ...divStyles } = style || {};
+  const {
+    objectFit: _objectFit,
+    objectPosition: _objectPosition,
+    ...divStyles
+  } = style || {};
 
   const imagedata = context.bitmaps[imageRef];
   // FIXME: this will fail with relative dimensions

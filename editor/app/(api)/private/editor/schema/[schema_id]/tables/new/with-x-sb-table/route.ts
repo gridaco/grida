@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, context: Context) {
   // .....
 
   // validate attributes
-  for (const [key, { type }] of Object.entries(data.connect_attributes_as)) {
+  for (const [key] of Object.entries(data.connect_attributes_as)) {
     assert(
       tableschema.properties[key],
       `attribute "${key}" not found in the table schema`
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest, context: Context) {
 
   // create connection
 
-  const { data: conn, error: conn_err } = await formsClient
+  const { error: conn_err } = await formsClient
     .from("connection_supabase")
     .upsert(
       {

@@ -30,7 +30,7 @@ export function SessionDataSyncProvider({
           },
           body: JSON.stringify({ value: value }),
         });
-      } catch (error) {}
+      } catch {}
     };
 
     if (prevRecord) {

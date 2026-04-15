@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
 import { AutoHeightThemedMonacoEditor } from "@/components/monaco";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ export function __UNSAFE_CONSOLE() {
   const [entries, setEntries] = useState<
     {
       input: string;
-      output: any;
+      output: unknown;
     }[]
   >([]);
   const entriesRef = useRef(entries); // Ref to track the latest entries state
@@ -56,6 +56,7 @@ export function __UNSAFE_CONSOLE() {
     // THIS IS THE ONLY POINT IN THIS APPLICATION WHERE EVAL IS EXPOSED.
     //
     try {
+      // oxlint-disable-next-line no-eval -- intentional: devtools debug console
       const output = eval(value);
       setEntries((prev) => [
         ...prev,
@@ -64,15 +65,16 @@ export function __UNSAFE_CONSOLE() {
           output,
         },
       ]);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
       setEntries((prev) => [
         ...prev,
         {
           input: value,
-          output: e.message,
+          output: message,
         },
       ]);
-      toast.error(e.message);
+      toast.error(message);
     }
   };
 
@@ -144,22 +146,10 @@ export function __UNSAFE_CONSOLE() {
   );
 }
 
-const serialize = (value: string) => {
+const serialize = (value: unknown) => {
   try {
     return JSON.stringify(value, null, 2);
-  } catch (e: any) {
-    return e.message;
+  } catch (e: unknown) {
+    return e instanceof Error ? e.message : String(e);
   }
 };
-
-function SafeSerialized({ value }: { value: any }) {
-  const txt = useMemo(() => {
-    try {
-      return JSON.stringify(value);
-    } catch (e: any) {
-      return e.message;
-    }
-  }, [value]);
-
-  return <>{txt}</>;
-}

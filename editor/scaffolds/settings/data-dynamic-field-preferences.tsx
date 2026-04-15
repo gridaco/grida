@@ -58,7 +58,7 @@ export function UnknownFieldPreferences() {
         error: "Failed to save settings",
       });
       reset(data); // Reset form state to the new values after successful submission
-    } catch (error) {}
+    } catch {}
   };
 
   const strategy = useWatch({ control, name: "strategy" });

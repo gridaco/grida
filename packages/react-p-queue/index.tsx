@@ -30,9 +30,11 @@ import BatchQueue from "./batch";
 
 // #region generic types
 interface Identifiable {
+  // oxlint-disable-next-line typescript/no-explicit-any
   [key: string]: any;
 }
 
+// oxlint-disable-next-line typescript/no-explicit-any
 type PQResolverResult<T, E = any> = {
   data: T | null;
   error?: E | null;
@@ -65,15 +67,18 @@ type PQConfig<T> = {
 // #region state context
 
 interface PQResolverState<T extends Identifiable, P extends Identifiable> {
+  // oxlint-disable-next-line typescript/no-explicit-any
   batch: BatchQueue<P, T, any> | null;
   resolver: PQBatchResolver<T, P> | PQSingleResolver<T, P>;
   queue: PQueue;
 }
 
+// oxlint-disable-next-line typescript/no-explicit-any
 const PQueueResolverContext = createContext<PQResolverState<any, any> | null>(
   null
 );
 
+// oxlint-disable-next-line typescript/no-explicit-any
 type PQError = any;
 
 interface PQState<T, P, E> {
@@ -82,8 +87,10 @@ interface PQState<T, P, E> {
   tasks: TaskPayload<P>[];
 }
 
+// oxlint-disable-next-line typescript/no-explicit-any
 const PQueueContext = createContext<PQState<any, any, any> | null>(null);
 
+// oxlint-disable-next-line typescript/no-explicit-any
 function initstate(config: PQConfig<any>): PQState<any, any, any> {
   return {
     config,
@@ -107,21 +114,26 @@ type PQueueAction =
 
 type PQueueTaskStartAction = {
   type: "start";
+  // oxlint-disable-next-line typescript/no-explicit-any
   task: any;
 };
 type PQueueTaskResultAction = {
   type: "result";
+  // oxlint-disable-next-line typescript/no-explicit-any
   result: PQResolverResult<any, any>;
 };
+// oxlint-disable-next-line typescript/no-explicit-any
 type PQueueAddAction = { type: "add"; task: any };
 type PQueueClearAction = { type: "clear" };
 // #endregion actions
 
 // #region reducer / provider
+/* oxlint-disable typescript/no-explicit-any */
 function reducer(
   state: PQState<any, any, any>,
   action: PQueueAction
 ): PQState<any, any, any> {
+  /* oxlint-enable typescript/no-explicit-any */
   switch (action.type) {
     case "add": {
       return {
@@ -189,6 +201,7 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
 
   const batchqueue = useMemo(() => {
     if (!batch) return null;
+    // oxlint-disable-next-line typescript/no-explicit-any
     return new BatchQueue<P, T, any>({
       batchSize: batch,
       throttleTime: throttle,
@@ -198,8 +211,7 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
         const results = await resolver(...tasks);
 
         // Dispatch results to update state
-        results.data?.forEach((result, index) => {
-          const task = tasks[index];
+        results.data?.forEach((result) => {
           dispatch({
             type: "result",
             result: { data: result, error: results.error },
@@ -276,7 +288,8 @@ type UseQueueReturnType<T, P> = {
 };
 // #endregion hook
 
-function useQueueStore<T, P>(): PQResolverResult<T, any>[] {
+// oxlint-disable-next-line typescript/no-explicit-any
+function useQueueStore<T, _P>(): PQResolverResult<T, any>[] {
   const state = useContext(PQueueContext);
   if (!state) throw new Error("QueueProvider not provided");
   const { store } = state;

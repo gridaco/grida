@@ -83,12 +83,14 @@ describe("Node Properties (headless)", () => {
       active: true,
     };
     ed.doc.changeNodePropertyFills(["rect-0"], [paint]);
-    const node = ed.state.document.nodes["rect-0"] as any;
+    const node = ed.state.document.nodes[
+      "rect-0"
+    ] as grida.program.nodes.UnknownNode;
     // Fill can be stored as `fill` (single) or `fill_paints` (array)
     const fill = node.fill ?? node.fill_paints?.[0];
     expect(fill).toBeDefined();
-    expect(fill.type).toBe("solid");
-    expect(fill.active).toBe(true);
+    expect(fill!.type).toBe("solid");
+    expect(fill!.active).toBe(true);
     // TODO: Assert the actual color value once the fill storage format
     // is stabilized (single `fill` vs `fill_paints` array).
   });

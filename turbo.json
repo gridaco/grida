@@ -21,10 +21,6 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
-    "lint": {
-      "dependsOn": ["^lint"],
-      "outputs": []
-    },
     "dev": {
       "persistent": true,
       "cache": false

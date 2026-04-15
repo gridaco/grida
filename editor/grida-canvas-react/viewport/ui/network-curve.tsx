@@ -53,13 +53,6 @@ export function BezierCurvedLine({
   );
 }
 
-const direction_to_axis_map = {
-  n: "v",
-  s: "v",
-  e: "h",
-  w: "h",
-} as const;
-
 /**
  * make a svg path data to connect point a to point b
  *

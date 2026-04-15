@@ -14,7 +14,7 @@ describe("Stress: Async serialization", () => {
     // Push 5 items
     for (let i = 1; i <= 5; i++) {
       h.atomic(`step ${i}`, (tx) => {
-        const d: any = counterDelta(c, 10, "doc");
+        const d = counterDelta(c, 10, "doc");
         const origApply = d.apply;
         const origRevert = d.revert;
         d.apply = () => {

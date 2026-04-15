@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useMemo } from "react";
+import React, { useMemo } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
   DevtoolsDialog,
@@ -15,19 +15,11 @@ import { PageBackground } from "@/theme/bg/background";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useRequestFormSession, useFormSession } from "./load";
 import { Env } from "@/env";
-import { FormStartPage as FormStartPageRenderer } from "@/theme/templates/formstart";
-import { ScreenWindowRoot } from "@/theme/templates/kit/components";
-import {
-  AgentPagesFlow,
-  useAgentFlow,
-} from "@/grida-forms/formstate/core/flow";
+import { AgentPagesFlow } from "@/grida-forms/formstate/core/flow";
 import type {
   FormAgentPrefetchData,
   FormClientFetchResponseError,
 } from "@/app/(api)/(public)/v1/[id]/route";
-import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
-import { StandaloneDocumentEditor } from "@/grida-canvas-react/provider";
-import grida from "@grida/schema";
 import { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
 
 export function Agent({
@@ -110,7 +102,7 @@ function Ready({
   const { background } = data;
 
   const pages = useMemo(() => {
-    const { start_page, lang, campaign } = data;
+    const { start_page } = data;
     return {
       start: start_page
         ? null
@@ -222,18 +214,13 @@ function FormPage({
 }) {
   const {
     //
-    start_page,
-    title,
     method,
     blocks,
     tree,
     fields,
     default_values,
     options,
-    lang,
     stylesheet,
-    background,
-    campaign,
   } = data;
 
   const { clearSessionStorage } = useRequestFormSession(form_id);

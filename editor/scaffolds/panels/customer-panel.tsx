@@ -16,7 +16,6 @@ import { fmt_local_index } from "@/utils/fmt";
 import { Link2Icon } from "@radix-ui/react-icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { provisional } from "@/services/customer/utils";
-import { useEditorState } from "../editor";
 import type { Platform } from "@/lib/platform";
 import useSWR from "swr";
 import { cn } from "@/components/lib/utils";
@@ -27,9 +26,6 @@ export function CustomerEditPanel({
 }: React.ComponentProps<typeof Sheet> & {
   customer_id?: string;
 }) {
-  const [state] = useEditorState();
-  const { organization, project } = state;
-
   const { data: customer } = useSWR<FormCustomerDetail>(
     customer_id ? `/private/editor/customers/${customer_id}` : undefined,
     async (url: string) => {

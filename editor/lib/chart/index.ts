@@ -1,7 +1,7 @@
 import { rollups } from "d3-array";
 
 export namespace Chart {
-  type Row = { [key: string]: any };
+  type Row = { [key: string]: unknown };
 
   export type MainAxisAggregate =
     | "none"
@@ -19,14 +19,14 @@ export namespace Chart {
     sort: "none" | { ascending?: boolean };
   }
 
-  function main_axis_aggregate(value: any, aggregate: MainAxisAggregate) {
+  function main_axis_aggregate(value: unknown, aggregate: MainAxisAggregate) {
     switch (aggregate) {
       case "datetime-day": {
-        const date = new Date(value);
+        const date = new Date(value as string | number | Date);
         return date.toISOString().split("T")[0]; // Aggregate by day
       }
       case "datetime-week": {
-        const date = new Date(value);
+        const date = new Date(value as string | number | Date);
         const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
         const pastDaysOfYear = Math.ceil(
           (date.getTime() - firstDayOfYear.getTime()) / 86400000
@@ -35,7 +35,7 @@ export namespace Chart {
         return `${date.getFullYear()}-W${weekNumber}`; // Aggregate by week
       }
       case "datetime-year": {
-        const date = new Date(value);
+        const date = new Date(value as string | number | Date);
         return date.getFullYear().toString(); // Aggregate by year
       }
       default:

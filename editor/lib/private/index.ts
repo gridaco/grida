@@ -284,7 +284,7 @@ export namespace PrivateEditorApi {
     export async function listXSBBucket(supabase_project_id: number) {
       return Axios.get<{
         data: GridaXSupabase.SupabaseBucket[];
-        error: any;
+        error: unknown;
       }>(
         `/private/editor/x-supabase/projects/${supabase_project_id}/storage/buckets`
       );
@@ -368,7 +368,7 @@ export namespace PrivateEditorApi {
       main_table_id: number;
       filters: ReadonlyArray<XPostgrestQuery.NamedPredicate>;
     }) {
-      return Axios.request<PostgrestSingleResponse<any>>({
+      return Axios.request<PostgrestSingleResponse<unknown>>({
         method: "DELETE",
         url: `/private/editor/connect/${form_id}/supabase/table/${main_table_id}/query`,
         data: { filters } satisfies XPostgrestQuery.Body,

@@ -7,6 +7,7 @@ import type {
   PaymentFieldData,
   PhoneFieldData,
 } from "@/grida-forms-hosted/types";
+import type { CountryCode } from "libphonenumber-js/core";
 import { Select as HtmlSelect } from "@/components/vanilla/select";
 import {
   Select,
@@ -134,7 +135,7 @@ interface IFormFieldRenderingProps extends IMonoFormFieldRenderingProps {
   is_array?: boolean;
 }
 
-const __noop = (_: any) => _;
+const __noop = (_: unknown) => _;
 
 /**
  * @beta is_array=true is experimental and only works on playground
@@ -324,7 +325,7 @@ function MonoFormField({
           // @ts-expect-error - PhoneField component prop type mismatch
           <PhoneField
             {...(sharedInputProps as React.ComponentProps<"input">)}
-            defaultCountry={defaultCountry as any}
+            defaultCountry={defaultCountry as CountryCode | undefined}
           />
         );
       }
@@ -608,7 +609,13 @@ function MonoFormField({
         name={name}
         defaultValue={defaultValue}
         // hidden value supports computed value
-        value={(computed_value ?? undefined) as any}
+        value={
+          (computed_value ?? undefined) as
+            | string
+            | number
+            | readonly string[]
+            | undefined
+        }
       />
     );
   }
@@ -748,10 +755,15 @@ function MonoFormField({
             <ToggleGroupRootWithValue
               name={name}
               required={novalidate ? false : required}
-              type={(multiple ? "multiple" : "single") as any}
-              defaultValue={defaultValue}
-              // TODO: need handling - this can be an array
-              onValueChange={onValueChange}
+              {...(multiple
+                ? ({ type: "multiple" } as const)
+                : ({
+                    type: "single",
+                    defaultValue: defaultValue as string | undefined,
+                    onValueChange: onValueChange as
+                      | ((value: string) => void)
+                      | undefined,
+                  } as const))}
             >
               {renderOptions({
                 options,
@@ -1165,9 +1177,11 @@ function ToggleGroupRootWithValue({
 >) {
   const ref = React.useRef<HTMLInputElement>(null);
   const [hiddenValue, setHiddenValue] = useState(props.defaultValue);
-  const onValueChange = (v: any) => {
+  const onValueChange = (v: string | string[]) => {
     setHiddenValue(v);
-    props.onValueChange?.(v);
+    (props.onValueChange as ((value: string | string[]) => void) | undefined)?.(
+      v
+    );
   };
 
   return (

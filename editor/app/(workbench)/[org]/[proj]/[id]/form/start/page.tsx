@@ -1,6 +1,5 @@
 "use client";
 import { FormEditorAgentThemeProvider } from "@/scaffolds/agent-form-builder/theme";
-import { SideControl } from "@/scaffolds/sidecontrol";
 import React, { useCallback, useState } from "react";
 import {
   Sheet,
@@ -31,9 +30,9 @@ import {
 } from "@/components/ui/card";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
+import type { FileIO } from "@/lib/file";
 import {
   CMSImageAssetField,
   CMSRichText,
@@ -43,6 +42,7 @@ import { SandboxWrapper } from "@/scaffolds/form-templates/sandbox";
 import { BrowseStartPageTemplatesDialog } from "@/scaffolds/form-templates/startpage-templates-dialog";
 import { ErrorBoundary } from "react-error-boundary";
 import grida from "@grida/schema";
+import type { tokens } from "@grida/tokens";
 import {
   Collapsible,
   CollapsibleContent,
@@ -51,7 +51,6 @@ import {
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  StandaloneDocumentEditor,
   ViewportRoot,
   EditorSurface,
   useRootTemplateInstanceNode,
@@ -145,7 +144,7 @@ function Ready() {
  */
 
 function SetupStartPage() {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const dialog = useDialogState("browse-start-page-templates");
 
   const setupStartPage = useCallback(
@@ -197,6 +196,7 @@ function SetupStartPage() {
   );
 }
 
+// oxlint-disable-next-line no-unused-vars
 function StartPageEditor({ template_id }: { template_id: string }) {
   const [edit, setEdit] = useState(false);
 
@@ -244,7 +244,7 @@ function StartPageEditor({ template_id }: { template_id: string }) {
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProps, rootProperties, rootProps } =
     useRootTemplateInstanceNode("page");
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   // const { uploadPublic } = useDocumentAssetUpload();
   // const debouncedRichTextHtmlChange = useDebounceCallback(
@@ -355,8 +355,11 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               {keys.map((key) => {
                 const def = rootProperties[key];
 
-                const change = (value: any) => {
-                  changeRootProps(key, value);
+                const change = (value: grida.program.schema.Value) => {
+                  changeRootProps(
+                    key,
+                    value as tokens.StringValueExpression | undefined
+                  );
                 };
 
                 const value = rootProps[key];
@@ -405,13 +408,14 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
 
 function PropertyField({
   definition,
+  // oxlint-disable-next-line oxc(only-used-in-recursion) -- name is part of the component interface, forwarded to recursive calls
   name,
   value,
   onValueChange,
 }: {
   definition: grida.program.schema.PropertyDefinition;
-  value: any;
-  onValueChange: (value: any) => void;
+  value: grida.program.schema.Value | undefined;
+  onValueChange: (value: grida.program.schema.Value) => void;
   name: string;
 }) {
   const { uploadPublic } = useDocumentAssetUpload();
@@ -420,7 +424,7 @@ function PropertyField({
     case "richtext": {
       return (
         <CMSRichText
-          value={value}
+          value={value as string}
           uploader={uploadPublic}
           onValueChange={onValueChange}
           placeholder={"Enter text here"}
@@ -433,7 +437,7 @@ function PropertyField({
       return (
         <Input
           // TODO: support tokens
-          value={value}
+          value={value as string}
           onChange={(e) => {
             onValueChange(e.target.value);
           }}
@@ -446,11 +450,11 @@ function PropertyField({
         <CMSImageAssetField
           uploader={uploadPublic}
           // TODO: currently, video and image fields accepts array value
-          value={value as any}
+          value={value as FileIO.GridaAsset[] | undefined}
           // TODO: currently, video and image fields accepts array value
           onValueChange={(assets) => {
             // FIXME: match signature
-            onValueChange(assets);
+            onValueChange(assets as unknown as grida.program.schema.Value);
           }}
         />
       );
@@ -459,11 +463,11 @@ function PropertyField({
         <CMSVideoAssetField
           uploader={uploadPublic}
           // TODO: currently, video and image fields accepts array value
-          value={value as any}
+          value={value as FileIO.GridaAsset[] | undefined}
           // TODO: currently, video and image fields accepts array value
           onValueChange={(asset) => {
             // FIXME: match signature
-            onValueChange(asset);
+            onValueChange(asset as unknown as grida.program.schema.Value);
           }}
         />
       );
@@ -499,9 +503,9 @@ function PropertyField({
                 type: t,
               } as grida.program.schema.PropertyDefinition
             }
-            value={value?.[0]}
+            value={(value as grida.program.schema.Value[] | undefined)?.[0]}
             onValueChange={(v) => {
-              onValueChange([v]);
+              onValueChange([v] as unknown as grida.program.schema.Value);
             }}
           />
         );

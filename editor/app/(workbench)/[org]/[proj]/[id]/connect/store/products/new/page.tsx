@@ -304,10 +304,11 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
 
   const handleKeyPress = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    index: number
+    _index: number
   ) => {
     if (e.key === "Enter" && !hasDraftValue) {
       const newValues = [...values, { __draft: true }];
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- draft value shape mismatch
       setValues(newValues as any);
       setLastAddedDraft(true);
     }

@@ -40,7 +40,7 @@ export class XSupabaseStorageCrossBucketTaskPooler {
 
   queue(
     fields: Pick<FormFieldDefinition, "id" | "storage" | "type">[],
-    rows: ReadonlyArray<Record<string, any>>,
+    rows: ReadonlyArray<Record<string, unknown>>,
     pkcol: string
   ) {
     const x_supabase_storage_file_fields = fields.filter(
@@ -60,7 +60,7 @@ export class XSupabaseStorageCrossBucketTaskPooler {
         }))
       );
 
-      this.tasks[pk] = task;
+      this.tasks[pk as string] = task;
     }
 
     return this.tasks;

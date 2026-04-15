@@ -84,7 +84,7 @@ export function CreateNewProjectDialog({
           action={`/private/accounts/organizations/${org}/projects/new`}
           method="post"
           id="new-project"
-          onSubmit={(e) => {
+          onSubmit={(_e) => {
             setBusy(true);
           }}
         >

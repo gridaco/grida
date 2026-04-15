@@ -37,29 +37,6 @@ const DEMO_MESSAGES = [
   "Let's keep going",
 ];
 
-const DEMO_NAMES = [
-  "Alice",
-  "Bob",
-  "Charlie",
-  "Diana",
-  "Eve",
-  "Frank",
-  "Grace",
-  "Henry",
-  "Ivy",
-  "Jack",
-  "Kate",
-  "Liam",
-  "Maya",
-  "Noah",
-  "Olivia",
-  "Paul",
-  "Quinn",
-  "Ruby",
-  "Sam",
-  "Tara",
-];
-
 const DEMO_COLORS = [
   { fill: "#ef4444", hue: "#dc2626" }, // Red
   { fill: "#8b5cf6", hue: "#7c3aed" }, // Purple
@@ -74,8 +51,7 @@ const DEMO_COLORS = [
 ];
 
 export function useMockDemoManager() {
-  const { state, addPlayer, updatePlayerMessage, updatePlayerPosition } =
-    useMultiplayerStore();
+  const { state, addPlayer, updatePlayerMessage } = useMultiplayerStore();
   const { players } = state;
 
   // Use ref to access current players without causing re-renders

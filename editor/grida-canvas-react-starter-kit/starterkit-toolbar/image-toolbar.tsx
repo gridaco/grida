@@ -76,10 +76,11 @@ function isImageNodeSelection(
   }
 
   // Check fill_paints array first - find topmost active image paint
-  const fillPaints = Array.isArray((node as any).fill_paints)
-    ? ((node as any).fill_paints as cg.Paint[])
-    : (node as any).fill
-      ? [(node as any).fill as cg.Paint]
+  const unknownNode = node as grida.program.nodes.UnknownNode;
+  const fillPaints = Array.isArray(unknownNode.fill_paints)
+    ? (unknownNode.fill_paints as cg.Paint[])
+    : unknownNode.fill
+      ? [unknownNode.fill as cg.Paint]
       : [];
   const fillImageIndex = findTopmostActiveImagePaintIndex(fillPaints);
   if (fillImageIndex !== -1) {
@@ -93,10 +94,10 @@ function isImageNodeSelection(
   }
 
   // Check stroke_paints array - find topmost active image paint
-  const strokePaints = Array.isArray((node as any).stroke_paints)
-    ? ((node as any).stroke_paints as cg.Paint[])
-    : (node as any).stroke
-      ? [(node as any).stroke as cg.Paint]
+  const strokePaints = Array.isArray(unknownNode.stroke_paints)
+    ? (unknownNode.stroke_paints as cg.Paint[])
+    : unknownNode.stroke
+      ? [unknownNode.stroke as cg.Paint]
       : [];
   const strokeImageIndex = findTopmostActiveImagePaintIndex(strokePaints);
   if (strokeImageIndex !== -1) {
@@ -150,17 +151,18 @@ function getCurrentPaints(
   node: grida.program.nodes.Node,
   paintTarget: "fill" | "stroke"
 ): cg.Paint[] {
+  const u = node as grida.program.nodes.UnknownNode;
   if (paintTarget === "fill") {
-    return Array.isArray((node as any).fill_paints)
-      ? ((node as any).fill_paints as cg.Paint[])
-      : (node as any).fill
-        ? [(node as any).fill as cg.Paint]
+    return Array.isArray(u.fill_paints)
+      ? (u.fill_paints as cg.Paint[])
+      : u.fill
+        ? [u.fill as cg.Paint]
         : [];
   } else {
-    return Array.isArray((node as any).stroke_paints)
-      ? ((node as any).stroke_paints as cg.Paint[])
-      : (node as any).stroke
-        ? [(node as any).stroke as cg.Paint]
+    return Array.isArray(u.stroke_paints)
+      ? (u.stroke_paints as cg.Paint[])
+      : u.stroke
+        ? [u.stroke as cg.Paint]
         : [];
   }
 }

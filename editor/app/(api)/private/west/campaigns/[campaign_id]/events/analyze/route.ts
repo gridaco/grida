@@ -11,7 +11,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const { campaign_id: campaign_id } = await context.params;
+  const { campaign_id } = await context.params;
   const from = req.nextUrl.searchParams.get("from") || undefined;
   const to = req.nextUrl.searchParams.get("to") || undefined;
   const interval = req.nextUrl.searchParams.get("interval") || undefined;

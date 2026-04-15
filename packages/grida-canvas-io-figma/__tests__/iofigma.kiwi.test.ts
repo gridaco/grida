@@ -1,5 +1,10 @@
 import { readFileSync } from "fs";
-import { readFigFile, readHTMLMessage } from "../fig-kiwi";
+import {
+  readFigFile,
+  readHTMLMessage,
+  type Message,
+  type NodeChange,
+} from "../fig-kiwi";
 import { iofigma } from "../lib";
 import type * as figrest from "@figma/rest-api-spec";
 
@@ -166,7 +171,7 @@ describe("iofigma.kiwi.factory.node", () => {
 
     it("should handle edge cases: FRAME with frameMaskDisabled=false but resizeToFit=undefined", () => {
       // Create a mock NodeChange that's a FRAME but doesn't match GROUP pattern
-      const mockFrame: any = {
+      const mockFrame: NodeChange = {
         type: "FRAME",
         guid: { sessionID: 1, localID: 1 },
         name: "test-frame",
@@ -175,7 +180,7 @@ describe("iofigma.kiwi.factory.node", () => {
         resizeToFit: undefined, // Not true, so not a GROUP
       };
 
-      const mockMessage: any = { nodeChanges: [], blobs: [] };
+      const mockMessage: Message = { nodeChanges: [], blobs: [] };
 
       const restApiNode = iofigma.kiwi.factory.node(mockFrame, mockMessage);
 
@@ -186,7 +191,7 @@ describe("iofigma.kiwi.factory.node", () => {
 
     it("should handle edge cases: FRAME with resizeToFit=true but frameMaskDisabled=true", () => {
       // Create a mock NodeChange that's a FRAME but doesn't match GROUP pattern
-      const mockFrame: any = {
+      const mockFrame: NodeChange = {
         type: "FRAME",
         guid: { sessionID: 1, localID: 1 },
         name: "test-frame",
@@ -195,7 +200,7 @@ describe("iofigma.kiwi.factory.node", () => {
         resizeToFit: true, // Could be true for other reasons
       };
 
-      const mockMessage: any = { nodeChanges: [], blobs: [] };
+      const mockMessage: Message = { nodeChanges: [], blobs: [] };
 
       const restApiNode = iofigma.kiwi.factory.node(mockFrame, mockMessage);
 
@@ -207,14 +212,14 @@ describe("iofigma.kiwi.factory.node", () => {
 
   describe("other node type conversions", () => {
     it("should convert RECTANGLE node correctly", () => {
-      const mockRect: any = {
+      const mockRect: NodeChange = {
         type: "RECTANGLE",
         guid: { sessionID: 1, localID: 1 },
         name: "test-rect",
         size: { x: 100, y: 100 },
       };
 
-      const mockMessage: any = { nodeChanges: [], blobs: [] };
+      const mockMessage: Message = { nodeChanges: [], blobs: [] };
 
       const restApiNode = iofigma.kiwi.factory.node(mockRect, mockMessage);
 
@@ -223,14 +228,14 @@ describe("iofigma.kiwi.factory.node", () => {
     });
 
     it("should convert ELLIPSE node correctly", () => {
-      const mockEllipse: any = {
+      const mockEllipse: NodeChange = {
         type: "ELLIPSE",
         guid: { sessionID: 1, localID: 1 },
         name: "test-ellipse",
         size: { x: 100, y: 100 },
       };
 
-      const mockMessage: any = { nodeChanges: [], blobs: [] };
+      const mockMessage: Message = { nodeChanges: [], blobs: [] };
 
       const restApiNode = iofigma.kiwi.factory.node(mockEllipse, mockMessage);
 
@@ -283,13 +288,13 @@ describe("iofigma.kiwi.factory.node", () => {
       expect(groupRest?.type).toBe("GROUP");
 
       // Regular FRAME: frameMaskDisabled=true → clipsContent=false (mask disabled = clipping disabled)
-      expect((regularRest as any)?.clipsContent).toBe(false);
+      expect((regularRest as figrest.FrameNode)?.clipsContent).toBe(false);
 
       // FRAME with clip: frameMaskDisabled=false → clipsContent=true (mask enabled = clipping enabled)
-      expect((frameWithClipRest as any)?.clipsContent).toBe(true);
+      expect((frameWithClipRest as figrest.FrameNode)?.clipsContent).toBe(true);
 
       // GROUP: handled separately, always clipsContent=false
-      expect((groupRest as any)?.clipsContent).toBe(false);
+      expect((groupRest as figrest.GroupNode)?.clipsContent).toBe(false);
     });
   });
 });

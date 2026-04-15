@@ -58,7 +58,6 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { saveAs } from "file-saver";
 import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +100,6 @@ import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools
 import { EditorSyncPlugin } from "@/grida-canvas/plugins/sync";
 import { Editor } from "@/grida-canvas/editor";
 import { PlayerAvatar } from "@/components/multiplayer/avatar";
-import grida from "@grida/schema";
 import colors, {
   neutral_colors,
   randomcolorname,
@@ -660,7 +658,6 @@ function Consumer({
     async () => {
       if (opfs) {
         try {
-          const snapshot = instance.getSnapshot();
           const dir = instance.archivedir();
 
           // Write images into OPFS (images/<hash>.<ext>)
@@ -694,11 +691,6 @@ function Consumer({
       preventDefault: true,
     }
   );
-
-  const onExport = () => {
-    const blob = instance.archive();
-    saveAs(blob, distro.snapshot_file_name());
-  };
 
   return (
     <AgentChatProvider>
@@ -850,7 +842,7 @@ function LocalFakeCursorChat() {
     instance.surface.updateCursorChatMessage(value);
   };
 
-  const handleValueCommit = (value: string) => {
+  const handleValueCommit = () => {
     // Clear message after commit
     instance.surface.updateCursorChatMessage(null);
   };

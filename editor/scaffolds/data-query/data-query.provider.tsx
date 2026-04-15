@@ -69,7 +69,7 @@ export function StandaloneDataQueryProvider({
   const state = isControlled ? value : internalState;
 
   const dispatch = useCallback(
-    (action: any) => {
+    (action: Parameters<typeof reducer>[1]) => {
       const newState = reducer(state, action);
       if (isControlled) {
         onChange(newState);

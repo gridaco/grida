@@ -32,7 +32,7 @@ export class DOMFontManagerAgentInterfaceProvider
     return Array.from(this.loadedFonts);
   }
 
-  setFallbackFonts(fonts: string[]): void {
+  setFallbackFonts(_fonts: string[]): void {
     // TODO: implement explicit font fallback management.
   }
 }

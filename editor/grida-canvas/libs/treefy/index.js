@@ -70,10 +70,12 @@
       line += makePrefix(key, last) + key;
 
       // append values and the circular reference indicator
-      showValues &&
-        (typeof root !== "object" || root instanceof Date) &&
-        (line += ": " + root);
-      circular && (line += " (circular ref.)");
+      if (showValues && (typeof root !== "object" || root instanceof Date)) {
+        line += ": " + root;
+      }
+      if (circular) {
+        line += " (circular ref.)";
+      }
 
       callback(line);
     }

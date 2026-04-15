@@ -22,6 +22,7 @@ export function parseStat(buffer: ArrayBuffer): StatData {
   return parseStatTable(font);
 }
 
+// oxlint-disable-next-line typescript/no-explicit-any
 export function parseStatTable(font: any): StatData {
   const stat = font.STAT as Typr.STATTable | undefined;
   const axes: StatAxis[] = [];

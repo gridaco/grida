@@ -15,7 +15,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useNodeMetadata, useCurrentEditor } from "@/grida-canvas-react";
 
-function validate(value: string | undefined): any | false {
+function validate(
+  value: string | undefined
+): Record<string, unknown> | undefined | false {
   if (value === undefined) return undefined;
   if (value === "") return undefined;
   try {
@@ -23,7 +25,7 @@ function validate(value: string | undefined): any | false {
     // check if object (not array)
     assert(parsed && typeof parsed === "object" && !Array.isArray(parsed));
     return parsed;
-  } catch (e) {
+  } catch {
     return false;
   }
 }

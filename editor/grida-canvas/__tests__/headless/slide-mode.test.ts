@@ -62,8 +62,12 @@ describe("SlideEditorMode", () => {
     const slide2 = mode.slides[1];
     const node = ed.state.document.nodes[slide2.id];
     expect(node).toBeDefined();
-    expect((node as any).layout_inset_left).toBe(1920 + 200); // slideWidth + slideGap
-    expect((node as any).layout_inset_top).toBe(0);
+    expect(
+      (node as unknown as { layout_inset_left: number }).layout_inset_left
+    ).toBe(1920 + 200); // slideWidth + slideGap
+    expect(
+      (node as unknown as { layout_inset_top: number }).layout_inset_top
+    ).toBe(0);
   });
 
   // ---- goToSlide / selection clearing ----

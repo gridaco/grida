@@ -21,6 +21,7 @@ export async function POST() {
 
       await service_role.forms
         .from("response_field")
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- migration script
         .update({ value: unwrapped as any })
         .eq("id", rf.id);
 

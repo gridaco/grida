@@ -122,7 +122,8 @@ export class RulerCanvas implements RulerOptions {
   update(opts: Partial<RulerOptions>) {
     for (const key in opts) {
       if (opts[key as keyof RulerOptions] !== undefined) {
-        (this as any)[key] = opts[key as keyof RulerOptions];
+        (this as unknown as Record<string, unknown>)[key] =
+          opts[key as keyof RulerOptions];
       }
     }
   }

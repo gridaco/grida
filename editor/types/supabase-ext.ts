@@ -1,5 +1,6 @@
 import type { Database } from "@app/database";
 
+// oxlint-disable-next-line no-unused-vars
 const schema = "grida_forms" as const;
 
 type SchemaKey = keyof Database;
@@ -28,5 +29,6 @@ export type UpsertDto<
 > = InsertDto<S, T>;
 
 export type DontCastJsonProperties<T, K extends keyof T> = Omit<T, K> & {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- intentional type erasure for JSON column types from Supabase
   [P in K]: any;
 };

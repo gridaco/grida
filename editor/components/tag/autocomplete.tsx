@@ -112,8 +112,10 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
       setInputFocused(true);
     }
 
-    const userOnFocus = (children as React.ReactElement<any>).props.onFocus;
-    if (userOnFocus) userOnFocus(event);
+    const userOnFocus = (
+      children as React.ReactElement<React.ComponentProps<"input">>
+    ).props.onFocus;
+    if (userOnFocus) userOnFocus(event as React.FocusEvent<HTMLInputElement>);
   };
 
   const handleInputBlur = (
@@ -128,8 +130,10 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
       setIsPopoverOpen(false);
     }
 
-    const userOnBlur = (children as React.ReactElement<any>).props.onBlur;
-    if (userOnBlur) userOnBlur(event);
+    const userOnBlur = (
+      children as React.ReactElement<React.ComponentProps<"input">>
+    ).props.onBlur;
+    if (userOnBlur) userOnBlur(event as React.FocusEvent<HTMLInputElement>);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -191,7 +195,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
   };
 
   const childrenWithProps = React.cloneElement(
-    children as React.ReactElement<any>,
+    children as React.ReactElement<React.ComponentProps<"input">>,
     {
       onKeyDown: handleKeyDown,
       onFocus: handleInputFocus,

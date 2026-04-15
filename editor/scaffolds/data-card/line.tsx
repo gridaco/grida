@@ -8,7 +8,7 @@ export function LineContent({
   property,
   wrap,
 }: {
-  value: any;
+  value: unknown;
   property: Data.Relation.Attribute;
   wrap?: boolean;
 }) {
@@ -18,7 +18,7 @@ export function LineContent({
       return (
         <div className="flex gap-2 items-center">
           <Checkbox
-            checked={value}
+            checked={value as boolean | undefined}
             disabled
             className="disabled:cursor-default"
           />
@@ -36,7 +36,7 @@ export function LineContent({
           data-wrap={wrap}
           className={"flex gap-0.5 data-[wrap='true']:flex-wrap"}
         >
-          {(value as Array<any>).map((it, i) => {
+          {(value as Array<unknown>).map((it, i) => {
             return (
               <Badge
                 variant="outline"
@@ -78,7 +78,7 @@ function fmtsafely(txt: string, format: Data.Relation.Attribute["format"]) {
     }
 
     return txt;
-  } catch (e) {
+  } catch {
     return "ERR";
   }
 }

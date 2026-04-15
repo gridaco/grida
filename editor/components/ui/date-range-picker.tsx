@@ -18,11 +18,7 @@ import {
   SelectValue,
 } from "./select";
 import { Switch } from "./switch";
-import {
-  ChevronUpIcon,
-  ChevronDownIcon,
-  CheckIcon,
-} from "@radix-ui/react-icons";
+import { ChevronUpIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/components/lib/utils";
 
 export interface DateRangePickerProps {

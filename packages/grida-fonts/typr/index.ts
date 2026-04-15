@@ -3127,6 +3127,7 @@ namespace Typr {
               deltaData.push(ri < dcnt ? bin.readShort(data, off) : i8[off]);
               off += ri < dcnt ? 2 : 1;
             }
+            // oxlint-disable-next-line unicorn/no-new-array
             const dd = new Array(regs.length);
             dd.fill(0);
             vdata.push(dd);
@@ -3177,6 +3178,7 @@ namespace Typr {
           } else {
             // If indices are out of bounds, push a default value (array of zeros)
             // This maintains the expected structure while handling malformed data gracefully
+            // oxlint-disable-next-line unicorn/no-new-array
             const defaultDelta = new Array(regs.length);
             defaultDelta.fill(0);
             dfs.push(defaultDelta);

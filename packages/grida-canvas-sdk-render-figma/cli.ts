@@ -393,7 +393,7 @@ async function runConvert(
 ): Promise<void> {
   const lower = outPath.toLowerCase();
   const isGrida1 = lower.endsWith(".grida1");
-  const isGrida =
+  const _isGrida =
     lower.endsWith(".grida") || (!isGrida1 && !lower.endsWith(".grida1"));
 
   const { documentPath, imagesDir, isRestJson } = resolveInput(

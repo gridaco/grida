@@ -5,7 +5,6 @@ import Header from "@/www/header";
 import Hero, { HeroBackground } from "@/app/(www)/(home)/_home/hero";
 import Content1 from "./content-1";
 import Content3 from "./content-3";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { motion } from "motion/react";

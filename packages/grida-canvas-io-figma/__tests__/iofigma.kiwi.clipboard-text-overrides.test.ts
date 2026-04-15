@@ -1,4 +1,6 @@
+import { NodeChange } from "../fig-kiwi";
 import { iofigma } from "../lib";
+import type * as figkiwi from "../fig-kiwi";
 
 describe("iofigma.kiwi flattenInstances text overrides (mocked)", () => {
   it("applies symbolOverrides textData.characters to matching TEXT node by guid", () => {
@@ -18,7 +20,7 @@ describe("iofigma.kiwi flattenInstances text overrides (mocked)", () => {
     // DOCUMENT -> CANVAS(Page) + CANVAS(InternalOnly)
     // InternalOnly -> SYMBOL -> TEXT
     // Page -> INSTANCE(symbolID -> SYMBOL) with symbolOverrides targeting TEXT guid
-    const nodeChanges: any[] = [
+    const nodeChanges: NodeChange[] = [
       { type: "DOCUMENT", guid: docGuid, name: "Document" },
       {
         type: "CANVAS",
@@ -67,7 +69,7 @@ describe("iofigma.kiwi flattenInstances text overrides (mocked)", () => {
       },
     ];
 
-    const message: any = { nodeChanges, blobs: [] };
+    const message: figkiwi.Message = { nodeChanges, blobs: [] };
 
     const roots = iofigma.kiwi.buildClipboardRootNodes({
       nodeChanges,
@@ -76,13 +78,19 @@ describe("iofigma.kiwi flattenInstances text overrides (mocked)", () => {
     });
 
     expect(roots.length).toBe(1);
-    expect((roots[0] as any).type).toBe("INSTANCE");
+    const inst = roots[0] as import("@figma/rest-api-spec").InstanceNode & {
+      id: string;
+    };
+    expect(inst.type).toBe("INSTANCE");
 
-    const inst: any = roots[0];
     expect(Array.isArray(inst.children)).toBe(true);
 
-    const textNode = (inst.children as any[]).find((n) => n.type === "TEXT");
+    const textNode = (inst.children as iofigma.kiwi.AnyFigmaNode[]).find(
+      (n) => n.type === "TEXT"
+    );
     expect(textNode).toBeDefined();
-    expect(textNode.characters).toBe("OVERRIDDEN");
+    expect(
+      (textNode as import("@figma/rest-api-spec").TextNode).characters
+    ).toBe("OVERRIDDEN");
   });
 });

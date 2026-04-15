@@ -16,6 +16,8 @@
  */
 import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import { Editor } from "@/grida-canvas/editor";
+import type { editor } from "@/grida-canvas";
+import type { Action } from "@/grida-canvas/action";
 import { CanvasWasmGeometryQueryInterfaceProvider } from "@/grida-canvas/backends/wasm";
 import {
   sceneNode,
@@ -31,7 +33,9 @@ import type { Scene } from "@grida/canvas-wasm";
 // ---------------------------------------------------------------------------
 
 if (typeof globalThis.reportError === "undefined") {
-  (globalThis as any).reportError = (_err: any) => {};
+  (
+    globalThis as unknown as { reportError: (err: unknown) => void }
+  ).reportError = (_err: unknown) => {};
 }
 
 // ---------------------------------------------------------------------------
@@ -40,7 +44,7 @@ if (typeof globalThis.reportError === "undefined") {
 
 function generateDocument(n: number): grida.program.document.Document {
   const children: string[] = [];
-  const nodes: Record<string, any> = {
+  const nodes: Record<string, grida.program.nodes.Node> = {
     scene: sceneNode("scene", "Scene"),
   };
   const cols = Math.ceil(Math.sqrt(n));
@@ -66,7 +70,7 @@ function generateDocument(n: number): grida.program.document.Document {
   };
 }
 
-let _createCanvas: (opts: any) => Promise<any>;
+let _createCanvas: typeof import("@grida/canvas-wasm").createCanvas;
 
 beforeAll(async () => {
   const pkg = await import("@grida/canvas-wasm");
@@ -75,7 +79,7 @@ beforeAll(async () => {
 
 async function createEditor(
   doc: grida.program.document.Document
-): Promise<{ ed: Editor; canvas: any }> {
+): Promise<{ ed: Editor; canvas: import("@grida/canvas-wasm").Canvas }> {
   const ed = Editor.createHeadless(
     { document: doc, editable: true, debug: false },
     { viewport: { width: 4096, height: 4096 } }
@@ -86,7 +90,7 @@ async function createEditor(
     height: 4096,
     useEmbeddedFonts: true,
   });
-  const scene: Scene = (canvas as any)._scene;
+  const scene: Scene = (canvas as unknown as { _scene: Scene })._scene;
   try {
     const bytes = io.GRID.encode(doc);
     scene.loadSceneGrida(bytes);
@@ -94,10 +98,9 @@ async function createEditor(
     scene.loadScene(JSON.stringify({ version: 4, document: doc }));
   }
   scene.switchScene("scene");
-  (ed as any)._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
-    ed,
-    scene
-  );
+  (
+    ed as unknown as { _m_geometry: CanvasWasmGeometryQueryInterfaceProvider }
+  )._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(ed, scene);
   return { ed, canvas };
 }
 
@@ -105,11 +108,14 @@ async function createEditor(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getNodePosition(state: any, nodeId: string): { x: number; y: number } {
-  const node = state.document.nodes[nodeId];
+function getNodePosition(
+  state: editor.state.IEditorState,
+  nodeId: string
+): { x: number; y: number } {
+  const node = state.document.nodes[nodeId] as grida.program.nodes.UnknownNode;
   return {
-    x: node.layout_inset_left,
-    y: node.layout_inset_top,
+    x: node.layout_inset_left ?? 0,
+    y: node.layout_inset_top ?? 0,
   };
 }
 
@@ -129,7 +135,7 @@ function simulateTranslateGesture(
       type: "event-target/event/on-pointer-down",
       node_ids_from_point: [nodeId],
       shiftKey: false,
-    } as any,
+    } as Action,
     { recording: "silent" }
   );
 
@@ -139,7 +145,7 @@ function simulateTranslateGesture(
       type: "event-target/event/on-drag-start",
       shiftKey: false,
       event: { movement: [0, 0], delta: [0, 0] },
-    } as any,
+    } as Action,
     { recording: "begin-gesture" }
   );
 
@@ -154,7 +160,7 @@ function simulateTranslateGesture(
           movement: [stepX * i, stepY * i],
           delta: [stepX, stepY],
         },
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
   }
@@ -166,7 +172,7 @@ function simulateTranslateGesture(
       shiftKey: false,
       node_ids_from_area: undefined,
       event: { movement: [dx, dy], delta: [0, 0] },
-    } as any,
+    } as Action,
     { recording: "end-gesture" }
   );
 }
@@ -177,7 +183,7 @@ function simulateTranslateGesture(
 
 describe("Translate gesture correctness", () => {
   let ed: Editor;
-  let canvas: any;
+  let canvas: import("@grida/canvas-wasm").Canvas;
 
   beforeAll(async () => {
     const doc = generateDocument(100);
@@ -283,7 +289,7 @@ describe("Translate gesture correctness", () => {
 
 describe("Translate gesture with hierarchy change", () => {
   let ed: Editor;
-  let canvas: any;
+  let canvas: import("@grida/canvas-wasm").Canvas;
 
   beforeAll(async () => {
     // Build a document with:
@@ -317,7 +323,7 @@ describe("Translate gesture with hierarchy change", () => {
       links: { scene: ["container1", "r0", "r1"] },
       nodes: {
         scene: sceneNode("scene", "Scene"),
-        container1: container as any,
+        container1: container as grida.program.nodes.Node,
         r0: rect0,
         r1: rect1,
       },
@@ -357,15 +363,20 @@ describe("Translate gesture with hierarchy change", () => {
     // by exactly the movement delta (within snap quantization).
 
     function computeAbsolutePosition(
-      state: any,
+      state: editor.state.IEditorState,
       nodeId: string
     ): { x: number; y: number } {
-      let x = state.document.nodes[nodeId].layout_inset_left;
-      let y = state.document.nodes[nodeId].layout_inset_top;
+      const node = state.document.nodes[
+        nodeId
+      ] as grida.program.nodes.UnknownNode;
+      let x = node.layout_inset_left ?? 0;
+      let y = node.layout_inset_top ?? 0;
 
       let parentId = state.document_ctx.lu_parent[nodeId];
       while (parentId) {
-        const parent = state.document.nodes[parentId];
+        const parent = state.document.nodes[
+          parentId
+        ] as grida.program.nodes.UnknownNode;
         if (!parent || parent.type === "scene") break;
         x += parent.layout_inset_left ?? 0;
         y += parent.layout_inset_top ?? 0;
@@ -381,7 +392,7 @@ describe("Translate gesture with hierarchy change", () => {
         node_id: "r0",
         layout_inset_left: 500,
         layout_inset_top: 100,
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
 
@@ -391,7 +402,7 @@ describe("Translate gesture with hierarchy change", () => {
         type: "event-target/event/on-pointer-down",
         node_ids_from_point: ["r0"],
         shiftKey: false,
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
     ed.doc.dispatch(
@@ -399,7 +410,7 @@ describe("Translate gesture with hierarchy change", () => {
         type: "event-target/event/on-drag-start",
         shiftKey: false,
         event: { movement: [0, 0], delta: [0, 0] },
-      } as any,
+      } as Action,
       { recording: "begin-gesture" }
     );
 
@@ -414,7 +425,7 @@ describe("Translate gesture with hierarchy change", () => {
         {
           type: "event-target/event/on-drag",
           event: { movement: [-frame, 0], delta: [-1, 0] },
-        } as any,
+        } as Action,
         { recording: "silent" }
       );
 
@@ -445,7 +456,7 @@ describe("Translate gesture with hierarchy change", () => {
         shiftKey: false,
         node_ids_from_area: undefined,
         event: { movement: [-frames, 0], delta: [0, 0] },
-      } as any,
+      } as Action,
       { recording: "end-gesture" }
     );
 
@@ -463,7 +474,7 @@ describe("Translate gesture with hierarchy change", () => {
 
 describe("Marquee drag correctness", () => {
   let ed: Editor;
-  let canvas: any;
+  let canvas: import("@grida/canvas-wasm").Canvas;
 
   beforeAll(async () => {
     const doc = generateDocument(20);
@@ -488,7 +499,7 @@ describe("Marquee drag correctness", () => {
         type: "event-target/event/on-pointer-move",
         position_canvas: { x: 900, y: 900 },
         position_client: { x: 900, y: 900 },
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
     // Pointer down on empty space (no node_ids_from_point)
@@ -497,7 +508,7 @@ describe("Marquee drag correctness", () => {
         type: "event-target/event/on-pointer-down",
         node_ids_from_point: [],
         shiftKey: false,
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
 
@@ -507,7 +518,7 @@ describe("Marquee drag correctness", () => {
         type: "event-target/event/on-drag-start",
         shiftKey: false,
         event: { movement: [0, 0], delta: [0, 0] },
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
 
@@ -521,7 +532,7 @@ describe("Marquee drag correctness", () => {
           {
             type: "event-target/event/on-drag",
             event: { movement: [frame, frame], delta: [1, 1] },
-          } as any,
+          } as Action,
           { recording: "silent" }
         );
       }).not.toThrow();
@@ -537,7 +548,7 @@ describe("Marquee drag correctness", () => {
         shiftKey: false,
         node_ids_from_area: [],
         event: { movement: [50, 50], delta: [0, 0] },
-      } as any,
+      } as Action,
       { recording: "silent" }
     );
 

@@ -26,10 +26,7 @@ import {
   useSlides,
   useCurrentSlide,
 } from "@/grida-canvas-react/use-slide-editor";
-import {
-  type SlideEditorMode,
-  slideAspectRatio,
-} from "@/grida-canvas/modes/slide-mode";
+import { slideAspectRatio } from "@/grida-canvas/modes/slide-mode";
 import type grida from "@grida/schema";
 
 // ---------------------------------------------------------------------------
@@ -214,7 +211,7 @@ type SlideRowProps = {
   /** CSS aspect-ratio value derived from slide config, e.g. `"1920 / 1080"`. */
   aspectRatio: string;
   /** Props from headless-tree item.getProps() for D&D + a11y */
-  itemProps: Record<string, any>;
+  itemProps: Record<string, unknown>;
 };
 
 const SlideRow = React.forwardRef<
@@ -280,12 +277,14 @@ const SlideRow = React.forwardRef<
         style={{ aspectRatio }}
       >
         {thumbnailSrc && (
-          <img
-            src={thumbnailSrc}
-            alt={`Slide ${index + 1}`}
-            className="absolute inset-0 w-full h-full object-contain"
-            draggable={false}
-          />
+          <picture>
+            <img
+              src={thumbnailSrc}
+              alt={`Slide ${index + 1}`}
+              className="absolute inset-0 w-full h-full object-contain"
+              draggable={false}
+            />
+          </picture>
         )}
       </div>
     </div>

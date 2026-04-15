@@ -6,7 +6,7 @@ import type {
   FormsPageLanguage,
   FormFieldAutocompleteType,
 } from "@/grida-forms-hosted/types";
-import { toArrayOf, MaybeArray } from "./utility";
+import { toArrayOf } from "./utility";
 import type { tokens } from "@grida/tokens";
 
 /**
@@ -135,7 +135,7 @@ export class JSONFormParser {
             : null
           : // needs validation
             (value as JSONFormRaw);
-    } catch (error) {}
+    } catch {}
   }
 
   //

@@ -29,12 +29,11 @@ import {
 
 export function EditorSidebar() {
   const [state, dispatch] = useEditorState();
-  const { insertmenu } = state;
 
   const onSidebarModeChange = (mode: string) => {
     dispatch({
       type: "editor/sidebar/mode",
-      mode: mode as any,
+      mode: mode as "project" | "build" | "data" | "connect",
     });
   };
 

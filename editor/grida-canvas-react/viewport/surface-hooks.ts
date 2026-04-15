@@ -18,7 +18,7 @@ export interface SurfaceNodeObject {
 
 // type SurfaceSelection = SurfaceSingleSelection | SurfaceSelectionGroup;
 
-interface SurfaceSingleSelection {
+export interface SurfaceSingleSelection {
   type: "single";
 
   /**
@@ -377,12 +377,8 @@ export function useSingleSelection(
       };
 
       const container = node as grida.program.nodes.ContainerNode;
-      const {
-        layout_direction: direction,
-        layout_main_axis_gap,
-        layout_cross_axis_gap,
-      } = container;
-      const axis = direction === "horizontal" ? "x" : "y";
+      const { layout_direction, layout_main_axis_gap } = container;
+      const axis = layout_direction === "horizontal" ? "x" : "y";
       const children = dq.getChildren(document_ctx, node_id);
       const children_rects = children
         .map((id) => instance.geometryProvider.getNodeAbsoluteBoundingRect(id))

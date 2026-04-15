@@ -14,8 +14,6 @@
 import type {
   ClientMessage,
   ServerMessage,
-  DocumentDiff,
-  NodeId,
   SerializedNode,
   PushMessage,
   ConnectMessage,

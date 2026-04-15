@@ -157,6 +157,7 @@ export const PropertySectionHeaderAction = React.forwardRef(
   ) {
     return (
       <Button
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- ref type mismatch between forwardRef and Button
         ref={forwardedRef as any}
         {...props}
         variant="ghost"

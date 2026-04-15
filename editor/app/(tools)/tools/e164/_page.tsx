@@ -50,6 +50,7 @@ export default function PhoneNumberTool() {
       try {
         const parsedNumber = parsePhoneNumberFromString(
           phoneNumber,
+          // oxlint-disable-next-line typescript-eslint/no-explicit-any -- libphonenumber-js CountryCode type
           country as any
         );
 
@@ -59,7 +60,7 @@ export default function PhoneNumberTool() {
           formattedNumbers.push(`[Invalid: ${phoneNumber}]`);
           errors.push(`Line ${i + 1}: Invalid phone number "${phoneNumber}"`);
         }
-      } catch (e) {
+      } catch {
         formattedNumbers.push(`[Error: ${phoneNumber}]`);
         errors.push(`Line ${i + 1}: Error processing "${phoneNumber}"`);
       }

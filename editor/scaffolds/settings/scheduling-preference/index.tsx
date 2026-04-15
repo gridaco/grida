@@ -125,7 +125,7 @@ export function SchedulingPreferences() {
       });
 
       reset(data); // Reset form state to the new values after successful submission
-    } catch (error) {}
+    } catch {}
   };
 
   const is_scheduling_enabled = useWatch({

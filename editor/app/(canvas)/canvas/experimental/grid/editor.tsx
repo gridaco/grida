@@ -67,14 +67,15 @@ function App() {
       </>
       <div className="grow prose mx-auto flex items-center justify-center">
         <GridEditor
-          renderer={({ id }) => {
+          renderer={(data) => {
+            const { id } = data as BlockRef;
             const block = state.blocks[id];
-            return <GridaBlockRenderer {...block} />;
+            return block ? <GridaBlockRenderer {...block} /> : null;
           }}
           onMarqueeEnd={() => {
             dispatch({ type: "ui/insert-panel/open", open: true });
           }}
-          onBlockDoubleClick={(block) => {
+          onBlockDoubleClick={(_block) => {
             //
           }}
         />
@@ -149,9 +150,9 @@ function useSelection() {
   const grid = useGrid();
 
   useEffect(() => {
-    const _: GridBlock<BlockRef> | undefined = grid.blocks.find(
-      (block) => block.id === grid.selection
-    );
+    const _ = grid.blocks.find((block) => block.id === grid.selection) as
+      | GridBlock<BlockRef>
+      | undefined;
 
     if (_) {
       const id = _.data?.id;
@@ -173,9 +174,9 @@ function useSelection() {
 }
 
 function Properties() {
-  const [state, dispatch] = useBuilderState();
+  const [, dispatch] = useBuilderState();
   const grid = useGrid();
-  const [id, selection] = useSelection();
+  const [id] = useSelection();
   return (
     <aside className="grow max-w-md border-s p-4">
       {id && (
@@ -220,7 +221,7 @@ function Properties() {
 const typography = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "small"];
 
 function PropertyBody() {
-  const [state, dispatch] = useBuilderState();
+  const [, dispatch] = useBuilderState();
   const [id, selection] = useSelection();
   const playgroundUploader = useDummyPublicUpload();
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
@@ -264,7 +265,14 @@ function PropertyBody() {
           <div>
             <Label>Horizontal</Label>
             <TextAlignControl
-              value={selection?.style?.textAlign as any}
+              value={
+                selection?.style?.textAlign as
+                  | "left"
+                  | "right"
+                  | "center"
+                  | "justify"
+                  | undefined
+              }
               onValueChange={(textAlign) => {
                 dispatch({
                   type: "block/style",

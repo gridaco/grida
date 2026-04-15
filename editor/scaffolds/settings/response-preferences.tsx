@@ -65,7 +65,7 @@ export function RestrictNumberOfResponseByCustomer() {
       });
 
       reset(data); // Reset form state to the new values after successful submission
-    } catch (error) {}
+    } catch {}
   };
 
   const enabled = useWatch({ control, name: "enabled" });
@@ -223,7 +223,7 @@ export function MaxRespoonses() {
         error: "Failed",
       });
       reset(data); // Reset form state to the new values after successful submission
-    } catch (error) {}
+    } catch {}
   };
 
   const enabled = useWatch({ control, name: "enabled" });

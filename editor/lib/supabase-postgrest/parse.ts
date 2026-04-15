@@ -54,6 +54,7 @@ export namespace SupabasePostgRESTOpenApi {
       | "array"
       | undefined;
     enum?: string[];
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- JSONSchemaType from ajv requires any
     items: JSONSchemaType<any>;
   };
 
@@ -61,6 +62,7 @@ export namespace SupabasePostgRESTOpenApi {
    * A.k.a Table Schema
    */
   export type SupabaseOpenAPIDefinitionJSONSchema = JSONSchemaType<
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- JSONSchemaType from ajv requires any
     Record<string, any>
   > & {
     properties: {
@@ -77,7 +79,7 @@ export namespace SupabasePostgRESTOpenApi {
       [key: string]: SupabaseOpenAPIDefinitionJSONSchema;
     };
     host: string;
-    parameters: any;
+    parameters: unknown;
     produces: string[];
     schemes: string[];
     swagger: string;
@@ -106,41 +108,39 @@ export namespace SupabasePostgRESTOpenApi {
     sb_project_reference_id: string;
     sb_schema_names: string[];
     sb_schema_openapi_docs: { [schema: string]: SupabaseOpenAPIDocument };
-    sb_schema_definitions: { [schema: string]: { [key: string]: any } };
+    sb_schema_definitions: {
+      [schema: string]: { [key: string]: SupabaseOpenAPIDefinitionJSONSchema };
+    };
     sb_project_url: string;
   }> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const u = new URL(url);
-        const projectref = u.hostname.split(".")[0];
-        const route = build_supabase_openapi_url(url, anonKey);
+    const u = new URL(url);
+    const projectref = u.hostname.split(".")[0];
+    const route = build_supabase_openapi_url(url, anonKey);
 
-        const schema_definitions: { [schema: string]: any } = {};
-        const schema_apidocs: { [schema: string]: any } = {};
+    const schema_definitions: {
+      [schema: string]: SupabaseOpenAPIDocument["definitions"];
+    } = {};
+    const schema_apidocs: { [schema: string]: SupabaseOpenAPIDocument } = {};
 
-        // can be optimized
-        for (const schema of schemas) {
-          const apidoc = await fetch_swagger(route, schema);
-          // validate
-          if (!apidoc || !("definitions" in apidoc)) {
-            return reject();
-          }
-          schema_apidocs[schema] = apidoc;
-          schema_definitions[schema] = apidoc.definitions;
-        }
-
-        return resolve({
-          sb_anon_key: anonKey,
-          sb_project_reference_id: projectref,
-          sb_schema_openapi_docs: schema_apidocs,
-          sb_schema_definitions: schema_definitions,
-          sb_schema_names: schemas,
-          sb_project_url: url,
-        });
-      } catch (e) {
-        reject(e);
+    // can be optimized
+    for (const schema of schemas) {
+      const apidoc = await fetch_swagger(route, schema);
+      // validate
+      if (!apidoc || !("definitions" in apidoc)) {
+        throw new Error("Invalid OpenAPI document");
       }
-    });
+      schema_apidocs[schema] = apidoc;
+      schema_definitions[schema] = apidoc.definitions;
+    }
+
+    return {
+      sb_anon_key: anonKey,
+      sb_project_reference_id: projectref,
+      sb_schema_openapi_docs: schema_apidocs,
+      sb_schema_definitions: schema_definitions,
+      sb_schema_names: schemas,
+      sb_project_url: url,
+    };
   }
 
   async function fetch_swagger(url: string, schema = "public") {
@@ -345,6 +345,7 @@ export namespace SupabasePostgRESTOpenApi {
    * //   ]
    * // }
    */
+  // oxlint-disable-next-line no-unused-vars
   function parse_supabase_postgrest_schema_properties_description(
     schema: SupabaseOpenAPIDefinitionJSONSchema
   ) {
@@ -362,7 +363,6 @@ export namespace SupabasePostgRESTOpenApi {
           columnName,
           columnDetails.description
         );
-        const description = columnDetails.description;
 
         if (pk) {
           result.pks.push(columnName);

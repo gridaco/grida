@@ -140,6 +140,7 @@ export function CustomerCreateDialog({
                       <PhoneInput
                         id="customer-create-phone"
                         {...field}
+                        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- PhoneInput value type mismatch
                         value={field.value as any}
                       />
                     )}
@@ -292,6 +293,7 @@ export function CustomerContactsEditDialog({
                       <PhoneInput
                         id="customer-contacts-phone"
                         {...field}
+                        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- PhoneInput value type mismatch
                         value={field.value as any}
                       />
                     )}

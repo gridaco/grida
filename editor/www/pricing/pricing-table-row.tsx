@@ -1,4 +1,4 @@
-import React, { Fragment } from "react";
+import React, { Fragment, ReactNode } from "react";
 import {
   InfoCircledIcon,
   CheckCircledIcon,
@@ -6,8 +6,14 @@ import {
 } from "@radix-ui/react-icons";
 import { PricingCategory } from "../data/pricing";
 
-export const PricingTableRowDesktop = (props: any) => {
-  const category: PricingCategory = props.category;
+interface PricingTableRowDesktopProps {
+  category: PricingCategory;
+  sectionId: string;
+  icon: ReactNode;
+}
+
+export const PricingTableRowDesktop = (props: PricingTableRowDesktopProps) => {
+  const category = props.category;
 
   return (
     <>
@@ -21,7 +27,7 @@ export const PricingTableRowDesktop = (props: any) => {
           scope="colgroup"
         >
           <div className="flex items-center gap-4">
-            {props.icon && props.icon}
+            {props.icon}
             <h4 className="m-0 text-base font-normal">{category.title}</h4>
           </div>
         </th>
@@ -31,7 +37,7 @@ export const PricingTableRowDesktop = (props: any) => {
         <td className="bg-background px-6 py-5 enterprise"></td>
       </tr>
 
-      {category.features.map((feat: any, i: number) => {
+      {category.features.map((feat, i) => {
         return (
           <Fragment key={feat.title}>
             <tr className="divide-border" key={i}>
@@ -50,50 +56,54 @@ export const PricingTableRowDesktop = (props: any) => {
                 )}
               </th>
 
-              {Object.entries(feat.plans).map((entry: any, i) => {
-                const planName = entry[0];
-                const planValue = entry[1];
+              {Object.entries(feat.plans).map(
+                (entry: [string, boolean | string | string[]], i) => {
+                  const planName = entry[0] as keyof NonNullable<
+                    typeof feat.tooltips
+                  >;
+                  const planValue = entry[1];
 
-                return (
-                  <td
-                    key={i}
-                    className={[
-                      `pl-6 pr-2 tier-${planName}`,
-                      typeof planValue === "boolean" ? "text-center" : "",
-                    ].join(" ")}
-                  >
-                    {typeof planValue === "boolean" && planValue === true ? (
-                      <CheckCircledIcon />
-                    ) : typeof planValue === "boolean" &&
-                      planValue === false ? (
-                      <div className="opacity-20">
-                        <MinusCircledIcon />
-                      </div>
-                    ) : (
-                      <div className="text-foreground text-xs flex flex-col justify-center">
-                        <span className="flex items-center gap-2">
-                          {feat.tooltips?.[planName] && (
-                            <span
-                              className="shrink-0 hover:text-background-overlay-default cursor-pointer transition-colors"
-                              data-tip={feat.tooltips[planName]}
-                            >
-                              <InfoCircledIcon />
+                  return (
+                    <td
+                      key={i}
+                      className={[
+                        `pl-6 pr-2 tier-${planName}`,
+                        typeof planValue === "boolean" ? "text-center" : "",
+                      ].join(" ")}
+                    >
+                      {typeof planValue === "boolean" && planValue === true ? (
+                        <CheckCircledIcon />
+                      ) : typeof planValue === "boolean" &&
+                        planValue === false ? (
+                        <div className="opacity-20">
+                          <MinusCircledIcon />
+                        </div>
+                      ) : (
+                        <div className="text-foreground text-xs flex flex-col justify-center">
+                          <span className="flex items-center gap-2">
+                            {feat.tooltips?.[planName] && (
+                              <span
+                                className="shrink-0 hover:text-background-overlay-default cursor-pointer transition-colors"
+                                data-tip={feat.tooltips[planName]}
+                              >
+                                <InfoCircledIcon />
+                              </span>
+                            )}
+                            {typeof planValue === "string"
+                              ? planValue
+                              : planValue[0]}
+                          </span>
+                          {typeof planValue !== "string" && (
+                            <span className="text-lighter leading-4">
+                              {planValue[1]}
                             </span>
                           )}
-                          {typeof planValue === "string"
-                            ? planValue
-                            : planValue[0]}
-                        </span>
-                        {typeof planValue !== "string" && (
-                          <span className="text-lighter leading-4">
-                            {planValue[1]}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                );
-              })}
+                        </div>
+                      )}
+                    </td>
+                  );
+                }
+              )}
             </tr>
             {i === category.features.length - 1 && (
               <tr className="my-16 bg-green-400 border-none"></tr>
@@ -105,7 +115,14 @@ export const PricingTableRowDesktop = (props: any) => {
   );
 };
 
-export const PricingTableRowMobile = (props: any) => {
+interface PricingTableRowMobileProps {
+  category: PricingCategory;
+  plan: "free" | "pro" | "team" | "enterprise";
+  sectionId?: string;
+  icon: ReactNode;
+}
+
+export const PricingTableRowMobile = (props: PricingTableRowMobileProps) => {
   const category = props.category;
   const plan = props.plan;
 
@@ -116,7 +133,7 @@ export const PricingTableRowMobile = (props: any) => {
     >
       <caption className="bg-background border-default divide-border dark:divide-border/25 dark:border-white/25 border-t border-b px-4 py-3 text-left text-sm font-medium text-foreground">
         <span className="flex items-center gap-2">
-          {props.icon && props.icon}
+          {props.icon}
           <span className="text-foreground font-normal">{category.title}</span>
         </span>
       </caption>
@@ -131,7 +148,7 @@ export const PricingTableRowMobile = (props: any) => {
         </tr>
       </thead>
       <tbody className="border-default divide-border dark:divide-white/25 divide-y first:divide-y-0">
-        {category.features.map((feat: any, i: number) => {
+        {category.features.map((feat, i) => {
           return (
             <tr
               key={i}

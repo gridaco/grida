@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useReducer, useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { useCallback, useMemo, useReducer } from "react";
 import {
   Label as ChartLabel,
   Area,
@@ -15,7 +14,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -39,7 +37,6 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSub,
@@ -144,15 +141,6 @@ function reducer(state: ChartViewState, action: ChartViewAction) {
 
   return state;
 }
-
-const dummy_pretty_data = [
-  { month: "January", a: 214, b: 80, c: 100 },
-  { month: "February", a: 305, b: 200, c: 150 },
-  { month: "March", a: 237, b: 120, c: 200 },
-  { month: "April", a: 73, b: 190, c: 250 },
-  { month: "May", a: 209, b: 130, c: 300 },
-  { month: "June", a: 214, b: 140, c: 350 },
-];
 
 function useDataFrame() {
   const tb = useDatagridTable();
@@ -459,7 +447,7 @@ function MainAxisQueryControl({
               case "week":
               case "time":
                 return (
-                  <DropdownMenuSub>
+                  <DropdownMenuSub key={name}>
                     <DropdownMenuSubTrigger>{name}</DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuRadioGroup
@@ -518,7 +506,7 @@ function MainAxisQueryControl({
 function DataChartSkeleton({ count = 20 }: { count?: number }) {
   const randbars = useMemo(
     () =>
-      Array.from({ length: count }, (_, i) => {
+      Array.from({ length: count }, (_) => {
         return Math.floor(Math.random() * 100);
       }),
     [count]
@@ -557,7 +545,7 @@ function DataChart({
   className,
 }: {
   type: DataChartRendererType;
-  data: Array<any>;
+  data: Array<Record<string, unknown>>;
   dataKey: string;
   defs: DataGroupDef;
   curve?: DataChartCurveType;
@@ -765,7 +753,7 @@ function DataChart({
 //   { group: "June", value: 287, fill: "#e76e50" },
 // ];
 
-function transformdata_pie<T = any>(
+function transformdata_pie<T = unknown>(
   data: Array<T>,
   {
     defs,

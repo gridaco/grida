@@ -13,7 +13,7 @@ export async function POST(
   }
 ) {
   const supabase = await createWestReferralClient();
-  const { campaign_id: campaign_id } = await context.params;
+  const { campaign_id } = await context.params;
   const body =
     (await req.json()) as Platform.WEST.Referral.ImportParticipantsRequestBody;
 

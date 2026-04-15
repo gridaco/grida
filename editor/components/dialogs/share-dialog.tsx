@@ -124,7 +124,7 @@ export function ShareDrawerDialog({
   testId?: string;
 }) {
   const t = React.useMemo(
-    () => ({ ...STRINGS[locale], ...(labels ?? {}) }),
+    () => ({ ...STRINGS[locale], ...labels }),
     [locale, labels]
   );
 

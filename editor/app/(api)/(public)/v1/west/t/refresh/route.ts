@@ -1,7 +1,7 @@
 import { service_role } from "@/lib/supabase/server";
 import { buildTenantSiteBaseUrl } from "@/host/tenant-url";
 import { headers } from "next/headers";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { Platform } from "@/lib/platform";
 import assert from "assert";
 
@@ -10,7 +10,7 @@ const IS_HOSTED = process.env.VERCEL === "1";
 /**
  * [refresh invitation]
  */
-export async function POST(req: NextRequest) {
+export async function POST() {
   //
   const headersList = await headers();
   const campaign_id = headersList.get(

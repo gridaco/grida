@@ -30,10 +30,13 @@ import {
   User,
   ClipboardList,
 } from "lucide-react";
+import { Platform } from "@/lib/platform";
 
 interface FinalStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Platform.WEST.Referral.Wizard.CampaignData;
+  updateData: (
+    data: Partial<Platform.WEST.Referral.Wizard.CampaignData>
+  ) => void;
 }
 
 const timezones = [
@@ -62,7 +65,10 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
     });
   };
 
-  const updateScheduling = (field: string, value: any) => {
+  const updateScheduling = (
+    field: string,
+    value: string | Date | boolean | null | undefined
+  ) => {
     updateData({
       scheduling: {
         ...data.scheduling,
@@ -318,7 +324,7 @@ export function FinalStep({ data, updateData }: FinalStepProps) {
               <div className="grid grid-cols-2 gap-2 py-1 border-b">
                 <div className="text-muted-foreground">Name:</div>
                 <div className="font-medium">
-                  {data.name || "Unnamed Campaign"}
+                  {data.title || "Unnamed Campaign"}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 py-1 border-b">

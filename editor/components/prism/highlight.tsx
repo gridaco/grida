@@ -26,7 +26,13 @@ export function Hightlight({
 }) {
   return (
     <_Highlight theme={supported_themes[theme]} code={code} language={language}>
-      {({ className, style, tokens, getLineProps, getTokenProps }) => (
+      {({
+        className: _className,
+        style,
+        tokens,
+        getLineProps,
+        getTokenProps,
+      }) => (
         <pre style={style}>
           {tokens.map((line, i) => (
             <div key={i} {...getLineProps({ line })}>

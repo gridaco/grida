@@ -807,7 +807,7 @@ export function snapObjectsResize(
     const resized_9points = cmath.rect.to9PointsChunk(resized_bounding_rect);
 
     // Build agent hit_points: mark all points on same axis as hit points
-    const agent_hit_points = resized_9points.map((point, idx) => {
+    const agent_hit_points = resized_9points.map((point) => {
       let x_hit = false;
       let y_hit = false;
 
@@ -862,7 +862,7 @@ export function snapObjectsResize(
           .map((idx) => this_anchor_indices.indexOf(idx)) // Robust global → local conversion
       );
 
-      return anchor_9points.map((point, localIdx) => {
+      return anchor_9points.map((point) => {
         // Mark all points on same axis as hit points FROM THIS OBJECT ONLY
         let x_hit = false;
         let y_hit = false;

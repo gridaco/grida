@@ -197,7 +197,7 @@ export function DiamondGradientPaintChip({
             ...paint,
             type: "linear_gradient",
             transform: paint.transform,
-            stops: paint.stops.map((stop, index) => ({
+            stops: paint.stops.map((stop, _index) => ({
               ...stop,
               color: kolor.colorformats.newRGBA32F(
                 stop.color.r,

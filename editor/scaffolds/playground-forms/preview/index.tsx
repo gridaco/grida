@@ -58,6 +58,7 @@ export default function PlaygroundPreview({
         event.data.namespace.includes("grida.co")
       ) {
         onMessage?.(event);
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- event type narrowing
         onEvent?.[event.data.type]?.(event as any);
 
         switch (event.data.type) {

@@ -17,7 +17,13 @@ import colors from "npm:tailwindcss@^4/colors";
 import Color from "npm:colorjs.io@^0.5.0";
 
 // Colors to ignore (deprecated/renamed in v4)
-const ignore = ["lightBlue", "trueGray", "coolGray", "warmGray", "blueGray"];
+const ignore = new Set([
+  "lightBlue",
+  "trueGray",
+  "coolGray",
+  "warmGray",
+  "blueGray",
+]);
 
 interface ColorEntry {
   name: string;
@@ -35,7 +41,7 @@ interface ColorEntry {
  * Flatten nested color objects into flat entries
  */
 function flattenColors(
-  obj: Record<string, any>,
+  obj: Record<string, unknown>,
   prefix = ""
 ): Array<[string, string]> {
   const result: Array<[string, string]> = [];
@@ -83,6 +89,7 @@ function hexToRgba(hex: string): string {
 /**
  * Convert hex color to RGB array [r, g, b] (0-255)
  */
+// oxlint-disable-next-line no-unused-vars
 function hexToRgbArray(hex: string): [number, number, number] {
   try {
     const color = new Color(hex);
@@ -177,7 +184,7 @@ function normalizeHex(hex: string): string {
 const colorEntries: ColorEntry[] = [];
 
 for (const colorName in colors) {
-  if (ignore.includes(colorName)) continue;
+  if (ignore.has(colorName)) continue;
   if (typeof colors[colorName] !== "object") continue;
 
   const entries = flattenColors(colors[colorName], `${colorName}-`);

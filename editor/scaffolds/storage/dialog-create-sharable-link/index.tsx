@@ -65,7 +65,7 @@ function ImageResourcePicker({
       >
         <FilePicker
           accept="image/*"
-          list={list}
+          list={(path) => list(path).then(() => {})}
           nodes={root}
           loading={loading}
           onValueCommit={(files) => {
@@ -144,7 +144,7 @@ function create_viewer(prev: Viewer, options: Partial<ViewerOptions>): Viewer {
   return { ...next, url };
 }
 
-function removeEmpty<T extends Record<string, any>>(obj: T): Partial<T> {
+function removeEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return Object.entries(obj)
     .filter(
       ([, value]) => value !== undefined && value !== null && value !== ""
@@ -260,10 +260,11 @@ export default function CreateViewerLinkDialog({
                   value={_viewer?.app}
                   className="justify-start"
                   onValueChange={(app) => {
+                    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- discriminated union narrowing
                     setViewer((v) => create_viewer(v!, { app: app as any }));
                   }}
                 >
-                  {viewer_pdf_options.map((option, index) => (
+                  {viewer_pdf_options.map((option, _index) => (
                     <ToggleGroupItem key={option.value} value={option.value}>
                       <option.Icon className="me-2 w-4 aspect-square" />
                       {option.label}

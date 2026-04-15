@@ -73,7 +73,7 @@ export default async function SubmitCompletePage({
 
   // id:val map
   const responsefields: Record<string, string> = response.fields.reduce(
-    (acc: any, response_field) => {
+    (acc: Record<string, string>, response_field) => {
       const field = fields.find((f) => f.id === response_field.form_field_id);
       const key = field?.name;
       if (!key) return acc; // this can't happen - but just in case
@@ -82,7 +82,7 @@ export default async function SubmitCompletePage({
         type: field.type,
         enums: options,
         multiple: field.multiple,
-      }).value;
+      }).value as string;
 
       return acc;
     },

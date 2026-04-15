@@ -15,6 +15,13 @@ import {
 } from "@/components/ui/select";
 import { Gift, Plus, Trash2, Users } from "lucide-react";
 import { Platform } from "@/lib/platform";
+
+type MilestoneReward =
+  Platform.WEST.Referral.Wizard.CampaignData["referrer_milestone_rewards"][number];
+
+type InviteeReward =
+  Platform.WEST.Referral.Wizard.CampaignData["invitee_onboarding_reward"];
+
 interface RewardStepProps {
   data: Platform.WEST.Referral.Wizard.CampaignData;
   updateData: (
@@ -49,7 +56,11 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
     });
   };
 
-  const updateMilestone = (index: number, field: string, value: any) => {
+  const updateMilestone = (
+    index: number,
+    field: keyof MilestoneReward,
+    value: string | number
+  ) => {
     const updatedMilestones = [...data.referrer_milestone_rewards];
     updatedMilestones[index] = {
       ...updatedMilestones[index],
@@ -75,12 +86,15 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
 
   const removeMilestone = (index: number) => {
     const updatedMilestones = data.referrer_milestone_rewards.filter(
-      (_: any, i: number) => i !== index
+      (_: MilestoneReward, i: number) => i !== index
     );
     updateData({ referrer_milestone_rewards: updatedMilestones });
   };
 
-  const updateInviteeReward = (field: string, value: any) => {
+  const updateInviteeReward = (
+    field: keyof InviteeReward,
+    value: string | number
+  ) => {
     updateData({
       invitee_onboarding_reward: {
         ...data.invitee_onboarding_reward,
@@ -175,7 +189,7 @@ export function RewardStep({ data, updateData }: RewardStepProps) {
               </p>
 
               {data.referrer_milestone_rewards.map(
-                (milestone: any, index: number) => (
+                (milestone: MilestoneReward, index: number) => (
                   <div
                     key={index}
                     className="space-y-3 pb-3 border-b last:border-0"

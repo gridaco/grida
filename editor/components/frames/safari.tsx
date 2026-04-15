@@ -204,9 +204,9 @@ export function Safari({
 export function SafariToolbar({
   url,
   // width = 1203,
-  height = 52,
-  mode = "default",
-  ...props
+  height: _height = 52,
+  mode: _mode = "default",
+  ..._props
 }: SafariProps) {
   return (
     <div className="w-full h-12 rounded-t-xl border-b flex justify-center items-center px-4">

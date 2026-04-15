@@ -133,6 +133,7 @@ export function useHexValueInput({
   // This prevents recalculation when the same color comes in as a new object reference
   const normalizedInitialValue = useMemo(() => {
     return normalizeRgbValue(initialValue, unit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using sub-properties for value-level comparison to avoid recalculating on new object references
   }, [initialValue.r, initialValue.g, initialValue.b, unit]);
 
   // Update internal value only when initialValue actually changes (ignoring reference equality)

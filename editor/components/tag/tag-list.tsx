@@ -24,25 +24,15 @@ export const TagList: React.FC<TagListProps> = ({
   customTagRenderer,
   direction,
   draggable,
-  onSortEnd,
-  className,
+  onSortEnd: _onSortEnd,
+  className: _className,
   inlineTags,
   activeTagIndex,
-  setActiveTagIndex,
+  setActiveTagIndex: _setActiveTagIndex,
   classStyleProps,
   disabled,
   ...tagListProps
 }) => {
-  const [draggedTagId, setDraggedTagId] = React.useState<string | null>(null);
-
-  const handleMouseDown = (id: string) => {
-    setDraggedTagId(id);
-  };
-
-  const handleMouseUp = () => {
-    setDraggedTagId(null);
-  };
-
   return (
     <>
       {!inlineTags ? (

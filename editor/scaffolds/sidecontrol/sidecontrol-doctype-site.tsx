@@ -102,7 +102,7 @@ function ThemeEditorPortal({
             <ThemeEditor
               onChange={(s) => {
                 const cssproperties = Object.entries(s.theme.colors).reduce(
-                  (acc: ThemeColorProperties, [key, value]) => {
+                  (acc: ThemeColorProperties, [_key, value]) => {
                     const l = kolor.parse(value.light);
                     const d = kolor.parse(value.dark);
                     acc.light[value.name] = l.values as [

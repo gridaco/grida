@@ -71,7 +71,9 @@ export function XSBListUsersSheet({
               <XSBSearchTableDataGrid
                 supabase_project_id={supabase_project_id}
                 onRowDoubleClick={(row) => {
-                  onValueChange?.(row[relation.referenced_column]);
+                  onValueChange?.(
+                    row[relation.referenced_column] as SQLForeignKeyValue
+                  );
                   props.onOpenChange?.(false);
                 }}
               />
@@ -95,7 +97,7 @@ function XSBSearchTableDataGrid({
     estimated_count: total ?? null,
   });
 
-  const { data, error, isLoading } = useXSBListUsers(supabase_project_id, {
+  const { data, isLoading } = useXSBListUsers(supabase_project_id, {
     page: (query?.q_page_index ?? 0) + 1,
     perPage: query?.q_page_limit ?? 100,
     r: query?.q_refresh_key,

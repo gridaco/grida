@@ -422,7 +422,7 @@ class EditorDocumentStore
      * @deprecated this is event target dependency - will be removed
      */
     private readonly getViewportSize: () => { width: number; height: number },
-    private readonly logger?: (...args: any[]) => void
+    private readonly logger?: (...args: unknown[]) => void
   ) {
     this.mstate = editor.state.init(initialState);
 
@@ -816,7 +816,7 @@ class EditorDocumentStore
     return this._tid;
   }
 
-  private log(...args: any[]) {
+  private log(...args: unknown[]) {
     this.logger?.(...args);
   }
 
@@ -1854,7 +1854,10 @@ class EditorDocumentStore
     });
   }
 
-  public schemaPutProperty(key: string, value: any) {
+  public schemaPutProperty(
+    key: string,
+    value: grida.program.schema.PropertyDefinition
+  ) {
     this.dispatch({
       type: "document/properties/put",
       key,
@@ -2871,7 +2874,7 @@ class EditorDocumentStore
   changeNodePropertyStyle(
     node_id: string,
     key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
-    value: any
+    value: grida.program.css.ExplicitlySupportedCSSProperties[keyof grida.program.css.ExplicitlySupportedCSSProperties]
   ) {
     this.dispatch({
       type: "node/change/style",
@@ -2941,7 +2944,7 @@ export class Editor
     editor.api.IExportConfigActions
 {
   // private readonly listeners: Set<(editor: this, action?: Action) => void> = new Set();
-  private readonly logger: (...args: any[]) => void;
+  private readonly logger: (...args: unknown[]) => void;
 
   /**
    * [main camera]
@@ -3105,7 +3108,7 @@ export class Editor
     onMount,
     __skipWarmup,
   }: {
-    logger?: (...args: any[]) => void;
+    logger?: (...args: unknown[]) => void;
     ui?: editor.ui.UIUXProviders;
     backend: editor.EditorContentRenderingBackend;
     /**
@@ -3252,7 +3255,7 @@ export class Editor
     initialState: editor.state.IEditorStateInit,
     options?: {
       viewport?: { width: number; height: number };
-      logger?: (...args: any[]) => void;
+      logger?: (...args: unknown[]) => void;
     }
   ): Editor {
     const viewport = new HeadlessViewportApi(
@@ -3287,7 +3290,7 @@ export class Editor
     });
   }
 
-  private log(...args: any[]) {
+  private log(...args: unknown[]) {
     if (this.debug || process.env.NODE_ENV === "development") {
       this.logger?.(...args);
     }
@@ -3568,7 +3571,7 @@ export class Editor
       // Safari doesn't support the "device-pixel-content-box" box option
       try {
         ro.observe(el, { box: "device-pixel-content-box" });
-      } catch (e) {
+      } catch {
         // Fallback for browsers that don't support device-pixel-content-box (e.g., Safari)
         ro.observe(el);
       }
@@ -5274,7 +5277,7 @@ export class EditorSurface
     });
   }
 
-  surfacePointerUp(event: editor.api.events.IPointerEvent) {
+  surfacePointerUp(_event: editor.api.events.IPointerEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-pointer-up",
     });
@@ -5302,7 +5305,7 @@ export class EditorSurface
     });
   }
 
-  surfaceDoubleClick(event: editor.api.events.IPointerEvent) {
+  surfaceDoubleClick(_event: editor.api.events.IPointerEvent) {
     this._editor.doc.dispatch({
       type: "event-target/event/on-double-click",
     });
@@ -5530,7 +5533,7 @@ export class EditorSurface
 
   public async writeClipboardMedia(
     target: "selection" | editor.NodeID,
-    format: "png"
+    _format: "png"
   ): Promise<boolean> {
     assert(
       this._editor.backend === "canvas",
@@ -5579,7 +5582,7 @@ export class EditorSurface
 
     try {
       await this.ui.clipboard?.write([item]);
-    } catch (error) {
+    } catch {
       await this.ui.clipboard?.writeText(data);
     }
 
@@ -6312,7 +6315,7 @@ export class EditorSurface
       }
       const result = await i.open();
       return result?.sRGBHex;
-    } catch (error) {
+    } catch {
       return undefined;
     }
   }
@@ -6353,8 +6356,8 @@ export class EditorSurface
         await this.ui.clipboard?.writeText(hex);
         this.ui.notify?.(`Copied hex color to clipboard ${hex}`, "success");
       }
-    } catch (error: any) {
-      if (error.message) {
+    } catch (error: unknown) {
+      if (error instanceof Error) {
         this.ui.notify?.(error.message, "error");
       }
     }
@@ -6582,7 +6585,7 @@ export class NodeProxy<T extends grida.program.nodes.Node> {
             [prop]: value,
           });
           return true;
-        } catch (e) {
+        } catch {
           return false; // unknown prop
         }
       },

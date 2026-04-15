@@ -22,8 +22,8 @@ import {
 } from "lucide-react";
 
 interface RewardTypeStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Record<string, unknown>;
+  updateData: (data: Record<string, unknown>) => void;
 }
 
 export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
@@ -69,7 +69,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
           </Label>
 
           <RadioGroup
-            value={data.reward_strategy_type}
+            value={data.reward_strategy_type as string | undefined}
             onValueChange={handleRewardTypeChange}
             className="grid grid-cols-1 md:grid-cols-3 gap-3"
           >
@@ -150,7 +150,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
           </Label>
 
           <RadioGroup
-            value={data.reward_currency_type}
+            value={data.reward_currency_type as string | undefined}
             onValueChange={handleCurrencyTypeChange}
             className="grid grid-cols-1 md:grid-cols-2 gap-3"
           >
@@ -232,7 +232,7 @@ export function RewardTypeStep({ data, updateData }: RewardTypeStepProps) {
                         Custom Currency Name
                       </FieldLabel>
                       <Select
-                        value={data.reward_currency}
+                        value={data.reward_currency as string | undefined}
                         onValueChange={(value) =>
                           updateData({ reward_currency: value })
                         }

@@ -66,7 +66,7 @@ export function ReferenceSearch({
           // [required] - for form validation
           {...props}
           // TODO: inspect me does the parent inteface need this?
-          value={value as any}
+          value={value as string | number | undefined}
           onValueChange={setValue}
         />
       );

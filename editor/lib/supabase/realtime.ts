@@ -9,7 +9,7 @@ import type { Database } from "@app/database";
 
 type RealtimeTableChangeData = {
   id: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type TableSubscriptionFilter = RealtimePostgresChangesFilter<"*">;
@@ -58,7 +58,7 @@ export function subscribeTable<
         }
       }
     )
-    .subscribe((status, err: any) => {
+    .subscribe((status, err: Error | undefined) => {
       if (err) console.error(err.message);
     });
 }

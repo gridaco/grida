@@ -3,7 +3,7 @@ import { tree } from "../src/lib";
 /**
  * Helper to create a tree lookup table from a graph structure
  */
-function createLUT(doc: tree.graph.IGraph<any>): tree.lut.ITreeLUT {
+function createLUT(doc: tree.graph.IGraph<unknown>): tree.lut.ITreeLUT {
   const graph = new tree.graph.Graph(doc);
   return graph.lut;
 }
@@ -39,7 +39,7 @@ describe("tree.distance", () => {
       b1: ["b1a"],
       b1a: [],
     },
-  } as any;
+  } satisfies tree.graph.IGraph<unknown>;
 
   const lut = createLUT(doc);
 
@@ -298,7 +298,7 @@ describe("tree.distance", () => {
           a1: [],
           a2: [],
         },
-      } as any;
+      } satisfies tree.graph.IGraph<unknown>;
       const siblingParentLUT = createLUT(siblingParentDoc);
 
       const result = tree.distance.findNearestByGraphDistance(
@@ -379,7 +379,7 @@ describe("tree.distance", () => {
       const singleNodeDoc = {
         nodes: { root: { type: "container", id: "root" } },
         links: { root: [] },
-      } as any;
+      } satisfies tree.graph.IGraph<unknown>;
       const singleLUT = createLUT(singleNodeDoc);
 
       expect(tree.distance.getGraphDistance(singleLUT, "root", "root")).toBe(0);
@@ -400,7 +400,7 @@ describe("tree.distance", () => {
           b: ["c"],
           c: [],
         },
-      } as any;
+      } satisfies tree.graph.IGraph<unknown>;
       const linearLUT = createLUT(linearDoc);
 
       expect(tree.distance.getGraphDistance(linearLUT, "a", "c")).toBe(2);

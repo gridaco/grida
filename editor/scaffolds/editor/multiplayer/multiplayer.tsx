@@ -156,7 +156,6 @@ function MultiplayerLayer() {
 
   const [state, dispatch] = useMultiplayer();
   const {
-    cursor_id,
     onPlayerPosition,
     onPlayerMessage,
     onPlayerTyping,

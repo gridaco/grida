@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import React from "react";
 import { CalendarBoxIcon, LocationBoxIcon } from "../../kit/components/icons";
-import { MapGL } from "@/components/mapgl";
 import { TwitterLogoIcon } from "@radix-ui/react-icons";
 import { YoutubeIcon } from "lucide-react";
 import grida from "@grida/schema";

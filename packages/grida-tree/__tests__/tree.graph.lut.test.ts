@@ -122,7 +122,7 @@ describe("tree.graph.Graph generation and LUT caching", () => {
       // Try to move non-existent node
       try {
         graph.mv("nonexistent", "root");
-      } catch (e) {
+      } catch {
         // Expected to fail
       }
 

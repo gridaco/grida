@@ -3,8 +3,6 @@ import { useCurrentEditor } from "@/grida-canvas-react/use-editor";
 import { cn } from "@/components/lib/utils";
 
 type ImageState = "loading" | "empty" | "loaded";
-// TODO: Update editor.getImage to accept size parameter for optimized image loading
-type ImageSize = "original" | `${number}%` | `${number}px`;
 
 /**
  * A React component that renders images from the Grida editor with loading and empty states.

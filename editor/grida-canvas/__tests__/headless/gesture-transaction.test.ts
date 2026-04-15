@@ -34,6 +34,7 @@ function createDoc(): grida.program.document.Document {
 }
 
 type D = { type: "node/change/*"; node_id: string; name: string };
+type UnknownNode = grida.program.nodes.UnknownNode;
 
 describe("Gesture Transactions via dispatch recording modes", () => {
   let ed: Editor;
@@ -70,7 +71,7 @@ describe("Gesture Transactions via dispatch recording modes", () => {
     // Still 1 undo step (the select)
     expect(ed.doc.historySnapshot.past).toHaveLength(1);
     // But state IS updated
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Mid2");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Mid2");
 
     // End gesture
     ed.doc.dispatch(
@@ -79,12 +80,12 @@ describe("Gesture Transactions via dispatch recording modes", () => {
     );
 
     expect(ed.doc.historySnapshot.past).toHaveLength(2); // select + gesture
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Final");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Final");
   });
 
   test("undo reverts entire gesture in one step", () => {
     ed.doc.select(["rect1"]);
-    const original = (ed.state.document.nodes.rect1 as any).name;
+    const original = (ed.state.document.nodes.rect1 as UnknownNode).name;
 
     ed.doc.dispatch(
       { type: "node/change/*", node_id: "rect1", name: "X" } satisfies D,
@@ -99,11 +100,11 @@ describe("Gesture Transactions via dispatch recording modes", () => {
       { recording: "end-gesture" }
     );
 
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Z");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Z");
 
     // One undo reverts the whole gesture
     ed.doc.undo();
-    expect((ed.state.document.nodes.rect1 as any).name).toBe(original);
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(original);
 
     // Next undo reverts the select
     ed.doc.undo();
@@ -112,7 +113,7 @@ describe("Gesture Transactions via dispatch recording modes", () => {
 
   test("abort-gesture reverts to pre-gesture state", () => {
     ed.doc.select(["rect1"]);
-    const original = (ed.state.document.nodes.rect1 as any).name;
+    const original = (ed.state.document.nodes.rect1 as UnknownNode).name;
 
     ed.doc.dispatch(
       { type: "node/change/*", node_id: "rect1", name: "A" } satisfies D,
@@ -128,7 +129,7 @@ describe("Gesture Transactions via dispatch recording modes", () => {
       { recording: "abort-gesture" }
     );
 
-    expect((ed.state.document.nodes.rect1 as any).name).toBe(original);
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(original);
     expect(ed.doc.historySnapshot.past).toHaveLength(1); // only the select
   });
 
@@ -195,17 +196,17 @@ describe("Gesture Transactions via dispatch recording modes", () => {
     expect(ed.doc.historySnapshot.past).toHaveLength(2);
 
     ed.doc.undo(); // undo gesture
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Renamed");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Renamed");
 
     ed.doc.undo(); // undo rename
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
   });
 
   test("gesture undo notifies subscribers even without Immer patches", () => {
     // This tests the bug where gesture undo used snapshot-based restore
     // (no Immer patches) and subscribers that depended on patches being
     // non-empty would skip re-rendering.
-    const emissions: { action: any; patchCount: number }[] = [];
+    const emissions: { action: string; patchCount: number }[] = [];
     const __unsub = ed.doc.subscribe((_doc, action, patches) => {
       emissions.push({
         action: action?.type ?? "undo/redo",
@@ -234,7 +235,7 @@ describe("Gesture Transactions via dispatch recording modes", () => {
     // Subscriber must have been called
     expect(emissions.length).toBe(1);
     // The document must have actually changed
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
   });
 
   test("isGestureActive reflects state", () => {
@@ -273,7 +274,9 @@ describe("Gesture Transactions via dispatch recording modes", () => {
       { recording: "silent" }
     );
     expect(ed.doc.isGestureActive).toBe(true);
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Mid-drag");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe(
+      "Mid-drag"
+    );
 
     // Undo while gesture is active — should abort gesture and undo previous
     ed.doc.undo();
@@ -282,7 +285,7 @@ describe("Gesture Transactions via dispatch recording modes", () => {
     expect(ed.doc.isGestureActive).toBe(false);
     // State should be back to before "Base" (the gesture was aborted,
     // then the "Base" entry was undone)
-    expect((ed.state.document.nodes.rect1 as any).name).toBe("Rect 1");
+    expect((ed.state.document.nodes.rect1 as UnknownNode).name).toBe("Rect 1");
     expect(ed.doc.historySnapshot.past).toHaveLength(0);
   });
 });

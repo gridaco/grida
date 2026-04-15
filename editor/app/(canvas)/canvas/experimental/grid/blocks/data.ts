@@ -1,5 +1,5 @@
 import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
-import type { GridaBlock, GridaBlockType } from "./types";
+import type { GridaBlock } from "./types";
 import {
   ButtonIcon,
   ClockIcon,

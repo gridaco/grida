@@ -126,7 +126,7 @@ function useVariableWithEditor() {
   ]);
 }
 
-export function SurfaceVariableWidthEditor({ node_id }: { node_id: string }) {
+export function SurfaceVariableWidthEditor() {
   const { transform } = useTransformState();
   const {
     profile,

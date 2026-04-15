@@ -41,7 +41,7 @@ export function FieldValueExpression({
   const fields = useFormFields();
   const schema = useFormSchema();
 
-  const onPropertySelect = (path: string[], { data }: any) => {
+  const onPropertySelect = (path: string[], { data }: { data: unknown }) => {
     const [field_name, ...access] = path;
     // find field id by name
     const field_id = fields.find((f) => f.name === field_name)?.id;
@@ -51,7 +51,8 @@ export function FieldValueExpression({
     }
 
     const rejecttypes = ["null", "object", "array"];
-    if (rejecttypes.includes(data.type)) {
+    const dataType = (data as { type?: string })?.type;
+    if (dataType && rejecttypes.includes(dataType)) {
       toast.error("This type can't be applied");
     }
 

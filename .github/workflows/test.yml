@@ -36,6 +36,6 @@ jobs:
       - name: Run Typecheck
         run: pnpm typecheck
       - name: Run Lint
-        run: pnpm turbo lint
+        run: pnpm lint
       - name: Run Tests
         run: pnpm turbo test --filter='!./crates/*'

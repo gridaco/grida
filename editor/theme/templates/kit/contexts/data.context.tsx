@@ -2,13 +2,13 @@
 
 import React, { createContext, useContext } from "react";
 
-const DataContext = createContext<Record<string, any>>({});
+const DataContext = createContext<Record<string, unknown>>({});
 
 export function DataProvider({
   children,
   data,
 }: {
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   children: React.ReactNode;
 }) {
   return (
@@ -16,6 +16,6 @@ export function DataProvider({
   );
 }
 
-export function useData<T extends Record<string, any>>() {
+export function useData<T extends Record<string, unknown>>() {
   return useContext(DataContext) as T;
 }

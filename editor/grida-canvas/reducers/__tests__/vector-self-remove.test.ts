@@ -1,4 +1,6 @@
 import surfaceReducer from "../surface.reducer";
+import type { SurfaceAction } from "@/grida-canvas/action";
+import type { ReducerContext } from "@/grida-canvas/reducers";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 
@@ -35,7 +37,7 @@ describe("surface reducer - vector self remove", () => {
           rotation: 0,
           z_index: 0,
           vector_network: { vertices: [], segments: [] },
-        } satisfies Partial<grida.program.nodes.VectorNode> as any,
+        } satisfies Partial<grida.program.nodes.VectorNode> as unknown as grida.program.nodes.Node,
       },
       entry_scene_id: "scene",
       bitmaps: {},
@@ -60,12 +62,12 @@ describe("surface reducer - vector self remove", () => {
         node_id,
         initial_vector_network: { vertices: [], segments: [] },
       },
-    } as any;
+    } as unknown as editor.state.IEditorState;
 
     const next = surfaceReducer(
       state,
-      { type: "surface/content-edit-mode/try-exit" } as any,
-      {} as any
+      { type: "surface/content-edit-mode/try-exit" } as SurfaceAction,
+      {} as ReducerContext
     );
 
     expect(next.document.nodes[node_id]).toBeUndefined();

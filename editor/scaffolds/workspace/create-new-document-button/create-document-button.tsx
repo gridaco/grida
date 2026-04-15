@@ -227,7 +227,6 @@ export function CreateNewDocumentButton({
 }
 
 function CreateNewDatabaseDialog({
-  project_name,
   project_id,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
@@ -284,7 +283,7 @@ function CreateNewDatabaseDialog({
         <div className="w-full">
           <Tabs
             value={resourceType}
-            onValueChange={(v) => setResourceType(v as any)}
+            onValueChange={(v) => setResourceType(v as "database" | "table")}
           >
             <TabsList>
               <TabsTrigger value="database">

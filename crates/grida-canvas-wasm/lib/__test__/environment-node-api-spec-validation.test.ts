@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createCanvas } from "..";
+import type createGridaCanvas from "../bin/grida-canvas-wasm";
 
 /**
  * WASM API Validation Tests (Node)
@@ -16,11 +17,13 @@ import { createCanvas } from "..";
  * Note: these tests intentionally do NOT call WebGL-dependent APIs.
  */
 
-let module: any;
+let module: createGridaCanvas.GridaCanvasWasmBindings;
 
 beforeAll(async () => {
   const pkg = require("../../dist/index.js") as {
-    default?: (opts?: unknown) => Promise<any>;
+    default?: (
+      opts?: unknown
+    ) => Promise<{ module: createGridaCanvas.GridaCanvasWasmBindings }>;
   };
 
   const factory = await pkg.default!();

@@ -1,4 +1,6 @@
 import documentReducer from "../document.reducer";
+import type { DocumentAction } from "@/grida-canvas/action";
+import type { ReducerContext } from "@/grida-canvas/reducers";
 import type grida from "@grida/schema";
 import type { editor } from "@/grida-canvas";
 
@@ -39,12 +41,13 @@ describe("document reducer - vector cut", () => {
         },
       },
       entry_scene_id: "scene",
-    } as any;
+    } as unknown as grida.program.document.Document;
 
     const state = {
       editable: true,
       document: doc,
-      document_ctx: {} as any,
+      document_ctx:
+        {} as unknown as editor.state.IMinimalDocumentState["document_ctx"],
       scene_id: "scene",
       selection: [node_id],
       hovered_node_id: null,
@@ -58,16 +61,16 @@ describe("document reducer - vector cut", () => {
           selected_segments: [0],
           selected_tangents: [],
         },
-      } satisfies Partial<editor.state.VectorContentEditMode> as any as editor.state.VectorContentEditMode,
-    } satisfies Partial<editor.state.IEditorState> as any as editor.state.IEditorState;
+      } satisfies Partial<editor.state.VectorContentEditMode> as unknown as editor.state.VectorContentEditMode,
+    } satisfies Partial<editor.state.IEditorState> as unknown as editor.state.IEditorState;
 
     const next = documentReducer(
       state,
-      { type: "cut", target: "selection" } as any,
-      {} as any
+      { type: "cut", target: "selection" } as DocumentAction,
+      {} as ReducerContext
     );
 
-    const mode = next.content_edit_mode as any;
+    const mode = next.content_edit_mode as editor.state.VectorContentEditMode;
     expect(mode.clipboard).toEqual({
       vertices: [
         [0, 0],

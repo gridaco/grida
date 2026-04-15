@@ -27,10 +27,10 @@ export function queryorbody(
   key: string,
   b: {
     searchParams: URLSearchParams;
-    body: any;
+    body: Record<string, unknown>;
   }
-) {
-  return b.searchParams.get(key) || b.body?.[key];
+): string | undefined {
+  return (b.searchParams.get(key) || (b.body?.[key] as string)) ?? undefined;
 }
 
 /**

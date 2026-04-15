@@ -40,7 +40,6 @@ export type GenerateImageApiResponse = {
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as GenerateImageApiRequestBody;
-  const ip = req.headers.get("x-forwarded-for");
   const client = await createLibraryClient();
 
   const model = ai.image.getSDKImageModel(body.model);

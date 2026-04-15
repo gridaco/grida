@@ -1,7 +1,7 @@
 // Translations transformations
 
 const fse = require("fs-extra");
-const marked = require("marked");
+// const marked = require("marked");
 const path = require("path");
 
 const docs_site_root = path.join(__dirname, "../../");
@@ -214,78 +214,72 @@ function handle_translation_dir(dir_path, locale) {
   }
 }
 
-/**
- * origin_rel_asset_path is relative path to the asset file. from origin file.
- * origin_path is the origin file path.
- * target_path is the path to the translated file.
- * the output should be new_rel_asset_path. which is relative path to the asset file. from translated file.
- *
- * for example,
- * - the origin_path is "./docs/bar.md"
- * - the origin_rel_asset_path is "./assets/image.png"
- * - the target_path is "../i18n/ko/bar.md"
- * - the new_rel_asset_path is "../../docs/assets/image.png"
- * @param {*} origin_rel_asset_path
- * @param {*} target_path
- */
-function transform_relative_asset_path(
-  origin_rel_asset_path,
-  origin_path,
-  target_path
-) {
-  const abs_path_to_asset = path.join(
-    path.dirname(origin_path),
-    origin_rel_asset_path
-  );
-  const rel_doc_to_root = path.relative(origin_path, docs_site_docs_root);
-  const rel_root_to_asset = path.relative(
-    docs_site_docs_root,
-    abs_path_to_asset
-  );
-  // console.log("rel", rel_doc_to_root);
-  // console.log("rel2", rel_root_to_asset);
+// /**
+//  * origin_rel_asset_path is relative path to the asset file. from origin file.
+//  * origin_path is the origin file path.
+//  * target_path is the path to the translated file.
+//  * the output should be new_rel_asset_path. which is relative path to the asset file. from translated file.
+//  *
+//  * for example,
+//  * - the origin_path is "./docs/bar.md"
+//  * - the origin_rel_asset_path is "./assets/image.png"
+//  * - the target_path is "../i18n/ko/bar.md"
+//  * - the new_rel_asset_path is "../../docs/assets/image.png"
+//  * @param {*} origin_rel_asset_path
+//  * @param {*} target_path
+//  */
+// function transform_relative_asset_path(
+//   origin_rel_asset_path,
+//   origin_path,
+//   target_path
+// ) {
+//   const abs_path_to_asset = path.join(
+//     path.dirname(origin_path),
+//     origin_rel_asset_path
+//   );
+//   const rel_doc_to_root = path.relative(origin_path, docs_site_docs_root);
+//   const rel_root_to_asset = path.relative(
+//     docs_site_docs_root,
+//     abs_path_to_asset
+//   );
+//   // console.log("rel", rel_doc_to_root);
+//   // console.log("rel2", rel_root_to_asset);
+//   // const rel = path.relative(docs_site_docs_root, origin_path);
+// }
 
-  // const rel = path.relative(docs_site_docs_root, origin_path);
-}
-
-function transform_translated_doc_content_with_asset_path(
-  content,
-  origin_path,
-  target_path
-) {
-  // parse markdown content with marked.
-  const _parsed = marked.lexer(content);
-
-  const _is_remote_url = (url) => {
-    return url.startsWith("http://") || url.startsWith("https://");
-  };
-
-  const mapper = (item) => {
-    const { type, tokens, items, raw, href } = item;
-    const children = items || tokens;
-
-    if (children) {
-      children.map(mapper);
-    }
-
-    switch (type) {
-      case "image":
-        if (_is_remote_url(href)) {
-          break;
-        }
-        // transform_relative_asset_path();
-        console.log("image", item, raw, href);
-        console.log(
-          "new path",
-          `"${transform_relative_asset_path(href, origin_path, target_path)}"`
-        );
-        break;
-    }
-  };
-
-  // console.log("lexer", _parsed);
-  _parsed.map(mapper);
-}
+// function transform_translated_doc_content_with_asset_path(
+//   content,
+//   origin_path,
+//   target_path
+// ) {
+//   // parse markdown content with marked.
+//   const _parsed = marked.lexer(content);
+//   const _is_remote_url = (url) => {
+//     return url.startsWith("http://") || url.startsWith("https://");
+//   };
+//   const mapper = (item) => {
+//     const { type, tokens, items, raw, href } = item;
+//     const children = items || tokens;
+//     if (children) {
+//       children.map(mapper);
+//     }
+//     switch (type) {
+//       case "image":
+//         if (_is_remote_url(href)) {
+//           break;
+//         }
+//         // transform_relative_asset_path();
+//         console.log("image", item, raw, href);
+//         console.log(
+//           "new path",
+//           `"${transform_relative_asset_path(href, origin_path, target_path)}"`
+//         );
+//         break;
+//     }
+//   };
+//   // console.log("lexer", _parsed);
+//   _parsed.map(mapper);
+// }
 
 function main() {
   handle_translations();

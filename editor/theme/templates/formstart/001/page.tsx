@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useMemo } from "react";
+import React from "react";
 import Image from "next/image";
 import {
   ScreenGrid,
@@ -21,19 +21,10 @@ import {
 import { cn } from "@/components/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
-import ReactPlayer from "react-player";
-import {
-  FormCampaignStartPageContextProvider,
-  useCampaignMeta,
-} from "@/theme/templates/kit/campaign";
-import type { FormStartPage } from "..";
-import { DataProvider, useData } from "../../kit/contexts/data.context";
-import { I18nextProvider, useTranslation } from "react-i18next";
-import i18next from "i18next";
+import { useData } from "../../kit/contexts/data.context";
+import { useTranslation } from "react-i18next";
 import _messages from "./messages.json";
 import type grida from "@grida/schema";
-
-type Messages = typeof _messages;
 
 const userprops = {
   title: { type: "string" },
@@ -48,6 +39,7 @@ export default function _001() {
 }
 
 function Consumer() {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t } = useTranslation<any>();
   const data = useData<UserProps>();
 

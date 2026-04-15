@@ -1,32 +1,37 @@
 import { readFileSync } from "fs";
 import { iofigma } from "../lib";
-import { readFigFile } from "../fig-kiwi";
+import { readFigFile, type NodeChange } from "../fig-kiwi";
 
 const FigImporter = iofigma.kiwi.FigImporter;
 
-function countNodes(node: any): number {
+type AnyFigmaNode = iofigma.kiwi.AnyFigmaNode;
+
+function countNodes(node: AnyFigmaNode): number {
   if (!node) return 0;
   let count = 1;
   if ("children" in node && Array.isArray(node.children)) {
-    node.children.forEach((child: any) => {
+    node.children.forEach((child: AnyFigmaNode) => {
       count += countNodes(child);
     });
   }
   return count;
 }
 
-function getDepth(node: any, depth = 0): number {
+function getDepth(node: AnyFigmaNode, depth = 0): number {
   if (!node) return depth;
   let max = depth + 1;
   if ("children" in node && Array.isArray(node.children)) {
-    node.children.forEach((child: any) => {
+    node.children.forEach((child: AnyFigmaNode) => {
       max = Math.max(max, getDepth(child, depth + 1));
     });
   }
   return max;
 }
 
-function countKiwiDescendants(canvasGuid: string, allNodes: any[]): number {
+function countKiwiDescendants(
+  canvasGuid: string,
+  allNodes: NodeChange[]
+): number {
   const visited = new Set<string>([canvasGuid]);
   const queue = [canvasGuid];
 
@@ -51,8 +56,8 @@ function countKiwiDescendants(canvasGuid: string, allNodes: any[]): number {
   return visited.size - 1; // Exclude CANVAS itself
 }
 
-function getKiwiDepth(canvasGuid: string, allNodes: any[]): number {
-  const guidToChildren = new Map<string, any[]>();
+function getKiwiDepth(canvasGuid: string, allNodes: NodeChange[]): number {
+  const guidToChildren = new Map<string, NodeChange[]>();
 
   allNodes.forEach((nc) => {
     if (nc.parentIndex?.guid && nc.guid) {
@@ -197,14 +202,14 @@ describe("FigImporter", () => {
       // This is a regression test for a bug where multiple root conversions could
       // generate colliding Grida IDs (when node_id_generator was not provided),
       // causing later roots to overwrite earlier ones during merge.
-      const mockPage: any = {
+      const mockPage = {
         name: "Mock",
         sortkey: "!",
         canvas: {
           type: "CANVAS",
           name: "Mock",
           guid: { sessionID: 0, localID: 1 },
-        },
+        } satisfies NodeChange,
         rootNodes: [
           // Minimal REST-ish nodes; restful.factory.document will generate new Grida IDs anyway.
           {
@@ -263,7 +268,7 @@ describe("FigImporter", () => {
             children: [],
             effects: [],
           },
-        ],
+        ] as AnyFigmaNode[],
       };
 
       const { document: packedDoc } = FigImporter.convertPageToScene(mockPage, {
@@ -309,10 +314,10 @@ describe("FigImporter", () => {
       expect(figFile.pages.length).toBe(1);
 
       // Count X_SLIDE nodes in the converted tree
-      function countByType(node: any, type: string): number {
+      function countByType(node: AnyFigmaNode, type: string): number {
         let count = node.type === type ? 1 : 0;
         if ("children" in node && Array.isArray(node.children)) {
-          node.children.forEach((child: any) => {
+          node.children.forEach((child: AnyFigmaNode) => {
             count += countByType(child, type);
           });
         }
@@ -321,7 +326,7 @@ describe("FigImporter", () => {
 
       const page = figFile.pages[0];
       let slideCount = 0;
-      page.rootNodes.forEach((root: any) => {
+      page.rootNodes.forEach((root) => {
         slideCount += countByType(root, "X_SLIDE");
       });
 
@@ -351,7 +356,7 @@ describe("FigImporter", () => {
       const page = figFile.pages[0];
 
       let processedCount = 0;
-      page.rootNodes.forEach((rootNode: any) => {
+      page.rootNodes.forEach((rootNode) => {
         processedCount += countNodes(rootNode);
       });
 

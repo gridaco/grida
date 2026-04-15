@@ -1064,7 +1064,7 @@ export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
 
 export interface TemplateEditorSetTemplatePropsAction {
   type: "document/template/set/props";
-  data: Record<string, any>;
+  data: Record<string, grida.program.schema.Value>;
 }
 
 // === WIP ===

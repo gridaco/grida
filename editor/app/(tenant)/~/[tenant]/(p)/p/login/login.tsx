@@ -31,10 +31,10 @@ export default function PortalLogin({
         email: email,
       }),
     });
-    const json = await res.json().catch(() => ({}));
+    const json: Record<string, unknown> = await res.json().catch(() => ({}));
     return {
       ok: res.ok,
-      challenge_id: (json as any)?.challenge_id as string | undefined,
+      challenge_id: json?.challenge_id as string | undefined,
     };
   };
 
@@ -81,15 +81,15 @@ export default function PortalLogin({
       }
     );
 
-    const json = await res.json().catch(() => ({}));
+    const json: Record<string, unknown> = await res.json().catch(() => ({}));
     setIsLoading(false);
 
     if (!res.ok) {
-      setError((json as any)?.error ?? "Invalid or expired OTP");
+      setError((json?.error as string) ?? "Invalid or expired OTP");
       return;
     }
 
-    const session_url = (json as any)?.session_url as string | undefined;
+    const session_url = json?.session_url as string | undefined;
     if (!session_url) {
       setError("Invalid or expired OTP");
       return;

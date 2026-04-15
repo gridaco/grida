@@ -314,7 +314,11 @@ export function DataQueryPredicatesMenu({
                       <div className="flex-1">
                         <Select
                           value={q.op}
-                          onValueChange={(v) => onchange({ op: v as any })}
+                          onValueChange={(v) =>
+                            onchange({
+                              op: v as Data.Query.Predicate.ExtendedPredicate["op"],
+                            })
+                          }
                         >
                           <SelectTrigger
                             className={WorkbenchUI.selectVariants({
@@ -422,7 +426,7 @@ export function DataQueryPrediateAddMenu({
           const defaults = predicateConfig?.getDefaultPredicate?.(property);
           const default_op = defaults?.op ?? "eq";
           const default_value =
-            "value" in (defaults ?? {}) ? (defaults as any).value : null;
+            defaults && "value" in defaults ? defaults.value : null;
 
           return (
             <DropdownMenuItem
@@ -430,7 +434,7 @@ export function DataQueryPrediateAddMenu({
               onSelect={() =>
                 onAdd({
                   column: key,
-                  op: default_op as any,
+                  op: default_op as Data.Query.Predicate.ExtendedPredicate["op"],
                   value: default_value ?? null,
                 })
               }
@@ -522,7 +526,7 @@ export function DataQueryPredicateChip({
       const op = Predicate.K.operators[ext];
       const supported =
         allowed_ops.includes(op.extends!) &&
-        (op.format ? op.format.includes(format as unknown as any) : true);
+        (op.format ? (op.format as readonly string[]).includes(format) : true);
 
       return supported;
     }
@@ -560,7 +564,9 @@ export function DataQueryPredicateChip({
             </span>
             <Select
               value={predicate.op}
-              onValueChange={(v) => onOpChange(v as any)}
+              onValueChange={(v) =>
+                onOpChange(v as Data.Query.Predicate.ExtendedPredicate["op"])
+              }
             >
               <SelectPrimitive.Trigger>
                 <Badge
@@ -596,7 +602,7 @@ export function DataQueryPredicateChip({
                     <SelectItem
                       value={key}
                       key={key}
-                      disabled={!allowed_ops.includes(key as any)}
+                      disabled={!allowed_ops.includes(key)}
                     >
                       {key}
                       <small className="ms-1 text-muted-foreground">

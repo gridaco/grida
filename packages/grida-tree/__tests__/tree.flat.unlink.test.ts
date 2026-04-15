@@ -1,8 +1,10 @@
 import { tree as lib } from "../src/lib";
 
+type FlatNode = { children?: string[]; [k: string]: unknown };
+
 describe("unlink", () => {
   it("removes a standalone node", () => {
-    const nodes = { a: {} as any, b: {} as any };
+    const nodes: Record<string, FlatNode> = { a: {}, b: {} };
     lib.flat_with_children.unlink(nodes, "a");
     expect(nodes).toEqual({ b: {} });
   });
@@ -19,7 +21,7 @@ describe("unlink", () => {
   });
 
   it("throws if id does not exist", () => {
-    const nodes = { a: {} as any };
+    const nodes: Record<string, FlatNode> = { a: {} };
     expect(() => lib.flat_with_children.unlink(nodes, "missing")).toThrow(
       /unlink: cannot unlink 'missing': No such node/
     );
@@ -29,7 +31,7 @@ describe("unlink", () => {
     const nodes = {
       x: { foo: "bar" },
       y: { children: ["x"] },
-    } as Record<string, any>;
+    } as Record<string, FlatNode>;
     lib.flat_with_children.unlink(nodes, "x");
     expect(nodes.y.children).toEqual([]);
     expect(nodes).not.toHaveProperty("x");
@@ -41,7 +43,7 @@ describe("unlink", () => {
       b: {},
       c: { children: ["d"] },
       d: {},
-    } as Record<string, any>;
+    } as Record<string, FlatNode>;
     lib.flat_with_children.unlink(nodes, "b");
     expect(Object.keys(nodes)).toEqual(["a", "c", "d"]);
     expect(nodes.a.children).toEqual([]);

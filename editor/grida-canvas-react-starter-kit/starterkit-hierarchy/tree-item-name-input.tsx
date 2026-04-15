@@ -101,7 +101,7 @@ export function NameInput({
         input.removeEventListener("keydown", handleKeyDown, true);
       }
     };
-  }, [ref.current, initialValue, onValueCommit, value]);
+  }, [initialValue, onValueCommit, value]);
 
   useEffect(() => {
     if (!isRenaming) return;
@@ -111,7 +111,7 @@ export function NameInput({
       input.select();
       isInitiallyFocused.current = true;
     }
-  }, [ref.current, isRenaming]);
+  }, [isRenaming]);
 
   return (
     <div className="w-full min-w-0">

@@ -1,0 +1,14 @@
+{
+  "extends": ["../.oxlintrc.jsonc"],
+  "plugins": ["nextjs"],
+  "rules": {
+    // --- react-hooks (all OFF — progressive enablement) ------------
+    "react/exhaustive-deps": "off",
+  },
+  "ignorePatterns": [
+    // shadcn / generated UI (no control over code):
+    "components/ui/**",
+    "components/ui2/**",
+    "components/ai-elements/**",
+  ],
+}

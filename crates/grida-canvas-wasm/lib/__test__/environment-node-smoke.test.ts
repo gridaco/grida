@@ -11,13 +11,14 @@ describe("node smoke", () => {
 
     expect(typeof pkg.default).toBe("function");
 
-    const factory: any = await pkg.default!();
+    const factory = (await pkg.default!()) as Record<string, unknown>;
     expect(factory).toBeTruthy();
     expect(factory.module).toBeTruthy();
 
     // Basic sanity: core exports + runtime methods should exist after instantiation.
-    expect(typeof factory.module._init).toBe("function");
-    expect(factory.module.HEAPU8).toBeInstanceOf(Uint8Array);
-    expect(typeof factory.module.UTF8ToString).toBe("function");
+    const mod = factory.module as Record<string, unknown>;
+    expect(typeof mod._init).toBe("function");
+    expect(mod.HEAPU8).toBeInstanceOf(Uint8Array);
+    expect(typeof mod.UTF8ToString).toBe("function");
   }, 30_000);
 });

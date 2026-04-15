@@ -43,12 +43,12 @@ export namespace factory {
     };
   }
 
-  export function createPropertyAccessExpression<T = any>(
+  export function createPropertyAccessExpression<T = unknown>(
     paths: access.KeyPath<T> | string[]
   ): tokens.PropertyAccessExpression {
     return {
       kind: "PropertyAccessExpression",
-      expression: paths as any,
+      expression: paths as string[],
     };
   }
 

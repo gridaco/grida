@@ -29,7 +29,7 @@ describe("iofigma.kiwi vectorNetworkBlob mapping", () => {
     const nodeChanges = figData.message.nodeChanges ?? [];
 
     // Pick a representative VECTOR where normalizedSize != size and bbox starts near 0,0.
-    const candidate = nodeChanges.find((nc: any) => {
+    const candidate = nodeChanges.find((nc) => {
       if (nc.type !== "VECTOR") return false;
       if (nc.vectorData?.vectorNetworkBlob === undefined) return false;
       if (!nc.size || !nc.vectorData?.normalizedSize) return false;
@@ -57,8 +57,7 @@ describe("iofigma.kiwi vectorNetworkBlob mapping", () => {
     if (!candidate) {
       throw new Error("No suitable VECTOR candidate found in the .fig fixture");
     }
-    // Cast to any to avoid over-specifying the full Kiwi NodeChange type here.
-    const nc: any = candidate;
+    const nc = candidate;
     if (!nc.vectorData || nc.vectorData.vectorNetworkBlob === undefined) {
       throw new Error("Candidate is missing vectorData.vectorNetworkBlob");
     }
@@ -86,7 +85,7 @@ describe("iofigma.kiwi vectorNetworkBlob mapping", () => {
     const restNode = iofigma.kiwi.factory.node(
       ncNoCommands,
       figData.message
-    ) as any;
+    ) as iofigma.__ir.VectorNodeWithVectorNetworkDataPresent;
     expect(restNode.type).toBe("X_VECTOR");
     const mappedB = bbox(restNode.vectorNetwork.vertices)!;
 

@@ -2,7 +2,6 @@
 
 import React, { useCallback } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
-import { useEditorState } from "@/scaffolds/editor";
 import { SidebarMenuGrid, SidebarMenuGridItem } from "@/components/sidebar";
 import { annotations } from "@/k/supported_field_types";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
@@ -28,7 +27,6 @@ import {
 import useInsertFormBlockMenu from "@/scaffolds/blocks-editor/use-insert-form-block";
 
 export function ModeInsertBlocks() {
-  const [state, dispatch] = useEditorState();
   const {
     search,
     setSearch,
@@ -43,7 +41,7 @@ export function ModeInsertBlocks() {
       addBlock(block);
       close();
     },
-    [addBlock, close]
+    [addBlock]
   );
 
   const handleAddFieldBlock = useCallback(
@@ -51,7 +49,7 @@ export function ModeInsertBlocks() {
       addFieldBlock(type);
       close();
     },
-    [addFieldBlock, close]
+    [addFieldBlock]
   );
 
   return (

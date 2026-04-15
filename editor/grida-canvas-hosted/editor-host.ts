@@ -43,7 +43,7 @@ export class GridaCanvasEditorSelfHostedWindowHost {
   private _wasm_factory: ApplicationFactory | null = null;
   private _scene: Scene | null = null;
   readonly fetch: typeof window.fetch;
-  readonly logger: (...args: any[]) => void;
+  readonly logger: (...args: unknown[]) => void;
 
   private _ready = false;
   get ready() {
@@ -55,7 +55,7 @@ export class GridaCanvasEditorSelfHostedWindowHost {
     logger = console.log,
   }: {
     fetch: typeof window.fetch;
-    logger?: (...args: any[]) => void;
+    logger?: (...args: unknown[]) => void;
   }) {
     this.fetch = fetch;
     this.logger = logger;
@@ -66,7 +66,7 @@ export class GridaCanvasEditorSelfHostedWindowHost {
     {
       el,
       doc,
-      webfontslist = "eager",
+      webfontslist: _webfontslist = "eager",
     }: {
       el: HTMLCanvasElement;
       doc: ResourceLoader<editor.state.IEditorStateInit>;

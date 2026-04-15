@@ -12,7 +12,7 @@ export function PricingCard({
   plan,
   price,
   excerpt,
-  highlight: highlight,
+  highlight,
   features = [],
   action,
 }: {

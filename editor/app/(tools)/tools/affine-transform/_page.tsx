@@ -222,7 +222,7 @@ function parseSvgPath(
 
 function parseMatrixInput(text: string): cmath.Transform | null {
   const cleaned = text
-    .replace(/[\[\](){}]/g, " ")
+    .replace(/[[\](){}]/g, " ")
     .replace(/;/g, ",")
     .replace(/\n/g, ",");
   const nums = cleaned

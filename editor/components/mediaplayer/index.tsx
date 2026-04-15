@@ -1,8 +1,8 @@
-import React, { createContext, useRef, useState, useEffect } from "react";
+import React, { createContext } from "react";
 import { useAudio } from "react-use";
 
 interface MediaState {
-  buffered: any[];
+  buffered: { start: number; end: number }[];
   duration: number;
   paused: boolean;
   muted: boolean;
@@ -56,7 +56,7 @@ function AudioMediaSessionProvider({
 }: React.PropsWithChildren<{
   session: MediaSessionState;
 }>) {
-  const [audio, state, controls, ref] = useAudio({
+  const [audio, state, controls, _ref] = useAudio({
     src: session.src,
     autoPlay: session.autoplay,
     playsInline: true,

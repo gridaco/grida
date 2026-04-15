@@ -9,7 +9,7 @@
 
 import type { Editor } from "@/grida-canvas/editor";
 import { editor } from "@/grida-canvas/editor.i";
-import type { SyncClient, PresenceState } from "@grida/canvas-sync";
+import type { SyncClient } from "@grida/canvas-sync";
 import type cmath from "@grida/cmath";
 import equal from "fast-deep-equal";
 

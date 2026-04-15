@@ -8,7 +8,7 @@ type EnumOption = { id: string; value: string };
 
 export namespace FormValue {
   export function parse(
-    value_or_reference: any,
+    value_or_reference: unknown,
     extra: {
       // in minutes, where the givven value is the offset from UTC
       utc_offset?: number;
@@ -17,7 +17,7 @@ export namespace FormValue {
       multiple?: boolean | null;
     }
   ): {
-    value: any;
+    value: unknown;
     enum_id?: string | null;
     enum_ids?: string[] | null;
   } {
@@ -33,16 +33,19 @@ export namespace FormValue {
 
       if (extra.utc_offset !== undefined) {
         const tz = offsetToEtcGMT(extra.utc_offset);
-        const clientdate = toDate(new Date(value_or_reference), {
-          timeZone: tz,
-        });
+        const clientdate = toDate(
+          new Date(value_or_reference as string | number),
+          {
+            timeZone: tz,
+          }
+        );
         return {
           value: clientdate.toISOString(),
         };
       } else {
         // If no client offset is provided, return the original date in ISO format
         return {
-          value: new Date(value_or_reference).toISOString(),
+          value: new Date(value_or_reference as string | number).toISOString(),
         };
       }
     }
@@ -114,7 +117,7 @@ export namespace FormValue {
         }
       }
 
-      const found = getEnum(value_or_reference, enums);
+      const found = getEnum(value_or_reference as string, enums);
 
       // locate the value
       const value = found ? found.value : value_or_reference;
@@ -139,7 +142,7 @@ export namespace FormValue {
     return enums.find((o) => o.id === value_or_reference) || null;
   }
 
-  export function safejson(data: any) {
+  export function safejson(data: unknown) {
     return JSON.parse(JSON.stringify(data));
   }
 }

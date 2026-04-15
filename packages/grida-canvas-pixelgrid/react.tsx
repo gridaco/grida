@@ -13,34 +13,33 @@ export const PixelGrid: React.FC<PixelGridProps> = (props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gridRef = useRef<PixelGridCanvas | null>(null);
 
+  const { width, height, color, unit, steps, transform } = props;
+  const step0 = steps?.[0];
+  const step1 = steps?.[1];
+  const t00 = transform[0][0];
+  const t01 = transform[0][1];
+  const t02 = transform[0][2];
+  const t10 = transform[1][0];
+  const t11 = transform[1][1];
+  const t12 = transform[1][2];
+
   useEffect(() => {
     if (!canvasRef.current) return;
     if (!gridRef.current) {
       // Create once
       gridRef.current = new PixelGridCanvas(canvasRef.current, {
-        unit: props.unit,
-        steps: props.steps,
-        transform: props.transform,
-        color: props.color,
+        unit,
+        steps,
+        transform,
+        color,
       });
     }
 
-    gridRef.current.setSize(props.width, props.height);
-    gridRef.current.updateTransform(props.transform);
+    gridRef.current.setSize(width, height);
+    gridRef.current.updateTransform(transform);
     gridRef.current.draw();
-  }, [
-    props.width,
-    props.height,
-    props.color,
-    props.steps?.[0],
-    props.steps?.[1],
-    props.transform[0][0],
-    props.transform[0][1],
-    props.transform[0][2],
-    props.transform[1][0],
-    props.transform[1][1],
-    props.transform[1][2],
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using extracted scalar values for value-level comparison; parent refs (transform, steps) are excluded to avoid re-running on new array references
+  }, [width, height, color, step0, step1, t00, t01, t02, t10, t11, t12]);
 
   return (
     <canvas

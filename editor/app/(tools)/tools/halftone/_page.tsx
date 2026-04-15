@@ -19,7 +19,7 @@ import kolor from "@grida/color";
 
 const DEFAULT_GRID = 10;
 const MAX_SIZE = 1024;
-const DEMO_IMAGE_SRC = "/images/customer-support-ceo.png";
+const DEMO_IMAGE_SRC = "/images/abstract-placeholder.jpg";
 
 type Shape =
   | "circle"
@@ -443,11 +443,13 @@ export default function HalftoneTool() {
             onClick={() => fileInputRef.current?.click()}
           >
             {imageSrc ? (
-              <img
-                src={imageSrc}
-                alt="Source"
-                className="w-full h-full object-cover"
-              />
+              <picture>
+                <img
+                  src={imageSrc}
+                  alt="Source"
+                  className="w-full h-full object-cover"
+                />
+              </picture>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
                 <ImageIcon className="size-8" />

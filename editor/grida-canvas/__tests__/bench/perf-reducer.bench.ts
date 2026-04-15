@@ -40,13 +40,16 @@ import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
 import { io } from "@grida/io";
 import type grida from "@grida/schema";
 import type { Scene } from "@grida/canvas-wasm";
+import type { Action } from "@/grida-canvas/action";
 
 // ---------------------------------------------------------------------------
 // Polyfills
 // ---------------------------------------------------------------------------
 
 if (typeof globalThis.reportError === "undefined") {
-  (globalThis as any).reportError = (_err: any) => {};
+  (
+    globalThis as unknown as { reportError: (err: unknown) => void }
+  ).reportError = (_err: unknown) => {};
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +58,7 @@ if (typeof globalThis.reportError === "undefined") {
 
 function generateLargeDocument(n: number): grida.program.document.Document {
   const children: string[] = [];
-  const nodes: Record<string, any> = {
+  const nodes: Record<string, grida.program.nodes.Node> = {
     scene: sceneNode("scene", "Scene"),
   };
   const cols = Math.ceil(Math.sqrt(n));
@@ -85,7 +88,7 @@ function generateLargeDocument(n: number): grida.program.document.Document {
 // WASM bootstrap (once per file)
 // ---------------------------------------------------------------------------
 
-let _createCanvas: (opts: any) => Promise<any>;
+let _createCanvas: typeof import("@grida/canvas-wasm").createCanvas;
 
 beforeAll(async () => {
   const pkg = await import("@grida/canvas-wasm");
@@ -94,7 +97,11 @@ beforeAll(async () => {
 
 async function createEditorWithWasm(
   doc: grida.program.document.Document
-): Promise<{ ed: Editor; canvas: any; scene: Scene }> {
+): Promise<{
+  ed: Editor;
+  canvas: import("@grida/canvas-wasm").Canvas;
+  scene: Scene;
+}> {
   const ed = Editor.createHeadless(
     { document: doc, editable: true, debug: false },
     { viewport: { width: 4096, height: 4096 } }
@@ -105,7 +112,7 @@ async function createEditorWithWasm(
     height: 4096,
     useEmbeddedFonts: true,
   });
-  const scene: Scene = (canvas as any)._scene;
+  const scene: Scene = (canvas as unknown as { _scene: Scene })._scene;
   try {
     const bytes = io.GRID.encode(doc);
     scene.loadSceneGrida(bytes);
@@ -113,10 +120,9 @@ async function createEditorWithWasm(
     scene.loadScene(JSON.stringify({ version: 4, document: doc }));
   }
   scene.switchScene("scene");
-  (ed as any)._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(
-    ed,
-    scene
-  );
+  (
+    ed as unknown as { _m_geometry: CanvasWasmGeometryQueryInterfaceProvider }
+  )._m_geometry = new CanvasWasmGeometryQueryInterfaceProvider(ed, scene);
   return { ed, canvas, scene };
 }
 
@@ -136,7 +142,7 @@ const SLOW = { time: 5_000, warmupIterations: 1 } as const;
 
 describe("1K nodes", () => {
   let ed: Editor;
-  let canvas: any;
+  let canvas: import("@grida/canvas-wasm").Canvas;
 
   beforeAll(async () => {
     perf.enable();
@@ -170,7 +176,7 @@ describe("1K nodes", () => {
               color: { r: Math.random(), g: Math.random(), b: 0, a: 1 },
               active: true,
             },
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -185,7 +191,7 @@ describe("1K nodes", () => {
             type: "node/change/*",
             node_id: "r0",
             opacity: Math.random(),
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -203,7 +209,7 @@ describe("1K nodes", () => {
             type: "event-target/event/on-pointer-down",
             node_ids_from_point: ["r0"],
             shiftKey: false,
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
         ed.doc.dispatch(
@@ -211,7 +217,7 @@ describe("1K nodes", () => {
             type: "event-target/event/on-drag-start",
             shiftKey: false,
             event: { movement: [0, 0], delta: [0, 0] },
-          } as any,
+          } as unknown as Action,
           { recording: "begin-gesture" }
         );
       });
@@ -223,7 +229,7 @@ describe("1K nodes", () => {
             shiftKey: false,
             node_ids_from_area: undefined,
             event: { movement: [dx, 0], delta: [0, 0] },
-          } as any,
+          } as unknown as Action,
           { recording: "end-gesture" }
         );
       });
@@ -236,7 +242,7 @@ describe("1K nodes", () => {
             {
               type: "event-target/event/on-drag",
               event: { movement: [dx, 0], delta: [1, 0] },
-            } as any,
+            } as unknown as Action,
             { recording: "silent" }
           );
         },
@@ -254,7 +260,7 @@ describe("1K nodes", () => {
           {
             type: "surface/gesture/start",
             gesture: { type: "scale", selection: ["r1"], direction: "se" },
-          } as any,
+          } as unknown as Action,
           { recording: "begin-gesture" }
         );
       });
@@ -266,7 +272,7 @@ describe("1K nodes", () => {
             shiftKey: false,
             node_ids_from_area: undefined,
             event: { movement: [dy, dy], delta: [0, 0] },
-          } as any,
+          } as unknown as Action,
           { recording: "end-gesture" }
         );
       });
@@ -279,7 +285,7 @@ describe("1K nodes", () => {
             {
               type: "event-target/event/on-drag",
               event: { movement: [dy, dy], delta: [1, 1] },
-            } as any,
+            } as unknown as Action,
             { recording: "silent" }
           );
         },
@@ -299,7 +305,7 @@ describe("1K nodes", () => {
             type: "node/change/*",
             node_id: "r0",
             name: `R-${Math.random()}`,
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -309,9 +315,12 @@ describe("1K nodes", () => {
     bench(
       "select",
       () => {
-        ed.doc.dispatch({ type: "select", selection: ["r1"] } as any, {
-          recording: "silent",
-        });
+        ed.doc.dispatch(
+          { type: "select", selection: ["r1"] } as unknown as Action,
+          {
+            recording: "silent",
+          }
+        );
       },
       FAST
     );
@@ -321,11 +330,19 @@ describe("1K nodes", () => {
       () => {
         // Toggle off then on so net state is unchanged
         ed.doc.dispatch(
-          { type: "node/change/*", node_id: "r2", active: false } as any,
+          {
+            type: "node/change/*",
+            node_id: "r2",
+            active: false,
+          } as unknown as Action,
           { recording: "silent" }
         );
         ed.doc.dispatch(
-          { type: "node/change/*", node_id: "r2", active: true } as any,
+          {
+            type: "node/change/*",
+            node_id: "r2",
+            active: true,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -336,9 +353,12 @@ describe("1K nodes", () => {
       "delete + insert cycle",
       () => {
         // Delete a node then re-insert it so the scene stays stable
-        ed.doc.dispatch({ type: "delete", target: ["r99"] } as any, {
-          recording: "silent",
-        });
+        ed.doc.dispatch(
+          { type: "delete", target: ["r99"] } as unknown as Action,
+          {
+            recording: "silent",
+          }
+        );
         ed.doc.dispatch(
           {
             type: "insert",
@@ -357,7 +377,7 @@ describe("1K nodes", () => {
                 active: true,
               },
             },
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -373,7 +393,7 @@ describe("1K nodes", () => {
             type: "event-target/event/on-drag-start",
             shiftKey: false,
             event: { movement: [0, 0], delta: [0, 0] },
-          } as any,
+          } as unknown as Action,
           { recording: "begin-gesture" }
         );
         ed.doc.dispatch(
@@ -382,7 +402,7 @@ describe("1K nodes", () => {
             shiftKey: false,
             node_ids_from_area: undefined,
             event: { movement: [0, 0], delta: [0, 0] },
-          } as any,
+          } as unknown as Action,
           { recording: "end-gesture" }
         );
       },
@@ -397,7 +417,7 @@ describe("1K nodes", () => {
             type: "event-target/event/on-pointer-move",
             position_canvas: { x: 100, y: 100 },
             position_client: { x: 100, y: 100 },
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -412,7 +432,7 @@ describe("1K nodes", () => {
           {
             type: "event-target/event/on-pointer-move-raycast",
             node_ids_from_point: ["r10", "r11", "r12"],
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -427,7 +447,7 @@ describe("1K nodes", () => {
 
 describe("10K nodes", () => {
   let ed: Editor;
-  let canvas: any;
+  let canvas: import("@grida/canvas-wasm").Canvas;
 
   beforeAll(async () => {
     perf.enable();
@@ -461,7 +481,7 @@ describe("10K nodes", () => {
               color: { r: Math.random(), g: Math.random(), b: 0, a: 1 },
               active: true,
             },
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -476,7 +496,7 @@ describe("10K nodes", () => {
             type: "node/change/*",
             node_id: "r0",
             opacity: Math.random(),
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -495,7 +515,7 @@ describe("10K nodes", () => {
             type: "node/change/*",
             node_id: "r0",
             name: `R-${Math.random()}`,
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -505,9 +525,12 @@ describe("10K nodes", () => {
     bench(
       "select",
       () => {
-        ed.doc.dispatch({ type: "select", selection: ["r1"] } as any, {
-          recording: "silent",
-        });
+        ed.doc.dispatch(
+          { type: "select", selection: ["r1"] } as unknown as Action,
+          {
+            recording: "silent",
+          }
+        );
       },
       FAST
     );
@@ -516,11 +539,19 @@ describe("10K nodes", () => {
       "active (visibility) toggle",
       () => {
         ed.doc.dispatch(
-          { type: "node/change/*", node_id: "r2", active: false } as any,
+          {
+            type: "node/change/*",
+            node_id: "r2",
+            active: false,
+          } as unknown as Action,
           { recording: "silent" }
         );
         ed.doc.dispatch(
-          { type: "node/change/*", node_id: "r2", active: true } as any,
+          {
+            type: "node/change/*",
+            node_id: "r2",
+            active: true,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },
@@ -536,7 +567,7 @@ describe("10K nodes", () => {
             type: "event-target/event/on-drag-start",
             shiftKey: false,
             event: { movement: [0, 0], delta: [0, 0] },
-          } as any,
+          } as unknown as Action,
           { recording: "begin-gesture" }
         );
         ed.doc.dispatch(
@@ -545,7 +576,7 @@ describe("10K nodes", () => {
             shiftKey: false,
             node_ids_from_area: undefined,
             event: { movement: [0, 0], delta: [0, 0] },
-          } as any,
+          } as unknown as Action,
           { recording: "end-gesture" }
         );
       },
@@ -560,7 +591,7 @@ describe("10K nodes", () => {
           {
             type: "event-target/event/on-pointer-move-raycast",
             node_ids_from_point: ["r10", "r11", "r12"],
-          } as any,
+          } as unknown as Action,
           { recording: "silent" }
         );
       },

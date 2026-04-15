@@ -25,8 +25,8 @@ import {
 } from "@/components/ui/tooltip";
 
 interface ConversionStepProps {
-  data: any;
-  updateData: (data: any) => void;
+  data: Record<string, unknown>;
+  updateData: (data: Record<string, unknown>) => void;
 }
 
 const currencies = [
@@ -123,7 +123,7 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
               Conversion Currency
             </FieldLabel>
             <Select
-              value={data.conversion_currency}
+              value={data.conversion_currency as string | undefined}
               onValueChange={(value) =>
                 updateData({ conversion_currency: value })
               }
@@ -149,7 +149,7 @@ export function ConversionStep({ data, updateData }: ConversionStepProps) {
               min="0"
               step="0.01"
               placeholder="100.00"
-              value={data.conversion_value || ""}
+              value={(data.conversion_value as string | number) || ""}
               onChange={(e) =>
                 updateData({
                   conversion_value: Number.parseFloat(e.target.value) || null,

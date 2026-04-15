@@ -9,6 +9,7 @@ import {
   closestCorners,
   useSensor,
   useSensors,
+  type DragEndEvent,
 } from "@dnd-kit/core";
 import { Block, BlocksCanvas } from "./blocks";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
@@ -66,18 +67,21 @@ function DndContextProvider({ children }: React.PropsWithChildren) {
     </DndContext>
   );
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (active.type === "section" && over?.type === "section") {
+    if (
+      active.data.current?.type === "section" &&
+      over?.data.current?.type === "section"
+    ) {
       event.over = null; // Prevent section over section
     }
 
     if (over && active.id !== over.id) {
       dispatch({
         type: "blocks/sort",
-        block_id: active.id,
-        over_id: over.id,
+        block_id: active.id as string,
+        over_id: over.id as string,
       });
     }
   }
@@ -130,7 +134,10 @@ function PendingBlocksResolver() {
           dispatch({
             type: "blocks/resolve",
             block_id: block.id,
-            block: { ...data, v_hidden: data.v_hidden as any },
+            block: {
+              ...data,
+              v_hidden: data.v_hidden as EditorFlatFormBlock["v_hidden"],
+            },
           });
         })
         .catch((e) => {
@@ -175,7 +182,7 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
 
     updatedBlocks.forEach(async (block) => {
       try {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("form_block")
           .update({
             // Assuming these are the fields to update
@@ -344,7 +351,7 @@ function FormSectionStyle({
   return <section className={cn(sectioncss, className)}>{children}</section>;
 }
 
-function shallowEqual(obj1: any, obj2: any) {
+function shallowEqual(obj1: unknown, obj2: unknown): boolean {
   if (obj1 === obj2) return true;
 
   if (
@@ -356,13 +363,16 @@ function shallowEqual(obj1: any, obj2: any) {
     return false;
   }
 
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+  const record1 = obj1 as Record<string, unknown>;
+  const record2 = obj2 as Record<string, unknown>;
+
+  const keys1 = Object.keys(record1);
+  const keys2 = Object.keys(record2);
 
   if (keys1.length !== keys2.length) return false;
 
   for (const key of keys1) {
-    if (obj1[key] !== obj2[key]) {
+    if (record1[key] !== record2[key]) {
       return false;
     }
   }

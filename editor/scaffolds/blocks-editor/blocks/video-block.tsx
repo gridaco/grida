@@ -1,8 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
 import {
-  CodeIcon,
   DotsHorizontalIcon,
   TrashIcon,
   VideoIcon,
@@ -28,14 +26,8 @@ import dynamic from "next/dynamic";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
-export function VideoBlock({
-  id,
-  type,
-  form_field_id,
-  src,
-  data,
-}: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+export function VideoBlock({ id, src }: EditorFlatFormBlock) {
+  const [, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
   const deleteBlock = useDeleteBlock();
 

@@ -84,7 +84,7 @@ export const useFileUploader = ({
               : info
           )
         );
-      } catch (error) {
+      } catch {
         fileInfo.status = "failed";
         setFileUploadInfos((prev) =>
           prev.map((info) =>

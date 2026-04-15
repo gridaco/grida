@@ -22,15 +22,12 @@ import _messages from "./messages.json";
 import { Features } from "@/grida-forms-hosted/features/scheduling";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/components/lib/utils";
-import { useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
 import type grida from "@grida/schema";
 import { NodeElement } from "@/grida-canvas-react-renderer-dom/nodes/node";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import { factory } from "@grida/tokens";
-
-type Messages = typeof _messages;
 
 const userprops = {
   title: { type: "string", default: "[Your Title Goes Here.]" },
@@ -44,16 +41,11 @@ const userprops = {
   media: { type: "array", items: { type: "image" }, default: [] },
 } satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
-type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
-
 export default function _005() {
   return <Consumer />;
 }
 
 function Consumer() {
-  const { t } = useTranslation<any>();
-  const data = useData();
-
   return (
     <ScreenRoot>
       <ScreenMobileFrame>
@@ -90,7 +82,7 @@ function Media() {
   });
 
   // TODO: fixme - wrong type
-  const media = props.media as any as FileIO.GridaAsset[];
+  const media = props.media as unknown as FileIO.GridaAsset[];
   // grida.program.objects.ImageSource[];
 
   return (
@@ -117,6 +109,7 @@ function Media() {
 }
 
 function CTAFooter() {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t } = useTranslation<any>();
   const { onClick } = useCTAContext();
 
@@ -124,9 +117,7 @@ function CTAFooter() {
     is_scheduling_enabled,
     scheduling_close_at,
     scheduling_open_at,
-    scheduling_tz,
     is_force_closed,
-    is_schedule_in_range,
   } = useCampaignMeta();
 
   const schedule = useMemo(
@@ -210,15 +201,11 @@ function CTAFooter() {
  * if the event is closed (by time or by capacity), it displays the event is closed.
  */
 function NextEventState({ className }: { className?: string }) {
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any
   const { t, i18n } = useTranslation<any>();
   const lang = i18n.language;
-  const {
-    is_scheduling_enabled,
-    scheduling_close_at,
-    scheduling_open_at,
-    scheduling_tz,
-    is_schedule_in_range: is_open,
-  } = useCampaignMeta();
+  const { is_scheduling_enabled, scheduling_close_at, scheduling_open_at } =
+    useCampaignMeta();
 
   const schedule = useMemo(
     () =>

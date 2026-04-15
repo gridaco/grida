@@ -17,7 +17,6 @@ import palettes from "@/theme/palettes";
 export function ThemePalette({
   dark: _dark,
   value,
-  preset,
   onPresetChange,
   onValueChange,
   onDarkChange,
@@ -92,6 +91,7 @@ export function ThemePalette({
                   <li className="flex items-center gap-2" key={k}>
                     <ColorChip
                       id={k}
+                      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- HSL color object from palette
                       value={v as any}
                       onChange={(v) => {
                         onValueChange?.({

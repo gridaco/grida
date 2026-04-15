@@ -15,9 +15,6 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/components/lib/utils";
-import { vfs } from "@/lib/vfs";
-
-type PathTokens = string[];
 
 type FileNode = {
   type: "file";
@@ -102,7 +99,7 @@ const FilePickerProvider: React.FC<FilePickerProviderProps> = ({
             ? prev.filter((n) => n !== node)
             : [...prev, node]
           : [node];
-        onValueChange && onValueChange(next);
+        if (onValueChange) onValueChange(next);
         return next;
       });
     },

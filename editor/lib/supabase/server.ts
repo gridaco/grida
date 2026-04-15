@@ -1,8 +1,5 @@
 import type { Database } from "@app/database";
-import {
-  createClient as _createClient,
-  SupabaseClientOptions,
-} from "@supabase/supabase-js";
+import { createClient as _createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -89,6 +86,7 @@ const __create_service_role_client = <
     process.env.SUPABASE_SECRET_KEY!,
     {
       db: {
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK db.schema expects a looser type than our branded SchemaName
         schema: schema as any,
       },
     }

@@ -1,3 +1,4 @@
+// oxlint-disable typescript-eslint/no-explicit-any
 import { useContext, useMemo } from "react";
 import { DataContext, ScopedVariableContext } from "./context";
 import { access } from "@grida/tokens";
@@ -26,7 +27,7 @@ export const useValue = <T = any>(key?: access.KeyPath<T>): any => {
   });
 };
 
-export const useSelectValue = <T>({
+export const useSelectValue = ({
   keys,
 }: {
   keys: Array<Array<string>>;

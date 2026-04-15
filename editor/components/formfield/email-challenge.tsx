@@ -113,7 +113,10 @@ export function createHttpEmailChallengeProvider({
     const t = await res.json().catch(() => null);
     if (!res.ok) {
       const msg =
-        (t && typeof t === "object" && "error" in t && (t as any).error) ||
+        (t &&
+          typeof t === "object" &&
+          "error" in t &&
+          (t as { error: unknown }).error) ||
         `Request failed (${res.status})`;
       throw new Error(String(msg));
     }
@@ -503,10 +506,10 @@ function _EmailChallenge({
 export function EmailChallenge({
   state,
   name,
-  label,
+  label: _label,
   placeholder,
   required,
-  requiredAsterisk = true,
+  requiredAsterisk: _requiredAsterisk = true,
   disabled,
   otpLength,
   otpType,
@@ -583,7 +586,7 @@ export function ChallengeEmailField({
   name,
   placeholder,
   required,
-  requiredAsterisk = true,
+  requiredAsterisk: _requiredAsterisk = true,
   disabled,
   otpLength = 6,
   otpType = "numeric",
@@ -762,7 +765,7 @@ export function EmailChallengePreview({
   name,
   placeholder,
   required,
-  requiredAsterisk = true,
+  requiredAsterisk: _requiredAsterisk = true,
   disabled,
   otpLength,
   otpType,

@@ -189,12 +189,12 @@ function HostedGridaCanvasDocumentProvider({
 
   const save = useCallback(() => {
     setSaving(true);
-    const json = editor.getDocumentJson();
-    return saveHostedGridaCanvasDocument(document_id, json as any).finally(
-      () => {
-        setSaving(false);
-      }
-    );
+    const json = editor.getDocumentJson() as
+      | grida.program.document.Document
+      | undefined;
+    return saveHostedGridaCanvasDocument(document_id, json).finally(() => {
+      setSaving(false);
+    });
   }, [editor, document_id, setSaving]);
 
   const debouncedSave = useDebounceCallback(save, 1000);
@@ -300,7 +300,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren) {
         data: init.data,
       };
 
-      process.env.NODE_ENV === "development" &&
+      if (process.env.NODE_ENV === "development")
         console.log("[EDITOR] saving..", data);
 
       const promise = fetch(`/private/editor/${db_table_id}/fields`, {
@@ -403,7 +403,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren) {
  * @returns
  */
 function useRowEditorRow() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
 
   const row = useMemo(() => {
     switch (state.doctype) {

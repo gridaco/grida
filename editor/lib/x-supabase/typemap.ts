@@ -9,8 +9,6 @@ export namespace PostgresTypeTools {
    * - `suggested` - The field is suggested and likely to be used.
    * - `allowed` - The field is allowed, yet not likely to be suggested.
    */
-  type SuggestionType = keyof SuggestionMap;
-
   type SuggestionMap = {
     default: FormInputType;
     suggested: FormInputType[];
@@ -288,13 +286,13 @@ export namespace PostgresTypeTools {
     interval: undefined,
   };
 
-  const supports_postgrest_text_search: PGSupportedColumnType[] = [
+  const supports_postgrest_text_search = new Set<PGSupportedColumnType>([
     "text",
     "varchar",
     "character varying",
     "citext",
     "tsvector",
-  ];
+  ]);
 
   export function supportsTextSearch(
     type: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType
@@ -307,8 +305,6 @@ export namespace PostgresTypeTools {
       return false;
     }
 
-    return supports_postgrest_text_search.includes(
-      type as PGSupportedColumnType
-    );
+    return supports_postgrest_text_search.has(type as PGSupportedColumnType);
   }
 }

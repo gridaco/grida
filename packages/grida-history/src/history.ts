@@ -11,7 +11,6 @@ import type {
   Preview,
   CommittedTransaction,
   Disposable,
-  Delta,
 } from "./types";
 import { StackImpl, type StackOptions } from "./stack";
 import { TransactionImpl } from "./transaction";
@@ -297,7 +296,7 @@ export class HistoryImpl implements History {
 
   private _discardAllPreviews(): void {
     // Copy the set since discard modifies it
-    for (const p of [...this._activePreviews]) {
+    for (const p of Array.from(this._activePreviews)) {
       if (p.state === "active") {
         p.discard();
       }

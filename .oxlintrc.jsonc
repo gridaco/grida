@@ -1,0 +1,39 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "react",
+    "react-perf",
+    // TODO:
+    // "vitest",
+    // "jsdoc",
+  ],
+  "categories": {
+    "correctness": "error",
+    "perf": "warn",
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    // ======================================
+    // grida-specific overrides:
+    "typescript/no-namespace": "off",
+  },
+  "env": {
+    "builtin": true,
+    "browser": true,
+    "node": true,
+    "es2024": true,
+  },
+  "ignorePatterns": [
+    "third_party/externals/",
+    ".legacy/",
+    ".ref/",
+    "data/",
+    "bin/",
+    "library/",
+    "worker-configuration.d.ts",
+    "database-generated.types.ts",
+  ],
+}

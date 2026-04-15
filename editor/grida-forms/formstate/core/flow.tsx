@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from "react";
-import { defineStepper, Stepper, Step } from "@stepperize/react";
+import { defineStepper, Step } from "@stepperize/react";
 
 interface IAgentFlowContext {
   prev: () => void;

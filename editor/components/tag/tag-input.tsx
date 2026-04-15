@@ -104,7 +104,7 @@ export interface TagInputProps
 }
 
 const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
-  (props, ref) => {
+  (props, _ref) => {
     const {
       id,
       placeholder,
@@ -126,7 +126,7 @@ const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
       sortTags,
       delimiterList,
       truncate,
-      autocompleteFilter,
+      autocompleteFilter: _autocompleteFilter,
       borderStyle,
       textCase,
       interaction,

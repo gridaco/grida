@@ -1,5 +1,5 @@
 import { Data } from "@/lib/data";
-import React, { createContext, useState } from "react";
+import React, { createContext } from "react";
 import { useXSBTableSearch } from "@/scaffolds/x-supabase/use-xsb-table-search";
 import { GridaXSupabase } from "@/types";
 

@@ -33,7 +33,7 @@ export async function GET(
     return notFound();
   }
 
-  const { title, fields, responses } = data;
+  const { fields, responses } = data;
 
   // headers
   const headers = [

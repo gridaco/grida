@@ -77,7 +77,7 @@ const EVENT_TYPE_MAP: Record<EmbedEventType, EmbedEvent["type"]> = {
 
 export class GridaEmbed {
   private iframe: HTMLIFrameElement;
-  private listeners = new Map<string, Set<(data: any) => void>>();
+  private listeners = new Map<string, Set<(data: unknown) => void>>();
   private ready = false;
   private queue: EmbedCommand[] = [];
   private handleMessage: (e: MessageEvent) => void;
@@ -268,8 +268,8 @@ export class GridaEmbed {
       set = new Set();
       this.listeners.set(event, set);
     }
-    set.add(cb);
-    return () => set!.delete(cb);
+    set.add(cb as (data: unknown) => void);
+    return () => set!.delete(cb as (data: unknown) => void);
   }
 
   // -------------------------------------------------------------------------

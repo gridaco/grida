@@ -50,10 +50,10 @@ export async function POST(
     .from("response_session")
     .update({
       raw: response_ref.raw
-        ? RawdataProcessing.namekeytoidkey(
-            response_ref.raw as object,
+        ? (RawdataProcessing.namekeytoidkey(
+            response_ref.raw as Record<string, unknown>,
             form_ref.fields
-          )
+          ) as Record<string, string>)
         : {},
     })
     .eq("id", session_id);

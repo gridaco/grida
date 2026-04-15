@@ -15,7 +15,7 @@ export function useDatagridTable<T extends GDocTable>():
   | Extract<GDocTable, T>
   | undefined {
   const [state] = useEditorState();
-  const { datagrid_table_id, tables } = state;
+  const { datagrid_table_id } = state;
 
   return useTable<T>(datagrid_table_id);
 }
@@ -44,7 +44,7 @@ export function useDataGridRefresh() {
 }
 
 export function useDataGridTextSearch(delay: number = 250) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
 
   return useDebounceCallback((txt: string) => {
     dispatch({
@@ -112,7 +112,7 @@ export function useFormFields() {
  */
 export function useDatagridTableAttributes() {
   const [state] = useEditorState();
-  const { doctype, form } = state;
+  const { doctype } = state;
   const tb = useDatagridTable();
 
   switch (doctype) {

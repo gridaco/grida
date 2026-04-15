@@ -17,11 +17,13 @@ export async function generate(input: string, gist?: string) {
     });
 
     for await (const partialObject of partialOutputStream) {
+      // oxlint-disable-next-line typescript-eslint/no-explicit-any -- AI SDK streaming partial object
       stream.update(partialObject as any);
     }
 
     stream.done();
 
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- AI SDK stream value access
     const final = (stream.value as any)["curr"];
 
     if (gist) {

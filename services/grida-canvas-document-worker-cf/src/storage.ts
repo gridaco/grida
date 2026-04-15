@@ -18,7 +18,6 @@ import type {
   SerializedNode,
   DocumentDiff,
   NodeOp,
-  SceneOp,
 } from "@grida/canvas-sync";
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ import type { svg } from "./svg-bindings";
 export class SVGAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
 
-  constructor(module: any) {
+  constructor(module: createGridaCanvas.GridaCanvasWasmBindings) {
     this.module = module;
   }
 
@@ -108,7 +108,7 @@ export class SVGAPI {
       const bytes = new Uint8Array(resultLen);
       bytes.set(heap.subarray(resultPtr + 4, resultPtr + 4 + resultLen));
       return bytes;
-    } catch (error) {
+    } catch {
       return null;
     } finally {
       if (resultPtr !== 0) {

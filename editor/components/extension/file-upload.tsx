@@ -366,39 +366,49 @@ FileUploaderTrigger.displayName = "FileUploaderTrigger";
 export const FileValue = forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
->(({ className, name, required, children, ...props }, ref) => {
-  const { dropzoneState, isLOF } = useFileUpload();
-  return (
-    <input
-      name={name}
-      required={required}
-      ref={dropzoneState.inputRef}
-      disabled={isLOF}
-      {...dropzoneState.getInputProps()}
-      style={{}}
-      className={cn("sr-only", `${isLOF ? "cursor-not-allowed" : ""}`)}
-    />
-  );
-});
+>(
+  (
+    { className: _className, name, required, children: _children, ..._props },
+    _ref
+  ) => {
+    const { dropzoneState, isLOF } = useFileUpload();
+    return (
+      <input
+        name={name}
+        required={required}
+        ref={dropzoneState.inputRef}
+        disabled={isLOF}
+        {...dropzoneState.getInputProps()}
+        style={{}}
+        className={cn("sr-only", `${isLOF ? "cursor-not-allowed" : ""}`)}
+      />
+    );
+  }
+);
 
 FileValue.displayName = "FileValue";
 
 export const UploadedFileValue = forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
->(({ className, name, required, value, children, ...props }, ref) => {
-  return (
-    <>
-      <input
-        ref={ref}
-        {...props}
-        name={name}
-        required={required}
-        value={value}
-        className={cn("sr-only", className)}
-      />
-    </>
-  );
-});
+>(
+  (
+    { className, name, required, value, children: _children, ...props },
+    ref
+  ) => {
+    return (
+      <>
+        <input
+          ref={ref}
+          {...props}
+          name={name}
+          required={required}
+          value={value}
+          className={cn("sr-only", className)}
+        />
+      </>
+    );
+  }
+);
 
 UploadedFileValue.displayName = "UploadedFileValue";

@@ -73,6 +73,7 @@ import type { Data } from "@/lib/data";
 import { getCountries } from "libphonenumber-js";
 import {
   PhoneCountryPicker,
+  type PhoneCountryCode,
   type PhoneCountryPickerOption,
 } from "@/components/extension/phone-country-picker";
 
@@ -555,17 +556,18 @@ export function FieldEditPanel({
                   }
                   onCheckedChange={(checked) => {
                     setData((prev) => {
-                      const base =
-                        prev && typeof prev === "object" ? { ...prev } : {};
+                      const base: Partial<PhoneFieldData> =
+                        prev && typeof prev === "object"
+                          ? ({ ...prev } as Partial<PhoneFieldData>)
+                          : {};
 
                       if (!checked) {
-                        delete (base as any).default_country;
+                        delete base.default_country;
                       } else {
-                        (base as any).default_country =
-                          (base as any).default_country ?? "US";
+                        base.default_country = base.default_country ?? "US";
                       }
 
-                      return base as any;
+                      return base as FormFieldDataSchema;
                     });
                   }}
                 />
@@ -577,15 +579,18 @@ export function FieldEditPanel({
                   <PhoneCountryPicker
                     value={
                       (((data as PhoneFieldData | null | undefined)
-                        ?.default_country as string | undefined) ?? "US") as any
+                        ?.default_country as string | undefined) ??
+                        "US") as PhoneCountryCode
                     }
                     options={phone_default_country_options}
                     onChange={(country) => {
                       setData((prev) => {
-                        const base =
-                          prev && typeof prev === "object" ? { ...prev } : {};
-                        (base as any).default_country = country;
-                        return base as any;
+                        const base: Partial<PhoneFieldData> =
+                          prev && typeof prev === "object"
+                            ? ({ ...prev } as Partial<PhoneFieldData>)
+                            : {};
+                        base.default_country = country;
+                        return base as FormFieldDataSchema;
                       });
                     }}
                   />

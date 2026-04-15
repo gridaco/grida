@@ -5,21 +5,15 @@ import { Button as FancyButton } from "@/www/ui/button";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sitemap } from "@/www/data/sitemap";
 import { ArrowRight } from "lucide-react";
 import { Section, SectionHeader } from "@/www/ui/section";
-import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/lib/utils";
 import { Marquee } from "@/www/ui/marquee";
 import { ArrowRightIcon, CalendarIcon } from "@radix-ui/react-icons";
-import {
-  BentoGrid,
-  BentoCard,
-  BentoCardContent,
-  BentoCardCTA,
-} from "@/www/ui/bento-grid";
+import { BentoGrid, BentoCard, BentoCardContent } from "@/www/ui/bento-grid";
 import {
   Accordion,
   AccordionContent,
@@ -224,20 +218,6 @@ function Hero() {
         </div>
       </motion.div>
     </section>
-  );
-}
-
-function Globe({
-  className,
-  ...props
-}: React.HtmlHTMLAttributes<HTMLDivElement>) {
-  return (
-    <iframe
-      {...props}
-      src="https://bg.grida.co/embed/globe"
-      className={cn("w-full h-full border-none bg-transparent", className)}
-      allowFullScreen
-    />
   );
 }
 

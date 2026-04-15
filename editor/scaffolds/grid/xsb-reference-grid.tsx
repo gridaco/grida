@@ -11,7 +11,7 @@ import { toShorter } from "@/lib/pg-meta/k/alias";
 import "./grid.css";
 
 export function XSBReferenceTableGrid<
-  R extends Record<string, any> = GridDataXSBUnknown.DataGridRow,
+  R extends Record<string, unknown> = GridDataXSBUnknown.DataGridRow,
 >({
   columns: _columns,
   rows: _rows,
@@ -55,7 +55,7 @@ export function XSBReferenceTableGrid<
             </CellRoot>
           );
         },
-        renderCell: ({ row, column }: RenderCellProps<any>) => {
+        renderCell: ({ row, column: _column }: RenderCellProps<R>) => {
           const val = row[col.key as keyof GridDataXSBUnknown.DataGridRow];
           const display = masked
             ? val
@@ -74,7 +74,7 @@ export function XSBReferenceTableGrid<
           );
         },
         maxWidth: 300,
-      }) as Column<any>
+      }) as Column<R>
   );
 
   const rows: R[] = _rows.map((row) => {
@@ -101,7 +101,11 @@ export function XSBReferenceTableGrid<
           <EmptyRowsRenderer loading={loading} hasPredicates={hasPredicates} />
         ),
       }}
-      rowKeyGetter={rowKey ? (row) => (row as any)[rowKey] : undefined}
+      rowKeyGetter={
+        rowKey
+          ? (row) => (row as Record<string, unknown>)[rowKey] as React.Key
+          : undefined
+      }
       rowHeight={32}
       headerRowHeight={36}
     />

@@ -74,7 +74,7 @@ export class UniqueFileNameGenerator {
  */
 export function sanitizeKey(key: string, sep: "-" | "_" = "-"): string {
   // Replace invalid characters with underscores or another safe character
-  return key.replace(/[^\w\/!-.()*' &@$=;:+,?]/g, sep);
+  return key.replace(/[^\w/!-.()*' &@$=;:+,?]/g, sep);
 }
 
 export function isValidKey(key: string): boolean {

@@ -42,7 +42,7 @@ export async function exportAsImage(
 
       // Exclude nodes that match the XPath query
       filter = (domNode) => excludedNodes.has(domNode as HTMLElement);
-    } catch (error) {
+    } catch {
       throw new Error("Invalid XPath");
     }
   }
@@ -118,7 +118,7 @@ export class DOMDefaultExportInterfaceProvider
     _node_id: string,
     format: grida.program.document.NodeExportSettings["format"] | (string & {})
   ): boolean {
-    return this.formats.includes(format as any);
+    return (this.formats as readonly string[]).includes(format);
   }
 
   async exportNodeAs<
@@ -128,7 +128,10 @@ export class DOMDefaultExportInterfaceProvider
     format: F,
     _config?: editor.api.ExportConfigOf<F>
   ): Promise<F extends "SVG" ? string : Uint8Array> {
-    assert(this.formats.includes(format as any), "non supported format");
+    assert(
+      (this.formats as readonly string[]).includes(format),
+      "non supported format"
+    );
 
     switch (format) {
       case "PNG":

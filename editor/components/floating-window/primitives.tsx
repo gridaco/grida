@@ -410,19 +410,23 @@ export function FloatingWindowRoot({
       ref={windowRef}
       data-floating-window
       className={className}
-      style={{
-        ["--floating-window-x" as any]: `${positionRef.current.x}px`,
-        ["--floating-window-y" as any]: `${positionRef.current.y}px`,
-        width,
-        height,
-        position: "absolute",
-        transform:
-          "translate3d(var(--floating-window-x, 0px), var(--floating-window-y, 0px), 0)",
-        transition:
-          dragging || suppressTransition ? undefined : transition || undefined,
-        willChange: "transform",
-        ...style,
-      }}
+      style={
+        {
+          "--floating-window-x": `${positionRef.current.x}px`,
+          "--floating-window-y": `${positionRef.current.y}px`,
+          width,
+          height,
+          position: "absolute",
+          transform:
+            "translate3d(var(--floating-window-x, 0px), var(--floating-window-y, 0px), 0)",
+          transition:
+            dragging || suppressTransition
+              ? undefined
+              : transition || undefined,
+          willChange: "transform",
+          ...style,
+        } as React.CSSProperties
+      }
     >
       {rendered}
     </div>
@@ -526,10 +530,14 @@ export function FloatingWindowTrigger({
   };
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<any>;
+    const child = children as React.ReactElement<Record<string, unknown>>;
     return React.cloneElement(child, {
-      onClick: (e: any) => {
-        child.props?.onClick?.(e);
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+        (
+          child.props as Record<string, unknown> & {
+            onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+          }
+        )?.onClick?.(e);
         handleClick(e);
       },
     });
@@ -574,10 +582,14 @@ export function FloatingWindowClose({
   };
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<any>;
+    const child = children as React.ReactElement<Record<string, unknown>>;
     return React.cloneElement(child, {
-      onClick: (e: any) => {
-        child.props?.onClick?.(e);
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+        (
+          child.props as Record<string, unknown> & {
+            onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+          }
+        )?.onClick?.(e);
         handleClick(e);
       },
     });

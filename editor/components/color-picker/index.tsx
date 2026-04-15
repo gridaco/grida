@@ -19,7 +19,9 @@ export interface ColorPickerBaseProps<
   onChange: (newColor: T) => void;
 }
 
-export function OklchColorPicker(props: Partial<ColorPickerBaseProps<string>>) {
+export function OklchColorPicker(
+  _props: Partial<ColorPickerBaseProps<string>>
+) {
   throw new Error("OklchColorPicker is not implemented");
 }
 

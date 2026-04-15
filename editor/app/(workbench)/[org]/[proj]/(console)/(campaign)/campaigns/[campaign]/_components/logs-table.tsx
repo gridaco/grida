@@ -57,7 +57,7 @@ export default function LogsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {(logs?.length ?? 0 > 0) ? (
+          {(logs?.length ?? 0) > 0 ? (
             logs.map((log, i) => (
               <TableRow key={i}>
                 <TableCell className="font-mono text-xs">

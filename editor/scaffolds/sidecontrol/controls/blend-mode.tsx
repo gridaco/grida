@@ -192,6 +192,7 @@ export function BlendModeDropdown({
               {groupItems.map((item, itemIndex) => (
                 <DropdownMenuCheckboxItem
                   key={`${groupKey}-${itemIndex}`}
+                  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- enum value comparison
                   checked={enumEq(typedValue as any, item)}
                   className="text-xs"
                   onPointerEnter={() => {

@@ -136,7 +136,7 @@ export function JsonPopupEditorCell({
 }
 
 function safeStringifyJson(
-  json: any,
+  json: unknown,
   replacer?: (number | string)[] | null,
   space?: string | number
 ) {
@@ -154,7 +154,7 @@ function isValidJson(jsonString: string) {
   try {
     JSON.parse(jsonString);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }

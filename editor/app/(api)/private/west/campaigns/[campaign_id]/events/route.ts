@@ -11,7 +11,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const { campaign_id: campaign_id } = await context.params;
+  const { campaign_id } = await context.params;
 
   const rlsclient = await createWestReferralClient();
 

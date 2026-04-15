@@ -23,7 +23,7 @@ import {
 import { useEditorState } from "@/scaffolds/editor";
 
 export function SectionBlock({ id }: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
   const deleteBlock = useDeleteBlock();
 

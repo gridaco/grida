@@ -51,7 +51,7 @@ import { RawdataProcessing } from "@/grida-forms/lib/rawdata";
 
 type Params = { id: string };
 
-const cjk = ["ko", "ja"];
+const cjk = new Set(["ko", "ja"]);
 
 interface FormClientFetchResponse {
   data: FormAgentPrefetchData | null;
@@ -152,9 +152,9 @@ export async function GET(
   let system_keys: GFKeys = {};
   try {
     system_keys = parseGFKeys(searchParams);
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("error while parsing system keys:", e);
-    response.error = e;
+    response.error = e as FormClientFetchResponseError;
   }
 
   // TODO: strict with permissions
@@ -178,7 +178,7 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  error && console.error("v1init", id, error);
+  if (error) console.error("v1init", id, error);
 
   if (!data) {
     return notFound();
@@ -190,12 +190,10 @@ export async function GET(
 
   const {
     title,
-
     description,
     default_page,
     fields,
     is_max_form_responses_in_total_enabled,
-    max_form_responses_in_total,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     project_id: __project_id,
@@ -409,8 +407,7 @@ export async function GET(
     // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
     const render_options = renderer
       .fields({ render: true })
-      .map((f) => f.options ?? [])
-      .flat();
+      .flatMap((f) => f.options ?? []);
     const inventory_access_error = await validate_options_inventory({
       inventory: options_inventory,
       options: render_options,
@@ -500,7 +497,7 @@ export async function GET(
     lang: lang,
     options: {
       is_powered_by_branding_enabled,
-      optimize_for_cjk: cjk.includes(lang),
+      optimize_for_cjk: cjk.has(lang),
     },
     background: (data.default_page as unknown as FormDocument | null)
       ?.background,
@@ -548,7 +545,7 @@ export async function GET(
   return NextResponse.json(response);
 }
 
-function merge<A = any, B = any>(a: A, b: B): A & B {
+function merge<A = unknown, B = unknown>(a: A, b: B): A & B {
   return { ...a, ...b };
 }
 

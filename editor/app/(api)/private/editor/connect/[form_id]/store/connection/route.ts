@@ -97,9 +97,7 @@ export async function POST(
   }
 
   // create new connection record
-  const { data: connection, error } = await forms.createStoreConnection(
-    store.id
-  );
+  const { error } = await forms.createStoreConnection(store.id);
 
   if (error) {
     console.error("connection::error:", error);

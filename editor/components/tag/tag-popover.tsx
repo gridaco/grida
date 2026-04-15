@@ -109,8 +109,10 @@ export const TagPopover: React.FC<TagPopoverProps> = ({
       setInputFocused(true);
     }
 
-    const userOnFocus = (children as React.ReactElement<any>).props.onFocus;
-    if (userOnFocus) userOnFocus(event);
+    const userOnFocus = (
+      children as React.ReactElement<React.ComponentProps<"input">>
+    ).props.onFocus;
+    if (userOnFocus) userOnFocus(event as React.FocusEvent<HTMLInputElement>);
   };
 
   const handleInputBlur = (
@@ -125,8 +127,10 @@ export const TagPopover: React.FC<TagPopoverProps> = ({
       setIsPopoverOpen(false);
     }
 
-    const userOnBlur = (children as React.ReactElement<any>).props.onBlur;
-    if (userOnBlur) userOnBlur(event);
+    const userOnBlur = (
+      children as React.ReactElement<React.ComponentProps<"input">>
+    ).props.onBlur;
+    if (userOnBlur) userOnBlur(event as React.FocusEvent<HTMLInputElement>);
   };
 
   return (
@@ -139,11 +143,14 @@ export const TagPopover: React.FC<TagPopoverProps> = ({
         className="relative flex items-center rounded-md border border-input bg-transparent pr-3"
         ref={triggerContainerRef}
       >
-        {React.cloneElement(children as React.ReactElement<any>, {
-          onFocus: handleInputFocus,
-          onBlur: handleInputBlur,
-          ref: inputRef,
-        })}
+        {React.cloneElement(
+          children as React.ReactElement<React.ComponentProps<"input">>,
+          {
+            onFocus: handleInputFocus,
+            onBlur: handleInputBlur,
+            ref: inputRef,
+          }
+        )}
         <PopoverTrigger asChild>
           <Button
             ref={triggerRef}

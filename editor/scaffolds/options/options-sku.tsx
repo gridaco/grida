@@ -129,12 +129,6 @@ function SkuItemRow({
     setOnHand((v) => v + diff);
   };
 
-  const onChangeOnHand = (value: number) => {
-    const diff = value - option.on_hand;
-    setOnHand((v) => v + diff);
-    setAvailable((v) => v + diff);
-  };
-
   useEffect(() => {
     onChange?.({ available: availabe, on_hand: onHand });
   }, [availabe, onHand]);

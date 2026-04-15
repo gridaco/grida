@@ -1,13 +1,8 @@
 "use client";
 
-import FormStartPage000 from "@/theme/templates/formstart/default/page";
-import FormStartPage001 from "@/theme/templates/formstart/001/page";
-import FormStartPage002 from "@/theme/templates/formstart/002/page";
 import FormStartPage003 from "@/theme/templates/formstart/003/page";
-import FormStartPage004 from "@/theme/templates/formstart/004/page";
 import FormStartPage005 from "@/theme/templates/formstart/005/page";
 import FormStartPage005_RES from "@/theme/templates/formstart/005/messages.json";
-import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import type { CampaignMeta } from "@/grida-forms-hosted/types";
 import React, { useMemo } from "react";
 import grida from "@grida/schema";
@@ -22,7 +17,7 @@ import { I18nextProvider } from "react-i18next";
 export namespace FormStartPage {
   type ClientTemplateDefinition =
     grida.program.document.template.TemplateDocumentDefinition & {
-      component: React.ComponentType<any>;
+      component: React.ComponentType<Record<string, unknown>>;
       resources: Resource;
     };
 
@@ -66,7 +61,7 @@ export namespace FormStartPage {
   type ResourceKey =
     | string
     | {
-        [key: string]: any;
+        [key: string]: unknown;
       };
 
   interface ResourceLanguage {
@@ -103,7 +98,7 @@ export namespace FormStartPage {
           resources: template.resources,
           lng: lang,
         },
-        (err, t) => {
+        (err, _t) => {
           if (err) return console.log("something went wrong loading", err);
         }
       );

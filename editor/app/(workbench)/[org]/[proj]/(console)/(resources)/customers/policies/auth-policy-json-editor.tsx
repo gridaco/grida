@@ -37,7 +37,7 @@ export function AuthPolicyJsonEditor({
       onValueChange?.(parsedChallenges);
 
       //
-    } catch (error) {
+    } catch {
       setJsonError("Invalid JSON format");
     }
   };

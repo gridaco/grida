@@ -4,14 +4,11 @@ import {
   UpdateFormAccessMaxResponseByCustomerRequest,
 } from "@/types/private/api";
 import assert from "assert";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const data: UpdateFormAccessMaxResponseByCustomerRequest = await req.json();
-
-  const cookieStore = await cookies();
 
   const { form_id, enabled, max } = data;
 

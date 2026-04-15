@@ -2,7 +2,6 @@ import produce from "immer";
 import type { DataQueryState } from "./data-query.provider";
 import type {
   DataQueryAction,
-  DataQueryRefreshAction,
   DataQueryPageLimitAction,
   DataQueryPaginateAction,
   DataQueryOrderByUpsertAction,
@@ -67,6 +66,7 @@ export default function reducer(
       });
     }
     case "data/query/orderby/clear": {
+      // oxlint-disable-next-line no-empty-pattern
       const {} = <DataQueryOrderByClearAction>action;
       return produce(state, (draft) => {
         draft.q_orderby = {};
@@ -104,6 +104,7 @@ export default function reducer(
       });
     }
     case "data/query/predicates/clear": {
+      // oxlint-disable-next-line no-empty-pattern
       const {} = <DataQueryPredicatesClearAction>action;
       return produce(state, (draft) => {
         draft.q_predicates = [];
@@ -150,6 +151,7 @@ export default function reducer(
       });
     }
     case "data/query/textsearch/clear": {
+      // oxlint-disable-next-line no-empty-pattern
       const {} = <DataQueryTextSearchClearAction>action;
       return produce(state, (draft) => {
         draft.q_text_search = null;

@@ -1,14 +1,14 @@
 import { useRef, useCallback } from "react";
 
-export function useThrottle<T extends (...args: any[]) => void>(
-  callback: T,
+export function useThrottle<A extends unknown[]>(
+  callback: (...args: A) => void,
   delay: number
-): (...args: Parameters<T>) => void {
+): (...args: A) => void {
   const lastRan = useRef(Date.now());
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   return useCallback(
-    (...args: Parameters<T>) => {
+    (...args: A) => {
       const handler = () => {
         if (Date.now() - lastRan.current >= delay) {
           callback(...args);

@@ -66,6 +66,7 @@ export async function POST(
       data: safe_data_field({
         type: init.type,
         data: init.data,
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK column type mismatch
       }) as any,
       accept: init.accept,
       multiple: init.multiple,
@@ -123,6 +124,7 @@ export async function POST(
 
   // upsert optgroups
   // upserted & inserted optgroups (for response)
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK response type
   const upserted_optgroups: any[] = [];
   // input id (draftid | db id) -> db id
   const upserted_optgroups_id_map = new Map<string, string>();
@@ -168,6 +170,7 @@ export async function POST(
     upserted_optgroups.push(...upserted);
   }
 
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK response type
   let upserted_options: any[] | undefined = undefined;
 
   if (options) {
@@ -301,16 +304,22 @@ function itemsdiff<T>(
   keep: T[];
   remove: T[];
 } {
-  const previous_keys = previous.map((r) => r[key]);
-  const current_keys = current.map((r) => r[key]);
-  const added_keys = current_keys.filter((k) => !previous_keys.includes(k));
-  const removed_keys = previous_keys.filter((k) => !current_keys.includes(k));
+  const previous_keys = new Set(previous.map((r) => r[key]));
+  const current_keys = new Set(current.map((r) => r[key]));
+  const added_keys = new Set(
+    [...current_keys].filter((k) => !previous_keys.has(k))
+  );
+  const removed_keys = new Set(
+    [...previous_keys].filter((k) => !current_keys.has(k))
+  );
   // not removed and not added
-  const keep_keys = current_keys.filter((k) => previous_keys.includes(k));
+  const keep_keys = new Set(
+    [...current_keys].filter((k) => previous_keys.has(k))
+  );
   return {
-    add: current.filter((r) => added_keys.includes(r[key])),
-    remove: previous.filter((r) => removed_keys.includes(r[key])),
-    keep: current.filter((r) => keep_keys.includes(r[key])),
+    add: current.filter((r) => added_keys.has(r[key])),
+    remove: previous.filter((r) => removed_keys.has(r[key])),
+    keep: current.filter((r) => keep_keys.has(r[key])),
   };
 }
 
@@ -346,13 +355,4 @@ function safe_data_field({
   }
 
   return data;
-}
-
-function omit<T extends Record<string, any>>(
-  obj: T,
-  ...keys: string[]
-): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([key]) => !keys.includes(key))
-  ) as Partial<T>;
 }

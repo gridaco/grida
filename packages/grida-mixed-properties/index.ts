@@ -18,7 +18,7 @@ export type MixedProperty<T, S> = {
 } & ({ value: T; mixed: false } | { value: S; mixed: true });
 
 export type KeyIgnoreFn<T> = (key: keyof T | string) => boolean;
-type CompareFn<T = any> = (a: T, b: T) => boolean;
+type CompareFn<T = unknown> = (a: T, b: T) => boolean;
 export type PropertyCompareFn<T> = <K extends keyof T>(
   key: K,
   a: T[K],
@@ -83,12 +83,15 @@ function should_ignore_key<T>(
  * // }
  * ```
  */
+// oxlint-disable-next-line typescript/no-explicit-any
 export default function mixed<T extends Record<string, any>, S>(
   objects: T[],
   {
     idKey,
     ignoredKey: ignoredKeys = [],
+    // oxlint-disable-next-line typescript/no-explicit-any
     mixed: mixedIndicator,
+    // oxlint-disable-next-line typescript/no-explicit-any
     compare = (_key: any, a: any, b: any) => equal(a, b),
   }: MixedOptions<T, S>
 ): MixedProperties<T, S> {
@@ -98,7 +101,7 @@ export default function mixed<T extends Record<string, any>, S>(
     new Set(objects.flatMap((obj) => Object.keys(obj ?? {})))
   ).filter((k) => k !== idKey && !should_ignore_key(k, ignoredKeys));
 
-  const result: Record<string, MixedProperty<any, any>> = {};
+  const result: Record<string, MixedProperty<unknown, unknown>> = {};
 
   for (const key of allKeys) {
     const values = objects.map((obj) => obj[key]);
@@ -130,13 +133,13 @@ export default function mixed<T extends Record<string, any>, S>(
   return result as MixedProperties<T, S>;
 }
 
-function getMixedPropertyType(value: any): MixedPropertyType {
+function getMixedPropertyType(value: unknown): MixedPropertyType {
   if (typeof value === "string") return "string";
   if (typeof value === "number") return "number";
   if (typeof value === "boolean") return "boolean";
   if (value && typeof value === "object" && !Array.isArray(value))
     return "object";
-  return undefined as any;
+  return undefined as unknown as MixedPropertyType;
 }
 
 function unique<T>(arr: T[], eq: CompareFn<T>): T[] {

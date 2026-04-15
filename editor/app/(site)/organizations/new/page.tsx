@@ -82,7 +82,7 @@ export default function NewOrganizationSetupPage(props: {
         action={`/private/accounts/organizations/new`}
         method="post"
         className="flex flex-col gap-8"
-        onSubmit={(e) => {
+        onSubmit={() => {
           setBusy(true);
         }}
       >

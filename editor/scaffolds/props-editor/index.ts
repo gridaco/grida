@@ -2,7 +2,6 @@
 import grida from "@grida/schema";
 import { produce } from "immer";
 import { useCallback, useEffect, useMemo, useReducer } from "react";
-import { flatten, unflatten } from "flat";
 
 /**
  * Sets a value on an object using a dot-notation path.
@@ -16,6 +15,7 @@ import { flatten, unflatten } from "flat";
  * setByPath(obj, "foo.bar.baz", 42);
  * console.log(obj); // { foo: { bar: { baz: 42 } } }
  */
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic nested path access
 function setByPath(obj: any, path: string, value: unknown) {
   const keys = path.split(".");
   let current = obj;
@@ -47,7 +47,8 @@ function setByPath(obj: any, path: string, value: unknown) {
  * const value = getByPath(obj, "foo.bar.baz");
  * console.log(value); // 42
  */
-function getByPath(obj: any, path: string): any {
+// oxlint-disable-next-line typescript-eslint/no-explicit-any, no-unused-vars -- dynamic nested path access
+function getByPath(obj: any, path: string): unknown {
   return path.split(".").reduce((acc, part) => acc?.[part], obj);
 }
 
@@ -63,6 +64,7 @@ function mergeDefaultProps(
   return merged;
 }
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- generic constraint for props
 export interface PropsEditorInstance<T extends Record<string, any> = any> {
   /**
    * the current props of the template
@@ -80,6 +82,7 @@ export interface PropsEditorInstance<T extends Record<string, any> = any> {
   mergedDefaultProps: Record<string, unknown>;
 }
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- generic constraint for props
 export type ReadonlyPropsEditorInstance<T extends Record<string, any> = any> =
   Pick<PropsEditorInstance<T>, "props" | "mergedDefaultProps">;
 
@@ -126,6 +129,7 @@ function reducer(state: State, action: Action): State {
   });
 }
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- generic constraint for props
 export function usePropsEditor<T extends Record<string, any>>({
   schema,
   initialProps,

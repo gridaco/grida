@@ -7,7 +7,7 @@ import type { fonts } from "./fonts-bindings";
 export class FontsAPI {
   private module: createGridaCanvas.GridaCanvasWasmBindings;
 
-  constructor(module: any) {
+  constructor(module: createGridaCanvas.GridaCanvasWasmBindings) {
     this.module = module;
   }
 
@@ -95,7 +95,7 @@ export class FontsAPI {
         const face = fontFaces[i];
 
         // Allocate face ID string
-        const [faceIdPtr, faceIdLen] = this._alloc_string(face.faceId);
+        const [faceIdPtr, _faceIdLen] = this._alloc_string(face.faceId);
         faceIdPtrs.push(faceIdPtr);
 
         // Allocate font data

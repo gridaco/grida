@@ -267,7 +267,7 @@ export default function AIModelsCatalogPage() {
             <TableBody>
               {[...grouped.entries()].map(([vendor, models]) => {
                 const Logo = Logos[vendor];
-                return models.map((model, i) => (
+                return models.map((model) => (
                   <TableRow key={model.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">

@@ -380,11 +380,15 @@ export namespace grida {
                 ? boolean
                 : never
           : // Handle arrays
+            // oxlint-disable-next-line typescript/no-explicit-any
             T[K] extends TypeArrayPropertyDefinition<any[]>
-            ? Array<any>
+            ? // oxlint-disable-next-line typescript/no-explicit-any
+              Array<any>
             : // Handle custom object types
+              // oxlint-disable-next-line typescript/no-explicit-any
               T[K] extends TypeObjectPropertyDefinition<any>
-              ? { [key: string]: any }
+              ? // oxlint-disable-next-line typescript/no-explicit-any
+                { [key: string]: any }
               : // Handle well-known object types
                 T[K] extends TypeWellKnownObjectPropertyDefinition
                 ? T[K]["type"] extends keyof objects.ObjectTypeMap
@@ -408,7 +412,9 @@ export namespace grida {
 
       export type PropertyDefinition =
         | TypeScalarPropertyDefinition
+        // oxlint-disable-next-line typescript/no-explicit-any
         | TypeArrayPropertyDefinition<any[]>
+        // oxlint-disable-next-line typescript/no-explicit-any
         | TypeObjectPropertyDefinition<any>
         | TypeWellKnownObjectPropertyDefinition;
 
@@ -529,6 +535,7 @@ export namespace grida {
   }
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace grida.program.document {
   export const SCHEMA_VERSION = "0.91.0-beta+20260311";
 
@@ -1083,6 +1090,7 @@ export namespace grida.program.document {
 /**
  * Supported CSS properties and types
  */
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace grida.program.css {
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/length
@@ -1212,6 +1220,7 @@ export namespace grida.program.css {
   >;
 }
 
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace grida.program.nodes {
   export type NodeID = id.NodeIdentifier;
   export type NodeType = Node["type"];
@@ -2907,7 +2916,9 @@ export namespace grida.program.nodes {
         }
         case "container": {
           // Remove children from prototype before spreading to prevent leakage
-          const { children, ...prototypeWithoutChildren } = prototype as any;
+          const { children: _children, ...prototypeWithoutChildren } =
+            // oxlint-disable-next-line typescript/no-explicit-any
+            prototype as any;
           return {
             name: prototype.type,
             type: prototype.type,
@@ -2931,7 +2942,10 @@ export namespace grida.program.nodes {
         case "instance":
         case "template_instance": {
           // Remove children from prototype before spreading to prevent leakage
-          const { children, ...prototypeWithoutChildren } = prototype as any;
+          const { children: _children, ...prototypeWithoutChildren } =
+            // oxlint-disable-next-line typescript/no-explicit-any
+            prototype as any;
+
           // @ts-expect-error
           return {
             name: prototype.type,
@@ -2978,6 +2992,7 @@ export namespace grida.program.nodes {
         }
         default:
           throw new Error(
+            // oxlint-disable-next-line typescript/no-explicit-any
             `Unsupported node prototype type: ${(prototype as any).type}`
           );
       }
@@ -3159,7 +3174,7 @@ export namespace grida.program.nodes {
 }
 
 const cloneWithUndefinedValues = (
-  obj: Record<string, any>
+  obj: Record<string, unknown>
 ): Record<string, undefined> =>
   Object.fromEntries(Object.keys(obj).map((key) => [key, undefined])) as Record<
     string,

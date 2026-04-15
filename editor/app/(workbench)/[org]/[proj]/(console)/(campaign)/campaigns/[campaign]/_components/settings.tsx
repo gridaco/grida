@@ -254,6 +254,7 @@ function Body({
   const router = useRouter();
 
   const form = useForm<CampaignFormValues>({
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- zodResolver type mismatch with react-hook-form
     resolver: zodResolver(formSchema) as any,
     defaultValues: defaultValues,
   });
@@ -854,8 +855,7 @@ function CampaignPublicDataFields({
           >
         );
       } finally {
-        if (cancelled) return;
-        setFormsLoading(false);
+        if (!cancelled) setFormsLoading(false);
       }
     })();
 

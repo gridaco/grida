@@ -7,7 +7,7 @@ import "./simple-csv-table.css";
 
 interface CSVPreviewProps {
   count: number;
-  data: any[];
+  data: Record<string, unknown>[];
   /** Height of the grid viewport. When omitted, the grid fills its container (use a parent with defined height). */
   height?: number;
   className?: string;

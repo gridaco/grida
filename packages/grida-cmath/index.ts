@@ -482,7 +482,7 @@ namespace cmath {
       frequency[num] = (frequency[num] || 0) + 1;
     });
 
-    let mostFrequent: [number, number] = [undefined as any, 0];
+    let mostFrequent: [number, number] = [undefined as unknown as number, 0];
 
     for (const key in frequency) {
       const count = frequency[key];
@@ -2716,16 +2716,19 @@ namespace cmath {
       const gapSize = (totalSize - totalRectSize) / (rectangles.length - 1);
 
       // Sort rectangles by position along the specified axis
-      const sortedIndexes = [...rectangles.map((_, index) => index)].sort(
-        (a, b) =>
+      const sortedIndexes = rectangles
+        .map((_, index) => index)
+        .sort((a, b) =>
           axis === "x"
             ? rectangles[a].x - rectangles[b].x
             : rectangles[a].y - rectangles[b].y
-      );
+        );
 
       // Distribute rectangles evenly along the axis
       let currentPosition = start;
-      const distributed = new Array(rectangles.length);
+      const distributed: Rectangle[] = Array.from({
+        length: rectangles.length,
+      }) as Rectangle[];
       for (const index of sortedIndexes) {
         const rect = rectangles[index];
         distributed[index] = {
@@ -3874,8 +3877,8 @@ namespace cmath {
 
         f1 = x1 < cx ? cmath.PI - f1 : f1;
         f2 = x2 < cx ? cmath.PI - f2 : f2;
-        f1 < 0 && (f1 = cmath.PI * 2 + f1);
-        f2 < 0 && (f2 = cmath.PI * 2 + f2);
+        if (f1 < 0) f1 = cmath.PI * 2 + f1;
+        if (f2 < 0) f2 = cmath.PI * 2 + f2;
         if (sweep_flag && f1 > f2) {
           f1 = f1 - cmath.PI * 2;
         }
@@ -5093,10 +5096,15 @@ namespace cmath {
             ) {
               // keep the better (smaller residual) if available
               if ((item.residual ?? 1e9) < (h.residual ?? 1e9)) {
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).a_t = item.a_t;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).b_t = item.b_t;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).p = item.p;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).residual = item.residual;
+                // oxlint-disable-next-line typescript/no-explicit-any
                 (h as any).kind = item.kind;
               }
               return;
@@ -5730,7 +5738,7 @@ namespace cmath {
      * - The returned angle is in the range (-180, 180].
      */
     export function angle(transform: Transform): number {
-      const [[a, b, _tx], [c, d, _ty]] = transform;
+      const [[a, _b, _tx], [c, _d, _ty]] = transform;
       const radians = Math.atan2(c, a); // typical for rotation matrix: a = cosθ, c = sinθ
       const degrees = radians * (180 / Math.PI);
       return degrees;

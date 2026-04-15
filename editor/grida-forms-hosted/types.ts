@@ -197,7 +197,8 @@ export interface IFormField {
   required: boolean;
   readonly: boolean;
   help_text?: string | null;
-  pattern?: any | null;
+  // oxlint-disable-next-line no-explicit-any -- DB Json type; narrowing requires updating all Supabase query consumers
+  pattern?: any;
   step?: number | null;
   min?: number | null;
   max?: number | null;
@@ -244,6 +245,7 @@ export interface IFormBlock<T = FormBlockType> {
   description_html?: string | null;
   body_html?: string | null;
   src?: string | null;
+  // oxlint-disable-next-line no-explicit-any -- polymorphic DB JSON; narrowing cascades across 30+ consumers
   data: any;
   parent_id?: string | null;
   local_index: number;
@@ -290,6 +292,7 @@ export interface FormResponseSession {
   id: string;
   created_at: string;
   customer_id: string | null;
+  // oxlint-disable-next-line no-explicit-any -- DB JSON field; narrowing cascades across 50+ consumers
   raw: Record<string, any> | null;
 }
 
@@ -303,6 +306,7 @@ export interface FormResponse {
   form_id: string;
   ip: string | null;
   platform_powered_by: PlatformPoweredBy | null;
+  // oxlint-disable-next-line no-explicit-any -- DB JSON field; narrowing cascades across 50+ consumers
   raw: any;
   updated_at: string;
   x_referer: string | null;
@@ -322,6 +326,7 @@ export interface FormResponseField {
   response_id: string;
   type: FormInputType;
   updated_at: string;
+  // oxlint-disable-next-line no-explicit-any -- DB JSON field; narrowing cascades across 50+ consumers
   value: any;
   form_field_option_id: string | null;
   storage_object_paths: string[] | null;
@@ -350,9 +355,16 @@ export interface FormFieldReferenceSchema {
   column: string;
 }
 
-export function isReferenceSchema(ref: any): ref is FormFieldReferenceSchema {
+export function isReferenceSchema(
+  ref: unknown
+): ref is FormFieldReferenceSchema {
   return (
-    ref && "type" in ref && "schema" in ref && "table" in ref && "column" in ref
+    typeof ref === "object" &&
+    ref !== null &&
+    "type" in ref &&
+    "schema" in ref &&
+    "table" in ref &&
+    "column" in ref
   );
 }
 

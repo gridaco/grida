@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { cva } from "class-variance-authority";
 import { cn } from "@/components/lib/utils";
 import ContentEditable, {
@@ -188,11 +188,13 @@ export function CursorChatInput({
     }
   };
 
-  const handleBeforeInput = (e: any) => {
+  const handleBeforeInput = (e: React.FormEvent<HTMLDivElement>) => {
     if (!maxLength) return;
 
     const currentLength = getTextContent().length;
-    const inputData = e.dataTransfer?.getData("text/plain") || e.data || "";
+    const nativeEvent = e.nativeEvent as InputEvent;
+    const inputData =
+      nativeEvent.dataTransfer?.getData("text/plain") || nativeEvent.data || "";
 
     if (currentLength + inputData.length > maxLength) {
       e.preventDefault();

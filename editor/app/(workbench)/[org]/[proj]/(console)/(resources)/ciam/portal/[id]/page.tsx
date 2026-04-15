@@ -209,6 +209,7 @@ export default function PortalPresetEditPage() {
     const req = Promise.resolve(
       client
         .from("portal_preset")
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK JSON column type
         .update({ portal_login_page: loginPage as any })
         .eq("id", params.id)
     ).then(({ error }) => {
@@ -240,6 +241,7 @@ export default function PortalPresetEditPage() {
     const req = Promise.resolve(
       client
         .from("portal_preset")
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK JSON column type
         .update({ verification_email_template: template as any })
         .eq("id", params.id)
     ).then(({ error }) => {

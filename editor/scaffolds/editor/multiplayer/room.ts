@@ -9,7 +9,6 @@ import type {
   ICursorNode,
 } from "./types";
 import {
-  IMultiplayerCursor,
   IMultiplayerCursorPresence,
   IMultiplayerCursorNotify,
 } from "./provider";
@@ -53,7 +52,7 @@ export function useMultiplayerRoom({
   const [broadcast, setBroadcast] = useState<
     | ((
         event: "LOCATION" | "POS" | "MESSAGE" | "NODE" | "NOTIFY",
-        payload: any
+        payload: object | undefined
       ) => void)
     | undefined
   >();
@@ -76,10 +75,10 @@ export function useMultiplayerRoom({
 
         onPresenceSync(cursors);
       })
-      .on("presence", { event: "join" }, ({ key, newPresences }) => {
+      .on("presence", { event: "join" }, ({ newPresences }) => {
         onJoin(newPresences.map((p) => p.cursor_id));
       })
-      .on("presence", { event: "leave" }, ({ key, leftPresences }) => {
+      .on("presence", { event: "leave" }, ({ leftPresences }) => {
         onLeave(leftPresences.map((p) => p.cursor_id));
       })
       .subscribe(async (status) => {
@@ -153,13 +152,13 @@ export function useMultiplayerRoom({
     );
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        setBroadcast(() => (event: string, payload: any) => {
+        setBroadcast(() => (event: string, payload: object | undefined) => {
           ch.send({
             type: "broadcast",
             event: event,
             payload: {
               cursor_id: cursor_id,
-              ...payload,
+              ...(payload as Record<string, unknown>),
             },
           });
         });

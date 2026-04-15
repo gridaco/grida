@@ -264,6 +264,7 @@ function Preview({
   );
 }
 
+// oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic component props
 function getComponent(template_id: string): React.ComponentType<any> {
   switch (template_id) {
     case "receipt01":

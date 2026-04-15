@@ -302,7 +302,7 @@ function ErrorCodeLink({
   );
 }
 
-const status_colors = {
+const status_colors: Record<number, string> = {
   0: "gray",
   200: "green",
   400: "red",
@@ -310,7 +310,7 @@ const status_colors = {
   500: "red",
 };
 
-const status_texts = {
+const status_texts: Record<number, string> = {
   0: "idle",
   200: "200",
   400: "400",
@@ -327,10 +327,10 @@ function StatusBadge({ status }: { status?: number }) {
           width: 10,
           height: 10,
           borderRadius: "50%",
-          backgroundColor: (status_colors as any)[status ?? 0],
+          backgroundColor: status_colors[status ?? 0],
         }}
       />
-      <span className="ms-2">{(status_texts as any)[status ?? 0]}</span>
+      <span className="ms-2">{status_texts[status ?? 0]}</span>
     </span>
   );
 }
@@ -570,9 +570,7 @@ function WillStartSoon({ at, onExpire }: { at: Date; onExpire?: () => void }) {
     hours,
     days,
     isRunning,
-    start,
     pause,
-    resume,
     restart,
   } = useTimer({
     // +10 seconds

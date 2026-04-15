@@ -1,4 +1,4 @@
-import { jsonSchema } from "ai";
+import { jsonSchema, type JSONSchema7 } from "ai";
 
 const _$ = "grida-portable-html-tailwind-json";
 
@@ -129,4 +129,4 @@ export const request_schema = jsonSchema<StreamingResponse>({
       additionalProperties: false,
     },
   },
-} as any);
+} as JSONSchema7);

@@ -32,7 +32,9 @@ export default async function SharedPlaygroundPage({
     <main>
       <Playground
         initial={{
-          src: (data as any)?.["form.json"],
+          src: (data as Record<string, unknown>)?.["form.json"] as
+            | string
+            | undefined,
           prompt: prompt || undefined,
           slug: slug,
         }}

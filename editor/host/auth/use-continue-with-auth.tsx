@@ -9,7 +9,9 @@ import usePendingCallback from "@/hooks/use-pending-callback";
 
 interface AuthContextType {
   session: Session | null;
-  withAuth: <T extends (...args: any[]) => any>(original: T) => T;
+  withAuth: <A extends unknown[], R>(
+    original: (...args: A) => R
+  ) => (...args: A) => R;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -17,11 +19,11 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const session = useSession();
   const [isOpen, setIsOpen] = useState(false);
-  const [pendingState, pendingHandlers] = usePendingCallback();
+  const [, pendingHandlers] = usePendingCallback();
   const hasHandledSession = useRef(false);
 
-  const withAuth = <T extends (...args: any[]) => any>(callback: T) => {
-    return (async (...args: any[]) => {
+  const withAuth = <A extends unknown[], R>(callback: (...args: A) => R) => {
+    return (async (...args: A) => {
       if (session) {
         return await callback(...args);
       } else {
@@ -37,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsOpen(true);
         });
       }
-    }) as T;
+    }) as unknown as (...args: A) => R;
   };
 
   const handleAuthSuccess = async () => {
@@ -48,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsOpen(false);
     try {
       await pendingHandlers.executeCallback();
-    } catch (error) {}
+    } catch {}
     hasHandledSession.current = true;
   };
 

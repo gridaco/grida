@@ -11,6 +11,7 @@ interface TossPaymentsShipping {
 
 interface TossPaymentsPaymentMethodOptions {
   paypal?: {
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- PayPal SDK type, shape not documented
     setTransactionContext: any;
   };
 }

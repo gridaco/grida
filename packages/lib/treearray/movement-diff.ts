@@ -83,6 +83,7 @@ export function movementDiff({
 }
 
 interface __InsertResult<
+  // oxlint-disable-next-line typescript/no-explicit-any
   T extends ISortItem = any,
   O extends ISortItem = ISortItem,
 > {
@@ -90,6 +91,7 @@ interface __InsertResult<
   data: (T | O)[];
   shifted: T[];
 }
+// oxlint-disable-next-line typescript/no-explicit-any
 export function __insert<T extends ISortItem = any, O = any>({
   step: { big, small = 1 },
   insert,
@@ -103,6 +105,7 @@ export function __insert<T extends ISortItem = any, O = any>({
   insert: O;
   insertat: number;
   data: T[];
+  // oxlint-disable-next-line typescript/no-explicit-any
 }): __InsertResult<T, any> {
   if (insertat < 0 || insertat == undefined) {
     throw `\`insertat\` cannot be negative value or empty. givven was ${insertat}`;
@@ -143,7 +146,7 @@ export function __insert<T extends ISortItem = any, O = any>({
     };
 
     const _shiftUntil = shiftUntil(cursorItem);
-    sorted.slice(0, _shiftUntil).map((item, i) => {
+    sorted.slice(0, _shiftUntil).map((item, _i) => {
       let newsort = item.sort + small;
       shifted.push(item);
       item.sort = newsort;

@@ -1,7 +1,7 @@
 import { cn } from "@/components/lib/utils";
 import { useTableDefinition } from "../data-query";
 import assert from "assert";
-import type { DGColumn, DGResponseRow } from "../grid";
+import type { DGResponseRow } from "../grid";
 import { useMemo } from "react";
 import { analyze } from "../data-card/analyze";
 import { DataCard } from "../data-card/card";

@@ -10,7 +10,7 @@ const IS_HOSTED = process.env.VERCEL === "1";
 /**
  * [invite]
  */
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   //
   const headersList = await headers();
   const campaign_id = headersList.get(

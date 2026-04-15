@@ -63,7 +63,7 @@ function useRenderer(raw?: string | JSONFormRaw | null) {
 }
 
 export default function PlaygroundPreviewSlave() {
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
 
   const [schema, setSchema] = useState<string | null>(null);
   const [variablescss, setVariablescss] = useState<string | null>(null);
@@ -110,6 +110,7 @@ export default function PlaygroundPreviewSlave() {
               fields={renderer.fields()}
               blocks={renderer.blocks()}
               tree={renderer.tree()}
+              // oxlint-disable-next-line typescript-eslint/no-explicit-any -- i18n translation type
               translation={resources[lang].translation as any}
               config={{
                 is_powered_by_branding_enabled: true,

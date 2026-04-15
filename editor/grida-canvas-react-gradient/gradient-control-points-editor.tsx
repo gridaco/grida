@@ -8,7 +8,6 @@ import {
   gradientPositionToScreen,
   controlPointsReducer,
   type GradientType,
-  type ControlPoints,
 } from "./gradient-reducer";
 import type cg from "@grida/cg";
 import kolor from "@grida/color";
@@ -176,7 +175,7 @@ export default function GradientControlPointsEditor({
 
   // Handle pointer up to end dragging
   const handlePointerUp = useCallback(
-    (e?: React.PointerEvent | PointerEvent) => {
+    (_e?: React.PointerEvent | PointerEvent) => {
       if (drag) {
         setDrag(null);
       }

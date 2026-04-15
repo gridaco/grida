@@ -1,7 +1,6 @@
 import type {
   CSSProperties,
   GridaBlock,
-  GridaGridImageBlock,
   ObjectFit,
   TypographyCSSProperties,
 } from "../blocks";

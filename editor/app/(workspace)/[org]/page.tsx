@@ -147,7 +147,3 @@ function ProjectsLoading() {
     </div>
   );
 }
-
-function RenameDialog() {
-  //
-}

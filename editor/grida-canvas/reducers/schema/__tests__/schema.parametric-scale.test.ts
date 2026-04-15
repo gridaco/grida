@@ -1,4 +1,7 @@
 import cmath from "@grida/cmath";
+import cg from "@grida/cg";
+import color from "@grida/color";
+import type grida from "@grida/schema";
 
 import { schema } from "../schema";
 
@@ -25,7 +28,7 @@ describe("parametric_scale.scale_rect_about_anchor", () => {
 
 describe("parametric_scale._fe_blur", () => {
   it("scales radii for progressive blur but keeps normalized coords", () => {
-    const initial: any = {
+    const initial: cg.FeLayerBlur = {
       type: "filter-blur",
       active: true,
       blur: {
@@ -39,31 +42,32 @@ describe("parametric_scale._fe_blur", () => {
       },
     };
 
-    const out = schema.parametric_scale._fe_blur(initial, 2) as any;
+    const out = schema.parametric_scale._fe_blur(initial, 2);
+    const blur = out.blur as cg.FeProgressiveBlur;
 
-    expect(out.blur.x1).toBe(-1);
-    expect(out.blur.y1).toBe(-0.5);
-    expect(out.blur.x2).toBe(1);
-    expect(out.blur.y2).toBe(0.5);
-    expect(out.blur.radius).toBe(6);
-    expect(out.blur.radius2).toBe(14);
+    expect(blur.x1).toBe(-1);
+    expect(blur.y1).toBe(-0.5);
+    expect(blur.x2).toBe(1);
+    expect(blur.y2).toBe(0.5);
+    expect(blur.radius).toBe(6);
+    expect(blur.radius2).toBe(14);
   });
 });
 
 describe("parametric_scale._fe_shadow", () => {
   it("scales dx/dy/blur/spread but preserves non-length fields", () => {
-    const initial: any = {
+    const initial: cg.FeShadow = {
       type: "shadow",
       active: true,
       inset: false,
-      color: { r: 1, g: 0, b: 0, a: 1 },
+      color: color.colorformats.newRGBA32F(1, 0, 0, 1),
       dx: 1,
       dy: -2,
       blur: 3,
       spread: 4,
     };
 
-    const out = schema.parametric_scale._fe_shadow(initial, 3) as any;
+    const out = schema.parametric_scale._fe_shadow(initial, 3);
 
     expect(out.type).toBe("shadow");
     expect(out.active).toBe(true);
@@ -79,15 +83,16 @@ describe("parametric_scale._fe_shadow", () => {
 
 describe("parametric_scale._fe_noise", () => {
   it("scales noise_size but preserves density/seed", () => {
-    const initial: any = {
+    const initial: cg.FeNoise = {
       type: "noise",
+      mode: "mono",
       active: true,
       noise_size: 5,
       density: 0.3,
       seed: 42,
     };
 
-    const out = schema.parametric_scale._fe_noise(initial, 0.5) as any;
+    const out = schema.parametric_scale._fe_noise(initial, 0.5);
 
     expect(out.noise_size).toBe(2.5);
     expect(out.density).toBe(0.3);
@@ -97,17 +102,14 @@ describe("parametric_scale._fe_noise", () => {
 
 describe("parametric_scale._stroke_width_profile", () => {
   it("scales stop.r but preserves stop.u", () => {
-    const initial: any = {
+    const initial: cg.VariableWidthProfile = {
       stops: [
         { u: 0, r: 1 },
         { u: 0.5, r: 2 },
       ],
     };
 
-    const out = schema.parametric_scale._stroke_width_profile(
-      initial,
-      4
-    ) as any;
+    const out = schema.parametric_scale._stroke_width_profile(initial, 4);
 
     expect(out.stops).toEqual([
       { u: 0, r: 4 },
@@ -118,17 +120,18 @@ describe("parametric_scale._stroke_width_profile", () => {
 
 describe("parametric_scale.apply_node", () => {
   it("scales stroke widths and dash arrays", () => {
-    const node: any = {
+    const node = {
       type: "rectangle",
       stroke_width: 2,
       stroke_dash_array: [1, 2, 3],
       corner_radius: 4,
-    };
+    } as unknown as grida.program.nodes.Node;
 
     schema.parametric_scale.apply_node(node, 2);
 
-    expect(node.stroke_width).toBe(4);
-    expect(node.stroke_dash_array).toEqual([2, 4, 6]);
-    expect(node.corner_radius).toBe(8);
+    const result = node as grida.program.nodes.UnknownNode;
+    expect(result.stroke_width).toBe(4);
+    expect(result.stroke_dash_array).toEqual([2, 4, 6]);
+    expect(result.corner_radius).toBe(8);
   });
 });

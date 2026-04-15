@@ -235,11 +235,11 @@ function __has_image_paint(
   switch (paint_target) {
     case "fill": {
       // Check fills
-      const fills = Array.isArray((node as any).fill_paints)
-        ? ((node as any)
-            .fill_paints as grida.program.nodes.i.props.PropsPaintValue[])
-        : (node as any).fill
-          ? [(node as any).fill as grida.program.nodes.i.props.PropsPaintValue]
+      const un = node as grida.program.nodes.UnknownNode;
+      const fills = Array.isArray(un.fill_paints)
+        ? (un.fill_paints as grida.program.nodes.i.props.PropsPaintValue[])
+        : un.fill
+          ? [un.fill as grida.program.nodes.i.props.PropsPaintValue]
           : [];
       const fillImageIndex = fills.findIndex(
         (paint) => paint?.type === "image"
@@ -256,14 +256,11 @@ function __has_image_paint(
     }
     case "stroke": {
       // Check strokes
-      const strokes = Array.isArray((node as any).stroke_paints)
-        ? ((node as any)
-            .stroke_paints as grida.program.nodes.i.props.PropsPaintValue[])
-        : (node as any).stroke
-          ? [
-              (node as any)
-                .stroke as grida.program.nodes.i.props.PropsPaintValue,
-            ]
+      const un2 = node as grida.program.nodes.UnknownNode;
+      const strokes = Array.isArray(un2.stroke_paints)
+        ? (un2.stroke_paints as grida.program.nodes.i.props.PropsPaintValue[])
+        : un2.stroke
+          ? [un2.stroke as grida.program.nodes.i.props.PropsPaintValue]
           : [];
       const strokeImageIndex = strokes.findIndex(
         (paint) => paint?.type === "image"

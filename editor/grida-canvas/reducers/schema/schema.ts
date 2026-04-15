@@ -19,6 +19,7 @@ export namespace schema {}
  *
  * Spec: https://grida.co/docs/wg/feat-authoring/parametric-scaling
  */
+// oxlint-disable-next-line eslint(no-unused-vars)
 export namespace schema.parametric_scale {
   type NodeScaleProps = Partial<
     grida.program.nodes.i.ICornerRadius &
@@ -96,6 +97,7 @@ export namespace schema.parametric_scale {
     };
   }
 
+  // oxlint-disable-next-line no-unused-vars
   function scale_number(
     v: number | null | undefined,
     s: number

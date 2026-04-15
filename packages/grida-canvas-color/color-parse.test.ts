@@ -533,31 +533,31 @@ describe("color-parse", () => {
     });
   });
 
-  it.skip("Array", () => {
-    expect(parse([1, 2, 3] as any)).toEqual({
-      space: "rgb",
-      values: [1, 2, 3],
-      alpha: 1,
-    });
-  });
+  // it.skip("Array", () => {
+  //   expect(parse([1, 2, 3] as any)).toEqual({
+  //     space: "rgb",
+  //     values: [1, 2, 3],
+  //     alpha: 1,
+  //   });
+  // });
 
-  it.skip("Object", () => {
-    expect(parse({ r: 1, g: 2, b: 3 } as any)).toEqual({
-      space: "rgb",
-      values: [1, 2, 3],
-      alpha: 1,
-    });
-    expect(parse({ red: 1, green: 2, blue: 3 } as any)).toEqual({
-      space: "rgb",
-      values: [1, 2, 3],
-      alpha: 1,
-    });
-    expect(parse({ h: 1, s: 2, l: 3 } as any)).toEqual({
-      space: "hsl",
-      values: [1, 2, 3],
-      alpha: 1,
-    });
-  });
+  // it.skip("Object", () => {
+  //   expect(parse({ r: 1, g: 2, b: 3 } as any)).toEqual({
+  //     space: "rgb",
+  //     values: [1, 2, 3],
+  //     alpha: 1,
+  //   });
+  //   expect(parse({ red: 1, green: 2, blue: 3 } as any)).toEqual({
+  //     space: "rgb",
+  //     values: [1, 2, 3],
+  //     alpha: 1,
+  //   });
+  //   expect(parse({ h: 1, s: 2, l: 3 } as any)).toEqual({
+  //     space: "hsl",
+  //     values: [1, 2, 3],
+  //     alpha: 1,
+  //   });
+  // });
 
   it("Number", () => {
     expect(parse(0xa141e)).toEqual({

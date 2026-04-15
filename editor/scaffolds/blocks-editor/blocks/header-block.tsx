@@ -30,7 +30,7 @@ export function HeaderBlock({
   title_html,
   description_html,
 }: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+  const [, dispatch] = useEditorState();
   const deleteBlock = useDeleteBlock();
   const [focused, setFocus] = useBlockFocus(id);
 

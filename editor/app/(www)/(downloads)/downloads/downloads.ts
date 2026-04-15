@@ -21,13 +21,6 @@ export namespace downloads {
   export type Arch = "x64" | "arm64" | "universal";
   export type Maker = "dmg" | "squirrel.windows" | "deb" | "rpm";
 
-  const content_types = {
-    dmg: "application/x-apple-diskimage",
-    exe: "application/x-msdos-program",
-    deb: "application/x-debian-package",
-    rpm: "application/x-redhat-package-manager",
-  };
-
   type Distro = {
     maker: "dmg" | "squirrel.windows" | "deb" | "rpm";
     pattern: string;
@@ -131,7 +124,7 @@ export namespace downloads {
    */
   export function getLinks_v001(
     platform: Platform | null,
-    arch?: Arch
+    _arch?: Arch
   ): DownloadLinks & {
     default: {
       platform: Platform;
@@ -237,7 +230,6 @@ export namespace downloads {
     }
 
     async fetch() {
-      if (this.m_assets) this.m_assets;
       const release = await fetchrelease();
       this.m_tag = release.data.tag_name;
       this.m_assets = release.data.assets;
@@ -277,7 +269,8 @@ export namespace downloads {
         // console.log(assets);
         assert(assets.length === 1);
         return assets[0];
-      } catch (e) {
+      } catch {
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- fallback for missing asset
         return null as any;
       }
     }

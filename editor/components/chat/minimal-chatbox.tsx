@@ -10,6 +10,7 @@ import {
   ChatBoxAttachmentPreview,
   ChatBoxSubmit,
   ChatBoxAttachmentUploader,
+  type Attachment,
 } from "./chatbox";
 
 export function MinimalChatBox({
@@ -21,7 +22,7 @@ export function MinimalChatBox({
   accept,
 }: {
   disabled?: boolean;
-  onValueCommit?: (value: { text: string; attachments: any[] }) => void;
+  onValueCommit?: (value: { text: string; attachments: Attachment[] }) => void;
   uploader?: FileIO.BucketFileUploaderFn;
   placeholder?: string;
   className?: string;

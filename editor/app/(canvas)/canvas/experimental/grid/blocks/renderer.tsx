@@ -145,7 +145,7 @@ function GridaFormsStartButtonBlock({ status }: GridaFormsStartButtonBlock) {
   );
 }
 
-function GridaFormsTimerBlock({}: GridaFormsTimerBlock) {
+function GridaFormsTimerBlock(_props: GridaFormsTimerBlock) {
   const mock = useMemo(
     () => new Date().getTime() + 1000 * 60 * 60 * 24 * 10,
     []

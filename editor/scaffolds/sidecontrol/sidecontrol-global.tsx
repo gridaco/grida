@@ -182,7 +182,13 @@ function _FormStartPageControl() {
             properties={properties!}
             props={shallowProps}
             onValueChange={(k, v) => {
-              editor.commands.changeNodePropertyProps("page", k, v);
+              editor.commands.changeNodePropertyProps(
+                "page",
+                k,
+                v as
+                  | import("@grida/tokens").tokens.StringValueExpression
+                  | undefined
+              );
             }}
           />
         </SidebarMenuSectionContent>
@@ -271,7 +277,7 @@ function FontFamilyControl() {
     <ToggleGroup
       type="single"
       value={state.theme.fontFamily}
-      onValueChange={(value) => onFontChange(value as any)}
+      onValueChange={(value) => onFontChange(value as FontFamily)}
       className="w-full"
     >
       <ToggleGroupItem
@@ -316,7 +322,7 @@ function useThemeColorScheme(appearance: Appearance): "light" | "dark" {
 
   const safeSystemTheme =
     // system theme is typed light | dark, but it sometimes gives "system"
-    (systemTheme as any) === "system" ? "light" : (systemTheme ?? "light");
+    (systemTheme as string) === "system" ? "light" : (systemTheme ?? "light");
 
   const colorscheme: "light" | "dark" =
     (appearance === "system" ? safeSystemTheme : appearance) ?? "light";
@@ -347,7 +353,7 @@ function Palette() {
     <Select
       value={palette}
       onValueChange={(v) => {
-        onPaletteChange(v as any);
+        onPaletteChange(v as FormStyleSheetV1Schema["palette"]);
       }}
     >
       <SelectTrigger className={cn("w-full", paletteobj && "!h-16 px-2 py-2")}>
@@ -389,7 +395,9 @@ function Palette() {
                         secondary={secondary}
                         background={background}
                         onSelect={() => {
-                          onPaletteChange(key as any);
+                          onPaletteChange(
+                            key as FormStyleSheetV1Schema["palette"]
+                          );
                         }}
                         selected={key === palette}
                         className="size-10 rounded-sm"
@@ -506,7 +514,7 @@ function Background() {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="none">None</SelectItem>
-          {backgrounds.map((background, i) => (
+          {backgrounds.map((background) => (
             <SelectItem key={background.embed} value={background.embed}>
               <div>
                 <Image
@@ -707,7 +715,7 @@ function Settings() {
                           name="lang"
                           value={lang}
                           onValueChange={(value) => {
-                            onLangChange(value as any);
+                            onLangChange(value as FormsPageLanguage);
                           }}
                         >
                           <SelectTrigger>

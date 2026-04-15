@@ -66,10 +66,14 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(schema);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
     return NextResponse.json(
-      { error: error.message || "Failed to generate form field schema" },
+      {
+        error:
+          (error instanceof Error ? error.message : null) ||
+          "Failed to generate form field schema",
+      },
       { status: 500 }
     );
   }

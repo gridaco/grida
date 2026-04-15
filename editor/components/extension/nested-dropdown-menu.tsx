@@ -12,7 +12,7 @@ import React from "react";
 
 type Path = string[];
 
-export interface NestedMenuItemProps<T = any> {
+export interface NestedMenuItemProps<T = unknown> {
   name: string;
   // when resolved set to true, the menu item will not have a submenu
   resolved?: boolean;
@@ -21,7 +21,7 @@ export interface NestedMenuItemProps<T = any> {
 }
 
 // Props for the NestedDropdownMenu component
-interface NestedDropdownMenuProps<T = any> {
+interface NestedDropdownMenuProps<T = unknown> {
   resolveMenuItems: (
     path: Path | "root"
   ) => NestedMenuItemProps<T>[] | undefined;
@@ -29,14 +29,14 @@ interface NestedDropdownMenuProps<T = any> {
   onSelect?: (path: Path, item: NestedMenuItemProps<T>) => void;
 }
 
-const renderMenuItems = ({
+const renderMenuItems = <T,>({
   items,
   resolveMenuItems,
   renderMenuItem,
   onSelect,
   relpath = [],
-}: NestedDropdownMenuProps & {
-  items: NestedMenuItemProps[];
+}: NestedDropdownMenuProps<T> & {
+  items: NestedMenuItemProps<T>[];
   relpath?: Path;
 }): React.ReactNode => {
   return items.map((item, index) => {

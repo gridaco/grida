@@ -44,7 +44,11 @@ export function NodeOverlayCornerRadiusHandle({
         se: "rectangular_corner_radius_bottom_right",
         sw: "rectangular_corner_radius_bottom_left",
       } as const;
-      return (node as any)[keyMap[anchor]] ?? 0;
+      return (
+        ((node as unknown as Record<string, unknown>)[
+          keyMap[anchor]
+        ] as number) ?? 0
+      );
     }
     return typeof node.corner_radius === "number" ? node.corner_radius : 0;
   }, [node, anchor]);

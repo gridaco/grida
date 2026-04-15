@@ -14,7 +14,6 @@ import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 import { TenantMiddleware } from "./lib/tenant/middleware";
 import { updateSession } from "./lib/supabase/proxy";
-import { Env } from "./env";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const IS_DEV = process.env.NODE_ENV === "development";

@@ -4,6 +4,7 @@ import React, { createContext, useContext } from "react";
 
 interface CurrentTenantLayout {
   id: string;
+  // oxlint-disable-next-line typescript-eslint/no-explicit-any -- JSON column from Supabase
   template: { data: any };
   metadata: unknown;
 }

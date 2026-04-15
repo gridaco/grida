@@ -11,15 +11,9 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  InputIcon,
-  LockClosedIcon,
-  ReloadIcon,
-  TokensIcon,
-} from "@radix-ui/react-icons";
+import { InputIcon, LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { tokens } from "@grida/tokens";
 import { Badge } from "@/components/ui/badge";
-import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
 import { PropertyAccessExpressionControl } from "./props-property-access-expression";
 import { useSchema } from "../schema";

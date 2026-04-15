@@ -28,7 +28,7 @@ export function createDocumentWithRects(
   count: number = 2
 ): grida.program.document.Document {
   const rects: string[] = [];
-  const nodes: Record<string, any> = {
+  const nodes: Record<string, grida.program.nodes.Node> = {
     scene: sceneNode("scene", "Scene"),
   };
 

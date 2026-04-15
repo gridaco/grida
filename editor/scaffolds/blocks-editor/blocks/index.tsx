@@ -37,8 +37,6 @@ export function Block(props: EditorFlatFormBlock) {
     setActivatorNodeRef,
     transform,
     isDragging,
-    isSorting,
-    isOver,
     transition,
   } = useSortable({
     id: props.id,

@@ -22,6 +22,7 @@
 import { iofigma } from "../lib";
 import type * as figrest from "@figma/rest-api-spec";
 import type grida from "@grida/schema";
+import type { NodeChange } from "../fig-kiwi";
 
 /** Narrow a Kiwi factory result to a node with HasLayoutTrait fields. */
 type KiwiLayoutNode = figrest.HasLayoutTrait & { rotation?: number };
@@ -178,7 +179,7 @@ describe("Kiwi → REST: rotation extraction from matrix", () => {
 
   function kiwiNodeRotation(figmaDegrees: number): number {
     const matrix = kiwiMatrix(figmaDegrees, 50, 100);
-    const nc = {
+    const nc: NodeChange = {
       guid: { sessionID: 1, localID: 1 },
       name: "TestRect",
       type: "RECTANGLE" as const,
@@ -188,12 +189,9 @@ describe("Kiwi → REST: rotation extraction from matrix", () => {
       fillPaints: [],
       strokePaints: [],
     };
-    const node = iofigma.kiwi.factory.node(
-      nc as any,
-      {
-        nodeChanges: [],
-      } as any
-    );
+    const node = iofigma.kiwi.factory.node(nc, {
+      nodeChanges: [],
+    });
     // node.rotation is the intermediate REST-format value (radians)
     return node!.rotation!;
   }
@@ -244,12 +242,9 @@ describe("Kiwi → REST: kiwi_layout_trait", () => {
       fillPaints: [],
       strokePaints: [],
     };
-    const node = iofigma.kiwi.factory.node(
-      nc as any,
-      {
-        nodeChanges: [],
-      } as any
-    );
+    const node = iofigma.kiwi.factory.node(nc, {
+      nodeChanges: [],
+    });
     expect(node).toBeDefined();
     const n = node as KiwiLayoutNode;
     expect(n.size).toEqual({ x: 200, y: 100 });
@@ -272,12 +267,9 @@ describe("Kiwi → REST: kiwi_layout_trait", () => {
       fillPaints: [],
       strokePaints: [],
     };
-    const node = iofigma.kiwi.factory.node(
-      nc as any,
-      {
-        nodeChanges: [],
-      } as any
-    );
+    const node = iofigma.kiwi.factory.node(nc, {
+      nodeChanges: [],
+    });
     expect((node as KiwiLayoutNode).absoluteBoundingBox!.width).toBeCloseTo(
       100,
       1
@@ -299,12 +291,9 @@ describe("Kiwi → REST: kiwi_layout_trait", () => {
       fillPaints: [],
       strokePaints: [],
     };
-    const node = iofigma.kiwi.factory.node(
-      nc as any,
-      {
-        nodeChanges: [],
-      } as any
-    );
+    const node = iofigma.kiwi.factory.node(nc, {
+      nodeChanges: [],
+    });
     const rad = (45 * Math.PI) / 180;
     const expectedW =
       Math.abs(100 * Math.cos(rad)) + Math.abs(50 * Math.sin(rad));
@@ -438,12 +427,9 @@ describe("Kiwi → REST → Grida: end-to-end rotation alignment", () => {
       strokePaints: [],
       frameMaskDisabled: true,
     };
-    const restNode = iofigma.kiwi.factory.node(
-      nc as any,
-      {
-        nodeChanges: [],
-      } as any
-    );
+    const restNode = iofigma.kiwi.factory.node(nc, {
+      nodeChanges: [],
+    });
     if (!restNode) throw new Error("Kiwi factory returned undefined");
 
     const result = iofigma.restful.factory.document(restNode, {}, context);
@@ -508,7 +494,7 @@ describe("Container transform propagation (non-identity 2×2)", () => {
         [0, 1, 50],
       ],
       rotation: 0,
-      children: [childRect as any],
+      children: [childRect as figrest.SubcanvasNode],
     });
 
     const result = iofigma.restful.factory.document(parentFrame, {}, context);
@@ -539,7 +525,7 @@ describe("Container transform propagation (non-identity 2×2)", () => {
       size: { x: 100, y: 80 },
       relativeTransform: rt90,
       rotation: figmaRestRotation(90),
-      children: [childRect as any],
+      children: [childRect],
     });
 
     const result = iofigma.restful.factory.document(parentFrame, {}, context);
@@ -570,7 +556,7 @@ describe("Container transform propagation (non-identity 2×2)", () => {
         [0, 1, 0],
       ],
       rotation: 0,
-      children: [childRect as any],
+      children: [childRect],
     });
 
     const result = iofigma.restful.factory.document(parentFrame, {}, context);
@@ -616,12 +602,9 @@ describe("AABB computation via end-to-end import", () => {
       fillPaints: [],
       strokePaints: [],
     };
-    const node = iofigma.kiwi.factory.node(
-      nc as any,
-      {
-        nodeChanges: [],
-      } as any
-    );
+    const node = iofigma.kiwi.factory.node(nc, {
+      nodeChanges: [],
+    });
     expect((node as KiwiLayoutNode).absoluteBoundingBox!.width).toBeCloseTo(
       200,
       1
@@ -643,12 +626,9 @@ describe("AABB computation via end-to-end import", () => {
       fillPaints: [],
       strokePaints: [],
     };
-    const node = iofigma.kiwi.factory.node(
-      nc as any,
-      {
-        nodeChanges: [],
-      } as any
-    );
+    const node = iofigma.kiwi.factory.node(nc, {
+      nodeChanges: [],
+    });
     expect((node as KiwiLayoutNode).absoluteBoundingBox!.x).toBeCloseTo(40, 1);
     expect((node as KiwiLayoutNode).absoluteBoundingBox!.y).toBeCloseTo(0, 1);
     expect((node as KiwiLayoutNode).absoluteBoundingBox!.width).toBeCloseTo(

@@ -5,10 +5,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { Editor } from "@/grida-canvas/editor";
 import { editor } from "@/grida-canvas";
 import { createHeadlessEditor } from "@/grida-canvas/__tests__/utils";
-import {
-  createDocumentWithRects,
-  MINIMAL_DOCUMENT,
-} from "@/grida-canvas/__tests__/utils/fixtures";
+import { createDocumentWithRects } from "@/grida-canvas/__tests__/utils/fixtures";
 
 describe("editor_type", () => {
   test("defaults to 'freeform' when not specified", () => {

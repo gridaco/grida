@@ -202,7 +202,7 @@ export class FormRenderTree {
         ?.map((block: FormBlock) => {
           const is_field = block.type === "field";
           const field = is_field
-            ? (_m_fields.find((f: any) => f.id === block.form_field_id) ?? null)
+            ? (_m_fields.find((f) => f.id === block.form_field_id) ?? null)
             : null;
 
           const shared: Partial<BaseRenderBlock> = {
@@ -306,12 +306,12 @@ export class FormRenderTree {
       {} as Record<string, Option[]>
     );
 
-    const _render_field_ids = _field_blocks.map(
-      (b: ClientFieldRenderBlock) => b.field.id
+    const _render_field_ids = new Set(
+      _field_blocks.map((b: ClientFieldRenderBlock) => b.field.id)
     );
 
     this._m_render_fields = _m_fields.filter((f) =>
-      _render_field_ids.includes(f.id)
+      _render_field_ids.has(f.id)
     );
 
     // if no blocks, render a simple form based on fields
@@ -325,7 +325,7 @@ export class FormRenderTree {
       const blocks: ClientRenderBlockWithoutIndex[] = [];
 
       const _fields_as_blocks: ClientRenderBlockWithoutIndex[] = _m_fields.map(
-        (field: any, i) => {
+        (field: FormFieldDefinition) => {
           return <ClientRenderBlockWithoutIndex>{
             id: field.id,
             type: "field",

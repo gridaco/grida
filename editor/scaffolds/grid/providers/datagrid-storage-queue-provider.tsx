@@ -1,4 +1,4 @@
-import QueueProvider, { useQueue, useQueueStore } from "react-p-queue";
+import QueueProvider, { useQueue } from "react-p-queue";
 import React, { useEffect, useState } from "react";
 import type {
   CellIdentifier,
@@ -22,7 +22,7 @@ const parsetaskid = (id: string): CellIdentifier => {
 
 type FileStorageQueryTask = {
   id: string;
-  row: Record<string, any> | null;
+  row: Record<string, unknown> | null;
 };
 
 type FileStorageQueryResult = {
@@ -134,11 +134,11 @@ export type UseFileRefsRetrunType =
 
 export function useFileRefs(
   identifier: CellIdentifier,
-  rowdata: Record<string, any> | null,
+  rowdata: Record<string, unknown> | null,
   resolver?: DataGridCellFileRefsResolver
 ): UseFileRefsRetrunType {
   const { add } = useQueue<FileStorageQueryResult, FileStorageQueryTask>();
-  const [error, setError] = useState<any | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [refs, setRefs] = useState<DataGridFileRef[] | "loading" | null>(
     "loading"
   );

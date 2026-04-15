@@ -187,7 +187,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       return updateState(state, (draft) => {
         // Use Graph.rm() to remove scene and all its children
         const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
-        const removed_ids = graph.rm(scene_id);
+        const __removed_ids = graph.rm(scene_id);
 
         // Remove from scenes_ref array
         draft.document.scenes_ref = draft.document.scenes_ref.filter(
@@ -526,10 +526,11 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             const node = dq.__getNodeById(draft, node_id);
             if (!node) continue;
 
-            const existing: cg.Paint[] = Array.isArray((node as any)[pluralKey])
-              ? ([...(node as any)[pluralKey]] as cg.Paint[])
-              : (node as any)[singularKey]
-                ? [(node as any)[singularKey] as cg.Paint]
+            const un = node as grida.program.nodes.UnknownNodeProperties;
+            const existing: cg.Paint[] = Array.isArray(un[pluralKey])
+              ? ([...un[pluralKey]] as cg.Paint[])
+              : un[singularKey]
+                ? [un[singularKey] as cg.Paint]
                 : [];
 
             const clonedPaint = JSON.parse(
@@ -539,9 +540,9 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             // Simply push the paint to the end without any checks
             existing.push(clonedPaint);
 
-            (node as any)[pluralKey] = existing;
+            (un as Record<string, unknown>)[pluralKey] = existing;
             if (existing.length > 0) {
-              (node as any)[singularKey] = existing[0];
+              (un as Record<string, unknown>)[singularKey] = existing[0];
             }
             applied = true;
           }
@@ -613,7 +614,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       if (state.user_clipboard.type !== "prototypes") break;
       if (!action.target) break;
       const { user_clipboard } = state;
-      const { ids, prototypes } = user_clipboard;
+      const { prototypes } = user_clipboard;
 
       const target_parents: string[] = Array.isArray(action.target)
         ? action.target
@@ -1032,7 +1033,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
                 // Update singular property for legacy compatibility
                 const singularKey =
                   paint_target === "stroke" ? "stroke" : "fill";
-                (node as any)[singularKey] = paints[0];
+                (
+                  node as grida.program.nodes.UnknownNodeProperties as Record<
+                    string,
+                    unknown
+                  >
+                )[singularKey] = paints[0];
               }
             });
             break;
@@ -1950,7 +1956,12 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             paints[resolvedIndex] = gradient;
             // Update singular property for legacy compatibility
             const singularKey = paintTarget === "stroke" ? "stroke" : "fill";
-            (node as any)[singularKey] = paints[0];
+            (
+              node as grida.program.nodes.UnknownNodeProperties as Record<
+                string,
+                unknown
+              >
+            )[singularKey] = paints[0];
           }
         }
       });

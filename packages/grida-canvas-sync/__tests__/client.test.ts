@@ -5,7 +5,6 @@ import type {
   ClientMessage,
   ServerMessage,
   SerializedNode,
-  DocumentDiff,
 } from "../src/protocol";
 import type { ISyncTransport, TransportStatus } from "../src/transport";
 

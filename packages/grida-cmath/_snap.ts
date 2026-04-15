@@ -499,9 +499,9 @@ function snapToObjects9PointsGeometry(
   const geometry_chunk_size = 9;
   // 1) snap to objects 9 points (each corner (4), center (1), and midpoints (4))
   const agent_points = cmath.rect.to9PointsChunk(agent);
-  const anchor_points: cmath.ext.snap.AxisAlignedPoint[] = anchors
-    .map((r) => cmath.rect.to9PointsChunk(r))
-    .flat();
+  const anchor_points: cmath.ext.snap.AxisAlignedPoint[] = anchors.flatMap(
+    (r) => cmath.rect.to9PointsChunk(r)
+  );
 
   const snap = cmath.ext.snap.snap2DAxisAligned(
     agent_points,
@@ -774,7 +774,7 @@ export namespace guide {
     lines: cmath.ui.Line[];
     points: cmath.Vector2[];
   } {
-    const { by_objects, anchors, delta } = context;
+    const { by_objects, anchors } = context;
     if (!by_objects) return { lines: [], points: [] };
 
     const { x, y, translated } = by_objects;

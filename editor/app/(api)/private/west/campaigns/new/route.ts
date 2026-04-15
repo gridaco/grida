@@ -98,6 +98,7 @@ export async function POST(req: Request) {
             cta: "Next",
           },
         },
+        // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK JSON column type
       } satisfies TemplateData.West_Referrral__Duo_001 as any,
       version: "1",
       is_public: true,
@@ -205,7 +206,11 @@ export async function POST(req: Request) {
     .from("campaign_referrer_milestone_reward")
     .insert(
       referrer_milestone_rewards.map(
-        (milestone: any) =>
+        (milestone: {
+          threshold: number;
+          description: string;
+          value: number;
+        }) =>
           ({
             campaign_id: campaign_id,
             threshold_count: milestone.threshold,

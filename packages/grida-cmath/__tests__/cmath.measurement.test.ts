@@ -1,5 +1,5 @@
 import cmath from "../index";
-import { measure, Measurement } from "../_measurement";
+import { measure } from "../_measurement";
 
 describe("cmath.measurement", () => {
   describe("measure", () => {

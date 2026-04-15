@@ -132,7 +132,7 @@ export class JSONFrom2DB {
         accept: f.accept,
         // 'alt': f.alt,
         autocomplete: toArrayOf(f.autocomplete),
-        data: f.data as any,
+        data: f.data as Database["grida_forms"]["Tables"]["attribute"]["Insert"]["data"],
         // 'description': f.description,
         form_id: this.form_id!,
         help_text: f.help_text,
@@ -180,14 +180,14 @@ export class JSONFrom2DB {
 
     const options = this.renderer
       .fields()
-      .map((f) =>
-        f.options?.map((o, i) => ({
-          ...o,
-          index: o.index || i,
-          _field: f,
-        }))
+      .flatMap(
+        (f) =>
+          f.options?.map((o, i) => ({
+            ...o,
+            index: o.index || i,
+            _field: f,
+          })) ?? []
       )
-      .flat()
       .filter((o) => !!o);
 
     const rows: FormFieldOptionInsertion[] = options.map((o) => {
@@ -213,7 +213,7 @@ export class JSONFrom2DB {
     // TODO: block mapping is not complete - only works for field blocks and header blocks
 
     // @ts-expect-error - Block mapping type incomplete
-    const rows: FormBlockInsertion[] = this.renderer.blocks().map((b, i) => {
+    const rows: FormBlockInsertion[] = this.renderer.blocks().map((b, _i) => {
       const __shared: Partial<FormBlockInsertion> = {
         // data: b.data
         form_id: this.form_id!,

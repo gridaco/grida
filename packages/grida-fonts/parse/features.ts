@@ -16,7 +16,9 @@ export function parseFeatures(buffer: ArrayBuffer): FontFeature[] {
   return parseFeaturesTable(font);
 }
 
+// oxlint-disable-next-line typescript/no-explicit-any
 export function parseFeaturesTable(font: any): FontFeature[] {
+  // oxlint-disable-next-line typescript/no-explicit-any
   const gsub = font.GSUB as any;
   if (!gsub || !gsub.features) return [];
   const glyphMap = buildGlyphMap(font);
@@ -29,6 +31,7 @@ export function parseFeaturesTable(font: any): FontFeature[] {
     return glyphs;
   };
 
+  // oxlint-disable-next-line typescript/no-explicit-any
   return Object.values(gsub.features).map((f: any) => {
     const glyphIds: number[] = (f.lookups || []).flatMap((li: number) =>
       getLookupGlyphs(li)
@@ -49,6 +52,7 @@ export function parseFeaturesTable(font: any): FontFeature[] {
   });
 }
 
+// oxlint-disable-next-line typescript/no-explicit-any
 function parseLookupGlyphs(font: any, lookupIndex: number): number[] {
   const data: Uint8Array = font._data;
   const bin = Typr.B;
@@ -136,6 +140,7 @@ function readCoverage(data: Uint8Array, offset: number): number[] {
   return [];
 }
 
+// oxlint-disable-next-line typescript/no-explicit-any
 function buildGlyphMap(font: any): Map<number, string> {
   const cmap = font.cmap;
   const map = new Map<number, string>();

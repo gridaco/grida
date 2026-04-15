@@ -92,6 +92,7 @@ export const parse_tmp_storage_object_path = (path: string) => {
 
 export class FileStorage {
   constructor(
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK generic params
     readonly client: SupabaseClient<any, any>,
     readonly bucket: string
   ) {

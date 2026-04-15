@@ -103,7 +103,7 @@ function ModeProviderGrida() {
     return GridData.columns({ table_id: tb.id, fields: tb.attributes });
   }, [tb]);
 
-  const { filtered, inputlength } = useMemo(() => {
+  const { filtered, inputlength: _inputlength } = useMemo(() => {
     return GridData.rows({
       table_id: tb.id,
       table: "v0_schema_table",
@@ -150,7 +150,7 @@ function ModeProviderXSB() {
     });
   }, [tb]);
 
-  const { filtered, inputlength } = useMemo(() => {
+  const { filtered, inputlength: _inputlength } = useMemo(() => {
     return GridData.rows({
       table_id: tb.id,
       table: "v0_schema_table",

@@ -6,10 +6,24 @@ import { Slot as SlotPrimitive } from "radix-ui";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/components/lib/utils/index";
 
-interface TreeContextValue<T = any> {
+/**
+ * Structural type covering the {@link TreeInstance} methods that the
+ * Tree / TreeDragLine components actually consume.  Using a structural
+ * subset avoids invariance issues with `TreeInstance<T>` (which is
+ * invariant due to `setState`).
+ */
+interface TreeLike {
+  getContainerProps: (treeLabel?: string) => Record<string, unknown>;
+  getDragLineStyle?: (
+    topOffset?: number,
+    leftOffset?: number
+  ) => Record<string, unknown>;
+}
+
+interface TreeContextValue<T = unknown> {
   indent: number;
   currentItem?: ItemInstance<T>;
-  tree?: any;
+  tree?: TreeLike;
 }
 
 const TreeContext = React.createContext<TreeContextValue>({
@@ -18,13 +32,13 @@ const TreeContext = React.createContext<TreeContextValue>({
   tree: undefined,
 });
 
-function useTreeContext<T = any>() {
+function useTreeContext<T = unknown>() {
   return React.useContext(TreeContext) as TreeContextValue<T>;
 }
 
 interface TreeProps extends React.HTMLAttributes<HTMLDivElement> {
   indent?: number;
-  tree?: any;
+  tree?: TreeLike;
 }
 
 function Tree({ indent = 20, tree, className, ...props }: TreeProps) {
@@ -55,13 +69,15 @@ function Tree({ indent = 20, tree, className, ...props }: TreeProps) {
   );
 }
 
-interface TreeItemProps<T = any> extends React.HTMLAttributes<HTMLDivElement> {
+interface TreeItemProps<
+  T = unknown,
+> extends React.HTMLAttributes<HTMLDivElement> {
   item: ItemInstance<T>;
   indent?: number;
   asChild?: boolean;
 }
 
-function TreeItem<T = any>({
+function TreeItem<T = unknown>({
   item,
   className,
   asChild,
@@ -85,7 +101,9 @@ function TreeItem<T = any>({
   const Comp = asChild ? SlotPrimitive.Slot : "div";
 
   return (
-    <TreeContext.Provider value={{ indent, currentItem: item }}>
+    <TreeContext.Provider
+      value={{ indent, currentItem: item as ItemInstance<unknown> }}
+    >
       <Comp
         data-slot="tree-item"
         style={mergedStyle}
@@ -133,12 +151,12 @@ function TreeItem<T = any>({
 }
 
 interface TreeItemLabelProps<
-  T = any,
+  T = unknown,
 > extends React.HTMLAttributes<HTMLSpanElement> {
   item?: ItemInstance<T>;
 }
 
-function TreeItemLabel<T = any>({
+function TreeItemLabel<T = unknown>({
   item: propItem,
   children,
   className,

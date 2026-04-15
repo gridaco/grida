@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { Editor } from "@tiptap/react";
 import type { Content, UseEditorOptions } from "@tiptap/react";
+import type { Extensions } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { useEditor } from "@tiptap/react";
 import { Typography } from "@tiptap/extension-typography";
@@ -32,7 +33,7 @@ export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   onUpdate?: (content: Content) => void;
   onBlur?: (content: Content) => void;
   uploader?: (file: File) => Promise<string>;
-  extensions?: any[];
+  extensions?: Extensions;
 }
 
 async function fakeuploader(file: File): Promise<string> {
@@ -179,7 +180,7 @@ export const useMinimalTiptapEditor = ({
   extensions,
   onUpdate,
   onBlur,
-  uploader,
+  uploader: _uploader,
   ...props
 }: UseMinimalTiptapEditorProps) => {
   const throttledSetValue = useThrottle(
