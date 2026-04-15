@@ -408,10 +408,8 @@ function MonoFormField({
             name={name}
             required={required}
             placeholder={placeholder}
-            initialContent={defaultValue ? JSON.parse(defaultValue) : undefined}
-            onContentChange={(editor, content) => {
-              onValueChange?.(JSON.stringify(content));
-            }}
+            initialContent={defaultValue}
+            onContentChange={onValueChange}
             uploader={makeUploader(fileupload)}
             resolver={makeResolver(fileresolve)}
           />

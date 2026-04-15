@@ -246,16 +246,6 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
     useRootTemplateInstanceNode("page");
   const [state] = useEditorState();
 
-  // const { uploadPublic } = useDocumentAssetUpload();
-  // const debouncedRichTextHtmlChange = useDebounceCallback(
-  //   (editor: BlockNoteEditor<any>, content: Block[]) => {
-  //     editor.blocksToHTMLLossy(content).then((html) => {
-  //       changeRootProps("body_html", html);
-  //     });
-  //   },
-  //   300
-  // );
-
   const {
     form: { campaign },
   } = state;

@@ -151,10 +151,12 @@ export namespace RichTextStagedFileUtils {
   export const TMP_PREFIX_SCHEMA = "grida-tmp://";
   export const TMP_SUFFIX_QUERY = "?grida-tmp=true";
 
-  // Define the prefix and suffix regex patterns
+  // Define the prefix and suffix regex patterns. The path capture must be
+  // non-greedy (`.+?`) so that a doc containing multiple staged URLs does
+  // not match across them (greedy `.+` backtracks to the last suffix).
   const _TMP_PREFIX_REGEXP = /grida-tmp:\/\//;
   const _TMP_SUFFIX_REGEXP = /\?grida-tmp=true/;
-  const _PATH_REGEXP = /grida-tmp:\/\/(.+)\?grida-tmp=true/g;
+  const _PATH_REGEXP = /grida-tmp:\/\/(.+?)\?grida-tmp=true/g;
 
   export function encodeTmpUrl(path: string) {
     return TMP_PREFIX_SCHEMA + path + TMP_SUFFIX_QUERY;
@@ -220,12 +222,13 @@ export namespace RichTextStagedFileUtils {
     // Ensure the document is a string
     let docString = typeof doc === "string" ? doc : JSON.stringify(doc);
 
-    // Define the formatter function
-    const formatter = (
-      match: string,
-      ps: { prefix: string; suffix: string }
-    ) => {
-      return files[match].publicUrl || `${ps.prefix}${match}${ps.suffix}`;
+    // Return the resolved publicUrl, or preserve the original tmp URL if the
+    // caller didn't provide a mapping for this path (or the mapping has an
+    // empty publicUrl). Must rebuild from the literal prefix/suffix constants
+    // rather than `ps.prefix`/`ps.suffix`, which are raw regex sources with
+    // escaped slashes that produce invalid JSON when spliced back in.
+    const formatter = (match: string) => {
+      return files[match]?.publicUrl || encodeTmpUrl(match);
     };
 
     // Replace the placeholders in the document string
@@ -237,6 +240,171 @@ export namespace RichTextStagedFileUtils {
     );
 
     return JSON.parse(docString);
+  }
+
+  /**
+   * Prefix stashed in an image node's `id` attribute to carry the
+   * bucket-relative staged path alongside a browser-fetchable display src,
+   * so {@link restageDocument} can rewrite `src` back to grida-tmp form
+   * without session-local state.
+   *
+   * Trade-off: the HTML `id` attribute is reused as a data carrier. Paths
+   * contain `/`, which is HTML5-legal in ids but unusual; two images with
+   * the same path also produce duplicate ids. Neither bites us in practice
+   * (upload paths include a timestamp, and the kit doesn't use `#id` CSS
+   * selectors), but a follow-up could move this onto a custom tiptap
+   * attribute if either constraint starts mattering.
+   */
+  export const STAGED_PATH_ID_PREFIX = "__grida_staged_path__";
+
+  /**
+   * Build an image node's `id` attribute value carrying a staged path.
+   * Consumed by {@link restageDocument} on serialize.
+   */
+  export function encodeStagedIdAttr(path: string): string {
+    return STAGED_PATH_ID_PREFIX + path;
+  }
+
+  /**
+   * Extract a staged path from an image node's `id` attribute, or null if
+   * the id doesn't carry a staged marker.
+   */
+  export function decodeStagedIdAttr(id: unknown): string | null {
+    if (typeof id !== "string") return null;
+    if (!id.startsWith(STAGED_PATH_ID_PREFIX)) return null;
+    return id.slice(STAGED_PATH_ID_PREFIX.length);
+  }
+
+  /**
+   * Sentinel returned by the restage walker to mark "drop this node". Using
+   * a symbol (rather than `undefined`) keeps the drop semantic distinct from
+   * legitimately-undefined property values that exist elsewhere in a node.
+   */
+  const DROP = Symbol("restage.drop");
+  type WalkResult = unknown | typeof DROP;
+
+  /**
+   * Inverse of {@link renderDocument} used by the richtext form field on
+   * serialize. Walks a tiptap doc and:
+   *
+   *   1. For every image node carrying a staged-path marker in its `id`
+   *      attribute, rewrites `src` back to `grida-tmp://{path}?grida-tmp=true`
+   *      so the server's submit pipeline (parseDocument → commitStagedFile →
+   *      renderDocument) can find and commit the staged files.
+   *
+   *   2. Drops any image node whose `src` is a local `blob:` URL — those
+   *      references are per-window and dead the moment the page navigates,
+   *      so persisting them into a draft is always a bug.
+   *
+   * The walker is copy-on-write: when nothing downstream changed, the
+   * original node is returned by reference so image-free documents do not
+   * allocate at all. This runs on every keystroke via richtext-field's
+   * `handleChange`, so the zero-allocation fast path matters.
+   */
+  export function restageDocument<T extends object | string>(doc: T): T {
+    const walk = (node: unknown): WalkResult => {
+      if (Array.isArray(node)) {
+        let changed = false;
+        const out: unknown[] = [];
+        for (const child of node) {
+          const walked = walk(child);
+          if (walked === DROP) {
+            changed = true;
+            continue;
+          }
+          if (walked !== child) changed = true;
+          out.push(walked);
+        }
+        return changed ? out : node;
+      }
+      if (node && typeof node === "object") {
+        const obj = node as Record<string, unknown>;
+        if (
+          obj.type === "image" &&
+          obj.attrs &&
+          typeof obj.attrs === "object"
+        ) {
+          const attrs = obj.attrs as Record<string, unknown>;
+          const src = typeof attrs.src === "string" ? attrs.src : "";
+          if (src.startsWith("blob:")) return DROP;
+          const stagedPath = decodeStagedIdAttr(attrs.id);
+          if (stagedPath) {
+            const rewrittenSrc = encodeTmpUrl(stagedPath);
+            if (src === rewrittenSrc) return node;
+            return { ...obj, attrs: { ...attrs, src: rewrittenSrc } };
+          }
+        }
+        let changed = false;
+        let copy: Record<string, unknown> | null = null;
+        for (const key of Object.keys(obj)) {
+          const walked = walk(obj[key]);
+          // DROP is only meaningful inside content arrays — at object-prop
+          // level it never fires because image nodes are always array-nested.
+          // Preserve the original value (including undefined) if nothing
+          // changed, to avoid corrupting legitimately-undefined props.
+          if (walked === DROP || walked === obj[key]) continue;
+          changed = true;
+          if (!copy) copy = { ...obj };
+          copy[key] = walked;
+        }
+        return changed && copy ? copy : node;
+      }
+      return node;
+    };
+
+    const parsed = typeof doc === "string" ? JSON.parse(doc as string) : doc;
+    const walked = walk(parsed);
+    const rewritten = walked === DROP ? parsed : walked;
+    if (rewritten === parsed) return doc;
+    return (
+      typeof doc === "string" ? JSON.stringify(rewritten) : rewritten
+    ) as T;
+  }
+
+  /**
+   * Client-side async variant of {@link renderDocument} that resolves
+   * `grida-tmp://…?grida-tmp=true` paths on demand via a resolver callback.
+   *
+   * Used by the richtext form field to rewrite staged URLs back to public URLs
+   * when loading `initialContent` into the editor, so previously-uploaded
+   * images render correctly on form re-open before the server has a chance
+   * to rewrite them via {@link renderDocument}.
+   *
+   * Each unique path is resolved at most once. Unresolved paths are left in
+   * place (the editor will render them as broken images, matching native
+   * browser behavior) so callers can decide how to surface the failure.
+   */
+  export async function resolveDocument<T extends object | string>(
+    doc: T,
+    resolver: (file: {
+      path: string;
+    }) => Promise<{ publicUrl: string } | null> | { publicUrl: string }
+  ): Promise<T> {
+    const { staged_file_paths } = parseDocument(doc);
+    if (staged_file_paths.length === 0) return doc;
+
+    const uniquePaths = Array.from(new Set(staged_file_paths));
+    const entries = await Promise.all(
+      uniquePaths.map(async (path) => {
+        try {
+          const resolved = await resolver({ path });
+          return [path, resolved?.publicUrl] as const;
+        } catch {
+          return [path, undefined] as const;
+        }
+      })
+    );
+
+    // renderDocument crashes if files[path] is missing, so provide an entry
+    // for every staged path. Unresolved paths get an empty publicUrl so the
+    // formatter's `|| fallback` branch preserves the original grida-tmp URL.
+    const files: Record<string, { path: string; publicUrl: string }> = {};
+    for (const [path, publicUrl] of entries) {
+      files[path] = { path, publicUrl: publicUrl ?? "" };
+    }
+
+    const rendered = renderDocument(doc, { files });
+    return (typeof doc === "string" ? JSON.stringify(rendered) : rendered) as T;
   }
 }
 

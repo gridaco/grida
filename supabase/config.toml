@@ -146,6 +146,11 @@ objects_path = "seed/buckets/storage"
 [storage.buckets.grida-forms]
 public = true
 
+[storage.buckets.grida-forms-response]
+public = true
+file_size_limit = "30MiB"
+allowed_mime_types = ["image/*", "video/*", "audio/*", "application/pdf"]
+
 
 [auth]
 enabled = true

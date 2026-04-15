@@ -19,10 +19,25 @@ import {
   ResetMarksOnEnter,
   FileHandler,
 } from "../extensions";
+import type { UploadReturnType } from "../extensions/image/image";
 import { cn } from "@/components/lib/utils";
-import { fileToBase64, getOutput, randomId } from "../utils";
+import { getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
 import { toast } from "sonner";
+
+/**
+ * Build an image node attrs object from a File. Uses a blob URL so the
+ * ImageViewBlock's upload effect can pick it up and route through the
+ * configured `uploadFn`. This keeps drop / paste / toolbar flows unified —
+ * all three insert blob URLs and upload through one path.
+ */
+const imageAttrsFromFile = (file: File) => ({
+  id: randomId(),
+  src: URL.createObjectURL(file),
+  alt: file.name,
+  title: file.name,
+  fileName: file.name,
+});
 
 export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   value?: Content;
@@ -32,20 +47,14 @@ export interface UseMinimalTiptapEditorProps extends UseEditorOptions {
   throttleDelay?: number;
   onUpdate?: (content: Content) => void;
   onBlur?: (content: Content) => void;
-  uploader?: (file: File) => Promise<string>;
+  /**
+   * Handles uploading a dropped / pasted / picked image file. Return a
+   * string to use directly as `<img src>`, or an object to also set
+   * additional image node attrs like `id` (useful for carrying a bucket
+   * path alongside the display URL).
+   */
+  uploader?: (file: File) => Promise<UploadReturnType>;
   extensions?: Extensions;
-}
-
-async function fakeuploader(file: File): Promise<string> {
-  // NOTE: This is a fake upload function. Replace this with your own upload logic.
-  // This function should return the uploaded image URL.
-
-  // wait 3s to simulate upload
-  await new Promise((resolve) => setTimeout(resolve, 3000));
-
-  const src = await fileToBase64(file);
-
-  return src;
 }
 
 const createExtensions = ({
@@ -53,7 +62,7 @@ const createExtensions = ({
   uploader,
 }: {
   placeholder: string;
-  uploader?: (file: File) => Promise<string>;
+  uploader?: (file: File) => Promise<UploadReturnType>;
 }) => [
   StarterKit.configure({
     horizontalRule: false,
@@ -72,27 +81,19 @@ const createExtensions = ({
     allowedMimeTypes: ["image/*"],
     maxFileSize: 5 * 1024 * 1024,
     allowBase64: true,
-    uploadFn: async (file: File) => {
-      return uploader ? await uploader(file) : await fakeuploader(file);
-    },
+    // When no uploader is wired, leave `uploadFn` undefined so ImageViewBlock
+    // falls through to its built-in base64 path (immediate, no artificial
+    // delay). Consumers without an uploader — the event description dialog
+    // and the dev/demo pages — then match their pre-migration behavior of
+    // embedding dropped images as data URLs synchronously at drop time.
+    uploadFn: uploader,
     onToggle(editor, files, pos) {
       editor.commands.insertContentAt(
         pos,
-        files.map((image) => {
-          const blobUrl = URL.createObjectURL(image);
-          const id = randomId();
-
-          return {
-            type: "image",
-            attrs: {
-              id,
-              src: blobUrl,
-              alt: image.name,
-              title: image.name,
-              fileName: image.name,
-            },
-          };
-        })
+        files.map((file) => ({
+          type: "image",
+          attrs: imageAttrsFromFile(file),
+        }))
       );
     },
     onImageRemoved({ id, src }) {
@@ -134,22 +135,21 @@ const createExtensions = ({
     allowedMimeTypes: ["image/*"],
     maxFileSize: 5 * 1024 * 1024,
     onDrop: (editor, files, pos) => {
-      files.forEach(async (file) => {
-        const src = await fileToBase64(file);
-        editor.commands.insertContentAt(pos, {
+      editor.commands.insertContentAt(
+        pos,
+        files.map((file) => ({
           type: "image",
-          attrs: { src },
-        });
-      });
+          attrs: imageAttrsFromFile(file),
+        }))
+      );
     },
     onPaste: (editor, files) => {
-      files.forEach(async (file) => {
-        const src = await fileToBase64(file);
-        editor.commands.insertContent({
+      editor.commands.insertContent(
+        files.map((file) => ({
           type: "image",
-          attrs: { src },
-        });
-      });
+          attrs: imageAttrsFromFile(file),
+        }))
+      );
     },
     onValidationError: (errors) => {
       errors.forEach((error) => {
@@ -180,7 +180,7 @@ export const useMinimalTiptapEditor = ({
   extensions,
   onUpdate,
   onBlur,
-  uploader: _uploader,
+  uploader,
   ...props
 }: UseMinimalTiptapEditorProps) => {
   const throttledSetValue = useThrottle(
@@ -208,7 +208,9 @@ export const useMinimalTiptapEditor = ({
   );
 
   const editor = useEditor({
-    extensions: extensions ? extensions : createExtensions({ placeholder }),
+    extensions: extensions
+      ? extensions
+      : createExtensions({ placeholder, uploader }),
     editorProps: {
       attributes: {
         autocomplete: "off",
