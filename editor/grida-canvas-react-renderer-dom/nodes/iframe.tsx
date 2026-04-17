@@ -12,6 +12,7 @@ export const IFrameWidget = ({
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.HTMLIFrameNode>) => {
   return (
     <iframe
+      title="Embedded iframe"
       src={src as string}
       width={css.toDimension(width)}
       height={css.toDimension(height)}

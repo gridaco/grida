@@ -6,19 +6,43 @@
     "oxc",
     "react",
     "react-perf",
+    "import",
+
     // TODO:
-    // "vitest",
+    // "jsx-a11y",
+    "vitest",
     // "jsdoc",
   ],
   "categories": {
     "correctness": "error",
-    "perf": "warn",
+    // "suspicious": "error",
+    // "restriction": "error",
+    // "perf": "warn",
   },
   "rules": {
-    "typescript/no-explicit-any": "error",
     // ======================================
     // grida-specific overrides:
-    "typescript/no-namespace": "off",
+    "no-namespace": "off",
+
+    // `test.todo` / `it.todo` is Vitest's sanctioned way to track planned-
+    // but-not-yet-written tests. We prefer it over `.skip` + TODO comments
+    // (`jest/no-disabled-tests` rejects those). The `vitest/warn-todo` rule
+    // is opinionated the other way; keep it at warn so CI doesn't fail on
+    // legitimate todos while still surfacing them during local development.
+    "vitest/warn-todo": "warn",
+
+    // ======================================
+    // restriction
+    "no-explicit-any": "error",
+    "no-import-type-side-effects": "error",
+    "no-var": "error",
+    // <planned>
+    // "no-invalid-void-type": "error",
+    // "no-empty-function": "error",
+    // "no-optional-chaining": "error",
+    // "no-alert": "error",
+    // "default-case": "error",
+    // </planned>
   },
   "env": {
     "builtin": true,
@@ -35,5 +59,21 @@
     "library/",
     "worker-configuration.d.ts",
     "database-generated.types.ts",
+  ],
+  "overrides": [
+    {
+      // Benchmark / perf test files intentionally measure timing and do not
+      // assert correctness. They log results to stdout and surface failures
+      // by throwing on regressions, not via `expect(...)`. Exempt them from
+      // the `expect-expect` rule only.
+      "files": [
+        "**/__tests__/bench/**",
+        "**/*.bench.test.ts",
+        "**/bench-*.test.ts",
+      ],
+      "rules": {
+        "jest/expect-expect": "off",
+      },
+    },
   ],
 }

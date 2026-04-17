@@ -15,7 +15,9 @@ describe("Transaction", () => {
       tx.push(counterDelta(c, 1));
       tx.onCommit = () => {};
       tx.commit();
-      expect(() => tx.push(counterDelta(c, 1))).toThrow();
+      expect(() => tx.push(counterDelta(c, 1))).toThrow(
+        /Cannot push to committed transaction/
+      );
     });
 
     it("push after abort throws", () => {
@@ -23,20 +25,22 @@ describe("Transaction", () => {
       const c = { value: 0 };
       tx.push(counterDelta(c, 1));
       tx.abort();
-      expect(() => tx.push(counterDelta(c, 1))).toThrow();
+      expect(() => tx.push(counterDelta(c, 1))).toThrow(
+        /Cannot push to aborted transaction/
+      );
     });
 
     it("commit after commit throws", () => {
       const tx = new TransactionImpl("t", {}, null);
       tx.onCommit = () => {};
       tx.commit(); // empty → no-op but still seals
-      expect(() => tx.commit()).toThrow();
+      expect(() => tx.commit()).toThrow(/Cannot commit committed transaction/);
     });
 
     it("abort after abort throws", () => {
       const tx = new TransactionImpl("t", {}, null);
       tx.abort();
-      expect(() => tx.abort()).toThrow();
+      expect(() => tx.abort()).toThrow(/Cannot abort aborted transaction/);
     });
   });
 

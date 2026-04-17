@@ -7,7 +7,7 @@ import {
   RenderHeaderCellProps,
   useRowSelection,
 } from "react-data-grid";
-import { type DGResponseRow } from "../types";
+import type { DGResponseRow } from "../types";
 import { CellRoot } from "../cells";
 import { useCellRootProps } from "../providers";
 import { SelectColumnHeaderCell } from "../cells/column-select-header-cell";

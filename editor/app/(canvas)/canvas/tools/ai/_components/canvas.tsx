@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { cn } from "@/components/lib/utils";
-import { type DeepPartial } from "ai";
-import { type PortableNode } from "../schema";
+import type { DeepPartial } from "ai";
+import type { PortableNode } from "../schema";
 
 const DEFAULT_IFRAME_HTML = `
   <html>
@@ -51,6 +51,7 @@ export function Canvas({
   return (
     <div className={cn("w-full h-full", className)} {...props}>
       <iframe
+        title="AI canvas preview"
         ref={iframeRef}
         srcDoc={DEFAULT_IFRAME_HTML}
         style={{

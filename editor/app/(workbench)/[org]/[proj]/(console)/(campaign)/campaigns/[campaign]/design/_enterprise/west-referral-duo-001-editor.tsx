@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { type WWWTemplateEditorInstance } from "@/scaffolds/platform/www";
+import type { WWWTemplateEditorInstance } from "@/scaffolds/platform/www";
 import assert from "assert";
 import { toast } from "sonner";
 import { CampaignTemplateDuo001Viewer } from "./template-duo-001-viewer";

@@ -9,8 +9,8 @@ import {
 } from "../figma-default-fonts";
 
 describe("figma-default-fonts", () => {
-  const addFont = vi.fn();
-  const setFallbackFonts = vi.fn();
+  const addFont = vi.fn<(family: string, data: Uint8Array) => void>();
+  const setFallbackFonts = vi.fn<(fonts: string[]) => void>();
   const mockCanvas: FigmaDefaultFontsCanvas = { addFont, setFallbackFonts };
 
   beforeEach(() => {

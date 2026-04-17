@@ -123,10 +123,9 @@ export function KeyboardShortcuts() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredActions = useMemo(() => {
-    const actionsWithId = Object.entries(actions).map(([id, action]) => ({
-      id,
-      ...action,
-    }));
+    const actionsWithId = Object.entries(actions).map(([id, action]) =>
+      Object.assign({ id }, action)
+    );
 
     if (!searchQuery.trim()) {
       return actionsWithId;

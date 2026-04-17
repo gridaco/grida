@@ -198,10 +198,11 @@ describe.runIf(rustBinAvailable())("parity with grida-dev reftest", () => {
   });
 });
 
-if (!rustBinAvailable()) {
-  describe("parity with grida-dev reftest (SKIPPED)", () => {
-    it.skip(`rust binary not found at ${RUST_BIN}; run 'cargo build -p grida-dev' to enable`, () => {
-      // placeholder for skip
-    });
-  });
-}
+describe.skipIf(rustBinAvailable())(
+  "parity with grida-dev reftest (SKIPPED)",
+  () => {
+    it.todo(
+      `rust binary not found at ${RUST_BIN}; run 'cargo build -p grida-dev' to enable`
+    );
+  }
+);

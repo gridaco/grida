@@ -2,7 +2,7 @@
 import React from "react";
 import Image from "next/image";
 import { Carousel, CarouselContent, CarouselItem } from "@/www/ui/carousel";
-import { type CarouselApi } from "@/www/ui/carousel";
+import type { CarouselApi } from "@/www/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import { cn } from "@/components/lib/utils";
 import { motion } from "motion/react";

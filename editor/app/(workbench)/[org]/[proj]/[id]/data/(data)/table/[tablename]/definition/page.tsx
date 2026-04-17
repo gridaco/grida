@@ -45,12 +45,12 @@ export default function TableDefinitionPage(props: {
       (name) => name !== tb.name
     );
     return schema_other_table_names.map((name) => {
-      return {
-        name,
-        ...SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+      return Object.assign(
+        { name },
+        SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
           schema_definitions[name]
-        ),
-      };
+        )
+      );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tb]);

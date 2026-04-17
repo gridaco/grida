@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { service_role } from "@/lib/supabase/server";
-import { type Metadata, type Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import type { FormDocument } from "@/grida-forms-hosted/types";
 import { ThemeProvider } from "@/components/theme-provider";

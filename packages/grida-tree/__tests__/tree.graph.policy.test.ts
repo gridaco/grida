@@ -496,7 +496,9 @@ describe("tree.graph with IGraphPolicy", () => {
         policy
       );
 
-      expect(() => graph.mv("child", "parent")).toThrow();
+      expect(() => graph.mv("child", "parent")).toThrow(
+        /Node cannot be a child/
+      );
       // Should only check can_be_child, not reach can_be_parent or can_link
       expect(checks).toEqual(["can_be_child"]);
     });
@@ -533,7 +535,9 @@ describe("tree.graph with IGraphPolicy", () => {
         policy
       );
 
-      expect(() => graph.mv("child", "parent")).toThrow();
+      expect(() => graph.mv("child", "parent")).toThrow(
+        /Node cannot be a parent/
+      );
       expect(checks).toEqual(["can_be_child", "can_be_parent"]);
     });
 
@@ -573,7 +577,9 @@ describe("tree.graph with IGraphPolicy", () => {
         policy
       );
 
-      expect(() => graph.mv("child", "parent")).toThrow();
+      expect(() => graph.mv("child", "parent")).toThrow(
+        /Node cannot have children/
+      );
       expect(checks).toEqual([
         "can_be_child",
         "can_be_parent",
@@ -617,7 +623,9 @@ describe("tree.graph with IGraphPolicy", () => {
         policy
       );
 
-      expect(() => graph.mv("child", "parent")).toThrow();
+      expect(() => graph.mv("child", "parent")).toThrow(
+        /Link not allowed by policy/
+      );
       expect(checks).toEqual([
         "can_be_child",
         "can_be_parent",

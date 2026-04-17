@@ -27,6 +27,7 @@ export function IconWidget({ repository, name }: IconWidgetProps) {
 }
 
 function RadixIconWidget({ name }: { name: keyof typeof RadixIcons }) {
+  // eslint-disable-next-line import/namespace
   const Component = RadixIcons[name];
   if (Component) return <Component />;
   return <></>;

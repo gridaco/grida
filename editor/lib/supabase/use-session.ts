@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { type Session } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 
 export default function useSession() {
   const client = useMemo(() => createBrowserClient(), []);

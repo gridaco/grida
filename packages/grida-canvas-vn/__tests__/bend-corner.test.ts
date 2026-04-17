@@ -1,6 +1,34 @@
 import { vn } from "../vn";
 import cmath from "@grida/cmath";
 
+// Predicate used by tangent tests: `component` must be either 0 (no tangent in that axis)
+// or close to the expected radius. Used to avoid conditional expect calls.
+const isZeroOrCloseTo = (
+  value: number,
+  expected: number,
+  digits = 5
+): boolean => {
+  if (value === 0) return true;
+  // Math.abs(value) must be approximately equal to expected within 10^-digits
+  return Math.abs(Math.abs(value) - expected) < Math.pow(10, -digits);
+};
+
+// Predicate: either both signs are non-zero AND opposite, or at least one is zero.
+const haveOppositeSignsOrZero = (a: number, b: number): boolean => {
+  if (a === 0 || b === 0) return true;
+  return Math.sign(a) === -Math.sign(b);
+};
+
+// Predicate: `magnitude` must be within [expected * 0.5, expected * 2].
+// If magnitude is 0, we treat that as "not set" and the predicate passes.
+const isZeroOrInRange = (
+  magnitude: number,
+  expectedRadius: number
+): boolean => {
+  if (magnitude === 0) return true;
+  return magnitude > expectedRadius * 0.5 && magnitude < expectedRadius * 2;
+};
+
 describe("bendCorner", () => {
   it("uses KAPPA to create mirrored tangents", () => {
     const square = vn.polygon([
@@ -104,18 +132,10 @@ describe("bendCorner", () => {
           i % 2 === 0 ? expectedRadiusTop : expectedRadiusSide; // Even indices are top/bottom, odd are sides
 
         // Check individual tangent magnitudes (not combined)
-        if (Math.abs(seg.ta[0]) > 0) {
-          expect(Math.abs(seg.ta[0])).toBeCloseTo(expectedRadius, 5);
-        }
-        if (Math.abs(seg.ta[1]) > 0) {
-          expect(Math.abs(seg.ta[1])).toBeCloseTo(expectedRadius, 5);
-        }
-        if (Math.abs(seg.tb[0]) > 0) {
-          expect(Math.abs(seg.tb[0])).toBeCloseTo(expectedRadius, 5);
-        }
-        if (Math.abs(seg.tb[1]) > 0) {
-          expect(Math.abs(seg.tb[1])).toBeCloseTo(expectedRadius, 5);
-        }
+        expect(isZeroOrCloseTo(seg.ta[0], expectedRadius)).toBe(true);
+        expect(isZeroOrCloseTo(seg.ta[1], expectedRadius)).toBe(true);
+        expect(isZeroOrCloseTo(seg.tb[0], expectedRadius)).toBe(true);
+        expect(isZeroOrCloseTo(seg.tb[1], expectedRadius)).toBe(true);
       }
     });
 
@@ -158,13 +178,9 @@ describe("bendCorner", () => {
 
         // Verify tangents are mirrored in direction (opposite signs)
         // Note: magnitudes may differ due to segment-length-aware scaling
-        // Check that they are in opposite directions
-        if (tangentA[0] !== 0 && tangentB[0] !== 0) {
-          expect(Math.sign(tangentA[0])).toBe(-Math.sign(tangentB[0]));
-        }
-        if (tangentA[1] !== 0 && tangentB[1] !== 0) {
-          expect(Math.sign(tangentA[1])).toBe(-Math.sign(tangentB[1]));
-        }
+        // Check that they are in opposite directions (or at least one axis is zero)
+        expect(haveOppositeSignsOrZero(tangentA[0], tangentB[0])).toBe(true);
+        expect(haveOppositeSignsOrZero(tangentA[1], tangentB[1])).toBe(true);
 
         // Verify tangent magnitudes are proportional to their segment lengths
         const seg1Length = editor.segmentLength(connectedSegments[0]);
@@ -259,18 +275,10 @@ describe("bendCorner", () => {
           index % 2 === 0 ? expectedRadiusTop : expectedRadiusSide;
 
         // Check individual tangent components (not combined)
-        if (Math.abs(seg.ta[0]) > 0) {
-          expect(Math.abs(seg.ta[0])).toBeCloseTo(expectedRadius, 5);
-        }
-        if (Math.abs(seg.ta[1]) > 0) {
-          expect(Math.abs(seg.ta[1])).toBeCloseTo(expectedRadius, 5);
-        }
-        if (Math.abs(seg.tb[0]) > 0) {
-          expect(Math.abs(seg.tb[0])).toBeCloseTo(expectedRadius, 5);
-        }
-        if (Math.abs(seg.tb[1]) > 0) {
-          expect(Math.abs(seg.tb[1])).toBeCloseTo(expectedRadius, 5);
-        }
+        expect(isZeroOrCloseTo(seg.ta[0], expectedRadius)).toBe(true);
+        expect(isZeroOrCloseTo(seg.ta[1], expectedRadius)).toBe(true);
+        expect(isZeroOrCloseTo(seg.tb[0], expectedRadius)).toBe(true);
+        expect(isZeroOrCloseTo(seg.tb[1], expectedRadius)).toBe(true);
       });
     });
   });
@@ -344,42 +352,22 @@ describe("segment-length-aware corner bending", () => {
     // Check tangent magnitudes rather than individual components
     const taMagnitude = Math.hypot(seg0.ta[0], seg0.ta[1]);
     const tbMagnitude = Math.hypot(seg0.tb[0], seg0.tb[1]);
-    if (taMagnitude > 0) {
-      // The magnitude should be proportional to the segment length
-      // Since the tangent direction depends on geometry, we check that it's reasonable
-      expect(taMagnitude).toBeGreaterThan(expectedRadius1 * 0.5);
-      expect(taMagnitude).toBeLessThan(expectedRadius1 * 2);
-    }
-    if (tbMagnitude > 0) {
-      expect(tbMagnitude).toBeGreaterThan(expectedRadius1 * 0.5);
-      expect(tbMagnitude).toBeLessThan(expectedRadius1 * 2);
-    }
+    expect(isZeroOrInRange(taMagnitude, expectedRadius1)).toBe(true);
+    expect(isZeroOrInRange(tbMagnitude, expectedRadius1)).toBe(true);
 
     // Segment 1-2 (side 2)
     const seg1 = segments[1];
     const seg1taMagnitude = Math.hypot(seg1.ta[0], seg1.ta[1]);
     const seg1tbMagnitude = Math.hypot(seg1.tb[0], seg1.tb[1]);
-    if (seg1taMagnitude > 0) {
-      expect(seg1taMagnitude).toBeGreaterThan(expectedRadius2 * 0.5);
-      expect(seg1taMagnitude).toBeLessThan(expectedRadius2 * 2);
-    }
-    if (seg1tbMagnitude > 0) {
-      expect(seg1tbMagnitude).toBeGreaterThan(expectedRadius2 * 0.5);
-      expect(seg1tbMagnitude).toBeLessThan(expectedRadius2 * 2);
-    }
+    expect(isZeroOrInRange(seg1taMagnitude, expectedRadius2)).toBe(true);
+    expect(isZeroOrInRange(seg1tbMagnitude, expectedRadius2)).toBe(true);
 
     // Segment 2-0 (side 3)
     const seg2 = segments[2];
     const seg2taMagnitude = Math.hypot(seg2.ta[0], seg2.ta[1]);
     const seg2tbMagnitude = Math.hypot(seg2.tb[0], seg2.tb[1]);
-    if (seg2taMagnitude > 0) {
-      expect(seg2taMagnitude).toBeGreaterThan(expectedRadius3 * 0.5);
-      expect(seg2taMagnitude).toBeLessThan(expectedRadius3 * 2);
-    }
-    if (seg2tbMagnitude > 0) {
-      expect(seg2tbMagnitude).toBeGreaterThan(expectedRadius3 * 0.5);
-      expect(seg2tbMagnitude).toBeLessThan(expectedRadius3 * 2);
-    }
+    expect(isZeroOrInRange(seg2taMagnitude, expectedRadius3)).toBe(true);
+    expect(isZeroOrInRange(seg2tbMagnitude, expectedRadius3)).toBe(true);
   });
 
   it("bends corners of a trapezoid with length-proportional tangents", () => {
@@ -418,53 +406,29 @@ describe("segment-length-aware corner bending", () => {
     const seg0 = segments[0];
     const seg0taMagnitude = Math.hypot(seg0.ta[0], seg0.ta[1]);
     const seg0tbMagnitude = Math.hypot(seg0.tb[0], seg0.tb[1]);
-    if (seg0taMagnitude > 0) {
-      expect(seg0taMagnitude).toBeGreaterThan(expectedRadiusTop * 0.5);
-      expect(seg0taMagnitude).toBeLessThan(expectedRadiusTop * 2);
-    }
-    if (seg0tbMagnitude > 0) {
-      expect(seg0tbMagnitude).toBeGreaterThan(expectedRadiusTop * 0.5);
-      expect(seg0tbMagnitude).toBeLessThan(expectedRadiusTop * 2);
-    }
+    expect(isZeroOrInRange(seg0taMagnitude, expectedRadiusTop)).toBe(true);
+    expect(isZeroOrInRange(seg0tbMagnitude, expectedRadiusTop)).toBe(true);
 
     // Right segment (1-2)
     const seg1 = segments[1];
     const seg1taMagnitude = Math.hypot(seg1.ta[0], seg1.ta[1]);
     const seg1tbMagnitude = Math.hypot(seg1.tb[0], seg1.tb[1]);
-    if (seg1taMagnitude > 0) {
-      expect(seg1taMagnitude).toBeGreaterThan(expectedRadiusRight * 0.5);
-      expect(seg1taMagnitude).toBeLessThan(expectedRadiusRight * 2);
-    }
-    if (seg1tbMagnitude > 0) {
-      expect(seg1tbMagnitude).toBeGreaterThan(expectedRadiusRight * 0.5);
-      expect(seg1tbMagnitude).toBeLessThan(expectedRadiusRight * 2);
-    }
+    expect(isZeroOrInRange(seg1taMagnitude, expectedRadiusRight)).toBe(true);
+    expect(isZeroOrInRange(seg1tbMagnitude, expectedRadiusRight)).toBe(true);
 
     // Bottom segment (2-3)
     const seg2 = segments[2];
     const seg2taMagnitude = Math.hypot(seg2.ta[0], seg2.ta[1]);
     const seg2tbMagnitude = Math.hypot(seg2.tb[0], seg2.tb[1]);
-    if (seg2taMagnitude > 0) {
-      expect(seg2taMagnitude).toBeGreaterThan(expectedRadiusBottom * 0.5);
-      expect(seg2taMagnitude).toBeLessThan(expectedRadiusBottom * 2);
-    }
-    if (seg2tbMagnitude > 0) {
-      expect(seg2tbMagnitude).toBeGreaterThan(expectedRadiusBottom * 0.5);
-      expect(seg2tbMagnitude).toBeLessThan(expectedRadiusBottom * 2);
-    }
+    expect(isZeroOrInRange(seg2taMagnitude, expectedRadiusBottom)).toBe(true);
+    expect(isZeroOrInRange(seg2tbMagnitude, expectedRadiusBottom)).toBe(true);
 
     // Left segment (3-0)
     const seg3 = segments[3];
     const seg3taMagnitude = Math.hypot(seg3.ta[0], seg3.ta[1]);
     const seg3tbMagnitude = Math.hypot(seg3.tb[0], seg3.tb[1]);
-    if (seg3taMagnitude > 0) {
-      expect(seg3taMagnitude).toBeGreaterThan(expectedRadiusLeft * 0.5);
-      expect(seg3taMagnitude).toBeLessThan(expectedRadiusLeft * 2);
-    }
-    if (seg3tbMagnitude > 0) {
-      expect(seg3tbMagnitude).toBeGreaterThan(expectedRadiusLeft * 0.5);
-      expect(seg3tbMagnitude).toBeLessThan(expectedRadiusLeft * 2);
-    }
+    expect(isZeroOrInRange(seg3taMagnitude, expectedRadiusLeft)).toBe(true);
+    expect(isZeroOrInRange(seg3tbMagnitude, expectedRadiusLeft)).toBe(true);
   });
 
   it("creates smooth elliptical-like shape for irregular polygon", () => {
@@ -532,14 +496,8 @@ describe("segment-length-aware corner bending", () => {
       const taMagnitude = Math.hypot(seg.ta[0], seg.ta[1]);
       const tbMagnitude = Math.hypot(seg.tb[0], seg.tb[1]);
 
-      if (taMagnitude > 0) {
-        expect(taMagnitude).toBeGreaterThan(expectedRadius * 0.5);
-        expect(taMagnitude).toBeLessThan(expectedRadius * 2);
-      }
-      if (tbMagnitude > 0) {
-        expect(tbMagnitude).toBeGreaterThan(expectedRadius * 0.5);
-        expect(tbMagnitude).toBeLessThan(expectedRadius * 2);
-      }
+      expect(isZeroOrInRange(taMagnitude, expectedRadius)).toBe(true);
+      expect(isZeroOrInRange(tbMagnitude, expectedRadius)).toBe(true);
     });
   });
 
@@ -566,11 +524,7 @@ describe("segment-length-aware corner bending", () => {
     const expectedRadius = (200 / 2) * cmath.KAPPA;
 
     // Check that both tangents use the reference segment's length
-    if (Math.abs(topSegment.ta[0]) > 0) {
-      expect(Math.abs(topSegment.ta[0])).toBeCloseTo(expectedRadius, 5);
-    }
-    if (Math.abs(leftSegment.tb[0]) > 0) {
-      expect(Math.abs(leftSegment.tb[0])).toBeCloseTo(expectedRadius, 5);
-    }
+    expect(isZeroOrCloseTo(topSegment.ta[0], expectedRadius)).toBe(true);
+    expect(isZeroOrCloseTo(leftSegment.tb[0], expectedRadius)).toBe(true);
   });
 });

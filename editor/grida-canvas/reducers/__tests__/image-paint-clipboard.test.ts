@@ -93,10 +93,13 @@ describe("document reducer - image paint clipboard", () => {
       paint_index: 0,
     });
     expect(next.user_clipboard!.type).toBe("property/fill-image-paint");
-    if (next.user_clipboard?.type === "property/fill-image-paint") {
-      expect(next.user_clipboard.paint).toEqual(paint);
-      expect(next.user_clipboard.paint).not.toBe(paint);
+    if (next.user_clipboard?.type !== "property/fill-image-paint") {
+      throw new Error(
+        "expected user_clipboard to be of type property/fill-image-paint"
+      );
     }
+    expect(next.user_clipboard.paint).toEqual(paint);
+    expect(next.user_clipboard.paint).not.toBe(paint);
   });
 
   test("pasting applies paint to selected nodes", () => {

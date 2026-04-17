@@ -16,11 +16,11 @@ import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
-import {
-  type GDocSchemaTableProviderGrida,
-  type TablespaceSchemaTableStreamType,
-  type TablespaceTransaction,
-  type TVirtualRow,
+import type {
+  GDocSchemaTableProviderGrida,
+  TablespaceSchemaTableStreamType,
+  TablespaceTransaction,
+  TVirtualRow,
 } from "./state";
 import PQueue from "p-queue";
 import assert from "assert";

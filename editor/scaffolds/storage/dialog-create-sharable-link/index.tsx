@@ -183,6 +183,7 @@ function ViewerBody({ viewer }: { viewer: Viewer }) {
   if (is_plain) {
     return (
       <object
+        aria-label="File preview"
         data={viewer.object}
         type={viewer.mimetype}
         width="100%"
@@ -190,7 +191,14 @@ function ViewerBody({ viewer }: { viewer: Viewer }) {
       />
     );
   } else {
-    return <iframe src={viewer.url} width="100%" height="100%" />;
+    return (
+      <iframe
+        title="Shared file preview"
+        src={viewer.url}
+        width="100%"
+        height="100%"
+      />
+    );
   }
 }
 

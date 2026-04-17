@@ -123,6 +123,10 @@ describe("iofigma.restful.factory.document", () => {
       });
 
       // Verify stroke children have paints (stroke geometry is rendered as fill, so fill_paints or stroke_paints)
+      const strokeChildrenWithPaints = strokeChildren.filter(
+        (child: grida.program.nodes.VectorNode) =>
+          (child.stroke_paints?.length ?? 0) > 0
+      );
       strokeChildren.forEach((child: grida.program.nodes.VectorNode) => {
         expect(child.type).toBe("vector");
         expect(
@@ -130,10 +134,12 @@ describe("iofigma.restful.factory.document", () => {
             (child.stroke_paints?.length ?? 0) > 0 ||
             (child.fill_paints?.length ?? 0) > 0
         ).toBeTruthy();
-        if ((child.stroke_paints?.length ?? 0) > 0) {
+      });
+      strokeChildrenWithPaints.forEach(
+        (child: grida.program.nodes.VectorNode) => {
           expect(child.stroke_width).toBeGreaterThan(0);
         }
-      });
+      );
     });
 
     it("should position child VectorNodes correctly relative to parent GroupNode", () => {

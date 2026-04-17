@@ -3825,15 +3825,15 @@ namespace cmath {
     ): number[] {
       // for more information of where this math came from visit:
       // http://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
-      var _120 = (cmath.PI * 120) / 180,
+      const _120 = (cmath.PI * 120) / 180,
         rad = (cmath.PI / 180) * (+angle || 0);
 
-      var res: number[] = [];
+      let res: number[] = [];
 
-      var xy: { x: number; y: number };
+      let xy: { x: number; y: number };
 
       const rotate = function (x: number, y: number, rad: number) {
-        var X = x * cmath.cos(rad) - y * cmath.sin(rad),
+        const X = x * cmath.cos(rad) - y * cmath.sin(rad),
           Y = x * cmath.sin(rad) + y * cmath.cos(rad);
         return { x: X, y: Y };
       };
@@ -3848,14 +3848,15 @@ namespace cmath {
         xy = rotate(x2, y2, -rad);
         x2 = xy.x;
         y2 = xy.y;
-        var x = (x1 - x2) / 2,
+        const x = (x1 - x2) / 2,
           y = (y1 - y2) / 2;
-        var h = (x * x) / (rx * rx) + (y * y) / (ry * ry);
+        let h = (x * x) / (rx * rx) + (y * y) / (ry * ry);
         if (h > 1) {
           h = cmath.sqrt(h);
           rx = h * rx;
           ry = h * ry;
         }
+        // oxlint-disable-next-line no-var
         var rx2 = rx * rx,
           ry2 = ry * ry,
           k =
@@ -3891,9 +3892,9 @@ namespace cmath {
         cx = recursive[2];
         cy = recursive[3];
       }
-      var df = f2 - f1;
+      let df = f2 - f1;
       if (cmath.abs(df) > _120) {
-        var f2old = f2,
+        const f2old = f2,
           x2old = x2,
           y2old = y2;
         f2 = f1 + _120 * (sweep_flag && f2 > f1 ? 1 : -1);
@@ -3907,7 +3908,7 @@ namespace cmath {
         ]);
       }
       df = f2 - f1;
-      var c1 = cmath.cos(f1),
+      const c1 = cmath.cos(f1),
         s1 = cmath.sin(f1),
         c2 = cmath.cos(f2),
         s2 = cmath.sin(f2),
@@ -3926,8 +3927,8 @@ namespace cmath {
       } else {
         // @ts-ignore
         res = [m2, m3, m4].concat(res).join().split(",");
-        var newres = [];
-        for (var i = 0, ii = res.length; i < ii; i++) {
+        const newres = [];
+        for (let i = 0, ii = res.length; i < ii; i++) {
           newres[i] =
             i % 2
               ? rotate(res[i - 1], res[i], rad).y

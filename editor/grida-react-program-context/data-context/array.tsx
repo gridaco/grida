@@ -1,5 +1,5 @@
 import React from "react";
-import { type access } from "@grida/tokens";
+import type { access } from "@grida/tokens";
 import { useValue } from "./use";
 import { ScopedVariableBoundary } from "./context";
 

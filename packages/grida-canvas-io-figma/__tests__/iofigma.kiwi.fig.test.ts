@@ -157,22 +157,21 @@ describe("FigImporter", () => {
       });
 
       // Verify we have at least one internal canvas in the fixture
-      if (internalCanvases.length > 0) {
-        const internalCanvas = internalCanvases[0];
+      expect(internalCanvases.length).toBeGreaterThan(0);
+      const internalCanvas = internalCanvases[0];
 
-        // Count symbols in internal canvas
-        const children = nodeChanges.filter((nc) => {
-          if (!nc.parentIndex?.guid || !internalCanvas.guid) return false;
-          return (
-            iofigma.kiwi.guid(nc.parentIndex.guid) ===
-            iofigma.kiwi.guid(internalCanvas.guid)
-          );
-        });
-        const symbolChildren = children.filter((nc) => nc.type === "SYMBOL");
+      // Count symbols in internal canvas
+      const children = nodeChanges.filter((nc) => {
+        if (!nc.parentIndex?.guid || !internalCanvas.guid) return false;
+        return (
+          iofigma.kiwi.guid(nc.parentIndex.guid) ===
+          iofigma.kiwi.guid(internalCanvas.guid)
+        );
+      });
+      const symbolChildren = children.filter((nc) => nc.type === "SYMBOL");
 
-        // Internal canvas should contain symbols (component definitions)
-        expect(symbolChildren.length).toBeGreaterThan(0);
-      }
+      // Internal canvas should contain symbols (component definitions)
+      expect(symbolChildren.length).toBeGreaterThan(0);
     });
   });
 

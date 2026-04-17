@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { DEFAULT_PLATFORM_APEX_DOMAIN } from "@/lib/domains";
 
+// Mirrors the subset of Supabase's `rpc(fn, args)` signature the production
+// code actually calls.
+type RpcFn = (fn: string, args: unknown) => unknown;
+const rpcMock = vi.hoisted(() => vi.fn<RpcFn>());
+
+vi.mock("@/lib/supabase/service-role-cookie-free-clients", () => ({
+  serviceRolePublicClient: () => ({ rpc: rpcMock }),
+}));
+
 describe("lib/tenant-url", () => {
-  const rpcMock = vi.hoisted(() => vi.fn());
-
-  vi.mock("@/lib/supabase/service-role-cookie-free-clients", () => ({
-    serviceRolePublicClient: () => ({ rpc: rpcMock }),
-  }));
-
   async function importSubject() {
     const mod = await import("./tenant-url");
     return mod.buildTenantSiteBaseUrl;

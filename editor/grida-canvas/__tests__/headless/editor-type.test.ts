@@ -4,6 +4,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { Editor } from "@/grida-canvas/editor";
 import { editor } from "@/grida-canvas";
+import type { Action } from "@/grida-canvas/action";
 import { createHeadlessEditor } from "@/grida-canvas/__tests__/utils";
 import { createDocumentWithRects } from "@/grida-canvas/__tests__/utils/fixtures";
 
@@ -72,7 +73,10 @@ describe("onPostDispatch", () => {
   });
 
   test("hook receives the action and the mutated state", () => {
-    const spy = vi.fn();
+    const spy =
+      vi.fn<
+        (action: Action, state: Readonly<editor.state.IEditorState>) => void
+      >();
     ed.doc.onPostDispatch(spy);
     ed.doc.select(["rect-0"]);
 
@@ -83,7 +87,10 @@ describe("onPostDispatch", () => {
   });
 
   test("hook fires on document/reset", () => {
-    const spy = vi.fn();
+    const spy =
+      vi.fn<
+        (action: Action, state: Readonly<editor.state.IEditorState>) => void
+      >();
     ed.doc.onPostDispatch(spy);
 
     const newState = editor.state.init({
@@ -115,7 +122,10 @@ describe("onPostDispatch", () => {
   });
 
   test("unregister stops hook from firing", () => {
-    const spy = vi.fn();
+    const spy =
+      vi.fn<
+        (action: Action, state: Readonly<editor.state.IEditorState>) => void
+      >();
     const unsub = ed.doc.onPostDispatch(spy);
 
     ed.doc.select(["rect-0"]);

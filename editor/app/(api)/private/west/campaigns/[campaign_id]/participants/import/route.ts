@@ -1,4 +1,4 @@
-import { type Platform } from "@/lib/platform";
+import type { Platform } from "@/lib/platform";
 import { createWestReferralClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 

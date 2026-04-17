@@ -96,7 +96,11 @@ function SectionMainDemo() {
           data-locked={isLocked}
           className="w-full h-full pointer-events-none data-[locked='false']:pointer-events-auto"
         >
-          <iframe src="/www-embed/demo-canvas" className="w-full h-full" />
+          <iframe
+            title="Canvas demo"
+            src="/www-embed/demo-canvas"
+            className="w-full h-full"
+          />
         </div>
       </Card>
     </motion.div>

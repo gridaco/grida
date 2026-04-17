@@ -294,9 +294,9 @@ describe("tree.graph.Graph.import()", () => {
         },
       };
 
-      expect(() =>
-        graph.import(subgraph, ["good1", "good2"], "root")
-      ).toThrow();
+      expect(() => graph.import(subgraph, ["good1", "good2"], "root")).toThrow(
+        /node ID conflict/
+      );
 
       // Verify nothing was added (atomic failure)
       const result = graph.snapshot();
@@ -905,7 +905,9 @@ describe("tree.graph.Graph.import()", () => {
       };
 
       // First root is valid, second would violate policy (parent is leaf)
-      expect(() => graph.import(subgraph, ["invalid"], "leaf")).toThrow();
+      expect(() => graph.import(subgraph, ["invalid"], "leaf")).toThrow(
+        /max_out_degree = 0/
+      );
 
       const result = graph.snapshot();
       // Nothing from subgraph should be added

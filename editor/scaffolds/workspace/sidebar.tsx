@@ -29,7 +29,7 @@ import {
   ChevronDown,
   Trash2Icon,
 } from "lucide-react";
-import { type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,

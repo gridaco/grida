@@ -1,6 +1,6 @@
 import React from "react";
 import Page from "./_page";
-import { type Metadata } from "next";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Supabase Admin Panel | Visual Database Interface for Supabase",

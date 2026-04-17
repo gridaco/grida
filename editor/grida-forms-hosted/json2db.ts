@@ -1,5 +1,5 @@
 import { FormRenderTree } from "@/grida-forms/lib";
-import { type JSONForm } from "@/types";
+import type { JSONForm } from "@/types";
 import type { Database } from "@app/database";
 import { toArrayOf } from "@/types/utility";
 import { SupabaseClient } from "@supabase/supabase-js";

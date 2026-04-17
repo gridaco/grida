@@ -17,14 +17,14 @@ describe("Subscription (headless)", () => {
   });
 
   test("subscribe fires on dispatch", () => {
-    const spy = vi.fn();
+    const spy = vi.fn<(...args: unknown[]) => void>();
     ed.subscribe(spy);
     ed.doc.select(["rect-0"]);
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
   test("subscribe fires on every dispatch", () => {
-    const spy = vi.fn();
+    const spy = vi.fn<(...args: unknown[]) => void>();
     ed.subscribe(spy);
     ed.doc.select(["rect-0"]);
     ed.doc.blur();
@@ -32,7 +32,7 @@ describe("Subscription (headless)", () => {
   });
 
   test("unsubscribe stops notifications", () => {
-    const spy = vi.fn();
+    const spy = vi.fn<(...args: unknown[]) => void>();
     const unsub = ed.subscribe(spy);
     ed.doc.select(["rect-0"]);
     expect(spy).toHaveBeenCalledTimes(1);
@@ -42,7 +42,7 @@ describe("Subscription (headless)", () => {
   });
 
   test("doc.subscribeWithSelector only fires on selected state change", () => {
-    const spy = vi.fn();
+    const spy = vi.fn<(...args: unknown[]) => void>();
     ed.doc.subscribeWithSelector(
       (state) => state.selection,
       (_doc, selection) => spy(selection),

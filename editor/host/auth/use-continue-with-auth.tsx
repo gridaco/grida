@@ -3,7 +3,7 @@
 import { createPortal } from "react-dom";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ContinueWithAuthDialog } from "./continue-with-auth-dialog";
-import { type Session } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 import useSession from "@/lib/supabase/use-session";
 import usePendingCallback from "@/hooks/use-pending-callback";
 

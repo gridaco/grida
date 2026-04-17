@@ -150,14 +150,12 @@ describe("bench: load_scene (WASM-on-Node)", () => {
     }, 120_000);
   }
 
-  if (fixtures.length === 0) {
-    it("no .grida fixtures found (skipped)", () => {
-      console.log(
-        "[wasm-bench] No .grida fixtures in lib/__test__/fixtures/local/. " +
-          "Place .grida files there to benchmark real scenes."
-      );
-    });
-  }
+  it.skipIf(fixtures.length > 0)("no .grida fixtures found (skipped)", () => {
+    console.log(
+      "[wasm-bench] No .grida fixtures in lib/__test__/fixtures/local/. " +
+        "Place .grida files there to benchmark real scenes."
+    );
+  });
 });
 
 describe("cross-boundary: TS encode → WASM decode", () => {
@@ -201,7 +199,8 @@ describe("cross-boundary: TS encode → WASM decode", () => {
     });
   }
 
-  if (sharedFixtures.length === 0) {
-    it("no shared .grida fixtures found (skipped)", () => {});
-  }
+  it.skipIf(sharedFixtures.length > 0)(
+    "no shared .grida fixtures found (skipped)",
+    () => {}
+  );
 });

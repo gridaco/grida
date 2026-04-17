@@ -47,6 +47,8 @@ describe("Selection (headless)", () => {
 
   test("select non-existent node throws", () => {
     // The reducer validates node existence and throws if not found
-    expect(() => ed.doc.select(["does-not-exist"])).toThrow();
+    expect(() => ed.doc.select(["does-not-exist"])).toThrow(
+      /node not found with node_id: "does-not-exist"/
+    );
   });
 });

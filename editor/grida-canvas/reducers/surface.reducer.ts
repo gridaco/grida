@@ -1,4 +1,4 @@
-import { type Draft } from "immer";
+import type { Draft } from "immer";
 import { updateState } from "./utils/immer";
 
 import type { SurfaceAction, EditorSurface_StartGesture } from "../action";

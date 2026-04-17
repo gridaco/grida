@@ -34,6 +34,7 @@ function SectionFooterContainer({
     >
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <iframe
+          title="Background gradient"
           loading="eager"
           className="w-full h-full"
           src="https://bg.grida.co/embed/shadergradient/88"

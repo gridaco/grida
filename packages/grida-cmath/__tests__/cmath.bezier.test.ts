@@ -2236,19 +2236,19 @@ describe("cmath.bezier.subdivide", () => {
       const leftMagnitude = Math.hypot(leftTangent[0], leftTangent[1]);
       const rightMagnitude = Math.hypot(rightTangent[0], rightTangent[1]);
 
-      if (leftMagnitude > 0 && rightMagnitude > 0) {
-        const leftNormalized = [
-          leftTangent[0] / leftMagnitude,
-          leftTangent[1] / leftMagnitude,
-        ];
-        const rightNormalized = [
-          rightTangent[0] / rightMagnitude,
-          rightTangent[1] / rightMagnitude,
-        ];
+      expect(leftMagnitude).toBeGreaterThan(0);
+      expect(rightMagnitude).toBeGreaterThan(0);
+      const leftNormalized = [
+        leftTangent[0] / leftMagnitude,
+        leftTangent[1] / leftMagnitude,
+      ];
+      const rightNormalized = [
+        rightTangent[0] / rightMagnitude,
+        rightTangent[1] / rightMagnitude,
+      ];
 
-        expect(leftNormalized[0]).toBeCloseTo(rightNormalized[0], 6);
-        expect(leftNormalized[1]).toBeCloseTo(rightNormalized[1], 6);
-      }
+      expect(leftNormalized[0]).toBeCloseTo(rightNormalized[0], 6);
+      expect(leftNormalized[1]).toBeCloseTo(rightNormalized[1], 6);
     });
 
     test("should handle complex curves with large tangents", () => {
@@ -2401,19 +2401,19 @@ describe("cmath.bezier.subdivide", () => {
         originalTangent[1]
       );
 
-      if (leftMagnitude > 0 && originalMagnitude > 0) {
-        const leftNormalized = [
-          leftEndTangent[0] / leftMagnitude,
-          leftEndTangent[1] / leftMagnitude,
-        ];
-        const originalNormalized = [
-          originalTangent[0] / originalMagnitude,
-          originalTangent[1] / originalMagnitude,
-        ];
+      expect(leftMagnitude).toBeGreaterThan(0);
+      expect(originalMagnitude).toBeGreaterThan(0);
+      const leftNormalized = [
+        leftEndTangent[0] / leftMagnitude,
+        leftEndTangent[1] / leftMagnitude,
+      ];
+      const originalNormalized = [
+        originalTangent[0] / originalMagnitude,
+        originalTangent[1] / originalMagnitude,
+      ];
 
-        expect(leftNormalized[0]).toBeCloseTo(originalNormalized[0], 6);
-        expect(leftNormalized[1]).toBeCloseTo(originalNormalized[1], 6);
-      }
+      expect(leftNormalized[0]).toBeCloseTo(originalNormalized[0], 6);
+      expect(leftNormalized[1]).toBeCloseTo(originalNormalized[1], 6);
     });
   });
 });

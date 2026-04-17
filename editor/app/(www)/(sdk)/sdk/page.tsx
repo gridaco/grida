@@ -6,7 +6,7 @@ import Hero from "./_sections/hero";
 import Features from "./_sections/features";
 import SectionMainDemo from "./_sections/demo";
 import FAQ from "./_sections/faq";
-import { type Metadata } from "next";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Grida Canvas SDK - Build Your Own Canvas Framework | Open Source",
