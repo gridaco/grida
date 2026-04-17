@@ -141,6 +141,10 @@ export namespace cursors {
     y: number,
     keyword: string = "default"
   ) {
-    return `image-set(url("${url}") 2x, url("${url}") 1x) ${x / 2} ${y / 2}, ${keyword}`;
+    // Always advertise the 64px asset as 2x density so it renders at 32 CSS px
+    // on every display. Listing the same image as `1x` made browsers on 1x
+    // displays (typical Windows) render it at 64 CSS px — visually 2x bigger
+    // with the hotspot offset by half its intended distance.
+    return `image-set(url("${url}") 2x) ${x / 2} ${y / 2}, ${keyword}`;
   }
 }
