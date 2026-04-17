@@ -31,14 +31,13 @@ Original Author: Grida
 
 ## Usage
 
-When using `url-set()` (1x/2x), the hotspot coordinates must match the _rendered_ cursor size. If you provide a `64px` cursor image as `2x`, the CSS hotspot is `(hotspot_in_image / 2)`.
+The hotspot coordinates in CSS must match the _rendered_ cursor size, not the image size. Since these assets are `64px` and we always advertise them as `2x` density, the rendered size is `32` CSS px and the CSS hotspot is `(hotspot_in_image / 2)`.
+
+Do **not** list the same image as both `2x` and `1x` — on a 1x display the browser would pick the `1x` candidate and render the cursor at `64` CSS px (2× too big), while the hotspot stayed sized for `32` CSS px. The arrow tip and the click point would no longer align.
 
 ```css
 cursor:
-  url-set(
-      url("/assets/css-cursors-grida/default-64-x28y28-000000.png") 2x,
-      url("/assets/css-cursors-grida/default-64-x28y28-000000.png") 1x
-    )
+  image-set(url("/assets/css-cursors-grida/default-64-x28y28-000000.png") 2x)
     /* (28/2) = 14 */ 14 14,
   default;
 ```

@@ -5,7 +5,6 @@ import {
   useMotionValue,
   easeIn,
   easeOut,
-  steps as motionSteps,
   animate,
 } from "motion/react";
 import { Progress as ProgressPrimitive } from "radix-ui";
@@ -19,132 +18,112 @@ import { useEffect, useState, useRef } from "react";
  *
  * @param loading - Whether the loading operation is active
  * @param expectedDuration - Expected duration in milliseconds for the loading operation
- * @param steps - Total number of steps (optional)
- * @param step - Current step number (optional)
  * @param maxFakedProgress - Maximum progress value to reach before completion (0-1)
  * @returns The current progress value (0-100)
  */
 function useUXProgressValue(
   loading: boolean,
   expectedDuration: number = 3000,
-  steps?: number,
-  step?: number,
   maxFakedProgress: number = 0.9
 ) {
   const [progress, setProgress] = useState(0);
   const progressValue = useMotionValue(0);
   const activeAnimationsRef = useRef<Array<{ stop: () => void }>>([]);
 
-  const createAsymptoticAnimation = (
-    targetValue: number,
-    startValue: number
-  ) => {
-    const k = Math.log(2) / 2; // Mathematical decay rate
-
-    const animation = animate(progressValue, targetValue, {
-      duration: Infinity,
-      ease: (t: number) => {
-        // Asymptotic function: approaches target asymptotically
-        const easedTime = easeOut(t);
-        return (
-          startValue +
-          (targetValue - startValue) * (1 - Math.exp(-k * easedTime * 10))
-        );
-      },
-      onUpdate: (value: number) => setProgress(value),
-    });
-
-    activeAnimationsRef.current.push(animation);
-    return animation;
-  };
-
-  const createStepAnimation = async (
-    stepProgress: number,
-    nextStepProgress: number,
-    maxProgress: number
-  ) => {
-    progressValue.set(stepProgress);
-    setProgress(stepProgress);
-
-    // Animate to next step
-    const animation = animate(progressValue, nextStepProgress, {
-      duration: expectedDuration / 1000,
-      ease: motionSteps(10, "end"),
-      onUpdate: (value: number) => setProgress(value),
-    });
-
-    activeAnimationsRef.current.push(animation);
-    await animation;
-
-    return createAsymptoticAnimation(maxProgress, nextStepProgress);
-  };
-
-  const createLinearAnimation = async (maxProgress: number) => {
-    const targetProgress = maxProgress * 0.8;
-
-    progressValue.set(0);
-    setProgress(0);
-
-    // Animate to 80% of max
-    const animation = animate(progressValue, targetProgress, {
-      duration: expectedDuration / 1000,
-      ease: easeIn,
-      onUpdate: (value: number) => setProgress(value),
-    });
-
-    activeAnimationsRef.current.push(animation);
-    await animation;
-
-    return createAsymptoticAnimation(maxProgress, targetProgress);
-  };
-
   const clearAllAnimations = () => {
     activeAnimationsRef.current.forEach((animation) => animation.stop());
     activeAnimationsRef.current = [];
   };
 
-  const startAnimation = async () => {
-    // Clear any existing animations first
-    clearAllAnimations();
-
-    progressValue.set(0);
-    setProgress(0);
-    const maxProgress = maxFakedProgress * 100;
-
-    if (steps && step !== undefined) {
-      await createStepAnimation(
-        (step / steps) * maxProgress,
-        ((step + 1) / steps) * maxProgress,
-        maxProgress
-      );
-    } else {
-      await createLinearAnimation(maxProgress);
-    }
-  };
-
   useEffect(() => {
+    // Per-effect cancellation guard. Motion resolves a stopped animation's
+    // promise (it does not reject), so every `await` inside this effect
+    // must be followed by a cancelled check to avoid chaining a new
+    // animation after the effect has been torn down or superseded.
+    let cancelled = false;
+
+    // Monotonic writer: UX progress must never move backwards while a
+    // single loading cycle is in flight. Explicit resets (to 0 on a fresh
+    // load, or to 100 on completion) bypass this via setProgress(value).
+    const pushProgress = (v: number) => {
+      if (cancelled) return;
+      setProgress((prev) => (v > prev ? v : prev));
+    };
+
+    const createAsymptoticAnimation = (
+      targetValue: number,
+      startValue: number
+    ) => {
+      const k = Math.log(2) / 2; // Mathematical decay rate
+
+      const animation = animate(progressValue, targetValue, {
+        duration: Infinity,
+        ease: (t: number) => {
+          // Asymptotic function: approaches target asymptotically
+          const easedTime = easeOut(t);
+          return (
+            startValue +
+            (targetValue - startValue) * (1 - Math.exp(-k * easedTime * 10))
+          );
+        },
+        onUpdate: (value: number) => pushProgress(value),
+      });
+
+      activeAnimationsRef.current.push(animation);
+      return animation;
+    };
+
+    const createLinearAnimation = async (maxProgress: number) => {
+      const targetProgress = maxProgress * 0.8;
+
+      const animation = animate(progressValue, targetProgress, {
+        duration: expectedDuration / 1000,
+        ease: easeIn,
+        onUpdate: (value: number) => pushProgress(value),
+      });
+
+      activeAnimationsRef.current.push(animation);
+      await animation;
+      if (cancelled) return;
+
+      createAsymptoticAnimation(maxProgress, targetProgress);
+    };
+
     if (loading) {
-      startAnimation();
-    } else {
-      setProgress(0);
+      // Fresh load cycle — stop anything still running from a prior cycle
+      // and hard-reset to 0. This is the only path that moves progress
+      // backwards, and it is intentional.
+      clearAllAnimations();
       progressValue.set(0);
-    }
-  }, [loading, expectedDuration, steps, step, maxFakedProgress, progressValue]);
+      setProgress(0);
 
-  useEffect(() => {
-    if (!loading && progress > 0) {
-      // Jump to 100% when loading completes
-      progressValue.set(100);
-      setProgress(100);
+      void createLinearAnimation(maxFakedProgress * 100);
+    } else {
+      // Loading completed — stop the faked progress animation so it can
+      // no longer overwrite progressValue, then run a short tween to 100
+      // so the bar reads as "done" before the overlay fades out.
+      clearAllAnimations();
+      const current = progressValue.get();
+      if (current >= 100) {
+        setProgress(100);
+      } else {
+        const completion = animate(progressValue, 100, {
+          duration: 0.25,
+          ease: easeOut,
+          onUpdate: (value: number) => {
+            if (cancelled) return;
+            setProgress(value);
+          },
+        });
+        activeAnimationsRef.current.push(completion);
+      }
     }
-  }, [loading, progress, progressValue]);
 
-  // Cleanup effect to cancel all animations on unmount
-  useEffect(() => {
     return () => {
+      cancelled = true;
       clearAllAnimations();
     };
-  }, []);
+  }, [loading, expectedDuration, maxFakedProgress, progressValue]);
 
   return progress;
 }
@@ -164,16 +143,6 @@ interface FullscreenLoadingOverlayProps {
    * @default 500
    */
   minDuration?: number;
-  /**
-   * Total number of steps for step-based progress.
-   * When provided with `step`, progress will be chunked into steps.
-   */
-  steps?: number;
-  /**
-   * Current step number (0-based).
-   * When provided with `steps`, progress will jump to this step and gradually approach the next.
-   */
-  step?: number;
   /**
    * Maximum progress value to reach before completion (0-1).
    * Progress will stay at this value until loading completes, then jump to 100%.
@@ -199,8 +168,6 @@ interface FullscreenLoadingOverlayProps {
 interface UXProgressProps {
   loading: boolean;
   expectedDuration?: number;
-  steps?: number;
-  step?: number;
   maxFakedProgress?: number;
   className?: string;
 }
@@ -208,16 +175,12 @@ interface UXProgressProps {
 function UXProgress({
   loading,
   expectedDuration = 3000,
-  steps,
-  step,
   maxFakedProgress = 0.9,
   className,
 }: UXProgressProps) {
   const progress = useUXProgressValue(
     loading,
     expectedDuration,
-    steps,
-    step,
     maxFakedProgress
   );
 
@@ -228,8 +191,6 @@ export function FullscreenLoadingOverlay({
   loading,
   expectedDuration = 3000,
   minDuration = 1000,
-  steps,
-  step,
   maxFakedProgress = 0.9,
   onExitComplete,
   exitDelay = 200,
@@ -289,8 +250,6 @@ export function FullscreenLoadingOverlay({
             <UXProgress
               loading={loading}
               expectedDuration={expectedDuration}
-              steps={steps}
-              step={step}
               maxFakedProgress={maxFakedProgress}
               className="w-52"
             />
