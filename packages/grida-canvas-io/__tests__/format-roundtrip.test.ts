@@ -577,18 +577,14 @@ describe("format roundtrip", () => {
         (scene) => {
           expect(scene.type).toBe("scene");
           expect(scene.background_color).toBeDefined();
-          if (
-            scene.background_color &&
-            typeof scene.background_color === "object" &&
-            "r" in scene.background_color
-          ) {
-            expect(scene.background_color.r).toBeCloseTo(0.5);
-            expect(scene.background_color.g).toBeCloseTo(0.75);
-            expect(scene.background_color.b).toBeCloseTo(1.0);
-            expect(scene.background_color.a).toBeCloseTo(1.0);
-          } else {
+          const bg = scene.background_color;
+          if (!bg || typeof bg !== "object" || !("r" in bg)) {
             throw new Error("Expected background_color to be RGBA32F object");
           }
+          expect(bg.r).toBeCloseTo(0.5);
+          expect(bg.g).toBeCloseTo(0.75);
+          expect(bg.b).toBeCloseTo(1.0);
+          expect(bg.a).toBeCloseTo(1.0);
         }
       );
     });
@@ -1890,14 +1886,15 @@ describe("format roundtrip", () => {
           expect(rectNode.fill_paints?.length).toBe(1);
           const paint = rectNode.fill_paints?.[0];
           expect(paint?.type).toBe("solid");
-          if (paint && paint.type === "solid") {
-            expect(paint.color.r).toBe(0);
-            expect(paint.color.g).toBe(0);
-            expect(paint.color.b).toBe(0);
-            expect(paint.color.a).toBe(1);
-            expect(paint.blend_mode).toBe("normal");
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "solid") {
+            throw new Error("expected paint to be solid");
           }
+          expect(paint.color.r).toBe(0);
+          expect(paint.color.g).toBe(0);
+          expect(paint.color.b).toBe(0);
+          expect(paint.color.a).toBe(1);
+          expect(paint.blend_mode).toBe("normal");
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -1940,14 +1937,15 @@ describe("format roundtrip", () => {
           expect(rectNode.fill_paints?.length).toBe(1);
           const paint = rectNode.fill_paints?.[0];
           expect(paint?.type).toBe("linear_gradient");
-          if (paint && paint.type === "linear_gradient") {
-            expect(paint.stops.length).toBe(2);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(1);
-            expect(paint.blend_mode).toBe("normal");
-            expect(paint.opacity).toBe(1);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "linear_gradient") {
+            throw new Error("expected paint to be linear_gradient");
           }
+          expect(paint.stops.length).toBe(2);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(1);
+          expect(paint.blend_mode).toBe("normal");
+          expect(paint.opacity).toBe(1);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -1994,18 +1992,19 @@ describe("format roundtrip", () => {
           expect(rectNode.fill_paints?.length).toBe(1);
           const paint = rectNode.fill_paints?.[0];
           expect(paint?.type).toBe("radial_gradient");
-          if (paint && paint.type === "radial_gradient") {
-            expect(paint.stops.length).toBe(3);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(0.5);
-            expect(paint.stops[2]?.offset).toBe(1);
-            expect(paint.stops[0]?.color.r).toBe(1);
-            expect(paint.stops[1]?.color.g).toBe(1);
-            expect(paint.stops[2]?.color.b).toBe(1);
-            expect(paint.blend_mode).toBe("multiply");
-            expect(paint.opacity).toBeCloseTo(0.8);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "radial_gradient") {
+            throw new Error("expected paint to be radial_gradient");
           }
+          expect(paint.stops.length).toBe(3);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(0.5);
+          expect(paint.stops[2]?.offset).toBe(1);
+          expect(paint.stops[0]?.color.r).toBe(1);
+          expect(paint.stops[1]?.color.g).toBe(1);
+          expect(paint.stops[2]?.color.b).toBe(1);
+          expect(paint.blend_mode).toBe("multiply");
+          expect(paint.opacity).toBeCloseTo(0.8);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2048,16 +2047,17 @@ describe("format roundtrip", () => {
           expect(rectNode.fill_paints?.length).toBe(1);
           const paint = rectNode.fill_paints?.[0];
           expect(paint?.type).toBe("sweep_gradient");
-          if (paint && paint.type === "sweep_gradient") {
-            expect(paint.stops.length).toBe(2);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(1);
-            expect(paint.stops[0]?.color.r).toBe(1);
-            expect(paint.stops[1]?.color.b).toBe(1);
-            expect(paint.blend_mode).toBe("screen");
-            expect(paint.opacity).toBeCloseTo(0.9);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "sweep_gradient") {
+            throw new Error("expected paint to be sweep_gradient");
           }
+          expect(paint.stops.length).toBe(2);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(1);
+          expect(paint.stops[0]?.color.r).toBe(1);
+          expect(paint.stops[1]?.color.b).toBe(1);
+          expect(paint.blend_mode).toBe("screen");
+          expect(paint.opacity).toBeCloseTo(0.9);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2104,21 +2104,22 @@ describe("format roundtrip", () => {
           expect(rectNode.fill_paints?.length).toBe(1);
           const paint = rectNode.fill_paints?.[0];
           expect(paint?.type).toBe("diamond_gradient");
-          if (paint && paint.type === "diamond_gradient") {
-            expect(paint.stops.length).toBe(3);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(0.5);
-            expect(paint.stops[2]?.offset).toBe(1);
-            expect(paint.stops[0]?.color.r).toBe(1);
-            expect(paint.stops[0]?.color.g).toBe(1);
-            expect(paint.stops[1]?.color.g).toBe(1);
-            expect(paint.stops[1]?.color.b).toBe(1);
-            expect(paint.stops[2]?.color.r).toBe(1);
-            expect(paint.stops[2]?.color.b).toBe(1);
-            expect(paint.blend_mode).toBe("overlay");
-            expect(paint.opacity).toBeCloseTo(0.75);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "diamond_gradient") {
+            throw new Error("expected paint to be diamond_gradient");
           }
+          expect(paint.stops.length).toBe(3);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(0.5);
+          expect(paint.stops[2]?.offset).toBe(1);
+          expect(paint.stops[0]?.color.r).toBe(1);
+          expect(paint.stops[0]?.color.g).toBe(1);
+          expect(paint.stops[1]?.color.g).toBe(1);
+          expect(paint.stops[1]?.color.b).toBe(1);
+          expect(paint.stops[2]?.color.r).toBe(1);
+          expect(paint.stops[2]?.color.b).toBe(1);
+          expect(paint.blend_mode).toBe("overlay");
+          expect(paint.opacity).toBeCloseTo(0.75);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2198,28 +2199,31 @@ describe("format roundtrip", () => {
           // Verify order is preserved
           const paint0 = rectNode.fill_paints?.[0];
           expect(paint0?.type).toBe("solid");
-          if (paint0 && paint0.type === "solid") {
-            expect(paint0.color.r).toBe(1);
-            expect(paint0.color.g).toBe(0);
-            expect(paint0.color.b).toBe(0);
+          if (!paint0 || paint0.type !== "solid") {
+            throw new Error("expected paint0 to be solid");
           }
+          expect(paint0.color.r).toBe(1);
+          expect(paint0.color.g).toBe(0);
+          expect(paint0.color.b).toBe(0);
 
           const paint1 = rectNode.fill_paints?.[1];
           expect(paint1?.type).toBe("linear_gradient");
-          if (paint1 && paint1.type === "linear_gradient") {
-            expect(paint1.stops[0]?.color.g).toBe(1);
-            expect(paint1.stops[1]?.color.b).toBe(1);
+          if (!paint1 || paint1.type !== "linear_gradient") {
+            throw new Error("expected paint1 to be linear_gradient");
           }
+          expect(paint1.stops[0]?.color.g).toBe(1);
+          expect(paint1.stops[1]?.color.b).toBe(1);
 
           const paint2 = rectNode.fill_paints?.[2];
           expect(paint2?.type).toBe("solid");
-          if (paint2 && paint2.type === "solid") {
-            expect(paint2.color.r).toBe(1);
-            expect(paint2.color.g).toBe(1);
-            expect(paint2.color.b).toBe(0);
-            expect(paint2.color.a).toBe(0.5);
-            expect(paint2.blend_mode).toBe("multiply");
+          if (!paint2 || paint2.type !== "solid") {
+            throw new Error("expected paint2 to be solid");
           }
+          expect(paint2.color.r).toBe(1);
+          expect(paint2.color.g).toBe(1);
+          expect(paint2.color.b).toBe(0);
+          expect(paint2.color.a).toBe(0.5);
+          expect(paint2.blend_mode).toBe("multiply");
         }
       );
     });
@@ -2271,19 +2275,21 @@ describe("format roundtrip", () => {
           // Verify order is preserved
           const paint0 = rectNode.stroke_paints?.[0];
           expect(paint0?.type).toBe("solid");
-          if (paint0 && paint0.type === "solid") {
-            expect(paint0.color.r).toBe(1);
-            expect(paint0.color.g).toBe(0);
-            expect(paint0.color.b).toBe(0);
+          if (!paint0 || paint0.type !== "solid") {
+            throw new Error("expected paint0 to be solid");
           }
+          expect(paint0.color.r).toBe(1);
+          expect(paint0.color.g).toBe(0);
+          expect(paint0.color.b).toBe(0);
 
           const paint1 = rectNode.stroke_paints?.[1];
           expect(paint1?.type).toBe("radial_gradient");
-          if (paint1 && paint1.type === "radial_gradient") {
-            expect(paint1.stops[0]?.color.g).toBe(1);
-            expect(paint1.stops[1]?.color.b).toBe(1);
-            expect(paint1.blend_mode).toBe("multiply");
+          if (!paint1 || paint1.type !== "radial_gradient") {
+            throw new Error("expected paint1 to be radial_gradient");
           }
+          expect(paint1.stops[0]?.color.g).toBe(1);
+          expect(paint1.stops[1]?.color.b).toBe(1);
+          expect(paint1.blend_mode).toBe("multiply");
         }
       );
     });
@@ -2417,9 +2423,10 @@ describe("format roundtrip", () => {
           expect(containerNode.fill_paints?.length).toBe(1);
           const paint = containerNode.fill_paints?.[0];
           expect(paint?.type).toBe("image");
-          if (paint && paint.type === "image") {
-            expect(paint.src).toBe(customRid);
+          if (!paint || paint.type !== "image") {
+            throw new Error("expected paint to be image");
           }
+          expect(paint.src).toBe(customRid);
         }
       );
     });
@@ -2462,18 +2469,19 @@ describe("format roundtrip", () => {
           expect(containerNode.fill_paints?.length).toBe(1);
           const paint = containerNode.fill_paints?.[0];
           expect(paint?.type).toBe("image");
-          if (paint && paint.type === "image") {
-            expect(paint.src).toBe(hex16Src);
-            expect(paint.fit).toBe("cover");
-            expect(paint.blend_mode).toBe("normal");
-            expect(paint.opacity).toBe(1);
-            expect(paint.active).toBe(true);
-            expect(paint.filters).toBeDefined();
-            expect(paint.filters?.exposure).toBeCloseTo(0.5);
-            expect(paint.filters?.contrast).toBeCloseTo(0.3);
-            expect(paint.filters?.saturation).toBeCloseTo(0.2);
-            expect(paint.filters?.temperature).toBeCloseTo(0.1);
+          if (!paint || paint.type !== "image") {
+            throw new Error("expected paint to be image");
           }
+          expect(paint.src).toBe(hex16Src);
+          expect(paint.fit).toBe("cover");
+          expect(paint.blend_mode).toBe("normal");
+          expect(paint.opacity).toBe(1);
+          expect(paint.active).toBe(true);
+          expect(paint.filters).toBeDefined();
+          expect(paint.filters?.exposure).toBeCloseTo(0.5);
+          expect(paint.filters?.contrast).toBeCloseTo(0.3);
+          expect(paint.filters?.saturation).toBeCloseTo(0.2);
+          expect(paint.filters?.temperature).toBeCloseTo(0.1);
         }
       );
     });
@@ -2511,14 +2519,15 @@ describe("format roundtrip", () => {
           expect(rectNode.stroke_paints?.length).toBe(1);
           const paint = rectNode.stroke_paints?.[0];
           expect(paint?.type).toBe("solid");
-          if (paint && paint.type === "solid") {
-            expect(paint.color.r).toBe(1);
-            expect(paint.color.g).toBe(0);
-            expect(paint.color.b).toBe(0);
-            expect(paint.color.a).toBe(1);
-            expect(paint.blend_mode).toBe("normal");
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "solid") {
+            throw new Error("expected paint to be solid");
           }
+          expect(paint.color.r).toBe(1);
+          expect(paint.color.g).toBe(0);
+          expect(paint.color.b).toBe(0);
+          expect(paint.color.a).toBe(1);
+          expect(paint.blend_mode).toBe("normal");
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2564,16 +2573,17 @@ describe("format roundtrip", () => {
           expect(rectNode.stroke_paints?.length).toBe(1);
           const paint = rectNode.stroke_paints?.[0];
           expect(paint?.type).toBe("linear_gradient");
-          if (paint && paint.type === "linear_gradient") {
-            expect(paint.stops.length).toBe(2);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(1);
-            expect(paint.stops[0]?.color.g).toBe(1);
-            expect(paint.stops[1]?.color.b).toBe(1);
-            expect(paint.blend_mode).toBe("normal");
-            expect(paint.opacity).toBe(1);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "linear_gradient") {
+            throw new Error("expected paint to be linear_gradient");
           }
+          expect(paint.stops.length).toBe(2);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(1);
+          expect(paint.stops[0]?.color.g).toBe(1);
+          expect(paint.stops[1]?.color.b).toBe(1);
+          expect(paint.blend_mode).toBe("normal");
+          expect(paint.opacity).toBe(1);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2618,16 +2628,17 @@ describe("format roundtrip", () => {
           expect(ellipseNode.stroke_paints?.length).toBe(1);
           const paint = ellipseNode.stroke_paints?.[0];
           expect(paint?.type).toBe("radial_gradient");
-          if (paint && paint.type === "radial_gradient") {
-            expect(paint.stops.length).toBe(2);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(1);
-            expect(paint.stops[0]?.color.r).toBe(1);
-            expect(paint.stops[1]?.color.b).toBe(1);
-            expect(paint.blend_mode).toBe("multiply");
-            expect(paint.opacity).toBeCloseTo(0.8);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "radial_gradient") {
+            throw new Error("expected paint to be radial_gradient");
           }
+          expect(paint.stops.length).toBe(2);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(1);
+          expect(paint.stops[0]?.color.r).toBe(1);
+          expect(paint.stops[1]?.color.b).toBe(1);
+          expect(paint.blend_mode).toBe("multiply");
+          expect(paint.opacity).toBeCloseTo(0.8);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2681,16 +2692,17 @@ describe("format roundtrip", () => {
           expect(vectorNode.stroke_paints?.length).toBe(1);
           const paint = vectorNode.stroke_paints?.[0];
           expect(paint?.type).toBe("sweep_gradient");
-          if (paint && paint.type === "sweep_gradient") {
-            expect(paint.stops.length).toBe(2);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(1);
-            expect(paint.stops[0]?.color.r).toBe(1);
-            expect(paint.stops[1]?.color.g).toBe(1);
-            expect(paint.blend_mode).toBe("screen");
-            expect(paint.opacity).toBeCloseTo(0.9);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "sweep_gradient") {
+            throw new Error("expected paint to be sweep_gradient");
           }
+          expect(paint.stops.length).toBe(2);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(1);
+          expect(paint.stops[0]?.color.r).toBe(1);
+          expect(paint.stops[1]?.color.g).toBe(1);
+          expect(paint.blend_mode).toBe("screen");
+          expect(paint.opacity).toBeCloseTo(0.9);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2732,18 +2744,19 @@ describe("format roundtrip", () => {
           expect(boolNode.stroke_paints?.length).toBe(1);
           const paint = boolNode.stroke_paints?.[0];
           expect(paint?.type).toBe("diamond_gradient");
-          if (paint && paint.type === "diamond_gradient") {
-            expect(paint.stops.length).toBe(2);
-            expect(paint.stops[0]?.offset).toBe(0);
-            expect(paint.stops[1]?.offset).toBe(1);
-            expect(paint.stops[0]?.color.r).toBe(1);
-            expect(paint.stops[0]?.color.g).toBe(1);
-            expect(paint.stops[1]?.color.r).toBe(1);
-            expect(paint.stops[1]?.color.b).toBe(1);
-            expect(paint.blend_mode).toBe("overlay");
-            expect(paint.opacity).toBeCloseTo(0.75);
-            expect(paint.active).toBe(true);
+          if (!paint || paint.type !== "diamond_gradient") {
+            throw new Error("expected paint to be diamond_gradient");
           }
+          expect(paint.stops.length).toBe(2);
+          expect(paint.stops[0]?.offset).toBe(0);
+          expect(paint.stops[1]?.offset).toBe(1);
+          expect(paint.stops[0]?.color.r).toBe(1);
+          expect(paint.stops[0]?.color.g).toBe(1);
+          expect(paint.stops[1]?.color.r).toBe(1);
+          expect(paint.stops[1]?.color.b).toBe(1);
+          expect(paint.blend_mode).toBe("overlay");
+          expect(paint.opacity).toBeCloseTo(0.75);
+          expect(paint.active).toBe(true);
         }
       );
     });
@@ -2786,15 +2799,16 @@ describe("format roundtrip", () => {
           expect(containerNode.stroke_paints?.length).toBe(1);
           const paint = containerNode.stroke_paints?.[0];
           expect(paint?.type).toBe("image");
-          if (paint && paint.type === "image") {
-            expect(paint.fit).toBe("cover");
-            expect(paint.blend_mode).toBe("normal");
-            expect(paint.opacity).toBe(1);
-            expect(paint.active).toBe(true);
-            expect(paint.filters).toBeDefined();
-            expect(paint.filters?.exposure).toBeCloseTo(0.2);
-            expect(paint.filters?.contrast).toBeCloseTo(0.1);
+          if (!paint || paint.type !== "image") {
+            throw new Error("expected paint to be image");
           }
+          expect(paint.fit).toBe("cover");
+          expect(paint.blend_mode).toBe("normal");
+          expect(paint.opacity).toBe(1);
+          expect(paint.active).toBe(true);
+          expect(paint.filters).toBeDefined();
+          expect(paint.filters?.exposure).toBeCloseTo(0.2);
+          expect(paint.filters?.contrast).toBeCloseTo(0.1);
         }
       );
     });
@@ -2877,18 +2891,19 @@ describe("format roundtrip", () => {
           expect(containerNode.fe_shadows).toBeDefined();
           expect(containerNode.fe_shadows?.length).toBe(1);
           const shadow = containerNode.fe_shadows?.[0];
-          if (shadow) {
-            expect(shadow.type).toBe("shadow");
-            expect(shadow.dx).toBeCloseTo(2);
-            expect(shadow.dy).toBeCloseTo(4);
-            expect(shadow.blur).toBeCloseTo(8);
-            expect(shadow.spread).toBeCloseTo(0);
-            expect(shadow.color.r).toBeCloseTo(0);
-            expect(shadow.color.g).toBeCloseTo(0);
-            expect(shadow.color.b).toBeCloseTo(0);
-            expect(shadow.color.a).toBeCloseTo(0.5);
-            expect(shadow.active).toBe(true);
+          if (!shadow) {
+            throw new Error("expected fe_shadows[0] to be defined");
           }
+          expect(shadow.type).toBe("shadow");
+          expect(shadow.dx).toBeCloseTo(2);
+          expect(shadow.dy).toBeCloseTo(4);
+          expect(shadow.blur).toBeCloseTo(8);
+          expect(shadow.spread).toBeCloseTo(0);
+          expect(shadow.color.r).toBeCloseTo(0);
+          expect(shadow.color.g).toBeCloseTo(0);
+          expect(shadow.color.b).toBeCloseTo(0);
+          expect(shadow.color.a).toBeCloseTo(0.5);
+          expect(shadow.active).toBe(true);
         }
       );
     });

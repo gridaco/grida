@@ -260,11 +260,13 @@ describe("REST API TEXT → AttributedTextNode", () => {
       // Blue run: fill_paints with blue
       expect(runs[1].fill_paints).toBeDefined();
       expect(runs[1].fill_paints!.length).toBe(1);
-      expect(runs[1].fill_paints![0].type).toBe("solid");
-      if (runs[1].fill_paints![0].type === "solid") {
-        expect(runs[1].fill_paints![0].color.b).toBeCloseTo(1);
-        expect(runs[1].fill_paints![0].color.r).toBeLessThan(0.2);
+      const bluePaint = runs[1].fill_paints![0];
+      expect(bluePaint.type).toBe("solid");
+      if (bluePaint.type !== "solid") {
+        throw new Error("expected bluePaint to be a solid paint");
       }
+      expect(bluePaint.color.b).toBeCloseTo(1);
+      expect(bluePaint.color.r).toBeLessThan(0.2);
     });
   });
 

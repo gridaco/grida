@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { DEFAULT_PLATFORM_APEX_DOMAIN } from "@/lib/domains";
 
+const rpcMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
+
+vi.mock("@/lib/supabase/service-role-cookie-free-clients", () => ({
+  serviceRolePublicClient: () => ({ rpc: rpcMock }),
+}));
+
 describe("lib/tenant-url", () => {
-  const rpcMock = vi.hoisted(() => vi.fn());
-
-  vi.mock("@/lib/supabase/service-role-cookie-free-clients", () => ({
-    serviceRolePublicClient: () => ({ rpc: rpcMock }),
-  }));
-
   async function importSubject() {
     const mod = await import("./tenant-url");
     return mod.buildTenantSiteBaseUrl;

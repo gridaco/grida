@@ -463,9 +463,10 @@ describe("create_packed_scene_document_from_prototype", () => {
 
       // Verify prototype has nested children
       expect(grida.program.nodes.hasChildren(prototype)).toBe(true);
-      if (grida.program.nodes.hasChildren(prototype)) {
-        expect(prototype.children).toHaveLength(2);
-      }
+      const prototypeChildren = grida.program.nodes.hasChildren(prototype)
+        ? prototype.children
+        : [];
+      expect(prototypeChildren).toHaveLength(2);
 
       // Step 2: Prototype → Document
       let idCounter = 0;

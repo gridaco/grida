@@ -83,11 +83,10 @@ describe("iofigma.kiwi.factory.node", () => {
       // frameMaskDisabled: true → clipsContent: false (no clipping)
       // frameMaskDisabled: undefined → clipsContent: true (default, with clipping)
       // Check based on actual value
-      if (frameNode?.frameMaskDisabled === true) {
-        expect((restApiNode as figrest.FrameNode).clipsContent).toBe(false);
-      } else {
-        expect((restApiNode as figrest.FrameNode).clipsContent).toBe(true);
-      }
+      const expectedClipsContent = frameNode?.frameMaskDisabled !== true;
+      expect((restApiNode as figrest.FrameNode).clipsContent).toBe(
+        expectedClipsContent
+      );
       // Real FRAMEs can have fills, but this one might not
       expect(Array.isArray((restApiNode as figrest.FrameNode).fills)).toBe(
         true

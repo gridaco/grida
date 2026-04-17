@@ -10,7 +10,7 @@
 
     // TODO:
     // "jsx-a11y",
-    // "vitest",
+    "vitest",
     // "jsdoc",
   ],
   "categories": {
@@ -23,6 +23,13 @@
     // ======================================
     // grida-specific overrides:
     "no-namespace": "off",
+
+    // `test.todo` / `it.todo` is Vitest's sanctioned way to track planned-
+    // but-not-yet-written tests. We prefer it over `.skip` + TODO comments
+    // (`jest/no-disabled-tests` rejects those). The `vitest/warn-todo` rule
+    // is opinionated the other way; keep it at warn so CI doesn't fail on
+    // legitimate todos while still surfacing them during local development.
+    "vitest/warn-todo": "warn",
 
     // ======================================
     // restriction
@@ -52,5 +59,21 @@
     "library/",
     "worker-configuration.d.ts",
     "database-generated.types.ts",
+  ],
+  "overrides": [
+    {
+      // Benchmark / perf test files intentionally measure timing and do not
+      // assert correctness. They log results to stdout and surface failures
+      // by throwing on regressions, not via `expect(...)`. Exempt them from
+      // the `expect-expect` rule only.
+      "files": [
+        "**/__tests__/bench/**",
+        "**/*.bench.test.ts",
+        "**/bench-*.test.ts",
+      ],
+      "rules": {
+        "jest/expect-expect": "off",
+      },
+    },
   ],
 }

@@ -257,10 +257,11 @@ describe("archive (.grida zip)", () => {
     ).toBe(true);
     const decoded = io.GRID.decode(unpacked.document);
     const rect = decoded.nodes["rect"] as grida.program.nodes.RectangleNode;
-    expect(rect.fill_paints?.[0]?.type).toBe("image");
-    if (rect.fill_paints?.[0]?.type === "image") {
-      expect(rect.fill_paints[0].src).toBe(`res://images/${customRid}`);
-    }
+    const imagePaint = rect.fill_paints?.[0];
+    expect(imagePaint?.type).toBe("image");
+    expect(imagePaint?.type === "image" ? imagePaint.src : undefined).toBe(
+      `res://images/${customRid}`
+    );
   });
 
   it("should handle special characters in image filenames", () => {

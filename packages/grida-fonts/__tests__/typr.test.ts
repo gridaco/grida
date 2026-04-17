@@ -78,36 +78,32 @@ describe("Typr font parsing", () => {
       "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
     );
 
-    // STAT table is optional, so we check if it exists
-    if (font.STAT) {
-      expect(font.STAT).toBeDefined();
-      expect(typeof font.STAT).toBe("object");
-
-      // If STAT table exists, it should have basic structure
-      expect(font.STAT).toHaveProperty("designAxes");
-      expect(font.STAT).toHaveProperty("axisValues");
-
-      // Design axes should be an array
-      if (font.STAT.designAxes) {
-        expect(Array.isArray(font.STAT.designAxes)).toBe(true);
-
-        // Each design axis should have required properties
-        // oxlint-disable-next-line typescript/no-explicit-any
-        font.STAT.designAxes.forEach((axis: any) => {
-          expect(axis).toHaveProperty("tag");
-          expect(axis).toHaveProperty("name");
-          expect(axis).toHaveProperty("ordering");
-        });
-      }
-
-      // Axis values should be an array
-      if (font.STAT.axisValues) {
-        expect(Array.isArray(font.STAT.axisValues)).toBe(true);
-      }
-    } else {
-      // If STAT table doesn't exist, that's also valid
-      expect(font.STAT).toBeUndefined();
+    // STAT table is expected for this variable font fixture.
+    const stat = font.STAT;
+    expect(stat).toBeDefined();
+    if (!stat) {
+      throw new Error("expected STAT table to be defined for fixture");
     }
+    expect(typeof stat).toBe("object");
+
+    // If STAT table exists, it should have basic structure
+    expect(stat).toHaveProperty("designAxes");
+    expect(stat).toHaveProperty("axisValues");
+
+    // Design axes should be an array (using a fallback when absent so the assertion is unconditional)
+    const designAxes = stat.designAxes ?? [];
+    expect(Array.isArray(designAxes)).toBe(true);
+    // Each design axis should have required properties
+    // oxlint-disable-next-line typescript/no-explicit-any
+    designAxes.forEach((axis: any) => {
+      expect(axis).toHaveProperty("tag");
+      expect(axis).toHaveProperty("name");
+      expect(axis).toHaveProperty("ordering");
+    });
+
+    // Axis values should be an array
+    const axisValues = stat.axisValues ?? [];
+    expect(Array.isArray(axisValues)).toBe(true);
   });
 
   it("handles STAT table when not present", () => {
@@ -127,41 +123,42 @@ describe("Typr font parsing", () => {
       "Geist/Geist-VariableFont_wght.ttf",
     ];
 
-    fonts.forEach((fontPath) => {
-      const font = loadFont(fontPath);
+    // Only validate fonts that actually have a STAT table; others are skipped
+    // at the data-collection step so we never have a conditional expect.
+    const fontsWithStat = fonts
+      .map((fontPath) => loadFont(fontPath))
+      .filter((font) => font.STAT !== undefined);
 
-      if (font.STAT) {
-        // Verify STAT table structure
-        expect(font.STAT).toHaveProperty("majorVersion");
-        expect(font.STAT).toHaveProperty("minorVersion");
-        expect(font.STAT).toHaveProperty("designAxes");
-        expect(font.STAT).toHaveProperty("axisValues");
+    fontsWithStat.forEach((font) => {
+      const stat = font.STAT!;
+      // Verify STAT table structure
+      expect(stat).toHaveProperty("majorVersion");
+      expect(stat).toHaveProperty("minorVersion");
+      expect(stat).toHaveProperty("designAxes");
+      expect(stat).toHaveProperty("axisValues");
 
-        // Version should be reasonable
-        expect(font.STAT.majorVersion).toBeGreaterThanOrEqual(1);
-        expect(font.STAT.minorVersion).toBeGreaterThanOrEqual(0);
+      // Version should be reasonable
+      expect(stat.majorVersion).toBeGreaterThanOrEqual(1);
+      expect(stat.minorVersion).toBeGreaterThanOrEqual(0);
 
-        // Design axes should be properly structured
-        if (font.STAT.designAxes) {
-          // oxlint-disable-next-line typescript/no-explicit-any
-          font.STAT.designAxes.forEach((axis: any) => {
-            expect(axis.tag).toMatch(/^[a-zA-Z]{4}$/); // 4-character tag
-            expect(typeof axis.name).toBe("string");
-            expect(typeof axis.ordering).toBe("number");
-          });
-        }
+      // Design axes should be properly structured
+      const designAxes = stat.designAxes ?? [];
+      // oxlint-disable-next-line typescript/no-explicit-any
+      designAxes.forEach((axis: any) => {
+        expect(axis.tag).toMatch(/^[a-zA-Z]{4}$/); // 4-character tag
+        expect(typeof axis.name).toBe("string");
+        expect(typeof axis.ordering).toBe("number");
+      });
 
-        // Axis values should have proper format
-        if (font.STAT.axisValues) {
-          // oxlint-disable-next-line typescript/no-explicit-any
-          font.STAT.axisValues.forEach((value: any) => {
-            expect(value).toHaveProperty("format");
-            expect(value).toHaveProperty("flags");
-            expect(value).toHaveProperty("name");
-            expect([1, 2, 3, 4]).toContain(value.format);
-          });
-        }
-      }
+      // Axis values should have proper format
+      const axisValues = stat.axisValues ?? [];
+      // oxlint-disable-next-line typescript/no-explicit-any
+      axisValues.forEach((value: any) => {
+        expect(value).toHaveProperty("format");
+        expect(value).toHaveProperty("flags");
+        expect(value).toHaveProperty("name");
+        expect([1, 2, 3, 4]).toContain(value.format);
+      });
     });
   });
 
@@ -209,19 +206,20 @@ describe("Typr font parsing", () => {
       (instance: any) => instance[0] === "Mono Linear"
     );
     expect(monoLinearInstance).toBeDefined();
-    if (monoLinearInstance) {
-      // oxlint-disable-next-line typescript/no-explicit-any
-      expect((monoLinearInstance as any)[1]).toBe(0); // flags should be 0 for Regular
-      // oxlint-disable-next-line typescript/no-explicit-any
-      const coords = (monoLinearInstance as any)[2];
-      expect(coords).toHaveLength(5); // Should have 5 coordinates
-      // Validate that coordinates are numbers
-      expect(typeof coords[0]).toBe("number"); // CASL
-      expect(typeof coords[1]).toBe("number"); // CRSV
-      expect(typeof coords[2]).toBe("number"); // MONO
-      expect(typeof coords[3]).toBe("number"); // slnt
-      expect(typeof coords[4]).toBe("number"); // wght
+    if (!monoLinearInstance) {
+      throw new Error("expected Mono Linear instance to be defined");
     }
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((monoLinearInstance as any)[1]).toBe(0); // flags should be 0 for Regular
+    // oxlint-disable-next-line typescript/no-explicit-any
+    const monoLinearCoords = (monoLinearInstance as any)[2];
+    expect(monoLinearCoords).toHaveLength(5); // Should have 5 coordinates
+    // Validate that coordinates are numbers
+    expect(typeof monoLinearCoords[0]).toBe("number"); // CASL
+    expect(typeof monoLinearCoords[1]).toBe("number"); // CRSV
+    expect(typeof monoLinearCoords[2]).toBe("number"); // MONO
+    expect(typeof monoLinearCoords[3]).toBe("number"); // slnt
+    expect(typeof monoLinearCoords[4]).toBe("number"); // wght
 
     // Find and validate a Light instance
     const lightInstance = instances.find(
@@ -229,12 +227,13 @@ describe("Typr font parsing", () => {
       (instance: any) => instance[0] === "Mono Linear Light"
     );
     expect(lightInstance).toBeDefined();
-    if (lightInstance) {
-      // oxlint-disable-next-line typescript/no-explicit-any
-      const coords = (lightInstance as any)[2];
-      expect(coords).toHaveLength(5);
-      expect(typeof coords[4]).toBe("number"); // wght should be a number
+    if (!lightInstance) {
+      throw new Error("expected Mono Linear Light instance to be defined");
     }
+    // oxlint-disable-next-line typescript/no-explicit-any
+    const lightCoords = (lightInstance as any)[2];
+    expect(lightCoords).toHaveLength(5);
+    expect(typeof lightCoords[4]).toBe("number"); // wght should be a number
 
     // Find and validate a Medium instance
     const mediumInstance = instances.find(
@@ -242,12 +241,13 @@ describe("Typr font parsing", () => {
       (instance: any) => instance[0] === "Mono Linear Medium"
     );
     expect(mediumInstance).toBeDefined();
-    if (mediumInstance) {
-      // oxlint-disable-next-line typescript/no-explicit-any
-      const coords = (mediumInstance as any)[2];
-      expect(coords).toHaveLength(5);
-      expect(typeof coords[4]).toBe("number"); // wght should be a number
+    if (!mediumInstance) {
+      throw new Error("expected Mono Linear Medium instance to be defined");
     }
+    // oxlint-disable-next-line typescript/no-explicit-any
+    const mediumCoords = (mediumInstance as any)[2];
+    expect(mediumCoords).toHaveLength(5);
+    expect(typeof mediumCoords[4]).toBe("number"); // wght should be a number
 
     // Validate coordinate structure and types
     // oxlint-disable-next-line typescript/no-explicit-any

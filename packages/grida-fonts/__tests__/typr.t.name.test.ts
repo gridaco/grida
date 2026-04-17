@@ -9,6 +9,18 @@ const loadFont = (relPath: string) => {
   return Typr.parse(buf)[0];
 };
 
+// Validator for an optional-string field in Typr's name table. Returns true
+// when the field is absent OR is a non-empty string; otherwise false. Keeps
+// the "check if present" semantics without a conditional expect.
+const isOptionalNonEmptyString = (v: unknown): boolean =>
+  v === undefined || (typeof v === "string" && v.length > 0);
+
+// Validator for an optional URL-string field. Returns true when the field is
+// absent, OR when it's a non-empty string that starts with http:// / https://.
+const isOptionalUrl = (v: unknown): boolean =>
+  v === undefined ||
+  (typeof v === "string" && v.length > 0 && /^https?:\/\//.test(v));
+
 describe("Typr.T.name - Name Table Parser", () => {
   describe("parseTab function", () => {
     it("parses name table structure correctly", () => {
@@ -90,11 +102,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Trademark is optional, so we check if it exists
-      if (font.name?.trademark) {
-        expect(typeof font.name.trademark).toBe("string");
-        expect(font.name.trademark.length).toBeGreaterThan(0);
-      }
+      // Trademark is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.trademark)).toBe(true);
     });
 
     it("extracts manufacturer information when available", () => {
@@ -102,11 +111,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Manufacturer is optional, so we check if it exists
-      if (font.name?.manufacturer) {
-        expect(typeof font.name.manufacturer).toBe("string");
-        expect(font.name.manufacturer.length).toBeGreaterThan(0);
-      }
+      // Manufacturer is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.manufacturer)).toBe(true);
     });
 
     it("extracts designer information when available", () => {
@@ -114,11 +120,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Designer is optional, so we check if it exists
-      if (font.name?.designer) {
-        expect(typeof font.name.designer).toBe("string");
-        expect(font.name.designer.length).toBeGreaterThan(0);
-      }
+      // Designer is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.designer)).toBe(true);
     });
 
     it("extracts description when available", () => {
@@ -126,11 +129,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Description is optional, so we check if it exists
-      if (font.name?.description) {
-        expect(typeof font.name.description).toBe("string");
-        expect(font.name.description.length).toBeGreaterThan(0);
-      }
+      // Description is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.description)).toBe(true);
     });
 
     it("extracts vendor URL when available", () => {
@@ -138,13 +138,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Vendor URL is optional, so we check if it exists
-      if (font.name?.urlVendor) {
-        expect(typeof font.name.urlVendor).toBe("string");
-        expect(font.name.urlVendor.length).toBeGreaterThan(0);
-        // Should be a valid URL format
-        expect(font.name.urlVendor).toMatch(/^https?:\/\//);
-      }
+      // Vendor URL is optional, so we check only if it exists (non-empty + URL format)
+      expect(isOptionalUrl(font.name?.urlVendor)).toBe(true);
     });
 
     it("extracts designer URL when available", () => {
@@ -152,13 +147,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Designer URL is optional, so we check if it exists
-      if (font.name?.urlDesigner) {
-        expect(typeof font.name.urlDesigner).toBe("string");
-        expect(font.name.urlDesigner.length).toBeGreaterThan(0);
-        // Should be a valid URL format
-        expect(font.name.urlDesigner).toMatch(/^https?:\/\//);
-      }
+      // Designer URL is optional, so we check only if it exists (non-empty + URL format)
+      expect(isOptionalUrl(font.name?.urlDesigner)).toBe(true);
     });
 
     it("extracts license information when available", () => {
@@ -176,13 +166,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // License URL is optional, so we check if it exists
-      if (font.name?.licenceURL) {
-        expect(typeof font.name.licenceURL).toBe("string");
-        expect(font.name.licenceURL.length).toBeGreaterThan(0);
-        // Should be a valid URL format
-        expect(font.name.licenceURL).toMatch(/^https?:\/\//);
-      }
+      // License URL is optional, so we check only if it exists (non-empty + URL format)
+      expect(isOptionalUrl(font.name?.licenceURL)).toBe(true);
     });
 
     it("extracts typographic family name when available", () => {
@@ -206,11 +191,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Compatible full name is optional, so we check if it exists
-      if (font.name?.compatibleFull) {
-        expect(typeof font.name.compatibleFull).toBe("string");
-        expect(font.name.compatibleFull.length).toBeGreaterThan(0);
-      }
+      // Compatible full name is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.compatibleFull)).toBe(true);
     });
 
     it("extracts sample text when available", () => {
@@ -218,11 +200,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // Sample text is optional, so we check if it exists
-      if (font.name?.sampleText) {
-        expect(typeof font.name.sampleText).toBe("string");
-        expect(font.name.sampleText.length).toBeGreaterThan(0);
-      }
+      // Sample text is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.sampleText)).toBe(true);
     });
 
     it("extracts PostScript CID name when available", () => {
@@ -230,11 +209,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // PostScript CID name is optional, so we check if it exists
-      if (font.name?.postScriptCID) {
-        expect(typeof font.name.postScriptCID).toBe("string");
-        expect(font.name.postScriptCID.length).toBeGreaterThan(0);
-      }
+      // PostScript CID name is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.postScriptCID)).toBe(true);
     });
 
     it("extracts WWS family name when available", () => {
@@ -242,11 +218,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // WWS family name is optional, so we check if it exists
-      if (font.name?.wwsFamilyName) {
-        expect(typeof font.name.wwsFamilyName).toBe("string");
-        expect(font.name.wwsFamilyName.length).toBeGreaterThan(0);
-      }
+      // WWS family name is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.wwsFamilyName)).toBe(true);
     });
 
     it("extracts WWS subfamily name when available", () => {
@@ -254,11 +227,8 @@ describe("Typr.T.name - Name Table Parser", () => {
         "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf"
       );
 
-      // WWS subfamily name is optional, so we check if it exists
-      if (font.name?.wwsSubfamilyName) {
-        expect(typeof font.name.wwsSubfamilyName).toBe("string");
-        expect(font.name.wwsSubfamilyName.length).toBeGreaterThan(0);
-      }
+      // WWS subfamily name is optional, so we check only if it exists
+      expect(isOptionalNonEmptyString(font.name?.wwsSubfamilyName)).toBe(true);
     });
   });
 

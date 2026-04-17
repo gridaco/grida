@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync } from "fs";
 import {
   parseHTMLString,
   FigmaArchiveParser,
@@ -100,22 +100,11 @@ test("parses multiple clipboard formats", () => {
   });
 });
 
-test.skip("write canned message to html", () => {
-  const message: Message = JSON.parse(
-    readFileSync(__dirname + "/../data/grey-circle-paste.json", {
-      encoding: "utf8",
-    })
-  );
-
-  const html = writeHTMLMessage({
-    meta: { fileKey: "abcd", pasteID: 0, dataType: "scene" },
-    schema: schema as unknown as CompiledSchema,
-    message,
-  });
-
-  writeFileSync(__dirname + "/../gen/grey-circle-regen.html", html);
-  expect(html).toMatchSnapshot();
-});
+// Dev-time regeneration: renders a known paste fixture to HTML and snapshots
+// it. Depends on an on-disk JSON fixture (`grey-circle-paste.json`) and a
+// writable `gen/` directory that aren't part of the checked-in suite, so the
+// run-loop version is kept as a todo until both are restored.
+test.todo("write canned message to html");
 
 test("write html string", () => {
   const nodeToCreate: NodeChange = {

@@ -14,7 +14,9 @@ describe("cmath.rect", () => {
     });
 
     it("should throw an error if less than 1 points are provided", () => {
-      expect(() => cmath.rect.fromPoints([])).toThrow();
+      expect(() => cmath.rect.fromPoints([])).toThrow(
+        /At least one point is required/
+      );
     });
 
     it("should handle points with negative coordinates", () => {

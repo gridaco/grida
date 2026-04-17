@@ -239,20 +239,20 @@ describe("splitSegment", () => {
 
     // For de Casteljau's algorithm, the tangents should be proportional but not necessarily equal
     // We check that they point in opposite directions (normalized vectors should be opposite)
-    if (leftMagnitude > 0 && rightMagnitude > 0) {
-      const leftNormalized = [
-        leftTangent[0] / leftMagnitude,
-        leftTangent[1] / leftMagnitude,
-      ];
-      const rightNormalized = [
-        rightTangent[0] / rightMagnitude,
-        rightTangent[1] / rightMagnitude,
-      ];
+    expect(leftMagnitude).toBeGreaterThan(0);
+    expect(rightMagnitude).toBeGreaterThan(0);
+    const leftNormalized = [
+      leftTangent[0] / leftMagnitude,
+      leftTangent[1] / leftMagnitude,
+    ];
+    const rightNormalized = [
+      rightTangent[0] / rightMagnitude,
+      rightTangent[1] / rightMagnitude,
+    ];
 
-      // They should point in opposite directions for proper continuity
-      expect(leftNormalized[0]).toBeCloseTo(-rightNormalized[0], 6);
-      expect(leftNormalized[1]).toBeCloseTo(-rightNormalized[1], 6);
-    }
+    // They should point in opposite directions for proper continuity
+    expect(leftNormalized[0]).toBeCloseTo(-rightNormalized[0], 6);
+    expect(leftNormalized[1]).toBeCloseTo(-rightNormalized[1], 6);
 
     // Verify that the split point is correctly positioned
     expect(editor.vertices[newIndex][0]).toBeGreaterThan(0);

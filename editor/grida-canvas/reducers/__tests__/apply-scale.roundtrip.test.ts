@@ -418,7 +418,12 @@ function applyScaleOnce(
   );
 }
 
-// TODO: don't skip
+// TODO: un-skip once fixtures are updated to expose numeric-absolute-box root
+// containers for every entry in FIXTURE_VERSION_SPECIFIER. Today the
+// `subtree round-trips` case throws on fixture `d1-20251209.grida1.zip` because
+// the root container is not a numeric absolute box, so the whole suite is
+// kept off until the fixture set is reconciled.
+// eslint-disable-next-line jest/no-disabled-tests
 describe.skip("apply-scale round-trip (accuracy)", () => {
   const fixturePaths = listFixturePathsByVersionSpecifier(
     FIXTURE_VERSION_SPECIFIER
@@ -444,9 +449,7 @@ describe.skip("apply-scale round-trip (accuracy)", () => {
         );
       }
 
-      const itIf = (cond: unknown) => (cond ? it : it.skip);
-
-      itIf(text_id)(
+      it.skipIf(!text_id)(
         "text node round-trips for 0.01x then 100x (epsilon on numbers)",
         () => {
           const tid = text_id!;
@@ -479,7 +482,7 @@ describe.skip("apply-scale round-trip (accuracy)", () => {
         }
       );
 
-      itIf(vector_id)(
+      it.skipIf(!vector_id)(
         "vector node round-trips for 0.01x then 100x (epsilon on numbers)",
         () => {
           const vid = vector_id!;
@@ -500,7 +503,12 @@ describe.skip("apply-scale round-trip (accuracy)", () => {
             include_subtree: false,
           });
 
-          expect(approxEqual(state.document.nodes[vid], initial)).toBe(true);
+          const roundTripped = approxEqual(state.document.nodes[vid], initial);
+          if (!roundTripped) {
+            throw new Error(
+              `[${path.basename(fixturePath)}] vector round-trip mismatch`
+            );
+          }
         }
       );
 
@@ -665,38 +673,40 @@ it("origin semantics: auto overrides root left/top but global does not", () => {
   expect(g.layout_inset_top).toBe(40);
 });
 
-it.skip("UB/TODO: origin semantics for depth=2 selection root (scene -> container -> node)", () => {
-  /**
-   * ## Scenario (un-studied / undefined behavior)
-   *
-   * We currently implement `space: "auto"` origin semantics by overriding `left/top`
-   * only for selection roots that are **direct children of the scene**.
-   *
-   * This test documents the missing case:
-   *
-   * - Scene
-   *   - Container A (absolute, numeric box)
-   *     - Rect B (absolute, numeric left/top/width/height)
-   *
-   * User selects **Rect B** (selection root at depth=2) and applies parametric scale
-   * with `origin: "center"` in `space: "auto"`.
-   *
-   * ### What needs to be defined / handled
-   *
-   * For depth>1 roots, "selection-local" origin is ambiguous because:
-   * - `left/top` are in the **parent local coordinate space** (Container A),
-   * - but our origin is derived from **selection bounds** (which are typically in
-   *   scene/global space in the editor UX),
-   * - and the parent may be in layout contexts (flex/grid/auto) where writing `left/top`
-   *   could be incorrect or meaningless.
-   *
-   * A correct implementation likely needs an explicit rule, e.g.:
-   * - compute origin in the same space as the node's authored `left/top` (parent-local),
-   * - or only apply the override when the parent is scene (current behavior),
-   * - or introduce a more complete "auto" layout strategy for non-scene parents.
-   *
-   * Until that is specified, we intentionally do **not** assert behavior here.
-   */
-  // TODO: once semantics are decided, construct a minimal document for:
-  // scene -> container -> rect, then assert whether `auto` should shift rect's left/top.
-});
+/**
+ * ## Scenario (un-studied / undefined behavior)
+ *
+ * We currently implement `space: "auto"` origin semantics by overriding `left/top`
+ * only for selection roots that are **direct children of the scene**.
+ *
+ * This test documents the missing case:
+ *
+ * - Scene
+ *   - Container A (absolute, numeric box)
+ *     - Rect B (absolute, numeric left/top/width/height)
+ *
+ * User selects **Rect B** (selection root at depth=2) and applies parametric scale
+ * with `origin: "center"` in `space: "auto"`.
+ *
+ * ### What needs to be defined / handled
+ *
+ * For depth>1 roots, "selection-local" origin is ambiguous because:
+ * - `left/top` are in the **parent local coordinate space** (Container A),
+ * - but our origin is derived from **selection bounds** (which are typically in
+ *   scene/global space in the editor UX),
+ * - and the parent may be in layout contexts (flex/grid/auto) where writing `left/top`
+ *   could be incorrect or meaningless.
+ *
+ * A correct implementation likely needs an explicit rule, e.g.:
+ * - compute origin in the same space as the node's authored `left/top` (parent-local),
+ * - or only apply the override when the parent is scene (current behavior),
+ * - or introduce a more complete "auto" layout strategy for non-scene parents.
+ *
+ * Until that is specified, we intentionally do **not** assert behavior here.
+ *
+ * TODO: once semantics are decided, construct a minimal document for:
+ * scene -> container -> rect, then assert whether `auto` should shift rect's left/top.
+ */
+it.todo(
+  "UB/TODO: origin semantics for depth=2 selection root (scene -> container -> node)"
+);

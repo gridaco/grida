@@ -58,14 +58,18 @@ describe("Preview", () => {
       const p = new PreviewImpl("test");
       p.onCommit = () => {};
       p.commit();
-      expect(() => p.set(makeCounterDelta(c, 5))).toThrow();
+      expect(() => p.set(makeCounterDelta(c, 5))).toThrow(
+        /Cannot set on committed preview/
+      );
     });
 
     it("set after discard throws", () => {
       const c = { value: 0 };
       const p = new PreviewImpl("test");
       p.discard();
-      expect(() => p.set(makeCounterDelta(c, 5))).toThrow();
+      expect(() => p.set(makeCounterDelta(c, 5))).toThrow(
+        /Cannot set on discarded preview/
+      );
     });
 
     it("commit with no active delta is sealed (no-op)", () => {

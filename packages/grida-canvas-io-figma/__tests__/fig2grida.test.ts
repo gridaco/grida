@@ -185,19 +185,18 @@ describe("fig2grida", () => {
       );
       const result = fig2grida(input);
 
-      if (result.pageNames.length > 1) {
-        // Unpack and verify multiple scenes
-        const unpacked = io.archive.unpack(result.bytes);
-        const decoded = io.GRID.decode(unpacked.document);
+      expect(result.pageNames.length).toBeGreaterThan(1);
+      // Unpack and verify multiple scenes
+      const unpacked = io.archive.unpack(result.bytes);
+      const decoded = io.GRID.decode(unpacked.document);
 
-        expect(decoded.scenes_ref.length).toBe(result.pageNames.length);
+      expect(decoded.scenes_ref.length).toBe(result.pageNames.length);
 
-        // Each scene ref should point to a valid scene node
-        for (const sceneId of decoded.scenes_ref) {
-          const sceneNode = decoded.nodes[sceneId];
-          expect(sceneNode).toBeDefined();
-          expect(sceneNode.type).toBe("scene");
-        }
+      // Each scene ref should point to a valid scene node
+      for (const sceneId of decoded.scenes_ref) {
+        const sceneNode = decoded.nodes[sceneId];
+        expect(sceneNode).toBeDefined();
+        expect(sceneNode.type).toBe("scene");
       }
     });
   });
@@ -211,11 +210,12 @@ describe("fig2grida", () => {
 
       expect(result.document.scenes_ref.length).toBeGreaterThan(0);
       expect(Object.keys(result.document.nodes).length).toBeGreaterThan(0);
-      for (const ref of result.imageRefsUsed) {
-        if (ref in images) {
-          expect(result.assets[ref]).toBeDefined();
-          expect(result.assets[ref]!.byteLength).toBeGreaterThan(0);
-        }
+      const usedRefsInImages = result.imageRefsUsed.filter(
+        (ref) => ref in images
+      );
+      for (const ref of usedRefsInImages) {
+        expect(result.assets[ref]).toBeDefined();
+        expect(result.assets[ref]!.byteLength).toBeGreaterThan(0);
       }
     }, 120_000);
 

@@ -41,7 +41,7 @@ describe("cmath.align", () => {
     it("should throw an error when the list of scalars is empty", () => {
       expect(() => {
         cmath.align.scalar(15, [], 5);
-      }).toThrow();
+      }).toThrow(/At least one target is required/);
     });
   });
 

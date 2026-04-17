@@ -109,6 +109,6 @@ describe("dnd.test", () => {
 
     expect(() => {
       dnd.test(t, objects);
-    }).toThrow();
+    }).toThrow(/At least one target is required/);
   });
 });

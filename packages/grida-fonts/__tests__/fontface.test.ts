@@ -3,7 +3,13 @@ import { DomFontAdapter } from "../fontface-dom";
 import type { GoogleWebFontListItem } from "../google";
 
 // Mock FontFace constructor for testing
-const MockFontFace = vi.fn().mockImplementation(function (
+type MockFontFaceCtor = (
+  this: Record<string, unknown>,
+  family: string,
+  src: string | ArrayBuffer,
+  descriptors: Record<string, string>
+) => Record<string, unknown>;
+const MockFontFace = vi.fn<MockFontFaceCtor>().mockImplementation(function (
   this: Record<string, unknown>,
   family: string,
   src: string | ArrayBuffer,
@@ -15,7 +21,9 @@ const MockFontFace = vi.fn().mockImplementation(function (
   this.weight = descriptors.weight || "400";
   this.stretch = descriptors.stretch || "normal";
   this.display = descriptors.display || "auto";
-  this.load = vi.fn().mockResolvedValue(this);
+  this.load = vi
+    .fn<() => Promise<Record<string, unknown>>>()
+    .mockResolvedValue(this);
   return this;
 });
 

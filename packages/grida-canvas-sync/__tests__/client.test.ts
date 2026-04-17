@@ -456,8 +456,9 @@ describe("SyncClient", () => {
       const { transport, client } = createClientAndTransport();
       connectClient(transport, client);
 
-      const stateHandler = vi.fn();
-      const errorHandler = vi.fn();
+      const stateHandler = vi.fn<(state: DocumentState) => void>();
+      const errorHandler =
+        vi.fn<(err: { code: string; message: string }) => void>();
       client.on("stateChange", stateHandler);
       client.on("error", errorHandler);
 

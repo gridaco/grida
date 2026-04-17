@@ -460,11 +460,11 @@ describe("Translate gesture with hierarchy change", () => {
       { recording: "end-gesture" }
     );
 
-    if (errors.length > 0) {
-      throw new Error(
-        `Position discontinuities (${errors.length} frames):\n${errors.slice(0, 10).join("\n")}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ""}`
-      );
-    }
+    const errorSummary =
+      errors.length > 0
+        ? `Position discontinuities (${errors.length} frames):\n${errors.slice(0, 10).join("\n")}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ""}`
+        : "";
+    expect(errorSummary).toBe("");
   });
 });
 

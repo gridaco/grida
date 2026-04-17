@@ -83,8 +83,8 @@ describe("fractional indexing", () => {
     it("should throw error when a >= b", () => {
       const key1 = generateKeyBetween(null, null);
       const key2 = generateKeyBetween(key1, null);
-      expect(() => generateKeyBetween(key2, key1)).toThrow();
-      expect(() => generateKeyBetween(key1, key1)).toThrow();
+      expect(() => generateKeyBetween(key2, key1)).toThrow(/>=/);
+      expect(() => generateKeyBetween(key1, key1)).toThrow(/>=/);
     });
 
     it("should work with custom digit set", () => {
@@ -391,10 +391,12 @@ describe("fractional indexing", () => {
       for (let i = 0; i < 50; i++) {
         const key = generateKeyBetween(prev, null, undefined, { jitter: true });
         keys.push(key);
-        if (prev) {
-          expect(key > prev).toBe(true);
-        }
         prev = key;
+      }
+
+      // Each key must be strictly greater than the previous one
+      for (let i = 1; i < keys.length; i++) {
+        expect(keys[i] > keys[i - 1]).toBe(true);
       }
 
       // Verify all keys are in ascending order
