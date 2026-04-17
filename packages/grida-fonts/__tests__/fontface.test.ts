@@ -2,18 +2,20 @@ import { UnifiedFontManager } from "../fontface";
 import { DomFontAdapter } from "../fontface-dom";
 import type { GoogleWebFontListItem } from "../google";
 
-// Mock FontFace constructor for testing
+// Mock FontFace constructor for testing. The signature mirrors the real
+// `FontFace` DOM API (src: string | BufferSource, descriptors optional) so
+// the mock is assignable to `global.FontFace`.
 type MockFontFaceCtor = (
   this: Record<string, unknown>,
   family: string,
-  src: string | ArrayBuffer,
-  descriptors: Record<string, string>
+  src: string | BufferSource,
+  descriptors?: FontFaceDescriptors
 ) => Record<string, unknown>;
 const MockFontFace = vi.fn<MockFontFaceCtor>().mockImplementation(function (
   this: Record<string, unknown>,
   family: string,
-  src: string | ArrayBuffer,
-  descriptors: Record<string, string>
+  src: string | BufferSource,
+  descriptors: FontFaceDescriptors = {}
 ) {
   this.family = family;
   this.src = src;
@@ -27,8 +29,10 @@ const MockFontFace = vi.fn<MockFontFaceCtor>().mockImplementation(function (
   return this;
 });
 
-// Mock global FontFace
-global.FontFace = MockFontFace;
+// Mock global FontFace. Cast through `unknown` because the mock returns a
+// plain Record rather than a real FontFace instance; tests only exercise
+// the recorded constructor calls, not the returned object's methods.
+global.FontFace = MockFontFace as unknown as typeof FontFace;
 
 // Import actual font data from JSON files
 import robotoflexData from "./robotoflex.json";
@@ -81,7 +85,7 @@ describe("Unified Font Manager - Core Functionality", () => {
       // Find the regular variant FontFace
       const regularCall = fontFaceCalls.find((call) => {
         const [family, _src, descriptor] = call;
-        return family === "Inter" && descriptor.style === "normal";
+        return family === "Inter" && descriptor?.style === "normal";
       });
 
       expect(regularCall).toBeDefined();
@@ -97,7 +101,7 @@ describe("Unified Font Manager - Core Functionality", () => {
       // Find the italic variant FontFace
       const italicCall = fontFaceCalls.find((call) => {
         const [family, _src, descriptor] = call;
-        return family === "Inter" && descriptor.style === "italic";
+        return family === "Inter" && descriptor?.style === "italic";
       });
 
       expect(italicCall).toBeDefined();
@@ -112,8 +116,8 @@ describe("Unified Font Manager - Core Functionality", () => {
 
       // Verify that both variants use the same font file (variable font)
       // Inter has opsz and wght axes but no slnt axis, so style should be normal/italic, not oblique
-      expect(regularCall![2].style).toBe("normal");
-      expect(italicCall![2].style).toBe("italic");
+      expect(regularCall![2]?.style).toBe("normal");
+      expect(italicCall![2]?.style).toBe("italic");
 
       // Note: Inter font has opsz (optical size) axis (14-32) which is not currently handled
       // This would require additional CSS font-feature-settings or font-variation-settings
@@ -183,7 +187,7 @@ describe("Unified Font Manager - Core Functionality", () => {
 
       // Check regular variant
       const regularCall = MockFontFace.mock.calls.find(
-        (call) => call[2].style === "normal"
+        (call) => call[2]?.style === "normal"
       );
       expect(regularCall).toBeDefined();
       expect(regularCall![0]).toBe("Static Font");
@@ -197,7 +201,7 @@ describe("Unified Font Manager - Core Functionality", () => {
 
       // Check italic variant
       const italicCall = MockFontFace.mock.calls.find(
-        (call) => call[2].style === "italic"
+        (call) => call[2]?.style === "italic"
       );
       expect(italicCall).toBeDefined();
       expect(italicCall![0]).toBe("Static Font");

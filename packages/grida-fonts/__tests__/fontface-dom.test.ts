@@ -1,17 +1,19 @@
 import { FontFaceManager as FontFaceManagerDOM } from "../fontface-dom";
 
-// Mock FontFace constructor for testing
+// Mock FontFace constructor for testing. The signature mirrors the real
+// `FontFace` DOM API (src: string | BufferSource, descriptors optional) so
+// the mock is assignable to `global.FontFace`.
 type MockFontFaceCtor = (
   this: Record<string, unknown>,
   family: string,
-  src: string,
-  descriptors: Record<string, string>
+  src: string | BufferSource,
+  descriptors?: FontFaceDescriptors
 ) => Record<string, unknown>;
 const MockFontFace = vi.fn<MockFontFaceCtor>().mockImplementation(function (
   this: Record<string, unknown>,
   family: string,
-  src: string,
-  descriptors: Record<string, string>
+  src: string | BufferSource,
+  descriptors: FontFaceDescriptors = {}
 ) {
   this.family = family;
   this.src = src;
@@ -25,8 +27,10 @@ const MockFontFace = vi.fn<MockFontFaceCtor>().mockImplementation(function (
   return this;
 });
 
-// Mock global FontFace
-global.FontFace = MockFontFace;
+// Mock global FontFace. Cast through `unknown` because the mock returns a
+// plain Record rather than a real FontFace instance; tests only exercise
+// the recorded constructor calls, not the returned object's methods.
+global.FontFace = MockFontFace as unknown as typeof FontFace;
 
 // Import actual font data from JSON files
 import mockRobotoFlex from "./robotoflex.json";
