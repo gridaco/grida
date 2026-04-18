@@ -1,0 +1,2517 @@
+# =============================================================================
+# Grida Canvas — Node Properties Catalog
+# =============================================================================
+#
+# Reference-only catalog of every per-node property in the Grida Canvas data
+# model. This file is authored by hand; it is NOT yet wired into codegen. Its
+# purpose is to:
+#
+#   1. Provide a single auditable enumeration of every property a node can hold.
+#   2. Establish stable numeric column ids that may later drive codegen,
+#      diffing, and wire formats.
+#   3. Serve as a completeness check against the persistency schema
+#      (format/grida.fbs).
+#
+# This catalog is intentionally runtime-agnostic. It describes WHAT properties
+# a node has, their types, nullability, and how each maps to the on-disk
+# FlatBuffers schema (`format/grida.fbs`). It does NOT assume any particular
+# runtime representation, column store, or CRDT strategy — those choices are
+# left to consumers.
+#
+# ─── Id stability rules ─────────────────────────────────────────────────────
+#
+#   (1) Ids are append-only. Never reuse an id.
+#   (2) A column's `type` may not change once assigned.
+#   (3) A column's `name` may be renamed, but the numeric `id` is the stable
+#       reference for everything downstream (codegen, binary layout, migration).
+#   (4) Retired columns remain in this file with `retired = true`. A tombstoned
+#       id MUST NOT be recycled.
+#   (5) Additions go at the end of their logical group. If a group has no free
+#       ids left, add at the next available global id.
+#   (6) The FBS schema has its own per-table `(id:)` field numbers. Those are
+#       local to each FBS table and are NOT expected to equal catalog ids.
+#       `fbs_path` is the authoritative link back to FBS.
+#
+# ─── Type vocabulary ────────────────────────────────────────────────────────
+#
+# Types describe the logical shape of a column's value, not a specific storage
+# class. Consumers map these to whatever backing representation they prefer.
+#
+#   f32             32-bit float scalar.
+#   bool            1-bit / byte boolean.
+#   u8              Unsigned 8-bit integer (commonly used for enum tags).
+#   i32             Signed 32-bit integer.
+#   string          UTF-8 string.
+#   list<f32>       Variable-length list of f32.
+#   paint_stack     Variable-length list of paint references into a document-
+#                   level paint pool. Individual paint variant payloads live
+#                   in the pool, not in the column.
+#   vector_network  Opaque vector-network blob (mirrors the FBS
+#                   `VectorNetworkData` table).
+#   object          Variable-length / composite value that doesn't fit a
+#                   scalar type. `object_shape` describes the TypeScript-ish
+#                   shape for readers.
+#
+# Nullability is carried on each column as a separate `nullable` flag, not
+# baked into the type name.
+#
+# ─── Applies-to vocabulary ──────────────────────────────────────────────────
+#
+#   Node type names are snake_case forms of the grida.fbs Node union variants:
+#     scene, group, tray, initial_container, container, boolean_operation,
+#     basic_shape, line, vector, path, text_span, attributed_text,
+#     markdown_embed, unknown.
+#
+#   "basic_shape" covers Rectangle/Ellipse/Polygon/RegularPolygon/
+#   RegularStarPolygon/Path node kinds, which all serialize to BasicShapeNode
+#   with a CanonicalLayerShape union discriminator (shape_kind).
+#
+#   "*" means: all nodes — universally applicable via SystemNodeTrait.
+#
+# ─── default_semantic ───────────────────────────────────────────────────────
+#
+#   safe    The zero / default bit pattern is a correct logical default for
+#           this property. Consumers may leave a cell uninitialized without
+#           observable differences from an explicit default write.
+#   unsafe  The zero bit pattern has a distinct logical meaning that is NOT
+#           the desired default. Consumers must track presence explicitly
+#           (e.g. via a separate presence bit, a nullable scalar, or an
+#           eager write on node creation).
+#
+# =============================================================================
+
+schema_version = 1
+description = "Grida Canvas node properties catalog. Runtime-agnostic reference — not yet used for codegen."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Identity & system (SystemNodeTrait) — all nodes
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 1
+name = "node_type"
+type = "u8"
+nullable = false
+applies_to = ["*"]
+fbs_path = "Node (union discriminator)"
+default_semantic = "safe"
+notes = "Discriminator for the grida.fbs `Node` union."
+
+[[column]]
+id = 2
+name = "id"
+type = "string"
+nullable = false
+applies_to = ["*"]
+fbs_path = "SystemNodeTrait.id"
+default_semantic = "safe"
+notes = "FBS wraps this in NodeIdentifier (1-field table). Required in FBS."
+
+[[column]]
+id = 3
+name = "name"
+type = "string"
+nullable = false
+applies_to = ["*"]
+fbs_path = "SystemNodeTrait.name"
+default_semantic = "safe"
+notes = "Empty string is a valid / default name."
+
+[[column]]
+id = 4
+name = "active"
+type = "bool"
+nullable = false
+applies_to = ["*"]
+fbs_path = "SystemNodeTrait.active"
+default_semantic = "safe"
+notes = "FBS default = true."
+
+[[column]]
+id = 5
+name = "locked"
+type = "bool"
+nullable = false
+applies_to = ["*"]
+fbs_path = "SystemNodeTrait.locked"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Hierarchy
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 10
+name = "parent"
+type = "i32"
+nullable = false
+applies_to = ["*"]
+fbs_path = "LayerTrait.parent.parent_id"
+default_semantic = "safe"
+notes = "Stored as an int slot index; -1 sentinel = root. FBS stores NodeIdentifier (string) inside ParentReference; runtime resolves to slot index. For SceneNode (which has no LayerTrait), runtime uses -1."
+
+[[column]]
+id = 11
+name = "sort_key"
+type = "string"
+nullable = false
+applies_to = ["*"]
+fbs_path = "LayerTrait.parent.position / SceneNode.position"
+default_semantic = "safe"
+notes = "Fractional index string for sibling ordering. Empty string = unsorted / default."
+
+[[column]]
+id = 12
+name = "deleted"
+type = "bool"
+nullable = false
+applies_to = ["*"]
+fbs_path = "none"
+default_semantic = "safe"
+notes = "Tombstone for LWW delete/undelete. Runtime/CRDT only — not serialized (snapshot excludes tombstoned nodes)."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LayerTrait common
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 20
+name = "opacity"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.opacity"
+default_semantic = "safe"
+notes = "FBS default = 1.0. 0 is a valid value (fully transparent)."
+
+[[column]]
+id = 21
+name = "blend_mode"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.blend_mode"
+default_semantic = "safe"
+notes = "LayerBlendMode enum (ubyte, includes PassThrough = 100 as the default for groups)."
+
+[[column]]
+id = 22
+name = "mask_kind"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.mask_type"
+default_semantic = "safe"
+notes = "Discriminator for the LayerMaskType union. Logical values: 0=None, 1=ImageAlpha, 2=ImageLuminance, 3=Geometry. ImageAlpha vs ImageLuminance is collapsed into this discriminator — the `image_mask_type` payload field (ImageMaskType) inside LayerMaskTypeImage is redundant once the discriminator is set."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Post-layout transform (LayerTrait.post_layout_transform — CGTransform2D)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 30
+name = "transform_m00"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform.m00"
+default_semantic = "safe"
+notes = "Identity = (1,0,0,0,1,0)."
+
+[[column]]
+id = 31
+name = "transform_m01"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform.m01"
+default_semantic = "safe"
+
+[[column]]
+id = 32
+name = "transform_m02"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform.m02"
+default_semantic = "safe"
+
+[[column]]
+id = 33
+name = "transform_m10"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform.m10"
+default_semantic = "safe"
+
+[[column]]
+id = 34
+name = "transform_m11"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform.m11"
+default_semantic = "safe"
+
+[[column]]
+id = 35
+name = "transform_m12"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform.m12"
+default_semantic = "safe"
+
+[[column]]
+id = 36
+name = "transform_origin_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform_origin.x"
+default_semantic = "safe"
+notes = "Alignment struct in cNDC (typical range [-1, 1]). 0 = center."
+
+[[column]]
+id = 37
+name = "transform_origin_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerTrait.post_layout_transform_origin.y"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Layout — positioning (LayoutStyle.layout_position)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 40
+name = "layout_position_basis"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutStyle.layout_position (union discriminator)"
+default_semantic = "safe"
+notes = "Discriminator for LayoutPositioningBasis union. 0=Cartesian, 1=Inset."
+
+[[column]]
+id = 41
+name = "position_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningCartesian.x"
+default_semantic = "safe"
+notes = "Only meaningful when layout_position_basis = Cartesian."
+
+[[column]]
+id = 42
+name = "position_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningCartesian.y"
+default_semantic = "safe"
+
+[[column]]
+id = 43
+name = "position_inset_top_kind"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.top.kind"
+default_semantic = "safe"
+notes = "PositioningSideOffsetKind: 0=Px, 1=Percent. Only meaningful when layout_position_basis = Inset AND the matching *_value column is non-null."
+
+[[column]]
+id = 44
+name = "position_inset_top_value"
+type = "f32"
+nullable = true
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.top.value"
+default_semantic = "unsafe"
+notes = "null = side not constrained (auto). 0 is a valid value (0px/0% from edge) — needs null separately."
+
+[[column]]
+id = 45
+name = "position_inset_right_kind"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.right.kind"
+default_semantic = "safe"
+
+[[column]]
+id = 46
+name = "position_inset_right_value"
+type = "f32"
+nullable = true
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.right.value"
+default_semantic = "unsafe"
+notes = "null = side not constrained."
+
+[[column]]
+id = 47
+name = "position_inset_bottom_kind"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.bottom.kind"
+default_semantic = "safe"
+
+[[column]]
+id = 48
+name = "position_inset_bottom_value"
+type = "f32"
+nullable = true
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.bottom.value"
+default_semantic = "unsafe"
+notes = "null = side not constrained."
+
+[[column]]
+id = 49
+name = "position_inset_left_kind"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.left.kind"
+default_semantic = "safe"
+
+[[column]]
+id = 50
+name = "position_inset_left_value"
+type = "f32"
+nullable = true
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutPositioningInset.left.value"
+default_semantic = "unsafe"
+notes = "null = side not constrained."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Layout — dimensions (LayoutStyle.layout_dimensions)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 60
+name = "layout_target_width_unit"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutDimensionStyle.layout_target_width.unit"
+default_semantic = "safe"
+notes = "LayoutDimensionUnit: 0=LengthPx, 1=Percentage."
+
+[[column]]
+id = 61
+name = "layout_target_width_value"
+type = "f32"
+nullable = true
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutDimensionStyle.layout_target_width.value"
+default_semantic = "unsafe"
+notes = "null = auto. FBS models this with a nullable scalar (value:float = null). 0 is a valid width (0px / 0%)."
+
+[[column]]
+id = 62
+name = "layout_target_height_unit"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutDimensionStyle.layout_target_height.unit"
+default_semantic = "safe"
+
+[[column]]
+id = 63
+name = "layout_target_height_value"
+type = "f32"
+nullable = true
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutDimensionStyle.layout_target_height.value"
+default_semantic = "unsafe"
+notes = "null = auto."
+
+[[column]]
+id = 64
+name = "layout_aspect_ratio_w"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutDimensionStyle.layout_target_aspect_ratio.width"
+default_semantic = "safe"
+notes = "FBS models aspect ratio as CGSize (width, height). Per FBS comment, (0, 0) = unset."
+
+[[column]]
+id = 65
+name = "layout_aspect_ratio_h"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutDimensionStyle.layout_target_aspect_ratio.height"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Layout — container (LayoutStyle.layout_container)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 70
+name = "layout_mode"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_mode"
+default_semantic = "safe"
+notes = "LayoutMode: 0=Normal, 1=Flex."
+
+[[column]]
+id = 71
+name = "layout_direction"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_direction"
+default_semantic = "safe"
+notes = "Axis: 0=Horizontal, 1=Vertical."
+
+[[column]]
+id = 72
+name = "layout_wrap"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_wrap"
+default_semantic = "safe"
+notes = "LayoutWrap: 0=None, 1=Wrap, 2=NoWrap."
+
+[[column]]
+id = 73
+name = "layout_main_axis_alignment"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_main_axis_alignment"
+default_semantic = "safe"
+
+[[column]]
+id = 74
+name = "layout_cross_axis_alignment"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_cross_axis_alignment"
+default_semantic = "safe"
+
+[[column]]
+id = 75
+name = "layout_padding_top"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_padding.top"
+default_semantic = "safe"
+notes = "EdgeInsets struct; 0 = no padding."
+
+[[column]]
+id = 76
+name = "layout_padding_right"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_padding.right"
+default_semantic = "safe"
+
+[[column]]
+id = 77
+name = "layout_padding_bottom"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_padding.bottom"
+default_semantic = "safe"
+
+[[column]]
+id = 78
+name = "layout_padding_left"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_padding.left"
+default_semantic = "safe"
+
+[[column]]
+id = 79
+name = "layout_main_axis_gap"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_main_axis_gap"
+default_semantic = "safe"
+
+[[column]]
+id = 80
+name = "layout_cross_axis_gap"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutContainerStyle.layout_cross_axis_gap"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Layout — child (LayoutStyle.layout_child)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 90
+name = "layout_positioning"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutChildStyle.layout_positioning"
+default_semantic = "safe"
+notes = "LayoutPositioning: 0=Auto, 1=Absolute."
+
+[[column]]
+id = 91
+name = "layout_grow"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayoutChildStyle.layout_grow"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shape geometry — BasicShapeNode.shape (CanonicalLayerShape union)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 100
+name = "shape_kind"
+type = "u8"
+nullable = false
+applies_to = ["basic_shape"]
+fbs_path = "BasicShapeNode.shape (union discriminator)"
+default_semantic = "safe"
+notes = "Discriminator for CanonicalLayerShape union variants (Rectangular/Elliptical/PointsPolygon/RegularPolygon/RegularStarPolygon/Path)."
+
+[[column]]
+id = 101
+name = "ellipse_inner_radius_ratio"
+type = "f32"
+nullable = false
+applies_to = ["basic_shape"]
+fbs_path = "CanonicalShapeElliptical.ring_sector_data.inner_radius_ratio"
+default_semantic = "safe"
+notes = "Only meaningful when shape_kind = Elliptical. Default 0 = solid ellipse (no inner ring)."
+
+[[column]]
+id = 102
+name = "ellipse_start_angle"
+type = "f32"
+nullable = false
+applies_to = ["basic_shape"]
+fbs_path = "CanonicalShapeElliptical.ring_sector_data.start_angle"
+default_semantic = "safe"
+notes = "Degrees. Default 0."
+
+[[column]]
+id = 103
+name = "ellipse_angle"
+type = "f32"
+nullable = false
+applies_to = ["basic_shape"]
+fbs_path = "CanonicalShapeElliptical.ring_sector_data.angle"
+default_semantic = "safe"
+notes = "Sweep angle in degrees. Default 360 = full ellipse."
+
+[[column]]
+id = 104
+name = "polygon_point_count"
+type = "i32"
+nullable = false
+applies_to = ["basic_shape"]
+fbs_path = "CanonicalShapeRegularPolygon.point_count / CanonicalShapeRegularStarPolygon.point_count"
+default_semantic = "safe"
+notes = "FBS type is uint (non-negative). Catalog uses i32 since negative values are not meaningful. Default 3 (triangle)."
+
+[[column]]
+id = 105
+name = "star_inner_radius_ratio"
+type = "f32"
+nullable = false
+applies_to = ["basic_shape"]
+fbs_path = "CanonicalShapeRegularStarPolygon.inner_radius_ratio"
+default_semantic = "safe"
+notes = "Only meaningful when shape_kind = RegularStarPolygon. Default 0.5."
+
+[[column]]
+id = 106
+name = "polygon_points"
+type = "object"
+nullable = false
+applies_to = ["basic_shape"]
+fbs_path = "CanonicalShapePointsPolygon.points"
+default_semantic = "safe"
+object_shape = "Array<{ x: f32, y: f32 }> in normalized (0..1) coordinates"
+notes = "Only meaningful when shape_kind = PointsPolygon. Empty array default."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Corner radius — flattened RectangularCornerRadius (tl/tr/br/bl × rx/ry)
+#
+# Applies to nodes with RectangularCornerRadiusTrait (container/tray/markdown_embed)
+# OR CornerRadiusTrait (boolean_operation/vector — uniform; the same rx/ry
+# applies to all four corners) OR BasicShapeNode's rectangular_corner_radius.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 120
+name = "corner_radius_tl_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.tl.rx / CGRadius.rx (for uniform CornerRadiusTrait nodes)"
+default_semantic = "safe"
+notes = "Corner radius is flattened into 8 columns (4 corners × rx/ry). For nodes using uniform CornerRadiusTrait (boolean_operation, vector), consumers are expected to write the same rx/ry into all four corners."
+
+[[column]]
+id = 121
+name = "corner_radius_tl_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.tl.ry / CGRadius.ry"
+default_semantic = "safe"
+
+[[column]]
+id = 122
+name = "corner_radius_tr_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.tr.rx / CGRadius.rx (uniform)"
+default_semantic = "safe"
+
+[[column]]
+id = 123
+name = "corner_radius_tr_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.tr.ry / CGRadius.ry (uniform)"
+default_semantic = "safe"
+
+[[column]]
+id = 124
+name = "corner_radius_br_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.br.rx / CGRadius.rx (uniform)"
+default_semantic = "safe"
+
+[[column]]
+id = 125
+name = "corner_radius_br_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.br.ry / CGRadius.ry (uniform)"
+default_semantic = "safe"
+
+[[column]]
+id = 126
+name = "corner_radius_bl_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.bl.rx / CGRadius.rx (uniform)"
+default_semantic = "safe"
+
+[[column]]
+id = 127
+name = "corner_radius_bl_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadius.bl.ry / CGRadius.ry (uniform)"
+default_semantic = "safe"
+
+[[column]]
+id = 128
+name = "corner_smoothing"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "basic_shape",
+  "markdown_embed",
+  "boolean_operation",
+  "vector",
+]
+fbs_path = "RectangularCornerRadiusTrait.corner_smoothing / CornerRadiusTrait.corner_smoothing / BasicShapeNode.corner_smoothing"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Paint stacks (variable-length, LWW per-stack, pool-backed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 140
+name = "fill_paints"
+type = "paint_stack"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "ContainerNode.fill_paints / TrayNode.fill_paints / BasicShapeNode.fill_paints / BooleanOperationNode.fill_paints / VectorNode.fill_paints / PathNode.fill_paints / TextSpanNodeProperties.fill_paints / AttributedTextNodeProperties.fill_paints / MarkdownEmbedNodeProperties.fill_paints"
+default_semantic = "safe"
+notes = "Array of PaintRef into the document's PaintPool. Empty stack default. Individual Paint payload fields (color, gradient stops, image filters, etc.) are NOT node columns — they live in the pool. LineNode has no fill in FBS (line is stroke-only)."
+
+[[column]]
+id = 141
+name = "stroke_paints"
+type = "paint_stack"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "ContainerNode.stroke_paints / TrayNode.stroke_paints / BasicShapeNode.stroke_paints / BooleanOperationNode.stroke_paints / LineNode.stroke_paints / VectorNode.stroke_paints / PathNode.stroke_paints / TextSpanNodeProperties.stroke_paints / AttributedTextNodeProperties.stroke_paints"
+default_semantic = "safe"
+notes = "MarkdownEmbed has no stroke in FBS."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stroke style — StrokeGeometryTrait / StrokeStyle / VariableWidthProfile /
+# RectangularStrokeWidth. Also inlined directly on BasicShapeNode.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 150
+name = "stroke_width"
+type = "f32"
+nullable = false
+applies_to = [
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "StrokeGeometryTrait.stroke_width / BasicShapeNode.stroke_width"
+default_semantic = "safe"
+notes = "Non-rectangular / uniform stroke width. For container/tray/basic_shape's rectangular case, the per-side columns (stroke_top_width..stroke_left_width) are the source of truth."
+
+[[column]]
+id = 151
+name = "stroke_align"
+type = "u8"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "StrokeStyle.stroke_align"
+default_semantic = "safe"
+notes = "StrokeAlign: 0=Inside, 1=Center, 2=Outside. Lives inside StrokeStyle which is part of both StrokeGeometryTrait and RectangularStrokeGeometryTrait."
+
+[[column]]
+id = 152
+name = "stroke_cap"
+type = "u8"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "StrokeStyle.stroke_cap"
+default_semantic = "safe"
+notes = "StrokeCap: 0=Butt, 1=Round, 2=Square."
+
+[[column]]
+id = 153
+name = "stroke_join"
+type = "u8"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "StrokeStyle.stroke_join"
+default_semantic = "safe"
+notes = "StrokeJoin: 0=Miter, 1=Round, 2=Bevel."
+
+[[column]]
+id = 154
+name = "stroke_miter_limit"
+type = "f32"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "StrokeStyle.stroke_miter_limit"
+default_semantic = "safe"
+notes = "FBS default = 4.0."
+
+[[column]]
+id = 155
+name = "stroke_top_width"
+type = "f32"
+nullable = false
+applies_to = ["container", "tray", "basic_shape"]
+fbs_path = "RectangularStrokeWidth.stroke_top_width"
+default_semantic = "safe"
+notes = "Per-side stroke width for rectangular stroke geometry."
+
+[[column]]
+id = 156
+name = "stroke_right_width"
+type = "f32"
+nullable = false
+applies_to = ["container", "tray", "basic_shape"]
+fbs_path = "RectangularStrokeWidth.stroke_right_width"
+default_semantic = "safe"
+
+[[column]]
+id = 157
+name = "stroke_bottom_width"
+type = "f32"
+nullable = false
+applies_to = ["container", "tray", "basic_shape"]
+fbs_path = "RectangularStrokeWidth.stroke_bottom_width"
+default_semantic = "safe"
+
+[[column]]
+id = 158
+name = "stroke_left_width"
+type = "f32"
+nullable = false
+applies_to = ["container", "tray", "basic_shape"]
+fbs_path = "RectangularStrokeWidth.stroke_left_width"
+default_semantic = "safe"
+
+[[column]]
+id = 159
+name = "stroke_dash_array"
+type = "object"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "StrokeStyle.stroke_dash_array"
+default_semantic = "safe"
+object_shape = "number[] (dash pattern in logical pixels)"
+notes = "Empty = no dash."
+
+[[column]]
+id = 160
+name = "stroke_width_profile_stops"
+type = "object"
+nullable = false
+applies_to = [
+  "container",
+  "tray",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+]
+fbs_path = "VariableWidthProfile.stops"
+default_semantic = "safe"
+object_shape = "Array<{ u: f32, r: f32 }> — normalized stop position + half-width"
+notes = "VariableWidthProfile is carried by StrokeGeometryTrait and RectangularStrokeGeometryTrait. Empty = no variable-width profile (render uses stroke_width as constant)."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stroke markers (Line / Vector only)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 161
+name = "marker_start_shape"
+type = "u8"
+nullable = false
+applies_to = ["line", "vector"]
+fbs_path = "LineNode.marker_start_shape / VectorNode.marker_start_shape"
+default_semantic = "safe"
+notes = "StrokeMarkerPreset enum (0=None, 1=RightTriangleOpen, 2=EquilateralTriangle, ...)."
+
+[[column]]
+id = 162
+name = "marker_end_shape"
+type = "u8"
+nullable = false
+applies_to = ["line", "vector"]
+fbs_path = "LineNode.marker_end_shape / VectorNode.marker_end_shape"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Container-specific
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 170
+name = "clips_content"
+type = "bool"
+nullable = false
+applies_to = ["container"]
+fbs_path = "ContainerNode.clips_content"
+default_semantic = "safe"
+notes = "Content clipping flag (children only). Only ContainerNode carries this in FBS — TrayNode explicitly does not clip per FBS docstring."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Boolean operation
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 175
+name = "boolean_op"
+type = "u8"
+nullable = false
+applies_to = ["boolean_operation"]
+fbs_path = "BooleanOperationNode.op"
+default_semantic = "safe"
+notes = "BooleanPathOperation: 0=Union, 1=Intersection, 2=Difference, 3=Xor."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Scene — SceneNode-only fields
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 180
+name = "scene_bg_r"
+type = "f32"
+nullable = false
+applies_to = ["scene"]
+fbs_path = "SceneNode.scene_background_color.r"
+default_semantic = "safe"
+notes = "SceneNode.scene_background_color is RGBA32F (flattened into 4 columns). Default (1,1,1,1) = white."
+
+[[column]]
+id = 181
+name = "scene_bg_g"
+type = "f32"
+nullable = false
+applies_to = ["scene"]
+fbs_path = "SceneNode.scene_background_color.g"
+default_semantic = "safe"
+
+[[column]]
+id = 182
+name = "scene_bg_b"
+type = "f32"
+nullable = false
+applies_to = ["scene"]
+fbs_path = "SceneNode.scene_background_color.b"
+default_semantic = "safe"
+
+[[column]]
+id = 183
+name = "scene_bg_a"
+type = "f32"
+nullable = false
+applies_to = ["scene"]
+fbs_path = "SceneNode.scene_background_color.a"
+default_semantic = "safe"
+
+[[column]]
+id = 184
+name = "scene_constraints_children"
+type = "u8"
+nullable = false
+applies_to = ["scene"]
+fbs_path = "SceneNode.constraints_children"
+default_semantic = "safe"
+notes = "SceneConstraintsChildren: 0=Single, 1=Multiple."
+
+[[column]]
+id = 185
+name = "scene_guides"
+type = "object"
+nullable = false
+applies_to = ["scene"]
+fbs_path = "SceneNode.guides"
+default_semantic = "safe"
+object_shape = "Array<{ axis: u8, offset: f32 }> — Guide2DEntry"
+
+[[column]]
+id = 186
+name = "scene_edges"
+type = "object"
+nullable = false
+applies_to = ["scene"]
+fbs_path = "SceneNode.edges"
+default_semantic = "safe"
+object_shape = "Array<{ id: string, a: EdgePoint, b: EdgePoint }> with EdgePoint union of position/anchor"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Text — TextSpanNode / AttributedTextNode (TextStyleRec + TextDecorationRec
+# + TextDimension + node-level text_align / text_align_vertical / max_lines / ellipsis)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 200
+name = "text"
+type = "string"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextSpanNodeProperties.text / AttributedTextNodeProperties.text"
+default_semantic = "safe"
+notes = "Stored as a single string value. Whether consumers treat concurrent edits with LWW semantics or integrate a sequence CRDT is out of scope for this catalog."
+
+[[column]]
+id = 201
+name = "text_align"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextSpanNodeProperties.text_align / AttributedTextNodeProperties.text_align"
+default_semantic = "safe"
+notes = "TextAlign: 0=Left, 1=Right, 2=Center, 3=Justify."
+
+[[column]]
+id = 202
+name = "text_align_vertical"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextSpanNodeProperties.text_align_vertical / AttributedTextNodeProperties.text_align_vertical"
+default_semantic = "safe"
+
+[[column]]
+id = 203
+name = "text_decoration_color_r"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_color.r"
+default_semantic = "unsafe"
+notes = "null = inherit from text fill color. FBS stores the color as an RGBA32F struct (always present); the catalog exposes per-channel nullability so that any non-null value is explicit. Consumers that can only read a non-nullable FBS struct must use a sentinel (e.g. all-zero) or a future nullable wrapper to represent 'inherit'."
+
+[[column]]
+id = 204
+name = "text_decoration_color_g"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_color.g"
+default_semantic = "unsafe"
+
+[[column]]
+id = 205
+name = "text_decoration_color_b"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_color.b"
+default_semantic = "unsafe"
+
+[[column]]
+id = 206
+name = "text_decoration_color_a"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_color.a"
+default_semantic = "unsafe"
+
+[[column]]
+id = 207
+name = "text_decoration_line"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_line"
+default_semantic = "safe"
+notes = "TextDecorationLine: 0=None, 1=Underline, 2=Overline, 3=LineThrough."
+
+[[column]]
+id = 208
+name = "text_decoration_skip_ink"
+type = "bool"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_skip_ink"
+default_semantic = "safe"
+notes = "FBS default = true."
+
+[[column]]
+id = 209
+name = "text_decoration_style"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_style"
+default_semantic = "safe"
+notes = "TextDecorationStyle: 0=Solid, 1=Double, 2=Dotted, 3=Dashed, 4=Wavy."
+
+[[column]]
+id = 210
+name = "text_decoration_thickness"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_decoration.text_decoration_thickness"
+default_semantic = "unsafe"
+notes = "null = auto (use font-derived thickness). FBS defaults to 1.0, which collapses 'auto' and an explicit 1.0 into the same value; the catalog adds nullability to preserve that distinction. See properties.md (known asymmetries)."
+
+[[column]]
+id = 211
+name = "text_ellipsis"
+type = "string"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextSpanNodeProperties.ellipsis / AttributedTextNodeProperties.ellipsis"
+default_semantic = "safe"
+notes = "Empty string = no ellipsis character override."
+
+[[column]]
+id = 212
+name = "text_font_family"
+type = "string"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_family"
+default_semantic = "unsafe"
+notes = "null = inherit. FBS marks font_family as `required` (a non-null string); the catalog exposes it as nullable because styled runs must be able to say 'inherit from parent span'. See properties.md (known asymmetries)."
+
+[[column]]
+id = 213
+name = "text_font_kerning"
+type = "bool"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_kerning"
+default_semantic = "safe"
+notes = "FBS default = true."
+
+[[column]]
+id = 214
+name = "text_font_optical_sizing_kind"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_optical_sizing.kind"
+default_semantic = "safe"
+notes = "FontOpticalSizingKind: 0=Auto, 1=None, 2=Fixed."
+
+[[column]]
+id = 215
+name = "text_font_optical_sizing_value"
+type = "f32"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_optical_sizing.value"
+default_semantic = "safe"
+notes = "Only meaningful when kind = Fixed. Non-nullable because the `kind` column already encodes presence."
+
+[[column]]
+id = 216
+name = "text_font_size"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_size"
+default_semantic = "unsafe"
+notes = "null = inherit. FBS default = 14.0 (scalar, cannot express 'inherit'). Catalog adds nullability so 14.0 is a real explicit value rather than 'inherited'."
+
+[[column]]
+id = 217
+name = "text_font_style_italic"
+type = "bool"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_style_italic"
+default_semantic = "safe"
+
+[[column]]
+id = 218
+name = "text_font_weight"
+type = "object"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_weight.value"
+default_semantic = "unsafe"
+object_shape = "number | null (typical weights 100..900; null = inherit)"
+notes = "FBS stores FontWeight { value: uint }. Logical type is nullable i32: null = inherit, otherwise a weight value that can exceed u8 but fits i32. Flagged as `object` because the current type vocabulary has no 'nullable i32' primitive; future codegen may introduce one."
+
+[[column]]
+id = 219
+name = "text_font_width"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_width"
+default_semantic = "unsafe"
+notes = "null = inherit."
+
+[[column]]
+id = 220
+name = "text_letter_spacing_kind"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.letter_spacing.kind"
+default_semantic = "safe"
+notes = "TextDimensionKind: 0=Normal, 1=Fixed, 2=Factor."
+
+[[column]]
+id = 221
+name = "text_letter_spacing_value"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.letter_spacing.value"
+default_semantic = "unsafe"
+notes = "null = normal (kind-defined default)."
+
+[[column]]
+id = 222
+name = "text_line_height_kind"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.line_height.kind"
+default_semantic = "safe"
+
+[[column]]
+id = 223
+name = "text_line_height_value"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.line_height.value"
+default_semantic = "unsafe"
+notes = "null = normal."
+
+[[column]]
+id = 224
+name = "text_max_lines"
+type = "i32"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextSpanNodeProperties.max_lines / AttributedTextNodeProperties.max_lines"
+default_semantic = "safe"
+notes = "FBS type is uint. 0 = unlimited (sentinel convention; fits 'safe' because 0 has a deterministic meaning)."
+
+[[column]]
+id = 225
+name = "text_transform"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.text_transform"
+default_semantic = "safe"
+notes = "TextTransform: 0=None, 1=Uppercase, 2=Lowercase, 3=Capitalize."
+
+[[column]]
+id = 226
+name = "text_word_spacing_kind"
+type = "u8"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.word_spacing.kind"
+default_semantic = "safe"
+
+[[column]]
+id = 227
+name = "text_word_spacing_value"
+type = "f32"
+nullable = true
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.word_spacing.value"
+default_semantic = "unsafe"
+notes = "null = normal."
+
+[[column]]
+id = 228
+name = "text_font_features"
+type = "object"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_features"
+default_semantic = "safe"
+object_shape = "Array<{ tag: string, value: bool }> — FontFeatureEntry (OpenType 4-char tags)"
+
+[[column]]
+id = 229
+name = "text_font_variations"
+type = "object"
+nullable = false
+applies_to = ["text_span", "attributed_text"]
+fbs_path = "TextStyleRec.font_variations"
+default_semantic = "safe"
+object_shape = "Array<{ axis: string, value: f32 }> — FontVariationEntry"
+
+[[column]]
+id = 230
+name = "text_styled_runs"
+type = "object"
+nullable = false
+applies_to = ["attributed_text"]
+fbs_path = "AttributedTextNodeProperties.styled_runs"
+default_semantic = "safe"
+crdt = "sequence"
+object_shape = "Array<StyledTextRunEntry> — per-run style overrides with byte offsets"
+notes = "Only AttributedTextNode carries styled runs. Stored as a whole-array value; concurrent-edit semantics (LWW vs sequence CRDT) are a runtime policy choice, not prescribed by this catalog."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Effects — blur (FeLayerBlur with FeBlur union: FeGaussianBlur | FeProgressiveBlur)
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 250
+name = "fe_blur_active"
+type = "bool"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_blur.active"
+default_semantic = "safe"
+notes = "false = blur absent. This slot is single-instance per node (not a vector)."
+
+[[column]]
+id = 251
+name = "fe_blur_kind"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_blur.blur (union discriminator)"
+default_semantic = "safe"
+notes = "FeBlur union discriminator: 0=Gaussian, 1=Progressive."
+
+[[column]]
+id = 252
+name = "fe_blur_radius"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "FeGaussianBlur.radius / FeProgressiveBlur.radius"
+default_semantic = "safe"
+notes = "Shared radius column across Gaussian and the start-side radius of Progressive."
+
+[[column]]
+id = 253
+name = "fe_blur_progressive_start_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "FeProgressiveBlur.start.x"
+default_semantic = "safe"
+notes = "Only meaningful when fe_blur_kind = Progressive."
+
+[[column]]
+id = 254
+name = "fe_blur_progressive_start_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "FeProgressiveBlur.start.y"
+default_semantic = "safe"
+
+[[column]]
+id = 255
+name = "fe_blur_progressive_end_x"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "FeProgressiveBlur.end.x"
+default_semantic = "safe"
+
+[[column]]
+id = 256
+name = "fe_blur_progressive_end_y"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "FeProgressiveBlur.end.y"
+default_semantic = "safe"
+
+[[column]]
+id = 257
+name = "fe_blur_progressive_radius2"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "FeProgressiveBlur.radius2"
+default_semantic = "safe"
+notes = "End-side radius for progressive blur."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Effects — backdrop blur
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 270
+name = "fe_backdrop_blur_active"
+type = "bool"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_backdrop_blur.active"
+default_semantic = "safe"
+
+[[column]]
+id = 271
+name = "fe_backdrop_blur_kind"
+type = "u8"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_backdrop_blur.blur (union discriminator)"
+default_semantic = "safe"
+notes = "FeBlur union discriminator for backdrop blur. Only Gaussian is represented in this catalog (no progressive backdrop coords). See properties.md (known asymmetries)."
+
+[[column]]
+id = 272
+name = "fe_backdrop_blur_radius"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "FeGaussianBlur.radius (under LayerEffects.fe_backdrop_blur.blur)"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Effects — liquid glass
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 280
+name = "fe_glass_active"
+type = "bool"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_glass.active"
+default_semantic = "safe"
+
+[[column]]
+id = 281
+name = "fe_glass_light_intensity"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_glass.light_intensity"
+default_semantic = "safe"
+
+[[column]]
+id = 282
+name = "fe_glass_light_angle"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_glass.light_angle"
+default_semantic = "safe"
+
+[[column]]
+id = 283
+name = "fe_glass_refraction"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_glass.refraction"
+default_semantic = "safe"
+
+[[column]]
+id = 284
+name = "fe_glass_depth"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_glass.depth"
+default_semantic = "safe"
+
+[[column]]
+id = 285
+name = "fe_glass_dispersion"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_glass.dispersion"
+default_semantic = "safe"
+
+[[column]]
+id = 286
+name = "fe_glass_blur_radius"
+type = "f32"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_glass.blur_radius"
+default_semantic = "safe"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Effects — variable-length
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 290
+name = "fe_shadows"
+type = "object"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_shadows"
+default_semantic = "safe"
+object_shape = "Array<ShadowEntry> — flattened FilterShadowEffect + FeShadow (kind, active, dx, dy, blur, spread, color rgba)"
+
+[[column]]
+id = 291
+name = "fe_noises"
+type = "object"
+nullable = false
+applies_to = [
+  "group",
+  "tray",
+  "initial_container",
+  "container",
+  "boolean_operation",
+  "basic_shape",
+  "line",
+  "vector",
+  "path",
+  "text_span",
+  "attributed_text",
+  "markdown_embed",
+]
+fbs_path = "LayerEffects.fe_noises"
+default_semantic = "safe"
+object_shape = "Array<NoiseEntry> — flattened FeNoiseEffect + NoiseEffectColors (active, noise_size, density, num_octaves, seed, coloring_kind, color channels, blend_mode)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Vector / Path
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 300
+name = "vector_network"
+type = "vector_network"
+nullable = true
+applies_to = ["vector"]
+fbs_path = "VectorNode.vector_network_data"
+default_semantic = "unsafe"
+notes = "Stored as a whole blob (nullable). Concurrent-edit semantics for vertices (whole-blob LWW vs per-vertex SoA vs sub-document CRDT) are a runtime policy choice. Per-region fill_paints / fill_rule (VectorNetworkRegion.region_fill_*) live inside the blob and are not separate node columns."
+
+[[column]]
+id = 301
+name = "path_data"
+type = "string"
+nullable = false
+applies_to = ["path", "basic_shape"]
+fbs_path = "PathNode.data / CanonicalShapePath.d"
+default_semantic = "safe"
+notes = "SVG path 'd' string. For BasicShapeNode this is carried via CanonicalShapePath (only when shape_kind = Path); for PathNode it's the sole geometry source. Empty string = no path."
+
+[[column]]
+id = 302
+name = "fill_rule"
+type = "u8"
+nullable = false
+applies_to = ["path", "basic_shape"]
+fbs_path = "PathNode.fill_rule / CanonicalShapePath.fill_rule / CanonicalShapePointsPolygon.fill_rule"
+default_semantic = "safe"
+notes = "FillRule: 0=NonZero, 1=EvenOdd. Also used by CanonicalShapePointsPolygon within BasicShape. Per-region fill rules (VectorNetworkRegion.region_fill_rule) are inside the vector_network blob."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Markdown embed
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[column]]
+id = 320
+name = "markdown"
+type = "string"
+nullable = false
+applies_to = ["markdown_embed"]
+fbs_path = "MarkdownEmbedNodeProperties.markdown"
+default_semantic = "safe"
+notes = "GFM source text. Empty string = no content."
