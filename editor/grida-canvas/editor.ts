@@ -2959,6 +2959,22 @@ export class Editor
   private _m_wasm_canvas_resize_observer: ResizeObserver | null = null;
 
   /**
+   * Tracks which scene the WASM surface is currently showing.
+   *
+   * Consulted only by the `scene_id` subscriber to short-circuit a
+   * redundant `switchScene` call when `__wasm_sync_document` has already
+   * activated the target scene earlier in the same dispatch chain
+   * (document/reset → syncDocument → camera.fit → transform dispatch
+   * → nested emit → scene_id subscriber).
+   *
+   * NOT consulted by `__wasm_sync_document` itself. Its `loadSceneGrida` +
+   * `switchScene` pair is indivisible: `loadSceneGrida` decodes new
+   * document bytes into the WASM `loaded_scenes` cache, and only
+   * `switchScene` installs the decoded scene into the live renderer.
+   */
+  private _m_wasm_active_scene_id: string | null = null;
+
+  /**
    * RAF id for the coalesced WASM redraw scheduler. `null` means no redraw
    * is pending. See {@link _scheduleWasmRedraw}.
    */
@@ -3586,94 +3602,8 @@ export class Editor
         });
       }
 
-      // Tracks which scene the WASM surface is currently showing.
-      //
-      // Consulted only by the `scene_id` subscriber to short-circuit a
-      // redundant `switchScene` call when `syncDocument` has already
-      // activated the target scene earlier in the same dispatch chain
-      // (document/reset → syncDocument → camera.fit → transform dispatch
-      // → nested emit → scene_id subscriber).
-      //
-      // NOT consulted by `syncDocument` itself. Its `loadSceneGrida` +
-      // `switchScene` pair is indivisible: `loadSceneGrida` decodes new
-      // document bytes into the WASM `loaded_scenes` cache, and only
-      // `switchScene` installs the decoded scene into the live renderer.
-      // Skipping `switchScene` on a same-scene-id document mutation would
-      // leave the renderer on the previous document (stale geometry,
-      // missing nodes), so `syncDocument` always calls it and always
-      // updates the tracker.
-      let __activeWasmSceneId: string | null = null;
-
-      const syncDocument = (
-        surface: Scene,
-        document: grida.program.document.Document,
-        sceneId?: string
-      ) => {
-        const t0 = __DEV__ ? performance.now() : 0;
-        let tLoad = 0;
-        let encodeMs = 0;
-        let loadMs = 0;
-
-        try {
-          const bytes = io.GRID.encode(document);
-          const tEncode = __DEV__ ? performance.now() : 0;
-          surface.loadSceneGrida(bytes);
-          tLoad = __DEV__ ? performance.now() : 0;
-          encodeMs = tEncode - t0;
-          loadMs = tLoad - tEncode;
-        } catch {
-          // Fallback to JSON if FlatBuffers encoding fails (e.g. unsupported node types)
-          const p = JSON.stringify({
-            version: grida.program.document.SCHEMA_VERSION,
-            document,
-          });
-          surface.loadScene(p);
-          tLoad = __DEV__ ? performance.now() : 0;
-          encodeMs = 0;
-          loadMs = tLoad - t0;
-        }
-
-        // loadSceneGrida only decodes and stores scenes. `switchScene`
-        // installs the decoded scene into the live renderer — it must
-        // ALWAYS run after loadSceneGrida, even when the scene id hasn't
-        // changed, because the underlying document bytes have. Updating
-        // `__activeWasmSceneId` here lets the scene_id subscriber skip
-        // the redundant second activation if it re-fires during a nested
-        // emit (see comment on __activeWasmSceneId).
-        const targetScene =
-          sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
-        if (targetScene) {
-          surface.switchScene(targetScene);
-          __activeWasmSceneId = targetScene;
-        }
-
-        // Re-apply scene-render configs that `load_scene` correctly resets.
-        // `switchScene` → `load_scene` resets all scene-scoped renderer
-        // state (isolation, etc.) because the old state references nodes
-        // from the previous scene graph. We re-apply from editor state,
-        // which is the source of truth.
-        const isolation = this.doc.state.isolation_root_node_id;
-        if (isolation) {
-          this.__runtime_renderer_set_isolation_mode(isolation);
-        }
-
-        const tSwitch = __DEV__ ? performance.now() : 0;
-
-        this._scheduleWasmRedraw();
-
-        if (__DEV__) {
-          const tRedraw = performance.now();
-          console.log(
-            `[syncDocument] ${Object.keys(document.nodes).length} nodes, ` +
-              `scene=${targetScene ?? "(none)"} in ${(tRedraw - t0).toFixed(0)}ms` +
-              ` (encode=${encodeMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
-              ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=scheduled)`
-          );
-        }
-      };
-
       // --- initial mount sync ---
-      syncDocument(
+      this.__wasm_sync_document(
         this._m_wasm_canvas_scene!,
         this.doc.state.document,
         this.doc.state.scene_id
@@ -3691,68 +3621,14 @@ export class Editor
       this.doc.subscribeWithSelector(
         (state) => state.document,
         (_, document, _prev, action, patches) => {
-          if (!this._m_wasm_canvas_scene) return;
-
-          // Full sync on document reset
-          if (action?.type === "document/reset") {
-            syncDocument(
-              this._m_wasm_canvas_scene,
-              document,
-              this.doc.state.scene_id
-            );
-            this.camera.fit("<scene>");
-            return;
-          }
-
-          // Patch-based sync for normal changes.
-          // When patches are empty but document changed (e.g. gesture undo
-          // using snapshot restore), fall through to full sync.
-          if (!patches || patches.length === 0) {
-            syncDocument(
-              this._m_wasm_canvas_scene,
-              document,
-              this.doc.state.scene_id
-            );
-            return;
-          }
-
-          const documentPatches = patches.filter(
-            (patch) => patch.path[0] === "document"
-          );
-          if (documentPatches.length === 0) return;
-
-          const operations =
-            editor.api.patch.toJsonPatchOperations(documentPatches);
-          if (operations.length === 0) return;
-
-          const result = this._m_wasm_canvas_scene.applyTransactions([
-            operations,
-          ]);
-
-          if (!result || result.some((report) => !report.success)) {
-            syncDocument(
-              this._m_wasm_canvas_scene,
-              document,
-              this.doc.state.scene_id
-            );
-            this.log("falling back to direct sync", result);
-          } else {
-            this._scheduleWasmRedraw();
-          }
+          this.__wasm_on_document_change(document, action, patches);
         }
       );
 
       this.doc.subscribeWithSelector(
         (state) => state.scene_id,
         (_, scene_id) => {
-          if (!this._m_wasm_canvas_scene || !scene_id) return;
-          // Short-circuit if WASM is already showing this scene — prevents
-          // a redundant layout pass when syncDocument activated the scene
-          // earlier in the same dispatch.
-          if (scene_id === __activeWasmSceneId) return;
-          this._m_wasm_canvas_scene.switchScene(scene_id);
-          __activeWasmSceneId = scene_id;
-          this._scheduleWasmRedraw();
+          this.__wasm_on_scene_id_change(scene_id);
         }
       );
 
@@ -3817,6 +3693,211 @@ export class Editor
         }
       );
     });
+  }
+
+  /**
+   * Full document → WASM sync.
+   *
+   * Encodes the current document (FlatBuffer, with JSON fallback),
+   * decodes it into the WASM `loaded_scenes` cache via `loadSceneGrida`,
+   * then activates the target scene via `switchScene`. The pair is
+   * indivisible — see the comment on {@link _m_wasm_active_scene_id}.
+   *
+   * Perf spans (opt-in via `GRIDA_PERF=1`):
+   *   - `dispatch.wasm.sync_document`          (total)
+   *   - `dispatch.wasm.sync_document.encode`
+   *   - `dispatch.wasm.sync_document.load_scene`
+   *   - `dispatch.wasm.sync_document.switch_scene`
+   */
+  private __wasm_sync_document(
+    surface: Scene,
+    document: grida.program.document.Document,
+    sceneId?: string
+  ) {
+    const endTotal = perf.start("dispatch.wasm.sync_document");
+    const t0 = __DEV__ ? performance.now() : 0;
+    let tLoad = 0;
+    let encodeMs = 0;
+    let loadMs = 0;
+
+    try {
+      const endEncode = perf.start("dispatch.wasm.sync_document.encode");
+      const bytes = io.GRID.encode(document);
+      endEncode();
+      const tEncode = __DEV__ ? performance.now() : 0;
+      const endLoad = perf.start("dispatch.wasm.sync_document.load_scene");
+      surface.loadSceneGrida(bytes);
+      endLoad();
+      tLoad = __DEV__ ? performance.now() : 0;
+      encodeMs = tEncode - t0;
+      loadMs = tLoad - tEncode;
+    } catch {
+      const p = JSON.stringify({
+        version: grida.program.document.SCHEMA_VERSION,
+        document,
+      });
+      const endLoad = perf.start("dispatch.wasm.sync_document.load_scene");
+      surface.loadScene(p);
+      endLoad();
+      tLoad = __DEV__ ? performance.now() : 0;
+      encodeMs = 0;
+      loadMs = tLoad - t0;
+    }
+
+    const targetScene =
+      sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
+    if (targetScene) {
+      const endSwitch = perf.start("dispatch.wasm.sync_document.switch_scene");
+      surface.switchScene(targetScene);
+      endSwitch();
+      this._m_wasm_active_scene_id = targetScene;
+    }
+
+    // Re-apply scene-render configs that `load_scene` correctly resets.
+    const isolation = this.doc.state.isolation_root_node_id;
+    if (isolation) {
+      this.__runtime_renderer_set_isolation_mode(isolation);
+    }
+
+    const tSwitch = __DEV__ ? performance.now() : 0;
+    this._scheduleWasmRedraw();
+    endTotal();
+
+    if (__DEV__) {
+      const tRedraw = performance.now();
+      console.log(
+        `[syncDocument] ${Object.keys(document.nodes).length} nodes, ` +
+          `scene=${targetScene ?? "(none)"} in ${(tRedraw - t0).toFixed(0)}ms` +
+          ` (encode=${encodeMs.toFixed(0)}ms load=${loadMs.toFixed(0)}ms` +
+          ` switch=${(tSwitch - tLoad).toFixed(0)}ms redraw=scheduled)`
+      );
+    }
+  }
+
+  /**
+   * Document subscriber body — decides between the fast
+   * `applyTransactions` patch path and a full `__wasm_sync_document`.
+   *
+   * Wrapped with perf spans (`dispatch.wasm.sync`,
+   * `dispatch.wasm.apply_transactions`) so benchmarks can attribute
+   * time to the actual sync strategy that ran for each action.
+   */
+  private __wasm_on_document_change(
+    document: grida.program.document.Document,
+    action: Action | undefined,
+    patches: editor.history.Patch[] | undefined
+  ) {
+    if (!this._m_wasm_canvas_scene) return;
+    const end = perf.start("dispatch.wasm.sync", { action: action?.type });
+
+    // Full sync on document reset
+    if (action?.type === "document/reset") {
+      this.__wasm_sync_document(
+        this._m_wasm_canvas_scene,
+        document,
+        this.doc.state.scene_id
+      );
+      this.camera.fit("<scene>");
+      end();
+      return;
+    }
+
+    // Patch-based sync for normal changes.
+    if (!patches || patches.length === 0) {
+      this.__wasm_sync_document(
+        this._m_wasm_canvas_scene,
+        document,
+        this.doc.state.scene_id
+      );
+      end();
+      return;
+    }
+
+    const documentPatches = patches.filter(
+      (patch) => patch.path[0] === "document"
+    );
+    if (documentPatches.length === 0) {
+      end();
+      return;
+    }
+
+    const operations = editor.api.patch.toJsonPatchOperations(documentPatches);
+    if (operations.length === 0) {
+      end();
+      return;
+    }
+
+    const endApply = perf.start("dispatch.wasm.apply_transactions", {
+      ops: operations.length,
+    });
+    const result = this._m_wasm_canvas_scene.applyTransactions([operations]);
+    endApply();
+
+    if (!result || result.some((report) => !report.success)) {
+      this.__wasm_sync_document(
+        this._m_wasm_canvas_scene,
+        document,
+        this.doc.state.scene_id
+      );
+      this.log("falling back to direct sync", result);
+    } else {
+      this._scheduleWasmRedraw();
+    }
+    end();
+  }
+
+  /**
+   * Scene-id subscriber body — short-circuits when
+   * `__wasm_sync_document` already activated the target scene earlier
+   * in the same dispatch chain.
+   */
+  private __wasm_on_scene_id_change(scene_id: string | null | undefined) {
+    if (!this._m_wasm_canvas_scene || !scene_id) return;
+    if (scene_id === this._m_wasm_active_scene_id) return;
+    const end = perf.start("dispatch.wasm.switch_scene");
+    this._m_wasm_canvas_scene.switchScene(scene_id);
+    this._m_wasm_active_scene_id = scene_id;
+    this._scheduleWasmRedraw();
+    end();
+  }
+
+  /**
+   * Wire an already-constructed {@link Scene} into the editor and install
+   * the document + scene_id subscribers **without** requiring a DOM canvas.
+   *
+   * Use this from headless tests / benchmarks — create a raster surface
+   * via `wasmFactory.createRasterSurface(w, h)`, then call
+   * `editor.mountHeadless(surface)`. This enables the exact same
+   * `syncDocument` / `applyTransactions` code path that `mount()` uses
+   * in the browser, so measurements reflect real runtime behavior.
+   *
+   * Does NOT wire transform/resize (no viewport), isolation/debug/
+   * pixelpreview/outline/highlight subscribers (not needed for perf
+   * measurement). Add them here if a future bench needs them.
+   */
+  public mountHeadless(surface: Scene) {
+    assert(this.backend === "canvas", "Editor is not using canvas backend");
+    this.__bind_wasm_surface(surface);
+
+    this.__wasm_sync_document(
+      surface,
+      this.doc.state.document,
+      this.doc.state.scene_id
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) => state.document,
+      (_, document, _prev, action, patches) => {
+        this.__wasm_on_document_change(document, action, patches);
+      }
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) => state.scene_id,
+      (_, scene_id) => {
+        this.__wasm_on_scene_id_change(scene_id);
+      }
+    );
   }
 
   // ================================================================
