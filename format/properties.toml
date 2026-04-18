@@ -249,7 +249,7 @@ notes = "Discriminator for the LayerMaskType union. Logical values: 0=None, 1=Im
 
 [[column]]
 id = 30
-name = "transform_m00"
+name = "post_layout_transform_m00"
 type = "f32"
 nullable = false
 applies_to = [
@@ -272,7 +272,7 @@ notes = "Identity = (1,0,0,0,1,0)."
 
 [[column]]
 id = 31
-name = "transform_m01"
+name = "post_layout_transform_m01"
 type = "f32"
 nullable = false
 applies_to = [
@@ -294,7 +294,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 32
-name = "transform_m02"
+name = "post_layout_transform_m02"
 type = "f32"
 nullable = false
 applies_to = [
@@ -316,7 +316,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 33
-name = "transform_m10"
+name = "post_layout_transform_m10"
 type = "f32"
 nullable = false
 applies_to = [
@@ -338,7 +338,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 34
-name = "transform_m11"
+name = "post_layout_transform_m11"
 type = "f32"
 nullable = false
 applies_to = [
@@ -360,7 +360,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 35
-name = "transform_m12"
+name = "post_layout_transform_m12"
 type = "f32"
 nullable = false
 applies_to = [
@@ -382,7 +382,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 36
-name = "transform_origin_x"
+name = "post_layout_transform_origin_x"
 type = "f32"
 nullable = false
 applies_to = [
@@ -405,7 +405,7 @@ notes = "Alignment struct in cNDC (typical range [-1, 1]). 0 = center."
 
 [[column]]
 id = 37
-name = "transform_origin_y"
+name = "post_layout_transform_origin_y"
 type = "f32"
 nullable = false
 applies_to = [
@@ -454,7 +454,7 @@ notes = "Discriminator for LayoutPositioningBasis union. 0=Cartesian, 1=Inset."
 
 [[column]]
 id = 41
-name = "position_x"
+name = "layout_position_cartesian_x"
 type = "f32"
 nullable = false
 applies_to = [
@@ -477,7 +477,7 @@ notes = "Only meaningful when layout_position_basis = Cartesian."
 
 [[column]]
 id = 42
-name = "position_y"
+name = "layout_position_cartesian_y"
 type = "f32"
 nullable = false
 applies_to = [
@@ -499,7 +499,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 43
-name = "position_inset_top_kind"
+name = "layout_position_inset_top_kind"
 type = "u8"
 nullable = false
 applies_to = [
@@ -522,7 +522,7 @@ notes = "PositioningSideOffsetKind: 0=Px, 1=Percent. Only meaningful when layout
 
 [[column]]
 id = 44
-name = "position_inset_top_value"
+name = "layout_position_inset_top_value"
 type = "f32"
 nullable = true
 applies_to = [
@@ -545,7 +545,7 @@ notes = "null = side not constrained (auto). 0 is a valid value (0px/0% from edg
 
 [[column]]
 id = 45
-name = "position_inset_right_kind"
+name = "layout_position_inset_right_kind"
 type = "u8"
 nullable = false
 applies_to = [
@@ -567,7 +567,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 46
-name = "position_inset_right_value"
+name = "layout_position_inset_right_value"
 type = "f32"
 nullable = true
 applies_to = [
@@ -590,7 +590,7 @@ notes = "null = side not constrained."
 
 [[column]]
 id = 47
-name = "position_inset_bottom_kind"
+name = "layout_position_inset_bottom_kind"
 type = "u8"
 nullable = false
 applies_to = [
@@ -612,7 +612,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 48
-name = "position_inset_bottom_value"
+name = "layout_position_inset_bottom_value"
 type = "f32"
 nullable = true
 applies_to = [
@@ -635,7 +635,7 @@ notes = "null = side not constrained."
 
 [[column]]
 id = 49
-name = "position_inset_left_kind"
+name = "layout_position_inset_left_kind"
 type = "u8"
 nullable = false
 applies_to = [
@@ -657,7 +657,7 @@ default_semantic = "safe"
 
 [[column]]
 id = 50
-name = "position_inset_left_value"
+name = "layout_position_inset_left_value"
 type = "f32"
 nullable = true
 applies_to = [
