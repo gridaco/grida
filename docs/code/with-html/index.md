@@ -1,1 +1,0 @@
-# Quickstart: Html (Vanilla)

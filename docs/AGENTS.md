@@ -12,27 +12,39 @@ This directory is the **source of truth** for documentation content.
 
 ## Actively maintained
 
-We **only actively maintain** the following docs areas:
+The most actively maintained docs areas are:
 
 - `docs/wg/**` — working group docs (design notes, architecture, proposals, WIP)
 - `docs/reference/**` — reference docs (glossary, specs, stable technical references)
+- `docs/editor/**` — editor user and feature docs
+- `docs/forms/**` — forms docs
+- `docs/platform/**` — platform/product docs
+- `docs/with-figma/**` — Figma interoperability, guides, and Assistant product docs
+- `docs/design/**` — design-oriented product/reference docs
+- `docs/math/**` — supporting technical references
 
 ## SEO frontmatter
 
-For docs SEO/frontmatter cleanup, start with the actively maintained areas:
-`docs/wg/**` and `docs/reference/**`. Avoid broad repo-wide churn across
-older docs sections unless the task explicitly asks for that migration.
+For docs SEO/frontmatter cleanup, start with the actively maintained areas
+above. Avoid broad repo-wide churn across deprecated, synced, or archived
+sections unless the task explicitly asks for that migration.
 
 When adding or meaningfully editing an actively maintained doc page, prefer
 frontmatter with `title`, `description`, and `keywords`. For most `wg/` and
 `reference/` Markdown pages that do not use MDX/JSX features, also include
 `format: md` as described below.
 
+## Special Cases
+
+Some docs trees are intentionally kept, but have different ownership rules:
+
+- `docs/cli/**` is deprecated. Keep it unless the task explicitly removes or rewrites deprecated CLI docs.
+- `docs/@designto-code/**` is synced from an external source. Do not restructure or rewrite it unless the task explicitly targets that sync source.
+- `docs/_history/**` contains archived, code-facing record material. It is not part of the user-facing docs surface; if you archive new docs, move them under `_history/` and mark each page `unlisted: true`.
+
 ## Everything else
 
-Other folders under `/docs` are **not actively managed**.
-
-- Unless you have a specific task, **avoid editing** content outside `docs/wg/**` and `docs/reference/**`.
+- Unless you have a specific task, prefer edits in the actively maintained areas above.
 - Do not edit generated artifacts under `/apps/docs/docs/**`.
 
 ## Universal routing (linking to editor pages)
@@ -100,16 +112,19 @@ This prevents all MDX-related parsing issues for the entire file.
 
 ## Structure
 
-| directory                        | name          | description                                                            | active |
-| -------------------------------- | ------------- | ---------------------------------------------------------------------- | ------ |
-| [/docs/wg](./wg)                 | working group | working group documents, architecture documents, todo list, etc        | yes    |
-| [/docs/wg/format](./wg/format)   | format        | Grida IR spec and CSS/HTML/SVG import mapping trackers                 | yes    |
-| [/docs/reference](./reference)   | reference     | glossary and references (technical documents)                          | yes    |
-| [/docs/math](./math)             | math          | Math reference, used for internal docs referencing                     | yes    |
-| [/docs/platform](./platform)     | platform      | Grida Platform (API/Spec) documents                                    | yes    |
-| [/docs/editor](./editor)         | editor        | Grida Editor - User Documentation                                      | yes    |
-| [/docs/forms](./forms)           | forms         | Grida Forms - User Documentation                                       | yes    |
-| [/docs/canvas](./canvas)         | canvas        | Grida Canvas SDK - User Documentation                                  | no     |
-| [/docs/cli](./cli)               | cli           | Grida CLI - User Documentation                                         | yes    |
-| [/docs/together](./together)     | together      | Contributing, Support, Community, etc                                  | yes    |
-| [/docs/with-figma](./with-figma) | with-figma    | Grida with Figma - Grida &lt;-&gt; Figma compatibility and user guides | yes    |
+| directory                                | name           | description                                                            | active |
+| ---------------------------------------- | -------------- | ---------------------------------------------------------------------- | ------ |
+| [/docs/wg](./wg)                         | working group  | working group documents, architecture documents, todo list, etc        | yes    |
+| [/docs/wg/format](./wg/format)           | format         | Grida IR spec and CSS/HTML/SVG import mapping trackers                 | yes    |
+| [/docs/reference](./reference)           | reference      | glossary and references (technical documents)                          | yes    |
+| [/docs/math](./math)                     | math           | Math reference, used for internal docs referencing                     | yes    |
+| [/docs/platform](./platform)             | platform       | Grida Platform (API/Spec) documents                                    | yes    |
+| [/docs/editor](./editor)                 | editor         | Grida Editor - User Documentation                                      | yes    |
+| [/docs/forms](./forms)                   | forms          | Grida Forms - User Documentation                                       | yes    |
+| [/docs/with-figma](./with-figma)         | with-figma     | Grida with Figma - Grida &lt;-&gt; Figma compatibility and user guides | yes    |
+| [/docs/design](./design)                 | design         | Design-oriented docs and visual behavior notes                         | yes    |
+| [/docs/canvas](./canvas)                 | canvas         | Grida Canvas SDK - User Documentation                                  | no     |
+| [/docs/cli](./cli)                       | cli            | Deprecated CLI docs kept for compatibility                             | no     |
+| [/docs/@designto-code](./@designto-code) | design-to-code | Externally synced reference docs                                       | no     |
+| [/docs/\_history](./_history)            | history        | Archived, code-facing record docs not meant for user navigation        | no     |
+| [/docs/together](./together)             | together       | Contributing, Support, Community, etc                                  | no     |
