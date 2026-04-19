@@ -44,13 +44,13 @@
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.0.1",
     "dotenv": "^17.4.2",
     "electron": "^41.2.1",
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.0.0",
     "typescript": "^5",
-    "vite": "^6.3.5"
+    "vite": "^8.0.8"
   },
   "packageManager": "pnpm@10.10.0"
 }
