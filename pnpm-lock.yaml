@@ -1173,6 +1173,9 @@ importers:
       '@grida/fonts':
         specifier: 0.0.0
         version: 0.0.0
+      '@grida/io':
+        specifier: workspace:*
+        version: link:../grida-canvas-io
       '@grida/io-figma':
         specifier: workspace:*
         version: link:../grida-canvas-io-figma

@@ -192,6 +192,130 @@ fn run_pan_pass(
     run_pan_pass_at(renderer, frames, 5.0, overlay)
 }
 
+/// Pick a sensible default target node for translate benchmarks.
+///
+/// Prefers the first root node that supports translation. Skips
+/// `InitialContainer` which has no movable transform.
+fn pick_translate_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
+    use cg::node::schema::Node;
+    for &root_id in scene.graph.roots() {
+        match scene.graph.get_node(&root_id) {
+            Ok(Node::InitialContainer(_)) => continue,
+            Ok(_) => return Some(root_id),
+            Err(_) => continue,
+        }
+    }
+    None
+}
+
+/// Run a node-translate mutation pass.
+///
+/// Each frame:
+///   1. Translate the target node by (±dx, 0) — reversing direction
+///      halfway through so the node ends near its starting position.
+///   2. Call `mark_node_change_kind` + `apply_changes` to drive the
+///      invalidation pipeline (same path as the native drag gesture
+///      in `EditorDocument::apply_and_mark`).
+///   3. Measure queue+flush as a regular frame.
+fn run_translate_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    target_id: cg::node::schema::NodeId,
+    dx: f32,
+    mut overlay: Option<OverlayBenchState>,
+) -> PassStats {
+    use grida_dev::editor::mutation::{self, MutationCommand};
+
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(frames as usize);
+    let mut queue_us_acc = Vec::with_capacity(frames as usize);
+    let mut draw_us_acc = Vec::with_capacity(frames as usize);
+    let mut mid_flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut compositor_us_acc = Vec::with_capacity(frames as usize);
+    let mut flush_us_acc = Vec::with_capacity(frames as usize);
+
+    let half = frames / 2;
+    let mut apply_changes_us_acc: Vec<u64> = Vec::with_capacity(frames as usize);
+    for i in 0..frames {
+        let d = if i < half { dx } else { -dx };
+
+        // Reuse the editor mutation API so the bench exercises
+        // exactly the same translate/classify path as the native
+        // drag (`EditorDocument::apply_and_mark`).
+        let reports = if let Some(scene) = renderer.scene.as_mut() {
+            mutation::apply(
+                scene,
+                &MutationCommand::Translate {
+                    ids: vec![target_id],
+                    dx: d,
+                    dy: 0.0,
+                },
+            )
+        } else {
+            Vec::new()
+        };
+        if reports.is_empty() {
+            continue;
+        }
+        for (id, kind) in &reports {
+            renderer.mark_node_change_kind(*id, *kind);
+        }
+
+        // Mirror Application::frame(): call apply_changes before queue,
+        // and include its cost in the total frame time. This is where
+        // the invalidation pipeline actually runs.
+        let t_total = Instant::now();
+        let t_ac = Instant::now();
+        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let apply_us = t_ac.elapsed().as_micros() as u64;
+
+        if let Some((queue_flush_total, q, d_us, mf, c, f)) =
+            measure_frame(renderer, false, overlay.as_mut())
+        {
+            let total = t_total.elapsed().as_micros() as u64;
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d_us);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+            apply_changes_us_acc.push(apply_us);
+            let _ = queue_flush_total; // queue+flush is part of total
+        }
+    }
+    let wall = wall_start.elapsed();
+    let settle_us = measure_settle(renderer);
+
+    // Print apply_changes cost separately — the differ + flush_dirty
+    // live inside it, so this is the load-bearing number for the
+    // invalidation refactor.
+    if !apply_changes_us_acc.is_empty() {
+        let mut sorted = apply_changes_us_acc.clone();
+        sorted.sort_unstable();
+        let n = sorted.len();
+        let avg = sorted.iter().sum::<u64>() / n as u64;
+        let p50 = sorted[n / 2];
+        let p95 = sorted[(n * 95 / 100).min(n - 1)];
+        let p99 = sorted[(n * 99 / 100).min(n - 1)];
+        let max = *sorted.last().unwrap();
+        println!(
+            "  apply_changes: avg={} p50={} p95={} p99={} MAX={} us",
+            avg, p50, p95, p99, max
+        );
+    }
+
+    compute_pass_stats(
+        &frame_times,
+        &queue_us_acc,
+        &draw_us_acc,
+        &mid_flush_us_acc,
+        &compositor_us_acc,
+        &flush_us_acc,
+        wall,
+        settle_us,
+    )
+}
+
 /// Run a zoom pass with configurable step and range.
 /// Measures queue + flush per frame. Ends with a settle (stable) frame.
 fn run_zoom_pass_at(
@@ -291,7 +415,7 @@ fn measure_resize(
     height: i32,
 ) -> Option<(u64, u64, u64, u64)> {
     use cg::runtime::camera::CameraChangeKind;
-    use cg::runtime::changes::ChangeFlags;
+    use cg::runtime::invalidation::GlobalFlag;
 
     let t0 = Instant::now();
 
@@ -300,7 +424,7 @@ fn measure_resize(
         width: width as f32,
         height: height as f32,
     });
-    renderer.mark_changed(ChangeFlags::VIEWPORT_SIZE);
+    renderer.mark_global(GlobalFlag::ViewportSize);
 
     // apply_changes replaces the old rebuild_scene_caches + invalidate_cache
     let t_apply = Instant::now();
@@ -2276,6 +2400,46 @@ pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> R
         comp_stats.promoted_count,
         comp_stats.memory_bytes as f64 / 1024.0,
     );
+
+    // --- Node-translate mutation benchmark (--translate) ---
+    if let Some(ref spec) = args.translate {
+        use cg::node::schema::NodeId;
+        let target_id: Option<NodeId> = match spec.as_str() {
+            "" | "first" => renderer.scene.as_ref().and_then(pick_translate_target),
+            s => s.parse::<NodeId>().ok(),
+        };
+        let Some(target_id) = target_id else {
+            return Err(anyhow!(
+                "--translate: no valid target node (spec='{}'). Use a numeric id or 'first'.",
+                spec
+            ));
+        };
+        let target_kind = renderer
+            .scene
+            .as_ref()
+            .and_then(|s| s.graph.get_node(&target_id).ok())
+            .map(|n| format!("{:?}", std::mem::discriminant(n)))
+            .unwrap_or_else(|| "?".to_string());
+        println!(
+            "\n=== Translate benchmark ({} frames, target id={} kind={}) ===",
+            args.frames, target_id, target_kind
+        );
+        // Enable the invalidation log so the dev can see which branch
+        // each frame takes (Full vs Transform vs Paint).
+        let pass = run_translate_pass(&mut renderer, args.frames, target_id, 2.0, None);
+        println!("  avg: {:>7} us ({:>6.1} fps)", pass.avg_us, pass.fps);
+        println!(
+            "  min: {:>7} us  p50: {:>7} us  p95: {:>7} us  p99: {:>7} us  MAX: {:>7} us",
+            pass.min_us, pass.p50_us, pass.p95_us, pass.p99_us, pass.max_us
+        );
+        println!(
+            "  queue: {} us  draw: {} us  mid_flush: {} us  compositor: {} us  flush: {} us  settle: {} us",
+            pass.queue_us, pass.draw_us, pass.mid_flush_us, pass.compositor_us, pass.flush_us, pass.settle_us
+        );
+        drop(renderer);
+        println!("\nDone.");
+        return Ok(());
+    }
 
     // --- Resize benchmark (--resize) ---
     if args.resize {

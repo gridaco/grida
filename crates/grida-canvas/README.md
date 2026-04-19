@@ -56,8 +56,7 @@ Grida Canvas is a **safe, high-performance 2D real-time rendering engine** for t
 | Module                                        | Description                                                                                                                                            |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `io::io_grida_fbs`                            | Encode/decode `.grida` FlatBuffers binaries. Bindings are generated from `format/grida.fbs` via `flatc --rust` (see repo root and `format/README.md`). |
-| `io::io_grida`                                | Decode Grida JSON documents into a `Scene`.                                                                                                            |
-| `io::io_grida_patch`                          | Apply JSON Patch to a decoded scene.                                                                                                                   |
+| `io::io_grida_file`                           | Unified loader that auto-detects raw FlatBuffers vs ZIP-wrapped `.grida` files.                                                                        |
 | `io::io_svg`, `io::io_css`, `io::io_markdown` | Additional import/parsing helpers.                                                                                                                     |
 
 ### Test fixtures
@@ -96,18 +95,6 @@ cargo build
 cargo run --example <example-name>
 cargo run --example headless_gpu --features native-gl-context
 ```
-
-## Tools
-
-### `tool_io_grida` — Grida file validator
-
-CLI for validating `.grida` files and debugging parsing.
-
-```sh
-cargo run --example tool_io_grida <path-to-grida-file>
-```
-
-Validates file structure, reports node counts and types, and surfaces decode errors. See [examples/tool_io_grida.rs](./examples/tool_io_grida.rs) for full documentation.
 
 ## Package docs
 

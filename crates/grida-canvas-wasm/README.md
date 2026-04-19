@@ -40,8 +40,8 @@ const canvas = await createCanvas({
   height: 256,
 });
 
-const doc = readFileSync("example/rectangle.grida1", "utf8");
-canvas.loadScene(doc);
+const bytes = new Uint8Array(readFileSync("scene.grida"));
+canvas.loadSceneGrida(bytes);
 
 const { data } = canvas.exportNodeAs("rectangle", {
   format: "PNG",

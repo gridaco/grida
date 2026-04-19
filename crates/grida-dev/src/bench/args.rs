@@ -33,6 +33,18 @@ pub struct BenchArgs {
     /// For A/B measurement of AA cost at different zoom levels.
     #[arg(long = "no-aa", default_value_t = false)]
     pub no_aa: bool,
+    /// Run a node-translate mutation benchmark instead of camera
+    /// motion passes.
+    ///
+    /// Each frame translates the target node by a small delta (simulating
+    /// interactive drag), then runs `apply_changes` + `flush`. Reports
+    /// per-frame stats that reflect **real mutation cost**, not camera
+    /// motion.
+    ///
+    /// Pass a numeric node id to translate a specific node; pass `first`
+    /// (or leave empty) to pick the first root node.
+    #[arg(long = "translate")]
+    pub translate: Option<String>,
 }
 
 #[derive(Args, Debug)]

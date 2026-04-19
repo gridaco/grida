@@ -182,7 +182,32 @@ export function NodeHierarchyList({ rootId }: NodeHierarchyListProps) {
   const nodes = useEditorState(
     editor,
     (state) => state.document.nodes,
-    (a, b) => a === b
+    // Custom comparator: treat `nodes` as unchanged when only non-display
+    // fields (transform, fills, effects, etc.) differ. Immer preserves
+    // per-node identity for untouched nodes, so this walk is O(N) with
+    // an early `na === nb` short-circuit on each unchanged entry.
+    //
+    // The tree UI only reflects the fields below; other reads of node
+    // data go through `editor.state.document.nodes[id]` (non-reactive)
+    // and always see fresh state.
+    (a, b) => {
+      if (a === b) return true;
+      const aKeys = Object.keys(a);
+      if (aKeys.length !== Object.keys(b).length) return false;
+      for (const id of aKeys) {
+        const na = a[id];
+        const nb = b[id];
+        if (na === nb) continue;
+        if (!na || !nb) return false;
+        if (na.name !== nb.name) return false;
+        if (na.type !== nb.type) return false;
+        if ((na.active ?? true) !== (nb.active ?? true)) return false;
+        if ((na.locked ?? false) !== (nb.locked ?? false)) return false;
+        if ((na as { mask?: unknown }).mask !== (nb as { mask?: unknown }).mask)
+          return false;
+      }
+      return true;
+    }
   );
   /**
    * TODO(perf): `state.document.nodes` is a broad subscription.

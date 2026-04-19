@@ -8,7 +8,11 @@ pre-commit:
 
     - name: oxlint
       glob: "*.{ts,tsx,js,jsx}"
-      run: pnpm oxlint {staged_files}
+      # --no-error-on-unmatched-pattern: when {staged_files} is empty
+      # (glob matched nothing) or every staged file is in oxlint's ignore
+      # list (e.g. generated files under lib/bin/), oxlint would otherwise
+      # exit 1 with "No files found to lint" and block the commit.
+      run: pnpm oxlint --no-error-on-unmatched-pattern {staged_files}
 
     - name: cargo-fmt
       glob: "*.rs"

@@ -40,15 +40,9 @@ init({
   grida.devtools_rendering_set_show_hit_testing(true);
   grida.devtools_rendering_set_show_ruler(true);
 
-  // Load the demo scene from JSON
-  fetch("./demo.grida1")
-    .then((r) => r.text())
-    .then((txt) => {
-      grida.loadScene(txt);
-      requestAnimationFrame(render);
-    });
+  grida.loadDummyScene();
+  requestAnimationFrame(render);
 
-  // grida.loadDummyScene();
   // grida.loadBenchmarkScene(50, 50);
 
   canvasel.addEventListener("pointermove", (event) => {

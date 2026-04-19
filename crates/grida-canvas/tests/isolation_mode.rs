@@ -120,7 +120,7 @@ fn isolate_and_flush(
     mode: IsolationMode,
 ) -> cg::runtime::scene::FrameFlushStats {
     renderer.set_isolation_mode(Some(mode));
-    renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
+    renderer.mark_global(cg::runtime::invalidation::GlobalFlag::RenderFilter);
     renderer.queue_stable();
     flush_ok(renderer)
 }
@@ -157,7 +157,7 @@ fn clearing_isolation_restores_full_scene() {
     isolate_and_flush(&mut renderer, IsolationMode::hidden(root_a));
 
     renderer.set_isolation_mode(None);
-    renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
+    renderer.mark_global(cg::runtime::invalidation::GlobalFlag::RenderFilter);
     renderer.queue_stable();
     let restored = flush_ok(&mut renderer).frame.display_list_size_estimated;
 
@@ -222,18 +222,6 @@ fn scene_load_resets_isolation() {
     renderer.load_scene(new_scene);
     assert!(renderer.isolation_mode().is_none());
     assert!(renderer.isolation_set().is_none());
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// ChangeFlags
-// ═══════════════════════════════════════════════════════════════════════
-
-#[test]
-fn render_filter_flag() {
-    let f =
-        cg::runtime::changes::ChangeFlags::RENDER_FILTER | cg::runtime::changes::ChangeFlags::NONE;
-    assert!(f.contains(cg::runtime::changes::ChangeFlags::RENDER_FILTER));
-    assert!(!f.contains(cg::runtime::changes::ChangeFlags::SCENE_LOAD));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -479,7 +467,7 @@ fn render_stage_shadow(preset: IsolationModeStagePreset) -> skia_safe::Image {
     let mut renderer = make_renderer(scene, 400, 400);
     renderer.set_isolation_mode(Some(IsolationMode::hidden(root)));
     renderer.set_isolation_stage_preset(preset);
-    renderer.mark_changed(cg::runtime::changes::ChangeFlags::RENDER_FILTER);
+    renderer.mark_global(cg::runtime::invalidation::GlobalFlag::RenderFilter);
     renderer.queue_stable();
     flush_ok(&mut renderer);
 

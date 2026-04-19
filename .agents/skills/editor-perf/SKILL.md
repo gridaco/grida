@@ -28,18 +28,46 @@ React subscription layer, and headless benchmarks.
 - Diagnosing slow interactions (drag, resize, color picker, opacity slider)
 - Investigating Immer overhead or state cloning costs
 - Instrumenting code with `PerfObserver` spans
-- Writing or running headless benchmarks (`.bench.ts` / `.test.ts`)
+- Writing or running the editor bench
 - Optimizing queries, snap targets, hover resolution
 - Reducing React re-render cost from editor state subscriptions
 
 ---
+
+## Pick your measurement tool
+
+Performance work starts with the right signal. The three tools below are
+complementary — do not skip the browser trace if the user offers one,
+do not open a browser for a reducer-only regression.
+
+| Tool                                            | Use when                                                                                                               | What it catches                                                                                        | What it misses                              |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| **Browser trace (Chrome DevTools Performance)** | User provided a `.json.gz` trace, or the symptom is interaction-level (drag/nudge feels laggy). **This is the truth.** | Everything on the main thread: React, selector cost, paint, compositor, GC, WASM, reducer, Immer, RAF. | Not reproducible without the user's session |
+| **editor-bench** (automated)                    | Default for proactive investigation and A/B of a reducer / encode / WASM change. No user input needed.                 | `PerfObserver` span table, per-scene (1K / 10K). Deterministic and comparable across runs.             | React render cost, DOM overlays, real RAF   |
+| **Node CPU profile**                            | A bench span points at a hotspot but you need function-level detail inside it, or microtask timing.                    | Function self-time and call chains within a single Node process.                                       | Browser-only code paths                     |
+
+### Decision rules
+
+1. **If the user provides a browser trace, start there.** It already has
+   React, DevTools, and WASM on the same timeline — quote actual
+   numbers from the trace rather than guessing. Parse it as JSON
+   (see "Reading a browser trace" below).
+2. **Otherwise run the bench first.** No user input needed — it covers
+   every scenario at 1K and 10K and emits a `PerfObserver` span table
+   that's directly comparable across runs.
+3. **Once bench points at a span, drill with a Node CPU profile.**
+   Use the `withCpuProfile()` helper in `_utils.ts`, or run node with
+   `--cpu-prof`. Open the resulting `.cpuprofile` in Chrome DevTools
+   (Performance → Load profile) for a function-level flame graph
+   inside the span.
 
 ## How to Orient Yourself
 
 Before touching any code, build context by reading these sources in order:
 
 1. **Read `editor/grida-canvas/__tests__/bench/README.md`** — benchmark
-   catalog, run instructions, and category definitions.
+   catalog, run instructions, and the authoritative list of
+   `PerfObserver` spans with a "when to trust the numbers" guide.
 2. **Read `editor/grida-canvas/perf.ts`** — the `PerfObserver` API.
    Understand `start()`, `measure()`, `report()`, `dump()`.
 3. **Skim `editor/grida-canvas/editor.ts`** — the `EditorDocumentStore`
@@ -47,7 +75,8 @@ Before touching any code, build context by reading these sources in order:
    entry point for all state mutations.
 4. **Skim `editor/grida-canvas/reducers/index.ts`** — the root reducer
    that wraps everything in Immer `produceWithPatches`.
-5. **Browse the benchmark files** to see what operations are already
+5. **Browse the bench files** (`perf-editor.test.ts`,
+   `perf-per-node-sync.test.ts`) to see what operations are already
    measured and at what scale.
 
 ### Key discovery queries
@@ -126,62 +155,65 @@ Use `GRIDA_PERF=1` to identify which category applies:
 
 ## The Benchmark System
 
-Two complementary benchmark files live in
-`editor/grida-canvas/__tests__/bench/`.
-
-### 1. Micro-benchmarks (`perf-reducer.bench.ts`)
-
-Uses Vitest `bench()` (Tinybench) for ops/sec and statistical comparison.
-Best for fast operations (<10ms) where many samples are possible.
-
-```sh
-pnpm vitest bench grida-canvas/__tests__/bench/perf-reducer.bench.ts
-```
-
-### 2. E2E macro-benchmarks (`perf-reducer.test.ts`)
-
-Uses manual timing + `PerfObserver` for internal span breakdown.
-Best for slow operations (>10ms) like full drag cycles where Tinybench
-cannot collect enough samples.
+The single source of truth is `perf-editor.test.ts` in
+`editor/grida-canvas/__tests__/bench/`. It uses `Editor.mountHeadless()`
+with the **real WASM raster backend** — every dispatch runs through the
+same `__wasm_on_document_change` subscriber the browser installs. Spans
+under `dispatch.wasm.*` are end-to-end identical to the browser; spans
+under `reducer.*` are pure JS and track within ~10% of browser V8.
 
 ```sh
-GRIDA_PERF=1 pnpm vitest run grida-canvas/__tests__/bench/perf-reducer.test.ts
+# Default — runs every scenario at 1K synthetic + bench.grida (10K) scales
+GRIDA_PERF=1 pnpm vitest run editor/grida-canvas/__tests__/bench/perf-editor.test.ts
 
-# With extra heap for large scenes
+# With CPU profile capture (delete scenarios)
+GRIDA_PERF=1 GRIDA_PERF_CPUPROFILE=1 pnpm vitest run \
+  editor/grida-canvas/__tests__/bench/perf-editor.test.ts
+
+# Large fixtures need more heap
 NODE_OPTIONS="--max-old-space-size=8192" GRIDA_PERF=1 \
-  pnpm vitest run grida-canvas/__tests__/bench/perf-reducer.test.ts
+  pnpm vitest run editor/grida-canvas/__tests__/bench/perf-editor.test.ts
 ```
 
-### When to use which
+### Which spans to read
 
-| Question                               | Use                               |
-| -------------------------------------- | --------------------------------- |
-| Is an operation faster after a change? | `.bench.ts` (ops/sec comparison)  |
-| Why is an operation slow? (breakdown)  | `.test.ts` (`PerfObserver` spans) |
-| Is the fix a regression for other ops? | `.bench.ts` (run full suite)      |
-| How does cost scale with node count?   | `.test.ts` (vary scene size)      |
+After a bench run, `perf.report()` prints a table per scene. The bench
+README has the authoritative catalog — read it there. Read the table
+in category order rather than by specific name:
 
-### WASM raster backend
+1. **Total dispatch** — your ceiling per action.
+2. **Reducer + Immer** — pure JS cost. Watch p95 on gesture scenarios
+   (drag / resize per-frame) — median can be microseconds while p95
+   spikes into hundreds of ms as the tree grows.
+3. **Document snapshot** — deep-clone at gesture boundaries; pays
+   twice per gesture (start + end).
+4. **WASM sync (full reload vs. patch path)** — compare the full-reload
+   span count against the patch-path span count. If the full reload
+   fires for every dispatch and the patch path rarely fires, too many
+   actions are routing through the slow path.
+5. **Gesture / query compute** — snap targets, hover ray, tree
+   traversal. Usually small but can dominate at high selection count.
 
-Both files use a WASM raster backend (`@grida/canvas-wasm` with
-`backend: "raster"`) so geometry queries return real bounding rects.
-This exercises the full gesture pipeline (snap, transform, scale)
-exactly as it runs in production.
+Prefer bench ratios over absolute numbers in commits and memory —
+absolutes shift with machine and node version; ratios stay meaningful.
 
 ### Adding a new benchmark
 
-```ts
-// In .bench.ts — use Vitest bench():
-bench("my operation", () => {
-  ed.doc.dispatch({ type: "...", ... } as any, { recording: "silent" });
-}, { time: 2_000, warmupIterations: 3 });
+Extend `BENCH_SCENARIOS` in `perf-editor.test.ts`. Use the `bench()`
+helper from `_utils.ts` for per-frame gestures and `runAndTime()` (or
+similar) for single-shot discrete actions:
 
-// In .test.ts — use manual bench() helper:
-const result = bench(() => {
-  ed.doc.dispatch({ type: "...", ... } as any, { recording: "silent" });
-}, 20);
+```ts
+const result = await bench(() => {
+  h.ed.doc.dispatch({ type: "...", ... } as Action, { recording: "silent" });
+}, { iterations: 10 });
 logBench("my operation", result);
 ```
+
+If you need a one-off CPU profile of a specific operation, use
+`withCpuProfile()` from `_utils.ts` — it wraps the call in
+`node:inspector` and writes a `.cpuprofile` to
+`fixtures/local/perf/cpuprofile/` (gated by `GRIDA_PERF_CPUPROFILE=1`).
 
 ---
 
@@ -254,18 +286,97 @@ The span labels use dot-notation hierarchy (`dispatch.reducer`,
 
 ---
 
+## Reading a browser trace
+
+Chrome DevTools exports traces as `.json.gz`. They are plain JSON after
+decompression, so analyze them with a short Python script rather than
+opening DevTools by hand.
+
+Key signals to extract:
+
+| Signal                                    | How to find it                                                                                                              |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| React component renders (count per name)  | Events with `cat == "blink.user_timing"` and `ph == "b"`. Each render emits one; counting them per `name` shows re-renders. |
+| Hot JS functions (self-time)              | `ProfileChunk` events contain `cpuProfile.nodes` + `samples` + `timeDeltas`. Accumulate `timeDeltas` per sample id.         |
+| Long interactions                         | `FunctionCall` events with `name == "dispatchContinuousEvent"` (or `dispatchDiscreteEvent`) — filter by `dur > 20000` (µs). |
+| What happened inside one long interaction | Filter `ProfileChunk` samples by their cumulative timestamp falling inside the `FunctionCall` window.                       |
+
+The trace includes React DevTools overhead when the extension is
+installed. **`measureInstance @ installHook.js` is the React DevTools
+profiler** — it can easily account for ~10% of CPU and inflates render
+counts. Ask the user to disable the extension for "clean" traces, or
+subtract it out when reading.
+
+```py
+# Minimal trace reader — extract events and CPU profile nodes
+import json, gzip
+from collections import defaultdict, Counter
+data = json.load(gzip.open("logs/Trace-....json.gz"))
+events = data["traceEvents"] if isinstance(data, dict) else data
+
+# Component renders by name
+renders = Counter()
+for e in events:
+    if e.get("cat") == "blink.user_timing" and e.get("ph") == "b":
+        renders[e.get("name","")] += 1
+
+# CPU self-time by function
+nodes_by_id = {}
+self_time = defaultdict(int)
+for e in events:
+    if e.get("name") == "ProfileChunk":
+        cp = e["args"]["data"].get("cpuProfile", {})
+        for n in cp.get("nodes", []):
+            nodes_by_id[n["id"]] = n
+        for sid, dt in zip(cp.get("samples", []),
+                           e["args"]["data"].get("timeDeltas", [])):
+            self_time[sid] += dt
+```
+
+---
+
+## Node CPU profiles
+
+When an `editor-bench` run flags a span but you need function-level
+detail, capture a `.cpuprofile`:
+
+```sh
+# Via the bench harness (preferred — uses withCpuProfile wrapper)
+GRIDA_PERF=1 GRIDA_PERF_CPUPROFILE=1 pnpm vitest run \
+  editor/grida-canvas/__tests__/bench/perf-editor.test.ts
+# → writes fixtures/local/perf/cpuprofile/*.cpuprofile
+
+# Or wrap a specific call in code:
+import { withCpuProfile } from "./_utils";
+await withCpuProfile("my-scenario", async () => { ... });
+```
+
+Open the resulting `.cpuprofile` in Chrome DevTools (Performance → Load
+profile) or VS Code for an interactive flame graph.
+
+For microtask-level detail, start Node with
+`--cpu-prof --cpu-prof-interval=100` (µs between samples). For trace
+events / async task timing, `--trace-events-enabled` captures a
+chrome://tracing-compatible JSON. Both are Node built-ins — no extra
+tooling required.
+
+---
+
 ## The Verification Workflow
 
 **Every performance change follows this sequence.**
 
 ### Step 1: Baseline
 
-Run the benchmarks BEFORE any changes. Save the output.
+Run the bench BEFORE any changes. Save the output.
 
 ```sh
-pnpm vitest bench grida-canvas/__tests__/bench/perf-reducer.bench.ts
-GRIDA_PERF=1 pnpm vitest run grida-canvas/__tests__/bench/perf-reducer.test.ts
+GRIDA_PERF=1 pnpm vitest run editor/grida-canvas/__tests__/bench/perf-editor.test.ts
 ```
+
+If the user provided a browser trace, also record its pre-change numbers
+(render counts and hot-function self-times) — these are the only way to
+verify React-side wins.
 
 ### Step 2: Implement
 
@@ -283,7 +394,9 @@ Run the same benchmarks AFTER the change. Compare.
 ### Step 4: Regression check
 
 An optimization for one operation must not regress others. Run the
-full benchmark suite, not just the target operation.
+full bench suite at both 1K and 10K scales, not just the target
+operation — many improvements that help 10K scenes add constant
+overhead that hurts 1K.
 
 ### Step 5: Accept or iterate
 
@@ -315,8 +428,9 @@ improvement in the target benchmark, and not regress other benchmarks.
 
 ### 4. Add a benchmark if one doesn't exist
 
-If optimizing an operation that has no benchmark, add one to
-`.bench.ts` or `.test.ts` first. Measure before and after.
+If optimizing an operation that has no bench coverage, extend
+`BENCH_SCENARIOS` in `perf-editor.test.ts` first. Measure before and
+after.
 
 ---
 
@@ -336,13 +450,13 @@ snapshots. At scale this causes multi-second freezes and high
 memory pressure. Check how snapshot data is captured when
 investigating gesture-start lag.
 
-### Headless benchmarks omit React cost
+### Bench omits React cost — that is intentional
 
-Headless benchmarks measure the reducer + emit pipeline but NOT
-React re-render cost. In the browser, subscribers run selectors
-and equality checks on every dispatch, and UI panels may re-render
-on every pointer move. These costs can only be measured with Chrome
-DevTools Profiler.
+The bench measures the reducer + emit + WASM pipeline, not the React
+subscription layer. If the complaint is about interaction feel (a
+pointer move stalls, a panel re-renders too often), bench will not
+see it. Use a browser trace for that; see "Pick your measurement
+tool" above.
 
 ### WASM geometry adds memory pressure
 

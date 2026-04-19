@@ -107,13 +107,6 @@ export interface AddImageWithIdResult {
   type: string;
 }
 
-export interface TransactionApplyReport {
-  success: boolean;
-  applied: number;
-  total: number;
-  error?: string;
-}
-
 export class Scene {
   private appptr: number;
   private module: createGridaCanvas.GridaCanvasWasmBindings;
@@ -165,17 +158,6 @@ export class Scene {
   _free_string(ptr: number, len: number) {
     this._assertAlive();
     ffi.free(this.module, ptr, len);
-  }
-
-  /**
-   * Load a scene from a `.grida1` JSON string.
-   * @param data - The JSON string to load.
-   */
-  loadScene(data: string) {
-    this._assertAlive();
-    const [ptr, len] = this._alloc_string(data);
-    this.module._load_scene_grida1(this.appptr, ptr, len - 1);
-    this._free_string(ptr, len);
   }
 
   /**
@@ -251,21 +233,35 @@ export class Scene {
     ffi.free(this.module, bytesPtr, bytesLen);
   }
 
-  applyTransactions(batch: unknown[][]): TransactionApplyReport[] | null {
+  /**
+   * Replace a single node's data in the active scene, keyed by the id
+   * encoded in `bytes`.
+   *
+   * `bytes` must be a single-node `GridaFile` buffer (see
+   * `io.GRID.encodeNode`). The node id must already exist in the active
+   * scene; parent links and children are untouched.
+   *
+   * Returns `false` if the buffer is malformed or the id is unknown. How
+   * to recover is up to the caller.
+   */
+  replaceNode(bytes: Uint8Array): boolean {
     this._assertAlive();
-    const json = JSON.stringify(batch);
-    const [ptr, len] = this._alloc_string(json);
-    const outptr = this.module._apply_scene_transactions(
-      this.appptr,
-      ptr,
-      len - 1
-    );
+    const [ptr, len] = ffi.allocBytes(this.module, bytes);
+    const ok = this.module._replace_node_grida(this.appptr, ptr, len);
+    ffi.free(this.module, ptr, len);
+    return ok;
+  }
+
+  /**
+   * Remove a node and all its descendants from the active scene, keyed by
+   * user id. Returns `false` if the id is unknown.
+   */
+  deleteNode(id: string): boolean {
+    this._assertAlive();
+    const [ptr, len] = this._alloc_string(id);
+    const ok = this.module._delete_node(this.appptr, ptr, len - 1);
     this._free_string(ptr, len);
-    if (outptr === 0) {
-      return null;
-    }
-    const str = ffi.readLenPrefixedString(this.module, outptr);
-    return JSON.parse(str) as TransactionApplyReport[];
+    return ok;
   }
 
   /**

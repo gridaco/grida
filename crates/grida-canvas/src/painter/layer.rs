@@ -79,6 +79,23 @@ pub enum PainterPictureLayer {
 }
 
 impl PainterPictureLayer {
+    /// Mutable access to the layer's shared base (id, z-index, opacity,
+    /// blend mode, transform, clip path).
+    ///
+    /// Used by partial-invalidation paths to patch a layer's cached
+    /// world transform in place when only its geometry changed —
+    /// avoids rebuilding the entire `LayerList`.
+    #[inline]
+    pub fn base_mut(&mut self) -> &mut PainterPictureLayerBase {
+        match self {
+            PainterPictureLayer::Shape(layer) => &mut layer.base,
+            PainterPictureLayer::Text(layer) => &mut layer.base,
+            PainterPictureLayer::Vector(layer) => &mut layer.base,
+            PainterPictureLayer::MarkdownEmbed(layer) => &mut layer.base,
+            PainterPictureLayer::HtmlEmbed(layer) => &mut layer.base,
+        }
+    }
+
     /// Returns true when the layer has no effects that would produce different
     /// `SkPicture` recordings for different `EffectQuality` levels.
     ///

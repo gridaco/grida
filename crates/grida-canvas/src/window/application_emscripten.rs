@@ -1,5 +1,4 @@
-use crate::io::io_grida::JSONFlattenResult;
-use crate::io::io_grida_patch::TransactionApplyReport;
+use crate::io::vn_json::JSONFlattenResult;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
@@ -309,10 +308,6 @@ impl ApplicationApi for EmscriptenApplication {
         self.base.highlight_strokes(ids, style);
     }
 
-    fn load_scene_grida1(&mut self, json: &str) {
-        self.base.load_scene_grida1(json);
-    }
-
     fn load_scene_grida(&mut self, bytes: &[u8]) {
         self.base.load_scene_grida(bytes);
     }
@@ -323,13 +318,6 @@ impl ApplicationApi for EmscriptenApplication {
 
     fn loaded_scene_ids(&self) -> Vec<String> {
         self.base.loaded_scene_ids()
-    }
-
-    fn apply_document_transactions(
-        &mut self,
-        transactions: Vec<Vec<serde_json::Value>>,
-    ) -> Vec<TransactionApplyReport> {
-        self.base.apply_document_transactions(transactions)
     }
 
     fn load_dummy_scene(&mut self) {
@@ -454,12 +442,5 @@ impl EmscriptenApplication {
 
     pub fn get_image_size(&self, id: &str) -> Option<(u32, u32)> {
         self.base.get_image_size(id)
-    }
-
-    pub fn apply_document_transactions_json(
-        &mut self,
-        json: &str,
-    ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
-        self.base.apply_document_transactions_json(json)
     }
 }

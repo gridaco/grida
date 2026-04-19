@@ -1210,6 +1210,15 @@ export namespace io {
     }
 
     /**
+     * Encodes a single node as a minimal `GridaFile` buffer for use with
+     * partial-sync APIs that identify the target by id (e.g.
+     * `Scene.replaceNode`). Hierarchy is not carried.
+     */
+    export function encodeNode(node: grida.program.nodes.Node): Uint8Array {
+      return format.document.encode.nodeToFlatbuffer(node);
+    }
+
+    /**
      * Decodes raw FlatBuffers bytes to a Grida document.
      *
      * @param bytes - Raw FlatBuffers bytes (must start with "GRID" magic)

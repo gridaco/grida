@@ -1,5 +1,4 @@
 pub mod camera;
-pub mod changes;
 pub mod config;
 pub mod cost_prediction;
 pub mod counter;
@@ -9,6 +8,7 @@ pub mod font_repository;
 pub mod frame_loop;
 pub mod frame_strategy;
 pub mod image_repository;
+pub mod invalidation;
 pub mod pixel_preview;
 pub mod render_policy;
 pub mod scene;

@@ -63,9 +63,17 @@ relying on hardcoded paths. File locations shift as the engine evolves.
 
 ## The Benchmark Systems
 
-There are three complementary benchmarks. The bulk report is the
-recommended starting point; the single-scene bench and Criterion
-provide deeper investigation when needed.
+There are four complementary benchmarks. The bulk report is the
+recommended starting point for camera-motion work; the node-mutation
+bench is the go-to for invalidation-pipeline work; the single-scene
+bench and Criterion provide deeper investigation when needed.
+
+| Class           | What moves between frames          | Tool                            | Measures                                       |
+| --------------- | ---------------------------------- | ------------------------------- | ---------------------------------------------- |
+| Camera motion   | `Camera2D` (pan/zoom)              | `grida-dev bench` scenarios     | draw + compositor + caches on stable scene     |
+| Node mutation   | Scene graph (translate / replace)  | `grida-dev bench --translate`   | `apply_changes` (invalidation pipeline) + draw |
+| Bulk regression | All scenes, camera motion          | `grida-dev bench-report` (JSON) | per-scene PassStats across the fixture set     |
+| Algorithmic     | Synthetic grid, various operations | `cargo bench -p cg` (Criterion) | CPU-only cost with statistical CI              |
 
 ### 1. Bulk benchmark report (`grida-dev bench-report`)
 
@@ -187,7 +195,70 @@ scenes that stress the subsystem you're optimizing. For effects/caching
 work, look for scenes with high promoted-node counts. For culling work,
 look for scenes with many visible nodes but few effects.
 
-### 2. Criterion benchmark (`bench_camera`)
+### 3. Node mutation benchmark (`grida-dev bench --translate`)
+
+Measures the **invalidation pipeline cost** — not camera motion.
+Every frame mutates the scene graph (translates a target node), then
+runs `apply_changes` + `queue_unstable` + `flush`. This is the bench
+that captures real drag-a-node behavior, identical to what
+`Application::frame()` + `EditorDocument::apply_and_mark` exercise in
+the demo.
+
+```sh
+# List scenes, pick a target
+cargo run -p grida-dev --release -- bench <path.grida> --list-scenes
+
+# Translate the first suitable root node for 200 frames
+cargo run -p grida-dev --release -- bench <path.grida> --translate first --frames 200
+
+# Translate a specific node by id
+cargo run -p grida-dev --release -- bench <path.grida> --translate 42 --frames 200
+```
+
+Output includes a separate line for **`apply_changes` timing** — this
+is the cost of running the classifier + dirty-set dispatch + partial
+rebuild, isolated from the draw phase. Treat this as the authoritative
+number for "is invalidation slow?"
+
+```
+apply_changes: avg=3720us p50=3288us p95=30714us MAX=30714us
+total frame:   avg=65344us p50=62159us fps=15.3
+queue: 1.3ms  draw: 10ms  mid_flush: 49ms  compositor: 1µs  flush: 7µs  settle: 83ms
+```
+
+**Per-frame dispatch trace (`GRIDA_INVALIDATION_LOG=1`):** opt-in
+stderr log showing which flush branch fires each frame, with phase
+timings:
+
+```sh
+GRIDA_INVALIDATION_LOG=1 cargo run -p grida-dev --release -- \
+    bench <path.grida> --translate first --frames 20
+```
+
+```
+[invalidation] geometry  dirty=1 (fast path)
+[invalidation] rebuild_partial  affected=5663 anchor=0us geom=847us patch=2669us
+```
+
+Reads: the classifier picked the Geometry fast path; the subtree
+enumeration produced 5663 affected ids; per-subtree geometry took
+847µs; the in-place layer/R-tree patch took 2669µs. Use this to
+confirm that the expected branch fires and to spot phase-level
+regressions.
+
+**Fixtures for mutation work:** `fixtures/local/perf/grida/` holds
+large real-world scenes (e.g. `01-135k.perf.grida` at 136k nodes) that
+expose O(scene) work in the invalidation pipeline. Use these to
+validate that "fast paths" are actually sublinear in scene size.
+
+**Verifying a fast path landed correctly:** when adding a new
+`ChangeKind` or subtree-scoped rebuild, always re-run the mutation
+bench with `GRIDA_INVALIDATION_LOG=1` and confirm (1) the expected
+branch label appears in the log, and (2) the phase costs are O(affected)
+not O(scene). A "fast path" that still prints scene-sized numbers
+isn't fast — just read the log.
+
+### 4. Criterion benchmark (`bench_camera`)
 
 Runs synthetic scenes on a raster (CPU) backend. This isolates
 algorithmic costs from GPU behavior and produces statistically rigorous
@@ -207,20 +278,24 @@ of scenes, configs, and operations. The naming convention is
 
 ### When to use which
 
-| Question                                      | Use                                              |
-| --------------------------------------------- | ------------------------------------------------ |
-| What's slow across all fixtures?              | Bulk report (`bench-report`)                     |
-| Baseline before/after a change?               | Bulk report (save JSON, compare)                 |
-| Detailed investigation of one scene?          | Single-scene GPU bench                           |
-| Is the algorithm itself faster?               | Criterion                                        |
-| Is there a statistical regression?            | Criterion (has CI)                               |
-| What's the real frame time with GPU overhead? | Single-scene GPU bench                           |
-| Does a config toggle actually help?           | Both GPU benchmarks + Criterion                  |
-| Does it match what users see in the app?      | `realtime` scenarios (sleep + settle simulation) |
-| Are there frame drops during gestures?        | Check `p99` and `MAX` in scenario stats          |
-| Is slow panning janky (stable frame spikes)?  | `frameloop` scenarios (real FrameLoop path)      |
-| Is resize janky?                              | Single-scene GPU bench with `--resize`           |
-| Is the SurfaceUI overlay causing slowdowns?   | A/B with `--overlay` flag on GPU bench           |
+| Question                                                  | Use                                                       |
+| --------------------------------------------------------- | --------------------------------------------------------- |
+| What's slow across all fixtures?                          | Bulk report (`bench-report`)                              |
+| Baseline before/after a change?                           | Bulk report (save JSON, compare)                          |
+| Detailed investigation of one scene?                      | Single-scene GPU bench                                    |
+| Is dragging / resizing / color-picking a node slow?       | **Mutation bench** (`--translate`)                        |
+| Is my invalidation fast path actually sublinear?          | **Mutation bench** + `GRIDA_INVALIDATION_LOG=1`           |
+| Which cache rebuild dominates `apply_changes`?            | **Mutation bench** — reads the phase breakdown in the log |
+| Did a `ChangeKind` classifier change regress other kinds? | **Mutation bench** on several targets (different kinds)   |
+| Is the algorithm itself faster?                           | Criterion                                                 |
+| Is there a statistical regression?                        | Criterion (has CI)                                        |
+| What's the real frame time with GPU overhead?             | Single-scene GPU bench                                    |
+| Does a config toggle actually help?                       | Both GPU benchmarks + Criterion                           |
+| Does it match what users see in the app?                  | `realtime` scenarios (sleep + settle simulation)          |
+| Are there frame drops during gestures?                    | Check `p99` and `MAX` in scenario stats                   |
+| Is slow panning janky (stable frame spikes)?              | `frameloop` scenarios (real FrameLoop path)               |
+| Is resize janky?                                          | Single-scene GPU bench with `--resize`                    |
+| Is the SurfaceUI overlay causing slowdowns?               | A/B with `--overlay` flag on GPU bench                    |
 
 ---
 

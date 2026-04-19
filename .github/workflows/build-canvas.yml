@@ -55,8 +55,13 @@ jobs:
         with:
           key: wasm32-unknown-emscripten
 
-      - name: Install workspace dependencies for @grida/canvas-wasm
-        run: pnpm install --filter "@grida/canvas-wasm..." --frozen-lockfile
+      # Full install (not filtered). The canvas-wasm vitest suite imports
+      # from packages/grida-canvas-io (source path), which transitively
+      # depends on @grida/schema, @grida/cg, @grida/cmath, @grida/format,
+      # @grida/sequence. A --filter install scoped to @grida/canvas-wasm
+      # misses those because canvas-wasm's own package.json has no deps.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Install Emscripten SDK
         run: python3 bin/activate-emsdk
@@ -68,3 +73,11 @@ jobs:
       - name: Build canvas wasm artifacts
         run: just build
         working-directory: crates/grida-canvas-wasm
+
+      # Build the one package the wasm vitest imports — turbo pulls its
+      # workspace deps (@grida/schema, cg, cmath, format, sequence).
+      - name: Build workspace packages for tests
+        run: pnpm turbo build --filter=@grida/io
+
+      - name: Run canvas wasm smoke test
+        run: pnpm --filter @grida/canvas-wasm test

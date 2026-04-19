@@ -43,7 +43,7 @@ impl FilterEffect {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FilterShadowEffect {
     DropShadow(FeShadow),
     InnerShadow(FeShadow),
@@ -81,7 +81,7 @@ impl From<FilterShadowEffect> for FilterEffect {
 /// - https://developer.mozilla.org/en-US/docs/Web/CSS/box-shadow
 /// - https://www.figma.com/plugin-docs/api/Effect/#dropshadoweffect
 /// - https://api.flutter.dev/flutter/painting/BoxShadow-class.html
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FeShadow {
     /// Horizontal shadow offset in px
     pub dx: f32,
@@ -125,7 +125,7 @@ pub struct FeShadow {
 /// - Shader implementation: `src/shaders/liquid_glass_effect.sksl`
 /// - Documentation: `src/shaders/liquid_glass_effect.md`
 /// - Example: `examples/golden_liquid_glass.rs`
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FeLiquidGlass {
     /// Controls transmission/transparency [0.0-1.0]
     /// Higher values = more see-through glass
@@ -171,28 +171,28 @@ impl Default for FeLiquidGlass {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
 pub enum FeBlur {
     Gaussian(FeGaussianBlur),
     Progressive(FeProgressiveBlur),
 }
 
 /// Layer blur effect wrapper with active flag
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FeLayerBlur {
     pub blur: FeBlur,
     pub active: bool,
 }
 
 /// Backdrop blur effect wrapper with active flag
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FeBackdropBlur {
     pub blur: FeBlur,
     pub active: bool,
 }
 
 /// A standalone blur filter effect (`<feGaussianBlur>`)
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct FeGaussianBlur {
     /// Blur radius (`stdDeviation` in SVG)
     pub radius: f32,
@@ -337,7 +337,7 @@ pub struct FeGaussianBlur {
 /// - Shader implementation: `src/shaders/progressive_blur_horizontal.sksl`, `progressive_blur_vertical.sksl`
 /// - Documentation: `src/shaders/progressive_blur.md`  
 /// - Examples: `examples/golden_progressive_blur.rs`, `examples/golden_progressive_blur_backdrop.rs`
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct FeProgressiveBlur {
     /// Gradient start point in normalized node-local space
     ///
@@ -471,7 +471,7 @@ impl From<f32> for FilterEffect {
 ///
 /// All types use the same underlying Perlin noise pattern controlled by
 /// `noise_size` and `density`, differing only in how colors are applied.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NoiseEffectColors {
     /// Single-color noise pattern.
     ///
@@ -544,7 +544,7 @@ pub enum NoiseEffectColors {
 /// - Alpha conversion: `<feColorMatrix type="luminanceToAlpha">`
 /// - Density control: `<feComponentTransfer>` with table values
 /// - Color application: `<feFlood>` + `<feComposite operator="in">`
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FeNoiseEffect {
     /// Controls noise grain size (lower = finer grains)
     pub noise_size: f32,

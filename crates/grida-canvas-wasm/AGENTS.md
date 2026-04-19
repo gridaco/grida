@@ -109,10 +109,8 @@ The generated WASM module exports C functions that can be called from JavaScript
 // Initialize the canvas
 const app = Module._init(width, height, useEmbeddedFonts);
 
-// Load a scene (FlatBuffers binary — preferred for large documents)
+// Load a scene (FlatBuffers binary)
 Module._load_scene_grida(app, gridaBytesPtr, gridaBytesLen);
-// Load a scene (JSON — legacy, higher memory overhead)
-Module._load_scene_grida1(app, sceneJsonPtr, sceneJsonLen);
 
 // Render a frame
 Module._tick(app, timestamp);

@@ -13,13 +13,12 @@ description: >
 
 Grida uses **FlatBuffers** as the canonical binary format. File identifier: `"GRID"`.
 
-Three on-disk variants:
+Two on-disk variants:
 
-| Variant         | Detection              | Notes                                          |
-| --------------- | ---------------------- | ---------------------------------------------- |
-| Raw FlatBuffers | `"GRID"` at bytes 4–7  | Bare document, no images                       |
-| ZIP archive     | ZIP magic bytes        | `manifest.json` + `document.grida` + `images/` |
-| Legacy JSON     | Starts with `{` or `[` | Deprecated, still decoded                      |
+| Variant         | Detection             | Notes                                          |
+| --------------- | --------------------- | ---------------------------------------------- |
+| Raw FlatBuffers | `"GRID"` at bytes 4–7 | Bare document, no images                       |
+| ZIP archive     | ZIP magic bytes       | `manifest.json` + `document.grida` + `images/` |
 
 **Document model**: Flat node repository (not nested). Nodes reference parents via ID + fractional-index position strings. Multi-scene: each Figma page → a `SceneNode`.
 
@@ -48,7 +47,6 @@ Three on-disk variants:
 | ------------------ | -------------------------------------------------------------- |
 | `io_grida_file.rs` | Format detection + unified `decode_all(&bytes)` → `Vec<Scene>` |
 | `io_grida_fbs.rs`  | FlatBuffers → Rust runtime (`GridaFile` → `Scene`)             |
-| `io_grida.rs`      | Legacy JSON decoder                                            |
 
 ## Code Generation
 
@@ -118,13 +116,6 @@ let result = flatbuffers::root::<fbs::GridaFile>(&bytes);
 ```
 
 Note: the TS FlatBuffers decoder is more lenient than Rust — a TS-side round-trip may pass even when the bytes are structurally invalid. Always verify with the Rust verifier.
-
-### Inspecting .grida files
-
-```sh
-cargo run --example tool_io_grida -- path/to/file.grida --list-scenes
-cargo run --example tool_io_grida -- path/to/file.grida --scene 0 --verbose
-```
 
 ### Cross-boundary tests
 

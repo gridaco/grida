@@ -16,7 +16,6 @@ import {
   useClipboardSync,
   useContentEditModeMinimalState,
   useCurrentSceneState,
-  useDocumentState,
   useEditableState,
   useEventTargetCSSCursor,
   useGestureState,
@@ -673,15 +672,13 @@ function DropzoneOverlay(props: editor.state.DropzoneIndication) {
   }
 }
 
-function RootFramesBarOverlay() {
+// Memoized so that re-renders of the parent `EditorSurface` (which subscribes
+// to many store slices and re-renders on every nudge/gesture) do not propagate
+// into this subtree. With no props, `React.memo`'s prop check is always equal;
+// internal hook changes still trigger re-renders via their own dispatch.
+const RootFramesBarOverlay = React.memo(function RootFramesBarOverlay() {
   const { selection, hovered_node_id } = useSelectionState();
-  const { document } = useDocumentState();
-  const scene = useCurrentSceneState();
   const _editor = useCurrentEditor();
-  const isolation_root_node_id = useEditorState(
-    _editor,
-    (state) => state.isolation_root_node_id
-  );
 
   // Mirrors Rust collect_labeled_nodes():
   //  - Trays at scene root → badge-style label
@@ -692,75 +689,107 @@ function RootFramesBarOverlay() {
   // When isolation is active (e.g. slides mode focusing a single tray),
   // only show labels for the isolated tray itself and its direct container
   // children — sibling trays and their children are hidden.
-  const labeledNodes = useMemo(() => {
-    type LabelVariant = "badge" | "plain";
-    type LabeledNode = {
-      node: grida.program.nodes.Node;
-      variant: LabelVariant;
-      /** For tray-child containers, the parent tray id. */
-      parentNodeId?: string;
-    };
+  //
+  // Selector + display-only comparator: the hook returns the cached projection
+  // whenever only non-display fields (transform, fills, etc.) differ — e.g.
+  // nudging a labeled node does not re-render the overlay or cascade into the
+  // per-node title bar / floating bar subtree. FloatingBar repositions via its
+  // own `useSingleSelection(node_id)` subscription, so stale `node` references
+  // here are fine for the fields this component actually reads (id/type/name).
+  const { labeledNodes, isSingleMode } = useEditorState(
+    _editor,
+    (state) => {
+      type LabelVariant = "badge" | "plain";
+      type LabeledNode = {
+        node: grida.program.nodes.Node;
+        variant: LabelVariant;
+        /** For tray-child containers, the parent tray id. */
+        parentNodeId?: string;
+      };
 
-    const labels: LabeledNode[] = [];
-    const { nodes, links } = document;
+      const labels: LabeledNode[] = [];
+      const { nodes, links } = state.document;
+      const scene_id = state.scene_id;
+      const scene = scene_id
+        ? (nodes[scene_id] as grida.program.nodes.SceneNode | undefined)
+        : undefined;
+      const children_refs = scene_id ? links[scene_id] || [] : [];
+      const isSingleMode = scene?.constraints.children === "single";
+      const isolation_root_node_id = state.isolation_root_node_id;
 
-    const isContainer = (n: grida.program.nodes.Node) =>
-      n.type === "container" ||
-      n.type === "template_instance" ||
-      n.type === "component" ||
-      n.type === "instance";
+      const isContainer = (n: grida.program.nodes.Node) =>
+        n.type === "container" ||
+        n.type === "template_instance" ||
+        n.type === "component" ||
+        n.type === "instance";
 
-    // When isolation is active, only show the isolated node's own title
-    // bar — no children, no siblings.
-    if (isolation_root_node_id) {
-      const node = nodes[isolation_root_node_id];
-      if (node && node.active !== false) {
+      // When isolation is active, only show the isolated node's own title
+      // bar — no children, no siblings.
+      if (isolation_root_node_id) {
+        const node = nodes[isolation_root_node_id];
+        if (node && node.active !== false) {
+          if (node.type === "tray") {
+            labels.push({ node, variant: "badge" });
+          } else if (isContainer(node)) {
+            labels.push({ node, variant: "plain" });
+          }
+        }
+        return { labeledNodes: labels, isSingleMode };
+      }
+
+      for (const rootId of children_refs) {
+        const node = nodes[rootId];
+        if (!node || node.active === false) continue;
+
         if (node.type === "tray") {
+          // Tray itself gets a badge label
           labels.push({ node, variant: "badge" });
+
+          // Tray's direct container children get plain labels (root-like)
+          const trayChildren = links[rootId];
+          if (trayChildren) {
+            for (const childId of trayChildren) {
+              const child = nodes[childId];
+              if (child && child.active !== false && isContainer(child)) {
+                labels.push({
+                  node: child,
+                  variant: "plain",
+                  parentNodeId: rootId,
+                });
+              }
+            }
+          }
         } else if (isContainer(node)) {
+          // Root container gets a plain label
           labels.push({ node, variant: "plain" });
         }
       }
-      return labels;
-    }
 
-    for (const rootId of scene.children_refs) {
-      const node = nodes[rootId];
-      if (!node || node.active === false) continue;
-
-      if (node.type === "tray") {
-        // Tray itself gets a badge label
-        labels.push({ node, variant: "badge" });
-
-        // Tray's direct container children get plain labels (root-like)
-        const trayChildren = links[rootId];
-        if (trayChildren) {
-          for (const childId of trayChildren) {
-            const child = nodes[childId];
-            if (child && child.active !== false && isContainer(child)) {
-              labels.push({
-                node: child,
-                variant: "plain",
-                parentNodeId: rootId,
-              });
-            }
-          }
-        }
-      } else if (isContainer(node)) {
-        // Root container gets a plain label
-        labels.push({ node, variant: "plain" });
+      return { labeledNodes: labels, isSingleMode };
+    },
+    (a, b) => {
+      if (a === b) return true;
+      if (a.isSingleMode !== b.isSingleMode) return false;
+      const la = a.labeledNodes;
+      const lb = b.labeledNodes;
+      if (la.length !== lb.length) return false;
+      for (let i = 0; i < la.length; i++) {
+        const ea = la[i];
+        const eb = lb[i];
+        if (ea === eb) continue;
+        if (ea.variant !== eb.variant) return false;
+        if (ea.parentNodeId !== eb.parentNodeId) return false;
+        const na = ea.node;
+        const nb = eb.node;
+        if (na === nb) continue;
+        if (na.id !== nb.id) return false;
+        if (na.type !== nb.type) return false;
+        if (na.name !== nb.name) return false;
+        if ((na.active ?? true) !== (nb.active ?? true)) return false;
       }
+      return true;
     }
-
-    return labels;
-  }, [
-    scene.children_refs,
-    document.nodes,
-    document.links,
-    isolation_root_node_id,
-  ]);
-
-  const isSingleMode = scene.constraints.children === "single";
+  );
 
   const nodeState = (node_id: string) =>
     selection.includes(node_id)
@@ -814,7 +843,7 @@ function RootFramesBarOverlay() {
       ))}
     </>
   );
-}
+});
 
 function NodeTitleBar({
   node,

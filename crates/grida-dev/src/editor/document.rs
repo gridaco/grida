@@ -10,6 +10,7 @@
 //! rebuilds all caches from scratch.
 
 use cg::node::schema::{Node, NodeId, Scene};
+use cg::runtime::invalidation::ChangeKind;
 use cg::surface::gesture::SurfaceGesture;
 use cg::window::application::UnknownTargetApplication;
 
@@ -39,8 +40,8 @@ impl EditorDocument {
     }
 
     /// Apply a mutation command to the document.
-    /// Returns `true` if the scene was modified.
-    pub fn apply(&mut self, cmd: &MutationCommand) -> bool {
+    /// Returns the list of `(NodeId, ChangeKind)` pairs, empty on no-op.
+    pub fn apply(&mut self, cmd: &MutationCommand) -> Vec<(NodeId, ChangeKind)> {
         mutation::apply(&mut self.scene, cmd)
     }
 
@@ -48,6 +49,39 @@ impl EditorDocument {
     /// This is a full reload — all caches are rebuilt.
     pub fn flush(&self, app: &mut UnknownTargetApplication) {
         app.renderer_mut().load_scene(self.scene.clone());
+    }
+
+    /// Apply a mutation to both the editor's scene and the renderer's
+    /// scene, then mark the resulting [`ChangeKind`]s on the renderer.
+    ///
+    /// This is the fast path for interactive mutations (drag, resize).
+    /// It avoids `load_scene`'s full cache rebuild — the renderer's
+    /// [`apply_changes`](cg::runtime::scene::Renderer::apply_changes)
+    /// picks the narrowest invalidation based on the reported
+    /// `ChangeKind`s.
+    ///
+    /// Returns `true` if any mutation actually occurred.
+    pub fn apply_and_mark(
+        &mut self,
+        app: &mut UnknownTargetApplication,
+        cmd: &MutationCommand,
+    ) -> bool {
+        let reports = mutation::apply(&mut self.scene, cmd);
+        if reports.is_empty() {
+            return false;
+        }
+        // Mirror the same mutation into the renderer's scene so
+        // subsequent frames render from the mutated state. If the
+        // renderer has no scene loaded yet (editor state out of sync),
+        // the mutation-report path still returns true but nothing
+        // visible changes until the next `flush`.
+        if let Some(renderer_scene) = app.renderer_mut().scene.as_mut() {
+            let _ = mutation::apply(renderer_scene, cmd);
+        }
+        for (id, kind) in reports {
+            app.renderer_mut().mark_node_change_kind(id, kind);
+        }
+        true
     }
 
     /// Process a gesture delta from the surface state.
@@ -77,7 +111,10 @@ impl EditorDocument {
                 let dx = new_pt[0] - old_pt[0];
                 let dy = new_pt[1] - old_pt[1];
                 let ids = app.surface_selected_nodes().to_vec();
-                self.apply(&MutationCommand::Translate { ids, dx, dy })
+                // Fast path: goes through the invalidation module
+                // (Geometry fast path → geometry + layers only, no
+                // layout, no effect tree).
+                self.apply_and_mark(app, &MutationCommand::Translate { ids, dx, dy })
             }
             // ── Resize ───────────────────────────────────────────────
             (
@@ -93,15 +130,16 @@ impl EditorDocument {
             _ => false,
         };
 
-        if mutated {
-            self.flush(app);
-        }
+        // Resize still goes through full `flush` because the legacy
+        // `handle_incremental_resize` path mutates only the editor's
+        // scene. The Transform path above is self-contained and doesn't
+        // need a separate flush.
         mutated
     }
 
     fn handle_incremental_resize(
         &mut self,
-        app: &UnknownTargetApplication,
+        app: &mut UnknownTargetApplication,
         direction: cg::surface::ResizeDirection,
         old_screen: [f32; 2],
         new_screen: [f32; 2],
@@ -165,11 +203,14 @@ impl EditorDocument {
 
         // Origin shift.
         if tx.abs() > 0.0001 || ty.abs() > 0.0001 {
-            mutated |= self.apply(&MutationCommand::Translate {
-                ids: resizable_ids.clone(),
-                dx: tx,
-                dy: ty,
-            });
+            mutated |= self.apply_and_mark(
+                app,
+                &MutationCommand::Translate {
+                    ids: resizable_ids.clone(),
+                    dx: tx,
+                    dy: ty,
+                },
+            );
         }
         // Per-node resize.
         for (id, w, h) in &node_sizes {
@@ -183,11 +224,14 @@ impl EditorDocument {
             } else {
                 None
             };
-            mutated |= self.apply(&MutationCommand::Resize {
-                id: *id,
-                width: new_width,
-                height: new_height,
-            });
+            mutated |= self.apply_and_mark(
+                app,
+                &MutationCommand::Resize {
+                    id: *id,
+                    width: new_width,
+                    height: new_height,
+                },
+            );
 
             // Auto-height for content-driven nodes: when width changes,
             // re-measure content height so the node fits its content.
@@ -215,11 +259,14 @@ impl EditorDocument {
                         _ => None,
                     };
                     if let Some(h) = measured {
-                        mutated |= self.apply(&MutationCommand::Resize {
-                            id: *id,
-                            width: None,
-                            height: Some(h),
-                        });
+                        mutated |= self.apply_and_mark(
+                            app,
+                            &MutationCommand::Resize {
+                                id: *id,
+                                width: None,
+                                height: Some(h),
+                            },
+                        );
                     }
                 }
             }

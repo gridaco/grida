@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { io } from "../../../../packages/grida-canvas-io/index";
 import { createCanvas } from "..";
 import type createGridaCanvas from "../bin/grida-canvas-wasm";
 
@@ -46,10 +47,10 @@ const EXPECTED_FUNCTIONS = [
   { name: "_redraw", paramCount: 1 },
 
   // scene
-  { name: "_load_scene_grida1", paramCount: 3 },
   { name: "_load_scene_grida", paramCount: 3 },
   { name: "_switch_scene", paramCount: 3 },
-  { name: "_apply_scene_transactions", paramCount: 3 },
+  { name: "_replace_node_grida", paramCount: 3 },
+  { name: "_delete_node", paramCount: 3 },
   { name: "_load_dummy_scene", paramCount: 1 },
   { name: "_load_benchmark_scene", paramCount: 3 },
 
@@ -136,11 +137,14 @@ describe("WASM API Validation", () => {
       useEmbeddedFonts: true,
     });
 
-    const doc = readFileSync(
+    const docJson = readFileSync(
       resolve(process.cwd(), "example/rectangle.grida1"),
       "utf8"
     );
-    canvas.loadScene(doc);
+    const parsed = JSON.parse(docJson) as { document: unknown };
+    canvas.loadSceneGrida(
+      io.GRID.encode(parsed.document as Parameters<typeof io.GRID.encode>[0])
+    );
     canvas.dispose();
 
     expect(() =>

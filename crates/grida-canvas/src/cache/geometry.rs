@@ -491,6 +491,172 @@ impl GeometryCache {
         }
     }
 
+    /// Partial rebuild: re-resolve the subtree rooted at each id in
+    /// `roots`, reusing the existing cache for everything outside
+    /// those subtrees.
+    ///
+    /// The API mirrors [`from_scene_with_layout`] but operates
+    /// in-place on an existing cache. The core algorithm
+    /// (`build_recursive`) is shared — this is purely a narrower
+    /// driver over the same per-node logic.
+    ///
+    /// # Union-of-children ancestors
+    ///
+    /// Nodes whose bounds are the union of their children's bounds
+    /// (`Group`, `BooleanOperation`) must be re-walked when any
+    /// descendant moves. Callers must either include those
+    /// ancestors in `roots` directly, or rely on the cache's parent
+    /// links via [`Self::expand_roots_for_union_ancestors`].
+    ///
+    /// # Preconditions
+    /// - `self` is already populated for every node in `scene.graph`
+    ///   (call `from_scene_with_layout` on first build).
+    /// - Each root's parent (if any) has a correct
+    ///   `absolute_transform` in the cache — i.e. no ancestor of any
+    ///   root is itself dirty.
+    ///
+    /// Returns the set of node ids whose entries were touched
+    /// (roots + all descendants). Useful to the caller for keeping
+    /// downstream caches (layer list, R-tree) in sync.
+    pub fn update_subtree(
+        &mut self,
+        roots: &std::collections::HashSet<NodeId>,
+        scene: &Scene,
+        paragraph_cache: &mut ParagraphCache,
+        fonts: &FontRepository,
+        layout_result: Option<&crate::layout::cache::LayoutResult>,
+        viewport_size: crate::node::schema::Size,
+    ) -> std::collections::HashSet<NodeId> {
+        let graph = &scene.graph;
+        let schema_geo = graph.geo_data();
+
+        // Enumerate all ids in the affected subtrees.
+        let mut affected: std::collections::HashSet<NodeId> =
+            std::collections::HashSet::with_capacity(roots.len() * 8);
+        for &root in roots {
+            if !graph.has_node(&root) {
+                continue;
+            }
+            affected.insert(root);
+            if let Ok(desc) = graph.descendants(&root) {
+                affected.extend(desc);
+            }
+        }
+        if affected.is_empty() {
+            return affected;
+        }
+
+        // Subset layout-container map. `resolve_layout` reads parents
+        // of affected nodes too, so include any parent that might
+        // appear in `is_layout_container` lookups (bounded by
+        // affected's size — those lookups only matter for children
+        // whose layout parent is a Container/InitialContainer, which
+        // must itself be an ancestor of the dirty root and thus
+        // already resolved in the cache).
+        let mut is_layout_container: DenseNodeMap<bool> =
+            DenseNodeMap::with_capacity(affected.len());
+        for &id in &affected {
+            if let Some(geo) = schema_geo.get(&id) {
+                let is_container = matches!(
+                    geo.kind,
+                    GeoNodeKind::Container | GeoNodeKind::InitialContainer
+                );
+                is_layout_container.insert(id, is_container);
+            }
+        }
+        // Include each root's parent too, since resolve_layout peeks
+        // at parent's container-kind to decide layout sourcing.
+        for &root in roots {
+            if let Some(parent_id) = self.entries.get(&root).and_then(|e| e.parent) {
+                if !is_layout_container.contains_key(&parent_id) {
+                    if let Some(geo) = schema_geo.get(&parent_id) {
+                        is_layout_container.insert(
+                            parent_id,
+                            matches!(
+                                geo.kind,
+                                GeoNodeKind::Container | GeoNodeKind::InitialContainer
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
+        // Resolve GeoInput only for affected ids.
+        let mut geo_inputs = DenseNodeMap::with_capacity(affected.len());
+        for &id in &affected {
+            let Some(geo) = schema_geo.get(&id) else {
+                continue;
+            };
+            let parent_id = self.entries.get(&id).and_then(|e| e.parent);
+            let resolved = resolve_layout(
+                &id,
+                geo,
+                parent_id,
+                layout_result,
+                &is_layout_container,
+                graph,
+                paragraph_cache,
+                fonts,
+                viewport_size,
+            );
+            geo_inputs.insert(id, resolved);
+        }
+
+        // For each root: reconstruct its parent's world transform from
+        // the existing cache, then run the shared recursive builder.
+        // `build_recursive` overwrites entries in place — nodes
+        // outside the affected subtrees are untouched.
+        for &root in roots {
+            let parent_id = self.entries.get(&root).and_then(|e| e.parent);
+            let parent_world = parent_id
+                .and_then(|pid| self.entries.get(&pid).map(|e| e.absolute_transform))
+                .unwrap_or_else(AffineTransform::identity);
+            Self::build_recursive(&root, &parent_world, parent_id, self, graph, &geo_inputs);
+        }
+
+        affected
+    }
+
+    /// Climb each root up through `Group` / `BooleanOperation`
+    /// ancestors (whose bounds are the union of their children) so
+    /// that after a child moves, the caller can invalidate the
+    /// smallest correct set of subtrees.
+    ///
+    /// Returns a new set of "anchor" roots — each is either the
+    /// original root, or its highest union-bounded ancestor.
+    ///
+    /// Pure read-only: doesn't touch the cache. Callers use the
+    /// result as the `roots` argument to [`Self::update_subtree`].
+    pub fn expand_roots_for_union_ancestors(
+        &self,
+        roots: &std::collections::HashSet<NodeId>,
+        scene: &Scene,
+    ) -> std::collections::HashSet<NodeId> {
+        let schema_geo = scene.graph.geo_data();
+        let mut anchors: std::collections::HashSet<NodeId> =
+            std::collections::HashSet::with_capacity(roots.len());
+        for &root in roots {
+            let mut cur = root;
+            loop {
+                let Some(parent) = self.entries.get(&cur).and_then(|e| e.parent) else {
+                    break;
+                };
+                let Some(parent_geo) = schema_geo.get(&parent) else {
+                    break;
+                };
+                match parent_geo.kind {
+                    GeoNodeKind::Group | GeoNodeKind::BooleanOperation => {
+                        cur = parent;
+                    }
+                    _ => break,
+                }
+            }
+            anchors.insert(cur);
+        }
+        anchors
+    }
+
     /// Access the full geometry entry for a node.
     pub fn get_entry(&self, id: &NodeId) -> Option<&GeometryEntry> {
         self.entries.get(id)

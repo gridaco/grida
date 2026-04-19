@@ -5,14 +5,13 @@ use crate::dummy;
 use crate::export::{
     export_node_as, export_pdf_document, ExportAs, ExportPdfDocumentOptions, Exported,
 };
-use crate::io::io_grida::{self, JSONFlattenResult};
-use crate::io::io_grida_patch::{self, TransactionApplyReport};
+use crate::io::vn_json::JSONFlattenResult;
 use crate::node::schema::*;
 use crate::query::Hierarchy;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
-use crate::runtime::changes::ChangeFlags;
 use crate::runtime::frame_loop::{FrameLoop, FrameQuality};
+use crate::runtime::invalidation::GlobalFlag;
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::timer::TimerMgr;
@@ -32,7 +31,6 @@ impl Hierarchy for NoHierarchy {
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect, rect::Rectangle, transform::AffineTransform, vector2::Vector2};
-use serde_json::Value;
 use skia_safe::{Matrix, Surface};
 use std::sync::Arc;
 
@@ -161,9 +159,6 @@ pub trait ApplicationApi {
         style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     );
 
-    /// Load a scene from a `.grida1` JSON string using the `io_grida` parser.
-    fn load_scene_grida1(&mut self, json: &str);
-
     /// Load a scene from `.grida` FlatBuffers binary bytes.
     fn load_scene_grida(&mut self, bytes: &[u8]);
 
@@ -174,13 +169,30 @@ pub trait ApplicationApi {
     /// Return the IDs of all scenes decoded by the last `load_scene_grida` call.
     fn loaded_scene_ids(&self) -> Vec<String>;
 
-    /// Apply a batch of scene transactions represented as JSON Patch operations.
-    fn apply_document_transactions(
-        &mut self,
-        transactions: Vec<Vec<Value>>,
-    ) -> Vec<TransactionApplyReport> {
-        let _ = transactions;
-        Vec::new()
+    /// Replace a single node's data in the active scene, keyed by the
+    /// string id encoded in `bytes`.
+    ///
+    /// `bytes` must be a single-node `GridaFile` buffer (as produced by a
+    /// partial encoder such as the TS `io.GRID.encodeNode`). The id must
+    /// already exist in the active scene's id mapping; parent links and
+    /// children are untouched — this is an in-place data swap.
+    ///
+    /// Returns `true` on success. Returns `false` on malformed input or an
+    /// unknown id; the caller is expected to recover by re-syncing the
+    /// whole scene.
+    fn replace_node_grida(&mut self, bytes: &[u8]) -> bool {
+        let _ = bytes;
+        false
+    }
+
+    /// Remove a node (and all descendants) from the active scene by its
+    /// user-facing string id. Clears the id-mapping entry for every
+    /// removed node.
+    ///
+    /// Returns `true` on success, `false` if the id is unknown.
+    fn delete_node(&mut self, user_id: &str) -> bool {
+        let _ = user_id;
+        false
     }
 
     // static demo scenes
@@ -235,7 +247,6 @@ pub struct UnknownTargetApplication {
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::AnySurfaceState,
     pub(crate) input: super::input::InputState,
-    pub(crate) document_json: Option<Value>,
 
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
@@ -325,7 +336,7 @@ impl ApplicationApi for UnknownTargetApplication {
             height: height as f32,
         });
 
-        self.renderer.mark_changed(ChangeFlags::VIEWPORT_SIZE);
+        self.renderer.mark_global(GlobalFlag::ViewportSize);
 
         // Bypass queue() — render immediately so the caller never sees a
         // stale canvas. The frame loop is invalidated+completed inside
@@ -685,14 +696,14 @@ impl ApplicationApi for UnknownTargetApplication {
     fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
         self.renderer.set_pixel_preview_scale(scale);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
         self.queue();
     }
 
     fn runtime_renderer_set_pixel_preview_stable(&mut self, stable: bool) {
         self.renderer.set_pixel_preview_strategy_stable(stable);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
         self.queue();
     }
 
@@ -703,7 +714,7 @@ impl ApplicationApi for UnknownTargetApplication {
         let policy = crate::runtime::render_policy::RenderPolicy::from_flags(flags);
         self.renderer.set_render_policy(policy);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
         self.queue();
     }
 
@@ -738,7 +749,7 @@ impl ApplicationApi for UnknownTargetApplication {
         });
         self.renderer.set_isolation_mode(mode);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::RenderFilter);
         self.queue();
     }
 
@@ -747,7 +758,7 @@ impl ApplicationApi for UnknownTargetApplication {
             crate::runtime::filter::IsolationModeStagePreset::from_u32(preset),
         );
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::RenderFilter);
         self.queue();
     }
 
@@ -783,13 +794,6 @@ impl ApplicationApi for UnknownTargetApplication {
             .collect();
         self.highlight_stroke_style = style;
         self.queue();
-    }
-
-    fn load_scene_grida1(&mut self, json: &str) {
-        match serde_json::from_str::<Value>(json) {
-            Ok(value) => self.load_scene_from_value(value),
-            Err(err) => eprintln!("failed to parse scene json: {}", err),
-        }
     }
 
     fn load_scene_grida(&mut self, bytes: &[u8]) {
@@ -847,11 +851,81 @@ impl ApplicationApi for UnknownTargetApplication {
             .collect()
     }
 
-    fn apply_document_transactions(
-        &mut self,
-        transactions: Vec<Vec<Value>>,
-    ) -> Vec<TransactionApplyReport> {
-        self.process_document_transactions(transactions)
+    fn replace_node_grida(&mut self, bytes: &[u8]) -> bool {
+        // A decode failure means the buffer itself is malformed — log loudly
+        // so it surfaces in dev builds. Unknown ids / missing scene are
+        // expected ("the host is out of sync"); silent `false` is correct
+        // there.
+        let decoded = match crate::io::io_grida_fbs::decode_single_node(bytes) {
+            Ok(d) => d,
+            Err(err) => {
+                eprintln!("replace_node_grida: decode failed: {err}");
+                return false;
+            }
+        };
+
+        let Some(internal_id) = self.id_mapping.get(&decoded.id).copied() else {
+            return false;
+        };
+        let Some(scene) = self.renderer.scene.as_mut() else {
+            return false;
+        };
+
+        // Capture the old node so the differ can classify the change
+        // before we overwrite it. Cloning here is cheap relative to the
+        // per-frame render cost; the diff result gates whether we go
+        // down a fast path or the full-rebuild path.
+        let old_node_for_diff = scene.graph.get_node(&internal_id).ok().cloned();
+
+        if scene.graph.replace_node(internal_id, decoded.node).is_err() {
+            return false;
+        }
+        if let Some(name) = decoded.name {
+            scene.graph.set_name(internal_id, name);
+        }
+
+        // Classify the change via the differ; fall back to `Full` when
+        // the old node wasn't available.
+        use crate::runtime::invalidation::{diff_node, ChangeKind};
+        let kind = old_node_for_diff
+            .as_ref()
+            .and_then(|old| {
+                scene
+                    .graph
+                    .get_node(&internal_id)
+                    .ok()
+                    .map(|new| (old, new))
+            })
+            .map(|(old, new)| diff_node(old, new))
+            .unwrap_or(ChangeKind::Full);
+
+        self.renderer.mark_node_change_kind(internal_id, kind);
+        self.queue();
+        true
+    }
+
+    fn delete_node(&mut self, user_id: &str) -> bool {
+        let Some(internal_id) = self.id_mapping.get(user_id).copied() else {
+            return false;
+        };
+
+        let Some(scene) = self.renderer.scene.as_mut() else {
+            return false;
+        };
+
+        let Ok(removed) = scene.graph.remove_subtree(internal_id) else {
+            return false;
+        };
+
+        for id in &removed {
+            if let Some(user) = self.id_mapping_reverse.remove(id) {
+                self.id_mapping.remove(&user);
+            }
+        }
+
+        self.renderer.mark_global(GlobalFlag::Layout);
+        self.queue();
+        true
     }
 
     fn load_dummy_scene(&mut self) {
@@ -1224,7 +1298,6 @@ impl UnknownTargetApplication {
             renderer,
             state,
             input: super::input::InputState::default(),
-            document_json: None,
 
             #[cfg(not(target_arch = "wasm32"))]
             image_rx,
@@ -1295,37 +1368,6 @@ impl UnknownTargetApplication {
         (self.request_redraw)();
     }
 
-    fn load_scene_from_value(&mut self, value: Value) {
-        match serde_json::from_value::<io_grida::JSONCanvasFile>(value.clone()) {
-            Ok(file) => {
-                if self.load_scene_from_canvas_file(file) {
-                    self.document_json = Some(value);
-                }
-            }
-            Err(err) => eprintln!("failed to deserialize scene json: {}", err),
-        }
-    }
-
-    fn load_scene_from_canvas_file(&mut self, file: io_grida::JSONCanvasFile) -> bool {
-        // Use IdConverter to handle string ID to u64 ID conversion
-        let mut converter = crate::io::id_converter::IdConverter::new();
-
-        match converter.convert_json_canvas_file(file) {
-            Ok(scene) => {
-                // Store the ID mappings for future API calls
-                self.id_mapping = converter.string_to_internal.clone();
-                self.id_mapping_reverse = converter.internal_to_string.clone();
-
-                self.renderer.load_scene(scene);
-                true
-            }
-            Err(err) => {
-                eprintln!("Failed to convert canvas file: {}", err);
-                false
-            }
-        }
-    }
-
     /// Convert user string ID to internal u64 ID
     pub fn user_id_to_internal(&self, user_id: &str) -> Option<NodeId> {
         self.id_mapping.get(user_id).copied()
@@ -1342,38 +1384,6 @@ impl UnknownTargetApplication {
             .into_iter()
             .filter_map(|id| self.internal_id_to_user(id))
             .collect()
-    }
-
-    fn process_document_transactions(
-        &mut self,
-        transactions: Vec<Vec<Value>>,
-    ) -> Vec<TransactionApplyReport> {
-        let Some(current_document) = self.document_json.take() else {
-            return transactions
-                .into_iter()
-                .map(|tx| TransactionApplyReport {
-                    success: false,
-                    applied: 0,
-                    total: tx.len(),
-                    error: Some("document not loaded".to_string()),
-                })
-                .collect();
-        };
-
-        let outcome = io_grida_patch::apply_transactions(current_document, transactions);
-        if let Some(file) = outcome.scene_file {
-            self.load_scene_from_canvas_file(file);
-        }
-        self.document_json = Some(outcome.document);
-        outcome.reports
-    }
-
-    pub fn apply_document_transactions_json(
-        &mut self,
-        json: &str,
-    ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
-        let transactions: Vec<Vec<Value>> = serde_json::from_str(json)?;
-        Ok(self.process_document_transactions(transactions))
     }
 
     fn queue(&mut self) {
@@ -1568,7 +1578,7 @@ impl UnknownTargetApplication {
             updated |= ok;
         }
         if updated {
-            self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+            self.renderer.mark_global(GlobalFlag::ImageLoaded);
         }
     }
 
@@ -1592,7 +1602,7 @@ impl UnknownTargetApplication {
             updated = true;
         }
         if updated {
-            self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+            self.renderer.mark_global(GlobalFlag::FontLoaded);
             if font_count > 0 {
                 self.print_font_repository_info();
             }
@@ -1665,7 +1675,7 @@ impl UnknownTargetApplication {
 
     pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
         self.renderer.fonts.set_user_fallback_families(fonts);
-        self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+        self.renderer.mark_global(GlobalFlag::FontLoaded);
     }
 
     pub fn get_default_fallback_fonts(&self) -> Vec<String> {
@@ -1682,14 +1692,14 @@ impl UnknownTargetApplication {
     /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.renderer.add_font(family, data);
-        self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+        self.renderer.mark_global(GlobalFlag::FontLoaded);
         self.queue();
     }
 
     /// Register image bytes with the renderer and return metadata.
     pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
         let result = self.renderer.add_image(data);
-        self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+        self.renderer.mark_global(GlobalFlag::ImageLoaded);
         self.queue();
         result
     }
@@ -1698,7 +1708,7 @@ impl UnknownTargetApplication {
     pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
         let result = self.renderer.add_image_with_rid(data, rid);
         if result.is_some() {
-            self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+            self.renderer.mark_global(GlobalFlag::ImageLoaded);
             self.queue();
         }
         result
