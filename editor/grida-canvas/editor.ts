@@ -2979,6 +2979,7 @@ export class Editor
 
   private _m_wasm_canvas_scene: Scene | null = null;
   private _m_wasm_canvas_resize_observer: ResizeObserver | null = null;
+  private _disposed = false;
 
   /**
    * Tracks which scene the WASM surface is currently showing.
@@ -3319,13 +3320,19 @@ export class Editor
   private _do_legacy_warmup() {
     // warm up
     // TODO: remove this from core document state.
-    googlefonts.fetchWebfontList().then((webfontlist) => {
-      this.doc.dispatch({
-        type: "__internal/webfonts#webfontList",
-        webfontlist,
+    googlefonts
+      .fetchWebfontList()
+      .then((webfontlist) => {
+        if (this._disposed) return;
+        this.doc.dispatch({
+          type: "__internal/webfonts#webfontList",
+          webfontlist,
+        });
+        void this.loadPlatformDefaultFonts();
+      })
+      .catch(() => {
+        // network/parse errors during warmup are non-fatal
       });
-      void this.loadPlatformDefaultFonts();
-    });
   }
 
   private log(...args: unknown[]) {
@@ -4562,13 +4569,25 @@ export class Editor
   }
 
   async loadPlatformDefaultFonts(): Promise<void> {
+    if (this._disposed) return;
     const fonts: string[] = Array.from(
       editor.config.fonts.DEFAULT_FONT_FALLBACK_SET
     );
 
     if (this.fontCollection) {
-      void Promise.all(fonts.map((family) => this.loadFontSync({ family })));
-      void this.fontCollection.setFallbackFonts(fonts);
+      void Promise.all(
+        fonts.map((family) =>
+          this.loadFontSync({ family }).catch(() => {
+            // individual font failures must not reject the warmup chain
+          })
+        )
+      );
+      if (this._disposed) return;
+      try {
+        void this.fontCollection.setFallbackFonts(fonts);
+      } catch {
+        // scene may have been disposed between the guard and the call
+      }
     }
   }
 
@@ -4836,6 +4855,7 @@ export class Editor
    * Dispose editor instance and cleanup resources
    */
   dispose() {
+    this._disposed = true;
     this._stopImagePoll();
     this._cancelWasmRedraw();
     if (this._m_wasm_canvas_resize_observer) {
