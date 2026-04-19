@@ -3,8 +3,10 @@
  *
  * This is the **single source of truth** for editor-level perf numbers.
  * Every test uses `Editor.mountHeadless()`, so dispatches run through the
- * real `__wasm_on_document_change` subscriber → `applyTransactions` fast
- * path or `__wasm_sync_document` full reload — exactly like the browser.
+ * real `__wasm_on_document_change` subscriber, which dispatches on the
+ * reducer's {@link Effect} to pick between the fast per-node path
+ * (`replaceNode` / `deleteNode`) and the full `__wasm_sync_document`
+ * re-encode — exactly like the browser.
  *
  * Run:
  *
@@ -23,7 +25,7 @@
  *
  * @vitest-environment node
  */
-import { describe, test, beforeAll, afterAll } from "vitest";
+import { describe, test, beforeAll, afterAll, expect } from "vitest";
 import { perf } from "@/grida-canvas/perf";
 import type { Action } from "@/grida-canvas/action";
 import { sceneNode, rectNode } from "@/grida-canvas/__tests__/utils/factories";
@@ -507,4 +509,113 @@ describe.skipIf(!HAS_BENCH_GRIDA)("perf-editor: bench.grida", () => {
       );
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Routing invariants — guard the Effect protocol against regressions.
+//
+// These tests do not measure *time*; they measure which WASM sync path was
+// taken per dispatch. A regression that silently reintroduces a full
+// document re-encode on the hot path (e.g. by breaking the bypass / Effect
+// wiring) is invisible to wall-clock microbenches because the reduced
+// throughput hides in averages — but the span counts change by an order of
+// magnitude. Asserting on them catches it immediately.
+// ---------------------------------------------------------------------------
+
+function countSpans(label: string): number {
+  return perf.dump().filter((s) => s.label === label).length;
+}
+
+describe("perf-editor: routing invariants", () => {
+  let h: WasmEditorHandle;
+
+  beforeAll(async () => {
+    perf.enable();
+    h = await createEditorWithWasmSync(generateGridDocument(100));
+    // Clear spans collected during mount + initial document/load so the
+    // assertions below only see what the hot-path dispatches produced.
+    perf.reset();
+  }, SCENE_TIMEOUT);
+
+  afterAll(() => {
+    h?.dispose();
+  });
+
+  test("node/change/* dispatches route through per-node sync", () => {
+    const before = countSpans("dispatch.wasm.sync_document");
+    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const N = 10;
+    for (let i = 0; i < N; i++) {
+      h.ed.doc.dispatch(
+        {
+          type: "node/change/*",
+          node_id: "r0",
+          name: `n${i}`,
+        } as unknown as Action,
+        { recording: "silent" }
+      );
+    }
+    expect(countSpans("dispatch.wasm.sync_document") - before).toBe(0);
+    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(N);
+  });
+
+  test("pointer-move (no raycast) emits EFFECT_NONE (neither sync path fires)", () => {
+    const beforeFull = countSpans("dispatch.wasm.sync_document");
+    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const N = 10;
+    for (let i = 0; i < N; i++) {
+      h.ed.doc.dispatch(
+        {
+          type: "event-target/event/on-pointer-move",
+          position_canvas: { x: i, y: i },
+          position_client: { x: i, y: i },
+        } as unknown as Action,
+        { recording: "silent" }
+      );
+    }
+    expect(countSpans("dispatch.wasm.sync_document") - beforeFull).toBe(0);
+    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(0);
+  });
+
+  test("drag per-frame does not fall back to full sync_document", async () => {
+    h.ed.doc.select(["r1"]);
+    h.ed.doc.dispatch(
+      {
+        type: "event-target/event/on-drag-start",
+        shiftKey: false,
+        event: { movement: [0, 0], delta: [0, 0] },
+      } as unknown as Action,
+      { recording: "begin-gesture" }
+    );
+
+    const before = countSpans("dispatch.wasm.sync_document");
+    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const N = 10;
+    for (let i = 1; i <= N; i++) {
+      h.ed.doc.dispatch(
+        {
+          type: "event-target/event/on-drag",
+          event: { movement: [i, 0], delta: [1, 0] },
+        } as unknown as Action,
+        { recording: "silent" }
+      );
+    }
+
+    h.ed.doc.dispatch(
+      {
+        type: "event-target/event/on-drag-end",
+        shiftKey: false,
+        node_ids_from_area: undefined,
+        event: { movement: [N, 0], delta: [0, 0] },
+      } as unknown as Action,
+      { recording: "end-gesture" }
+    );
+
+    // Per-frame drag MUST route through per_node_sync. A regression here
+    // means the bypass/Effect wiring broke and the hot path is re-encoding
+    // the whole document every frame — which pushes 60fps drag past the
+    // frame budget at 10K+ nodes.
+    expect(countSpans("dispatch.wasm.sync_document") - before).toBe(0);
+    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(N);
+  });
 });

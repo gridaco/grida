@@ -4,7 +4,7 @@
  * These tests exercise the **real WASM sync path** through
  * `Editor.mountHeadless()`, so numbers attribute to the same spans
  * the browser trace shows (`dispatch.wasm.sync_document.*`,
- * `dispatch.wasm.apply_transactions`, `dispatch.reducer`, etc).
+ * `dispatch.wasm.per_node_sync`, `dispatch.reducer`, etc).
  *
  * Opt-in instrumentation:
  *
@@ -102,10 +102,12 @@ export interface WasmEditorHandle {
  * Create a headless editor wired to a real WASM raster surface via
  * `Editor.mountHeadless(scene)`.
  *
- * This installs the **same** document + scene_id subscribers that
- * `mount()` installs in the browser, so every dispatch runs through
- * `__wasm_on_document_change` → `applyTransactions` (fast path) or
- * `__wasm_sync_document` (full reload). Measurements reflect real runtime.
+ * This installs the **same** WASM-bridging subscribers that `mount()`
+ * installs in the browser (via the shared `mountShared()` path), so
+ * every dispatch runs through `__wasm_on_document_change` — which
+ * dispatches on the reducer's {@link Effect} to pick between the fast
+ * per-node path (`replaceNode` / `deleteNode`) and a full
+ * `__wasm_sync_document` re-encode. Measurements reflect real runtime.
  */
 export async function createEditorWithWasmSync(
   doc: grida.program.document.Document,

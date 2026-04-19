@@ -1,6 +1,6 @@
 import { produce, applyPatches, produceWithPatches } from "immer";
 import { editor, type Action } from ".";
-import reducer, { type ReducerContext } from "./reducers";
+import reducer, { type ReducerContext, canBypassImmer } from "./reducers";
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { TCanvasEventTargetDragGestureState } from "./action";
@@ -49,6 +49,13 @@ import assert from "assert";
 import { describeDocumentTree } from "./utils/cmd-tree";
 import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
 import { perf } from "./perf";
+import {
+  EFFECT_NONE,
+  EFFECT_STRUCTURAL,
+  effectFromPatches,
+  mergeEffect,
+  type Effect,
+} from "./sync";
 
 const __DEV__ = process.env.NODE_ENV === "development";
 
@@ -87,62 +94,6 @@ function resolveWithEditorInstance<T>(
   value: WithEditorInstance<T>
 ): T {
   return isWithEditorFunction(value) ? value(instance) : value;
-}
-
-/**
- * Routing decision for a batch of Immer patches produced by a document
- * dispatch. Used by the WASM sync path to pick between the per-node fast
- * path and a full scene re-encode.
- *
- * - `skip` — the patches touch nothing under `document.*` (e.g. selection
- *   or editor state), so the WASM side has nothing to sync.
- * - `full` — the patches mutate links, bitmaps, images, properties, or
- *   create/reorder nodes. The per-node API can't express these, so we
- *   re-encode the whole scene.
- * - `per_node` — every document patch is scoped to an existing node and
- *   can be applied via `replaceNode` / `deleteNode`.
- */
-type DocumentSyncRoute =
-  | { kind: "skip" }
-  | { kind: "full" }
-  | { kind: "per_node"; replace: Set<string>; remove: Set<string> };
-
-function classifyDocumentPatches(
-  patches: readonly editor.history.Patch[]
-): DocumentSyncRoute {
-  const replace = new Set<string>();
-  const remove = new Set<string>();
-  let sawDocumentPatch = false;
-
-  for (const patch of patches) {
-    const path = patch.path;
-    if (path[0] !== "document") continue;
-    sawDocumentPatch = true;
-
-    // Non-node mutations (links, bitmaps, images, properties, metadata):
-    // the per-node API can't perform them.
-    if (path[1] !== "nodes") return { kind: "full" };
-
-    const nodeId = path[2];
-    if (typeof nodeId !== "string") return { kind: "full" };
-
-    const isExactNodeSlot = path.length === 3;
-    // `add` at the exact node slot is a node creation — requires parent/link
-    // updates that only a full sync can do.
-    if (isExactNodeSlot && patch.op === "add") return { kind: "full" };
-    if (isExactNodeSlot && patch.op === "remove") {
-      remove.add(nodeId);
-      continue;
-    }
-    replace.add(nodeId);
-  }
-
-  if (!sawDocumentPatch) return { kind: "skip" };
-  // Remove wins when the same id appears in both — a property patch
-  // followed by removal in the same tick would otherwise replay a
-  // stale node into a slot we're about to delete.
-  for (const id of remove) replace.delete(id);
-  return { kind: "per_node", replace, remove };
 }
 
 export class Camera implements editor.api.ICameraActions {
@@ -517,14 +468,16 @@ class EditorDocumentStore
     if (this._historyAdapter.hasActiveGesture) {
       this._historyAdapter.abortGesture();
       this._tid++;
-      this.emit(undefined, []);
+      // Gesture abort restores an unknown subset of the document state;
+      // full re-encode is the safe choice here.
+      this.emit(undefined, [], EFFECT_STRUCTURAL);
     }
 
     const patches = this._historyAdapter.undo();
     if (!patches) return;
 
     this._tid++;
-    this.emit(undefined, patches);
+    this.emit(undefined, patches, effectFromPatches(patches));
   }
 
   public redo() {
@@ -534,7 +487,7 @@ class EditorDocumentStore
     if (!patches) return;
 
     this._tid++;
-    this.emit(undefined, patches);
+    this.emit(undefined, patches, effectFromPatches(patches));
   }
 
   get isGestureActive(): boolean {
@@ -572,15 +525,22 @@ class EditorDocumentStore
     if (!this._historyAdapter.hasActivePreview) return;
     this._historyAdapter.previewDiscard();
     this._tid++;
-    this.emit(undefined, []);
+    // Preview discard restores an unknown subset of the document; force
+    // a full re-encode so the renderer can't diverge from the reverted
+    // state.
+    this.emit(undefined, [], EFFECT_STRUCTURAL);
   }
 
   get isPreviewActive(): boolean {
     return this._historyAdapter.hasActivePreview;
   }
 
-  private emit(action: Action | undefined, patches: editor.history.Patch[]) {
-    this.listeners.forEach((l) => l(this, action, patches));
+  private emit(
+    action: Action | undefined,
+    patches: editor.history.Patch[],
+    effect: Effect
+  ) {
+    this.listeners.forEach((l) => l(this, action, patches, effect));
   }
 
   // TODO(@grida/history): Migrate to dispatch(…, { recording: "silent" })
@@ -620,7 +580,7 @@ class EditorDocumentStore
   private apply(reducer: (draft: editor.state.IEditorState) => void) {
     const [state, patches] = produceWithPatches(this.mstate, reducer);
     this.mstate = state;
-    this.emit(undefined, patches);
+    this.emit(undefined, patches, effectFromPatches(patches));
   }
 
   /**
@@ -630,7 +590,10 @@ class EditorDocumentStore
   public reduce(reducer: (draft: editor.state.IEditorState) => void) {
     this.mstate = produce(this.mstate, reducer);
     this._tid++;
-    this.emit(undefined, []);
+    // This path surfaces no patches — the renderer can't tell what
+    // changed, so force a full re-encode. `reduce()` is deprecated and
+    // not on any hot path.
+    this.emit(undefined, [], EFFECT_STRUCTURAL);
   }
 
   public dispatch(
@@ -680,6 +643,7 @@ class EditorDocumentStore
 
     let lastAction: Action;
     let allPatches: editor.history.Patch[] = [];
+    let batchEffect: Effect = EFFECT_NONE;
 
     for (const action of actions) {
       const beforeState = this.mstate;
@@ -687,21 +651,18 @@ class EditorDocumentStore
       const __perf_end_reducer = perf.start("dispatch.reducer", {
         action_type: action.type,
       });
-      const [nextState, patches, inversePatches] = reducer(
+      // Mutable bypass is safe only for actions whose write set is fully
+      // enumerated by the bypass clone logic in `reducers/index.ts` —
+      // and only under `recording: "silent"` (bypass produces no patches,
+      // which history only tolerates when recording is off). Using the
+      // shared `canBypassImmer()` predicate keeps reducer/dispatch in
+      // lockstep; there is no separate whitelist to drift.
+      const [nextState, patches, inversePatches, effect] = reducer(
         this.mstate,
         action,
         context,
         {
-          // Only bypass Immer for the known gesture hot-loop actions where
-          // we've verified which state sub-objects get mutated and cloned them.
-          // Other "silent" actions (config changes, etc.) may write to
-          // sub-objects we haven't cloned, which would corrupt frozen state.
-          skipPatches:
-            recording === "silent" &&
-            (action.type === "event-target/event/on-drag" ||
-              action.type === "event-target/event/on-pointer-move" ||
-              action.type === "event-target/event/on-pointer-move-raycast" ||
-              action.type === "node/change/*"),
+          skipPatches: recording === "silent" && canBypassImmer(action),
         }
       );
       __perf_end_reducer();
@@ -724,6 +685,7 @@ class EditorDocumentStore
 
       lastAction = action;
       allPatches = allPatches.concat(patches);
+      batchEffect = mergeEffect(batchEffect, effect);
     }
 
     this._tid++;
@@ -738,7 +700,7 @@ class EditorDocumentStore
     const __perf_end_emit = perf.start("dispatch.emit", {
       listener_count: this.listeners.size,
     });
-    this.emit(lastAction!, allPatches);
+    this.emit(lastAction!, allPatches, batchEffect);
     __perf_end_emit();
 
     __perf_end_dispatch();
@@ -763,7 +725,8 @@ class EditorDocumentStore
     const wrapped = (
       _: this,
       action?: Action,
-      patches?: editor.history.Patch[]
+      patches?: editor.history.Patch[],
+      effect?: Effect
     ) => {
       const next = selector(this.mstate);
       if (!isEqual(previous, next)) {
@@ -772,7 +735,7 @@ class EditorDocumentStore
         // [1]
         previous = next;
         // [2]
-        fn(this, next, prev, action, patches);
+        fn(this, next, prev, action, patches, effect);
       }
     };
 
@@ -868,7 +831,10 @@ class EditorDocumentStore
       hook(resetAction, this.mstate);
     }
 
-    this.emit(resetAction, []);
+    // `document/reset` is always a wholesale state swap — the structural
+    // effect forces a full `__wasm_sync_document` re-encode in the
+    // subscriber.
+    this.emit(resetAction, [], EFFECT_STRUCTURAL);
     return this._tid;
   }
 
@@ -3371,9 +3337,9 @@ export class Editor
   public subscribe(fn: editor.api.SubscriptionCallbackFn<this>) {
     // TODO: we can have a single subscription to the document and use that.
     // Subscribe to the document store changes
-    return this.doc.subscribe((doc, action, patches) => {
+    return this.doc.subscribe((doc, action, patches, effect) => {
       // Forward the document store changes to our listeners
-      fn(this, action, patches);
+      fn(this, action, patches, effect);
     });
   }
 
@@ -3565,6 +3531,99 @@ export class Editor
   }
 
   /**
+   * Shared mount logic — bind the WASM surface and install the document /
+   * scene_id / render-config subscribers that bridge editor state into the
+   * renderer.
+   *
+   * Called by both {@link mount} (DOM path) and {@link mountHeadless}
+   * (bench/test path). Everything viewport-specific (ResizeObserver,
+   * canvas transform, initial `camera.fit`) stays in `mount()` — this
+   * method contains only the state→WASM bridge that is identical in
+   * both environments, so the two paths stay in lockstep by
+   * construction.
+   */
+  private mountShared(surface: Scene) {
+    this.__bind_wasm_surface(surface);
+
+    // --- initial mount sync ---
+    this.__wasm_sync_document(
+      surface,
+      this.doc.state.document,
+      this.doc.state.scene_id
+    );
+
+    // --- state subscribers ---
+
+    this.doc.subscribeWithSelector(
+      (state) => state.document,
+      (_, document, _prev, action, _patches, effect) => {
+        this.__wasm_on_document_change(document, action, effect);
+      }
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) => state.scene_id,
+      (_, scene_id) => {
+        this.__wasm_on_scene_id_change(scene_id);
+      }
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) => state.isolation_root_node_id,
+      (_, nodeId) => {
+        this.__runtime_renderer_set_isolation_mode(nodeId);
+      }
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) => state.debug,
+      (_, v) => {
+        this._m_wasm_canvas_scene?.setDebug(v);
+        this._scheduleWasmRedraw();
+      }
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) => state.pixelpreview,
+      (_, v) => {
+        this.__runtime_renderer_set_pixel_preview_scale(v);
+      }
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) =>
+        [state.outline_mode, state.outline_mode_ignores_clips] as const,
+      (_, [outline_mode, outline_mode_ignores_clips]) => {
+        this.__runtime_renderer_set_outline_mode(
+          outline_mode,
+          outline_mode_ignores_clips
+        );
+      },
+      (a, b) => a[0] === b[0] && a[1] === b[1]
+    );
+
+    this.doc.subscribeWithSelector(
+      (state) => {
+        const hovered = state.hovered_node_id;
+        const selected = state.selection;
+        return [...selected, ...(hovered ? [hovered] : [])];
+      },
+      (_, v) => {
+        this._m_wasm_canvas_scene?.highlightStrokes({
+          nodes: v,
+          style: {
+            strokeWidth: 1,
+            // --color-workbench-accent-sky
+            stroke: "#00a6f4",
+          },
+        });
+        this._scheduleWasmRedraw();
+      },
+      (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
+    );
+  }
+
+  /**
    * mount the canvas surface
    * this does not YET manage the width / height / dpr. It assumes the canvas sets its own physical width / height.
    * @param el canvas element
@@ -3580,7 +3639,10 @@ export class Editor
         el,
         this.__surfaceOptions
       );
-      this.__bind_wasm_surface(surface);
+
+      // Install the shared surface + state bridge. After this returns the
+      // editor is fully wired; everything below is viewport-specific.
+      this.mountShared(surface);
       this.onMount?.(surface);
 
       this.log("grida wasm initialized");
@@ -3658,12 +3720,7 @@ export class Editor
         });
       }
 
-      // --- initial mount sync ---
-      this.__wasm_sync_document(
-        this._m_wasm_canvas_scene!,
-        this.doc.state.document,
-        this.doc.state.scene_id
-      );
+      // --- viewport-specific initial sync ---
       syncTransform(
         this._m_wasm_canvas_scene!,
         this.doc.state.transform,
@@ -3671,76 +3728,6 @@ export class Editor
         el.height
       );
       this.camera.fit("<scene>");
-
-      // --- state subscribers ---
-
-      this.doc.subscribeWithSelector(
-        (state) => state.document,
-        (_, document, _prev, action, patches) => {
-          this.__wasm_on_document_change(document, action, patches);
-        }
-      );
-
-      this.doc.subscribeWithSelector(
-        (state) => state.scene_id,
-        (_, scene_id) => {
-          this.__wasm_on_scene_id_change(scene_id);
-        }
-      );
-
-      this.doc.subscribeWithSelector(
-        (state) => state.isolation_root_node_id,
-        (_, nodeId) => {
-          this.__runtime_renderer_set_isolation_mode(nodeId);
-        }
-      );
-
-      this.doc.subscribeWithSelector(
-        (state) => state.debug,
-        (_, v) => {
-          this._m_wasm_canvas_scene?.setDebug(v);
-          this._scheduleWasmRedraw();
-        }
-      );
-
-      this.doc.subscribeWithSelector(
-        (state) => state.pixelpreview,
-        (_, v) => {
-          this.__runtime_renderer_set_pixel_preview_scale(v);
-        }
-      );
-
-      this.doc.subscribeWithSelector(
-        (state) =>
-          [state.outline_mode, state.outline_mode_ignores_clips] as const,
-        (_, [outline_mode, outline_mode_ignores_clips]) => {
-          this.__runtime_renderer_set_outline_mode(
-            outline_mode,
-            outline_mode_ignores_clips
-          );
-        },
-        (a, b) => a[0] === b[0] && a[1] === b[1]
-      );
-
-      this.doc.subscribeWithSelector(
-        (state) => {
-          const hovered = state.hovered_node_id;
-          const selected = state.selection;
-          return [...selected, ...(hovered ? [hovered] : [])];
-        },
-        (_, v) => {
-          this._m_wasm_canvas_scene?.highlightStrokes({
-            nodes: v,
-            style: {
-              strokeWidth: 1,
-              // --color-workbench-accent-sky
-              stroke: "#00a6f4",
-            },
-          });
-          this._scheduleWasmRedraw();
-        },
-        (a, b) => a.length === b.length && a.every((id, i) => id === b[i])
-      );
 
       this.doc.subscribeWithSelector(
         (state) => state.transform,
@@ -3815,18 +3802,25 @@ export class Editor
   }
 
   /**
-   * Document subscriber body — routes document changes through either the
-   * fast per-node sync path (`replaceNode` / `deleteNode`) or a full
-   * `__wasm_sync_document`.
+   * Document subscriber body — dispatches on the reducer-provided
+   * {@link Effect} to pick between fast per-node sync (`replaceNode` /
+   * `deleteNode`) and a full `__wasm_sync_document` re-encode.
    *
-   * The routing decision is made by {@link classifyDocumentPatches}.
+   * The Effect is authoritative — it is computed by whoever owns the
+   * mutation (reducer / bypass / history replay), not derived from
+   * patches at the subscriber. See `./sync.ts` for the rationale.
+   *
+   * When no effect is provided (legacy callers, unknown edits) we fall
+   * back to a full re-encode: it's the only choice that can't diverge
+   * the renderer from the state.
+   *
    * Perf spans (`dispatch.wasm.sync`, `dispatch.wasm.per_node_sync`) let
    * benchmarks attribute time to the strategy that ran.
    */
   private __wasm_on_document_change(
     document: grida.program.document.Document,
     action: Action | undefined,
-    patches: editor.history.Patch[] | undefined
+    effect: Effect | undefined
   ) {
     if (!this._m_wasm_canvas_scene) return;
     const surface = this._m_wasm_canvas_scene;
@@ -3835,6 +3829,7 @@ export class Editor
       this.__wasm_sync_document(surface, document, this.doc.state.scene_id);
     };
 
+    // `document/reset` always needs a full re-encode AND a viewport re-fit.
     if (action?.type === "document/reset") {
       fullSync();
       this.camera.fit("<scene>");
@@ -3842,37 +3837,45 @@ export class Editor
       return;
     }
 
-    // No patches means the caller can't tell us what changed (e.g. silent
-    // recording, document/load). Safest is to re-encode the whole scene.
-    if (!patches || patches.length === 0) {
+    // Missing effect = caller didn't participate in the Effect protocol.
+    // Safe default is the full re-encode.
+    if (!effect || effect.kind === "structural") {
       fullSync();
       end();
       return;
     }
-
-    const route = classifyDocumentPatches(patches);
-    if (route.kind === "skip") {
-      end();
-      return;
-    }
-    if (route.kind === "full") {
-      fullSync();
+    if (effect.kind === "none") {
       end();
       return;
     }
 
+    // effect.kind === "nodes"
     const endApply = perf.start("dispatch.wasm.per_node_sync", {
-      replaces: route.replace.size,
-      removes: route.remove.size,
+      replaces: effect.replace.size,
+      removes: effect.remove.size,
     });
-    const applied = this.__wasm_apply_per_node_sync(surface, document, route);
+    const applied = this.__wasm_apply_per_node_sync(surface, document, effect);
     endApply();
 
     if (applied) {
       this._scheduleWasmRedraw();
     } else {
+      // A per-node op returning false means the WASM side rejected the
+      // change — typically a missing node id (effect referenced a slot
+      // that doesn't exist in the decoded scene) or a malformed encoded
+      // node. Fall back to full sync for correctness, but warn loudly:
+      // this should never happen in steady state and silently falling
+      // back hides real bugs behind a 100ms re-encode.
       fullSync();
-      this.log("per-node sync failed; fell back to full sync");
+      console.warn(
+        "[grida-canvas] per-node sync failed; fell back to full re-encode. " +
+          "This is a correctness fallback, not a hot path — investigate.",
+        {
+          action: action?.type,
+          replaces: Array.from(effect.replace),
+          removes: Array.from(effect.remove),
+        }
+      );
     }
     end();
   }
@@ -3880,12 +3883,12 @@ export class Editor
   private __wasm_apply_per_node_sync(
     surface: Scene,
     document: grida.program.document.Document,
-    route: Extract<DocumentSyncRoute, { kind: "per_node" }>
+    effect: Extract<Effect, { kind: "nodes" }>
   ): boolean {
-    for (const id of route.remove) {
+    for (const id of effect.remove) {
       if (!surface.deleteNode(id)) return false;
     }
-    for (const id of route.replace) {
+    for (const id of effect.replace) {
       const node = document.nodes[id];
       if (!node) return false;
       if (!surface.replaceNode(io.GRID.encodeNode(node))) return false;
@@ -3909,42 +3912,21 @@ export class Editor
   }
 
   /**
-   * Wire an already-constructed {@link Scene} into the editor and install
-   * the document + scene_id subscribers **without** requiring a DOM canvas.
+   * Wire an already-constructed {@link Scene} into the editor **without**
+   * requiring a DOM canvas. Use this from headless tests / benchmarks —
+   * create a raster surface via `wasmFactory.createRasterSurface(w, h)`,
+   * then call `editor.mountHeadless(surface)`.
    *
-   * Use this from headless tests / benchmarks — create a raster surface
-   * via `wasmFactory.createRasterSurface(w, h)`, then call
-   * `editor.mountHeadless(surface)`. This enables the exact same
-   * `syncDocument` / `applyTransactions` code path that `mount()` uses
-   * in the browser, so measurements reflect real runtime behavior.
-   *
-   * Does NOT wire transform/resize (no viewport), isolation/debug/
-   * pixelpreview/outline/highlight subscribers (not needed for perf
-   * measurement). Add them here if a future bench needs them.
+   * Headless mount runs exactly the same bridge as {@link mount} via
+   * {@link mountShared}: the document/scene_id/isolation/debug/
+   * pixelpreview/outline/highlight subscribers are all installed, so
+   * measurements reflect real runtime behavior. Only the viewport
+   * layer (DOM canvas, ResizeObserver, transform sync, initial
+   * `camera.fit`) is skipped.
    */
   public mountHeadless(surface: Scene) {
     assert(this.backend === "canvas", "Editor is not using canvas backend");
-    this.__bind_wasm_surface(surface);
-
-    this.__wasm_sync_document(
-      surface,
-      this.doc.state.document,
-      this.doc.state.scene_id
-    );
-
-    this.doc.subscribeWithSelector(
-      (state) => state.document,
-      (_, document, _prev, action, patches) => {
-        this.__wasm_on_document_change(document, action, patches);
-      }
-    );
-
-    this.doc.subscribeWithSelector(
-      (state) => state.scene_id,
-      (_, scene_id) => {
-        this.__wasm_on_scene_id_change(scene_id);
-      }
-    );
+    this.mountShared(surface);
   }
 
   // ================================================================

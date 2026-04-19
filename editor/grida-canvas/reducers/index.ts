@@ -17,6 +17,12 @@ import grida from "@grida/schema";
 import type vn from "@grida/vn";
 import { editor } from "@/grida-canvas";
 import { perf } from "../perf";
+import {
+  EFFECT_NONE,
+  effectFromPatches,
+  effectNodes,
+  type Effect,
+} from "../sync";
 
 enablePatches();
 
@@ -48,7 +54,98 @@ export type ReducerContext = {
   };
 };
 
-export type ReducerResult = [editor.state.IEditorState, Patch[], Patch[]];
+/**
+ * Reducer output tuple.
+ *
+ * The 4th slot (`Effect`) is the authoritative signal the WASM subscriber
+ * uses to decide between full re-encode, per-node replace, or skip. It is
+ * **not** derived from `patches` at the subscriber — the bypass path
+ * produces no patches but still mutates nodes, so routing from patches
+ * alone silently falls back to full sync and defeats the bypass. See
+ * `../sync.ts` for the protocol.
+ */
+export type ReducerResult = [
+  editor.state.IEditorState,
+  Patch[],
+  Patch[],
+  Effect,
+];
+
+/**
+ * Actions that enter the mutable-bypass branch. These are the gesture
+ * hot-loop actions where Immer proxy/finalize overhead dominates — we
+ * clone the specific state sub-objects they write to and run the recipe
+ * directly on the clone. The bypass branch is also responsible for
+ * producing an {@link Effect} that names the mutated nodes (since the
+ * patches array it returns is always empty).
+ */
+const BYPASS_ACTION_TYPES: ReadonlySet<Action["type"]> = new Set<
+  Action["type"]
+>([
+  "event-target/event/on-drag",
+  "event-target/event/on-pointer-move",
+  "event-target/event/on-pointer-move-raycast",
+  "node/change/*",
+]);
+
+/** @internal Is this action eligible for the mutable bypass path? */
+export function canBypassImmer(action: Action): boolean {
+  return BYPASS_ACTION_TYPES.has(action.type);
+}
+
+/**
+ * Compute the WASM-sync {@link Effect} for an action that took the
+ * mutable-bypass path, by inspecting which node slots the bypass
+ * cloned (and therefore may have mutated).
+ *
+ * Must stay aligned with the cloning strategy in the bypass branch —
+ * every node slot we clone for mutation must appear in the effect.
+ * The `scene_id` root is only reported for `guide` gestures (the only
+ * gesture that actually writes to scene guides); all other clone-for-
+ * safety cases on the scene root are no-ops on the wire since the
+ * replacement bytes are identical.
+ */
+function effectForBypassAction(
+  state: editor.state.IEditorState,
+  action: Action
+): Effect {
+  // Hover/raycast actions never mutate document.nodes[*]; they update
+  // pointer / hover / hit state only.
+  if (
+    action.type === "event-target/event/on-pointer-move" ||
+    action.type === "event-target/event/on-pointer-move-raycast"
+  ) {
+    return EFFECT_NONE;
+  }
+
+  if (action.type === "node/change/*") {
+    const nodeId = (action as { node_id: string }).node_id;
+    if (typeof nodeId !== "string") return EFFECT_NONE;
+    return effectNodes(new Set([nodeId]), new Set());
+  }
+
+  // event-target/event/on-drag — collect mutated node ids from gesture
+  // and content-edit-mode state. Mirrors the bypass clone logic below.
+  const replace = new Set<string>();
+  const gesture = state.gesture;
+  if (gesture.type !== "idle" && "selection" in gesture && gesture.selection) {
+    for (const id of gesture.selection) replace.add(id);
+  }
+  if (gesture.type === "draw") replace.add(gesture.node_id);
+  if (
+    (gesture.type === "sort" || gesture.type === "gap") &&
+    gesture.layout?.objects
+  ) {
+    for (const o of gesture.layout.objects) replace.add(o.id);
+  }
+  if (gesture.type === "brush") replace.add(gesture.node_id);
+  if (gesture.type === "guide" && state.scene_id) {
+    replace.add(state.scene_id);
+  }
+  const cem = state.content_edit_mode;
+  if (cem) replace.add(cem.node_id);
+  return effectNodes(replace, new Set());
+}
 
 /** Deep-clone a vector network so VectorNetworkEditor can mutate in-place. */
 function cloneVectorNetwork(network: vn.VectorNetwork): vn.VectorNetwork {
@@ -372,7 +469,11 @@ export default function reducer(
   }
   __perf_end();
 
-  return [nextState, patches, inversePatches];
+  const effect: Effect = opts?.skipPatches
+    ? effectForBypassAction(state, action)
+    : effectFromPatches(patches);
+
+  return [nextState, patches, inversePatches, effect];
 }
 
 function _reducer<S extends editor.state.IEditorState>(

@@ -2,9 +2,11 @@
 
 End-to-end benchmarks for the Grida Canvas editor dispatch pipeline.
 All scenarios run in Node.js against the **real WASM raster backend** via
-`Editor.mountHeadless()` — same `__wasm_on_document_change` subscriber
-the browser installs in `mount()`. Numbers are trustworthy for tuning
-`applyTransactions` / `__wasm_sync_document` cost; see caveats below.
+`Editor.mountHeadless()`. Headless and DOM mount share the same
+`mountShared(surface)` bridge, so every subscriber the browser installs
+(document / scene_id / isolation / debug / pixelpreview / outline /
+highlightStrokes) runs here too — numbers are trustworthy for tuning
+per-node sync / `__wasm_sync_document` cost; see caveats below.
 
 ## Files
 
@@ -67,7 +69,7 @@ prefix so you can see reducer vs. WASM cost at a glance.
 | `dispatch.wasm.sync_document.encode`       | `editor.ts`                     | `io.GRID.encode(document)` → FlatBuffer bytes             |
 | `dispatch.wasm.sync_document.load_scene`   | `editor.ts`                     | `Scene.loadSceneGrida(bytes)` — decode into WASM cache    |
 | `dispatch.wasm.sync_document.switch_scene` | `editor.ts`                     | `Scene.switchScene(sceneId)` — install decoded scene      |
-| `dispatch.wasm.apply_transactions`         | `editor.ts`                     | Fast patch path — `Scene.applyTransactions([ops])`        |
+| `dispatch.wasm.per_node_sync`              | `editor.ts`                     | Fast per-node path — `Scene.replaceNode` / `deleteNode`   |
 | `dispatch.wasm.switch_scene`               | `editor.ts`                     | Scene-id-only switch (no document reload)                 |
 | `reducer.immer_produce`                    | `reducers/index.ts`             | Immer `produceWithPatches`                                |
 | `snapshot`                                 | `editor.i.ts`                   | `JSON.parse(JSON.stringify(document))` deep clone         |
@@ -79,6 +81,29 @@ prefix so you can see reducer vs. WASM cost at a glance.
 
 `perf.ts` is the runtime — `GRIDA_PERF=1` or `NEXT_PUBLIC_GRIDA_PERF=1`
 enables collection globally with zero overhead when off.
+
+## How sync routing works
+
+The `__wasm_on_document_change` subscriber does **not** inspect Immer
+patches to pick a sync strategy. Routing is driven by a first-class
+`Effect` type (`grida-canvas/sync.ts`) the reducer returns alongside the
+new state:
+
+- `none` — selection / marquee / hover only; the subscriber no-ops.
+- `nodes` — bounded set of node ids whose props changed or were
+  removed; the subscriber calls `replaceNode` / `deleteNode`
+  (`dispatch.wasm.per_node_sync`).
+- `structural` — scene graph / links / bitmaps / properties changed;
+  the subscriber re-encodes the whole scene
+  (`dispatch.wasm.sync_document`).
+
+Both the Immer path (via `effectFromPatches(patches)`) and the mutable
+bypass path (via `effectForBypassAction(state, action)`) produce the
+same Effect protocol, so the hot gesture loop — which uses the bypass
+and emits **no patches** — still routes through the fast per-node sync
+instead of silently falling back to a full re-encode. Regressions are
+guarded by span-count invariants in
+[`perf-editor.test.ts`](./perf-editor.test.ts) ("routing invariants").
 
 ## When to trust the numbers
 
