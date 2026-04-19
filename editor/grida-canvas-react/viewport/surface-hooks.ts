@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import { analyzeDistribution } from "./ui/distribution";
 import cmath from "@grida/cmath";
 import { NodeWithMeta, useTransformState } from "../provider";
@@ -243,23 +243,41 @@ export function useSelectionGroups(
   ...node_ids: string[]
 ): SurfaceSelectionGroup[] {
   const instance = useCurrentEditor();
-  const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
 
   // Use stable node IDs to avoid unnecessary re-renders
   const __node_ids = useStableNodeIds(node_ids);
 
+  // Narrow subscription: only re-render when one of the selected nodes
+  // actually changes identity.  Immer structural sharing guarantees ref
+  // equality for untouched nodes, so a per-element `===` check is enough.
+  const selectedNodes = useEditorState(
+    instance,
+    (s) => __node_ids.map((id) => s.document.nodes[id]),
+    (a, b) => {
+      if (a === b) return true;
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+      }
+      return true;
+    }
+  );
+  const document_ctx = useEditorState(
+    instance,
+    (s) => s.document_ctx,
+    Object.is
+  );
+
   const [groups, setGroups] = useState<SurfaceSelectionGroup[]>([]);
 
   const grouped = useMemo(() => {
-    const activenodes = __node_ids
-      .map((id) => document.nodes[id])
-      .filter((n) => n?.active);
+    const activenodes = selectedNodes.filter((n) => n?.active);
     return Object.groupBy(
       activenodes,
       (it) => dq.getParentId(document_ctx, it.id) ?? ""
     );
-  }, [document.nodes, document_ctx, __node_ids]);
+  }, [selectedNodes, document_ctx]);
 
   useEffect(() => {
     const groupkeys = Object.keys(grouped);
@@ -304,13 +322,29 @@ export function useSingleSelection(
   } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
   const instance = useCurrentEditor();
-  const { document, document_ctx } = useDocumentState();
   const { transform } = useTransformState();
-  const node = document.nodes[node_id];
+  // Narrow subscriptions: only re-render when this specific node (or its
+  // parent, when provided) actually changes identity.  Immer structural
+  // sharing guarantees reference equality for untouched nodes, so `Object.is`
+  // is sufficient and cheap.
+  const node = useEditorState(
+    instance,
+    (s) => s.document.nodes[node_id],
+    Object.is
+  );
   // When a parent moves, the child's absolute position changes even though
-  // the child's own node data is unchanged.  Including the parent node
-  // object in the effect deps lets us pick up that change cheaply.
-  const parentNode = parentNodeId ? document.nodes[parentNodeId] : undefined;
+  // the child's own node data is unchanged.  Subscribing to the parent node
+  // reference lets us pick up that change cheaply.
+  const parentNode = useEditorState(
+    instance,
+    (s) => (parentNodeId ? s.document.nodes[parentNodeId] : undefined),
+    Object.is
+  );
+  const document_ctx = useEditorState(
+    instance,
+    (s) => s.document_ctx,
+    Object.is
+  );
 
   const [data, setData] = useState<SurfaceSingleSelection | undefined>(
     undefined

@@ -331,6 +331,9 @@ interface UseDocumentState {
   document_ctx: editor.state.IEditorState["document_ctx"];
 }
 
+/**
+ * @deprecated will be removed
+ */
 export function useDocumentState(): UseDocumentState {
   const editor = useCurrentEditor();
   return useEditorState<UseDocumentState>(

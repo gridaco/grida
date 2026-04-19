@@ -22,7 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useCurrentEditor, useDocumentState } from "@/grida-canvas-react";
+import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import { RGBA32FColorControl } from "./controls/color";
 import {
@@ -51,9 +51,13 @@ function SceneBackgroundPropertyLine() {
 
 export function DocumentProperties({ className }: { className?: string }) {
   const editor = useCurrentEditor();
-  const { document } = useDocumentState();
+  const properties = useEditorState(
+    editor,
+    (s) => s.document.properties,
+    Object.is
+  );
 
-  const keys = Object.keys(document.properties ?? {});
+  const keys = Object.keys(properties ?? {});
 
   const addProperty = () => {
     editor.commands.schemaDefineProperty();
@@ -86,7 +90,7 @@ export function DocumentProperties({ className }: { className?: string }) {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="divide-y m-0 p-0">
           {keys.map((key, i) => {
-            const property = document.properties![key];
+            const property = properties![key];
             return (
               <PropertyDefinitionBlock
                 key={i}
