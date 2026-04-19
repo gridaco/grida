@@ -93,7 +93,7 @@
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum StrokeWidth {
     /// No stroke (all widths are 0)
     #[default]
@@ -329,7 +329,7 @@ impl From<UnknownStrokeWidth> for RectangularStrokeWidth {
 /// assert!(no_stroke.is_none());
 /// assert_eq!(no_stroke.value_or_zero(), 0.0);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SingularStrokeWidth(pub Option<f32>);
 
 impl SingularStrokeWidth {
@@ -463,7 +463,7 @@ impl From<UnknownStrokeWidth> for StrokeWidth {
 /// * `stroke_right_width` - Stroke width for the right edge
 /// * `stroke_bottom_width` - Stroke width for the bottom edge
 /// * `stroke_left_width` - Stroke width for the left edge
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RectangularStrokeWidth {
     pub stroke_top_width: f32,
     pub stroke_right_width: f32,

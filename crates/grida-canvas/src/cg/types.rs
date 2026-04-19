@@ -7,7 +7,7 @@ use std::hash::Hash;
 use super::alignment::Alignment;
 
 /// A 2D point with x and y coordinates.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CGPoint {
     pub x: f32,
     pub y: f32,

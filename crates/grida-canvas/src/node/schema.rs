@@ -9,7 +9,7 @@ use math2::transform::AffineTransform;
 // Re-export the ID types from the id module
 pub use crate::node::id::{NodeId, NodeIdGenerator, UserNodeId};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct LayerEffects {
     /// single layer blur is supported per layer
     /// layer blur is applied after all other effects
@@ -193,7 +193,7 @@ impl LayerEffects {
 /// - line
 /// - vector
 /// - text
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct StrokeStyle {
     pub stroke_align: StrokeAlign,
     pub stroke_cap: StrokeCap,
@@ -625,7 +625,7 @@ impl Default for UniformNodeLayout {
 ///     layout_gap: Some(LayoutGap::all(8.0)),
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LayoutContainerStyle {
     /// The layout algorithm to use for arranging children.
     ///
@@ -749,7 +749,7 @@ impl Default for LayoutContainerStyle {
 /// This explicit separation (container vs child styles) aligns with CSS's model where:
 /// - Container properties (`display: flex`, `flex-direction`, `gap`) affect children
 /// - Child properties (`flex-grow`, `position`, `align-self`) affect the child itself
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LayoutChildStyle {
     /// The flex growth factor — how much this child should grow relative to siblings.
     ///
@@ -796,7 +796,7 @@ pub struct LayoutChildStyle {
      */
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LayoutPositioningBasis {
     /// Cartesian position mode is the default mode.
     /// In this mode, the position is specified using x and y coordinates.
@@ -845,7 +845,7 @@ impl Default for LayoutPositioningBasis {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct LayoutDimensionStyle {
     pub layout_target_width: Option<f32>,
     pub layout_target_height: Option<f32>,

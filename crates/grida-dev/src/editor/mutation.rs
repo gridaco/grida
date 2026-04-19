@@ -14,6 +14,7 @@
 use cg::cg::prelude::*;
 use cg::node::scene_graph::SceneGraph;
 use cg::node::schema::*;
+use cg::runtime::invalidation::ChangeKind;
 
 /// A scene-graph mutation command.
 #[derive(Debug, Clone)]
@@ -31,27 +32,41 @@ pub enum MutationCommand {
 }
 
 /// Apply a mutation command to a scene in-place.
-/// Returns `true` if the scene was actually modified.
-pub fn apply(scene: &mut Scene, cmd: &MutationCommand) -> bool {
+///
+/// Returns the list of `(NodeId, ChangeKind)` pairs describing what
+/// changed. The caller forwards these to
+/// [`cg::runtime::scene::Renderer::mark_node_change_kind`] so the
+/// invalidation module can pick the narrowest cache-rebuild path.
+///
+/// An empty return means the command was a no-op (delta below
+/// threshold, unsupported node type, or unknown id).
+pub fn apply(scene: &mut Scene, cmd: &MutationCommand) -> Vec<(NodeId, ChangeKind)> {
     match cmd {
         MutationCommand::Translate { ids, dx, dy } => {
             if dx.abs() < 0.0001 && dy.abs() < 0.0001 {
-                return false;
+                return Vec::new();
             }
+            let mut out = Vec::with_capacity(ids.len());
             for id in ids {
                 translate_node(&mut scene.graph, id, *dx, *dy);
+                out.push((*id, ChangeKind::Geometry));
             }
-            true
+            out
         }
         MutationCommand::Resize { id, width, height } => {
             if let Ok(node) = scene.graph.get_node(id) {
                 if !node_supports_resize(node) {
-                    return false;
+                    return Vec::new();
                 }
             } else {
-                return false;
+                return Vec::new();
             }
-            resize_node(scene, id, *width, *height)
+            if resize_node(scene, id, *width, *height) {
+                // Resize is a size change → `Full` in v1.
+                vec![(*id, ChangeKind::Full)]
+            } else {
+                Vec::new()
+            }
         }
     }
 }

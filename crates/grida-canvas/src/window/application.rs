@@ -10,8 +10,8 @@ use crate::node::schema::*;
 use crate::query::Hierarchy;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
-use crate::runtime::changes::ChangeFlags;
 use crate::runtime::frame_loop::{FrameLoop, FrameQuality};
+use crate::runtime::invalidation::GlobalFlag;
 use crate::runtime::scene::{Backend, FrameFlushResult, Renderer};
 use crate::sys::clock;
 use crate::sys::timer::TimerMgr;
@@ -336,7 +336,7 @@ impl ApplicationApi for UnknownTargetApplication {
             height: height as f32,
         });
 
-        self.renderer.mark_changed(ChangeFlags::VIEWPORT_SIZE);
+        self.renderer.mark_global(GlobalFlag::ViewportSize);
 
         // Bypass queue() — render immediately so the caller never sees a
         // stale canvas. The frame loop is invalidated+completed inside
@@ -696,14 +696,14 @@ impl ApplicationApi for UnknownTargetApplication {
     fn runtime_renderer_set_pixel_preview_scale(&mut self, scale: u8) {
         self.renderer.set_pixel_preview_scale(scale);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
         self.queue();
     }
 
     fn runtime_renderer_set_pixel_preview_stable(&mut self, stable: bool) {
         self.renderer.set_pixel_preview_strategy_stable(stable);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
         self.queue();
     }
 
@@ -714,7 +714,7 @@ impl ApplicationApi for UnknownTargetApplication {
         let policy = crate::runtime::render_policy::RenderPolicy::from_flags(flags);
         self.renderer.set_render_policy(policy);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::CONFIG);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
         self.queue();
     }
 
@@ -749,7 +749,7 @@ impl ApplicationApi for UnknownTargetApplication {
         });
         self.renderer.set_isolation_mode(mode);
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::RenderFilter);
         self.queue();
     }
 
@@ -758,7 +758,7 @@ impl ApplicationApi for UnknownTargetApplication {
             crate::runtime::filter::IsolationModeStagePreset::from_u32(preset),
         );
         self.renderer
-            .mark_changed(crate::runtime::changes::ChangeFlags::RENDER_FILTER);
+            .mark_global(crate::runtime::invalidation::GlobalFlag::RenderFilter);
         self.queue();
     }
 
@@ -870,6 +870,13 @@ impl ApplicationApi for UnknownTargetApplication {
         let Some(scene) = self.renderer.scene.as_mut() else {
             return false;
         };
+
+        // Capture the old node so the differ can classify the change
+        // before we overwrite it. Cloning here is cheap relative to the
+        // per-frame render cost; the diff result gates whether we go
+        // down a fast path or the full-rebuild path.
+        let old_node_for_diff = scene.graph.get_node(&internal_id).ok().cloned();
+
         if scene.graph.replace_node(internal_id, decoded.node).is_err() {
             return false;
         }
@@ -877,10 +884,22 @@ impl ApplicationApi for UnknownTargetApplication {
             scene.graph.set_name(internal_id, name);
         }
 
-        self.renderer.mark_node_changed(
-            internal_id,
-            ChangeFlags::NODE_CONTENT | ChangeFlags::LAYOUT_DIRTY,
-        );
+        // Classify the change via the differ; fall back to `Full` when
+        // the old node wasn't available.
+        use crate::runtime::invalidation::{diff_node, ChangeKind};
+        let kind = old_node_for_diff
+            .as_ref()
+            .and_then(|old| {
+                scene
+                    .graph
+                    .get_node(&internal_id)
+                    .ok()
+                    .map(|new| (old, new))
+            })
+            .map(|(old, new)| diff_node(old, new))
+            .unwrap_or(ChangeKind::Full);
+
+        self.renderer.mark_node_change_kind(internal_id, kind);
         self.queue();
         true
     }
@@ -904,7 +923,7 @@ impl ApplicationApi for UnknownTargetApplication {
             }
         }
 
-        self.renderer.mark_changed(ChangeFlags::LAYOUT_DIRTY);
+        self.renderer.mark_global(GlobalFlag::Layout);
         self.queue();
         true
     }
@@ -1559,7 +1578,7 @@ impl UnknownTargetApplication {
             updated |= ok;
         }
         if updated {
-            self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+            self.renderer.mark_global(GlobalFlag::ImageLoaded);
         }
     }
 
@@ -1583,7 +1602,7 @@ impl UnknownTargetApplication {
             updated = true;
         }
         if updated {
-            self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+            self.renderer.mark_global(GlobalFlag::FontLoaded);
             if font_count > 0 {
                 self.print_font_repository_info();
             }
@@ -1656,7 +1675,7 @@ impl UnknownTargetApplication {
 
     pub fn set_default_fallback_fonts(&mut self, fonts: Vec<String>) {
         self.renderer.fonts.set_user_fallback_families(fonts);
-        self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+        self.renderer.mark_global(GlobalFlag::FontLoaded);
     }
 
     pub fn get_default_fallback_fonts(&self) -> Vec<String> {
@@ -1673,14 +1692,14 @@ impl UnknownTargetApplication {
     /// supported (e.g. Regular, Bold, Italic per family).
     pub fn add_font(&mut self, family: &str, data: &[u8]) {
         self.renderer.add_font(family, data);
-        self.renderer.mark_changed(ChangeFlags::FONT_LOADED);
+        self.renderer.mark_global(GlobalFlag::FontLoaded);
         self.queue();
     }
 
     /// Register image bytes with the renderer and return metadata.
     pub fn add_image(&mut self, data: &[u8]) -> (String, String, u32, u32, String) {
         let result = self.renderer.add_image(data);
-        self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+        self.renderer.mark_global(GlobalFlag::ImageLoaded);
         self.queue();
         result
     }
@@ -1689,7 +1708,7 @@ impl UnknownTargetApplication {
     pub fn add_image_with_rid(&mut self, data: &[u8], rid: &str) -> Option<(u32, u32, String)> {
         let result = self.renderer.add_image_with_rid(data, rid);
         if result.is_some() {
-            self.renderer.mark_changed(ChangeFlags::IMAGE_LOADED);
+            self.renderer.mark_global(GlobalFlag::ImageLoaded);
             self.queue();
         }
         result

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// `pos` is the normalized position along the stroke in [0, 1].
 /// `r` is the half-width at this position in pixels.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WidthStop {
     /// Normalized position along the stroke [0, 1].
     #[serde(rename = "u")]
@@ -18,7 +18,7 @@ pub struct WidthStop {
 ///
 /// Contains a base width and a set of width stops.
 /// Can build a sampler for efficient runtime queries.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VarWidthProfile {
     /// Base half-width used when no stops are defined.
     pub base: f32,

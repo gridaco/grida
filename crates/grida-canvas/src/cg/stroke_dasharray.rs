@@ -75,7 +75,7 @@ use serde::{Deserialize, Serialize};
 /// - [`StrokeAlign`] - Controls stroke positioning relative to path
 /// - [SVG stroke-dasharray](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray)
 /// - [Skia SkPathEffect](https://skia.org/docs/user/api/skpaint_overview/#patheffect)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct StrokeDashArray(pub Vec<f32>);
 

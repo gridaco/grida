@@ -2,9 +2,9 @@ use crate::cg::prelude::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::Painter;
 use crate::runtime::camera::CameraChangeKind;
-use crate::runtime::changes::{ChangeFlags, ChangeSet};
 use crate::runtime::counter::FrameCounter;
 use crate::runtime::frame_strategy::FrameRenderStrategy;
+use crate::runtime::invalidation::GlobalFlag;
 use crate::runtime::render_policy::RenderPolicy;
 use crate::sk;
 use crate::{
@@ -344,12 +344,13 @@ pub struct Renderer {
     /// Cached composited frame for zoom fast path.
     /// See [`ZoomImageCache`] for details.
     zoom_image_cache: Option<ZoomImageCache>,
-    /// Accumulated changes since the last frame.
+    /// Per-phase dirty sets, the authoritative invalidation state.
     ///
-    /// Mutation sites call [`mark_changed`] to declare what changed;
-    /// [`apply_changes`] consumes the set once per frame and performs
-    /// the correct invalidation for every cache layer.
-    changes: ChangeSet,
+    /// Populated by [`Self::mark_global`] (scene-wide flags) and
+    /// [`Self::mark_node_change_kind`] (per-node kinds). Consumed once
+    /// per frame by [`Self::apply_changes`], which dispatches to the
+    /// narrowest rebuild path and clears the state.
+    dirty: super::invalidation::SceneDirty,
     /// Picture cache generation + variant key at the time of the last
     /// successful prefill. When the cache generation and variant key
     /// match, the prefill loop can be skipped entirely — all pictures
@@ -803,7 +804,7 @@ impl Renderer {
             downscale_dims: (0, 0),
             pan_image_cache: None,
             zoom_image_cache: None,
-            changes: ChangeSet::new(),
+            dirty: super::invalidation::SceneDirty::new(),
             last_prefill_generation: u64::MAX,
             last_prefill_variant_key: u64::MAX,
             last_prefill_layer_count: 0,
@@ -934,7 +935,8 @@ impl Renderer {
 
         // Record the change. apply_changes() will handle per-node
         // picture/compositor/atlas invalidation and viewport caches.
-        self.mark_node_changed(node_id, ChangeFlags::NODE_TEXT);
+        // Text edits change measured size → route through Full.
+        self.mark_node_change_kind(node_id, super::invalidation::ChangeKind::Full);
     }
 
     /// Update the shape bounding rect for a text node's layer.
@@ -1035,7 +1037,7 @@ impl Renderer {
         if !enable {
             self.scene_cache.compositor.clear();
             self.compositor_atlas.clear();
-            self.mark_changed(ChangeFlags::CONFIG);
+            self.mark_global(GlobalFlag::Config);
         }
     }
 
@@ -1067,7 +1069,7 @@ impl Renderer {
             // re-captured as individual textures on the next frame.
             self.scene_cache.compositor.invalidate_all();
             self.compositor_atlas.clear();
-            self.mark_changed(ChangeFlags::CONFIG);
+            self.mark_global(GlobalFlag::Config);
         }
     }
 
@@ -1855,7 +1857,7 @@ impl Renderer {
         // replaced above (empty), so the caches are naturally fresh — but the
         // flag is still needed for viewport snapshot caches and any future
         // apply_changes() logic.
-        self.mark_changed(ChangeFlags::SCENE_LOAD);
+        self.mark_global(GlobalFlag::SceneLoad);
         self.queue_stable();
     }
 
@@ -2016,11 +2018,10 @@ impl Renderer {
         true
     }
 
-    /// Clear the cached scene picture.
-    ///
-    /// **Prefer [`mark_changed`] + [`apply_changes`]** for new code.
-    /// This method is retained for the few call sites that have not yet
-    /// been migrated to the central change-tracking system.
+    /// Clear the cached scene picture. Legacy entry point retained
+    /// for call sites that have not migrated to the central
+    /// change-tracking system; prefer `mark_global` /
+    /// `mark_node_change_kind` + `apply_changes` for new code.
     pub fn invalidate_cache(&mut self) {
         self.scene_cache.invalidate();
         // Also invalidate all compositor layer images so they re-rasterize.
@@ -2034,22 +2035,24 @@ impl Renderer {
     // Central change-tracking
     // -------------------------------------------------------------------
 
-    /// Declare that something changed.
-    ///
-    /// Callers set the appropriate [`ChangeFlags`] to describe the
-    /// mutation. The renderer accumulates them until the next frame,
-    /// when [`apply_changes`] translates the flags into precise
-    /// per-cache invalidation.
-    pub fn mark_changed(&mut self, flags: ChangeFlags) {
-        self.changes.mark(flags);
+    /// Declare that a scene-wide (non–per-node) invalidation
+    /// occurred — viewport resize, font load, image load, config
+    /// change, etc. Per-node mutations go through
+    /// [`Self::mark_node_change_kind`].
+    pub fn mark_global(&mut self, flag: super::invalidation::GlobalFlag) {
+        self.dirty.apply_global(flag);
     }
 
-    /// Declare that a specific node changed.
+    /// Declare that a specific node changed with the given
+    /// [`ChangeKind`].
     ///
-    /// Same as [`mark_changed`] but also records the node ID for
-    /// surgical per-node cache invalidation.
-    pub fn mark_node_changed(&mut self, id: NodeId, flags: ChangeFlags) {
-        self.changes.push_node(id, flags);
+    /// Use when the mutation site already knows what changed (e.g.
+    /// `Translate` → `Geometry`). For `replace_node`-style mutations
+    /// where the caller doesn't know, run
+    /// [`invalidation::diff_node`](super::invalidation::diff_node)
+    /// on the old and new values first.
+    pub fn mark_node_change_kind(&mut self, id: NodeId, kind: super::invalidation::ChangeKind) {
+        self.dirty.apply(id, kind);
     }
 
     /// Consume accumulated changes and perform cache invalidation.
@@ -2065,11 +2068,9 @@ impl Renderer {
     /// marquee drag, hover highlight) where the caller can skip the
     /// expensive frame-plan + draw and just blit the cached content.
     pub fn apply_changes(&mut self, camera_change: CameraChangeKind, stable: bool) -> bool {
-        let cs = self.changes.take();
-        let flags = cs.flags();
-
-        // Fast path: nothing changed (pure camera move handled below).
-        let has_data_changes = !flags.is_empty();
+        let mut dirty = std::mem::take(&mut self.dirty);
+        let global = dirty.global;
+        let has_data_changes = !dirty.is_empty();
         let content_changed = has_data_changes || camera_change.any_changed();
 
         // ----- Layout -----
@@ -2078,27 +2079,87 @@ impl Renderer {
         // or auto-sized roots (the common infinite-canvas case has neither).
         // Invalidate paragraph cache before layout so rebuild_scene_caches()
         // measures text with the new fonts rather than stale fallback paragraphs.
-        if flags.contains(ChangeFlags::FONT_LOADED) {
+        if global.font_loaded {
             self.scene_cache.paragraph.borrow_mut().invalidate();
         }
 
-        if has_data_changes && !flags.contains(ChangeFlags::SCENE_LOAD) {
-            let needs_layout = flags
-                .intersects(ChangeFlags::LAYOUT_DIRTY | ChangeFlags::FONT_LOADED)
-                || (flags.contains(ChangeFlags::VIEWPORT_SIZE)
-                    && self.scene_has_viewport_dependent_layout());
-            if needs_layout {
+        if has_data_changes && !global.scene_load {
+            let needs_layout = global.layout
+                || global.font_loaded
+                || !dirty.layout.is_empty()
+                || (global.viewport_size && self.scene_has_viewport_dependent_layout());
+            let needs_effect_tree = !dirty.effect_tree.is_empty();
+            let needs_layer_list = dirty.layer_list;
+            let needs_geometry = !dirty.geometry.is_empty();
+
+            if needs_layout || needs_effect_tree || needs_layer_list {
+                // Full rebuild: at least one of layout / effect tree /
+                // layer list is dirty, so run all four phases.
+                if super::invalidation::log_enabled() {
+                    eprintln!(
+                        "[invalidation] full  layout={} geom={} effect={} layers={}",
+                        dirty.layout.len(),
+                        dirty.geometry.len(),
+                        dirty.effect_tree.len(),
+                        dirty.layer_list
+                    );
+                }
                 self.rebuild_scene_caches();
+            } else if needs_geometry {
+                // Geometry fast path: per-subtree geometry update +
+                // partial layer/R-tree patch. Skips Taffy layout and
+                // effect-tree rebuild entirely. Covers both classical
+                // transform and layout-position changes via the
+                // [`super::invalidation::lens::motion_of`] lens.
+                if super::invalidation::log_enabled() {
+                    eprintln!(
+                        "[invalidation] geometry  dirty={} (fast path)",
+                        dirty.geometry.len(),
+                    );
+                }
+                match self.rebuild_geometry_and_layers_partial(&dirty.geometry) {
+                    Some(affected) => {
+                        // Picture & compositor caches encode the
+                        // world transform of each node; every
+                        // descendant's world transform just shifted.
+                        // Widen `paint_touched` so the per-node
+                        // invalidation loops below cover the whole
+                        // subtree, not just the dirty roots.
+                        dirty.paint_touched.extend(affected);
+                    }
+                    None => {
+                        // Fallback: full rebuild ran (no prior layer
+                        // index). Every picture is potentially
+                        // stale relative to the new geometry.
+                        self.scene_cache.picture.invalidate();
+                        self.scene_cache.compositor.invalidate_all();
+                        self.compositor_atlas.clear();
+                    }
+                }
+            } else if !dirty.paint_touched.is_empty() {
+                // Paint-only: geometry and bounds are unchanged, but
+                // the `LayerList`'s cached paint fields (fills,
+                // strokes, opacity, blend_mode, effects, shape,
+                // stroke_path, …) must be refreshed for the painter.
+                // Rebuilds `layers` + `commands` from the scene;
+                // leaves the R-tree intact.
+                if super::invalidation::log_enabled() {
+                    eprintln!(
+                        "[invalidation] paint  touched={} (rebuild layer vec)",
+                        dirty.paint_touched.len()
+                    );
+                }
+                if let Some(scene) = self.scene.as_ref() {
+                    self.scene_cache.rebuild_layer_vec(scene);
+                }
             }
         }
 
         // ----- Picture cache (per-node recorded Skia Pictures) -----
-        if flags.intersects(
-            ChangeFlags::SCENE_LOAD | ChangeFlags::FONT_LOADED | ChangeFlags::IMAGE_LOADED,
-        ) {
+        if global.scene_load || global.font_loaded || global.image_loaded {
             self.scene_cache.picture.invalidate();
         } else if has_data_changes {
-            for &id in cs.nodes() {
+            for id in dirty.paint_touched.iter().copied() {
                 self.scene_cache.picture.invalidate_node(id);
             }
         }
@@ -2107,25 +2168,25 @@ impl Renderer {
         // FONT_LOADED is handled above (before rebuild_scene_caches) so that
         // layout measurement uses fresh paragraphs. Only SCENE_LOAD needs
         // invalidation here.
-        if flags.contains(ChangeFlags::SCENE_LOAD) {
+        if global.scene_load {
             self.scene_cache.paragraph.borrow_mut().invalidate();
         }
         // Per-node paragraph invalidation is handled by update_layer_text
-        // which runs before mark_changed, so we don't repeat it here.
+        // which runs before mark_node_change_kind, so we don't repeat it here.
 
         // ----- Vector path cache -----
-        if flags.contains(ChangeFlags::SCENE_LOAD) {
+        if global.scene_load {
             self.scene_cache.path.borrow_mut().invalidate();
         }
 
         // ----- Compositor (LayerImageCache) + Atlas -----
-        if flags.contains(ChangeFlags::SCENE_LOAD) {
+        if global.scene_load {
             self.scene_cache.compositor.clear();
             self.compositor_atlas.clear();
-        } else if flags.intersects(ChangeFlags::FONT_LOADED | ChangeFlags::IMAGE_LOADED) {
+        } else if global.font_loaded || global.image_loaded {
             self.scene_cache.compositor.invalidate_all();
             self.compositor_atlas.clear();
-        } else if flags.contains(ChangeFlags::CONFIG) {
+        } else if global.config {
             // Config changes (e.g. atlas toggle off) may need full compositor reset.
             // The config-change call site sets compositor state directly before
             // marking CONFIG; this handles the residual viewport cache clearing.
@@ -2135,9 +2196,9 @@ impl Renderer {
             self.scene_cache.compositor.mark_all_stale();
         }
         // Per-node compositor invalidation
-        for &id in cs.nodes() {
-            self.scene_cache.compositor.invalidate(&id);
-            self.compositor_atlas.free_node(&id);
+        for id in dirty.paint_touched.iter() {
+            self.scene_cache.compositor.invalidate(id);
+            self.compositor_atlas.free_node(id);
         }
 
         // ----- Viewport snapshot caches (pan/zoom image caches) -----
@@ -2226,6 +2287,146 @@ impl Renderer {
 
             // 4. Rebuild layers
             self.scene_cache.update_layers(scene);
+        }
+    }
+
+    /// Surgical rebuild: per-subtree geometry update + in-place
+    /// layer/R-tree patch for the affected anchor set.
+    ///
+    /// For interactive drag on large scenes, the layer-list + R-tree
+    /// rebuild dominates the frame budget (measured at ~330ms of a
+    /// ~348ms apply_changes on a 136K-node scene). This path replaces
+    /// the full `update_layers` with a targeted patch, cutting that
+    /// 330ms to O(subtree size).
+    ///
+    /// Returns:
+    /// - `Some(affected)` when the partial path ran — the caller
+    ///   should widen per-node cache invalidation (picture,
+    ///   compositor, atlas) to cover `affected`, since descendants'
+    ///   cached world transforms just changed.
+    /// - `None` when no prior full build had primed the side maps
+    ///   and the full-rebuild fallback ran — the caller should
+    ///   scene-wide-invalidate picture / compositor / atlas.
+    ///
+    /// Preconditions:
+    /// - `roots` must contain the dirty node ids (e.g.
+    ///   `SceneDirty::geometry`).
+    /// - The caller is responsible for verifying no non-motion field
+    ///   changed (the classifier ensures this by only calling this
+    ///   path for `ChangeKind::Geometry`).
+    pub fn rebuild_geometry_and_layers_partial(
+        &mut self,
+        roots: &std::collections::HashSet<NodeId>,
+    ) -> Option<std::collections::HashSet<NodeId>> {
+        let Some(scene) = self.scene.as_ref() else {
+            return Some(std::collections::HashSet::new());
+        };
+        if !self.scene_cache.has_layer_index() {
+            // No prior full build has populated the side maps; fall
+            // back to the full rebuild so invariants hold.
+            self.rebuild_geometry_and_layers();
+            return None;
+        }
+
+        let log = super::invalidation::log_enabled();
+        let t0 = if log {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
+
+        // 1. Climb through union-of-children ancestors (Group,
+        //    BooleanOperation) so their cached bounds don't go stale.
+        let anchors = self
+            .scene_cache
+            .geometry
+            .expand_roots_for_union_ancestors(roots, scene);
+
+        let t_anchor = t0.map(|t| t.elapsed().as_micros() as u64);
+        let t1 = if log {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
+
+        // 2. Partial geometry rebuild — O(affected subtrees).
+        let viewport_size = self.window_context.viewport_size;
+        let layout_result = self.layout_engine.result();
+        let affected = self.scene_cache.update_geometry_for_subtree(
+            &anchors,
+            scene,
+            &self.fonts,
+            Some(layout_result),
+            viewport_size,
+        );
+
+        let t_geom = t1.map(|t| t.elapsed().as_micros() as u64);
+        let t2 = if log {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
+
+        // 3. Partial layer + R-tree patch, scoped to the same
+        //    affected set.
+        self.scene_cache.patch_layers_for_subtree(&affected);
+
+        let t_patch = t2.map(|t| t.elapsed().as_micros() as u64);
+
+        if log {
+            eprintln!(
+                "[invalidation] rebuild_partial  affected={} anchor={}us geom={}us patch={}us",
+                affected.len(),
+                t_anchor.unwrap_or(0),
+                t_geom.unwrap_or(0),
+                t_patch.unwrap_or(0),
+            );
+        }
+        Some(affected)
+    }
+
+    /// Fast-path rebuild: geometry + layers only, skipping layout and
+    /// effect-tree rebuild.
+    ///
+    /// Used when the classifier reports [`ChangeKind::Geometry`] — a
+    /// motion-only mutation does not alter layout constraints or
+    /// render-surface membership, only world transforms and bounds.
+    /// Skips two of the four phases `rebuild_scene_caches` runs.
+    pub fn rebuild_geometry_and_layers(&mut self) {
+        if let Some(scene) = self.scene.as_ref() {
+            let viewport_size = self.window_context.viewport_size;
+
+            let log = super::invalidation::log_enabled();
+            let t0 = if log {
+                Some(std::time::Instant::now())
+            } else {
+                None
+            };
+
+            let layout_result = self.layout_engine.result();
+            self.scene_cache.update_geometry_with_layout(
+                scene,
+                &self.fonts,
+                layout_result,
+                viewport_size,
+            );
+            let t_geom = t0.map(|t| t.elapsed().as_micros() as u64);
+
+            let t1 = if log {
+                Some(std::time::Instant::now())
+            } else {
+                None
+            };
+            self.scene_cache.update_layers(scene);
+            let t_layers = t1.map(|t| t.elapsed().as_micros() as u64);
+
+            if log {
+                eprintln!(
+                    "[invalidation] rebuild_geometry_and_layers  geom={}us layers={}us",
+                    t_geom.unwrap_or(0),
+                    t_layers.unwrap_or(0)
+                );
+            }
         }
     }
 
