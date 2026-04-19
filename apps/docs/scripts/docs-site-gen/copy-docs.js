@@ -15,7 +15,13 @@ function copyAll() {
   // deletions in the source tree do not leave duplicate routes (e.g. README
   // vs index) in the build output.
   fse.emptyDirSync(dest);
-  fse.copySync(origin, dest, { overwrite: true });
+  fse.copySync(origin, dest, {
+    overwrite: true,
+    filter: (src) => {
+      const base = path.basename(src);
+      return base !== ".DS_Store";
+    },
+  });
 }
 
 module.exports = copyAll;

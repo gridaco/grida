@@ -1,84 +1,55 @@
 ---
 id: intro
-title: Introduction
+title: Grida Documentation
+description: Product guides, Figma workflows, forms docs, platform docs, and technical references for Grida.
+keywords:
+  - grida
+  - documentation
+  - canvas editor
+  - forms
+  - figma
+  - assistant
+  - platform
+format: md
 ---
 
-# Introduction
+# Grida Documentation
 
-Grida is a Opensource Design to Code toolkit. To bring your imagination to life as fast as possible, Grida converts your design into human-level code, which dramatically reduces hours and months of development time. **You now Focus on the core.**
+Grida is an open-source canvas editor and rendering engine, with products and workflows around Figma interoperability, forms, platform tooling, and headless rendering.
 
-💸 Building UI applications from scratch costs a lot of time. Coding all the designs from scratch may seem like a conventional way, but it is not anymore. You can now focus on the core, and **let grida take care of the UI side.**
+This site is the main entry point for product documentation. If you are new to Grida, start with the section that matches what you are trying to do.
 
-⚡️ Headless. Grida is a **headless toolkit and super fast**. You don't need to import your design everytime the design is modified. Edit instantly, get the result instantly.
+## Start Here
 
-❤️ **Open source.** Grida is built with talented developers around the world. Do you want to be part of it? You can start contributing easier than you think.
+- Use [Editor](./editor/features/README.md) if you are working inside the Grida editor and want feature docs or workflow help.
+- Use [With Figma](./with-figma/index.md) if you are importing from Figma, using Assistant, or working through Figma-related setup.
+- Use [Forms](./forms/respondent-email-notifications.md) if you are building form flows, notifications, or response handling.
+- Use [Platform](./platform/index.md) if you are working with product infrastructure, customers, tags, or platform features.
+- Use [Canvas SDK](./canvas/sdk/index.md) if you are embedding or integrating Grida canvas capabilities.
 
-## Fast Track ⏱️
+## Product Areas
 
-1. Install [Grida Assistant](https://grida.co/assistant) Figma Plugin to get started.
-2. Enter your desing url in input on [grida.co](https://grida.co) and get result for entire figma file.
+- [Editor](./editor/features/README.md) for editor capabilities and interaction docs.
+- [With Figma](./with-figma/index.md) for interoperability guides, import workflows, and the maintained Assistant product surface.
+- [Forms](./forms/respondent-email-notifications.md) for forms-specific user docs.
+- [Platform](./platform/index.md) for product/platform docs.
+- [Canvas SDK](./canvas/sdk/index.md) for the canvas embed and SDK surface.
+- [Design](./design/blend-mode.md) for design-oriented notes and visual model docs such as vector network behavior.
 
-## Features
+## Reference And Technical Docs
 
-- **Instant Code conversion**
-  - Supports React, Flutter, Vanilla - which can be used to build any websites and mobile apps.
-  - We can convert any design whatever you select, instantly.
-- **Unified Design system**
-  - Design for design Code for code? - Now you can have your design system truly unified, automatically.
-- **Various Widgets support**
-  - Grida is smart. we understand your design, converts it to desired widgets. Draw a button, we'll make button.
-- **Components and Variant support**
-  - Supports Features like Components and Variants that are used when structuring your design system.
-- **Responsive code**
-  - Supports Autolayout Perfectly.
-  - Generates Respnsive code based on Flexbox, extending layout features that are not supported by Figma.
-  - On Flutter, we use Column, Row, Flex, Wrap to represent a layout.
-  - Generates hight quality code that you can actually understand and agree on.
-- **Extending your design**
-  - Current version of design tools has foundational limitations for representing dynamic layouts. e.g. We can't represent a layout with max-width nor wrap. Grida enables you to bring your design to the next responsible level without leaving figma, [with our unique feature - Flags][flags-docs].
-- **Lint**
-  - Good designer makes even the very deepest, invisible part organized and explainable. Grida provides Design Lint feature to tidy up your design even to the invisible part. Make your design clean, Make your code clean.
+- [Reference](./reference/index.md) for stable technical references and specs.
+- [Working Group](./wg/index.md) for design notes, architecture, proposals, and implementation plans.
+- [Math](./math/kappa.md) for supporting technical notes used by renderer and geometry work.
+- [Packages](./packages/index.md) for package-level entry points such as `@grida/refig`.
 
-## Design principles
+## Older Or Specialized Docs
 
-- **Zero Dependency**
-  <!-- TODO: , but available on prod -->
-- **Strictly follows the standard.**
-  <!-- TODO: , but available on prod -->
-- **Design first.**
-  <!-- TODO: , but available on prod -->
-- **Clean design, Clean code.**
-  <!-- TODO: , but available on prod -->
-- **Transparancy.**
-  <!-- TODO: , but available on prod -->
-- **We're not here to do everything.**
-  <!-- TODO: , but available on prod -->
-- **Accessibility.**
-  <!-- TODO: , but available on prod -->
+- [CLI](./cli/index.md) is kept for compatibility, but should be treated as deprecated unless a task explicitly targets it.
+- `docs/@designto-code/**` is synced from an external source and remains in place as reference material.
 
-## Staying informed
+## Project Links
 
-- [GitHub][grida-github]
-- [Facebook][grida-facebook]
-- [Twitter][grida-twitter]
-- [Blog][grida-blog]
-- [Slack][grida-join-slack]
-
-## Let's Dive in
-
-Click the Next button below to get started!
-
-<!-- --------------- -->
-
-[grida-website-signup]: https://accounts.grida.co/signup
-[grida-youtube]: https://www.youtube.com/channel/UCgJO5apXl_pXRfTxNrkbEBw
-[grida-github]: https://github.com/gridaco
-[grida-join-slack]: https://grida.co/join-slack
-[grida-blog]: https://grida.co/blog
-[grida-reddit]: https://www.reddit.com/r/gridaco/
-[grida-twitter]: https://twitter.com/grida_co
-[grida-facebook]: https://www.facebook.com/grida.co
-[grida-instagram]: https://www.instagram.com/grida.co
-[contributor-covenant]: https://www.contributor-covenant.org/
-[grida-codeofconduct]: https://github.com/gridaco/grida.co/blob/main/CODE_OF_CONDUCT.md
-[flags-docs]: https://grida.co/docs/flags/
+- [Repository](https://github.com/gridaco/grida)
+- [Website](https://grida.co)
+- [Slack](https://grida.co/join-slack)
