@@ -79,8 +79,8 @@ importers:
         specifier: ^4.3.4
         version: 4.4.1(vite@6.3.5(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1))
       dotenv:
-        specifier: ^16.4.7
-        version: 16.5.0
+        specifier: ^17.4.2
+        version: 17.4.2
       electron:
         specifier: ^41.2.1
         version: 41.2.1
@@ -1364,8 +1364,8 @@ packages:
   dir-compare@4.2.0:
     resolution: {integrity: sha512-2xMCmOoMrdQIPHdsTawECdNPwlVFB9zGcz3kuhmBO6U3oU+UQjsue0i8ayLKpgBcm+hcXPMVSGUN9d+pvJ6+VQ==}
 
-  dotenv@16.5.0:
-    resolution: {integrity: sha512-m/C+AwOAr9/W1UOIZUo232ejMNnJAJtYQjUbHoNTBNTJSvqzzDh7vnrei3o3r3m9blf6ZoDkvcw0VmozNRFJxg==}
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
   ds-store@0.1.6:
@@ -4452,7 +4452,7 @@ snapshots:
       minimatch: 3.1.2
       p-limit: 3.1.0
 
-  dotenv@16.5.0: {}
+  dotenv@17.4.2: {}
 
   ds-store@0.1.6:
     dependencies:

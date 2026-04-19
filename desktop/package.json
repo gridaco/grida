@@ -45,7 +45,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4.3.4",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.4.2",
     "electron": "^41.2.1",
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.0.0",
