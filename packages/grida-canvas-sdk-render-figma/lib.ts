@@ -7,6 +7,7 @@
 
 import type { ExportSetting } from "@figma/rest-api-spec";
 import { createCanvas, type Canvas, type types } from "@grida/canvas-wasm";
+import { io } from "@grida/io";
 import { iofigma } from "@grida/io-figma";
 import {
   restJsonToGridaDocument,
@@ -236,13 +237,7 @@ export class FigmaDocument {
   listFontFamilies(rootNodeId?: string): string[] {
     if (rootNodeId != null && rootNodeId !== "") {
       const resolved = this._resolve(rootNodeId);
-      const parsed = JSON.parse(resolved.sceneJson) as {
-        document?: grida.program.document.Document;
-      };
-      if (parsed?.document) {
-        return this._collectFontFamiliesFromDocument(parsed.document);
-      }
-      return [];
+      return this._collectFontFamiliesFromDocument(resolved.document);
     }
 
     if (this.sourceType === "rest-api-json") {
@@ -491,23 +486,16 @@ function collectFontFamiliesFromRestDocument(
  * @internal
  */
 interface ResolvedScene {
-  sceneJson: string;
+  document: grida.program.document.Document;
   images: Record<string, Uint8Array>;
   imageRefsUsed?: string[];
 }
 
-/**
- * Convert a {@link GridaDocumentResult} to a {@link ResolvedScene} by
- * serializing the document to JSON.
- */
 function gridaDocumentResultToResolvedScene(
   result: GridaDocumentResult
 ): ResolvedScene {
   return {
-    sceneJson: JSON.stringify({
-      version: grida.program.document.SCHEMA_VERSION,
-      document: result.document,
-    }),
+    document: result.document,
     images: result.assets,
     imageRefsUsed: result.imageRefsUsed,
   };
@@ -628,7 +616,7 @@ export class FigmaRenderer {
     for (const [ref, bytes] of Object.entries(resolved.images)) {
       canvas.addImageWithId(bytes, `res://images/${ref}`);
     }
-    canvas.loadScene(resolved.sceneJson);
+    canvas.loadSceneGrida(io.GRID.encode(resolved.document));
     this._requestedNodeId = nodeId;
     this._sceneLoaded = true;
   }

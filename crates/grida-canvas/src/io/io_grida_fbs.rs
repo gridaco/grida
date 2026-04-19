@@ -76,6 +76,11 @@ pub enum FbsDecodeError {
     InvalidBuffer(flatbuffers::InvalidFlatbuffer),
     MissingDocument,
     MissingScene,
+    /// Single-node buffer has a missing or empty `nodes` vector.
+    EmptyNodes,
+    /// Single-node buffer carried a `Node` variant that is not a valid
+    /// partial-replacement target (e.g. `SceneNode`, or unrecognized).
+    UnsupportedNodeType,
 }
 
 impl std::fmt::Display for FbsDecodeError {
@@ -84,6 +89,10 @@ impl std::fmt::Display for FbsDecodeError {
             FbsDecodeError::InvalidBuffer(e) => write!(f, "invalid FlatBuffer: {e}"),
             FbsDecodeError::MissingDocument => write!(f, "GridaFile.document is null"),
             FbsDecodeError::MissingScene => write!(f, "document has no scenes"),
+            FbsDecodeError::EmptyNodes => write!(f, "per-node buffer has no nodes"),
+            FbsDecodeError::UnsupportedNodeType => {
+                write!(f, "per-node buffer carries an unsupported node type")
+            }
         }
     }
 }
@@ -530,6 +539,98 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
         scene_ids: scene_ids_ordered,
         position_map: position_map.into_iter().collect(),
     })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Single-node decode (per-node sync path)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One decoded layer node from a single-node `GridaFile` buffer.
+///
+/// Produced by [`decode_single_node`]. Carries the node's string id (so
+/// callers can map into their own id space) and display name alongside the
+/// decoded `Node`. Parent hierarchy is intentionally not decoded: the
+/// expected use is in-place replacement against an id that already exists
+/// in the target scene.
+pub struct DecodedSingleNode {
+    /// The node's own string id (from `SystemNodeTrait.id`).
+    pub id: String,
+    /// Display name, if the node carries one.
+    pub name: Option<String>,
+    /// The decoded node value.
+    pub node: Node,
+}
+
+/// Decode a single-node `GridaFile` buffer (a `CanvasDocument` with exactly
+/// one `NodeSlot`) into a [`DecodedSingleNode`].
+///
+/// `SceneNode` slots and empty buffers are rejected — only layer-bearing
+/// nodes are valid targets for partial replacement.
+pub fn decode_single_node(bytes: &[u8]) -> Result<DecodedSingleNode, FbsDecodeError> {
+    // SAFETY: Skip verification (matches decode_all_inner).
+    let grida_file = unsafe { flatbuffers::root_unchecked::<fbs::GridaFile>(bytes) };
+    let document = grida_file
+        .document()
+        .ok_or(FbsDecodeError::MissingDocument)?;
+    let nodes_vec = document.nodes().ok_or(FbsDecodeError::EmptyNodes)?;
+    if nodes_vec.is_empty() {
+        return Err(FbsDecodeError::EmptyNodes);
+    }
+    let slot = nodes_vec.get(0);
+
+    macro_rules! decode_layer_slot {
+        ($accessor:ident, $decode_fn:expr) => {{
+            let typed = slot
+                .$accessor()
+                .ok_or(FbsDecodeError::UnsupportedNodeType)?;
+            let sys = typed.node();
+            let layer = typed.layer();
+            let id = sys.id().id().to_owned();
+            let name = sys.name().map(|s| s.to_owned());
+            let lc = decode_layer_common(&sys, &layer);
+            let node = $decode_fn(&lc, &layer, &typed);
+            DecodedSingleNode { id, name, node }
+        }};
+    }
+
+    let result = match slot.node_type() {
+        fbs::Node::GroupNode => decode_layer_slot!(node_as_group_node, decode_group_node),
+        fbs::Node::TrayNode => decode_layer_slot!(node_as_tray_node, decode_tray_node),
+        fbs::Node::ContainerNode => {
+            decode_layer_slot!(node_as_container_node, decode_container_node)
+        }
+        fbs::Node::InitialContainerNode => {
+            decode_layer_slot!(
+                node_as_initial_container_node,
+                decode_initial_container_node
+            )
+        }
+        fbs::Node::BasicShapeNode => {
+            decode_layer_slot!(node_as_basic_shape_node, decode_basic_shape_node)
+        }
+        fbs::Node::VectorNode => decode_layer_slot!(node_as_vector_node, decode_vector_node),
+        fbs::Node::PathNode => decode_layer_slot!(node_as_path_node, decode_path_node),
+        fbs::Node::LineNode => decode_layer_slot!(node_as_line_node, decode_line_node),
+        fbs::Node::TextSpanNode => {
+            decode_layer_slot!(node_as_text_span_node, decode_text_span_node)
+        }
+        fbs::Node::AttributedTextNode => {
+            decode_layer_slot!(node_as_attributed_text_node, decode_attributed_text_node)
+        }
+        fbs::Node::BooleanOperationNode => {
+            decode_layer_slot!(
+                node_as_boolean_operation_node,
+                decode_boolean_operation_node
+            )
+        }
+        fbs::Node::MarkdownEmbedNode => {
+            decode_layer_slot!(node_as_markdown_embed_node, decode_markdown_embed_node)
+        }
+        // SceneNode and anything else are not valid per-node sync targets.
+        _ => return Err(FbsDecodeError::UnsupportedNodeType),
+    };
+
+    Ok(result)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

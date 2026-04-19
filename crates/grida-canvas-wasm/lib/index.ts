@@ -297,12 +297,24 @@ export class Canvas {
     return this._backend;
   }
 
-  loadScene(json: string) {
-    this._scene.loadScene(json);
-  }
-
   loadSceneGrida(data: Uint8Array) {
     this._scene.loadSceneGrida(data);
+  }
+
+  /**
+   * Activate a scene previously decoded by `loadSceneGrida`.
+   * Required before `exportNodeAs` or other rendering ops when the document
+   * contains multiple scenes or when no default is implicitly activated.
+   */
+  switchScene(sceneId: string) {
+    this._scene.switchScene(sceneId);
+  }
+
+  /**
+   * Return the IDs of all scenes decoded by the last `loadSceneGrida` call.
+   */
+  loadedSceneIds(): string[] {
+    return this._scene.loadedSceneIds();
   }
 
   /**

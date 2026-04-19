@@ -5,8 +5,7 @@ use crate::dummy;
 use crate::export::{
     export_node_as, export_pdf_document, ExportAs, ExportPdfDocumentOptions, Exported,
 };
-use crate::io::io_grida::{self, JSONFlattenResult};
-use crate::io::io_grida_patch::{self, TransactionApplyReport};
+use crate::io::vn_json::JSONFlattenResult;
 use crate::node::schema::*;
 use crate::query::Hierarchy;
 use crate::resources::{FontMessage, ImageMessage};
@@ -32,7 +31,6 @@ impl Hierarchy for NoHierarchy {
 #[cfg(not(target_arch = "wasm32"))]
 use futures::channel::mpsc;
 use math2::{rect, rect::Rectangle, transform::AffineTransform, vector2::Vector2};
-use serde_json::Value;
 use skia_safe::{Matrix, Surface};
 use std::sync::Arc;
 
@@ -161,9 +159,6 @@ pub trait ApplicationApi {
         style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
     );
 
-    /// Load a scene from a `.grida1` JSON string using the `io_grida` parser.
-    fn load_scene_grida1(&mut self, json: &str);
-
     /// Load a scene from `.grida` FlatBuffers binary bytes.
     fn load_scene_grida(&mut self, bytes: &[u8]);
 
@@ -174,13 +169,30 @@ pub trait ApplicationApi {
     /// Return the IDs of all scenes decoded by the last `load_scene_grida` call.
     fn loaded_scene_ids(&self) -> Vec<String>;
 
-    /// Apply a batch of scene transactions represented as JSON Patch operations.
-    fn apply_document_transactions(
-        &mut self,
-        transactions: Vec<Vec<Value>>,
-    ) -> Vec<TransactionApplyReport> {
-        let _ = transactions;
-        Vec::new()
+    /// Replace a single node's data in the active scene, keyed by the
+    /// string id encoded in `bytes`.
+    ///
+    /// `bytes` must be a single-node `GridaFile` buffer (as produced by a
+    /// partial encoder such as the TS `io.GRID.encodeNode`). The id must
+    /// already exist in the active scene's id mapping; parent links and
+    /// children are untouched — this is an in-place data swap.
+    ///
+    /// Returns `true` on success. Returns `false` on malformed input or an
+    /// unknown id; the caller is expected to recover by re-syncing the
+    /// whole scene.
+    fn replace_node_grida(&mut self, bytes: &[u8]) -> bool {
+        let _ = bytes;
+        false
+    }
+
+    /// Remove a node (and all descendants) from the active scene by its
+    /// user-facing string id. Clears the id-mapping entry for every
+    /// removed node.
+    ///
+    /// Returns `true` on success, `false` if the id is unknown.
+    fn delete_node(&mut self, user_id: &str) -> bool {
+        let _ = user_id;
+        false
     }
 
     // static demo scenes
@@ -235,7 +247,6 @@ pub struct UnknownTargetApplication {
     pub(crate) renderer: Renderer,
     pub(crate) state: super::state::AnySurfaceState,
     pub(crate) input: super::input::InputState,
-    pub(crate) document_json: Option<Value>,
 
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) image_rx: mpsc::UnboundedReceiver<ImageMessage>,
@@ -785,13 +796,6 @@ impl ApplicationApi for UnknownTargetApplication {
         self.queue();
     }
 
-    fn load_scene_grida1(&mut self, json: &str) {
-        match serde_json::from_str::<Value>(json) {
-            Ok(value) => self.load_scene_from_value(value),
-            Err(err) => eprintln!("failed to parse scene json: {}", err),
-        }
-    }
-
     fn load_scene_grida(&mut self, bytes: &[u8]) {
         use crate::io::io_grida_file;
         match io_grida_file::decode_with_id_map(bytes) {
@@ -847,11 +851,62 @@ impl ApplicationApi for UnknownTargetApplication {
             .collect()
     }
 
-    fn apply_document_transactions(
-        &mut self,
-        transactions: Vec<Vec<Value>>,
-    ) -> Vec<TransactionApplyReport> {
-        self.process_document_transactions(transactions)
+    fn replace_node_grida(&mut self, bytes: &[u8]) -> bool {
+        // A decode failure means the buffer itself is malformed — log loudly
+        // so it surfaces in dev builds. Unknown ids / missing scene are
+        // expected ("the host is out of sync"); silent `false` is correct
+        // there.
+        let decoded = match crate::io::io_grida_fbs::decode_single_node(bytes) {
+            Ok(d) => d,
+            Err(err) => {
+                eprintln!("replace_node_grida: decode failed: {err}");
+                return false;
+            }
+        };
+
+        let Some(internal_id) = self.id_mapping.get(&decoded.id).copied() else {
+            return false;
+        };
+        let Some(scene) = self.renderer.scene.as_mut() else {
+            return false;
+        };
+        if scene.graph.replace_node(internal_id, decoded.node).is_err() {
+            return false;
+        }
+        if let Some(name) = decoded.name {
+            scene.graph.set_name(internal_id, name);
+        }
+
+        self.renderer.mark_node_changed(
+            internal_id,
+            ChangeFlags::NODE_CONTENT | ChangeFlags::LAYOUT_DIRTY,
+        );
+        self.queue();
+        true
+    }
+
+    fn delete_node(&mut self, user_id: &str) -> bool {
+        let Some(internal_id) = self.id_mapping.get(user_id).copied() else {
+            return false;
+        };
+
+        let Some(scene) = self.renderer.scene.as_mut() else {
+            return false;
+        };
+
+        let Ok(removed) = scene.graph.remove_subtree(internal_id) else {
+            return false;
+        };
+
+        for id in &removed {
+            if let Some(user) = self.id_mapping_reverse.remove(id) {
+                self.id_mapping.remove(&user);
+            }
+        }
+
+        self.renderer.mark_changed(ChangeFlags::LAYOUT_DIRTY);
+        self.queue();
+        true
     }
 
     fn load_dummy_scene(&mut self) {
@@ -1224,7 +1279,6 @@ impl UnknownTargetApplication {
             renderer,
             state,
             input: super::input::InputState::default(),
-            document_json: None,
 
             #[cfg(not(target_arch = "wasm32"))]
             image_rx,
@@ -1295,37 +1349,6 @@ impl UnknownTargetApplication {
         (self.request_redraw)();
     }
 
-    fn load_scene_from_value(&mut self, value: Value) {
-        match serde_json::from_value::<io_grida::JSONCanvasFile>(value.clone()) {
-            Ok(file) => {
-                if self.load_scene_from_canvas_file(file) {
-                    self.document_json = Some(value);
-                }
-            }
-            Err(err) => eprintln!("failed to deserialize scene json: {}", err),
-        }
-    }
-
-    fn load_scene_from_canvas_file(&mut self, file: io_grida::JSONCanvasFile) -> bool {
-        // Use IdConverter to handle string ID to u64 ID conversion
-        let mut converter = crate::io::id_converter::IdConverter::new();
-
-        match converter.convert_json_canvas_file(file) {
-            Ok(scene) => {
-                // Store the ID mappings for future API calls
-                self.id_mapping = converter.string_to_internal.clone();
-                self.id_mapping_reverse = converter.internal_to_string.clone();
-
-                self.renderer.load_scene(scene);
-                true
-            }
-            Err(err) => {
-                eprintln!("Failed to convert canvas file: {}", err);
-                false
-            }
-        }
-    }
-
     /// Convert user string ID to internal u64 ID
     pub fn user_id_to_internal(&self, user_id: &str) -> Option<NodeId> {
         self.id_mapping.get(user_id).copied()
@@ -1342,38 +1365,6 @@ impl UnknownTargetApplication {
             .into_iter()
             .filter_map(|id| self.internal_id_to_user(id))
             .collect()
-    }
-
-    fn process_document_transactions(
-        &mut self,
-        transactions: Vec<Vec<Value>>,
-    ) -> Vec<TransactionApplyReport> {
-        let Some(current_document) = self.document_json.take() else {
-            return transactions
-                .into_iter()
-                .map(|tx| TransactionApplyReport {
-                    success: false,
-                    applied: 0,
-                    total: tx.len(),
-                    error: Some("document not loaded".to_string()),
-                })
-                .collect();
-        };
-
-        let outcome = io_grida_patch::apply_transactions(current_document, transactions);
-        if let Some(file) = outcome.scene_file {
-            self.load_scene_from_canvas_file(file);
-        }
-        self.document_json = Some(outcome.document);
-        outcome.reports
-    }
-
-    pub fn apply_document_transactions_json(
-        &mut self,
-        json: &str,
-    ) -> Result<Vec<TransactionApplyReport>, serde_json::Error> {
-        let transactions: Vec<Vec<Value>> = serde_json::from_str(json)?;
-        Ok(self.process_document_transactions(transactions))
     }
 
     fn queue(&mut self) {

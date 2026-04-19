@@ -184,10 +184,6 @@ name = "skia_bench_scene_scale"
 path = "examples/skia_bench/skia_bench_scene_scale.rs"
 required-features = ["native-gl-context"]
 
-# ── IO tools ─────────────────────────────────────────────────────
-[[example]]
-name = "tool_io_grida"
-
 [lints]
 workspace = true
 

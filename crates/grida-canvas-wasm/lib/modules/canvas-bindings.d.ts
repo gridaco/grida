@@ -36,11 +36,6 @@ declare namespace canvas {
       height: number
     ): void;
     _redraw(state: GridaCanvasApplicationPtr): void;
-    _load_scene_grida1(
-      state: GridaCanvasApplicationPtr,
-      ptr: number,
-      len: number
-    ): void;
     _load_scene_grida(
       state: GridaCanvasApplicationPtr,
       ptr: number,
@@ -60,11 +55,16 @@ declare namespace canvas {
       bytes_ptr: number,
       bytes_len: number
     ): void;
-    _apply_scene_transactions(
+    _replace_node_grida(
       state: GridaCanvasApplicationPtr,
       ptr: number,
       len: number
-    ): Ptr;
+    ): boolean;
+    _delete_node(
+      state: GridaCanvasApplicationPtr,
+      id_ptr: number,
+      id_len: number
+    ): boolean;
     _load_dummy_scene(state: GridaCanvasApplicationPtr): void;
     _load_benchmark_scene(
       state: GridaCanvasApplicationPtr,

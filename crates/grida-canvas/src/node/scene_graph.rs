@@ -775,6 +775,14 @@ impl SceneGraph {
         Ok(())
     }
 
+    /// Remove a node from the scene roots list, if present.
+    ///
+    /// No-op when the id is not a root. Scene-root children are tracked in
+    /// both `roots` and `links[scene_id]`, so subtree deletion must hit both.
+    pub fn remove_from_roots(&mut self, id: &NodeId) {
+        self.roots.retain(|r| r != id);
+    }
+
     /// Iterate over all parent->children pairs
     pub fn iter(&self) -> impl Iterator<Item = (NodeId, &Vec<NodeId>)> {
         self.links.iter()
@@ -870,6 +878,51 @@ impl SceneGraph {
             let geo = extract_geo_data(node);
             self.geo_data.insert(*id, geo);
         }
+    }
+
+    /// Remove a subtree rooted at `id`: unlinks from its parent (or the scene
+    /// roots), then deletes every descendant in post-order. Returns the list
+    /// of removed ids so callers can invalidate external mappings (e.g.
+    /// host-side id lookups). Returns `NodeNotFound` if `id` is not in the
+    /// graph.
+    pub fn remove_subtree(&mut self, id: NodeId) -> SceneGraphResult<Vec<NodeId>> {
+        if !self.has_node(&id) {
+            return Err(SceneGraphError::NodeNotFound(id));
+        }
+        let mut to_remove: Vec<NodeId> = Vec::new();
+        self.walk_postorder(&id, &mut |n| to_remove.push(*n))?;
+
+        if let Some(parent_id) = self.get_parent(&id) {
+            let _ = self.remove_child(&parent_id, &id);
+        }
+        self.remove_from_roots(&id);
+
+        for removed in &to_remove {
+            let _ = self.remove_node(removed);
+        }
+        Ok(to_remove)
+    }
+
+    /// Replace an existing node's data in place, refreshing the `geo_data`
+    /// and `layer_core` caches. Parent links and children are untouched.
+    ///
+    /// `has_flex` is only ever set true here (never cleared) — an
+    /// over-approximation: if a Flex container is replaced by a Normal one
+    /// the flag stays true until the next full scene load. The cost is a
+    /// stray Taffy pass; correctness is unaffected.
+    ///
+    /// Returns `NodeNotFound` if the id is not in the repository.
+    pub fn replace_node(&mut self, id: NodeId, node: Node) -> SceneGraphResult<()> {
+        if self.nodes.get(&id).is_none() {
+            return Err(SceneGraphError::NodeNotFound(id));
+        }
+        let geo = extract_geo_data(&node);
+        let lc = extract_layer_core(&node);
+        self.has_flex |= lc.is_flex;
+        self.nodes.insert_with_id(id, node);
+        self.geo_data.insert(id, geo);
+        self.layer_core.insert(id, lc);
+        Ok(())
     }
 
     /// Access the compact, schema-level geometry data map.

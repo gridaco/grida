@@ -4,11 +4,14 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { io } from "../../../../packages/grida-canvas-io/index";
 import { createCanvas } from "..";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 const OUTPUT_DIR = resolve(process.cwd(), "lib/__test__/out");
+
+const FIXTURES_DIR = resolve(process.cwd(), "../../fixtures/test-grida");
 
 function expectPng(data: Uint8Array) {
   expect(Array.from(data.slice(0, 8))).toEqual(PNG_SIGNATURE);
@@ -20,7 +23,28 @@ function writePng(name: string, data: Uint8Array) {
   writeFileSync(resolve(OUTPUT_DIR, `${name}.png`), Buffer.from(data));
 }
 
-async function renderDocToPng(opts: { docPath: string; nodeId: string }) {
+function createFile(name: string, bytes: Uint8Array): File {
+  const blob = new Blob([bytes as BlobPart], {
+    type: "application/octet-stream",
+  });
+  return new File([blob], name, { type: "application/octet-stream" });
+}
+
+async function loadGridaFixture(name: string) {
+  const bytes = new Uint8Array(readFileSync(resolve(FIXTURES_DIR, name)));
+  const loaded = await io.load(createFile(name, bytes));
+  const sceneId = loaded.document.scenes_ref[0];
+  if (!sceneId) throw new Error(`${name}: no scenes_ref entries`);
+  const nodeIds = loaded.document.links[sceneId];
+  if (!nodeIds || nodeIds.length === 0) {
+    throw new Error(`${name}: no nodes linked under scene ${sceneId}`);
+  }
+  return { bytes, sceneId, nodeId: nodeIds[0]! };
+}
+
+async function renderFixtureNodeToPng(fixture: string) {
+  const { bytes, sceneId, nodeId } = await loadGridaFixture(fixture);
+
   const canvas = await createCanvas({
     backend: "raster",
     width: 256,
@@ -28,47 +52,38 @@ async function renderDocToPng(opts: { docPath: string; nodeId: string }) {
     useEmbeddedFonts: true,
   });
 
-  const doc = readFileSync(resolve(process.cwd(), opts.docPath), "utf8");
-  canvas.loadScene(doc);
+  canvas.loadSceneGrida(bytes);
+  canvas.switchScene(sceneId);
 
-  const { data } = canvas.exportNodeAs(opts.nodeId, {
+  const { data } = canvas.exportNodeAs(nodeId, {
     format: "PNG",
     constraints: { type: "none", value: 1 },
   });
 
-  return { canvas, data };
+  return { canvas, data, sceneId, nodeId };
 }
 
 describe("raster export (node)", () => {
   it("createCanvas: creates a raster backend and exports PNG", async () => {
-    const { canvas, data } = await renderDocToPng({
-      docPath: "example/rectangle.grida1",
-      nodeId: "rectangle",
-    });
+    const { canvas, data } = await renderFixtureNodeToPng("L0.grida");
 
     expect(canvas.backend).toBe("raster");
     expectPng(data);
-    writePng("rectangle", data);
+    writePng("L0-first-node", data);
   }, 30_000);
 
-  it("renders a minimal document and exports PNG", async () => {
-    const { data } = await renderDocToPng({
-      docPath: "example/rectangle.grida1",
-      nodeId: "rectangle",
-    });
+  it("renders L0.grida and exports the first node as PNG", async () => {
+    const { data } = await renderFixtureNodeToPng("L0.grida");
 
     expectPng(data);
-    writePng("rectangle-minimal", data);
+    writePng("L0-minimal", data);
   }, 30_000);
 
-  it("renders a gradient document and exports PNG", async () => {
-    const { data } = await renderDocToPng({
-      docPath: "example/gradient.grida1",
-      nodeId: "gradient-rect",
-    });
+  it("renders cover.grida and exports the first node as PNG", async () => {
+    const { data } = await renderFixtureNodeToPng("cover.grida");
 
     expectPng(data);
-    writePng("gradient-rect", data);
+    writePng("cover-first-node", data);
   }, 30_000);
 
   it("registers fixture image with addImageWithId and renders with custom RID", async () => {
@@ -159,7 +174,12 @@ describe("raster export (node)", () => {
       (result as { width: number; height: number }).height
     ).toBeGreaterThan(0);
 
-    canvas.loadScene(JSON.stringify(doc));
+    canvas.loadSceneGrida(
+      io.GRID.encode(
+        doc.document as unknown as Parameters<typeof io.GRID.encode>[0]
+      )
+    );
+    canvas.switchScene("main");
 
     const { data } = canvas.exportNodeAs("image-rect", {
       format: "PNG",

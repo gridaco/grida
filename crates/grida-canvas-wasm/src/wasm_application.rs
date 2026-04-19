@@ -137,21 +137,6 @@ pub unsafe extern "C" fn redraw(app: *mut UnknownTargetApplication) {
 }
 
 #[no_mangle]
-/// js::_load_scene_grida1
-pub unsafe extern "C" fn load_scene_grida1(
-    app: *mut UnknownTargetApplication,
-    ptr: *const u8,
-    len: usize,
-) {
-    if let Some(app) = app.as_mut() {
-        let json = __str_from_ptr_len(ptr, len);
-        if let Some(json) = json {
-            app.load_scene_grida1(&json);
-        }
-    }
-}
-
-#[no_mangle]
 /// js::_load_scene_grida
 pub unsafe extern "C" fn load_scene_grida(
     app: *mut UnknownTargetApplication,
@@ -237,27 +222,42 @@ pub unsafe extern "C" fn resolve_image(
 }
 
 #[no_mangle]
-/// js::_apply_scene_transactions
-pub unsafe extern "C" fn apply_scene_transactions(
+/// js::_replace_node_grida
+///
+/// Replace a single node's data, keyed by the id embedded in the
+/// single-node `GridaFile` buffer at `(ptr, len)`. See
+/// [`ApplicationApi::replace_node_grida`] for semantics. Returns `false`
+/// on malformed input or an unknown id.
+pub unsafe extern "C" fn replace_node_grida(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
-) -> *const u8 {
+) -> bool {
     if let Some(app) = app.as_mut() {
-        if let Some(json) = __str_from_ptr_len(ptr, len) {
-            match app.apply_document_transactions_json(&json) {
-                Ok(reports) => {
-                    if let Ok(output) = serde_json::to_string(&reports) {
-                        return alloc_len_prefixed(output.as_bytes());
-                    }
-                }
-                Err(err) => {
-                    eprintln!("failed to apply scene transactions: {}", err);
-                }
-            }
+        if !ptr.is_null() && len > 0 {
+            let bytes = std::slice::from_raw_parts(ptr, len);
+            return app.replace_node_grida(bytes);
         }
     }
-    std::ptr::null()
+    false
+}
+
+#[no_mangle]
+/// js::_delete_node
+///
+/// Remove a node and all its descendants from the active scene, keyed by
+/// user string id. Returns `false` if the id is unknown.
+pub unsafe extern "C" fn delete_node(
+    app: *mut UnknownTargetApplication,
+    id_ptr: *const u8,
+    id_len: usize,
+) -> bool {
+    if let Some(app) = app.as_mut() {
+        if let Some(id) = __str_from_ptr_len(id_ptr, id_len) {
+            return app.delete_node(&id);
+        }
+    }
+    false
 }
 
 #[no_mangle]

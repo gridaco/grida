@@ -1,18 +1,16 @@
-//! `.grida` / `.grida1` file format detection and unified decoding.
+//! `.grida` file format detection and unified decoding.
 //!
-//! A `.grida` file can be one of three variants:
+//! A `.grida` file is one of two variants:
 //!
-//! | Variant        | Magic / Signature                        |
-//! |----------------|------------------------------------------|
-//! | Raw FlatBuffers| `"GRID"` identifier at bytes 4–7         |
-//! | ZIP archive    | PK magic (`\x50\x4b\x03\x04`)           |
-//! | JSON (legacy)  | Starts with `{` or `[` (UTF-8)           |
+//! | Variant         | Magic / Signature                        |
+//! |-----------------|------------------------------------------|
+//! | Raw FlatBuffers | `"GRID"` identifier at bytes 4–7         |
+//! | ZIP archive     | PK magic (`\x50\x4b\x03\x04`)            |
 //!
 //! This module provides:
 //! - [`detect`] — sniff the format from raw bytes.
 //! - [`decode`] / [`decode_all`] — unified decode that auto-dispatches.
-//! - [`decode_with_id_map`] — full decode with internal→string ID mapping
-//!   (FBS/ZIP only).
+//! - [`decode_with_id_map`] — full decode with internal→string ID mapping.
 //!
 //! # Example
 //!
@@ -27,22 +25,20 @@
 use std::fmt;
 use std::io::{Cursor, Read};
 
-use crate::io::{id_converter::IdConverter, io_grida, io_grida_fbs};
+use crate::io::io_grida_fbs;
 use crate::node::schema::Scene;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Format detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Detected variant of a `.grida` / `.grida1` file.
+/// Detected variant of a `.grida` file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     /// Raw FlatBuffers binary (`"GRID"` file identifier at bytes 4–7).
     RawFbs,
     /// ZIP archive containing `manifest.json` + `document.grida`.
     Zip,
-    /// Legacy JSON format (starts with `{` or `[`).
-    Json,
     /// Unrecognized format.
     Unknown,
 }
@@ -52,7 +48,6 @@ impl fmt::Display for Format {
         match self {
             Format::RawFbs => write!(f, "Raw FlatBuffers"),
             Format::Zip => write!(f, "ZIP archive"),
-            Format::Json => write!(f, "JSON"),
             Format::Unknown => write!(f, "Unknown"),
         }
     }
@@ -72,15 +67,6 @@ pub fn detect(bytes: &[u8]) -> Format {
     if bytes.len() >= 8 && &bytes[4..8] == b"GRID" {
         return Format::RawFbs;
     }
-    // JSON: first non-whitespace/BOM byte is '{' or '['
-    let first_significant = bytes
-        .iter()
-        .position(|&b| !b.is_ascii_whitespace() && b != 0xEF && b != 0xBB && b != 0xBF)
-        .map(|i| bytes[i])
-        .unwrap_or(0);
-    if first_significant == b'{' || first_significant == b'[' {
-        return Format::Json;
-    }
     Format::Unknown
 }
 
@@ -97,12 +83,6 @@ pub enum DecodeError {
     Zip(String),
     /// FlatBuffers decode error.
     Fbs(io_grida_fbs::FbsDecodeError),
-    /// JSON parse error.
-    Json(String),
-    /// JSON-to-scene conversion error.
-    Conversion(String),
-    /// Attempted an FBS-only operation on a JSON file.
-    JsonNotSupported,
     /// The decoded file contained no scenes.
     NoScenes,
 }
@@ -112,16 +92,10 @@ impl fmt::Display for DecodeError {
         match self {
             DecodeError::UnrecognizedFormat => write!(
                 f,
-                "unrecognized file format: expected .grida FlatBuffers, ZIP, or JSON"
+                "unrecognized file format: expected .grida FlatBuffers or ZIP"
             ),
             DecodeError::Zip(msg) => write!(f, "ZIP error: {msg}"),
             DecodeError::Fbs(e) => write!(f, "FlatBuffers decode error: {e}"),
-            DecodeError::Json(msg) => write!(f, "JSON parse error: {msg}"),
-            DecodeError::Conversion(msg) => write!(f, "scene conversion error: {msg}"),
-            DecodeError::JsonNotSupported => write!(
-                f,
-                "this operation requires FlatBuffers or ZIP format (JSON is not supported)"
-            ),
             DecodeError::NoScenes => write!(f, "no scenes found in .grida file"),
         }
     }
@@ -192,37 +166,13 @@ fn extract_fbs_from_zip(bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {
     Ok(fbs_bytes)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Resolve raw FBS bytes from any format (FBS passthrough, ZIP extraction)
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// Given raw file bytes, resolve to the FlatBuffers payload.
-///
-/// - `RawFbs` → returns the bytes as-is.
-/// - `Zip` → extracts `document.grida` from the archive.
-/// - `Json` / `Unknown` → returns an error (no FBS payload).
 fn resolve_fbs_bytes(bytes: &[u8]) -> Result<Vec<u8>, DecodeError> {
     match detect(bytes) {
         Format::RawFbs => Ok(bytes.to_vec()),
         Format::Zip => extract_fbs_from_zip(bytes),
-        Format::Json => Err(DecodeError::JsonNotSupported),
         Format::Unknown => Err(DecodeError::UnrecognizedFormat),
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Decode — JSON path
-// ─────────────────────────────────────────────────────────────────────────────
-
-fn decode_json(bytes: &[u8]) -> Result<Vec<Scene>, DecodeError> {
-    let json_str =
-        std::str::from_utf8(bytes).map_err(|e| DecodeError::Json(format!("invalid UTF-8: {e}")))?;
-    let file = io_grida::parse(json_str).map_err(|e| DecodeError::Json(format!("{e}")))?;
-    let mut converter = IdConverter::new();
-    let scene = converter
-        .convert_json_canvas_file(file)
-        .map_err(|e| DecodeError::Conversion(e.to_string()))?;
-    Ok(vec![scene])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -239,22 +189,11 @@ pub fn decode(bytes: &[u8]) -> Result<Scene, DecodeError> {
 
 /// Decode all scenes from a `.grida` file (any format).
 pub fn decode_all(bytes: &[u8]) -> Result<Vec<Scene>, DecodeError> {
-    match detect(bytes) {
-        Format::RawFbs => Ok(io_grida_fbs::decode_all(bytes)?),
-        Format::Zip => {
-            let fbs_bytes = extract_fbs_from_zip(bytes)?;
-            Ok(io_grida_fbs::decode_all(&fbs_bytes)?)
-        }
-        Format::Json => decode_json(bytes),
-        Format::Unknown => Err(DecodeError::UnrecognizedFormat),
-    }
+    let fbs_bytes = resolve_fbs_bytes(bytes)?;
+    Ok(io_grida_fbs::decode_all(&fbs_bytes)?)
 }
 
-/// Decode a `.grida` file (FBS or ZIP) and return scenes plus the
-/// internal→string ID mapping.
-///
-/// JSON files are not supported here because the JSON codec does not preserve
-/// the FBS-level ID map.  Use [`decode_all`] for JSON files.
+/// Decode a `.grida` file and return scenes plus the internal→string ID mapping.
 pub fn decode_with_id_map(bytes: &[u8]) -> Result<io_grida_fbs::DecodeResult, DecodeError> {
     let fbs_bytes = resolve_fbs_bytes(bytes)?;
     Ok(io_grida_fbs::decode_with_id_map(&fbs_bytes)?)

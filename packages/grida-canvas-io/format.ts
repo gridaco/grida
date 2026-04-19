@@ -5185,6 +5185,48 @@ export namespace format {
   export namespace document {
     export namespace encode {
       /**
+       * Narrows `node` to the shape `nodeLayout` expects. Nodes without
+       * layout fields (SceneNode, legacy shapes) fail this check and are
+       * encoded without a layout block.
+       */
+      function hasLayoutFields(
+        node: grida.program.nodes.Node
+      ): node is grida.program.nodes.Node &
+        Parameters<typeof format.layout.encode.nodeLayout>[1] {
+        const n = node as grida.program.nodes.UnknownNode;
+        return (
+          n.layout_positioning !== undefined &&
+          n.layout_target_width !== undefined &&
+          n.layout_target_height !== undefined
+        );
+      }
+
+      /**
+       * Append one node to `builder` as a `NodeSlot`: optional layout
+       * block + node table + NodeSlot wrapper. Returns the NodeSlot
+       * offset.
+       */
+      function encodeNodeSlot(
+        builder: flatbuffers.Builder,
+        node: grida.program.nodes.Node,
+        parentRef: { parentId: string; position: string } | undefined
+      ): flatbuffers.Offset {
+        const layoutOffset = hasLayoutFields(node)
+          ? format.layout.encode.nodeLayout(builder, node)
+          : undefined;
+        const { nodeType, nodeOffset } = format.node.encode.node(
+          builder,
+          node,
+          parentRef,
+          layoutOffset
+        );
+        fbs.NodeSlot.startNodeSlot(builder);
+        fbs.NodeSlot.addNodeType(builder, nodeType);
+        fbs.NodeSlot.addNode(builder, nodeOffset);
+        return fbs.NodeSlot.endNodeSlot(builder);
+      }
+
+      /**
        * Encodes a TypeScript Document to FlatBuffers binary format.
        *
        * @param document - The TS IR document to encode
@@ -5256,59 +5298,7 @@ export namespace format {
         for (const nodeId of nodeIds) {
           const node = document.nodes[nodeId]!;
           const parentRef = nodeToParentRef.get(nodeId);
-
-          // Layout: only for nodes that have the expected TS fields (position/size).
-          let layoutOffset: number | undefined = undefined;
-          if (
-            "layout_positioning" in node &&
-            "layout_target_width" in node &&
-            "layout_target_height" in node &&
-            node.layout_positioning &&
-            node.layout_target_width !== undefined &&
-            node.layout_target_height !== undefined
-          ) {
-            layoutOffset = format.layout.encode.nodeLayout(
-              builder,
-              node as Pick<
-                grida.program.nodes.UnknownNode,
-                | "layout_positioning"
-                | "layout_inset_left"
-                | "layout_inset_top"
-                | "layout_inset_right"
-                | "layout_inset_bottom"
-                | "layout_target_width"
-                | "layout_target_height"
-              > &
-                Partial<
-                  Pick<
-                    grida.program.nodes.ContainerNode,
-                    | "layout_mode"
-                    | "layout_direction"
-                    | "layout_wrap"
-                    | "layout_main_axis_alignment"
-                    | "layout_cross_axis_alignment"
-                    | "layout_main_axis_gap"
-                    | "layout_cross_axis_gap"
-                    | "layout_padding_top"
-                    | "layout_padding_right"
-                    | "layout_padding_bottom"
-                    | "layout_padding_left"
-                  >
-                >
-            );
-          }
-
-          const { nodeType, nodeOffset } = format.node.encode.node(
-            builder,
-            node,
-            parentRef,
-            layoutOffset
-          );
-          // Wrap in NodeSlot table (avoids vector-of-unions, enables Rust codegen)
-          fbs.NodeSlot.startNodeSlot(builder);
-          fbs.NodeSlot.addNodeType(builder, nodeType);
-          fbs.NodeSlot.addNode(builder, nodeOffset);
-          nodeSlotOffsets.push(fbs.NodeSlot.endNodeSlot(builder));
+          nodeSlotOffsets.push(encodeNodeSlot(builder, node, parentRef));
         }
 
         const nodesOffset = fbs.CanvasDocument.createNodesVector(
@@ -5332,6 +5322,37 @@ export namespace format {
         const documentOffset = fbs.CanvasDocument.endCanvasDocument(builder);
 
         // Build GridaFile root
+        fbs.GridaFile.startGridaFile(builder);
+        fbs.GridaFile.addDocument(builder, documentOffset);
+        const rootOffset = fbs.GridaFile.endGridaFile(builder);
+
+        builder.finish(rootOffset, "GRID");
+
+        return builder.asUint8Array();
+      }
+
+      /**
+       * Encodes a single node as a minimal `GridaFile` buffer containing one
+       * `NodeSlot`. The consumer identifies the target by id; hierarchy is
+       * not re-encoded and `schema_version` is omitted.
+       */
+      export function nodeToFlatbuffer(
+        node: grida.program.nodes.Node
+      ): Uint8Array {
+        const builder = new flatbuffers.Builder(1024);
+
+        const slotOffset = encodeNodeSlot(builder, node, undefined);
+
+        const nodesOffset = fbs.CanvasDocument.createNodesVector(builder, [
+          slotOffset,
+        ]);
+        const scenesOffset = fbs.CanvasDocument.createScenesVector(builder, []);
+
+        fbs.CanvasDocument.startCanvasDocument(builder);
+        fbs.CanvasDocument.addNodes(builder, nodesOffset);
+        fbs.CanvasDocument.addScenes(builder, scenesOffset);
+        const documentOffset = fbs.CanvasDocument.endCanvasDocument(builder);
+
         fbs.GridaFile.startGridaFile(builder);
         fbs.GridaFile.addDocument(builder, documentOffset);
         const rootOffset = fbs.GridaFile.endGridaFile(builder);

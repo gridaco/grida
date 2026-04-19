@@ -89,6 +89,62 @@ function resolveWithEditorInstance<T>(
   return isWithEditorFunction(value) ? value(instance) : value;
 }
 
+/**
+ * Routing decision for a batch of Immer patches produced by a document
+ * dispatch. Used by the WASM sync path to pick between the per-node fast
+ * path and a full scene re-encode.
+ *
+ * - `skip` — the patches touch nothing under `document.*` (e.g. selection
+ *   or editor state), so the WASM side has nothing to sync.
+ * - `full` — the patches mutate links, bitmaps, images, properties, or
+ *   create/reorder nodes. The per-node API can't express these, so we
+ *   re-encode the whole scene.
+ * - `per_node` — every document patch is scoped to an existing node and
+ *   can be applied via `replaceNode` / `deleteNode`.
+ */
+type DocumentSyncRoute =
+  | { kind: "skip" }
+  | { kind: "full" }
+  | { kind: "per_node"; replace: Set<string>; remove: Set<string> };
+
+function classifyDocumentPatches(
+  patches: readonly editor.history.Patch[]
+): DocumentSyncRoute {
+  const replace = new Set<string>();
+  const remove = new Set<string>();
+  let sawDocumentPatch = false;
+
+  for (const patch of patches) {
+    const path = patch.path;
+    if (path[0] !== "document") continue;
+    sawDocumentPatch = true;
+
+    // Non-node mutations (links, bitmaps, images, properties, metadata):
+    // the per-node API can't perform them.
+    if (path[1] !== "nodes") return { kind: "full" };
+
+    const nodeId = path[2];
+    if (typeof nodeId !== "string") return { kind: "full" };
+
+    const isExactNodeSlot = path.length === 3;
+    // `add` at the exact node slot is a node creation — requires parent/link
+    // updates that only a full sync can do.
+    if (isExactNodeSlot && patch.op === "add") return { kind: "full" };
+    if (isExactNodeSlot && patch.op === "remove") {
+      remove.add(nodeId);
+      continue;
+    }
+    replace.add(nodeId);
+  }
+
+  if (!sawDocumentPatch) return { kind: "skip" };
+  // Remove wins when the same id appears in both — a property patch
+  // followed by removal in the same tick would otherwise replay a
+  // stale node into a slot we're about to delete.
+  for (const id of remove) replace.delete(id);
+  return { kind: "per_node", replace, remove };
+}
+
 export class Camera implements editor.api.ICameraActions {
   constructor(
     readonly editor: Editor,
@@ -3716,33 +3772,17 @@ export class Editor
   ) {
     const endTotal = perf.start("dispatch.wasm.sync_document");
     const t0 = __DEV__ ? performance.now() : 0;
-    let tLoad = 0;
-    let encodeMs = 0;
-    let loadMs = 0;
 
-    try {
-      const endEncode = perf.start("dispatch.wasm.sync_document.encode");
-      const bytes = io.GRID.encode(document);
-      endEncode();
-      const tEncode = __DEV__ ? performance.now() : 0;
-      const endLoad = perf.start("dispatch.wasm.sync_document.load_scene");
-      surface.loadSceneGrida(bytes);
-      endLoad();
-      tLoad = __DEV__ ? performance.now() : 0;
-      encodeMs = tEncode - t0;
-      loadMs = tLoad - tEncode;
-    } catch {
-      const p = JSON.stringify({
-        version: grida.program.document.SCHEMA_VERSION,
-        document,
-      });
-      const endLoad = perf.start("dispatch.wasm.sync_document.load_scene");
-      surface.loadScene(p);
-      endLoad();
-      tLoad = __DEV__ ? performance.now() : 0;
-      encodeMs = 0;
-      loadMs = tLoad - t0;
-    }
+    const endEncode = perf.start("dispatch.wasm.sync_document.encode");
+    const bytes = io.GRID.encode(document);
+    endEncode();
+    const tEncode = __DEV__ ? performance.now() : 0;
+    const endLoad = perf.start("dispatch.wasm.sync_document.load_scene");
+    surface.loadSceneGrida(bytes);
+    endLoad();
+    const tLoad = __DEV__ ? performance.now() : 0;
+    const encodeMs = tEncode - t0;
+    const loadMs = tLoad - tEncode;
 
     const targetScene =
       sceneId ?? document.scenes_ref?.[0] ?? document.entry_scene_id;
@@ -3775,12 +3815,13 @@ export class Editor
   }
 
   /**
-   * Document subscriber body — decides between the fast
-   * `applyTransactions` patch path and a full `__wasm_sync_document`.
+   * Document subscriber body — routes document changes through either the
+   * fast per-node sync path (`replaceNode` / `deleteNode`) or a full
+   * `__wasm_sync_document`.
    *
-   * Wrapped with perf spans (`dispatch.wasm.sync`,
-   * `dispatch.wasm.apply_transactions`) so benchmarks can attribute
-   * time to the actual sync strategy that ran for each action.
+   * The routing decision is made by {@link classifyDocumentPatches}.
+   * Perf spans (`dispatch.wasm.sync`, `dispatch.wasm.per_node_sync`) let
+   * benchmarks attribute time to the strategy that ran.
    */
   private __wasm_on_document_change(
     document: grida.program.document.Document,
@@ -3788,62 +3829,68 @@ export class Editor
     patches: editor.history.Patch[] | undefined
   ) {
     if (!this._m_wasm_canvas_scene) return;
+    const surface = this._m_wasm_canvas_scene;
     const end = perf.start("dispatch.wasm.sync", { action: action?.type });
+    const fullSync = () => {
+      this.__wasm_sync_document(surface, document, this.doc.state.scene_id);
+    };
 
-    // Full sync on document reset
     if (action?.type === "document/reset") {
-      this.__wasm_sync_document(
-        this._m_wasm_canvas_scene,
-        document,
-        this.doc.state.scene_id
-      );
+      fullSync();
       this.camera.fit("<scene>");
       end();
       return;
     }
 
-    // Patch-based sync for normal changes.
+    // No patches means the caller can't tell us what changed (e.g. silent
+    // recording, document/load). Safest is to re-encode the whole scene.
     if (!patches || patches.length === 0) {
-      this.__wasm_sync_document(
-        this._m_wasm_canvas_scene,
-        document,
-        this.doc.state.scene_id
-      );
+      fullSync();
       end();
       return;
     }
 
-    const documentPatches = patches.filter(
-      (patch) => patch.path[0] === "document"
-    );
-    if (documentPatches.length === 0) {
+    const route = classifyDocumentPatches(patches);
+    if (route.kind === "skip") {
+      end();
+      return;
+    }
+    if (route.kind === "full") {
+      fullSync();
       end();
       return;
     }
 
-    const operations = editor.api.patch.toJsonPatchOperations(documentPatches);
-    if (operations.length === 0) {
-      end();
-      return;
-    }
-
-    const endApply = perf.start("dispatch.wasm.apply_transactions", {
-      ops: operations.length,
+    const endApply = perf.start("dispatch.wasm.per_node_sync", {
+      replaces: route.replace.size,
+      removes: route.remove.size,
     });
-    const result = this._m_wasm_canvas_scene.applyTransactions([operations]);
+    const applied = this.__wasm_apply_per_node_sync(surface, document, route);
     endApply();
 
-    if (!result || result.some((report) => !report.success)) {
-      this.__wasm_sync_document(
-        this._m_wasm_canvas_scene,
-        document,
-        this.doc.state.scene_id
-      );
-      this.log("falling back to direct sync", result);
-    } else {
+    if (applied) {
       this._scheduleWasmRedraw();
+    } else {
+      fullSync();
+      this.log("per-node sync failed; fell back to full sync");
     }
     end();
+  }
+
+  private __wasm_apply_per_node_sync(
+    surface: Scene,
+    document: grida.program.document.Document,
+    route: Extract<DocumentSyncRoute, { kind: "per_node" }>
+  ): boolean {
+    for (const id of route.remove) {
+      if (!surface.deleteNode(id)) return false;
+    }
+    for (const id of route.replace) {
+      const node = document.nodes[id];
+      if (!node) return false;
+      if (!surface.replaceNode(io.GRID.encodeNode(node))) return false;
+    }
+    return true;
   }
 
   /**

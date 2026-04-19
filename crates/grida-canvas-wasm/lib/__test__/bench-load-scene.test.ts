@@ -71,15 +71,19 @@ function discoverGridaFixtures(): { name: string; path: string }[] {
 }
 
 describe("bench: load_scene (WASM-on-Node)", () => {
-  it("grida1 JSON (rectangle)", async () => {
+  it("grida1 JSON fixture encoded to FBS (rectangle)", async () => {
     const scene = createRasterScene();
-    const doc = readFileSync(
+    const docJson = readFileSync(
       resolve(process.cwd(), "example/rectangle.grida1"),
       "utf8"
     );
+    const parsed = JSON.parse(docJson) as { document: unknown };
+    const bytes = io.GRID.encode(
+      parsed.document as Parameters<typeof io.GRID.encode>[0]
+    );
 
     const t0 = performance.now();
-    scene.loadScene(doc);
+    scene.loadSceneGrida(bytes);
     const elapsed = performance.now() - t0;
 
     console.log(`[wasm-bench] rectangle.grida1: ${elapsed.toFixed(0)}ms`);
