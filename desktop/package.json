@@ -22,7 +22,6 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-squirrel-startup": "^1.0.1",
-    "keytar": "^7.9.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "scheduler": "^0.25.0",
