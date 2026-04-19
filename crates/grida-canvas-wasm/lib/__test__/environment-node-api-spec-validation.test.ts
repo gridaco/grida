@@ -47,7 +47,6 @@ const EXPECTED_FUNCTIONS = [
   { name: "_redraw", paramCount: 1 },
 
   // scene
-  { name: "_load_scene_grida1", paramCount: 3 },
   { name: "_load_scene_grida", paramCount: 3 },
   { name: "_switch_scene", paramCount: 3 },
   { name: "_replace_node_grida", paramCount: 3 },
