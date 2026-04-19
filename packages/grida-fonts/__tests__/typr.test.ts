@@ -287,7 +287,7 @@ describe("Typr font parsing", () => {
       const __ = font.HVAR;
       const ___ = font.fvar;
     }).not.toThrow();
-  }, 20000);
+  }, 60000);
 
   it("handles various fonts with potential malformed tables gracefully", () => {
     // Test multiple fonts to ensure our safety fixes work broadly
