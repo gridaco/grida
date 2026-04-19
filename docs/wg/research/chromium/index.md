@@ -39,6 +39,7 @@ material when designing rendering systems that face similar problems.
 | [svg-pattern.md](./svg-pattern.md)                                                     | SVG `<pattern>` paint server semantics, Chromium/resvg/Skia comparison                              |
 | [blink-rendering-pipeline.md](./blink-rendering-pipeline.md)                           | Blink Style → Layout → Paint pipeline, ComputedStyle groups, LayoutNG, inline layout, list markers  |
 | [external-resource-loading.md](./external-resource-loading.md)                         | Resource fetch lifecycle, ImageResource observer pattern, CSS background-image/img loading pipeline |
+| [dirty-flag-management.md](./dirty-flag-management.md)                                 | Dirty-flag families across Blink + cc, categorized by type and by invalidation shape/granularity    |
 
 ## Source locations
 
