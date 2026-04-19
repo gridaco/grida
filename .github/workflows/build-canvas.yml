@@ -77,7 +77,7 @@ jobs:
       # Build the one package the wasm vitest imports — turbo pulls its
       # workspace deps (@grida/schema, cg, cmath, format, sequence).
       - name: Build workspace packages for tests
-        run: pnpm turbo build --filter=@grida/canvas-io
+        run: pnpm turbo build --filter=@grida/io
 
       - name: Run canvas wasm smoke test
         run: pnpm --filter @grida/canvas-wasm test
