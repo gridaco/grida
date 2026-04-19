@@ -5,7 +5,7 @@ import { builtinModules } from "module";
 export default defineConfig({
   build: {
     rollupOptions: {
-      external: [...builtinModules, "keytar"],
+      external: [...builtinModules],
     },
   },
   define: {

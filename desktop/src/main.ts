@@ -45,12 +45,11 @@ Menu.setApplicationMenu(menu);
 // Some APIs can only be used after this event occurs.
 let mainwindow: BrowserWindow | null = null;
 app.on("ready", async () => {
-  // const token = await keytar.getPassword(SERVICE, ACCOUNT);
-  // if (!token) {
-  //   create_login_window();
-  // } else {
-  //   create_window();
-  // }
+  // To gate on a stored auth token, use Electron's built-in safeStorage:
+  //   const buf = await fs.promises.readFile(tokenPath).catch(() => null);
+  //   const token = buf && safeStorage.isEncryptionAvailable()
+  //     ? safeStorage.decryptString(buf) : null;
+  // if (!token) create_login_window(); else create_window();
 
   await session.defaultSession.cookies.set({
     name: "grida-desktop-version",

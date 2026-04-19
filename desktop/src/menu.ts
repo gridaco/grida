@@ -4,7 +4,6 @@ import {
   BrowserWindow,
   MenuItemConstructorOptions,
   Menu,
-  MenuItem,
 } from "electron";
 import create_main_window, { create_canvas_playground_window } from "./window";
 import { EDITOR_BASE_URL } from "./env";
@@ -98,14 +97,18 @@ export function create_default_menu(
         {
           label: "Reload",
           accelerator: "CmdOrCtrl+Shift+Alt+R",
-          click: (menuItem: MenuItem, focusedWindow?: BrowserWindow) => {
+          click: (menuItem, baseWindow) => {
+            const focusedWindow =
+              baseWindow instanceof BrowserWindow ? baseWindow : undefined;
             if (focusedWindow) focusedWindow.reload();
           },
         },
         {
           label: "Toggle Full Screen",
           accelerator: process.platform === "darwin" ? "Ctrl+Command+F" : "F11",
-          click: (menuItem: MenuItem, focusedWindow?: BrowserWindow) => {
+          click: (menuItem, baseWindow) => {
+            const focusedWindow =
+              baseWindow instanceof BrowserWindow ? baseWindow : undefined;
             if (focusedWindow)
               focusedWindow.setFullScreen(!focusedWindow.isFullScreen());
           },

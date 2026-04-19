@@ -5,7 +5,6 @@ import {
 } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { MakerDMG } from "@electron-forge/maker-dmg";
-// import { MakerSnap } from "@electron-forge/maker-snap";
 import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { VitePlugin } from "@electron-forge/plugin-vite";
@@ -41,9 +40,9 @@ const config: ForgeConfig = {
     icon: icon,
     osxSign: {},
     osxNotarize: {
-      appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_PASSWORD,
-      teamId: process.env.APPLE_TEAM_ID,
+      appleId: process.env.APPLE_ID ?? "",
+      appleIdPassword: process.env.APPLE_PASSWORD ?? "",
+      teamId: process.env.APPLE_TEAM_ID ?? "",
     },
     win32metadata: {
       CompanyName: "Grida Inc.",
@@ -102,7 +101,6 @@ const config: ForgeConfig = {
         ],
       },
     }),
-    // new MakerSnap({}),
   ],
   plugins: [
     new VitePlugin({

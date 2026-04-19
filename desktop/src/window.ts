@@ -12,17 +12,17 @@ const trafficLightPosition = {
   y: 14,
 } as const;
 
-const WINDOW_ICON: { [key: string]: string | null } = {
-  aix: null,
-  android: null,
-  darwin: null,
-  freebsd: null,
-  haiku: null,
+const WINDOW_ICON: { [key: string]: string | undefined } = {
+  aix: undefined,
+  android: undefined,
+  darwin: undefined,
+  freebsd: undefined,
+  haiku: undefined,
   linux: path.join(__dirname, "../images/icon.png"),
-  openbsd: null,
+  openbsd: undefined,
   win32: path.join(__dirname, "../images/icon.ico"),
-  cygwin: null,
-  netbsd: null,
+  cygwin: undefined,
+  netbsd: undefined,
 };
 
 function get_window_constructor_options(): BaseWindowConstructorOptions {
