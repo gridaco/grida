@@ -2,6 +2,7 @@ use crate::cache::compositor::LayerImageCache;
 use crate::node::schema::{NodeId, Scene};
 use crate::runtime::effect_tree::EffectTree;
 use crate::runtime::font_repository::FontRepository;
+use crate::sk;
 use crate::{
     cache::{
         geometry::GeometryCache,
@@ -9,7 +10,7 @@ use crate::{
         picture::{PictureCache, PictureCacheStrategy},
         vector_path::VectorPathCache,
     },
-    painter::layer::{Layer, LayerList},
+    painter::layer::{Layer, LayerList, PainterRenderCommand},
 };
 use math2::{rect::Rectangle, vector2::Vector2};
 use rstar::{RTree, RTreeObject, AABB};
@@ -234,6 +235,13 @@ impl SceneCache {
     /// entry for every node in `affected` — do **not** rebuild the
     /// full `LayerList` or re-bulk-load the R-tree.
     ///
+    /// Also walks `self.layers.commands` and patches every cloned
+    /// layer / render surface whose id is in `affected`. `commands`
+    /// is the tree the painter actually consumes; without this walk,
+    /// nodes with effects (which are wrapped in `RenderSurface` commands)
+    /// keep their old world transform / bounds / clip path and render
+    /// as "ghosts" at the pre-drag position.
+    ///
     /// Callers must:
     /// 1. Ensure `affected` contains the *subtree* of every dirty
     ///    root (world transforms of descendants depend on their
@@ -286,6 +294,71 @@ impl SceneCache {
                     rtree_bounds: new_aabb,
                 },
             );
+        }
+
+        // `self.layers.layers` and `self.layers.commands` are independent
+        // clones built side-by-side in `LayerList::from_scene`. The loop
+        // above only patched `layers`; walk `commands` to keep the render
+        // tree in sync. Effect-bearing nodes live here as `RenderSurface`
+        // and would otherwise render at stale world positions.
+        Self::patch_commands_for_subtree(&mut self.layers.commands, affected, &self.geometry);
+    }
+
+    /// Recursively patch cloned world-space state in a command tree so
+    /// it matches the newly-rebuilt geometry cache.
+    fn patch_commands_for_subtree(
+        commands: &mut [PainterRenderCommand],
+        affected: &HashSet<NodeId>,
+        geometry: &GeometryCache,
+    ) {
+        for cmd in commands.iter_mut() {
+            match cmd {
+                PainterRenderCommand::Draw(layer) => {
+                    let id = *layer.id();
+                    if affected.contains(&id) {
+                        if let Some(new_world) = geometry.get_world_transform(&id) {
+                            layer.base_mut().transform = new_world;
+                        }
+                    }
+                }
+                PainterRenderCommand::MaskGroup(group) => {
+                    Self::patch_commands_for_subtree(&mut group.mask_commands, affected, geometry);
+                    Self::patch_commands_for_subtree(
+                        &mut group.content_commands,
+                        affected,
+                        geometry,
+                    );
+                }
+                PainterRenderCommand::RenderSurface(surface) => {
+                    if affected.contains(&surface.id) {
+                        let new_transform = geometry
+                            .get_world_transform(&surface.id)
+                            .unwrap_or(surface.transform);
+                        let new_bounds = geometry
+                            .get_render_bounds(&surface.id)
+                            .unwrap_or(surface.bounds);
+
+                        // `surface.clip_path` was baked in world space
+                        // from the owner's old world transform. Reproject
+                        // it by the motion delta (new * inv(old)) so it
+                        // continues to clip in the correct place.
+                        if let Some(ref mut clip) = surface.clip_path {
+                            if let Some(old_inv) = surface.transform.inverse() {
+                                let delta = new_transform.compose(&old_inv);
+                                *clip = clip.make_transform(&sk::sk_matrix(delta.matrix));
+                            }
+                        }
+
+                        surface.transform = new_transform;
+                        surface.bounds = new_bounds;
+
+                        if let Some(own_layer) = surface.own_layer.as_mut() {
+                            own_layer.base_mut().transform = new_transform;
+                        }
+                    }
+                    Self::patch_commands_for_subtree(&mut surface.children, affected, geometry);
+                }
+            }
         }
     }
 
