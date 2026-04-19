@@ -7,6 +7,19 @@
 
 import type { ExportSetting } from "@figma/rest-api-spec";
 import { createCanvas, type Canvas, type types } from "@grida/canvas-wasm";
+
+/**
+ * TODO: remove once @grida/canvas-wasm with Canvas.switchScene /
+ * Canvas.loadedSceneIds is published and depended on. The passthroughs
+ * already exist on HEAD at crates/grida-canvas-wasm/lib/index.ts but are
+ * not in canary.19 or older — we reach into the inner `_scene` field
+ * until a newer version ships.
+ */
+interface SceneWithSceneApi {
+  switchScene(sceneId: string): void;
+  loadedSceneIds(): string[];
+}
+
 import { io } from "@grida/io";
 import { iofigma } from "@grida/io-figma";
 import {
@@ -617,6 +630,16 @@ export class FigmaRenderer {
       canvas.addImageWithId(bytes, `res://images/${ref}`);
     }
     canvas.loadSceneGrida(io.GRID.encode(resolved.document));
+    // `loadSceneGrida` decodes into `loaded_scenes` but does not activate
+    // a scene on the renderer — `switchScene` must be called explicitly.
+    // The Canvas wrapper in @grida/canvas-wasm <= 0.91.0-canary.19 doesn't
+    // expose `switchScene`/`loadedSceneIds`; reach into the inner Scene.
+    const scene = (canvas as unknown as { _scene: SceneWithSceneApi })._scene;
+    const sceneIds = scene.loadedSceneIds();
+    if (sceneIds.length === 0) {
+      throw new Error("FigmaRenderer: no scenes decoded from document");
+    }
+    scene.switchScene(sceneIds[0]);
     this._requestedNodeId = nodeId;
     this._sceneLoaded = true;
   }
