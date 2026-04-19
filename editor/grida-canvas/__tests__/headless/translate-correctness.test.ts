@@ -91,12 +91,7 @@ async function createEditor(
     useEmbeddedFonts: true,
   });
   const scene: Scene = (canvas as unknown as { _scene: Scene })._scene;
-  try {
-    const bytes = io.GRID.encode(doc);
-    scene.loadSceneGrida(bytes);
-  } catch {
-    scene.loadScene(JSON.stringify({ version: 4, document: doc }));
-  }
+  scene.loadSceneGrida(io.GRID.encode(doc));
   scene.switchScene("scene");
   (
     ed as unknown as { _m_geometry: CanvasWasmGeometryQueryInterfaceProvider }
