@@ -68,3 +68,6 @@ jobs:
       - name: Build canvas wasm artifacts
         run: just build
         working-directory: crates/grida-canvas-wasm
+
+      - name: Run canvas wasm smoke test
+        run: pnpm --filter @grida/canvas-wasm test
