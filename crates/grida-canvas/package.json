@@ -3,11 +3,9 @@
   "private": true,
   "description": "turbo ci rust wrapper",
   "scripts": {
-    "build": "cargo build --release",
     "flatc:clean": "rm -f src/io/generated/grida.rs",
     "flatc:generate": "pnpm flatc:clean && python3 ../../bin/activate-flatc -- --rust -o src/io/generated ../../format/grida.fbs && mv src/io/generated/grida_generated.rs src/io/generated/grida.rs",
     "generate": "pnpm flatc:generate",
-    "prebuild": "pnpm flatc:generate",
-    "test": "cargo test"
+    "prebuild": "pnpm flatc:generate"
   }
 }
