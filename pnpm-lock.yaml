@@ -1168,9 +1168,6 @@ importers:
 
   packages/grida-canvas-sdk-render-figma:
     dependencies:
-      '@figma/rest-api-spec':
-        specifier: 0.36.0
-        version: 0.36.0
       '@grida/canvas-wasm':
         specifier: 0.91.0-canary.17
         version: 0.91.0-canary.17
@@ -1178,6 +1175,9 @@ importers:
         specifier: ^12.1.0
         version: 12.1.0
     devDependencies:
+      '@figma/rest-api-spec':
+        specifier: 0.36.0
+        version: 0.36.0
       '@grida/fonts':
         specifier: 0.0.0
         version: 0.0.0

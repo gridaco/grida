@@ -18,7 +18,7 @@ Headless Figma renderer — render `.fig` and REST API JSON to PNG/JPEG/WebP/PDF
 
 ## Build
 
-tsdown bundles all `@grida/*` except `@grida/canvas-wasm`. `deps.neverBundle: ["@grida/canvas-wasm", "commander"]`; `deps.alwaysBundle: [/^@grida\/(?!canvas-wasm$)/]`.
+tsdown bundles all `@grida/*` except `@grida/canvas-wasm`. `deps.neverBundle: ["@grida/canvas-wasm", "commander", "@figma/rest-api-spec"]`; `deps.alwaysBundle: [/^@grida\/(?!canvas-wasm$)/]`. `@figma/rest-api-spec` ships only `.ts` sources (no `.d.ts`), so it's kept external in the emitted `.d.ts` and declared as a peer dep.
 
 ## Smoke test
 

@@ -62,16 +62,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@figma/rest-api-spec": "0.36.0",
     "@grida/canvas-wasm": "0.91.0-canary.17",
     "commander": "^12.1.0"
   },
   "devDependencies": {
+    "@figma/rest-api-spec": "0.36.0",
     "@grida/fonts": "0.0.0",
     "@grida/io": "workspace:*",
     "@grida/io-figma": "workspace:*",
     "@grida/schema": "workspace:*",
     "fflate": "^0.8.2",
     "tsdown": "^0.21.9"
+  },
+  "peerDependencies": {
+    "@figma/rest-api-spec": "^0.36.0"
   }
 }
