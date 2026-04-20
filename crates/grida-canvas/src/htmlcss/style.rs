@@ -412,9 +412,82 @@ pub enum StyleImage {
 pub enum BackgroundLayer {
     /// Solid color fill (CSS `background-color`).
     Solid(CGColor),
-    /// Image layer: gradient or URL-referenced image.
-    /// Chromium: `FillLayer::image_` field holding a `StyleImage*`.
-    Image(StyleImage),
+    /// Image layer with full CSS geometry (size, position, repeat, clip, origin).
+    /// Chromium: `FillLayer` with image, size, position, repeat, clip, origin.
+    Image(BackgroundImage),
+}
+
+/// A CSS background image layer with geometry.
+#[derive(Debug, Clone)]
+pub struct BackgroundImage {
+    pub source: StyleImage,
+    pub size: BackgroundSize,
+    pub position: BackgroundPosition,
+    pub repeat: BackgroundRepeat,
+    pub clip: BackgroundBox,
+    pub origin: BackgroundBox,
+}
+
+/// CSS `background-size`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BackgroundSize {
+    /// `auto` / `auto auto` — use intrinsic size; fall back to 100% 100%.
+    Auto,
+    /// `cover`
+    Cover,
+    /// `contain`
+    Contain,
+    /// `<width> <height>` with `auto` permitted on either axis.
+    Explicit { width: CssLength, height: CssLength },
+}
+
+impl Default for BackgroundSize {
+    fn default() -> Self {
+        BackgroundSize::Auto
+    }
+}
+
+/// CSS `background-position` resolved to a 2D offset.
+/// Each axis is `Px`/`Percent`; `Auto` is treated as `Percent(0.0)`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BackgroundPosition {
+    pub x: CssLength,
+    pub y: CssLength,
+}
+
+impl Default for BackgroundPosition {
+    fn default() -> Self {
+        BackgroundPosition {
+            x: CssLength::Percent(0.0),
+            y: CssLength::Percent(0.0),
+        }
+    }
+}
+
+/// CSS `background-repeat` keyword, per axis.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum BackgroundRepeatKeyword {
+    #[default]
+    Repeat,
+    NoRepeat,
+    Space,
+    Round,
+}
+
+/// CSS `background-repeat` as an `(x, y)` pair.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct BackgroundRepeat {
+    pub x: BackgroundRepeatKeyword,
+    pub y: BackgroundRepeatKeyword,
+}
+
+/// Common box reference for `background-clip` and `background-origin`.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum BackgroundBox {
+    #[default]
+    BorderBox,
+    PaddingBox,
+    ContentBox,
 }
 
 /// CSS `linear-gradient()` / `repeating-linear-gradient()`.

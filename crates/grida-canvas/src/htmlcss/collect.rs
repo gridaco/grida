@@ -1446,14 +1446,134 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
         }
     }
 
-    // 2. Background image layers (gradients and URL images on top)
-    for image in bg.background_image.0.iter() {
-        if let Some(style_image) = convert_image(image) {
-            layers.push(BackgroundLayer::Image(style_image));
+    // 2. Background image layers (gradients and URL images on top).
+    //    CSS cycles shorter per-layer longhands to match the image count.
+    let cycle = |n: usize, i: usize| -> usize {
+        if n == 0 {
+            0
+        } else {
+            i % n
         }
+    };
+    let sizes = &bg.background_size.0;
+    let px = &bg.background_position_x.0;
+    let py = &bg.background_position_y.0;
+    let reps = &bg.background_repeat.0;
+    let clips = &bg.background_clip.0;
+    let origins = &bg.background_origin.0;
+
+    for (i, image) in bg.background_image.0.iter().enumerate() {
+        let Some(source) = convert_image(image) else {
+            continue;
+        };
+        let size = sizes
+            .get(cycle(sizes.len(), i))
+            .map(extract_bg_size)
+            .unwrap_or_default();
+        let position = BackgroundPosition {
+            x: px
+                .get(cycle(px.len(), i))
+                .map(length_percentage_to_css)
+                .unwrap_or(CssLength::Percent(0.0)),
+            y: py
+                .get(cycle(py.len(), i))
+                .map(length_percentage_to_css)
+                .unwrap_or(CssLength::Percent(0.0)),
+        };
+        let repeat = reps
+            .get(cycle(reps.len(), i))
+            .map(extract_bg_repeat)
+            .unwrap_or_default();
+        let clip = clips
+            .get(cycle(clips.len(), i))
+            .map(extract_bg_clip)
+            .unwrap_or(BackgroundBox::BorderBox);
+        let origin = origins
+            .get(cycle(origins.len(), i))
+            .map(extract_bg_origin)
+            .unwrap_or(BackgroundBox::PaddingBox);
+
+        layers.push(BackgroundLayer::Image(BackgroundImage {
+            source,
+            size,
+            position,
+            repeat,
+            clip,
+            origin,
+        }));
     }
 
     layers
+}
+
+fn extract_bg_size(sz: &style::values::computed::BackgroundSize) -> BackgroundSize {
+    use style::values::generics::background::BackgroundSize as G;
+    use style::values::generics::length::GenericLengthPercentageOrAuto as LPA;
+    match sz {
+        G::Cover => BackgroundSize::Cover,
+        G::Contain => BackgroundSize::Contain,
+        G::ExplicitSize { width, height } => {
+            let to_len =
+                |v: &LPA<style::values::computed::NonNegativeLengthPercentage>| -> CssLength {
+                    match v {
+                        LPA::Auto => CssLength::Auto,
+                        LPA::LengthPercentage(lp) => length_percentage_to_css(&lp.0),
+                    }
+                };
+            let w = to_len(width);
+            let h = to_len(height);
+            // Canonicalize the initial value — `auto auto` → `Auto`.
+            if matches!((w, h), (CssLength::Auto, CssLength::Auto)) {
+                BackgroundSize::Auto
+            } else {
+                BackgroundSize::Explicit {
+                    width: w,
+                    height: h,
+                }
+            }
+        }
+    }
+}
+
+fn extract_bg_repeat(
+    r: &style::properties::longhands::background_repeat::single_value::computed_value::T,
+) -> BackgroundRepeat {
+    // Stylo's BackgroundRepeat is `(Keyword, Keyword)`.
+    use style::values::specified::background::BackgroundRepeatKeyword as K;
+    let map = |k: K| -> BackgroundRepeatKeyword {
+        match k {
+            K::Repeat => BackgroundRepeatKeyword::Repeat,
+            K::NoRepeat => BackgroundRepeatKeyword::NoRepeat,
+            K::Space => BackgroundRepeatKeyword::Space,
+            K::Round => BackgroundRepeatKeyword::Round,
+        }
+    };
+    BackgroundRepeat {
+        x: map(r.0),
+        y: map(r.1),
+    }
+}
+
+fn extract_bg_clip(
+    v: &style::properties::longhands::background_clip::single_value::computed_value::T,
+) -> BackgroundBox {
+    use style::properties::longhands::background_clip::single_value::computed_value::T;
+    match v {
+        T::BorderBox => BackgroundBox::BorderBox,
+        T::PaddingBox => BackgroundBox::PaddingBox,
+        T::ContentBox => BackgroundBox::ContentBox,
+    }
+}
+
+fn extract_bg_origin(
+    v: &style::properties::longhands::background_origin::single_value::computed_value::T,
+) -> BackgroundBox {
+    use style::properties::longhands::background_origin::single_value::computed_value::T;
+    match v {
+        T::BorderBox => BackgroundBox::BorderBox,
+        T::PaddingBox => BackgroundBox::PaddingBox,
+        T::ContentBox => BackgroundBox::ContentBox,
+    }
 }
 
 fn is_repeating(flags: &style::values::generics::image::GradientFlags) -> bool {
@@ -1504,9 +1624,7 @@ fn extract_radial_shape(
     }
 }
 
-fn extract_gradient_position(
-    pos: &style::values::computed::Position,
-) -> GradientPosition {
+fn extract_gradient_position(pos: &style::values::computed::Position) -> GradientPosition {
     GradientPosition {
         x: length_percentage_to_css(&pos.horizontal),
         y: length_percentage_to_css(&pos.vertical),

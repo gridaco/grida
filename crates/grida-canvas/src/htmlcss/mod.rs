@@ -217,9 +217,11 @@ fn collect_urls_from_element(el: &style::StyledElement, urls: &mut Vec<String>) 
 
     // Background image URLs
     for layer in &el.background {
-        if let style::BackgroundLayer::Image(style::StyleImage::Url(url)) = layer {
-            if !url.is_empty() {
-                urls.push(url.clone());
+        if let style::BackgroundLayer::Image(img) = layer {
+            if let style::StyleImage::Url(url) = &img.source {
+                if !url.is_empty() {
+                    urls.push(url.clone());
+                }
             }
         }
     }
@@ -825,14 +827,11 @@ code block
     #[test]
     fn test_inset_extraction_px() {
         let _guard = crate::stylo_test::lock();
-        let html = r#"<div style="position:absolute;top:100px;left:50px;right:10px;bottom:20px">x</div>"#;
+        let html =
+            r#"<div style="position:absolute;top:100px;left:50px;right:10px;bottom:20px">x</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
-        fn find_positioned<'a>(
-            el: &'a style::StyledElement,
-        ) -> Option<&'a style::StyledElement> {
-            if el.inset.top != types::CssLength::Auto
-                || el.inset.left != types::CssLength::Auto
-            {
+        fn find_positioned<'a>(el: &'a style::StyledElement) -> Option<&'a style::StyledElement> {
+            if el.inset.top != types::CssLength::Auto || el.inset.left != types::CssLength::Auto {
                 return Some(el);
             }
             for child in &el.children {
@@ -857,12 +856,8 @@ code block
         let _guard = crate::stylo_test::lock();
         let html = r#"<div style="position:absolute;top:25%;left:50%">x</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
-        fn find_positioned<'a>(
-            el: &'a style::StyledElement,
-        ) -> Option<&'a style::StyledElement> {
-            if el.inset.top != types::CssLength::Auto
-                || el.inset.left != types::CssLength::Auto
-            {
+        fn find_positioned<'a>(el: &'a style::StyledElement) -> Option<&'a style::StyledElement> {
+            if el.inset.top != types::CssLength::Auto || el.inset.left != types::CssLength::Auto {
                 return Some(el);
             }
             for child in &el.children {
@@ -879,9 +874,215 @@ code block
         assert_eq!(el.inset.left, types::CssLength::Percent(0.5));
     }
 
+    // ── Background geometry extraction ───────────────────────────────
+
+    #[test]
+    fn test_bg_size_default() {
+        let _guard = crate::stylo_test::lock();
+        let img = find_bg_image(
+            &collect::collect_styled_tree(
+                r#"<div style="background:linear-gradient(red,blue)">x</div>"#,
+            )
+            .unwrap()
+            .unwrap(),
+        )
+        .expect("bg image")
+        .clone();
+        assert_eq!(img.size, style::BackgroundSize::Auto);
+        assert_eq!(img.position, style::BackgroundPosition::default());
+        assert_eq!(img.repeat.x, style::BackgroundRepeatKeyword::Repeat);
+        assert_eq!(img.clip, style::BackgroundBox::BorderBox);
+        assert_eq!(img.origin, style::BackgroundBox::PaddingBox);
+    }
+
+    #[test]
+    fn test_bg_size_cover_contain() {
+        let _guard = crate::stylo_test::lock();
+        let html =
+            r#"<div style="background:linear-gradient(red,blue);background-size:cover">x</div>"#;
+        let img = find_bg_image(&collect::collect_styled_tree(html).unwrap().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(img.size, style::BackgroundSize::Cover);
+
+        let html =
+            r#"<div style="background:linear-gradient(red,blue);background-size:contain">x</div>"#;
+        let img = find_bg_image(&collect::collect_styled_tree(html).unwrap().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(img.size, style::BackgroundSize::Contain);
+    }
+
+    #[test]
+    fn test_bg_size_explicit() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="background:linear-gradient(red,blue);background-size:80px 40px">x</div>"#;
+        let img = find_bg_image(&collect::collect_styled_tree(html).unwrap().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(
+            img.size,
+            style::BackgroundSize::Explicit {
+                width: types::CssLength::Px(80.0),
+                height: types::CssLength::Px(40.0),
+            }
+        );
+
+        let html =
+            r#"<div style="background:linear-gradient(red,blue);background-size:50% auto">x</div>"#;
+        let img = find_bg_image(&collect::collect_styled_tree(html).unwrap().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(
+            img.size,
+            style::BackgroundSize::Explicit {
+                width: types::CssLength::Percent(0.5),
+                height: types::CssLength::Auto,
+            }
+        );
+    }
+
+    #[test]
+    fn test_bg_position() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="background:linear-gradient(red,blue);background-position:center">x</div>"#;
+        let img = find_bg_image(&collect::collect_styled_tree(html).unwrap().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(img.position.x, types::CssLength::Percent(0.5));
+        assert_eq!(img.position.y, types::CssLength::Percent(0.5));
+
+        let html = r#"<div style="background:linear-gradient(red,blue);background-position:20px 30px">x</div>"#;
+        let img = find_bg_image(&collect::collect_styled_tree(html).unwrap().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(img.position.x, types::CssLength::Px(20.0));
+        assert_eq!(img.position.y, types::CssLength::Px(30.0));
+
+        let html = r#"<div style="background:linear-gradient(red,blue);background-position:100% 0">x</div>"#;
+        let img = find_bg_image(&collect::collect_styled_tree(html).unwrap().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(img.position.x, types::CssLength::Percent(1.0));
+        assert_eq!(img.position.y, types::CssLength::Px(0.0));
+    }
+
+    #[test]
+    fn test_bg_repeat() {
+        let _guard = crate::stylo_test::lock();
+        use self::style::BackgroundRepeatKeyword::*;
+
+        let cases: &[(&str, _, _)] = &[
+            ("repeat", Repeat, Repeat),
+            ("no-repeat", NoRepeat, NoRepeat),
+            ("repeat-x", Repeat, NoRepeat),
+            ("repeat-y", NoRepeat, Repeat),
+            ("space", Space, Space),
+            ("round", Round, Round),
+            ("repeat no-repeat", Repeat, NoRepeat),
+        ];
+        for (css, ex_x, ex_y) in cases {
+            let html = format!(
+                r#"<div style="background:linear-gradient(red,blue);background-repeat:{css}">x</div>"#
+            );
+            let img = find_bg_image(&collect::collect_styled_tree(&html).unwrap().unwrap())
+                .unwrap()
+                .clone();
+            assert_eq!(img.repeat.x, *ex_x, "case: {css} x");
+            assert_eq!(img.repeat.y, *ex_y, "case: {css} y");
+        }
+    }
+
+    #[test]
+    fn test_bg_clip_origin() {
+        let _guard = crate::stylo_test::lock();
+        use self::style::BackgroundBox::*;
+
+        let cases: &[(&str, _, _)] = &[
+            (
+                "background-clip:padding-box;background-origin:content-box",
+                PaddingBox,
+                ContentBox,
+            ),
+            (
+                "background-clip:content-box;background-origin:border-box",
+                ContentBox,
+                BorderBox,
+            ),
+            (
+                "background-clip:border-box;background-origin:padding-box",
+                BorderBox,
+                PaddingBox,
+            ),
+        ];
+        for (css, ex_clip, ex_origin) in cases {
+            let html =
+                format!(r#"<div style="background:linear-gradient(red,blue);{css}">x</div>"#);
+            let img = find_bg_image(&collect::collect_styled_tree(&html).unwrap().unwrap())
+                .unwrap()
+                .clone();
+            assert_eq!(img.clip, *ex_clip, "case: {css}");
+            assert_eq!(img.origin, *ex_origin, "case: {css}");
+        }
+    }
+
+    #[test]
+    fn test_bg_per_layer_cycling() {
+        let _guard = crate::stylo_test::lock();
+        // Two gradient layers; single repeat/clip/origin values must cycle.
+        let html = r#"<div style="
+            background-image:linear-gradient(red,red),linear-gradient(blue,blue);
+            background-size:20px 20px,40px 40px;
+            background-repeat:no-repeat;
+            background-clip:padding-box;
+        ">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        fn find_el<'a>(el: &'a style::StyledElement) -> Option<&'a style::StyledElement> {
+            if !el.background.is_empty() && el.tag == "div" {
+                return Some(el);
+            }
+            for child in &el.children {
+                if let style::StyledNode::Element(c) = child {
+                    if let Some(f) = find_el(c) {
+                        return Some(f);
+                    }
+                }
+            }
+            None
+        }
+        let el = find_el(&root).unwrap();
+        let imgs: Vec<&style::BackgroundImage> = el
+            .background
+            .iter()
+            .filter_map(|l| match l {
+                style::BackgroundLayer::Image(i) => Some(i),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(imgs.len(), 2, "should have 2 image layers");
+        assert_eq!(
+            imgs[0].size,
+            style::BackgroundSize::Explicit {
+                width: types::CssLength::Px(20.0),
+                height: types::CssLength::Px(20.0),
+            }
+        );
+        assert_eq!(
+            imgs[1].size,
+            style::BackgroundSize::Explicit {
+                width: types::CssLength::Px(40.0),
+                height: types::CssLength::Px(40.0),
+            }
+        );
+        assert_eq!(imgs[0].repeat.x, style::BackgroundRepeatKeyword::NoRepeat);
+        assert_eq!(imgs[1].repeat.x, style::BackgroundRepeatKeyword::NoRepeat);
+        assert_eq!(imgs[0].clip, style::BackgroundBox::PaddingBox);
+        assert_eq!(imgs[1].clip, style::BackgroundBox::PaddingBox);
+    }
+
     // ── Gradient extraction ──────────────────────────────────────────
 
-    fn find_bg_image(el: &style::StyledElement) -> Option<&style::StyleImage> {
+    fn find_bg_image(el: &style::StyledElement) -> Option<&style::BackgroundImage> {
         for layer in &el.background {
             if let style::BackgroundLayer::Image(img) = layer {
                 return Some(img);
@@ -897,9 +1098,13 @@ code block
         None
     }
 
+    fn find_bg_source(el: &style::StyledElement) -> Option<&style::StyleImage> {
+        find_bg_image(el).map(|i| &i.source)
+    }
+
     fn expect_radial(html: &str) -> style::RadialGradient {
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
-        match find_bg_image(&root).expect("no background image") {
+        match find_bg_source(&root).expect("no background image") {
             style::StyleImage::RadialGradient(g) => g.clone(),
             other => panic!("expected RadialGradient, got {:?}", other),
         }
@@ -907,7 +1112,7 @@ code block
 
     fn expect_conic(html: &str) -> style::ConicGradient {
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
-        match find_bg_image(&root).expect("no background image") {
+        match find_bg_source(&root).expect("no background image") {
             style::StyleImage::ConicGradient(g) => g.clone(),
             other => panic!("expected ConicGradient, got {:?}", other),
         }
@@ -915,7 +1120,7 @@ code block
 
     fn expect_linear(html: &str) -> style::LinearGradient {
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
-        match find_bg_image(&root).expect("no background image") {
+        match find_bg_source(&root).expect("no background image") {
             style::StyleImage::LinearGradient(g) => g.clone(),
             other => panic!("expected LinearGradient, got {:?}", other),
         }
@@ -969,8 +1174,10 @@ code block
     fn test_radial_size_explicit() {
         let _guard = crate::stylo_test::lock();
         assert_eq!(
-            expect_radial(r#"<div style="background:radial-gradient(circle 40px,red,blue)">x</div>"#)
-                .size,
+            expect_radial(
+                r#"<div style="background:radial-gradient(circle 40px,red,blue)">x</div>"#
+            )
+            .size,
             style::RadialSize::Explicit {
                 x: types::CssLength::Px(40.0),
                 y: types::CssLength::Px(40.0),
@@ -1067,8 +1274,7 @@ code block
                 .repeating
         );
         assert!(
-            !expect_conic(r#"<div style="background:conic-gradient(red,blue)">x</div>"#)
-                .repeating
+            !expect_conic(r#"<div style="background:conic-gradient(red,blue)">x</div>"#).repeating
         );
     }
 
@@ -1135,10 +1341,134 @@ code block
         let bl = pixel_at(&px, 25, 75, 100); // bottom-left: CSS 225° → blue
         let tl = pixel_at(&px, 25, 25, 100); // top-left: CSS 315° → yellow
 
-        assert_eq!([tr[0], tr[1], tr[2]], [255, 0, 0], "top-right should be red");
-        assert_eq!([br[0], br[1], br[2]], [0, 255, 0], "bottom-right should be green");
-        assert_eq!([bl[0], bl[1], bl[2]], [0, 0, 255], "bottom-left should be blue");
-        assert_eq!([tl[0], tl[1], tl[2]], [255, 255, 0], "top-left should be yellow");
+        assert_eq!(
+            [tr[0], tr[1], tr[2]],
+            [255, 0, 0],
+            "top-right should be red"
+        );
+        assert_eq!(
+            [br[0], br[1], br[2]],
+            [0, 255, 0],
+            "bottom-right should be green"
+        );
+        assert_eq!(
+            [bl[0], bl[1], bl[2]],
+            [0, 0, 255],
+            "bottom-left should be blue"
+        );
+        assert_eq!(
+            [tl[0], tl[1], tl[2]],
+            [255, 255, 0],
+            "top-left should be yellow"
+        );
+    }
+
+    /// Probe: `background-size: 50px 50px; no-repeat; position: 0 0` paints a
+    /// tile only in the top-left quadrant of a 100×100 box. The rest of the
+    /// box shows the surface clear color (white).
+    #[test]
+    fn test_bg_size_no_repeat_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="width:100px;height:100px;background:
+  linear-gradient(to right, #ff0000 0 100%);
+  background-size:50px 50px;
+  background-repeat:no-repeat;
+  background-position:0 0;"></div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+
+        // Inside tile: red.
+        let inside = pixel_at(&px, 25, 25, 100);
+        assert_eq!(
+            [inside[0], inside[1], inside[2]],
+            [255, 0, 0],
+            "inside tile"
+        );
+        // Outside tile: white (surface clear).
+        let outside = pixel_at(&px, 75, 75, 100);
+        assert_eq!(
+            [outside[0], outside[1], outside[2]],
+            [255, 255, 255],
+            "outside tile"
+        );
+    }
+
+    /// Probe: `background-position: 100% 100%` with `no-repeat` tile at
+    /// 50×50 in a 100×100 box pins the tile to the bottom-right quadrant.
+    #[test]
+    fn test_bg_position_bottom_right_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="width:100px;height:100px;background:
+  linear-gradient(to right, #0000ff 0 100%);
+  background-size:50px 50px;
+  background-repeat:no-repeat;
+  background-position:100% 100%;"></div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+        let br = pixel_at(&px, 75, 75, 100);
+        assert_eq!([br[0], br[1], br[2]], [0, 0, 255], "bottom-right tile");
+        let tl = pixel_at(&px, 25, 25, 100);
+        assert_eq!([tl[0], tl[1], tl[2]], [255, 255, 255], "top-left empty");
+    }
+
+    /// Probe: `repeat-x` tiles the 50×25 image horizontally but not vertically.
+    #[test]
+    fn test_bg_repeat_x_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="width:100px;height:100px;background:
+  linear-gradient(to right, #00aa00 0 100%);
+  background-size:50px 25px;
+  background-repeat:repeat-x;
+  background-position:0 0;"></div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+        // Top band tiles across.
+        let left = pixel_at(&px, 10, 10, 100);
+        let right = pixel_at(&px, 80, 10, 100);
+        assert_eq!([left[0], left[1], left[2]], [0, 170, 0], "top-left tile");
+        assert_eq!(
+            [right[0], right[1], right[2]],
+            [0, 170, 0],
+            "top-right tile"
+        );
+        // Below first row → no repeat-y.
+        let below = pixel_at(&px, 50, 60, 100);
+        assert_eq!(
+            [below[0], below[1], below[2]],
+            [255, 255, 255],
+            "second row empty"
+        );
+    }
+
+    /// Probe: `background-clip: padding-box` with an 8px solid border clips
+    /// the gradient to the padding area. A pixel inside the padding area
+    /// shows the gradient; a pixel inside the border strip shows the border
+    /// color (gradient is clipped away).
+    #[test]
+    fn test_bg_clip_padding_box_probe() {
+        let _guard = crate::stylo_test::lock();
+        // Total box is 100×100 (84 padding area + 8px border each side).
+        let html = r#"
+<div style="width:84px;height:84px;border:8px solid #888888;background:
+  linear-gradient(to right, #ff0000 0 100%);
+  background-clip:padding-box;
+  background-origin:padding-box;"></div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+
+        // Deep inside the padding area → red (gradient visible).
+        let inside = pixel_at(&px, 50, 50, 100);
+        assert_eq!(
+            [inside[0], inside[1], inside[2]],
+            [255, 0, 0],
+            "inside padding-box"
+        );
+        // Inside the left border strip → border color (no gradient).
+        let border = pixel_at(&px, 3, 50, 100);
+        assert_eq!(
+            [border[0], border[1], border[2]],
+            [0x88, 0x88, 0x88],
+            "border strip shows border color, not gradient"
+        );
     }
 
     /// Verify no transform yields empty vec.

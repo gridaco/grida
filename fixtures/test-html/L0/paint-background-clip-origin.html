@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: background-clip + background-origin</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .rect {
+        width: 160px;
+        height: 120px;
+        border: 8px dashed #888;
+        padding: 16px;
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+        background-image: linear-gradient(
+          135deg,
+          #ff0000 0 50%,
+          #0000ff 50% 100%
+        );
+      }
+      .clip-border {
+        background-clip: border-box;
+        background-origin: border-box;
+      }
+      .clip-padding {
+        background-clip: padding-box;
+        background-origin: padding-box;
+      }
+      .clip-content {
+        background-clip: content-box;
+        background-origin: content-box;
+      }
+      .mix-1 {
+        background-clip: border-box;
+        background-origin: content-box;
+      }
+      .mix-2 {
+        background-clip: padding-box;
+        background-origin: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">clip+origin: border-box</div>
+        <div class="rect clip-border"></div>
+      </div>
+      <div>
+        <div class="label">clip+origin: padding-box</div>
+        <div class="rect clip-padding"></div>
+      </div>
+      <div>
+        <div class="label">clip+origin: content-box</div>
+        <div class="rect clip-content"></div>
+      </div>
+      <div>
+        <div class="label">clip:border, origin:content</div>
+        <div class="rect mix-1"></div>
+      </div>
+      <div>
+        <div class="label">clip:padding, origin:border</div>
+        <div class="rect mix-2"></div>
+      </div>
+    </div>
+  </body>
+</html>

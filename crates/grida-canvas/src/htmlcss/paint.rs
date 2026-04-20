@@ -16,11 +16,12 @@ use skia_safe::{Canvas, ClipOp, Color, Paint, PaintStyle, PictureRecorder, Rect}
 
 use super::layout::{build_skia_text_style, LayoutBox, LayoutNode};
 use super::style::{
-    BackgroundLayer, BorderSide, ConicGradient, GradientStop, InlineBoxDecoration, InlineGroup,
-    InlineRunItem, LinearGradient, Outline, RadialGradient, StyleImage, StyledElement, TextRun,
-    WidgetAppearance,
+    BackgroundBox, BackgroundImage, BackgroundLayer, BackgroundRepeatKeyword, BackgroundSize,
+    BorderSide, ConicGradient, GradientStop, InlineBoxDecoration, InlineGroup, InlineRunItem,
+    LinearGradient, Outline, RadialGradient, StyleImage, StyledElement, TextRun, WidgetAppearance,
 };
 use super::types;
+use super::types::CssLength;
 use super::ImageProvider;
 
 /// Paint a `LayoutBox` tree into a Skia `Picture`.
@@ -319,47 +320,207 @@ fn paint_background(
     let r = &style.border_radius;
 
     for layer in &style.background {
-        let mut paint = Paint::default();
-        paint.set_style(PaintStyle::Fill);
-        paint.set_anti_alias(true);
-
         match layer {
             BackgroundLayer::Solid(c) => {
                 if c.a == 0 {
                     continue;
                 }
+                let mut paint = Paint::default();
+                paint.set_style(PaintStyle::Fill);
+                paint.set_anti_alias(true);
                 paint.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
-            }
-            BackgroundLayer::Image(style_image) => {
-                if let Some(image) = resolve_style_image(style_image, w, h, images) {
-                    let src_rect = Rect::from_wh(image.width() as f32, image.height() as f32);
-                    canvas.save();
-                    if !r.is_zero() {
-                        let mut rrect = skia_safe::RRect::new();
-                        rrect.set_rect_radii(rect, &r.to_skia_radii());
-                        canvas.clip_rrect(rrect, ClipOp::Intersect, true);
-                    }
-                    // TODO: background-size, background-position, background-repeat
-                    canvas.draw_image_rect(
-                        &image,
-                        Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
-                        rect,
-                        &paint,
-                    );
-                    canvas.restore();
+                if r.is_zero() {
+                    canvas.draw_rect(rect, &paint);
+                } else {
+                    let mut rrect = skia_safe::RRect::new();
+                    rrect.set_rect_radii(rect, &r.to_skia_radii());
+                    canvas.draw_rrect(rrect, &paint);
                 }
-                continue;
             }
-        }
-
-        if r.is_zero() {
-            canvas.draw_rect(rect, &paint);
-        } else {
-            let mut rrect = skia_safe::RRect::new();
-            rrect.set_rect_radii(rect, &r.to_skia_radii());
-            canvas.draw_rrect(rrect, &paint);
+            BackgroundLayer::Image(img) => {
+                paint_background_image_layer(canvas, style, w, h, img, images);
+            }
         }
     }
+}
+
+/// Rect of a CSS box reference (`border-box`, `padding-box`, `content-box`)
+/// within an element's local coordinates (border-box origin).
+fn box_reference_rect(style: &StyledElement, w: f32, h: f32, which: BackgroundBox) -> Rect {
+    let b = &style.border;
+    let p = &style.padding;
+    match which {
+        BackgroundBox::BorderBox => Rect::from_xywh(0.0, 0.0, w, h),
+        BackgroundBox::PaddingBox => Rect::from_xywh(
+            b.left.width,
+            b.top.width,
+            (w - b.left.width - b.right.width).max(0.0),
+            (h - b.top.width - b.bottom.width).max(0.0),
+        ),
+        BackgroundBox::ContentBox => Rect::from_xywh(
+            b.left.width + p.left,
+            b.top.width + p.top,
+            (w - b.left.width - b.right.width - p.left - p.right).max(0.0),
+            (h - b.top.width - b.bottom.width - p.top - p.bottom).max(0.0),
+        ),
+    }
+}
+
+/// Resolve a `CssLength` as an axis-independent length value with a container
+/// basis for percentages. Used for `background-size` axis values where `%`
+/// is relative to the positioning area and `auto` carries intrinsic semantics.
+fn resolve_bg_length(v: CssLength, basis: f32) -> Option<f32> {
+    match v {
+        CssLength::Auto => None,
+        CssLength::Px(px) => Some(px),
+        CssLength::Percent(p) => Some(basis * p),
+    }
+}
+
+/// Resolve `background-size` to concrete `(tile_w, tile_h)` given the
+/// positioning area size and the image's intrinsic size (if any).
+fn resolve_bg_size(
+    size: BackgroundSize,
+    area_w: f32,
+    area_h: f32,
+    intrinsic: Option<(f32, f32)>,
+) -> (f32, f32) {
+    match size {
+        BackgroundSize::Cover => {
+            let (iw, ih) = intrinsic.unwrap_or((area_w.max(1.0), area_h.max(1.0)));
+            let s = (area_w / iw).max(area_h / ih);
+            (iw * s, ih * s)
+        }
+        BackgroundSize::Contain => {
+            let (iw, ih) = intrinsic.unwrap_or((area_w.max(1.0), area_h.max(1.0)));
+            let s = (area_w / iw).min(area_h / ih);
+            (iw * s, ih * s)
+        }
+        BackgroundSize::Auto => intrinsic.unwrap_or((area_w, area_h)),
+        BackgroundSize::Explicit { width, height } => {
+            let w_resolved = resolve_bg_length(width, area_w);
+            let h_resolved = resolve_bg_length(height, area_h);
+            match (w_resolved, h_resolved) {
+                (Some(w), Some(h)) => (w, h),
+                (Some(w), None) => match intrinsic {
+                    Some((iw, ih)) if iw > 0.0 => (w, ih * (w / iw)),
+                    _ => (w, area_h),
+                },
+                (None, Some(h)) => match intrinsic {
+                    Some((iw, ih)) if ih > 0.0 => (iw * (h / ih), h),
+                    _ => (area_w, h),
+                },
+                (None, None) => intrinsic.unwrap_or((area_w, area_h)),
+            }
+        }
+    }
+}
+
+/// Resolve a `background-position` axis value.
+/// - `Px(p)` → `p` (raw offset from origin)
+/// - `Percent(p)` → `(area - tile) * p` (CSS rule: 0% = flush-left, 100% = flush-right)
+/// - `Auto` → 0
+fn resolve_bg_position_axis(v: CssLength, area: f32, tile: f32) -> f32 {
+    match v {
+        CssLength::Px(p) => p,
+        CssLength::Percent(p) => (area - tile) * p,
+        CssLength::Auto => 0.0,
+    }
+}
+
+fn repeat_keyword_to_tile_mode(k: BackgroundRepeatKeyword) -> skia_safe::TileMode {
+    match k {
+        BackgroundRepeatKeyword::NoRepeat => skia_safe::TileMode::Decal,
+        // Space / Round fall back to plain repeat (P1 follow-up).
+        _ => skia_safe::TileMode::Repeat,
+    }
+}
+
+fn paint_background_image_layer(
+    canvas: &Canvas,
+    style: &StyledElement,
+    w: f32,
+    h: f32,
+    img: &BackgroundImage,
+    images: &dyn ImageProvider,
+) {
+    let origin_rect = box_reference_rect(style, w, h, img.origin);
+    let clip_rect = box_reference_rect(style, w, h, img.clip);
+    if origin_rect.width() <= 0.0 || origin_rect.height() <= 0.0 {
+        return;
+    }
+    if clip_rect.width() <= 0.0 || clip_rect.height() <= 0.0 {
+        return;
+    }
+
+    // Intrinsic size: URL images carry pixel dimensions; gradients don't.
+    let intrinsic = match &img.source {
+        StyleImage::Url(url) => images
+            .get(url)
+            .map(|im| (im.width() as f32, im.height() as f32)),
+        _ => None,
+    };
+
+    let (tile_w, tile_h) = resolve_bg_size(
+        img.size,
+        origin_rect.width(),
+        origin_rect.height(),
+        intrinsic,
+    );
+    if tile_w <= 0.0 || tile_h <= 0.0 {
+        return;
+    }
+
+    // Resolve the source image. For gradients, rasterize at tile size so the
+    // resulting image maps 1:1 onto a single tile via the shader's local matrix.
+    let src_image = match &img.source {
+        StyleImage::Url(url) => images.get(url).cloned(),
+        _ => resolve_style_image(&img.source, tile_w, tile_h, images),
+    };
+    let Some(src_image) = src_image else {
+        return;
+    };
+
+    let px =
+        resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w) + origin_rect.left;
+    let py =
+        resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h) + origin_rect.top;
+
+    let sx = tile_w / src_image.width() as f32;
+    let sy = tile_h / src_image.height() as f32;
+    let mut local = skia_safe::Matrix::scale((sx, sy));
+    local.post_translate((px, py));
+
+    let tmx = repeat_keyword_to_tile_mode(img.repeat.x);
+    let tmy = repeat_keyword_to_tile_mode(img.repeat.y);
+
+    let shader = src_image.to_shader(
+        Some((tmx, tmy)),
+        skia_safe::SamplingOptions::default(),
+        Some(&local),
+    );
+    let Some(shader) = shader else {
+        return;
+    };
+
+    let mut paint = Paint::default();
+    paint.set_style(PaintStyle::Fill);
+    paint.set_anti_alias(true);
+    paint.set_shader(shader);
+
+    canvas.save();
+    // Clip to the referenced box. border-box clip respects border-radius;
+    // padding/content-box clip uses the inset rect.
+    if img.clip == BackgroundBox::BorderBox && !style.border_radius.is_zero() {
+        let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
+        let mut rrect = skia_safe::RRect::new();
+        rrect.set_rect_radii(border_rect, &style.border_radius.to_skia_radii());
+        canvas.clip_rrect(rrect, ClipOp::Intersect, true);
+    } else {
+        canvas.clip_rect(clip_rect, ClipOp::Intersect, true);
+    }
+    canvas.draw_rect(clip_rect, &paint);
+    canvas.restore();
 }
 
 // ─── Replaced element painting (Chromium: ReplacedPainter) ──────────
@@ -444,7 +605,6 @@ use skia_safe::gradient_shader::{Gradient, GradientColors, Interpolation};
 use skia_safe::{Point, TileMode};
 
 use super::style::{GradientPosition, RadialShape, RadialSize};
-use super::types::CssLength;
 
 fn build_gradient_data(stops: &[GradientStop]) -> (Vec<skia_safe::Color4f>, Vec<f32>) {
     let colors: Vec<skia_safe::Color4f> = stops
