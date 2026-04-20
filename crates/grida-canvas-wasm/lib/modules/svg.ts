@@ -2,6 +2,7 @@
 // #region: High-Level JavaScript Wrapper Functions
 // ====================================================================================================
 
+import type createGridaCanvas from "../grida-canvas-wasm";
 import type { svg } from "./svg-bindings";
 
 export class SVGAPI {

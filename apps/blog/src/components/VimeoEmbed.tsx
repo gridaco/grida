@@ -1,11 +1,11 @@
 import React from "react";
 
-const wrapperStyle = {
+const wrapperStyle: React.CSSProperties = {
   padding: "64.67% 0 0 0",
   position: "relative",
 };
 
-const iframeStyle = {
+const iframeStyle: React.CSSProperties = {
   position: "absolute",
   top: 0,
   left: 0,

@@ -36,8 +36,8 @@
     }
   },
   "scripts": {
-    "build": "tsup index.ts react.tsx --format cjs,esm --dts",
-    "dev": "tsup index.ts react.tsx --format cjs,esm --dts --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

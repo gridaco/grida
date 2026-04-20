@@ -1,3 +1,4 @@
+import type createGridaCanvas from "../grida-canvas-wasm";
 import type { types } from "../";
 import { FontsAPI } from "./fonts";
 import { MarkdownAPI } from "./markdown";

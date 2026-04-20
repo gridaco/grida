@@ -19,12 +19,12 @@ We keep a **single package** that works in both browser and Node by ensuring the
 - **Do NOT bundle the Emscripten glue into `dist/index.*`**
   - `lib/index.ts` imports `./grida-canvas-wasm` (a thin wrapper)
   - Wrapper: `lib/grida-canvas-wasm.ts` imports `./bin/grida-canvas-wasm`
-  - `tsup.config.ts` sets `external: ["./grida-canvas-wasm"]` and copies `lib/bin/*` via `publicDir`
+  - `tsdown.config.ts` sets `deps.neverBundle: ["./grida-canvas-wasm"]` and copies `lib/bin/*` via `copy`
   - Result: `dist/index.js` only imports `./grida-canvas-wasm`, and the actual glue stays as `dist/grida-canvas-wasm.js` (copied), so Turbopack never sees Node built-ins inside the bundled entry.
 
 ⚠️ Notes:
 
-- Simply setting `tsup.external` to `["node:fs", "node:path", ...]` is **not sufficient** here; bundling the glue can still produce Node built-in imports in `dist/index.js`, which breaks Turbopack.
+- Simply setting `tsdown.deps.neverBundle` to `["node:fs", "node:path", ...]` is **not sufficient** here; bundling the glue can still produce Node built-in imports in `dist/index.js`, which breaks Turbopack.
 - If you change `lib/index.ts` to import `./bin/grida-canvas-wasm` directly (no wrapper + external), re-verify `pnpm --filter editor build` with Turbopack.
 
 ## Build System

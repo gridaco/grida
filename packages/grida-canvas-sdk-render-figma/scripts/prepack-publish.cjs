@@ -1,6 +1,6 @@
 /**
  * prepack: strip workspace:* deps from package.json before pack/publish.
- * Internal packages (@grida/io-figma, @grida/schema) are bundled by tsup and
+ * Internal packages (@grida/io-figma, @grida/schema) are bundled by tsdown and
  * not published; workspace: protocol breaks npm consumers.
  */
 const fs = require("fs");

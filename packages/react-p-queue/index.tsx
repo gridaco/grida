@@ -1,5 +1,4 @@
 "use client";
-import assert from "assert";
 import PQueue from "p-queue";
 import React, {
   createContext,
@@ -335,7 +334,7 @@ function useQueue<T, P>(): UseQueueReturnType<T, P> {
         // If batch mode is not enabled, use p-queue
         try {
           const res = await queue.add(() => resolver(task));
-          assert(res);
+          if (!res) throw new Error("Resolver result is required");
           dispatch({ type: "result", result: res });
           return res;
         } catch (e) {

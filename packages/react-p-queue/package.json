@@ -30,8 +30,8 @@
     }
   },
   "scripts": {
-    "build": "tsup index.tsx --format cjs,esm --dts",
-    "dev": "tsup index.tsx --format cjs,esm --dts --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -2,6 +2,7 @@
 // #region: High-Level JavaScript Wrapper Functions
 // ====================================================================================================
 
+import type createGridaCanvas from "../grida-canvas-wasm";
 import type { markdown } from "./markdown-bindings";
 
 export class MarkdownAPI {
