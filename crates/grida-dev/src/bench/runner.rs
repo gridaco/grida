@@ -208,6 +208,119 @@ fn pick_translate_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
     None
 }
 
+/// Find the first deep leaf starting from `root_id` (a node with no
+/// children, or the deepest child along the first branch). Skips
+/// `InitialContainer`.
+fn find_leaf_from(scene: &Scene, id: cg::node::schema::NodeId) -> Option<cg::node::schema::NodeId> {
+    use cg::node::schema::Node;
+    if matches!(scene.graph.get_node(&id), Ok(Node::InitialContainer(_))) {
+        return None;
+    }
+    if let Some(children) = scene.graph.get_children(&id) {
+        if children.is_empty() {
+            return Some(id);
+        }
+        for c in children {
+            if let Some(leaf) = find_leaf_from(scene, *c) {
+                return Some(leaf);
+            }
+        }
+        return Some(id);
+    }
+    Some(id)
+}
+
+/// Pick a leaf (childless) node for realistic per-node mutation benches.
+fn pick_leaf_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
+    for &root_id in scene.graph.roots() {
+        if let Some(leaf) = find_leaf_from(scene, root_id) {
+            return Some(leaf);
+        }
+    }
+    None
+}
+
+/// Pick a leaf that supports paint (fills) via `MutationCommand::SetFill`.
+fn pick_paint_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
+    use cg::node::schema::Node;
+    // DFS iteratively, pick the first leaf with fills.
+    let mut stack: Vec<cg::node::schema::NodeId> = scene.graph.roots().to_vec();
+    while let Some(id) = stack.pop() {
+        match scene.graph.get_node(&id) {
+            Ok(Node::InitialContainer(_)) => {}
+            Ok(Node::Rectangle(_))
+            | Ok(Node::Ellipse(_))
+            | Ok(Node::RegularPolygon(_))
+            | Ok(Node::RegularStarPolygon(_))
+            | Ok(Node::TextSpan(_))
+            | Ok(Node::Path(_))
+            | Ok(Node::Polygon(_))
+            | Ok(Node::Vector(_)) => return Some(id),
+            _ => {}
+        }
+        if let Some(children) = scene.graph.get_children(&id) {
+            for c in children.iter().rev() {
+                stack.push(*c);
+            }
+        }
+    }
+    None
+}
+
+/// Pick a leaf that supports resize via `MutationCommand::Resize`.
+fn pick_resize_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
+    use grida_dev::editor::mutation::node_supports_resize;
+    let mut stack: Vec<cg::node::schema::NodeId> = scene.graph.roots().to_vec();
+    // Prefer a leaf (childless) resizable node.
+    let mut fallback = None;
+    while let Some(id) = stack.pop() {
+        if let Ok(node) = scene.graph.get_node(&id) {
+            if node_supports_resize(node) {
+                if scene.graph.get_children(&id).is_none_or(|v| v.is_empty()) {
+                    return Some(id);
+                }
+                if fallback.is_none() {
+                    fallback = Some(id);
+                }
+            }
+        }
+        if let Some(children) = scene.graph.get_children(&id) {
+            for c in children.iter().rev() {
+                stack.push(*c);
+            }
+        }
+    }
+    fallback
+}
+
+/// Collect up to `n` leaves for delete-bench N cycles. Skips
+/// `InitialContainer`. Iterative DFS; returns ids in DFS order.
+fn collect_leaves(scene: &Scene, n: usize) -> Vec<cg::node::schema::NodeId> {
+    use cg::node::schema::Node;
+    let mut out = Vec::with_capacity(n);
+    let mut stack: Vec<cg::node::schema::NodeId> = scene.graph.roots().to_vec();
+    stack.reverse();
+    while let Some(id) = stack.pop() {
+        if matches!(scene.graph.get_node(&id), Ok(Node::InitialContainer(_))) {
+            continue;
+        }
+        match scene.graph.get_children(&id) {
+            Some(children) if !children.is_empty() => {
+                for c in children.iter().rev() {
+                    stack.push(*c);
+                }
+            }
+            _ => {
+                out.push(id);
+                if out.len() >= n {
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Run a node-translate mutation pass.
 ///
 /// Each frame:
@@ -314,6 +427,377 @@ fn run_translate_pass(
         wall,
         settle_us,
     )
+}
+
+/// Shared tail: given per-frame accumulators from a mutation pass, compute
+/// PassStats and pretty-print the apply_changes percentile summary.
+fn finalize_mutation_pass(
+    frame_times: &[u64],
+    queue: &[u64],
+    draw: &[u64],
+    mid_flush: &[u64],
+    compositor: &[u64],
+    flush: &[u64],
+    apply_us: &[u64],
+    wall: std::time::Duration,
+    settle_us: u64,
+) -> PassStats {
+    if !apply_us.is_empty() {
+        let mut sorted = apply_us.to_vec();
+        sorted.sort_unstable();
+        let n = sorted.len();
+        let avg = sorted.iter().sum::<u64>() / n as u64;
+        let p50 = sorted[n / 2];
+        let p95 = sorted[(n * 95 / 100).min(n - 1)];
+        let p99 = sorted[(n * 99 / 100).min(n - 1)];
+        let max = *sorted.last().unwrap();
+        println!(
+            "  apply_changes: avg={} p50={} p95={} p99={} MAX={} us",
+            avg, p50, p95, p99, max
+        );
+    }
+    compute_pass_stats(
+        frame_times,
+        queue,
+        draw,
+        mid_flush,
+        compositor,
+        flush,
+        wall,
+        settle_us,
+    )
+}
+
+fn print_mutation_stats(pass: &PassStats) {
+    println!("  avg: {:>7} us ({:>6.1} fps)", pass.avg_us, pass.fps);
+    println!(
+        "  min: {:>7} us  p50: {:>7} us  p95: {:>7} us  p99: {:>7} us  MAX: {:>7} us",
+        pass.min_us, pass.p50_us, pass.p95_us, pass.p99_us, pass.max_us
+    );
+    println!(
+        "  queue: {} us  draw: {} us  mid_flush: {} us  compositor: {} us  flush: {} us  settle: {} us",
+        pass.queue_us, pass.draw_us, pass.mid_flush_us, pass.compositor_us, pass.flush_us, pass.settle_us
+    );
+}
+
+/// Run a paint (SetFill) mutation pass. Each frame toggles the fill
+/// color between two values on the target node, exercising the
+/// paint-only invalidation fast path.
+fn run_paint_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    target_id: cg::node::schema::NodeId,
+) -> PassStats {
+    use cg::cg::prelude::*;
+    use grida_dev::editor::mutation::{self, MutationCommand};
+
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(frames as usize);
+    let mut queue_us_acc = Vec::with_capacity(frames as usize);
+    let mut draw_us_acc = Vec::with_capacity(frames as usize);
+    let mut mid_flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut compositor_us_acc = Vec::with_capacity(frames as usize);
+    let mut flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut apply_changes_us_acc: Vec<u64> = Vec::with_capacity(frames as usize);
+
+    let color_a = CGColor {
+        r: 255,
+        g: 64,
+        b: 64,
+        a: 255,
+    };
+    let color_b = CGColor {
+        r: 64,
+        g: 64,
+        b: 255,
+        a: 255,
+    };
+
+    for i in 0..frames {
+        let color = if i % 2 == 0 { color_a } else { color_b };
+        let reports = if let Some(scene) = renderer.scene.as_mut() {
+            mutation::apply(
+                scene,
+                &MutationCommand::SetFill {
+                    id: target_id,
+                    color,
+                },
+            )
+        } else {
+            Vec::new()
+        };
+        if reports.is_empty() {
+            continue;
+        }
+        for (id, kind) in &reports {
+            renderer.mark_node_change_kind(*id, *kind);
+        }
+
+        let t_total = Instant::now();
+        let t_ac = Instant::now();
+        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let apply_us = t_ac.elapsed().as_micros() as u64;
+
+        if let Some((_, q, d, mf, c, f)) = measure_frame(renderer, false, None) {
+            let total = t_total.elapsed().as_micros() as u64;
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+            apply_changes_us_acc.push(apply_us);
+        }
+    }
+    let wall = wall_start.elapsed();
+    let settle_us = measure_settle(renderer);
+    finalize_mutation_pass(
+        &frame_times,
+        &queue_us_acc,
+        &draw_us_acc,
+        &mid_flush_us_acc,
+        &compositor_us_acc,
+        &flush_us_acc,
+        &apply_changes_us_acc,
+        wall,
+        settle_us,
+    )
+}
+
+/// Run a resize-node pass. Each frame alternates width/height between
+/// two values, exercising the `ChangeKind::Full` invalidation path.
+fn run_resize_node_pass(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    target_id: cg::node::schema::NodeId,
+) -> PassStats {
+    use grida_dev::editor::mutation::{self, MutationCommand};
+
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(frames as usize);
+    let mut queue_us_acc = Vec::with_capacity(frames as usize);
+    let mut draw_us_acc = Vec::with_capacity(frames as usize);
+    let mut mid_flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut compositor_us_acc = Vec::with_capacity(frames as usize);
+    let mut flush_us_acc = Vec::with_capacity(frames as usize);
+    let mut apply_changes_us_acc: Vec<u64> = Vec::with_capacity(frames as usize);
+
+    // Read the current bounds from the renderer's cache to pick two
+    // sensible size values (so we avoid e.g. 0-size legal-but-empty
+    // outputs that skip invalidation entirely).
+    let base = renderer
+        .get_cache()
+        .geometry()
+        .get_render_bounds(&target_id)
+        .map(|r| (r.width.max(1.0), r.height.max(1.0)))
+        .unwrap_or((100.0, 100.0));
+    let (w_a, h_a) = (base.0, base.1);
+    let (w_b, h_b) = (base.0 + 10.0, base.1 + 10.0);
+
+    for i in 0..frames {
+        let (w, h) = if i % 2 == 0 { (w_a, h_a) } else { (w_b, h_b) };
+        let reports = if let Some(scene) = renderer.scene.as_mut() {
+            mutation::apply(
+                scene,
+                &MutationCommand::Resize {
+                    id: target_id,
+                    width: Some(w),
+                    height: Some(h),
+                },
+            )
+        } else {
+            Vec::new()
+        };
+        if reports.is_empty() {
+            continue;
+        }
+        for (id, kind) in &reports {
+            renderer.mark_node_change_kind(*id, *kind);
+        }
+
+        let t_total = Instant::now();
+        let t_ac = Instant::now();
+        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let apply_us = t_ac.elapsed().as_micros() as u64;
+
+        if let Some((_, q, d, mf, c, f)) = measure_frame(renderer, false, None) {
+            let total = t_total.elapsed().as_micros() as u64;
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+            apply_changes_us_acc.push(apply_us);
+        }
+    }
+    let wall = wall_start.elapsed();
+    let settle_us = measure_settle(renderer);
+    finalize_mutation_pass(
+        &frame_times,
+        &queue_us_acc,
+        &draw_us_acc,
+        &mid_flush_us_acc,
+        &compositor_us_acc,
+        &flush_us_acc,
+        &apply_changes_us_acc,
+        wall,
+        settle_us,
+    )
+}
+
+/// Run a delete mutation pass. Each frame deletes one pre-selected leaf
+/// from the scene. Unlike translate/paint/resize, this cannot
+/// meaningfully repeat on the same target; we pre-collect `frames`
+/// leaves and delete one per frame.
+fn run_delete_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> PassStats {
+    use grida_dev::editor::mutation::{self, MutationCommand};
+
+    let targets = renderer
+        .scene
+        .as_ref()
+        .map(|s| collect_leaves(s, frames as usize))
+        .unwrap_or_default();
+    if targets.is_empty() {
+        return PassStats::default();
+    }
+
+    let wall_start = Instant::now();
+    let mut frame_times = Vec::with_capacity(targets.len());
+    let mut queue_us_acc = Vec::with_capacity(targets.len());
+    let mut draw_us_acc = Vec::with_capacity(targets.len());
+    let mut mid_flush_us_acc = Vec::with_capacity(targets.len());
+    let mut compositor_us_acc = Vec::with_capacity(targets.len());
+    let mut flush_us_acc = Vec::with_capacity(targets.len());
+    let mut apply_changes_us_acc: Vec<u64> = Vec::with_capacity(targets.len());
+
+    for id in &targets {
+        let reports = if let Some(scene) = renderer.scene.as_mut() {
+            mutation::apply(scene, &MutationCommand::Delete { id: *id })
+        } else {
+            Vec::new()
+        };
+        if reports.is_empty() {
+            continue;
+        }
+        for (id, kind) in &reports {
+            renderer.mark_node_change_kind(*id, *kind);
+        }
+
+        let t_total = Instant::now();
+        let t_ac = Instant::now();
+        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let apply_us = t_ac.elapsed().as_micros() as u64;
+
+        if let Some((_, q, d, mf, c, f)) = measure_frame(renderer, false, None) {
+            let total = t_total.elapsed().as_micros() as u64;
+            frame_times.push(total);
+            queue_us_acc.push(q);
+            draw_us_acc.push(d);
+            mid_flush_us_acc.push(mf);
+            compositor_us_acc.push(c);
+            flush_us_acc.push(f);
+            apply_changes_us_acc.push(apply_us);
+        }
+    }
+    let wall = wall_start.elapsed();
+    let settle_us = measure_settle(renderer);
+    finalize_mutation_pass(
+        &frame_times,
+        &queue_us_acc,
+        &draw_us_acc,
+        &mid_flush_us_acc,
+        &compositor_us_acc,
+        &flush_us_acc,
+        &apply_changes_us_acc,
+        wall,
+        settle_us,
+    )
+}
+
+/// Unified mutation bench dispatch. Each kind runs as a self-contained
+/// pass that prints its own header and stats. `all` runs every kind
+/// sequentially against the same loaded scene.
+fn run_mutation_kind(
+    renderer: &mut cg::runtime::scene::Renderer,
+    frames: u32,
+    spec: &str,
+) -> Result<()> {
+    let kind = spec.trim().to_ascii_lowercase();
+    let run_one = |which: &str, r: &mut cg::runtime::scene::Renderer| -> Result<()> {
+        match which {
+            "translate-root" => {
+                let Some(id) = r.scene.as_ref().and_then(pick_translate_target) else {
+                    return Err(anyhow!("translate-root: no root target"));
+                };
+                println!(
+                    "\n=== Mutation: translate-root ({} frames, id={}) ===",
+                    frames, id
+                );
+                let pass = run_translate_pass(r, frames, id, 2.0, None);
+                print_mutation_stats(&pass);
+            }
+            "translate-leaf" => {
+                let Some(id) = r.scene.as_ref().and_then(pick_leaf_target) else {
+                    return Err(anyhow!("translate-leaf: no leaf target"));
+                };
+                println!(
+                    "\n=== Mutation: translate-leaf ({} frames, id={}) ===",
+                    frames, id
+                );
+                let pass = run_translate_pass(r, frames, id, 2.0, None);
+                print_mutation_stats(&pass);
+            }
+            "resize" => {
+                let Some(id) = r.scene.as_ref().and_then(pick_resize_target) else {
+                    return Err(anyhow!("resize: no resizable target"));
+                };
+                println!("\n=== Mutation: resize ({} frames, id={}) ===", frames, id);
+                let pass = run_resize_node_pass(r, frames, id);
+                print_mutation_stats(&pass);
+            }
+            "paint" => {
+                let Some(id) = r.scene.as_ref().and_then(pick_paint_target) else {
+                    return Err(anyhow!("paint: no paintable target"));
+                };
+                println!("\n=== Mutation: paint ({} frames, id={}) ===", frames, id);
+                let pass = run_paint_pass(r, frames, id);
+                print_mutation_stats(&pass);
+            }
+            "delete" => {
+                println!(
+                    "\n=== Mutation: delete ({} leaves, one per frame) ===",
+                    frames
+                );
+                let pass = run_delete_pass(r, frames);
+                print_mutation_stats(&pass);
+            }
+            other => {
+                return Err(anyhow!(
+                    "unknown --mutation kind '{}'. Expected: translate-root | translate-leaf | resize | paint | delete | all",
+                    other
+                ));
+            }
+        }
+        Ok(())
+    };
+
+    if kind == "all" {
+        // Run read-only mutations first (paint, translate variants),
+        // then resize, then delete last (delete reduces the scene).
+        for which in [
+            "paint",
+            "translate-leaf",
+            "translate-root",
+            "resize",
+            "delete",
+        ] {
+            run_one(which, renderer)?;
+        }
+    } else {
+        run_one(&kind, renderer)?;
+    }
+    Ok(())
 }
 
 /// Run a zoom pass with configurable step and range.
@@ -2400,6 +2884,14 @@ pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> R
         comp_stats.promoted_count,
         comp_stats.memory_bytes as f64 / 1024.0,
     );
+
+    // --- Unified mutation benchmark (--mutation=<kind>) ---
+    if let Some(ref spec) = args.mutation {
+        run_mutation_kind(&mut renderer, args.frames, spec)?;
+        drop(renderer);
+        println!("\nDone.");
+        return Ok(());
+    }
 
     // --- Node-translate mutation benchmark (--translate) ---
     if let Some(ref spec) = args.translate {

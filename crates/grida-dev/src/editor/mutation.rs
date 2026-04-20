@@ -29,6 +29,12 @@ pub enum MutationCommand {
         width: Option<f32>,
         height: Option<f32>,
     },
+    /// Replace the node's fills with a single solid color. Emits
+    /// `ChangeKind::Paint`.
+    SetFill { id: NodeId, color: CGColor },
+    /// Remove the subtree rooted at `id`. Emits
+    /// `(parent_or_self, ChangeKind::Full)`.
+    Delete { id: NodeId },
 }
 
 /// Apply a mutation command to a scene in-place.
@@ -49,7 +55,7 @@ pub fn apply(scene: &mut Scene, cmd: &MutationCommand) -> Vec<(NodeId, ChangeKin
             let mut out = Vec::with_capacity(ids.len());
             for id in ids {
                 translate_node(&mut scene.graph, id, *dx, *dy);
-                out.push((*id, ChangeKind::Geometry));
+                out.push((*id, ChangeKind::Layout));
             }
             out
         }
@@ -62,10 +68,26 @@ pub fn apply(scene: &mut Scene, cmd: &MutationCommand) -> Vec<(NodeId, ChangeKin
                 return Vec::new();
             }
             if resize_node(scene, id, *width, *height) {
-                // Resize is a size change → `Full` in v1.
                 vec![(*id, ChangeKind::Full)]
             } else {
                 Vec::new()
+            }
+        }
+        MutationCommand::SetFill { id, color } => {
+            if set_fill_solid(&mut scene.graph, id, *color) {
+                vec![(*id, ChangeKind::Paint)]
+            } else {
+                Vec::new()
+            }
+        }
+        MutationCommand::Delete { id } => {
+            // Report the parent (or `*id` for a root) with `Full`
+            // so the renderer full-rebuilds. The cg crate currently
+            // has no structural-remove fast path.
+            let parent = scene.graph.get_parent(id).unwrap_or(*id);
+            match scene.graph.remove_subtree(*id) {
+                Ok(_) => vec![(parent, ChangeKind::Full)],
+                Err(_) => Vec::new(),
             }
         }
     }
@@ -248,6 +270,61 @@ fn resize_node(scene: &mut Scene, id: &NodeId, width: Option<f32>, height: Optio
         }
     }
     changed
+}
+
+/// Overwrite the node's fills with a single solid paint, if the node
+/// supports fills. Returns `true` when the mutation landed. Emits
+/// `ChangeKind::Paint` via `MutationCommand::SetFill`.
+fn set_fill_solid(graph: &mut SceneGraph, id: &NodeId, color: CGColor) -> bool {
+    let Ok(node) = graph.get_node_mut(id) else {
+        return false;
+    };
+    let paint = Paint::Solid(SolidPaint::new_color(color));
+    match node {
+        Node::Rectangle(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::Ellipse(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::RegularPolygon(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::RegularStarPolygon(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::Line(_) => false, // lines use stroke, not fill
+        Node::TextSpan(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::AttributedText(_) => false, // per-span fills; out of scope here
+        Node::Path(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::Polygon(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::Vector(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::Container(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        Node::Tray(n) => {
+            n.fills = Paints::new([paint]);
+            true
+        }
+        _ => false,
+    }
 }
 
 // ── Resize geometry helpers (pure math) ──────────────────────────────────

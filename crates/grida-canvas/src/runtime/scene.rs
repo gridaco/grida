@@ -2047,7 +2047,7 @@ impl Renderer {
     /// [`ChangeKind`].
     ///
     /// Use when the mutation site already knows what changed (e.g.
-    /// `Translate` → `Geometry`). For `replace_node`-style mutations
+    /// `Translate` → `Layout`). For `replace_node`-style mutations
     /// where the caller doesn't know, run
     /// [`invalidation::diff_node`](super::invalidation::diff_node)
     /// on the old and new values first.
@@ -2106,11 +2106,12 @@ impl Renderer {
                 }
                 self.rebuild_scene_caches();
             } else if needs_geometry {
-                // Geometry fast path: per-subtree geometry update +
-                // partial layer/R-tree patch. Skips Taffy layout and
-                // effect-tree rebuild entirely. Covers both classical
-                // transform and layout-position changes via the
-                // [`super::invalidation::lens::motion_of`] lens.
+                // Layout fast path (ChangeKind::Layout): per-subtree
+                // geometry-cache update + partial layer/R-tree patch.
+                // Skips Taffy recompute and effect-tree rebuild entirely.
+                // Covers both classical transform and layout-position
+                // changes via the [`super::invalidation::lens::motion_of`]
+                // lens.
                 if super::invalidation::log_enabled() {
                     eprintln!(
                         "[invalidation] geometry  dirty={} (fast path)",
@@ -2313,7 +2314,7 @@ impl Renderer {
     ///   `SceneDirty::geometry`).
     /// - The caller is responsible for verifying no non-motion field
     ///   changed (the classifier ensures this by only calling this
-    ///   path for `ChangeKind::Geometry`).
+    ///   path for `ChangeKind::Layout`).
     pub fn rebuild_geometry_and_layers_partial(
         &mut self,
         roots: &std::collections::HashSet<NodeId>,
@@ -2388,7 +2389,7 @@ impl Renderer {
     /// Fast-path rebuild: geometry + layers only, skipping layout and
     /// effect-tree rebuild.
     ///
-    /// Used when the classifier reports [`ChangeKind::Geometry`] — a
+    /// Used when the classifier reports [`ChangeKind::Layout`] — a
     /// motion-only mutation does not alter layout constraints or
     /// render-surface membership, only world transforms and bounds.
     /// Skips two of the four phases `rebuild_scene_caches` runs.

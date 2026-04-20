@@ -15,7 +15,7 @@
 //!
 //! [`Motion`] uniformly covers both positioning models — leaf nodes'
 //! `AffineTransform` and `Container`/`Tray` `position + rotation` —
-//! so a Container position change registers as the same "Geometry"
+//! so a Container position change registers as the same "Layout"
 //! motion as a leaf transform change.
 
 use crate::cg::prelude::*;
@@ -33,7 +33,7 @@ use math2::transform::AffineTransform;
 /// expresses that placement as an `AffineTransform` (leaf variants) or
 /// as a `position + rotation` pair (Container, Tray).
 ///
-/// This lens drives the Geometry fast path. Whenever it reports a
+/// This lens drives the Layout classifier. Whenever it reports a
 /// difference but every other field of the node is unchanged, the
 /// change is a rigid-body move — children's local placement is
 /// unaffected, only their world transforms need re-deriving.
@@ -236,7 +236,7 @@ pub fn paint_of(node: &Node) -> PaintLens<'_> {
 ///
 /// For leaf variants this is the `AffineTransform` field; for
 /// Container/Tray it's the `(position, rotation)` pair. Drives the
-/// [`ChangeKind::Geometry`](super::ChangeKind::Geometry) classifier.
+/// [`ChangeKind::Layout`](super::ChangeKind::Layout) classifier.
 pub fn motion_differs(a: &Node, b: &Node) -> bool {
     motion_of(a) != motion_of(b)
 }

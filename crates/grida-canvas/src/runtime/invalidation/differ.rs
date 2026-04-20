@@ -5,7 +5,7 @@
 //!
 //! Motion and paint detection are **lens-based** — the functions in
 //! [`super::lens`] give a uniform view of those fields across all
-//! node variants, so the Geometry and Paint fast paths cover every
+//! node variants, so the Layout and Paint fast paths cover every
 //! variant that has those fields without per-variant dispatch.
 //!
 //! What varies per variant is the "other" category — shape-specific
@@ -16,11 +16,11 @@
 //! Variants whose "other" fields can't be cheaply compared (complex
 //! non-`PartialEq` types like `TextStyleRec`, `AttributedString`) are
 //! conservative: they always report `true`. In practice that means
-//! Geometry/Paint fast paths don't fire for text today, only for
+//! Layout/Paint fast paths don't fire for text today, only for
 //! shapes and containers. Text fast paths can be added later by
 //! extending `PartialEq` coverage of the text-style types.
 //!
-//! Guarantee: whenever the differ returns [`ChangeKind::Geometry`]
+//! Guarantee: whenever the differ returns [`ChangeKind::Layout`]
 //! or [`ChangeKind::Paint`], the non-matching field must be within
 //! that category. When in doubt → [`ChangeKind::Full`].
 
@@ -48,7 +48,7 @@ pub fn diff_node(old: &Node, new: &Node) -> ChangeKind {
 fn classify(motion: bool, paint: bool, other: bool) -> ChangeKind {
     match (motion, paint, other) {
         (false, false, false) => ChangeKind::None,
-        (true, false, false) => ChangeKind::Geometry,
+        (true, false, false) => ChangeKind::Layout,
         (false, true, false) => ChangeKind::Paint,
         _ => ChangeKind::Full,
     }
@@ -259,7 +259,7 @@ fn group_other_differs(a: &GroupNodeRec, b: &GroupNodeRec) -> bool {
 
 fn container_other_differs(a: &ContainerNodeRec, b: &ContainerNodeRec) -> bool {
     // Note: `rotation` and `position` live in the Motion lens (see
-    // lens::motion_of) — a change in either alone counts as Geometry,
+    // lens::motion_of) — a change in either alone counts as Layout,
     // not Full.
     a.active != b.active
         || a.mask != b.mask
