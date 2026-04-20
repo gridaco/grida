@@ -94,8 +94,8 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `min-width`, `max-width`      | ✅     | Via Taffy                                       |
 | `min-height`, `max-height`    | ✅     | Via Taffy                                       |
 | `aspect-ratio`                | ⚠️     | Via Taffy; broken in flex layouts ([taffy#804]) |
-| `inline-size`, `block-size`   | ❌     | Logical sizing not mapped                       |
-| `min-inline-size`, etc.       | ❌     | Logical sizing not mapped                       |
+| `inline-size`, `block-size`   | ✅     | Stylo cascade maps to width/height (LTR)        |
+| `min-inline-size`, etc.       | ✅     | Stylo cascade maps to min/max width/height      |
 | `padding` (all sides)         | ✅     | px values                                       |
 | `margin` (all sides)          | ✅     | px, auto; collapsing via Taffy block flow       |
 | `box-sizing`                  | ✅     | Via Taffy                                       |
@@ -107,19 +107,19 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Positioning
 
-| CSS Property                     | Status | Notes                                   |
-| -------------------------------- | ------ | --------------------------------------- |
-| `position: static`               | ✅     | Default                                 |
-| `position: relative`             | ✅     | Via Taffy                               |
-| `position: absolute`             | ✅     | Via Taffy                               |
-| `position: fixed`                | ❌     |                                         |
-| `position: sticky`               | ❌     |                                         |
-| `top`, `right`, `bottom`, `left` | ⚠️     | Stub in collect.rs, returns defaults    |
-| `inset` (shorthand)              | ❌     |                                         |
-| `inset-block`, `inset-inline`    | ❌     | Logical insets not mapped               |
-| `z-index`                        | ⚠️     | Stored but not used for paint order     |
-| `float`                          | ❌     | Recognized in collect, no layout effect |
-| `clear`                          | ❌     | Recognized in collect, no layout effect |
+| CSS Property                     | Status | Notes                                             |
+| -------------------------------- | ------ | ------------------------------------------------- |
+| `position: static`               | ✅     | Default                                           |
+| `position: relative`             | ✅     | Via Taffy                                         |
+| `position: absolute`             | ✅     | Via Taffy                                         |
+| `position: fixed`                | ❌     |                                                   |
+| `position: sticky`               | ❌     |                                                   |
+| `top`, `right`, `bottom`, `left` | ✅     | Extracted as CssLength (px/%/auto)                |
+| `inset` (shorthand)              | ❌     |                                                   |
+| `inset-block`, `inset-inline`    | ✅     | Stylo cascade maps to top/right/bottom/left (LTR) |
+| `z-index`                        | ⚠️     | Stored but not used for paint order               |
+| `float`                          | ❌     | Recognized in collect, no layout effect           |
+| `clear`                          | ❌     | Recognized in collect, no layout effect           |
 
 ### Flexbox
 
@@ -197,27 +197,27 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Border
 
-| CSS Property               | Status | Notes                                      |
-| -------------------------- | ------ | ------------------------------------------ |
-| `border-width` (all sides) | ✅     |                                            |
-| `border-color` (all sides) | ✅     |                                            |
-| `border-style` (all sides) | ✅     | solid/dashed/dotted painted; rest fallback |
-| `border-style: groove`     | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: ridge`      | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: inset`      | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: outset`     | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: double`     | ❌     | Enum defined, paint falls back to solid    |
-| `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)     |
-| `border` (shorthand)       | ✅     |                                            |
-| `border-image`             | ✅     | 9-slice via `ImageProvider`                |
-| `border-image-outset`      | ✅     | Extends border-image area                  |
-| `border-image-repeat`      | ✅     | stretch/repeat/round/space                 |
-| `border-image-slice`       | ✅     | px values; `fill` keyword                  |
-| `border-image-source`      | ✅     | url() via `ImageProvider`                  |
-| `border-image-width`       | ✅     | px values; falls back to border-width      |
-| `border-collapse`          | ❌     |                                            |
-| `border-spacing`           | ❌     |                                            |
-| Logical border properties  | ❌     | `border-block-*`, `border-inline-*`        |
+| CSS Property               | Status | Notes                                                 |
+| -------------------------- | ------ | ----------------------------------------------------- |
+| `border-width` (all sides) | ✅     |                                                       |
+| `border-color` (all sides) | ✅     |                                                       |
+| `border-style` (all sides) | ✅     | solid/dashed/dotted painted; rest fallback            |
+| `border-style: groove`     | ❌     | Enum defined, paint falls back to solid               |
+| `border-style: ridge`      | ❌     | Enum defined, paint falls back to solid               |
+| `border-style: inset`      | ❌     | Enum defined, paint falls back to solid               |
+| `border-style: outset`     | ❌     | Enum defined, paint falls back to solid               |
+| `border-style: double`     | ❌     | Enum defined, paint falls back to solid               |
+| `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)                |
+| `border` (shorthand)       | ✅     |                                                       |
+| `border-image`             | ✅     | 9-slice via `ImageProvider`                           |
+| `border-image-outset`      | ✅     | Extends border-image area                             |
+| `border-image-repeat`      | ✅     | stretch/repeat/round/space                            |
+| `border-image-slice`       | ✅     | px values; `fill` keyword                             |
+| `border-image-source`      | ✅     | url() via `ImageProvider`                             |
+| `border-image-width`       | ✅     | px values; falls back to border-width                 |
+| `border-collapse`          | ❌     |                                                       |
+| `border-spacing`           | ❌     |                                                       |
+| Logical border properties  | ✅     | `border-block-*`, `border-inline-*` via Stylo cascade |
 
 ### Outline
 

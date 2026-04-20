@@ -1478,6 +1478,84 @@ code block
         assert!(bottom[0] < 100, "bottom darker than 128, got {}", bottom[0]);
     }
 
+    // ── CSS logical properties (LTR horizontal-tb) ───────────────────
+    //
+    // In the default writing mode, Stylo's cascade resolves logical
+    // longhands onto the physical slots we already extract — no code on
+    // our side has to translate anything. These tests pin that behavior
+    // so a future Stylo upgrade or a local refactor doesn't silently
+    // drop the mapping.
+
+    #[test]
+    fn test_logical_inline_block_size() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="inline-size:140px;block-size:80px">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.width, types::CssLength::Px(140.0));
+        assert_eq!(el.height, types::CssLength::Px(80.0));
+    }
+
+    #[test]
+    fn test_logical_min_max_size() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="min-inline-size:100px;max-block-size:60px">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.min_width, types::CssLength::Px(100.0));
+        assert_eq!(el.max_height, types::CssLength::Px(60.0));
+    }
+
+    #[test]
+    fn test_logical_inset() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="position:absolute;inset-block-start:20px;inset-inline-start:40px;inset-block-end:10px;inset-inline-end:5px">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.inset.top, types::CssLength::Px(20.0));
+        assert_eq!(el.inset.left, types::CssLength::Px(40.0));
+        assert_eq!(el.inset.bottom, types::CssLength::Px(10.0));
+        assert_eq!(el.inset.right, types::CssLength::Px(5.0));
+    }
+
+    #[test]
+    fn test_logical_padding() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="padding-inline-start:20px;padding-block-start:10px;padding-inline-end:4px;padding-block-end:6px">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.padding.left, 20.0);
+        assert_eq!(el.padding.top, 10.0);
+        assert_eq!(el.padding.right, 4.0);
+        assert_eq!(el.padding.bottom, 6.0);
+    }
+
+    #[test]
+    fn test_logical_border() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="border-inline-start:6px solid #ff0000;border-block-end:4px solid #0000ff">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.border.left.width, 6.0);
+        assert_eq!(
+            (
+                el.border.left.color.r,
+                el.border.left.color.g,
+                el.border.left.color.b
+            ),
+            (255, 0, 0)
+        );
+        assert_eq!(el.border.bottom.width, 4.0);
+        assert_eq!(
+            (
+                el.border.bottom.color.r,
+                el.border.bottom.color.g,
+                el.border.bottom.color.b
+            ),
+            (0, 0, 255)
+        );
+    }
+
     // ── Gradient stop px positions ──────────────────────────────────
 
     #[test]
