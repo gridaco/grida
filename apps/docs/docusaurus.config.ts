@@ -59,6 +59,7 @@ const config: Config = {
     defaultLocale: "en",
     locales: [
       "en",
+      "ja",
       // "fr",
       "ko",
     ],
