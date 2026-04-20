@@ -17,8 +17,8 @@
     }
   },
   "scripts": {
-    "build": "tsdown --platform neutral index.ts --format cjs --format esm --dts",
-    "dev": "tsdown --platform neutral index.ts --format cjs --format esm --dts --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -30,8 +30,8 @@
     }
   },
   "scripts": {
-    "build": "tsdown --platform neutral index.tsx --format cjs --format esm --dts",
-    "dev": "tsdown --platform neutral index.tsx --format cjs --format esm --dts --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

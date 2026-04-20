@@ -38,8 +38,8 @@
     }
   },
   "scripts": {
-    "build": "tsdown --platform neutral src/index.ts src/utils.ts src/locales.ts --format cjs --format esm --dts",
-    "dev": "tsdown --platform neutral src/index.ts src/utils.ts src/locales.ts --format cjs --format esm --dts --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   }

@@ -20,8 +20,8 @@
     }
   },
   "scripts": {
-    "build": "tsdown --platform neutral src/index.ts --format cjs --format esm --dts",
-    "dev": "tsdown --platform neutral src/index.ts --format cjs --format esm --dts --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
