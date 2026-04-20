@@ -929,14 +929,23 @@ impl Renderer {
             .borrow_mut()
             .invalidate_by_id(node_id);
 
+        // Invalidate per-node paint caches directly. We must NOT route
+        // through `mark_node_change_kind`: every `ChangeKind` variant
+        // with a dirty signal triggers an `apply_changes` branch that
+        // rebuilds `LayerList` from the scene graph (`rebuild_scene_caches`
+        // for Full, `rebuild_geometry_and_layers_partial` for Layout,
+        // `rebuild_layer_vec` for Paint). The rebuild reads `node.text`
+        // from the graph — during an editing session the node still holds
+        // the pre-session text, so the rebuild would overwrite the
+        // in-place layer edit we just did and revert the display to the
+        // stale node text.
+        self.scene_cache.picture.invalidate_node(node_id);
+        self.scene_cache.compositor.invalidate(&node_id);
+        self.compositor_atlas.free_node(&node_id);
+
         // Invalidate the pan image cache so mouse-move frames don't blit
         // stale content while text is being edited.
         self.pan_image_cache = None;
-
-        // Record the change. apply_changes() will handle per-node
-        // picture/compositor/atlas invalidation and viewport caches.
-        // Text edits change measured size → route through Full.
-        self.mark_node_change_kind(node_id, super::invalidation::ChangeKind::Full);
     }
 
     /// Update the shape bounding rect for a text node's layer.
