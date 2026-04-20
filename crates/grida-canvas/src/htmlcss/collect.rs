@@ -1749,26 +1749,78 @@ fn gradient_items_to_stops(
             .unwrap_or(current_color)
     };
 
-    let mut raw: Vec<(Option<f32>, CGColor)> = Vec::new();
+    // Each element: (position, is_px, color). Px-positioned stops are
+    // normalized to gradient-line fractions at paint time where the line
+    // length is known.
+    let mut raw: Vec<(Option<f32>, bool, CGColor)> = Vec::new();
     for item in items {
         match item {
             GenericGradientItem::SimpleColorStop(color) => {
-                raw.push((None, resolve(color)));
+                raw.push((None, false, resolve(color)));
             }
             GenericGradientItem::ComplexColorStop { color, position } => {
-                let offset = position.to_percentage().map(|p| p.0);
-                raw.push((offset, resolve(color)));
+                let (offset, is_px) = if let Some(pct) = position.to_percentage() {
+                    (Some(pct.0), false)
+                } else if let Some(len) = position.to_length() {
+                    (Some(len.px()), true)
+                } else {
+                    (None, false)
+                };
+                raw.push((offset, is_px, resolve(color)));
             }
             GenericGradientItem::InterpolationHint(_) => {}
         }
     }
-    auto_distribute_stops(&mut raw);
+    auto_distribute_stops_typed(&mut raw);
     raw.into_iter()
-        .map(|(o, c)| GradientStop {
+        .map(|(o, is_px, c)| GradientStop {
             offset: o.unwrap_or(0.0),
+            offset_is_px: is_px,
             color: c,
         })
         .collect()
+}
+
+/// Like `auto_distribute_stops`, but carries an `is_px` flag per stop.
+///
+/// First and last auto stops default to `0%` and `100%` respectively. Interior
+/// runs of auto stops are linearly interpolated between their bookends. When
+/// bookends use different units we inherit the previous stop's unit; exact
+/// resolution defers to paint-time which has the gradient-line length.
+fn auto_distribute_stops_typed(raw: &mut [(Option<f32>, bool, CGColor)]) {
+    let n = raw.len();
+    if n == 0 {
+        return;
+    }
+    if raw[0].0.is_none() {
+        raw[0].0 = Some(0.0);
+        raw[0].1 = false;
+    }
+    if raw[n - 1].0.is_none() {
+        raw[n - 1].0 = Some(1.0);
+        raw[n - 1].1 = false;
+    }
+    let mut i = 1;
+    while i < n - 1 {
+        if raw[i].0.is_some() {
+            i += 1;
+            continue;
+        }
+        let mut j = i + 1;
+        while j < n && raw[j].0.is_none() {
+            j += 1;
+        }
+        let prev = raw[i - 1].0.unwrap();
+        let next = raw[j].0.unwrap();
+        let prev_is_px = raw[i - 1].1;
+        let count = (j - i + 1) as f32;
+        for (k, slot) in (i..j).enumerate() {
+            let t = (k + 1) as f32 / count;
+            raw[slot].0 = Some(prev + t * (next - prev));
+            raw[slot].1 = prev_is_px;
+        }
+        i = j;
+    }
 }
 
 /// Convert conic-gradient items to GradientStops.
@@ -1812,6 +1864,7 @@ fn conic_gradient_items_to_stops(
     raw.into_iter()
         .map(|(o, c)| GradientStop {
             offset: o.unwrap_or(0.0),
+            offset_is_px: false,
             color: c,
         })
         .collect()

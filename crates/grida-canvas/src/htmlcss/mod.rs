@@ -1415,6 +1415,72 @@ code block
         }
     }
 
+    // ── Gradient stop px positions ──────────────────────────────────
+
+    #[test]
+    fn test_gradient_stop_px_extraction() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="background:linear-gradient(90deg,red 0px,blue 20px)">x</div>"#;
+        let g = expect_linear(html);
+        assert_eq!(g.stops.len(), 2);
+        assert!(g.stops[0].offset_is_px);
+        assert_eq!(g.stops[0].offset, 0.0);
+        assert!(g.stops[1].offset_is_px);
+        assert_eq!(g.stops[1].offset, 20.0);
+    }
+
+    #[test]
+    fn test_gradient_stop_percent_extraction() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="background:linear-gradient(90deg,red 0%,blue 50%)">x</div>"#;
+        let g = expect_linear(html);
+        assert!(!g.stops[0].offset_is_px);
+        assert_eq!(g.stops[0].offset, 0.0);
+        assert!(!g.stops[1].offset_is_px);
+        assert_eq!(g.stops[1].offset, 0.5);
+    }
+
+    /// Probe: `repeating-linear-gradient` with 20px red / 20px white stops
+    /// on a 100px-wide box paints a 40px cycle — so every 40px the pattern
+    /// repeats. Before this fix, px stops collapsed to 0..100% and the
+    /// cycle was the entire box (no tiling).
+    #[test]
+    fn test_gradient_repeating_px_stops_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:100px;height:20px;background:repeating-linear-gradient(90deg,#ff0000 0 20px,#ffffff 20px 40px)"></div>"#;
+        let px = rasterize_rgba(html, 100, 20);
+        let at = |x: i32| {
+            let p = pixel_at(&px, x, 10, 100);
+            [p[0], p[1], p[2]]
+        };
+        assert_eq!(at(10), [255, 0, 0], "0–20 red");
+        assert_eq!(at(30), [255, 255, 255], "20–40 white");
+        assert_eq!(at(50), [255, 0, 0], "40–60 red");
+        assert_eq!(at(70), [255, 255, 255], "60–80 white");
+        assert_eq!(at(90), [255, 0, 0], "80–100 red");
+    }
+
+    /// A gradient with a mix of px and percent stops still paints correctly.
+    #[test]
+    fn test_gradient_mixed_px_percent_probe() {
+        let _guard = crate::stylo_test::lock();
+        // 100px wide. Red up to 25px (25% line length), white from 50%.
+        let html = r#"<div style="width:100px;height:20px;background:linear-gradient(90deg,#ff0000 25px,#ffffff 50%)"></div>"#;
+        let px = rasterize_rgba(html, 100, 20);
+        let left = pixel_at(&px, 10, 10, 100);
+        assert_eq!(
+            [left[0], left[1], left[2]],
+            [255, 0, 0],
+            "pre-first-stop red"
+        );
+        let right = pixel_at(&px, 75, 10, 100);
+        assert_eq!(
+            [right[0], right[1], right[2]],
+            [255, 255, 255],
+            "post-last-stop white"
+        );
+    }
+
     // ── Gradient color interpolation ─────────────────────────────────
     //
     // The explicit `in <colorspace>` syntax is gated in Stylo behind the

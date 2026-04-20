@@ -4,10 +4,8 @@
     <meta charset="utf-8" />
     <title>Paint: Repeating Gradients</title>
     <!--
-      NOTE: stops use % (not px). Px-unit stops in repeating gradients are
-      not yet supported — they auto-distribute to 0..100% and the cycle
-      fraction collapses to 1.0 (no tiling). Fix requires preserving raw
-      stop positions through the data model (StopPosition::{Px, Percent}).
+      Stops use both % and px positions. Px stops resolve to fractions
+      of the gradient-line length at paint time.
     -->
     <style>
       body {
@@ -50,9 +48,27 @@
         background: repeating-linear-gradient(45deg, #14a 0 10%, #fff 10% 20%);
       }
 
+      /* px-unit stops: 20px red / 20px white on a 180px line = 9 stripes. */
+      .rep-linear-px {
+        background: repeating-linear-gradient(
+          90deg,
+          #0066cc 0 20px,
+          #fff 20px 40px
+        );
+      }
+
       /* repeating-radial — 5 concentric rings */
       .rep-radial {
         background: repeating-radial-gradient(circle, #f00 0 10%, #fff 10% 20%);
+      }
+
+      /* px-unit radial stops: 15px ring cycle from center. */
+      .rep-radial-px {
+        background: repeating-radial-gradient(
+          circle,
+          #cc3366 0 15px,
+          #fff 15px 30px
+        );
       }
 
       /* repeating-conic — 6 segments */
@@ -72,8 +88,16 @@
         <div class="rect rep-linear-diag">diagonal</div>
       </div>
       <div>
+        <div class="label">repeating-linear 90deg (20px cycle)</div>
+        <div class="rect rep-linear-px">px stops</div>
+      </div>
+      <div>
         <div class="label">repeating-radial (10% cycle)</div>
         <div class="rect rep-radial">rings</div>
+      </div>
+      <div>
+        <div class="label">repeating-radial (15px rings)</div>
+        <div class="rect rep-radial-px">px rings</div>
       </div>
       <div>
         <div class="label">repeating-conic (60deg cycle)</div>

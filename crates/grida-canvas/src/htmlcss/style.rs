@@ -616,7 +616,14 @@ impl Default for GradientPosition {
 /// A gradient color stop.
 #[derive(Debug, Clone, Copy)]
 pub struct GradientStop {
-    pub offset: f32, // 0.0 = start, 1.0 = end
+    /// Stop position. When `offset_is_px` is false this is a fraction
+    /// of the gradient line (0.0 = start, 1.0 = end) resolved at
+    /// extraction time. When true it is a raw px offset along the
+    /// gradient line, resolved to a fraction at paint time using the
+    /// geometry-dependent line length. Only meaningful for
+    /// linear/radial — conic stop positions are always angular.
+    pub offset: f32,
+    pub offset_is_px: bool,
     pub color: CGColor,
 }
 

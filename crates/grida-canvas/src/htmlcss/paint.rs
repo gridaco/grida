@@ -651,6 +651,22 @@ use skia_safe::{Point, TileMode};
 use super::style::{GradientPosition, RadialShape, RadialSize};
 
 fn build_gradient_data(stops: &[GradientStop]) -> (Vec<skia_safe::Color4f>, Vec<f32>) {
+    build_gradient_data_with_line_length(stops, f32::INFINITY)
+}
+
+/// Convert stops to Skia color and position vectors, normalizing any px
+/// positions against the gradient-line length `L`. If all stops are
+/// fraction-based `L` may be any value (it's only consulted for px stops).
+///
+/// After normalization this also clamps each position to be >= its
+/// predecessor, matching CSS's "stops must be non-decreasing" rule. Skia
+/// asserts strictly increasing positions in debug builds; we clamp to
+/// equal to preserve author intent (shared stops create hard color
+/// transitions).
+fn build_gradient_data_with_line_length(
+    stops: &[GradientStop],
+    line_length: f32,
+) -> (Vec<skia_safe::Color4f>, Vec<f32>) {
     let colors: Vec<skia_safe::Color4f> = stops
         .iter()
         .map(|s| {
@@ -662,7 +678,30 @@ fn build_gradient_data(stops: &[GradientStop]) -> (Vec<skia_safe::Color4f>, Vec<
             )
         })
         .collect();
-    let positions: Vec<f32> = stops.iter().map(|s| s.offset).collect();
+
+    let inv_l = if line_length > 1e-6 {
+        1.0 / line_length
+    } else {
+        0.0
+    };
+    let mut positions: Vec<f32> = stops
+        .iter()
+        .map(|s| {
+            if s.offset_is_px {
+                s.offset * inv_l
+            } else {
+                s.offset
+            }
+        })
+        .collect();
+
+    // CSS: each stop position is clamped to at least the previous stop.
+    for i in 1..positions.len() {
+        if positions[i] < positions[i - 1] {
+            positions[i] = positions[i - 1];
+        }
+    }
+
     (colors, positions)
 }
 
@@ -818,11 +857,6 @@ fn build_linear_gradient_shader(
     w: f32,
     h: f32,
 ) -> Option<skia_safe::Shader> {
-    let (colors, raw_positions) = build_gradient_data(&grad.stops);
-    if colors.len() < 2 {
-        return None;
-    }
-
     // CSS: 0deg = to top, 90deg = to right. Convert to start/end points.
     let rad = grad.angle_deg.to_radians();
     let sin = rad.sin();
@@ -831,6 +865,13 @@ fn build_linear_gradient_shader(
     let cy = h / 2.0;
     // Half-length covers the projected extent of the box along the gradient line.
     let half_len = (w * sin.abs() + h * cos.abs()) / 2.0;
+    let line_length = 2.0 * half_len;
+
+    let (colors, raw_positions) = build_gradient_data_with_line_length(&grad.stops, line_length);
+    if colors.len() < 2 {
+        return None;
+    }
+
     let p1 = Point::new(cx - sin * half_len, cy + cos * half_len);
     let p2_full = Point::new(cx + sin * half_len, cy - cos * half_len);
 
@@ -854,13 +895,19 @@ fn build_radial_gradient_shader(
     w: f32,
     h: f32,
 ) -> Option<skia_safe::Shader> {
-    let (colors, raw_positions) = build_gradient_data(&grad.stops);
+    let (cx, cy) = resolve_center(&grad.center, w, h);
+    let (rx_full, ry_full) = radial_radii(grad.shape, grad.size, cx, cy, w, h);
+
+    // Use the larger axis as the gradient line length for px stop
+    // resolution. For circles rx = ry; for ellipses this is a reasonable
+    // convention — CSS defines the ending shape's "gradient line" as
+    // radius-like distance from the center.
+    let line_length = rx_full.max(ry_full);
+
+    let (colors, raw_positions) = build_gradient_data_with_line_length(&grad.stops, line_length);
     if colors.len() < 2 {
         return None;
     }
-
-    let (cx, cy) = resolve_center(&grad.center, w, h);
-    let (rx_full, ry_full) = radial_radii(grad.shape, grad.size, cx, cy, w, h);
 
     let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
     let (rx, ry) = (rx_full * cycle, ry_full * cycle);
