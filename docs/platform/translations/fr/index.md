@@ -1,4 +1,5 @@
 ---
+id: intro
 title: Plateforme Grida
 description: Documentation de plateforme pour les clients Grida, les tags et les fonctionnalités produit associées.
 keywords:

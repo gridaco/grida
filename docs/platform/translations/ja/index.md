@@ -1,4 +1,5 @@
 ---
+id: intro
 title: Grida Platform
 description: Grida の顧客、タグ、および関連プロダクト機能に関するプラットフォーム文書です。
 keywords:

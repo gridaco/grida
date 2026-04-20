@@ -5,7 +5,7 @@ const fse = require("fs-extra");
 const path = require("path");
 
 const docs_site_root = path.join(__dirname, "../../");
-const docs_site_docs_root = path.join(__dirname, "../../../docs");
+const docs_site_docs_root = path.join(__dirname, "../../docs");
 
 /**
  * Loop through the docs directory.

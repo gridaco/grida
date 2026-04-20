@@ -1,4 +1,5 @@
 ---
+id: intro
 title: Grida 플랫폼
 description: Grida의 고객, 태그, 관련 제품 기능에 대한 플랫폼 문서입니다.
 keywords:
