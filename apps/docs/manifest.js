@@ -6,12 +6,16 @@ module.exports = {
         path: "/docs/getting-started",
       },
       {
-        title: "Assistant",
+        title: "With Figma",
         open: true,
         routes: [
           {
+            title: "Assistant",
+            path: "/docs/with-figma/assistant",
+          },
+          {
             title: "Design Assistant",
-            path: "/docs/assistant/design-assistant",
+            path: "/docs/with-figma/assistant/design-assistant",
             routes: [
               {
                 title: "Icons loader",
@@ -21,31 +25,31 @@ module.exports = {
           },
           // {
           //   title: "Components View",
-          //   path: "/docs/assistant/components-view",
+          //   path: "/docs/with-figma/assistant/components-view",
           // },
           // {
           //   title: "Code View",
-          //   path: "/docs/assistant/code-view",
+          //   path: "/docs/with-figma/assistant/code-view",
           // },
           // {
           //   title: "Quick look",
-          //   path: "/docs/assistant/quicklook",
+          //   path: "/docs/with-figma/assistant/quicklook",
           // },
           // {
           //   title: "Click to copy",
-          //   path: "/docs/assistant/click-to-copy",
+          //   path: "/docs/with-figma/assistant/click-to-copy",
           // },
           // {
           //   title: "Design Linting",
-          //   path: "/docs/assistant/linter",
+          //   path: "/docs/with-figma/assistant/linter",
           // },
           // {
           //   title: "Preferences",
-          //   path: "/docs/assistant/preferences",
+          //   path: "/docs/with-figma/assistant/preferences",
           // },
           // {
           //   title: "Environment Variables",
-          //   path: "/docs/assistant/environment-variables",
+          //   path: "/docs/with-figma/assistant/environment-variables",
           // },
         ],
       },

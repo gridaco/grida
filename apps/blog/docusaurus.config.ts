@@ -13,10 +13,12 @@ const config: Config = {
   organizationName: "gridaco",
   projectName: "grida",
   onBrokenLinks: "throw",
-  onBrokenMarkdownLinks: "warn",
 
   markdown: {
     mermaid: true,
+    hooks: {
+      onBrokenMarkdownLinks: "warn",
+    },
   },
 
   themes: ["@docusaurus/theme-mermaid"],

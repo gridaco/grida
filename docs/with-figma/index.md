@@ -8,6 +8,13 @@ Grida provides seamless integration with Figma, enabling designers to transfer w
 
 ## Features
 
+### Assistant
+
+The maintained Grida Assistant docs now live under this section:
+
+- [Assistant](./assistant/01-intro.mdx)
+- [Design Assistant](./assistant/design-assistant/index.mdx)
+
 ### Import from Figma
 
 Copy nodes from Figma and paste them directly into Grida. The editor automatically detects Figma clipboard format and converts nodes to native Grida format, preserving:
@@ -43,6 +50,7 @@ The conversion pipeline maps Figma properties to Grida equivalents:
 
 - [How to get Personal Access Token](./guides/how-to-get-personal-access-token.md)
 - [How to get Sharable Design Link](./guides/how-to-get-sharable-design-link.md)
+- [How to save a local .fig copy](./guides/how-to-get-fig-file.md)
 
 ## Technical Details
 

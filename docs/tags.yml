@@ -240,3 +240,38 @@ data-layout:
   label: Data layout
   permalink: /data-layout
   description: Memory layout, SoA/AoS, and property storage models (e.g. engine research).
+
+planning:
+  label: Planning
+  permalink: /planning
+  description: Planning docs, implementation sequencing, and staged rollout notes.
+
+invalidation:
+  label: Invalidation
+  permalink: /invalidation
+  description: Dirty tracking, dependency propagation, and cache invalidation behavior.
+
+architecture:
+  label: Architecture
+  permalink: /architecture
+  description: System architecture, module boundaries, and high-level design structure.
+
+viewport-filter:
+  label: Viewport filter
+  permalink: /viewport-filter
+  description: Viewport-scoped filtering, dimming, and isolation behavior.
+
+dirty-flags:
+  label: Dirty flags
+  permalink: /dirty-flags
+  description: Fine-grained dirty flag models for scene updates and render invalidation.
+
+resource-loading:
+  label: Resource loading
+  permalink: /resource-loading
+  description: Loading external resources such as images, blobs, and document assets.
+
+images:
+  label: Images
+  permalink: /images
+  description: Image resources, decoding, caching, and image-backed rendering paths.
