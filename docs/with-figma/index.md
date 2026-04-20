@@ -1,3 +1,17 @@
+---
+title: Grida with Figma
+description: Learn how Grida works with Figma, including Assistant docs, import workflows, and practical setup guides.
+keywords:
+  - grida
+  - figma
+  - import
+  - assistant
+  - design workflow
+format: md
+doc_tasks:
+  - update
+---
+
 # Grida with Figma
 
 Grida provides seamless integration with Figma, enabling designers to transfer work between tools without friction.
@@ -48,8 +62,8 @@ The conversion pipeline maps Figma properties to Grida equivalents:
 
 ## Guides
 
-- [How to get Personal Access Token](./guides/how-to-get-personal-access-token.md)
-- [How to get Sharable Design Link](./guides/how-to-get-sharable-design-link.md)
+- [How to get a Figma personal access token](./guides/how-to-get-personal-access-token.md)
+- [How to get a shareable Figma design link](./guides/how-to-get-sharable-design-link.md)
 - [How to save a local .fig copy](./guides/how-to-get-fig-file.md)
 
 ## Technical Details

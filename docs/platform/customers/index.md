@@ -1,3 +1,17 @@
+---
+title: Customers
+description: Learn the Grida customer object, CSV import format, metadata fields, and update behavior.
+keywords:
+  - grida
+  - platform
+  - customers
+  - csv import
+  - metadata
+doc_tasks:
+  - enhance
+format: md
+---
+
 # Customers
 
 This object represents a customer of your business. Use it to create recurring charges, save payment and contact information, and track payments that belong to the same customer.
@@ -56,7 +70,7 @@ Example:
 
 > **CSV Note:** When providing the `tags` within the CSV file, you should provide comma separated text (for example, `"tag1,tag2,tag3"`). The list of tags must be wrapped in quotation marks.
 
-Learn more about [tags](/platform/tags/index.md).
+Learn more about [tags](../tags/index.md).
 
 ### `metadata`
 
