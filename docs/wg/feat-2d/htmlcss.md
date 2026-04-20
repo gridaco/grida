@@ -117,7 +117,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `top`, `right`, `bottom`, `left` | ✅     | Extracted as CssLength (px/%/auto)                |
 | `inset` (shorthand)              | ❌     |                                                   |
 | `inset-block`, `inset-inline`    | ✅     | Stylo cascade maps to top/right/bottom/left (LTR) |
-| `z-index`                        | ⚠️     | Stored but not used for paint order               |
+| `z-index`                        | ✅     | Sibling paint order (§9.9.1 subset; no stacking contexts for opacity/transform yet) |
 | `float`                          | ❌     | Recognized in collect, no layout effect           |
 | `clear`                          | ❌     | Recognized in collect, no layout effect           |
 
