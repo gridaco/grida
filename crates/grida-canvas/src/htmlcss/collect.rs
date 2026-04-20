@@ -2105,13 +2105,14 @@ fn extract_blend_mode(style: &ComputedValues) -> BlendMode {
 /// Returns an empty Vec for `transform: none`.
 fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
     use style::values::computed::transform::TransformOperation;
+    use style::values::generics::transform::{
+        GenericRotate as Rotate, GenericScale as Scale, GenericTranslate as Translate,
+    };
     use types::{LengthPercentage as LP, TransformOp};
 
-    let transform = style.get_box().clone_transform();
+    let bx = style.get_box();
+    let transform = bx.clone_transform();
     let ops = &transform.0;
-    if ops.is_empty() {
-        return Vec::new();
-    }
 
     let resolve_lp = |lp: &style::values::computed::LengthPercentage| -> LP {
         if let Some(pct) = lp.to_percentage() {
@@ -2123,7 +2124,42 @@ fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
         }
     };
 
-    let mut result = Vec::with_capacity(ops.len());
+    let mut result: Vec<TransformOp> = Vec::with_capacity(ops.len() + 3);
+
+    // CSS Transforms 2: individual transform properties apply first, in the
+    // order translate → rotate → scale, then the `transform` shorthand.
+    // https://drafts.csswg.org/css-transforms-2/#individual-transforms
+    match bx.clone_translate() {
+        Translate::None => {}
+        Translate::Translate(tx, ty, _tz) => {
+            result.push(TransformOp::Translate(resolve_lp(&tx), resolve_lp(&ty)));
+        }
+    }
+    match bx.clone_rotate() {
+        Rotate::None => {}
+        Rotate::Rotate(angle) => {
+            result.push(TransformOp::Rotate(angle.radians()));
+        }
+        // 3D rotate: only honor if the rotation axis is close to the Z axis (0,0,z).
+        Rotate::Rotate3D(x, y, z, angle) => {
+            if x == 0.0 && y == 0.0 && z != 0.0 {
+                let radians = angle.radians();
+                let signed = if z > 0.0 { radians } else { -radians };
+                result.push(TransformOp::Rotate(signed));
+            }
+        }
+    }
+    match bx.clone_scale() {
+        Scale::None => {}
+        Scale::Scale(sx, sy, _sz) => {
+            result.push(TransformOp::Scale(sx, sy));
+        }
+    }
+
+    if ops.is_empty() && result.is_empty() {
+        return Vec::new();
+    }
+
     for op in ops.iter() {
         let ir_op = match op {
             TransformOperation::Matrix(mat) => {

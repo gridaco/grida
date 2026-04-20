@@ -1195,6 +1195,98 @@ code block
         assert!(el.font.text_shadow.is_empty());
     }
 
+    // ── Individual transform properties ──────────────────────────────
+
+    #[test]
+    fn test_transform_translate_longhand() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="translate:40px 20px">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.transform.len(), 1);
+        match el.transform[0] {
+            types::TransformOp::Translate(tx, ty) => {
+                assert_eq!(tx, types::LengthPercentage::Px(40.0));
+                assert_eq!(ty, types::LengthPercentage::Px(20.0));
+            }
+            ref other => panic!("expected Translate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_transform_rotate_longhand() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="rotate:90deg">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.transform.len(), 1);
+        match el.transform[0] {
+            types::TransformOp::Rotate(rad) => {
+                assert!((rad - std::f32::consts::FRAC_PI_2).abs() < 1e-4);
+            }
+            ref other => panic!("expected Rotate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_transform_scale_longhand() {
+        let _guard = crate::stylo_test::lock();
+        // Uniform scale.
+        let html = r#"<div style="scale:1.5">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.transform.len(), 1);
+        match el.transform[0] {
+            types::TransformOp::Scale(sx, sy) => {
+                assert_eq!(sx, 1.5);
+                assert_eq!(sy, 1.5);
+            }
+            ref other => panic!("expected Scale, got {other:?}"),
+        }
+
+        // Non-uniform.
+        let html = r#"<div style="scale:2 0.5">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        match el.transform[0] {
+            types::TransformOp::Scale(sx, sy) => {
+                assert_eq!(sx, 2.0);
+                assert_eq!(sy, 0.5);
+            }
+            ref other => panic!("expected Scale, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_transform_individual_order() {
+        let _guard = crate::stylo_test::lock();
+        // Per spec, ordering is translate → rotate → scale → transform.
+        let html = r#"<div style="
+            translate:10px 0;
+            rotate:45deg;
+            scale:2;
+            transform:skew(10deg)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.transform.len(), 4);
+        assert!(matches!(
+            el.transform[0],
+            types::TransformOp::Translate(_, _)
+        ));
+        assert!(matches!(el.transform[1], types::TransformOp::Rotate(_)));
+        assert!(matches!(el.transform[2], types::TransformOp::Scale(_, _)));
+        assert!(matches!(el.transform[3], types::TransformOp::Skew(_, _)));
+    }
+
+    #[test]
+    fn test_transform_individual_none_defaults() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div>x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert!(el.transform.is_empty(), "no transform props → empty");
+    }
+
     // ── Gradient extraction ──────────────────────────────────────────
 
     fn find_bg_image(el: &style::StyledElement) -> Option<&style::BackgroundImage> {
