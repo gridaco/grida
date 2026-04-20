@@ -499,6 +499,44 @@ pub enum BackgroundBox {
     ContentBox,
 }
 
+/// CSS gradient `color-interpolation-method` — the color space where color
+/// stops are blended.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum GradientColorSpace {
+    #[default]
+    Oklab,
+    Srgb,
+    SrgbLinear,
+    Hsl,
+    Hwb,
+    Lab,
+    Lch,
+    Oklch,
+    DisplayP3,
+    Rec2020,
+    A98Rgb,
+    ProphotoRgb,
+    XyzD50,
+    XyzD65,
+}
+
+/// Hue interpolation strategy for cylindrical color spaces (HSL, HWB, LCH, OKLCH).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum GradientHueMethod {
+    #[default]
+    Shorter,
+    Longer,
+    Increasing,
+    Decreasing,
+}
+
+/// Resolved CSS `color-interpolation-method` on a gradient.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct GradientInterpolation {
+    pub color_space: GradientColorSpace,
+    pub hue_method: GradientHueMethod,
+}
+
 /// CSS `linear-gradient()` / `repeating-linear-gradient()`.
 #[derive(Debug, Clone)]
 pub struct LinearGradient {
@@ -506,6 +544,7 @@ pub struct LinearGradient {
     pub angle_deg: f32,
     pub stops: Vec<GradientStop>,
     pub repeating: bool,
+    pub interpolation: GradientInterpolation,
 }
 
 /// CSS `radial-gradient()` / `repeating-radial-gradient()`.
@@ -516,6 +555,7 @@ pub struct RadialGradient {
     pub center: GradientPosition,
     pub stops: Vec<GradientStop>,
     pub repeating: bool,
+    pub interpolation: GradientInterpolation,
 }
 
 /// CSS `conic-gradient()` / `repeating-conic-gradient()`.
@@ -527,6 +567,7 @@ pub struct ConicGradient {
     pub center: GradientPosition,
     pub stops: Vec<GradientStop>,
     pub repeating: bool,
+    pub interpolation: GradientInterpolation,
 }
 
 /// Radial gradient shape.

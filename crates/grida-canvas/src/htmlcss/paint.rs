@@ -704,11 +704,44 @@ fn make_gradient<'a>(
     colors: &'a [skia_safe::Color4f],
     positions: &'a [f32],
     tile: TileMode,
+    interpolation: super::style::GradientInterpolation,
 ) -> Gradient<'a> {
     Gradient::new(
         GradientColors::new(colors, Some(positions), tile, None),
-        Interpolation::default(),
+        to_skia_interpolation(interpolation),
     )
+}
+
+fn to_skia_interpolation(v: super::style::GradientInterpolation) -> Interpolation {
+    use super::style::{GradientColorSpace as CS, GradientHueMethod as HM};
+    use skia_safe::gradient_shader::interpolation::{ColorSpace, HueMethod, InPremul};
+    let color_space = match v.color_space {
+        CS::Oklab => ColorSpace::OKLab,
+        CS::Srgb => ColorSpace::SRGB,
+        CS::SrgbLinear => ColorSpace::SRGBLinear,
+        CS::Hsl => ColorSpace::HSL,
+        CS::Hwb => ColorSpace::HWB,
+        CS::Lab => ColorSpace::Lab,
+        CS::Lch => ColorSpace::LCH,
+        CS::Oklch => ColorSpace::OKLCH,
+        CS::DisplayP3 => ColorSpace::DisplayP3,
+        CS::Rec2020 => ColorSpace::Rec2020,
+        CS::A98Rgb => ColorSpace::A98RGB,
+        CS::ProphotoRgb => ColorSpace::ProphotoRGB,
+        // XYZ spaces have no Skia equivalent; fall back to destination (sRGB-like).
+        CS::XyzD50 | CS::XyzD65 => ColorSpace::Destination,
+    };
+    let hue_method = match v.hue_method {
+        HM::Shorter => HueMethod::Shorter,
+        HM::Longer => HueMethod::Longer,
+        HM::Increasing => HueMethod::Increasing,
+        HM::Decreasing => HueMethod::Decreasing,
+    };
+    Interpolation {
+        in_premul: InPremul::No,
+        color_space,
+        hue_method,
+    }
 }
 
 fn tile_mode(repeating: bool) -> TileMode {
@@ -807,7 +840,12 @@ fn build_linear_gradient_shader(
         p1.y + cycle * (p2_full.y - p1.y),
     );
 
-    let gradient = make_gradient(&colors, &positions, tile_mode(grad.repeating));
+    let gradient = make_gradient(
+        &colors,
+        &positions,
+        tile_mode(grad.repeating),
+        grad.interpolation,
+    );
     skia_safe::shaders::linear_gradient((p1, p2), &gradient, None)
 }
 
@@ -833,7 +871,12 @@ fn build_radial_gradient_shader(
     let mut matrix = skia_safe::Matrix::scale((rx, ry));
     matrix.post_translate((cx, cy));
 
-    let gradient = make_gradient(&colors, &positions, tile_mode(grad.repeating));
+    let gradient = make_gradient(
+        &colors,
+        &positions,
+        tile_mode(grad.repeating),
+        grad.interpolation,
+    );
     skia_safe::shaders::radial_gradient((Point::new(0.0, 0.0), 1.0), &gradient, Some(&matrix))
 }
 
@@ -859,7 +902,7 @@ fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<s
     // circle fall below a negative `start` under `Clamp` and collapse onto
     // the first stop. For non-repeating conic the sweep still covers a full
     // 360° cycle, so `Repeat` produces no visible tiling.
-    let gradient = make_gradient(&colors, &positions, TileMode::Repeat);
+    let gradient = make_gradient(&colors, &positions, TileMode::Repeat, grad.interpolation);
     skia_safe::shaders::sweep_gradient(Point::new(cx, cy), (start, end), &gradient, None)
 }
 

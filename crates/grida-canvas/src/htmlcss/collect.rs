@@ -1311,6 +1311,7 @@ fn convert_image(
                 direction,
                 items,
                 flags,
+                color_interpolation_method,
                 ..
             } => {
                 let stops = gradient_items_to_stops(items, current_color);
@@ -1322,6 +1323,7 @@ fn convert_image(
                     angle_deg,
                     stops,
                     repeating: is_repeating(flags),
+                    interpolation: extract_gradient_interpolation(color_interpolation_method),
                 }))
             }
             GenericGradient::Radial {
@@ -1329,6 +1331,7 @@ fn convert_image(
                 position,
                 items,
                 flags,
+                color_interpolation_method,
                 ..
             } => {
                 let stops = gradient_items_to_stops(items, current_color);
@@ -1342,6 +1345,7 @@ fn convert_image(
                     center: extract_gradient_position(position),
                     stops,
                     repeating: is_repeating(flags),
+                    interpolation: extract_gradient_interpolation(color_interpolation_method),
                 }))
             }
             GenericGradient::Conic {
@@ -1349,6 +1353,7 @@ fn convert_image(
                 position,
                 items,
                 flags,
+                color_interpolation_method,
                 ..
             } => {
                 let stops = conic_gradient_items_to_stops(items, current_color);
@@ -1360,10 +1365,48 @@ fn convert_image(
                     center: extract_gradient_position(position),
                     stops,
                     repeating: is_repeating(flags),
+                    interpolation: extract_gradient_interpolation(color_interpolation_method),
                 }))
             }
         },
         _ => None,
+    }
+}
+
+fn extract_gradient_interpolation(
+    m: &style::color::mix::ColorInterpolationMethod,
+) -> GradientInterpolation {
+    use style::color::mix::HueInterpolationMethod as HIM;
+    use style::color::ColorSpace as CS;
+    let color_space = match m.space {
+        CS::Srgb => GradientColorSpace::Srgb,
+        CS::SrgbLinear => GradientColorSpace::SrgbLinear,
+        CS::Hsl => GradientColorSpace::Hsl,
+        CS::Hwb => GradientColorSpace::Hwb,
+        CS::Lab => GradientColorSpace::Lab,
+        CS::Lch => GradientColorSpace::Lch,
+        CS::Oklab => GradientColorSpace::Oklab,
+        CS::Oklch => GradientColorSpace::Oklch,
+        CS::DisplayP3 => GradientColorSpace::DisplayP3,
+        CS::Rec2020 => GradientColorSpace::Rec2020,
+        CS::A98Rgb => GradientColorSpace::A98Rgb,
+        CS::ProphotoRgb => GradientColorSpace::ProphotoRgb,
+        CS::XyzD50 => GradientColorSpace::XyzD50,
+        CS::XyzD65 => GradientColorSpace::XyzD65,
+        // Skia has no linear display-p3; fall back to display-p3 (gamma-encoded).
+        CS::DisplayP3Linear => GradientColorSpace::DisplayP3,
+    };
+    // Stylo's `Specified` has no Skia equivalent; map to Shorter (the default
+    // and what CSS Color 4 falls back to in most contexts).
+    let hue_method = match m.hue {
+        HIM::Shorter | HIM::Specified => GradientHueMethod::Shorter,
+        HIM::Longer => GradientHueMethod::Longer,
+        HIM::Increasing => GradientHueMethod::Increasing,
+        HIM::Decreasing => GradientHueMethod::Decreasing,
+    };
+    GradientInterpolation {
+        color_space,
+        hue_method,
     }
 }
 

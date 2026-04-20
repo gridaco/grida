@@ -1415,6 +1415,84 @@ code block
         }
     }
 
+    // ── Gradient color interpolation ─────────────────────────────────
+    //
+    // The explicit `in <colorspace>` syntax is gated in Stylo behind the
+    // `layout.css.gradient-color-interpolation-method.enabled` pref which
+    // defaults to false in our workspace. The default-path
+    // (`best_interpolation_between`) still picks sRGB or Oklab based on the
+    // stop color types, and that's what we cover here.
+
+    #[test]
+    fn test_gradient_interpolation_legacy_is_srgb() {
+        let _guard = crate::stylo_test::lock();
+        // All stops use legacy rgb/hex notation → sRGB default.
+        let html = r#"<div style="background:linear-gradient(red,blue)">x</div>"#;
+        let g = expect_linear(html);
+        assert_eq!(g.interpolation.color_space, style::GradientColorSpace::Srgb);
+        assert_eq!(
+            g.interpolation.hue_method,
+            style::GradientHueMethod::Shorter
+        );
+    }
+
+    #[test]
+    fn test_gradient_interpolation_oklab_color_is_oklab() {
+        let _guard = crate::stylo_test::lock();
+        // One modern color function → Oklab default.
+        let html = r#"<div style="background:linear-gradient(oklab(0.5 0 0),blue)">x</div>"#;
+        let g = expect_linear(html);
+        assert_eq!(
+            g.interpolation.color_space,
+            style::GradientColorSpace::Oklab
+        );
+    }
+
+    #[test]
+    fn test_gradient_interpolation_oklch_both_is_oklab() {
+        let _guard = crate::stylo_test::lock();
+        // Two modern (oklch) stops → Oklab default.
+        let html = r#"<div style="background:linear-gradient(oklch(70% 0.2 20),oklch(70% 0.2 260))">x</div>"#;
+        let g = expect_linear(html);
+        assert_eq!(
+            g.interpolation.color_space,
+            style::GradientColorSpace::Oklab
+        );
+    }
+
+    #[test]
+    fn test_gradient_interpolation_radial_inherits_auto() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="background:radial-gradient(circle,oklab(0.5 0 0),red)">x</div>"#;
+        let g = expect_radial(html);
+        assert_eq!(
+            g.interpolation.color_space,
+            style::GradientColorSpace::Oklab
+        );
+    }
+
+    /// Probe: the midpoint of legacy (sRGB) vs Oklab-auto gradient between
+    /// equivalent colors renders differently — confirms Skia honors the
+    /// extracted interpolation space.
+    #[test]
+    fn test_gradient_interpolation_oklab_probe_differs_from_srgb() {
+        let _guard = crate::stylo_test::lock();
+        let srgb_html = r#"<div style="width:100px;height:20px;background:linear-gradient(90deg,#ffff00,#0000ff)"></div>"#;
+        // Use oklab() stops so the auto-detected space is Oklab.
+        let oklab_html = r#"<div style="width:100px;height:20px;background:linear-gradient(90deg,oklab(0.97 -0.07 0.2),oklab(0.45 -0.03 -0.3))"></div>"#;
+        let srgb_px = rasterize_rgba(srgb_html, 100, 20);
+        let oklab_px = rasterize_rgba(oklab_html, 100, 20);
+        let srgb_mid = pixel_at(&srgb_px, 50, 10, 100);
+        let oklab_mid = pixel_at(&oklab_px, 50, 10, 100);
+        let diff = ((srgb_mid[0] as i32 - oklab_mid[0] as i32).abs()
+            + (srgb_mid[1] as i32 - oklab_mid[1] as i32).abs()
+            + (srgb_mid[2] as i32 - oklab_mid[2] as i32).abs()) as u32;
+        assert!(
+            diff > 30,
+            "sRGB vs Oklab midpoints should diverge; got srgb={srgb_mid:?} oklab={oklab_mid:?}"
+        );
+    }
+
     /// Pixel probe: a linear gradient with `currentcolor` start and white end
     /// on a `color: red` element paints red at the left edge, white at right.
     #[test]
