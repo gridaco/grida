@@ -14,7 +14,7 @@
     "hono": "^4.9.8"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "typescript": "^6",
     "wrangler": "^4.81.0"
   }
 }

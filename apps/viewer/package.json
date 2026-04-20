@@ -26,7 +26,7 @@
     "@types/react-dom": "^19",
     "postcss": "^8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^6"
   },
   "packageManager": "pnpm@10.10.0"
 }

@@ -32,6 +32,6 @@
     "@types/node": "^24",
     "@webgpu/types": "^0.1.61",
     "serve": "^14.2.4",
-    "typescript": "^5"
+    "typescript": "^6"
   }
 }
