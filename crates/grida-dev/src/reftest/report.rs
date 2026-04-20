@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize, Debug)]
-pub struct TestResult {
+pub(crate) struct TestResult {
     pub test_name: String,
     pub similarity_score: f64,
     pub diff_percentage: f64,
@@ -16,7 +16,7 @@ pub struct TestResult {
 }
 
 #[derive(Serialize, Debug)]
-pub struct ReftestReport {
+pub(crate) struct ReftestReport {
     pub total: usize,
     pub average_similarity: f64,
     pub min_similarity: f64,
@@ -28,7 +28,7 @@ pub struct ReftestReport {
 }
 
 impl ReftestReport {
-    pub fn new(suite_dir: &Path, output_dir: &Path, tests: Vec<TestResult>) -> Self {
+    pub(crate) fn new(suite_dir: &Path, output_dir: &Path, tests: Vec<TestResult>) -> Self {
         let total = tests.len();
 
         let similarities: Vec<f64> = tests
@@ -79,7 +79,7 @@ impl ReftestReport {
     }
 }
 
-pub fn generate_json_report(report: &ReftestReport, output_path: &Path) -> Result<()> {
+pub(crate) fn generate_json_report(report: &ReftestReport, output_path: &Path) -> Result<()> {
     // Ensure output directory exists
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent)

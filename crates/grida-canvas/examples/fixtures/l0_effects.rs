@@ -24,7 +24,7 @@ fn effect_rect(x: f32, effects: LayerEffects) -> Node {
     })
 }
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let gap = 170.0;
 
     let blur = effect_rect(

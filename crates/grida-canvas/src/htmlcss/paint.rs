@@ -24,7 +24,7 @@ use super::types;
 use super::ImageProvider;
 
 /// Paint a `LayoutBox` tree into a Skia `Picture`.
-pub fn paint_to_picture(
+pub(crate) fn paint_to_picture(
     root: &LayoutBox,
     width: f32,
     height: f32,

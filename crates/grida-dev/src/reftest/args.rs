@@ -2,7 +2,7 @@ use clap::Args;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy)]
-pub enum BgColor {
+pub(crate) enum BgColor {
     White,
     Black,
 }
@@ -19,7 +19,7 @@ impl std::str::FromStr for BgColor {
 }
 
 #[derive(Args, Debug)]
-pub struct ReftestArgs {
+pub(crate) struct ReftestArgs {
     /// Path to W3C_SVG_11_TestSuite directory
     #[arg(long = "suite-dir")]
     pub suite_dir: PathBuf,

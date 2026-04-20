@@ -87,10 +87,10 @@ const WHITE_FAINT: CGColor = CGColor {
 // Scene
 // ═══════════════════════════════════════════════════════════════════════════
 
-pub const WIDTH: f32 = 1600.0;
-pub const HEIGHT: f32 = 900.0;
+pub(crate) const WIDTH: f32 = 1600.0;
+pub(crate) const HEIGHT: f32 = 900.0;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let mut nodes: Vec<(NodeId, Node)> = Vec::new();
     let links: std::collections::HashMap<NodeId, Vec<NodeId>> = std::collections::HashMap::new();
     let mut id = 0u64;

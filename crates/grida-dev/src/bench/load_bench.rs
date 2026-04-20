@@ -33,7 +33,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 #[derive(Args, Debug)]
-pub struct LoadBenchArgs {
+pub(crate) struct LoadBenchArgs {
     /// Path to a `.grida` file.
     pub path: String,
     /// Scene index to benchmark (0-based). Use --list-scenes to see available.
@@ -422,7 +422,10 @@ fn print_timings(label: &str, timings: &StageTimings) {
     }
 }
 
-pub async fn run_load_bench(args: LoadBenchArgs, loader: impl AsyncSceneLoader) -> Result<()> {
+pub(crate) async fn run_load_bench(
+    args: LoadBenchArgs,
+    loader: impl AsyncSceneLoader,
+) -> Result<()> {
     let scenes = loader.load(&args.path).await?;
 
     if args.list_scenes {

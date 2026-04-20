@@ -1,12 +1,12 @@
 #[derive(serde::Serialize)]
-pub struct BenchReportOutput {
+pub(crate) struct BenchReportOutput {
     pub meta: BenchReportMeta,
     pub results: Vec<SceneBenchResult>,
     pub errors: Vec<BenchError>,
 }
 
 #[derive(serde::Serialize)]
-pub struct BenchReportMeta {
+pub(crate) struct BenchReportMeta {
     pub frames: u32,
     pub viewport: [i32; 2],
     pub files_count: usize,
@@ -14,7 +14,7 @@ pub struct BenchReportMeta {
 }
 
 #[derive(serde::Serialize)]
-pub struct SceneBenchResult {
+pub(crate) struct SceneBenchResult {
     pub file: String,
     pub scene: String,
     pub scene_index: usize,
@@ -31,7 +31,7 @@ pub struct SceneBenchResult {
 
 /// A named benchmark scenario result.
 #[derive(serde::Serialize)]
-pub struct ScenarioResult {
+pub(crate) struct ScenarioResult {
     /// Human-readable name, e.g. "pan_slow_fit", "zoom_fast".
     pub name: String,
     /// What kind of camera operation.
@@ -43,7 +43,7 @@ pub struct ScenarioResult {
 }
 
 #[derive(serde::Serialize)]
-pub struct ScenarioParams {
+pub(crate) struct ScenarioParams {
     /// For pan: world-units per frame. For zoom: zoom step per frame.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f32>,
@@ -60,7 +60,7 @@ pub struct ScenarioParams {
 
 /// Unified pass stats with per-stage breakdown (used for both pan and zoom).
 #[derive(serde::Serialize, Clone, Default)]
-pub struct PassStats {
+pub(crate) struct PassStats {
     pub avg_us: u64,
     pub fps: f64,
     pub min_us: u64,
@@ -84,7 +84,7 @@ pub struct PassStats {
 }
 
 #[derive(serde::Serialize)]
-pub struct BenchError {
+pub(crate) struct BenchError {
     pub file: String,
     pub error: String,
 }

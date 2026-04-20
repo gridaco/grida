@@ -4,7 +4,7 @@ use std::collections::HashMap;
 /// Comprehensive affine transform coverage: rotations at various angles,
 /// custom transform origins, nested transform composition, non-rectangular
 /// shape rotations, and flips (180°).
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // ── Row 1: Shape rotations at key angles ────────────────────────────
 
     // [1] Rectangle 0° (identity — baseline reference)

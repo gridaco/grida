@@ -3,7 +3,7 @@ use cg::cg::stroke_width::SingularStrokeWidth;
 use math2::transform::AffineTransform;
 use std::collections::HashMap;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // Group 1: image mask (alpha)
     let group_img = Node::Group(GroupNodeRec {
         active: true,

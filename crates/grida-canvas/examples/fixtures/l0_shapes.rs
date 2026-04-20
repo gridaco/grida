@@ -2,7 +2,7 @@ use super::*;
 use cg::vectornetwork::*;
 use math2::transform::AffineTransform;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let rectangle = rect(0.0, 0.0, 200.0, 100.0, solid(220, 59, 59, 255));
 
     let ell = ellipse(220.0, 10.0, 100.0, 80.0, solid(59, 100, 220, 255));

@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-pub struct TestPair {
+pub(crate) struct TestPair {
     pub svg_path: PathBuf,
     pub ref_png_path: PathBuf,
     pub test_name: String,
@@ -50,7 +50,7 @@ fn name_from_rel_path(rel: &Path) -> String {
 
 /// Find SVG→PNG pairs by matching SVG inputs using a glob pattern relative to `base_dir` and
 /// mapping each matched SVG to an expected PNG under `expects_dir` with mirrored relative path.
-pub fn find_test_pairs_from_glob(
+pub(crate) fn find_test_pairs_from_glob(
     base_dir: &Path,
     inputs_glob: &str,
     expects_dir: &Path,
@@ -119,7 +119,7 @@ pub fn find_test_pairs_from_glob(
 }
 
 /// Discover pairs by scanning `svg_dir` for `*.svg` and matching `<name>.png` in `png_dir`.
-pub fn find_test_pairs_in_dirs(svg_dir: &Path, png_dir: &Path) -> Result<Vec<TestPair>> {
+pub(crate) fn find_test_pairs_in_dirs(svg_dir: &Path, png_dir: &Path) -> Result<Vec<TestPair>> {
     if !svg_dir.exists() {
         anyhow::bail!("SVG directory not found: {}", svg_dir.display());
     }
@@ -150,7 +150,7 @@ pub fn find_test_pairs_in_dirs(svg_dir: &Path, png_dir: &Path) -> Result<Vec<Tes
     Ok(pairs)
 }
 
-pub fn render_svg_to_png(
+pub(crate) fn render_svg_to_png(
     svg_path: &Path,
     output_path: &Path,
     target_size: Option<(u32, u32)>,

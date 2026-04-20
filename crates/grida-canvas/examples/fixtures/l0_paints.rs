@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let s = 150.0;
     let gap = 170.0;
 

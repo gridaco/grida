@@ -3,7 +3,7 @@ use cg::cg::alignment::Alignment;
 use math2::box_fit::BoxFit;
 
 /// Image paint with non-default filter values: exposure, contrast, saturation, etc.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let s = 150.0;
     let gap = 170.0;
 

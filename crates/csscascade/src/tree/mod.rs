@@ -262,22 +262,22 @@ impl StyledNodeBuilder {
         }
     }
 
-    pub fn node_id(mut self, id: NodeId) -> Self {
+    pub(crate) fn node_id(mut self, id: NodeId) -> Self {
         self.node_id = id;
         self
     }
 
-    pub fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+    pub(crate) fn attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.attributes.push(Attribute::new(name, value));
         self
     }
 
-    pub fn child(mut self, child: StyledNode) -> Self {
+    pub(crate) fn child(mut self, child: StyledNode) -> Self {
         self.children.push(child);
         self
     }
 
-    pub fn build(self) -> StyledNode {
+    pub(crate) fn build(self) -> StyledNode {
         StyledNode {
             node_id: self.node_id,
             tag: self.tag,

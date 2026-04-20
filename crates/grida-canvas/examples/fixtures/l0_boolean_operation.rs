@@ -4,7 +4,7 @@ use math2::transform::AffineTransform;
 use std::collections::HashMap;
 
 /// All four boolean operations, each with two overlapping child rectangles.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let ops = [
         (BooleanPathOperation::Union, solid(220, 59, 59, 255)),
         (BooleanPathOperation::Intersection, solid(59, 100, 220, 255)),

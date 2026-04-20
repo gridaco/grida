@@ -89,7 +89,7 @@ body {
     "#;
     const LOG_STYLE_DETAILS: bool = true;
 
-    pub struct CascadeDriver {
+    pub(crate) struct CascadeDriver {
         stylist: Stylist,
         stylesheet_lock: SharedRwLock,
         snapshot_map: SnapshotMap,
@@ -98,7 +98,7 @@ body {
     }
 
     impl CascadeDriver {
-        pub fn new(dom: &DemoDom) -> Self {
+        pub(crate) fn new(dom: &DemoDom) -> Self {
             trace_dom!("cascade: building Stylist seed");
             let style_quirks = translate_quirks_mode(dom.quirks_mode());
             let stylesheet_lock = stylo_dom::doc_shared_lock().clone();
@@ -127,7 +127,7 @@ body {
             }
         }
 
-        pub fn flush(&mut self, document: HtmlDocument) {
+        pub(crate) fn flush(&mut self, document: HtmlDocument) {
             let guard = self.stylesheet_lock.read();
             let guards = StylesheetGuards::same(&guard);
             trace_dom!("cascade: flushing stylist");
@@ -138,7 +138,7 @@ body {
             );
         }
 
-        pub fn style_document(&mut self, document: HtmlDocument) -> usize {
+        pub(crate) fn style_document(&mut self, document: HtmlDocument) -> usize {
             let guard = self.stylesheet_lock.read();
             let mut thread_local = self
                 .thread_local
@@ -375,7 +375,7 @@ mod demo_dom {
     use tendril::StrTendril;
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-    pub struct NodeId(pub(crate) usize);
+    pub(crate) struct NodeId(pub(crate) usize);
 
     impl NodeId {
         pub(crate) fn idx(self) -> usize {
@@ -384,14 +384,14 @@ mod demo_dom {
     }
 
     #[derive(Debug)]
-    pub struct DemoNode {
+    pub(crate) struct DemoNode {
         pub parent: Option<NodeId>,
         pub children: Vec<NodeId>,
         pub data: DemoNodeData,
     }
 
     #[derive(Debug)]
-    pub enum DemoNodeData {
+    pub(crate) enum DemoNodeData {
         Document,
         Doctype {
             name: StrTendril,
@@ -408,7 +408,7 @@ mod demo_dom {
     }
 
     #[derive(Debug)]
-    pub struct DemoElementData {
+    pub(crate) struct DemoElementData {
         pub name: QualName,
         pub attrs: Vec<Attribute>,
         pub template_contents: Option<NodeId>,
@@ -421,7 +421,7 @@ mod demo_dom {
     }
 
     #[derive(Debug)]
-    pub struct DemoDom {
+    pub(crate) struct DemoDom {
         nodes: Vec<DemoNode>,
         document: NodeId,
         quirks_mode: QuirksMode,
@@ -433,7 +433,7 @@ mod demo_dom {
     unsafe impl Send for DemoDom {}
 
     impl DemoDom {
-        pub fn parse_from_bytes(bytes: &[u8]) -> io::Result<Self> {
+        pub(crate) fn parse_from_bytes(bytes: &[u8]) -> io::Result<Self> {
             trace_dom!("demo_dom: parsing {} bytes", bytes.len());
             let mut reader = Cursor::new(bytes);
             let dom = parse_document(DemoDomBuilder::new(), ParseOpts::default())
@@ -443,29 +443,29 @@ mod demo_dom {
             Ok(dom)
         }
 
-        pub fn document_id(&self) -> NodeId {
+        pub(crate) fn document_id(&self) -> NodeId {
             self.document
         }
 
-        pub fn document_children(&self) -> &[NodeId] {
+        pub(crate) fn document_children(&self) -> &[NodeId] {
             trace_dom!("demo_dom: document_children");
             &self.nodes[self.document.idx()].children
         }
 
-        pub fn quirks_mode(&self) -> QuirksMode {
+        pub(crate) fn quirks_mode(&self) -> QuirksMode {
             self.quirks_mode
         }
 
-        pub fn node(&self, id: NodeId) -> &DemoNode {
+        pub(crate) fn node(&self, id: NodeId) -> &DemoNode {
             trace_dom!("dom_access: node {:?}", id);
             &self.nodes[id.idx()]
         }
 
-        pub fn element_data_slot(&self, id: NodeId) -> &AtomicRefCell<Option<ElementData>> {
+        pub(crate) fn element_data_slot(&self, id: NodeId) -> &AtomicRefCell<Option<ElementData>> {
             &self.element_data[id.idx()]
         }
 
-        pub fn all_node_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        pub(crate) fn all_node_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
             (0..self.nodes.len()).map(NodeId)
         }
     }
@@ -1021,7 +1021,7 @@ mod stylo_dom {
     static DEMO_DOM: OnceLock<DemoDom> = OnceLock::new();
     static STYLE_LOCK: OnceLock<SharedRwLock> = OnceLock::new();
 
-    pub fn bootstrap_dom(dom: DemoDom) -> HtmlDocument {
+    pub(crate) fn bootstrap_dom(dom: DemoDom) -> HtmlDocument {
         trace_dom!("bootstrap_dom: installing DemoDom");
         let document = dom.document_id();
         DEMO_DOM
@@ -1041,21 +1041,21 @@ mod stylo_dom {
     }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-    pub struct HtmlNode(NodeId);
+    pub(crate) struct HtmlNode(NodeId);
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-    pub struct HtmlElement(NodeId);
+    pub(crate) struct HtmlElement(NodeId);
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-    pub struct HtmlDocument(NodeId);
+    pub(crate) struct HtmlDocument(NodeId);
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-    pub struct HtmlShadowRoot {
+    pub(crate) struct HtmlShadowRoot {
         host: HtmlElement,
     }
 
     impl HtmlDocument {
-        pub fn root_element(&self) -> Option<HtmlElement> {
+        pub(crate) fn root_element(&self) -> Option<HtmlElement> {
             trace_dom!("HtmlDocument::root_element {:?}", self);
             dom().document_children().iter().find_map(|child| {
                 matches!(dom().node(*child).data, DemoNodeData::Element(_))
@@ -1067,7 +1067,7 @@ mod stylo_dom {
             HtmlNode(self.0)
         }
 
-        pub fn element_count(&self) -> usize {
+        pub(crate) fn element_count(&self) -> usize {
             let mut count = 0;
             let mut stack = Vec::new();
             if let Some(root) = self.root_element() {
@@ -1086,17 +1086,17 @@ mod stylo_dom {
     }
 
     impl HtmlElement {
-        pub fn local_name_string(&self) -> String {
+        pub(crate) fn local_name_string(&self) -> String {
             trace_dom!("HtmlElement::local_name_string {:?}", self);
             self.element_data().name.local.to_string()
         }
 
-        pub fn first_element_child(self) -> Option<HtmlElement> {
+        pub(crate) fn first_element_child(self) -> Option<HtmlElement> {
             trace_dom!("HtmlElement::first_element_child {:?}", self);
             self.node().first_element_child()
         }
 
-        pub fn next_element_sibling(self) -> Option<HtmlElement> {
+        pub(crate) fn next_element_sibling(self) -> Option<HtmlElement> {
             trace_dom!("HtmlElement::next_element_sibling {:?}", self);
             self.node().next_element_sibling()
         }

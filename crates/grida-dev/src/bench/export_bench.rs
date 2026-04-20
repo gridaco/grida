@@ -43,7 +43,7 @@ use super::runner::AsyncSceneLoader;
 // ── CLI args ────────────────────────────────────────────────────────────
 
 #[derive(Args, Debug)]
-pub struct ExportBenchArgs {
+pub(crate) struct ExportBenchArgs {
     /// Path to a `.grida` file.
     pub path: String,
 
@@ -571,7 +571,10 @@ fn save_to_tmp(bytes: &[u8], node_id: NodeId, ext: &str) -> Result<PathBuf> {
 
 // ── Entry point ─────────────────────────────────────────────────────────
 
-pub async fn run_export_bench<L: AsyncSceneLoader>(args: ExportBenchArgs, loader: L) -> Result<()> {
+pub(crate) async fn run_export_bench<L: AsyncSceneLoader>(
+    args: ExportBenchArgs,
+    loader: L,
+) -> Result<()> {
     // Load scenes
     let scenes = loader.load(&args.path).await?;
     if scenes.is_empty() {

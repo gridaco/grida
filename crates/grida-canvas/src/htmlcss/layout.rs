@@ -19,7 +19,7 @@ use super::types;
 
 /// A positioned box after layout.
 #[derive(Debug)]
-pub struct LayoutBox<'a> {
+pub(crate) struct LayoutBox<'a> {
     pub style: &'a StyledElement,
     pub x: f32,
     pub y: f32,
@@ -30,7 +30,7 @@ pub struct LayoutBox<'a> {
 
 /// A positioned node — either a box, text, inline group, or replaced element.
 #[derive(Debug)]
-pub enum LayoutNode<'a> {
+pub(crate) enum LayoutNode<'a> {
     Box(LayoutBox<'a>),
     Text {
         run: &'a TextRun,
@@ -49,7 +49,7 @@ pub enum LayoutNode<'a> {
 // ─── Layout computation ──────────────────────────────────────────────
 
 /// Run layout on a `StyledElement` tree and produce a positioned `LayoutBox` tree.
-pub fn compute_layout<'a>(
+pub(crate) fn compute_layout<'a>(
     root: &'a StyledElement,
     available_width: f32,
     fonts: &FontRepository,
@@ -83,7 +83,7 @@ pub fn compute_layout<'a>(
 }
 
 /// Compute just the content height (without building a full LayoutBox tree).
-pub fn compute_content_height(
+pub(crate) fn compute_content_height(
     root: &StyledElement,
     available_width: f32,
     fonts: &FontRepository,

@@ -10,7 +10,9 @@ use std::{
 pub use byte_store::ByteStore;
 pub use index::ResourceIndex;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::cg::types::{Paint, ResourceRef};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::node::schema::Scene;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::window::application::{HostEvent, HostEventCallback};
@@ -119,7 +121,7 @@ pub struct FontMessage {
 }
 
 /// Collect the URL string from a [`ResourceRef`].
-#[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
 fn resource_ref_url(r: &ResourceRef) -> &str {
     match r {
         ResourceRef::RID(s) | ResourceRef::HASH(s) => s,
@@ -127,7 +129,7 @@ fn resource_ref_url(r: &ResourceRef) -> &str {
 }
 
 /// Push any image URLs found in a paint slice.
-#[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
 fn collect_image_urls_from_paints(paints: &[Paint], out: &mut Vec<String>) {
     for paint in paints {
         if let Paint::Image(img) = paint {
@@ -143,7 +145,7 @@ fn collect_image_urls_from_paints(paints: &[Paint], out: &mut Vec<String>) {
 /// strokes, and dedicated image references.
 // TODO: consider a dedicated paints store or iterator so this doesn't need
 // to match every node variant individually.
-#[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
 fn extract_image_urls(scene: &Scene) -> Vec<String> {
     use crate::node::schema::Node;
     let mut urls = Vec::new();

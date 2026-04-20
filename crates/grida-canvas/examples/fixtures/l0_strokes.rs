@@ -63,7 +63,7 @@ fn marker_line(x: f32, y: f32, start: StrokeMarkerPreset, end: StrokeMarkerPrese
     })
 }
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let gap = 140.0;
 
     let r1 = stroked_rect(

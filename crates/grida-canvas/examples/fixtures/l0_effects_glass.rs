@@ -1,7 +1,7 @@
 use super::*;
 use cg::cg::fe::*;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // Note: rect(x, y, w, h, ..) uses from_box_center which, at 0° rotation,
     // places the rect's top-left at (x, y).
 

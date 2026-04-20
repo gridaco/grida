@@ -1,7 +1,7 @@
 use clap::Args;
 
 #[derive(Args, Debug)]
-pub struct BenchArgs {
+pub(crate) struct BenchArgs {
     /// Path to a `.grida` file (optional; uses synthetic grid if omitted).
     pub path: Option<String>,
     /// Grid dimension when no file is given (renders N x N rectangles).
@@ -62,7 +62,7 @@ pub struct BenchArgs {
 }
 
 #[derive(Args, Debug)]
-pub struct BenchReportArgs {
+pub(crate) struct BenchReportArgs {
     /// Path to a `.grida` file or a directory (recursively finds `*.grida` files).
     pub path: String,
     /// Number of frames per benchmark pass (pan and zoom each).

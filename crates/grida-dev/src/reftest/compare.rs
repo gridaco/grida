@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::reftest::args::BgColor;
 
-pub struct ComparisonResult {
+pub(crate) struct ComparisonResult {
     pub similarity_score: f64, // 0.0 (completely different) to 1.0 (identical)
     pub diff_percentage: f64,  // percentage of pixels that differ
     pub error: Option<String>, // if comparison failed
@@ -36,12 +36,12 @@ fn composite_to_opaque(img: &RgbaImage, bg: BgColor) -> RgbaImage {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum ScoringMask {
+pub(crate) enum ScoringMask {
     None,
     Alpha,
 }
 
-pub fn compare_images(
+pub(crate) fn compare_images(
     actual: &Path,
     expected: &Path,
     diff_output: Option<&Path>,

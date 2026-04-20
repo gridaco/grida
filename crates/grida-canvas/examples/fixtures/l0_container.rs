@@ -2,7 +2,7 @@ use super::*;
 use std::collections::HashMap;
 
 /// Container-specific features: clip on/off, nesting, InitialContainer.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // ── [1] Outer container (clip=true) ─────────────────────────────────
     // Child rectangle intentionally overflows to demonstrate clipping.
     let clip_on = Node::Container(ContainerNodeRec {

@@ -27,7 +27,7 @@ use super::types::{CssLength, LineHeight, WhiteSpace};
 /// The UA stylesheet is handled by `csscascade::CascadeDriver` — it
 /// registers a compact Chromium-derived UA sheet at `Origin::UserAgent`
 /// so elements receive browser-default styles automatically.
-pub fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, String> {
+pub(crate) fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, String> {
     use csscascade::cascade::CascadeDriver;
     use style::thread_state::{self, ThreadState};
 

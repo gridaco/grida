@@ -4,7 +4,7 @@
 
 #[no_mangle]
 /// js::_allocate
-pub extern "C" fn allocate(len: usize) -> *mut u8 {
+pub(crate) extern "C" fn allocate(len: usize) -> *mut u8 {
     let mut buf = Vec::<u8>::with_capacity(len);
     let ptr = buf.as_mut_ptr();
     std::mem::forget(buf);
@@ -13,13 +13,13 @@ pub extern "C" fn allocate(len: usize) -> *mut u8 {
 
 #[no_mangle]
 /// js::_deallocate
-pub unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
+pub(crate) unsafe extern "C" fn deallocate(ptr: *mut u8, len: usize) {
     if !ptr.is_null() && len != 0 {
         drop(Vec::from_raw_parts(ptr, len, len));
     }
 }
 
-pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
+pub(crate) unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
     if ptr.is_null() || len == 0 {
         return None;
     }
@@ -32,7 +32,7 @@ pub unsafe fn __str_from_ptr_len(ptr: *const u8, len: usize) -> Option<String> {
 
 /// Creates a success response wrapper for WASM
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmSuccessResponse<T> {
+pub(crate) struct WasmSuccessResponse<T> {
     /// Success flag
     pub success: bool,
     /// Response data
@@ -41,7 +41,7 @@ pub struct WasmSuccessResponse<T> {
 
 /// Creates an error response wrapper for WASM
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmErrorResponse {
+pub(crate) struct WasmErrorResponse {
     /// Success flag
     pub success: bool,
     /// Error information
@@ -50,14 +50,14 @@ pub struct WasmErrorResponse {
 
 /// Error information for WASM responses
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmError {
+pub(crate) struct WasmError {
     /// Error message
     pub message: String,
 }
 
 impl<T: serde::Serialize> WasmSuccessResponse<T> {
     /// Creates a new success response
-    pub fn new(data: T) -> Self {
+    pub(crate) fn new(data: T) -> Self {
         Self {
             success: true,
             data,
@@ -65,7 +65,7 @@ impl<T: serde::Serialize> WasmSuccessResponse<T> {
     }
 
     /// Serializes the response to JSON
-    pub fn to_json(&self) -> Result<String, String> {
+    pub(crate) fn to_json(&self) -> Result<String, String> {
         serde_json::to_string(self)
             .map_err(|e| format!("Failed to serialize success response: {}", e))
     }
@@ -73,7 +73,7 @@ impl<T: serde::Serialize> WasmSuccessResponse<T> {
 
 impl WasmErrorResponse {
     /// Creates a new error response
-    pub fn new(message: String) -> Self {
+    pub(crate) fn new(message: String) -> Self {
         Self {
             success: false,
             error: WasmError { message },
@@ -81,7 +81,7 @@ impl WasmErrorResponse {
     }
 
     /// Serializes the response to JSON
-    pub fn to_json(&self) -> Result<String, String> {
+    pub(crate) fn to_json(&self) -> Result<String, String> {
         serde_json::to_string(self)
             .map_err(|e| format!("Failed to serialize error response: {}", e))
     }

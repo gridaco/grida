@@ -1,7 +1,7 @@
 use super::*;
 use cg::cg::stroke_width::RectangularStrokeWidth;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // Container with per-side stroke widths
     let c1 = Node::Container(ContainerNodeRec {
         active: true,

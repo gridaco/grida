@@ -6,7 +6,6 @@ use crate::reftest::render::{
 };
 use crate::reftest::report::{generate_json_report, ReftestReport, TestResult};
 use anyhow::{Context, Result};
-use image;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::panic;
 use std::path::{Path, PathBuf};
@@ -43,7 +42,7 @@ fn get_score_category(score: f64) -> &'static str {
     }
 }
 
-pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
+pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     // Load optional config from suite-dir/reftest.toml
     let cfg = ReftestToml::load_from_dir(&args.suite_dir).unwrap_or(None);
 
@@ -415,6 +414,6 @@ pub async fn run_reftest(args: &ReftestArgs) -> Result<()> {
 }
 
 // Convenience wrapper to match main.rs signature (takes owned args)
-pub async fn run(args: ReftestArgs) -> Result<()> {
+pub(crate) async fn run(args: ReftestArgs) -> Result<()> {
     run_reftest(&args).await
 }

@@ -31,7 +31,7 @@ fn attr_node(
     })
 }
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let base = TextStyleRec::from_font("Inter", 18.0);
     let mut bold = TextStyleRec::from_font("Inter", 18.0);
     bold.font_weight = FontWeight(700);

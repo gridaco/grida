@@ -1,9 +1,9 @@
-pub mod args;
-pub mod compare;
-pub mod config;
-pub mod render;
-pub mod report;
-pub mod runner;
+pub(crate) mod args;
+pub(crate) mod compare;
+pub(crate) mod config;
+pub(crate) mod render;
+pub(crate) mod report;
+pub(crate) mod runner;
 
-pub use args::ReftestArgs;
-pub use runner::run;
+pub(crate) use args::ReftestArgs;
+pub(crate) use runner::run;

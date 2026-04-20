@@ -2439,15 +2439,6 @@ impl Renderer {
         self.window_context.viewport_size = Size { width, height };
     }
 
-    #[allow(dead_code)]
-    fn with_recording(
-        &self,
-        bounds: &rect::Rectangle,
-        draw: impl FnOnce(&Painter),
-    ) -> Option<Picture> {
-        self.with_recording_with_policy(bounds, self.config.render_policy, draw)
-    }
-
     fn with_recording_with_policy(
         &self,
         bounds: &rect::Rectangle,

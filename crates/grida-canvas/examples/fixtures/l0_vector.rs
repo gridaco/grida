@@ -4,7 +4,7 @@ use cg::vectornetwork::*;
 use math2::transform::AffineTransform;
 
 /// Vector network nodes: closed shape, open path, multi-region, variable-width stroke.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // Closed bezier quad (4 curved segments forming a rounded square)
     let closed = Node::Vector(VectorNodeRec {
         active: true,
