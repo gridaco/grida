@@ -158,28 +158,72 @@ fn paint_box(
         );
     }
 
-    // ── Phase 2: Children (Chromium: kForeground for inlines, recurse for blocks) ──
-    for child in &layout.children {
+    // ── Phase 2: Children — z-index aware (simplified stacking) ──
+    //
+    // Per CSS 2.1 §9.9.1, positioned children with an explicit `z-index`
+    // paint in three passes around the default flow: negative → flow →
+    // non-negative. We don't model full stacking contexts (opacity,
+    // transform, etc.) yet — only the sibling-z-index ordering case.
+    //
+    // A child participates in z-ordered painting when it's a Box with
+    // `position != static` AND `z_index.is_some()`. All other nodes
+    // (text runs, inline groups, static boxes) paint in source order in
+    // the middle pass.
+    fn z_key(child: &LayoutNode) -> Option<i32> {
         match child {
-            LayoutNode::Box(child_box) => {
-                paint_box(canvas, child_box, fonts, images);
+            LayoutNode::Box(b) => {
+                if b.style.position == types::Position::Static {
+                    None
+                } else {
+                    b.style.z_index
+                }
             }
-            LayoutNode::Text {
-                run,
-                x: tx,
-                y: ty,
-                width: tw,
-            } => {
-                paint_text(canvas, run, *tx, *ty, *tw, fonts);
+            _ => None,
+        }
+    }
+    fn paint_child(
+        canvas: &Canvas,
+        child: &LayoutNode,
+        fonts: &FontCollection,
+        images: &dyn ImageProvider,
+    ) {
+        match child {
+            LayoutNode::Box(child_box) => paint_box(canvas, child_box, fonts, images),
+            LayoutNode::Text { run, x, y, width } => paint_text(canvas, run, *x, *y, *width, fonts),
+            LayoutNode::InlineGroup { group, x, y, width } => {
+                paint_inline_group(canvas, group, *x, *y, *width, fonts)
             }
-            LayoutNode::InlineGroup {
-                group,
-                x: gx,
-                y: gy,
-                width: gw,
-            } => {
-                paint_inline_group(canvas, group, *gx, *gy, *gw, fonts);
+        }
+    }
+
+    let any_explicit_z = layout.children.iter().any(|c| z_key(c).is_some());
+    if !any_explicit_z {
+        for child in &layout.children {
+            paint_child(canvas, child, fonts, images);
+        }
+    } else {
+        // Stable-partition into three buckets preserving source order.
+        let mut back: Vec<(i32, usize)> = Vec::new();
+        let mut middle: Vec<usize> = Vec::new();
+        let mut front: Vec<(i32, usize)> = Vec::new();
+        for (i, child) in layout.children.iter().enumerate() {
+            match z_key(child) {
+                Some(z) if z < 0 => back.push((z, i)),
+                Some(z) => front.push((z, i)),
+                None => middle.push(i),
             }
+        }
+        // Stable sort by z; source order preserved for equal z.
+        back.sort_by_key(|(z, _)| *z);
+        front.sort_by_key(|(z, _)| *z);
+        for (_, i) in &back {
+            paint_child(canvas, &layout.children[*i], fonts, images);
+        }
+        for i in &middle {
+            paint_child(canvas, &layout.children[*i], fonts, images);
+        }
+        for (_, i) in &front {
+            paint_child(canvas, &layout.children[*i], fonts, images);
         }
     }
 

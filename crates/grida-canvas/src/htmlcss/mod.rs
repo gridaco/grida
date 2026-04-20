@@ -1287,6 +1287,80 @@ code block
         assert!(el.transform.is_empty(), "no transform props → empty");
     }
 
+    // ── z-index ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_z_index_auto() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div>x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert!(el.z_index.is_none(), "auto → None");
+    }
+
+    #[test]
+    fn test_z_index_integer() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="position:absolute;z-index:42">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.z_index, Some(42));
+
+        let html = r#"<div style="position:absolute;z-index:-5">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.z_index, Some(-5));
+    }
+
+    /// Probe: two absolutely-positioned siblings overlap. Source order paints
+    /// red last, but blue has higher z-index, so blue wins at the overlap.
+    #[test]
+    fn test_z_index_paint_order_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="position:relative;width:300px;height:300px;background:#ffffff">
+  <div style="position:absolute;top:40px;left:40px;width:120px;height:120px;background:#0000ff;z-index:2"></div>
+  <div style="position:absolute;top:100px;left:100px;width:120px;height:120px;background:#ff0000;z-index:1"></div>
+</div>"#;
+        let px = rasterize_rgba(html, 300, 300);
+        let red_only = pixel_at(&px, 200, 200, 300);
+        assert_eq!(
+            [red_only[0], red_only[1], red_only[2]],
+            [255, 0, 0],
+            "red-only area"
+        );
+        let blue_only = pixel_at(&px, 50, 50, 300);
+        assert_eq!(
+            [blue_only[0], blue_only[1], blue_only[2]],
+            [0, 0, 255],
+            "blue-only area"
+        );
+        let overlap = pixel_at(&px, 150, 150, 300);
+        assert_eq!(
+            [overlap[0], overlap[1], overlap[2]],
+            [0, 0, 255],
+            "overlap wins by z-index, not source order"
+        );
+    }
+
+    /// Without z-index, source order wins (red later = on top).
+    #[test]
+    fn test_z_index_source_order_default() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="position:relative;width:300px;height:300px;background:#ffffff">
+  <div style="position:absolute;top:40px;left:40px;width:120px;height:120px;background:#0000ff"></div>
+  <div style="position:absolute;top:100px;left:100px;width:120px;height:120px;background:#ff0000"></div>
+</div>"#;
+        let px = rasterize_rgba(html, 300, 300);
+        let overlap = pixel_at(&px, 150, 150, 300);
+        assert_eq!(
+            [overlap[0], overlap[1], overlap[2]],
+            [255, 0, 0],
+            "source order wins when no z-index"
+        );
+    }
+
     // ── Gradient extraction ──────────────────────────────────────────
 
     fn find_bg_image(el: &style::StyledElement) -> Option<&style::BackgroundImage> {

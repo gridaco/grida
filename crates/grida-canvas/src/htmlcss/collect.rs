@@ -940,6 +940,15 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Inset (for positioned elements)
     el.inset = extract_inset(style);
 
+    // z-index (None when keyword `auto`)
+    {
+        use style::values::generics::position::ZIndex;
+        el.z_index = match style.get_position().clone_z_index() {
+            ZIndex::Integer(i) => Some(i),
+            ZIndex::Auto => None,
+        };
+    }
+
     // Background
     el.background = extract_background(style);
 
