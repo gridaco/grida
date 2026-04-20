@@ -1,26 +1,41 @@
 ---
-title: "How to get Figma Design link"
-version: 0.1.0
-revision: 1
+title: How to get a shareable Figma design link
+description: Copy a Figma link to a frame or file so you can share it or use it in Grida workflows.
+keywords:
+  - figma
+  - share link
+  - design link
+  - grida
+format: md
+doc_tasks:
+  - update
 ---
 
-# How do I get Sharable design link from Figma?
+# How to get a shareable Figma design link
 
-## How to copy link to the frame
+## Copy a link to a frame
 
-1. Open figma file, navigate to frame you want to copy the link of.
-2. Right-click on the frame,
-3. Navigate to **Copy/Paste as**, and select **Copy link**.
+1. Open the Figma file and navigate to the frame you want to share.
+2. Right-click the frame.
+3. Open **Copy/Paste as**.
+4. Select **Copy link**.
 
-Now you have a link to the frame. this can be used for sharing the design, or passing the design as an input for Grida.
+You now have a direct link to that frame. You can share it with collaborators or use it as input in Grida workflows.
 
-<!-- ## How to copy link to the component -->
+## Copy a link to the whole file
 
-## How to copy link to the entire file
+1. Open the Figma file.
+2. Click **Share** in the top-right corner.
+3. Click **Copy link**.
 
-1. Open figma file, on the top-right corner, click on **Share**,
-2. Click on **Copy link**.
+The copied URL may include a `node-id` query parameter, for example:
 
-This will give you a link looks like `https://www.figma.com/file/XXXXXXX/grida.co?node-id=0000%3A0000`
-For to specifically indicate the entire fike, you have to remove the following part of the link: `?node-id=~`
-Wich will look like this - `https://www.figma.com/file/XXXXXXX` (e.g. `https://www.figma.com/file/Gaznaw1QHppxvs9UkqNOb0`)
+```txt
+https://www.figma.com/file/XXXXXXX/example-file?node-id=0%3A1
+```
+
+If you want a link to the whole file instead of a specific node, remove the `?node-id=...` portion so the URL looks like:
+
+```txt
+https://www.figma.com/file/XXXXXXX/example-file
+```

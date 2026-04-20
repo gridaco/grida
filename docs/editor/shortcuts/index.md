@@ -1,3 +1,17 @@
+---
+title: Grida Editor shortcuts
+description: Reference the keyboard shortcuts available in the Grida editor across tools, selection, editing, layout, and view controls.
+keywords:
+  - grida
+  - editor
+  - shortcuts
+  - keyboard shortcuts
+  - hotkeys
+format: md
+doc_tasks:
+  - update
+---
+
 # Grida Editor Shortcuts
 
 Welcome to the official keyboard shortcuts guide for the Grida Canvas Editor. This reference covers all available keyboard shortcuts to help you work more efficiently and navigate the editor with ease.

@@ -1,3 +1,16 @@
+---
+title: How to save a local .fig copy from Figma
+description: Download a local .fig file from Figma so you can import it into Grida.
+keywords:
+  - figma
+  - fig file
+  - import
+  - grida
+format: md
+doc_tasks:
+  - update
+---
+
 # How to Save a Local .fig Copy from Figma
 
 This guide explains how to download a .fig file from Figma to import into Grida.

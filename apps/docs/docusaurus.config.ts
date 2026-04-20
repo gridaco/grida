@@ -57,11 +57,7 @@ const config: Config = {
   stylesheets: [require.resolve("katex/dist/katex.min.css")],
   i18n: {
     defaultLocale: "en",
-    locales: [
-      "en",
-      // "fr",
-      "ko",
-    ],
+    locales: ["en", "ja", "fr", "ko"],
   },
   themeConfig: {
     navbar: {

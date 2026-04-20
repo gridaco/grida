@@ -1,6 +1,15 @@
 ---
 title: Respondent email notifications
 description: Learn how to send a custom confirmation email to respondents after a form submission in Grida Forms (CIAM verified email required).
+keywords:
+  - grida
+  - forms
+  - email notifications
+  - respondent email
+  - ciam
+format: md
+doc_tasks:
+  - update
 ---
 
 ### Respondent email notifications

@@ -1,3 +1,15 @@
+---
+title: Tags
+description: Understand how tags work in Grida for categorization, segmentation, and filtering.
+keywords:
+  - grida
+  - platform
+  - tags
+  - categorization
+  - filtering
+format: md
+---
+
 # Tags
 
 Tags are labels used to categorize, segment, and filter resources within your project. They allow you to organize your data clearly and flexibly.
@@ -38,4 +50,4 @@ When associating tags with a resource, use the following structure:
 
 Currently, tags are supported for the following resources:
 
-- [**Customer**](/platform/customers/index.md): Organize, segment, and manage your customers efficiently using tags.
+- [**Customer**](../customers/index.md): Organize, segment, and manage your customers efficiently using tags.

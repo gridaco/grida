@@ -34,6 +34,58 @@ frontmatter with `title`, `description`, and `keywords`. For most `wg/` and
 `reference/` Markdown pages that do not use MDX/JSX features, also include
 `format: md` as described below.
 
+## Doc taxonomy
+
+We use a simple shipping-first taxonomy for Docusaurus docs.
+
+- **Ship minimally meaningful docs.** If a doc already helps a user complete a task or understand a feature, publish it as a normal doc even if it still needs screenshots, examples, or polish.
+- **Use `draft: true` for docs that are not meaningful enough to ship yet.** Drafts are for placeholders, partial notes, or incomplete pages that would not yet help a user on their own.
+- **Do not use `unlisted: true` as the default state for incomplete docs.** `unlisted: true` is reserved for intentionally non-discoverable docs such as on-demand pages, historical records, or docs that should exist but stay out of navigation/search.
+- **Use `doc_tasks` for follow-up work on docs that still ship.** This is our custom frontmatter field for triage and task tracking.
+
+### `doc_tasks` frontmatter
+
+Use `doc_tasks` when a page is publishable now but still needs follow-up work.
+
+```md
+---
+title: Example doc
+description: Short summary of what the page covers.
+doc_tasks:
+  - enhance
+  - translate
+format: md
+---
+```
+
+Allowed values:
+
+- `enhance` — the doc ships, but needs better examples, screenshots, structure, or depth
+- `update` — the doc ships, but should be checked against current product behavior, APIs, or UI
+- `translate` — the source doc ships, but still needs priority translation work
+
+Guidelines:
+
+- Omit `doc_tasks` when no follow-up work needs to be tracked.
+- Prefer `doc_tasks` over `draft: true` when the page is already useful enough to publish.
+- Remove a task once that follow-up work is complete.
+
+## Authoring workflow
+
+When creating or revising a Docusaurus doc, use this decision flow:
+
+1. Is the page already minimally meaningful for its audience?
+   - If yes, ship it normally.
+   - If it still needs obvious follow-up work, add `doc_tasks`.
+2. Is the page not yet useful enough on its own?
+   - Add `draft: true`.
+3. Should the page exist but remain intentionally hard to discover?
+   - Use `unlisted: true`.
+4. Is the page a normal Markdown page without JSX/MDX features?
+   - Prefer `format: md`.
+5. Does the page have a Korean translation under a sibling `translations/ko/` directory?
+   - If not and translation is still desired, add `doc_tasks: [translate]` to the source doc.
+
 ## Special Cases
 
 Some docs trees are intentionally kept, but have different ownership rules:

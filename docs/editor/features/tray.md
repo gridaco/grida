@@ -2,6 +2,9 @@
 title: Tray
 description: Organize your canvas with Trays — lightweight containers that group frames without affecting layout or exports.
 format: md
+doc_tasks:
+  - enhance
+  - translate
 ---
 
 # Tray
