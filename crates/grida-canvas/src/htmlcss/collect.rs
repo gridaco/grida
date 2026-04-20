@@ -2018,6 +2018,46 @@ fn extract_font(style: &ComputedValues) -> FontProps {
     props.decoration_overline = td_line.intersects(StyloTextDecorationLine::OVERLINE);
     props.decoration_line_through = td_line.intersects(StyloTextDecorationLine::LINE_THROUGH);
 
+    // text-decoration-style: solid|double|dotted|dashed|wavy (MozNone → Solid).
+    {
+        use style::properties::longhands::text_decoration_style::computed_value::T as TDS;
+        props.decoration_style = match style.clone_text_decoration_style() {
+            TDS::Solid | TDS::MozNone => TextDecorationStyle::Solid,
+            TDS::Double => TextDecorationStyle::Double,
+            TDS::Dotted => TextDecorationStyle::Dotted,
+            TDS::Dashed => TextDecorationStyle::Dashed,
+            TDS::Wavy => TextDecorationStyle::Wavy,
+        };
+    }
+
+    // text-decoration-color: `currentcolor` (unresolvable to absolute) stays
+    // None and paint falls back to the element's text color.
+    props.decoration_color = style
+        .clone_text_decoration_color()
+        .as_absolute()
+        .map(abs_color_to_cg);
+
+    // text-shadow: inherited list. Stylo gives us resolved absolute colors
+    // (falling back to currentcolor resolved against text color).
+    props.text_shadow = style
+        .clone_text_shadow()
+        .0
+        .iter()
+        .map(|s| {
+            let color = s
+                .color
+                .as_absolute()
+                .map(abs_color_to_cg)
+                .unwrap_or(CGColor::BLACK);
+            TextShadow {
+                offset_x: s.horizontal.px(),
+                offset_y: s.vertical.px(),
+                blur: s.blur.0.px(),
+                color,
+            }
+        })
+        .collect();
+
     // White-space (decomposed into collapse + wrap in modern CSS/Stylo)
     {
         use style::properties::longhands::text_wrap_mode::computed_value::T as TWM;

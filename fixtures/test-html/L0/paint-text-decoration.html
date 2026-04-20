@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: text-decoration color + style</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 24px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+      .u-solid {
+        text-decoration: underline;
+      }
+      .u-red {
+        text-decoration: underline #ff0000;
+      }
+      .u-double {
+        text-decoration: underline double #0000ff;
+      }
+      .u-dotted {
+        text-decoration: underline dotted #00aa00;
+      }
+      .u-dashed {
+        text-decoration: underline dashed #888;
+      }
+      .u-wavy {
+        text-decoration: underline wavy #ff00ff;
+      }
+      .lt-color {
+        text-decoration: line-through #ff0000;
+      }
+      .multi {
+        text-decoration: underline line-through #0000ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">underline (default)</div>
+        <div class="u-solid">Decoration</div>
+      </div>
+      <div class="cell">
+        <div class="label">underline red</div>
+        <div class="u-red">Decoration</div>
+      </div>
+      <div class="cell">
+        <div class="label">underline double blue</div>
+        <div class="u-double">Decoration</div>
+      </div>
+      <div class="cell">
+        <div class="label">underline dotted green</div>
+        <div class="u-dotted">Decoration</div>
+      </div>
+      <div class="cell">
+        <div class="label">underline dashed gray</div>
+        <div class="u-dashed">Decoration</div>
+      </div>
+      <div class="cell">
+        <div class="label">underline wavy magenta</div>
+        <div class="u-wavy">Decoration</div>
+      </div>
+      <div class="cell">
+        <div class="label">line-through red</div>
+        <div class="lt-color">Decoration</div>
+      </div>
+      <div class="cell">
+        <div class="label">underline+line-through blue</div>
+        <div class="multi">Decoration</div>
+      </div>
+    </div>
+  </body>
+</html>

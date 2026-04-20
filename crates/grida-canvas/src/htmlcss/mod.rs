@@ -1080,6 +1080,121 @@ code block
         assert_eq!(imgs[1].clip, style::BackgroundBox::PaddingBox);
     }
 
+    // ── Text decoration + text-shadow extraction ─────────────────────
+
+    fn find_el_with<'a, F: Fn(&style::StyledElement) -> bool>(
+        el: &'a style::StyledElement,
+        pred: &F,
+    ) -> Option<&'a style::StyledElement> {
+        if pred(el) {
+            return Some(el);
+        }
+        for child in &el.children {
+            if let style::StyledNode::Element(c) = child {
+                if let Some(f) = find_el_with(c, pred) {
+                    return Some(f);
+                }
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn test_text_decoration_color_absolute() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<p style="text-decoration:underline #ff0000">deco</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").expect("p element");
+        assert!(el.font.decoration_underline);
+        let c = el.font.decoration_color.expect("color resolved");
+        assert_eq!((c.r, c.g, c.b), (255, 0, 0));
+    }
+
+    #[test]
+    fn test_text_decoration_color_currentcolor() {
+        let _guard = crate::stylo_test::lock();
+        // No explicit decoration-color → initial value is `currentcolor` which
+        // Stylo does not resolve to absolute; extraction should yield None.
+        let html = r#"<p style="text-decoration:underline">deco</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").expect("p element");
+        assert!(el.font.decoration_underline);
+        assert!(el.font.decoration_color.is_none(), "currentcolor → None");
+    }
+
+    #[test]
+    fn test_text_decoration_style_variants() {
+        let _guard = crate::stylo_test::lock();
+        use crate::cg::prelude::TextDecorationStyle as TDS;
+        let cases: &[(&str, TDS)] = &[
+            ("solid", TDS::Solid),
+            ("double", TDS::Double),
+            ("dotted", TDS::Dotted),
+            ("dashed", TDS::Dashed),
+            ("wavy", TDS::Wavy),
+        ];
+        for (css, expected) in cases {
+            let html = format!(r#"<p style="text-decoration:underline {css}">x</p>"#);
+            let root = collect::collect_styled_tree(&html).unwrap().unwrap();
+            let el = find_el_with(&root, &|e| e.tag == "p").expect("p");
+            assert_eq!(el.font.decoration_style, *expected, "case: {css}");
+        }
+    }
+
+    #[test]
+    fn test_text_shadow_single() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<p style="text-shadow: 4px 6px 8px #ff0000">x</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").expect("p");
+        assert_eq!(el.font.text_shadow.len(), 1);
+        let s = el.font.text_shadow[0];
+        assert_eq!(s.offset_x, 4.0);
+        assert_eq!(s.offset_y, 6.0);
+        assert_eq!(s.blur, 8.0);
+        assert_eq!((s.color.r, s.color.g, s.color.b), (255, 0, 0));
+    }
+
+    #[test]
+    fn test_text_shadow_stacked() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<p style="text-shadow: 1px 2px 0 red, 3px 4px 5px blue">x</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").expect("p");
+        assert_eq!(el.font.text_shadow.len(), 2);
+        assert_eq!(el.font.text_shadow[0].offset_x, 1.0);
+        assert_eq!(el.font.text_shadow[0].offset_y, 2.0);
+        assert_eq!(el.font.text_shadow[0].blur, 0.0);
+        assert_eq!(
+            (
+                el.font.text_shadow[0].color.r,
+                el.font.text_shadow[0].color.g,
+                el.font.text_shadow[0].color.b
+            ),
+            (255, 0, 0)
+        );
+        assert_eq!(el.font.text_shadow[1].offset_x, 3.0);
+        assert_eq!(el.font.text_shadow[1].offset_y, 4.0);
+        assert_eq!(el.font.text_shadow[1].blur, 5.0);
+        assert_eq!(
+            (
+                el.font.text_shadow[1].color.r,
+                el.font.text_shadow[1].color.g,
+                el.font.text_shadow[1].color.b
+            ),
+            (0, 0, 255)
+        );
+    }
+
+    #[test]
+    fn test_text_shadow_empty_by_default() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<p>x</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").expect("p");
+        assert!(el.font.text_shadow.is_empty());
+    }
+
     // ── Gradient extraction ──────────────────────────────────────────
 
     fn find_bg_image(el: &style::StyledElement) -> Option<&style::BackgroundImage> {
@@ -1468,6 +1583,33 @@ code block
             [border[0], border[1], border[2]],
             [0x88, 0x88, 0x88],
             "border strip shows border color, not gradient"
+        );
+    }
+
+    /// Smoke probe: a sharp (no-blur) red text-shadow must produce red pixels
+    /// somewhere in the rendered output. Only meaningful when the test font
+    /// repository resolves a font with renderable glyphs; if not (CI without
+    /// system fonts), the test is a no-op since no text is painted.
+    #[test]
+    fn test_text_shadow_red_pixels_present() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="margin:0;padding:0;font-size:40px;color:#000000;text-shadow:12px 0 0 #ff0000">HELLO</div>"#;
+        let px = rasterize_rgba(html, 400, 200);
+        // Skip if no glyphs painted (empty font repo → no black text pixels).
+        let black_count = px
+            .iter()
+            .filter(|p| p[0] < 40 && p[1] < 40 && p[2] < 40)
+            .count();
+        if black_count < 10 {
+            return;
+        }
+        let red_count = px
+            .iter()
+            .filter(|p| p[0] > 200 && p[1] < 40 && p[2] < 40)
+            .count();
+        assert!(
+            red_count > 20,
+            "expected many red shadow pixels, got {red_count} (black={black_count})"
         );
     }
 

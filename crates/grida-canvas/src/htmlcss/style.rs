@@ -381,6 +381,15 @@ pub struct BoxShadow {
     pub inset: bool,
 }
 
+/// CSS `text-shadow` entry — one shadow in a comma-separated list.
+#[derive(Debug, Clone, Copy)]
+pub struct TextShadow {
+    pub offset_x: f32,
+    pub offset_y: f32,
+    pub blur: f32,
+    pub color: CGColor,
+}
+
 // ─── Background Sub-types (StyleBackgroundData) ─────────────────────
 
 /// A CSS image value — polymorphic like Chromium's `StyleImage`.
@@ -593,6 +602,8 @@ pub struct FontProps {
     pub decoration_line_through: bool,
     pub decoration_style: TextDecorationStyle,
     pub decoration_color: Option<CGColor>,
+    /// CSS `text-shadow`. Inherited. Bottom-to-top paint order.
+    pub text_shadow: Vec<TextShadow>,
     pub white_space: WhiteSpace,
     pub text_indent: f32,
     pub text_overflow: TextOverflow,
@@ -617,6 +628,7 @@ impl Default for FontProps {
             decoration_line_through: false,
             decoration_style: TextDecorationStyle::Solid,
             decoration_color: None,
+            text_shadow: Vec::new(),
             white_space: WhiteSpace::Normal,
             text_indent: 0.0,
             text_overflow: TextOverflow::Clip,

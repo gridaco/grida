@@ -3,7 +3,7 @@
 //! Builds a Taffy tree from the styled IR, runs CSS layout (block flow,
 //! flexbox, grid), and produces positioned boxes with resolved dimensions.
 
-use crate::cg::prelude::CGColor;
+use crate::cg::prelude::{CGColor, TextDecorationStyle as CgTextDecorationStyle};
 use crate::runtime::font_repository::FontRepository;
 
 use skia_safe::font_style;
@@ -777,11 +777,28 @@ pub(crate) fn build_skia_text_style(font: &FontProps, color: &CGColor) -> TextSt
     }
     if decoration != textlayout::TextDecoration::NO_DECORATION {
         ts.set_decoration_type(decoration);
-        ts.set_decoration_style(textlayout::TextDecorationStyle::Solid);
-        ts.set_decoration_color(skia_safe::Color::from_argb(
-            color.a, color.r, color.g, color.b,
-        ));
+        let dec_style = match font.decoration_style {
+            CgTextDecorationStyle::Solid => textlayout::TextDecorationStyle::Solid,
+            CgTextDecorationStyle::Double => textlayout::TextDecorationStyle::Double,
+            CgTextDecorationStyle::Dotted => textlayout::TextDecorationStyle::Dotted,
+            CgTextDecorationStyle::Dashed => textlayout::TextDecorationStyle::Dashed,
+            CgTextDecorationStyle::Wavy => textlayout::TextDecorationStyle::Wavy,
+        };
+        ts.set_decoration_style(dec_style);
+        let dc = font.decoration_color.unwrap_or(*color);
+        ts.set_decoration_color(skia_safe::Color::from_argb(dc.a, dc.r, dc.g, dc.b));
         ts.set_decoration_thickness_multiplier(1.0);
+    }
+
+    // text-shadow: stacked in source order, painted bottom-up by Skia.
+    // CSS blur radius → Skia blur sigma (Gaussian). Empirically sigma ≈ blur / 2.
+    for sh in &font.text_shadow {
+        let sigma = (sh.blur as f64) * 0.5;
+        ts.add_shadow(textlayout::TextShadow::new(
+            skia_safe::Color::from_argb(sh.color.a, sh.color.r, sh.color.g, sh.color.b),
+            skia_safe::Point::new(sh.offset_x, sh.offset_y),
+            sigma,
+        ));
     }
 
     ts
