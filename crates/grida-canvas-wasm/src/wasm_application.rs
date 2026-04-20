@@ -45,7 +45,7 @@ fn config_from_flags(flags: u32) -> cg::runtime::config::RuntimeRendererConfig {
 
 #[no_mangle]
 /// js::_init
-pub extern "C" fn init(
+pub(crate) extern "C" fn init(
     width: i32,
     height: i32,
     use_embedded_fonts: bool,
@@ -69,7 +69,7 @@ pub extern "C" fn init(
 ///
 /// config_flags: bitfield for `RuntimeRendererConfig` (see `CONFIG_FLAG_*`).
 /// Pass 0 for defaults.
-pub extern "C" fn init_with_backend(
+pub(crate) extern "C" fn init_with_backend(
     backend_id: u32,
     width: i32,
     height: i32,
@@ -89,7 +89,7 @@ pub extern "C" fn init_with_backend(
 
 #[no_mangle]
 /// js::_tick
-pub unsafe extern "C" fn tick(app: *mut UnknownTargetApplication, time: f64) {
+pub(crate) unsafe extern "C" fn tick(app: *mut UnknownTargetApplication, time: f64) {
     if let Some(app) = app.as_mut() {
         app.tick(time);
     }
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn tick(app: *mut UnknownTargetApplication, time: f64) {
 /// - Raster (headless) apps are freed immediately.
 /// - WebGL apps are driven by an Emscripten RAF loop; `_destroy` first requests
 ///   the loop to stop, then the loop frees the application on its final tick.
-pub unsafe extern "C" fn destroy(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn destroy(app: *mut UnknownTargetApplication) {
     let Some(app_ref) = app.as_mut() else {
         return;
     };
@@ -118,7 +118,7 @@ pub unsafe extern "C" fn destroy(app: *mut UnknownTargetApplication) {
 
 #[no_mangle]
 /// js::_resize_surface
-pub unsafe extern "C" fn resize_surface(
+pub(crate) unsafe extern "C" fn resize_surface(
     app: *mut UnknownTargetApplication,
     width: i32,
     height: i32,
@@ -130,7 +130,7 @@ pub unsafe extern "C" fn resize_surface(
 
 #[no_mangle]
 /// js::_redraw
-pub unsafe extern "C" fn redraw(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn redraw(app: *mut UnknownTargetApplication) {
     if let Some(app) = app.as_mut() {
         app.redraw();
     }
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn redraw(app: *mut UnknownTargetApplication) {
 
 #[no_mangle]
 /// js::_load_scene_grida
-pub unsafe extern "C" fn load_scene_grida(
+pub(crate) unsafe extern "C" fn load_scene_grida(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -153,7 +153,7 @@ pub unsafe extern "C" fn load_scene_grida(
 
 #[no_mangle]
 /// js::_switch_scene
-pub unsafe extern "C" fn switch_scene(
+pub(crate) unsafe extern "C" fn switch_scene(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -169,7 +169,7 @@ pub unsafe extern "C" fn switch_scene(
 #[no_mangle]
 /// js::_loaded_scene_ids
 /// Returns a len-prefixed JSON array of scene ID strings, or null if empty.
-pub unsafe extern "C" fn loaded_scene_ids(app: *mut UnknownTargetApplication) -> *const u8 {
+pub(crate) unsafe extern "C" fn loaded_scene_ids(app: *mut UnknownTargetApplication) -> *const u8 {
     if let Some(app) = app.as_ref() {
         let ids = app.loaded_scene_ids();
         if ids.is_empty() {
@@ -185,7 +185,9 @@ pub unsafe extern "C" fn loaded_scene_ids(app: *mut UnknownTargetApplication) ->
 #[no_mangle]
 /// js::_drain_missing_images
 /// Returns a len-prefixed JSON array of missing image ref strings, or null if empty.
-pub unsafe extern "C" fn drain_missing_images(app: *mut UnknownTargetApplication) -> *const u8 {
+pub(crate) unsafe extern "C" fn drain_missing_images(
+    app: *mut UnknownTargetApplication,
+) -> *const u8 {
     if let Some(app) = app.as_mut() {
         let refs = app.drain_missing_images();
         if refs.is_empty() {
@@ -202,7 +204,7 @@ pub unsafe extern "C" fn drain_missing_images(app: *mut UnknownTargetApplication
 /// js::_resolve_image
 /// Same as _add_image_with_rid but without return value, and queues a redraw.
 /// Used by the lazy image loading system.
-pub unsafe extern "C" fn resolve_image(
+pub(crate) unsafe extern "C" fn resolve_image(
     app: *mut UnknownTargetApplication,
     rid_ptr: *const u8,
     rid_len: usize,
@@ -228,7 +230,7 @@ pub unsafe extern "C" fn resolve_image(
 /// single-node `GridaFile` buffer at `(ptr, len)`. See
 /// [`ApplicationApi::replace_node_grida`] for semantics. Returns `false`
 /// on malformed input or an unknown id.
-pub unsafe extern "C" fn replace_node_grida(
+pub(crate) unsafe extern "C" fn replace_node_grida(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -247,7 +249,7 @@ pub unsafe extern "C" fn replace_node_grida(
 ///
 /// Remove a node and all its descendants from the active scene, keyed by
 /// user string id. Returns `false` if the id is unknown.
-pub unsafe extern "C" fn delete_node(
+pub(crate) unsafe extern "C" fn delete_node(
     app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
@@ -266,7 +268,7 @@ pub unsafe extern "C" fn delete_node(
 /// Legacy path — updates devtools hit test only, does NOT dispatch through
 /// the surface event system. Use `surface_pointer_move` for full surface
 /// interaction (hover, cursor icon).
-pub unsafe extern "C" fn pointer_move(app: *mut UnknownTargetApplication, x: f32, y: f32) {
+pub(crate) unsafe extern "C" fn pointer_move(app: *mut UnknownTargetApplication, x: f32, y: f32) {
     if let Some(app) = app.as_mut() {
         app.pointer_move(x, y);
     }
@@ -316,7 +318,7 @@ fn decode_button(id: u32) -> cg::surface::PointerButton {
 ///
 /// Dispatches a pointer-move through the surface event system (hover, cursor).
 /// Returns packed `SurfaceResponse` flags as u32.
-pub unsafe extern "C" fn surface_pointer_move(
+pub(crate) unsafe extern "C" fn surface_pointer_move(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -333,7 +335,7 @@ pub unsafe extern "C" fn surface_pointer_move(
 /// `button`: 0=Primary, 1=Secondary, 2=Middle
 /// `modifiers`: bitmask (bit0=shift, bit1=alt, bit2=ctrl_or_cmd)
 /// Returns packed `SurfaceResponse` flags as u32.
-pub unsafe extern "C" fn surface_pointer_down(
+pub(crate) unsafe extern "C" fn surface_pointer_down(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -357,7 +359,7 @@ pub unsafe extern "C" fn surface_pointer_down(
 /// `button`: 0=Primary, 1=Secondary, 2=Middle
 /// `modifiers`: bitmask (bit0=shift, bit1=alt, bit2=ctrl_or_cmd)
 /// Returns packed `SurfaceResponse` flags as u32.
-pub unsafe extern "C" fn surface_pointer_up(
+pub(crate) unsafe extern "C" fn surface_pointer_up(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -380,7 +382,7 @@ pub unsafe extern "C" fn surface_pointer_up(
 ///
 /// Returns the current cursor icon as u32:
 /// 0=Default, 1=Pointer, 2=Grab, 3=Grabbing, 4=Crosshair, 5=Move
-pub unsafe extern "C" fn surface_get_cursor(app: *const UnknownTargetApplication) -> u32 {
+pub(crate) unsafe extern "C" fn surface_get_cursor(app: *const UnknownTargetApplication) -> u32 {
     match app.as_ref() {
         Some(app) => match app.surface_cursor() {
             cg::surface::CursorIcon::Default => 0,
@@ -401,7 +403,7 @@ pub unsafe extern "C" fn surface_get_cursor(app: *const UnknownTargetApplication
 /// js::_surface_get_hovered_node
 ///
 /// Returns a length-prefixed JSON string of the hovered node ID, or null.
-pub unsafe extern "C" fn surface_get_hovered_node(
+pub(crate) unsafe extern "C" fn surface_get_hovered_node(
     app: *const UnknownTargetApplication,
 ) -> *const u8 {
     match app.as_ref() {
@@ -426,7 +428,7 @@ pub unsafe extern "C" fn surface_get_hovered_node(
 /// js::_surface_get_selected_nodes
 ///
 /// Returns a length-prefixed JSON string of the selected node IDs (as user-facing strings).
-pub unsafe extern "C" fn surface_get_selected_nodes(
+pub(crate) unsafe extern "C" fn surface_get_selected_nodes(
     app: *const UnknownTargetApplication,
 ) -> *const u8 {
     match app.as_ref() {
@@ -444,7 +446,7 @@ pub unsafe extern "C" fn surface_get_selected_nodes(
 /// js::_surface_set_selection
 ///
 /// Restore selection from a JSON array of node IDs (e.g. for undo/redo).
-pub unsafe extern "C" fn surface_set_selection(
+pub(crate) unsafe extern "C" fn surface_set_selection(
     app: *mut UnknownTargetApplication,
     json_ptr: *const u8,
     json_len: u32,
@@ -471,7 +473,7 @@ pub unsafe extern "C" fn surface_set_selection(
 /// - `target`: 0 = fill, 1 = stroke
 /// - `recursive`: whether to include descendant subtrees
 /// - `limit`: max number of distinct paint groups to return (0 = unlimited)
-pub unsafe extern "C" fn query_paint_groups(
+pub(crate) unsafe extern "C" fn query_paint_groups(
     app: *const UnknownTargetApplication,
     ids_json_ptr: *const u8,
     ids_json_len: u32,
@@ -548,7 +550,7 @@ pub unsafe extern "C" fn query_paint_groups(
 ///
 /// Configure surface overlay rendering from JSON.
 /// Fields: { dpr, text_baseline_decoration, show_size_meter, show_frame_titles }
-pub unsafe extern "C" fn set_surface_overlay_config(
+pub(crate) unsafe extern "C" fn set_surface_overlay_config(
     app: *mut UnknownTargetApplication,
     json_ptr: *const u8,
     json_len: u32,
@@ -588,7 +590,12 @@ pub unsafe extern "C" fn set_surface_overlay_config(
 
 #[no_mangle]
 /// js::_command
-pub unsafe extern "C" fn command(app: *mut UnknownTargetApplication, id: u32, a: f32, b: f32) {
+pub(crate) unsafe extern "C" fn command(
+    app: *mut UnknownTargetApplication,
+    id: u32,
+    a: f32,
+    b: f32,
+) {
     use cg::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
@@ -615,7 +622,7 @@ pub unsafe extern "C" fn command(app: *mut UnknownTargetApplication, id: u32, a:
 
 #[no_mangle]
 /// js::_set_main_camera_transform
-pub unsafe extern "C" fn set_main_camera_transform(
+pub(crate) unsafe extern "C" fn set_main_camera_transform(
     app: *mut UnknownTargetApplication,
     a: f32,
     c: f32,
@@ -637,7 +644,7 @@ pub unsafe extern "C" fn set_main_camera_transform(
 // ====================================================================================================
 
 #[derive(Serialize)]
-pub struct CreateImageResourceResult {
+pub(crate) struct CreateImageResourceResult {
     pub hash: String,
     pub url: String,
     pub width: u32,
@@ -648,7 +655,7 @@ pub struct CreateImageResourceResult {
 
 #[no_mangle]
 /// js::_add_image
-pub unsafe extern "C" fn add_image(
+pub(crate) unsafe extern "C" fn add_image(
     app: *mut UnknownTargetApplication,
     data_ptr: *const u8,
     data_len: usize,
@@ -671,7 +678,7 @@ pub unsafe extern "C" fn add_image(
 }
 
 #[derive(Serialize)]
-pub struct AddImageWithRidResult {
+pub(crate) struct AddImageWithRidResult {
     pub width: u32,
     pub height: u32,
     #[serde(rename = "type")]
@@ -680,7 +687,7 @@ pub struct AddImageWithRidResult {
 
 #[no_mangle]
 /// js::_add_image_with_rid
-pub unsafe extern "C" fn add_image_with_rid(
+pub(crate) unsafe extern "C" fn add_image_with_rid(
     app: *mut UnknownTargetApplication,
     data_ptr: *const u8,
     data_len: usize,
@@ -705,7 +712,7 @@ pub unsafe extern "C" fn add_image_with_rid(
 
 #[no_mangle]
 /// js::_get_image_bytes
-pub unsafe extern "C" fn get_image_bytes(
+pub(crate) unsafe extern "C" fn get_image_bytes(
     app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
@@ -725,7 +732,7 @@ pub unsafe extern "C" fn get_image_bytes(
 
 #[no_mangle]
 /// js::_get_image_size
-pub unsafe extern "C" fn get_image_size(
+pub(crate) unsafe extern "C" fn get_image_size(
     app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
@@ -748,7 +755,7 @@ pub unsafe extern "C" fn get_image_size(
 // ====================================================================================================
 
 #[derive(Serialize)]
-pub struct FontKey {
+pub(crate) struct FontKey {
     /// CSS font-family name.
     pub family: String,
     // In the future, additional properties will precisely describe the font to enable
@@ -758,7 +765,7 @@ pub struct FontKey {
 #[no_mangle]
 /// js::_add_font - Register font bytes. Multiple calls with the same family
 /// and different font files are supported (e.g. Regular, Bold, Italic per family).
-pub unsafe extern "C" fn add_font(
+pub(crate) unsafe extern "C" fn add_font(
     app: *mut UnknownTargetApplication,
     family_ptr: *const u8,
     family_len: usize,
@@ -775,7 +782,7 @@ pub unsafe extern "C" fn add_font(
 
 #[no_mangle]
 /// js::_has_missing_fonts
-pub unsafe extern "C" fn has_missing_fonts(app: *mut UnknownTargetApplication) -> bool {
+pub(crate) unsafe extern "C" fn has_missing_fonts(app: *mut UnknownTargetApplication) -> bool {
     if let Some(app) = app.as_ref() {
         app.has_missing_fonts()
     } else {
@@ -785,7 +792,9 @@ pub unsafe extern "C" fn has_missing_fonts(app: *mut UnknownTargetApplication) -
 
 #[no_mangle]
 /// js::_list_missing_fonts
-pub unsafe extern "C" fn list_missing_fonts(app: *mut UnknownTargetApplication) -> *const u8 {
+pub(crate) unsafe extern "C" fn list_missing_fonts(
+    app: *mut UnknownTargetApplication,
+) -> *const u8 {
     use serde_json;
 
     if let Some(app) = app.as_ref() {
@@ -803,7 +812,9 @@ pub unsafe extern "C" fn list_missing_fonts(app: *mut UnknownTargetApplication) 
 
 #[no_mangle]
 /// js::_list_available_fonts
-pub unsafe extern "C" fn list_available_fonts(app: *mut UnknownTargetApplication) -> *const u8 {
+pub(crate) unsafe extern "C" fn list_available_fonts(
+    app: *mut UnknownTargetApplication,
+) -> *const u8 {
     use serde_json;
 
     if let Some(app) = app.as_ref() {
@@ -821,7 +832,7 @@ pub unsafe extern "C" fn list_available_fonts(app: *mut UnknownTargetApplication
 
 #[no_mangle]
 /// js::_set_default_fallback_fonts
-pub unsafe extern "C" fn set_default_fallback_fonts(
+pub(crate) unsafe extern "C" fn set_default_fallback_fonts(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -838,7 +849,7 @@ pub unsafe extern "C" fn set_default_fallback_fonts(
 
 #[no_mangle]
 /// js::_get_default_fallback_fonts
-pub unsafe extern "C" fn get_default_fallback_fonts(
+pub(crate) unsafe extern "C" fn get_default_fallback_fonts(
     app: *mut UnknownTargetApplication,
 ) -> *const u8 {
     use serde_json;
@@ -860,7 +871,7 @@ pub unsafe extern "C" fn get_default_fallback_fonts(
 
 #[no_mangle]
 /// js::_get_node_id_from_point
-pub unsafe extern "C" fn get_node_id_from_point(
+pub(crate) unsafe extern "C" fn get_node_id_from_point(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -875,7 +886,7 @@ pub unsafe extern "C" fn get_node_id_from_point(
 
 #[no_mangle]
 /// js::_get_node_ids_from_point
-pub unsafe extern "C" fn get_node_ids_from_point(
+pub(crate) unsafe extern "C" fn get_node_ids_from_point(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -894,7 +905,7 @@ pub unsafe extern "C" fn get_node_ids_from_point(
 
 #[no_mangle]
 /// js::_get_node_ids_from_envelope
-pub unsafe extern "C" fn get_node_ids_from_envelope(
+pub(crate) unsafe extern "C" fn get_node_ids_from_envelope(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -916,7 +927,7 @@ pub unsafe extern "C" fn get_node_ids_from_envelope(
 
 #[no_mangle]
 /// js::_get_node_absolute_bounding_box
-pub unsafe extern "C" fn get_node_absolute_bounding_box(
+pub(crate) unsafe extern "C" fn get_node_absolute_bounding_box(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -943,7 +954,7 @@ pub unsafe extern "C" fn get_node_absolute_bounding_box(
 /// inclusive, as a JSON array of user-facing string IDs.
 ///
 /// Returns null if the node does not exist.
-pub unsafe extern "C" fn get_node_id_path(
+pub(crate) unsafe extern "C" fn get_node_id_path(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -969,7 +980,7 @@ pub unsafe extern "C" fn get_node_id_path(
 
 #[no_mangle]
 /// js::_export_node_as
-pub unsafe extern "C" fn export_node_as(
+pub(crate) unsafe extern "C" fn export_node_as(
     app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
@@ -1018,7 +1029,7 @@ pub unsafe extern "C" fn export_node_as(
 ///
 /// Returns a length-prefixed byte buffer (4-byte LE u32 length + PDF data),
 /// or null on failure.
-pub unsafe extern "C" fn export_pdf_document(
+pub(crate) unsafe extern "C" fn export_pdf_document(
     app: *mut UnknownTargetApplication,
     json_ptr: *const u8,
     json_len: usize,
@@ -1042,7 +1053,7 @@ pub unsafe extern "C" fn export_pdf_document(
 
 #[no_mangle]
 /// js::_to_vector_network
-pub unsafe extern "C" fn to_vector_network(
+pub(crate) unsafe extern "C" fn to_vector_network(
     app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
@@ -1070,7 +1081,7 @@ pub unsafe extern "C" fn to_vector_network(
 
 #[no_mangle]
 /// js::_set_debug
-pub unsafe extern "C" fn set_debug(app: *mut UnknownTargetApplication, debug: bool) {
+pub(crate) unsafe extern "C" fn set_debug(app: *mut UnknownTargetApplication, debug: bool) {
     if let Some(app) = app.as_mut() {
         app.set_debug(debug);
     }
@@ -1078,7 +1089,7 @@ pub unsafe extern "C" fn set_debug(app: *mut UnknownTargetApplication, debug: bo
 
 #[no_mangle]
 /// js::_toggle_debug
-pub unsafe extern "C" fn toggle_debug(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn toggle_debug(app: *mut UnknownTargetApplication) {
     if let Some(app) = app.as_mut() {
         app.toggle_debug();
     }
@@ -1086,7 +1097,7 @@ pub unsafe extern "C" fn toggle_debug(app: *mut UnknownTargetApplication) {
 
 #[no_mangle]
 /// js::_set_verbose
-pub unsafe extern "C" fn set_verbose(app: *mut UnknownTargetApplication, verbose: bool) {
+pub(crate) unsafe extern "C" fn set_verbose(app: *mut UnknownTargetApplication, verbose: bool) {
     if let Some(app) = app.as_mut() {
         app.set_verbose(verbose);
     }
@@ -1094,7 +1105,7 @@ pub unsafe extern "C" fn set_verbose(app: *mut UnknownTargetApplication, verbose
 
 #[no_mangle]
 /// js::_devtools_rendering_set_show_ruler
-pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
+pub(crate) unsafe extern "C" fn devtools_rendering_set_show_ruler(
     app: *mut UnknownTargetApplication,
     show: bool,
 ) {
@@ -1105,7 +1116,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_ruler(
 
 #[no_mangle]
 /// js::_devtools_rendering_set_show_tiles
-pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
+pub(crate) unsafe extern "C" fn devtools_rendering_set_show_tiles(
     app: *mut UnknownTargetApplication,
     enabled: bool,
 ) {
@@ -1116,7 +1127,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_tiles(
 
 #[no_mangle]
 /// js::_runtime_renderer_set_layer_compositing
-pub unsafe extern "C" fn runtime_renderer_set_layer_compositing(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_layer_compositing(
     app: *mut UnknownTargetApplication,
     enabled: bool,
 ) {
@@ -1127,7 +1138,7 @@ pub unsafe extern "C" fn runtime_renderer_set_layer_compositing(
 
 #[no_mangle]
 /// js::_runtime_renderer_set_pixel_preview_scale
-pub unsafe extern "C" fn runtime_renderer_set_pixel_preview_scale(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_pixel_preview_scale(
     app: *mut UnknownTargetApplication,
     scale: u32,
 ) {
@@ -1138,7 +1149,7 @@ pub unsafe extern "C" fn runtime_renderer_set_pixel_preview_scale(
 
 #[no_mangle]
 /// js::_runtime_renderer_set_pixel_preview_stable
-pub unsafe extern "C" fn runtime_renderer_set_pixel_preview_stable(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_pixel_preview_stable(
     app: *mut UnknownTargetApplication,
     stable: bool,
 ) {
@@ -1149,7 +1160,7 @@ pub unsafe extern "C" fn runtime_renderer_set_pixel_preview_stable(
 
 #[no_mangle]
 /// js::_runtime_renderer_set_render_policy_flags
-pub unsafe extern "C" fn runtime_renderer_set_render_policy_flags(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_render_policy_flags(
     app: *mut UnknownTargetApplication,
     flags: u32,
 ) {
@@ -1160,7 +1171,7 @@ pub unsafe extern "C" fn runtime_renderer_set_render_policy_flags(
 
 #[no_mangle]
 /// js::_runtime_renderer_set_skip_layout
-pub unsafe extern "C" fn runtime_renderer_set_skip_layout(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_skip_layout(
     app: *mut UnknownTargetApplication,
     skip: bool,
 ) {
@@ -1178,7 +1189,7 @@ pub unsafe extern "C" fn runtime_renderer_set_skip_layout(
 /// - `flags`: bitmask of `IsolationModeFlags` (bit 0 = OVERFLOW_DIM).
 /// - `overflow_opacity`: opacity for overflow-dimmed content (0.0–1.0).
 ///   Only read when `flags & OVERFLOW_DIM != 0`.
-pub unsafe extern "C" fn runtime_renderer_set_isolation_mode(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_isolation_mode(
     app: *mut UnknownTargetApplication,
     id_ptr: *const u8,
     id_len: usize,
@@ -1208,7 +1219,7 @@ pub unsafe extern "C" fn runtime_renderer_set_isolation_mode(
 /// |   7   | shadow-2xl  |
 ///
 /// Unknown values map to None.
-pub unsafe extern "C" fn runtime_renderer_set_isolation_stage_preset(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_isolation_stage_preset(
     app: *mut UnknownTargetApplication,
     preset: u32,
 ) {
@@ -1221,7 +1232,7 @@ pub unsafe extern "C" fn runtime_renderer_set_isolation_stage_preset(
 /// js::_runtime_renderer_set_outline_mode
 ///
 /// Back-compat shim: delegates to `runtime_renderer_set_render_policy_flags`.
-pub unsafe extern "C" fn runtime_renderer_set_outline_mode(
+pub(crate) unsafe extern "C" fn runtime_renderer_set_outline_mode(
     app: *mut UnknownTargetApplication,
     enable: bool,
 ) {
@@ -1240,7 +1251,7 @@ pub unsafe extern "C" fn runtime_renderer_set_outline_mode(
 
 #[no_mangle]
 /// js::_devtools_rendering_set_show_fps_meter
-pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
+pub(crate) unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
     app: *mut UnknownTargetApplication,
     show: bool,
 ) {
@@ -1251,7 +1262,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_fps_meter(
 
 #[no_mangle]
 /// js::_devtools_rendering_set_show_stats
-pub unsafe extern "C" fn devtools_rendering_set_show_stats(
+pub(crate) unsafe extern "C" fn devtools_rendering_set_show_stats(
     app: *mut UnknownTargetApplication,
     show: bool,
 ) {
@@ -1262,7 +1273,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_stats(
 
 #[no_mangle]
 /// js::_devtools_rendering_set_show_hit_testing
-pub unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
+pub(crate) unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
     app: *mut UnknownTargetApplication,
     show: bool,
 ) {
@@ -1279,7 +1290,7 @@ pub unsafe extern "C" fn devtools_rendering_set_show_hit_testing(
 
 #[no_mangle]
 /// js::_highlight_strokes
-pub unsafe extern "C" fn highlight_strokes(
+pub(crate) unsafe extern "C" fn highlight_strokes(
     app: *mut UnknownTargetApplication,
     ptr: *const u8,
     len: usize,
@@ -1332,7 +1343,7 @@ pub unsafe extern "C" fn highlight_strokes(
 
 #[no_mangle]
 /// js::_load_dummy_scene
-pub unsafe extern "C" fn load_dummy_scene(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn load_dummy_scene(app: *mut UnknownTargetApplication) {
     if let Some(app) = app.as_mut() {
         app.load_dummy_scene();
     }
@@ -1340,7 +1351,7 @@ pub unsafe extern "C" fn load_dummy_scene(app: *mut UnknownTargetApplication) {
 
 #[no_mangle]
 /// js::_load_benchmark_scene
-pub unsafe extern "C" fn load_benchmark_scene(
+pub(crate) unsafe extern "C" fn load_benchmark_scene(
     app: *mut UnknownTargetApplication,
     cols: u32,
     rows: u32,

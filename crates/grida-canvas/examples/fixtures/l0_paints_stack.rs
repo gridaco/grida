@@ -5,7 +5,7 @@ use cg::cg::tilemode::TileMode;
 use math2::box_fit::BoxFit;
 use math2::transform::AffineTransform;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // Single rectangle with 5 stacked fills
     let stacked = Node::Rectangle(RectangleNodeRec {
         active: true,

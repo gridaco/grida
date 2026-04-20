@@ -23,7 +23,7 @@ fn effect_rect(x: f32, effects: LayerEffects) -> Node {
     })
 }
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let gap = 220.0;
 
     // Layer progressive blur: top-left clear → bottom-right blurred

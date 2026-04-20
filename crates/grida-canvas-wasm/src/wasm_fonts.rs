@@ -18,7 +18,7 @@ use fonts::serde::WasmFontFamilyResult;
 
 /// WASM response for face record (single font parsing)
 #[derive(serde::Serialize)]
-pub struct WasmFaceRecord {
+pub(crate) struct WasmFaceRecord {
     pub face_id: String,
     pub ps_name: String,
     pub family_name: String,
@@ -131,7 +131,7 @@ unsafe fn convert_c_arrays_to_faces(
 /// # Returns
 /// JSON string containing UIFontFamilyResult or error information
 #[no_mangle]
-pub unsafe extern "C" fn grida_fonts_analyze_family(
+pub(crate) unsafe extern "C" fn grida_fonts_analyze_family(
     family_name: *const c_char,
     font_count: usize,
     face_ids: *const *const c_char,
@@ -194,7 +194,7 @@ pub unsafe extern "C" fn grida_fonts_analyze_family(
 /// # Returns
 /// JSON string containing FaceRecord or error information
 #[no_mangle]
-pub unsafe extern "C" fn grida_fonts_parse_font(
+pub(crate) unsafe extern "C" fn grida_fonts_parse_font(
     font_data_ptr: *const u8,
     font_data_size: usize,
     face_id: *const c_char,
@@ -262,7 +262,7 @@ pub unsafe extern "C" fn grida_fonts_parse_font(
 /// # Arguments
 /// * `ptr` - Pointer to memory allocated by a WASM function
 #[no_mangle]
-pub unsafe extern "C" fn grida_fonts_free(ptr: *mut c_char) {
+pub(crate) unsafe extern "C" fn grida_fonts_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         let _ = CString::from_raw(ptr);
     }

@@ -16,7 +16,7 @@ use cg::io::io_markdown::markdown_to_html;
 
 /// WASM response for markdown to HTML conversion result
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmMarkdownToHtmlResult {
+pub(crate) struct WasmMarkdownToHtmlResult {
     /// Converted HTML string
     pub html: String,
 }
@@ -41,7 +41,7 @@ pub struct WasmMarkdownToHtmlResult {
 ///
 /// js:__grida_markdown_to_html
 #[no_mangle]
-pub unsafe extern "C" fn grida_markdown_to_html(markdown: *const c_char) -> *mut c_char {
+pub(crate) unsafe extern "C" fn grida_markdown_to_html(markdown: *const c_char) -> *mut c_char {
     let result = (|| -> Result<String, String> {
         if markdown.is_null() {
             return Err("markdown cannot be null".to_string());

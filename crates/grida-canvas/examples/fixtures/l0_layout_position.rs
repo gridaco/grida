@@ -1,7 +1,7 @@
 use super::*;
 use std::collections::HashMap;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let container = Node::Container(ContainerNodeRec {
         active: true,
         opacity: 1.0,

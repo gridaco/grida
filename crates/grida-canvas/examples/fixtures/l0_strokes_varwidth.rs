@@ -2,7 +2,7 @@ use super::*;
 use cg::vectornetwork::*;
 
 /// Variable-width stroke profiles on vector paths: taper, bulge, multi-stop, asymmetric.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // Shared S-curve path (4 vertices, 3 segments)
     fn s_curve(x: f32, y: f32, profile: cg::cg::varwidth::VarWidthProfile) -> Node {
         Node::Vector(VectorNodeRec {

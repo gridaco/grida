@@ -481,9 +481,7 @@ fn stage_shadow_xl_renders_pixels() {
     let w = img.width();
     let h = img.height();
 
-    let (_, _, max_x, max_y) = content_bbox(&img).expect("ShadowXL should render pixels");
-    let cx = (max_x + (max_x - 100)) / 2 + 50; // horizontal center of container
-    let cy = (max_y + (max_y - 100)) / 2 + 50;
+    content_bbox(&img).expect("ShadowXL should render pixels");
 
     // Container center: opaque white.
     let (_, _, bx, by) = content_bbox(&img).unwrap();

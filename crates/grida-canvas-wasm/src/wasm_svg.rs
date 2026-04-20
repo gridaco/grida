@@ -16,7 +16,7 @@ use cg::io::io_svg::{svg_optimize, svg_to_grida_bytes};
 
 /// WASM response for SVG optimization result
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct WasmSvgOptimizeResult {
+pub(crate) struct WasmSvgOptimizeResult {
     /// Optimized SVG string with CSS styles resolved and inlined
     pub svg_optimized: String,
 }
@@ -40,7 +40,7 @@ pub struct WasmSvgOptimizeResult {
 ///
 /// js:__grida_svg_optimize
 #[no_mangle]
-pub unsafe extern "C" fn grida_svg_optimize(svg: *const c_char) -> *mut c_char {
+pub(crate) unsafe extern "C" fn grida_svg_optimize(svg: *const c_char) -> *mut c_char {
     let result = (|| -> Result<String, String> {
         if svg.is_null() {
             return Err("svg cannot be null".to_string());
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn grida_svg_optimize(svg: *const c_char) -> *mut c_char {
 ///
 /// js::_grida_svg_to_document
 #[no_mangle]
-pub unsafe extern "C" fn grida_svg_to_document(svg: *const c_char) -> *mut u8 {
+pub(crate) unsafe extern "C" fn grida_svg_to_document(svg: *const c_char) -> *mut u8 {
     let result = (|| -> Result<Vec<u8>, String> {
         if svg.is_null() {
             return Err("svg cannot be null".to_string());

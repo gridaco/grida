@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, Default, Clone, Copy)]
-pub struct DiffConfig {
+pub(crate) struct DiffConfig {
     #[serde(default)]
     pub aa: Option<bool>,
     #[serde(default)]
@@ -12,13 +12,13 @@ pub struct DiffConfig {
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
-pub struct ScoringConfig {
+pub(crate) struct ScoringConfig {
     #[serde(default)]
     pub mask: Option<String>, // "none" | "alpha"
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
-pub struct TestConfig {
+pub(crate) struct TestConfig {
     // Optional name under [test]
     #[serde(default)]
     pub name: Option<String>,
@@ -40,7 +40,7 @@ pub struct TestConfig {
 }
 
 #[derive(Debug, Deserialize, Default)]
-pub struct ReftestToml {
+pub(crate) struct ReftestToml {
     // Legacy top-level name (still supported)
     #[serde(default)]
     pub name: Option<String>,
@@ -64,7 +64,7 @@ pub struct ReftestToml {
 }
 
 impl ReftestToml {
-    pub fn load_from_dir(dir: &Path) -> Result<Option<Self>> {
+    pub(crate) fn load_from_dir(dir: &Path) -> Result<Option<Self>> {
         let path = dir.join("reftest.toml");
         if !path.exists() {
             return Ok(None);
@@ -90,36 +90,36 @@ impl ReftestToml {
         }
     }
 
-    pub fn resolve_name(&self) -> Option<String> {
+    pub(crate) fn resolve_name(&self) -> Option<String> {
         let t = self.pick_test();
         t.name.or_else(|| self.name.clone())
     }
 
-    pub fn input_pattern(&self) -> Option<&str> {
+    pub(crate) fn input_pattern(&self) -> Option<&str> {
         if let Some(t) = &self.test {
             return t.inputs.as_deref();
         }
         self.inputs.as_deref()
     }
 
-    pub fn resolve_inputs(&self, base: &Path) -> Option<PathBuf> {
+    pub(crate) fn resolve_inputs(&self, base: &Path) -> Option<PathBuf> {
         let t = self.pick_test();
         t.inputs.as_ref().map(|p| base.join(p))
     }
-    pub fn resolve_expects(&self, base: &Path) -> Option<PathBuf> {
+    pub(crate) fn resolve_expects(&self, base: &Path) -> Option<PathBuf> {
         let t = self.pick_test();
         t.expects.as_ref().map(|p| base.join(p))
     }
-    pub fn resolve_bg(&self) -> Option<String> {
+    pub(crate) fn resolve_bg(&self) -> Option<String> {
         self.pick_test().bg
     }
-    pub fn resolve_diff(&self) -> Option<DiffConfig> {
+    pub(crate) fn resolve_diff(&self) -> Option<DiffConfig> {
         self.pick_test().diff
     }
-    pub fn resolve_scoring(&self) -> Option<ScoringConfig> {
+    pub(crate) fn resolve_scoring(&self) -> Option<ScoringConfig> {
         self.pick_test().scoring
     }
-    pub fn resolve_kind(&self) -> Option<String> {
+    pub(crate) fn resolve_kind(&self) -> Option<String> {
         self.pick_test().kind
     }
 }

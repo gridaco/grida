@@ -3,7 +3,7 @@ use cg::cg::alignment::Alignment;
 use math2::box_fit::BoxFit;
 use math2::transform::AffineTransform;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let s = 150.0;
     let gap = 170.0;
     let img = || ResourceRef::HASH(SYSTEM_IMAGE.to_owned());

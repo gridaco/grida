@@ -2818,7 +2818,7 @@ fn build_benchmark_scene(grid: u32) -> Scene {
 // Single-scene bench (human-readable output)
 // ---------------------------------------------------------------------------
 
-pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> Result<()> {
+pub(crate) async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> Result<()> {
     let scenes = if let Some(ref path) = args.path {
         load_scenes.load(path).await?
     } else {
@@ -3021,7 +3021,7 @@ pub async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoader) -> R
 // Bulk bench-report (JSON output)
 // ---------------------------------------------------------------------------
 
-pub async fn run_bench_report(
+pub(crate) async fn run_bench_report(
     args: BenchReportArgs,
     load_scenes: impl AsyncSceneLoader,
 ) -> Result<()> {
@@ -3147,6 +3147,6 @@ pub async fn run_bench_report(
 // ---------------------------------------------------------------------------
 
 #[allow(async_fn_in_trait)]
-pub trait AsyncSceneLoader {
+pub(crate) trait AsyncSceneLoader {
     async fn load(&self, source: &str) -> Result<Vec<Scene>>;
 }

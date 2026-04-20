@@ -1,25 +1,25 @@
 //! Shared helpers for fixture generators.
 #![allow(dead_code)]
 
-pub use std::collections::HashMap;
+pub(crate) use std::collections::HashMap;
 
-pub use cg::cg::alignment::Alignment;
-pub use cg::cg::color::CGColor;
-pub use cg::cg::stroke_width::{SingularStrokeWidth, StrokeWidth};
-pub use cg::cg::tilemode::TileMode;
-pub use cg::cg::types::*;
+pub(crate) use cg::cg::alignment::Alignment;
+pub(crate) use cg::cg::color::CGColor;
+pub(crate) use cg::cg::stroke_width::{SingularStrokeWidth, StrokeWidth};
+pub(crate) use cg::cg::tilemode::TileMode;
+pub(crate) use cg::cg::types::*;
 use cg::io::io_grida_fbs;
-pub use cg::node::scene_graph::SceneGraph;
-pub use cg::node::schema::*;
-pub use math2::box_fit::BoxFit;
-pub use math2::transform::AffineTransform;
+pub(crate) use cg::node::scene_graph::SceneGraph;
+pub(crate) use cg::node::schema::*;
+pub(crate) use math2::box_fit::BoxFit;
+pub(crate) use math2::transform::AffineTransform;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Scene building
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// Build a `Scene` from `(id, node)` pairs, parent→children links, and root ids.
-pub fn build_scene(
+pub(crate) fn build_scene(
     name: &str,
     bg: Option<CGColor>,
     nodes: Vec<(NodeId, Node)>,
@@ -35,7 +35,7 @@ pub fn build_scene(
 }
 
 /// Build id_map and position_map with a prefix to avoid collisions in multi-scene files. every node ID to avoid collisions in multi-scene files.
-pub fn build_maps_prefixed(
+pub(crate) fn build_maps_prefixed(
     scene: &Scene,
     id_map: &mut HashMap<NodeId, String>,
     position_map: &mut HashMap<NodeId, String>,
@@ -129,7 +129,7 @@ fn wrap_zip(fbs_bytes: &[u8]) -> Vec<u8> {
 }
 
 /// Encode multiple scenes into a raw `.grida` FlatBuffer file with decode verification.
-pub fn write_multi_fixture(scenes: &[(&str, Scene)], name: &str) {
+pub(crate) fn write_multi_fixture(scenes: &[(&str, Scene)], name: &str) {
     let bytes = encode_scenes(scenes);
     assert!(!bytes.is_empty(), "{name}: encoded bytes empty");
 
@@ -163,7 +163,7 @@ pub fn write_multi_fixture(scenes: &[(&str, Scene)], name: &str) {
 
 /// Encode multiple scenes into a ZIP-wrapped `.grida` archive (production format)
 /// with decode round-trip verification.
-pub fn write_multi_fixture_zip(scenes: &[(&str, Scene)], name: &str) {
+pub(crate) fn write_multi_fixture_zip(scenes: &[(&str, Scene)], name: &str) {
     let fbs_bytes = encode_scenes(scenes);
     assert!(!fbs_bytes.is_empty(), "{name}: encoded bytes empty");
 
@@ -202,7 +202,7 @@ pub fn write_multi_fixture_zip(scenes: &[(&str, Scene)], name: &str) {
 // Paint builders
 // ═════════════════════════════════════════════════════════════════════════════
 
-pub fn solid(r: u8, g: u8, b: u8, a: u8) -> Paint {
+pub(crate) fn solid(r: u8, g: u8, b: u8, a: u8) -> Paint {
     Paint::Solid(SolidPaint {
         active: true,
         color: CGColor { r, g, b, a },
@@ -210,7 +210,7 @@ pub fn solid(r: u8, g: u8, b: u8, a: u8) -> Paint {
     })
 }
 
-pub fn linear_gradient() -> Paint {
+pub(crate) fn linear_gradient() -> Paint {
     Paint::LinearGradient(LinearGradientPaint {
         active: true,
         xy1: Alignment::CENTER_LEFT,
@@ -242,7 +242,7 @@ pub fn linear_gradient() -> Paint {
     })
 }
 
-pub fn radial_gradient() -> Paint {
+pub(crate) fn radial_gradient() -> Paint {
     Paint::RadialGradient(RadialGradientPaint {
         active: true,
         transform: AffineTransform::default(),
@@ -272,7 +272,7 @@ pub fn radial_gradient() -> Paint {
     })
 }
 
-pub fn sweep_gradient() -> Paint {
+pub(crate) fn sweep_gradient() -> Paint {
     Paint::SweepGradient(SweepGradientPaint {
         active: true,
         transform: AffineTransform::default(),
@@ -312,16 +312,16 @@ pub fn sweep_gradient() -> Paint {
 
 /// The system checker image bundled in the renderer. Use this for all fixture
 /// image paints so they actually render in the native demo.
-pub const SYSTEM_IMAGE: &str = "system://images/checker-16-strip-L98L92.png";
+pub(crate) const SYSTEM_IMAGE: &str = "system://images/checker-16-strip-L98L92.png";
 
-pub fn image_paint() -> Paint {
+pub(crate) fn image_paint() -> Paint {
     image_paint_with(
         ResourceRef::HASH(SYSTEM_IMAGE.to_owned()),
         ImagePaintFit::Fit(BoxFit::Cover),
     )
 }
 
-pub fn image_paint_with(image: ResourceRef, fit: ImagePaintFit) -> Paint {
+pub(crate) fn image_paint_with(image: ResourceRef, fit: ImagePaintFit) -> Paint {
     Paint::Image(ImagePaint {
         active: true,
         image,
@@ -339,7 +339,7 @@ pub fn image_paint_with(image: ResourceRef, fit: ImagePaintFit) -> Paint {
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// Simple rectangle with one fill.
-pub fn rect(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
+pub(crate) fn rect(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
     Node::Rectangle(RectangleNodeRec {
         active: true,
         opacity: 1.0,
@@ -362,7 +362,7 @@ pub fn rect(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
 }
 
 /// Rectangle with rotation.
-pub fn rect_rotated(x: f32, y: f32, w: f32, h: f32, rotation: f32, fill: Paint) -> Node {
+pub(crate) fn rect_rotated(x: f32, y: f32, w: f32, h: f32, rotation: f32, fill: Paint) -> Node {
     Node::Rectangle(RectangleNodeRec {
         active: true,
         opacity: 1.0,
@@ -385,7 +385,7 @@ pub fn rect_rotated(x: f32, y: f32, w: f32, h: f32, rotation: f32, fill: Paint) 
 }
 
 /// Simple ellipse with one fill.
-pub fn ellipse(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
+pub(crate) fn ellipse(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
     Node::Ellipse(EllipseNodeRec {
         active: true,
         opacity: 1.0,
@@ -410,7 +410,7 @@ pub fn ellipse(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
 }
 
 /// Simple line.
-pub fn line(x: f32, y: f32, length: f32, rotation: f32, stroke_width: f32) -> Node {
+pub(crate) fn line(x: f32, y: f32, length: f32, rotation: f32, stroke_width: f32) -> Node {
     Node::Line(LineNodeRec {
         active: true,
         opacity: 1.0,
@@ -435,7 +435,7 @@ pub fn line(x: f32, y: f32, length: f32, rotation: f32, stroke_width: f32) -> No
 }
 
 /// Simple text span.
-pub fn text(x: f32, y: f32, content: &str, font_size: f32, font_weight: u32) -> Node {
+pub(crate) fn text(x: f32, y: f32, content: &str, font_size: f32, font_weight: u32) -> Node {
     Node::TextSpan(TextSpanNodeRec {
         active: true,
         transform: AffineTransform::new(x, y, 0.0),
@@ -464,7 +464,7 @@ pub fn text(x: f32, y: f32, content: &str, font_size: f32, font_weight: u32) -> 
 }
 
 /// Rectangle with effects (shadows, blur, etc.).
-pub fn rect_with_effects(
+pub(crate) fn rect_with_effects(
     x: f32,
     y: f32,
     w: f32,
@@ -494,7 +494,7 @@ pub fn rect_with_effects(
 }
 
 /// Rectangle with effects and absolute positioning (for use inside containers).
-pub fn rect_absolute_with_effects(
+pub(crate) fn rect_absolute_with_effects(
     x: f32,
     y: f32,
     w: f32,
@@ -527,7 +527,7 @@ pub fn rect_absolute_with_effects(
 }
 
 /// Rectangle with absolute positioning (for use inside containers).
-pub fn rect_absolute(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
+pub(crate) fn rect_absolute(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
     Node::Rectangle(RectangleNodeRec {
         active: true,
         opacity: 1.0,
@@ -553,7 +553,7 @@ pub fn rect_absolute(x: f32, y: f32, w: f32, h: f32, fill: Paint) -> Node {
 }
 
 /// Rectangle with opacity and one fill.
-pub fn rect_opacity(x: f32, y: f32, w: f32, h: f32, fill: Paint, opacity: f32) -> Node {
+pub(crate) fn rect_opacity(x: f32, y: f32, w: f32, h: f32, fill: Paint, opacity: f32) -> Node {
     Node::Rectangle(RectangleNodeRec {
         active: true,
         opacity,
@@ -576,7 +576,7 @@ pub fn rect_opacity(x: f32, y: f32, w: f32, h: f32, fill: Paint, opacity: f32) -
 }
 
 /// Rectangle with opacity, fill, and stroke.
-pub fn rect_opacity_fill_stroke(
+pub(crate) fn rect_opacity_fill_stroke(
     x: f32,
     y: f32,
     w: f32,
@@ -608,7 +608,7 @@ pub fn rect_opacity_fill_stroke(
 }
 
 /// Simple flat scene: all nodes at the root level, auto-assigned positions.
-pub fn flat_scene(name: &str, nodes: Vec<Node>) -> Scene {
+pub(crate) fn flat_scene(name: &str, nodes: Vec<Node>) -> Scene {
     let mut pairs = Vec::new();
     for (i, node) in nodes.into_iter().enumerate() {
         pairs.push(((i + 1) as u64, node));

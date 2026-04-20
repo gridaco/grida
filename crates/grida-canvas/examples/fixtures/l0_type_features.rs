@@ -1,7 +1,7 @@
 use super::*;
 
 /// OpenType font features: ligatures, small caps, stylistic sets, etc.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let y_gap = 50.0;
 
     // Ligatures disabled

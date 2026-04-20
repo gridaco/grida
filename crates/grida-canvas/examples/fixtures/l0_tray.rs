@@ -137,7 +137,7 @@ fn tray(
 
 /// Tray node features: explicit dimensions, fills, strokes, corner radius,
 /// container children treated as root-level frames (no clipping, no effects, no layout).
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // ── [1] Tray with two container children ──────────────────────────────
     // Simulates a Figma SECTION holding two frames side by side.
     let tray1 = tray(

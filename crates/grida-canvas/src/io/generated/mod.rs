@@ -15,5 +15,5 @@
 //! the `check-generated-fbs` workflow will fail.
 
 #[rustfmt::skip]
-#[allow(dead_code, unused_imports, clippy::all)]
+#[allow(dead_code, unused_imports, unused_extern_crates, clippy::all)]
 pub mod grida;

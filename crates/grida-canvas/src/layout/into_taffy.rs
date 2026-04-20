@@ -277,7 +277,7 @@ impl From<UniformNodeLayout> for Style {
 ///
 /// This is the central entry point for converting scene graph nodes to Taffy styles.
 /// All node types are handled here, providing a unified approach to layout computation.
-pub fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) -> Style {
+pub(crate) fn node_to_taffy_style(node: &Node, _graph: &SceneGraph, _node_id: &NodeId) -> Style {
     match node {
         Node::Container(n) => n.into(),
         Node::InitialContainer(n) => n.into(),

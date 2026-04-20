@@ -30,7 +30,7 @@ use super::types;
 /// Apply faux-table overrides to a Taffy style based on the element's CSS
 /// display type. Returns `true` if overrides were applied (caller should
 /// skip the normal display/flex mapping).
-pub fn apply_faux_table_style(display: types::Display, style: &mut taffy::Style) -> bool {
+pub(crate) fn apply_faux_table_style(display: types::Display, style: &mut taffy::Style) -> bool {
     match display {
         // <table> → flex column container, full width
         types::Display::Table => {
@@ -69,7 +69,7 @@ pub fn apply_faux_table_style(display: types::Display, style: &mut taffy::Style)
 /// `<thead>`, `<tbody>`, `<tfoot>` have `display: table-header-group` etc.
 /// in CSS, but our `Display` enum doesn't have those variants — they fall
 /// to `Block`. We detect them by tag name as a fallback.
-pub fn apply_faux_table_style_by_tag(tag: &str, style: &mut taffy::Style) -> bool {
+pub(crate) fn apply_faux_table_style_by_tag(tag: &str, style: &mut taffy::Style) -> bool {
     match tag {
         "thead" | "tbody" | "tfoot" => {
             style.display = taffy::Display::Flex;

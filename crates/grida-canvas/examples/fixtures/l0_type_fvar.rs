@@ -1,7 +1,7 @@
 use super::*;
 
 /// Variable font axes: weight, width, optical sizing, and custom fvar axes.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let y_gap = 50.0;
 
     // Weight axis via font_weight (100..900)

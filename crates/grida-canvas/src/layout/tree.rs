@@ -322,7 +322,6 @@ impl LayoutTree {
     }
 
     /// Clear the tree
-    #[allow(dead_code)]
     pub(crate) fn clear(&mut self) {
         self.taffy.clear();
         self.scene_to_taffy.clear();
@@ -331,29 +330,9 @@ impl LayoutTree {
     }
 
     /// Get number of nodes in the layout tree
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.scene_to_taffy.len()
-    }
-
-    /// Check if the layout tree is empty
-    #[allow(dead_code)]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.scene_to_taffy.is_empty()
-    }
-
-    /// Access the underlying taffy tree directly
-    ///
-    /// Use this when you need to perform operations not wrapped by LayoutTree
-    #[allow(dead_code)]
-    pub(crate) fn taffy(&self) -> &TaffyTree<LayoutNodeContext> {
-        &self.taffy
-    }
-
-    /// Mutable access to the underlying taffy tree
-    #[allow(dead_code)]
-    pub(crate) fn taffy_mut(&mut self) -> &mut TaffyTree<LayoutNodeContext> {
-        &mut self.taffy
     }
 }
 

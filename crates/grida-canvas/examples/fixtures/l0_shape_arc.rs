@@ -3,7 +3,7 @@ use cg::cg::stroke_width::SingularStrokeWidth;
 use math2::transform::AffineTransform;
 
 /// Ellipse arc variants: full, semicircle, donut, pie wedge, rounded arc.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let s = 120.0;
     let gap = 140.0;
 

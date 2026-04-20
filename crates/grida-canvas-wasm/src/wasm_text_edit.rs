@@ -104,7 +104,7 @@ fn wasm_cmd_to_editing(cmd: WasmEditCommand) -> Option<EditCommand> {
 /// The Application reads all text properties directly from the scene node
 /// to guarantee the editing layout matches the Painter exactly.
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_enter(
+pub(crate) unsafe extern "C" fn text_edit_enter(
     app: *mut UnknownTargetApplication,
     node_id_ptr: *const u8,
     node_id_len: usize,
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn text_edit_enter(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_exit(
+pub(crate) unsafe extern "C" fn text_edit_exit(
     app: *mut UnknownTargetApplication,
     commit: bool,
 ) -> *const u8 {
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn text_edit_exit(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_is_active(app: *mut UnknownTargetApplication) -> bool {
+pub(crate) unsafe extern "C" fn text_edit_is_active(app: *mut UnknownTargetApplication) -> bool {
     app.as_ref()
         .map(|a| a.text_edit_is_active())
         .unwrap_or(false)
@@ -143,7 +143,9 @@ pub unsafe extern "C" fn text_edit_is_active(app: *mut UnknownTargetApplication)
 ///
 /// Returns a length-prefixed UTF-8 string, or null if no session is active.
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_get_text(app: *mut UnknownTargetApplication) -> *const u8 {
+pub(crate) unsafe extern "C" fn text_edit_get_text(
+    app: *mut UnknownTargetApplication,
+) -> *const u8 {
     let Some(app) = app.as_ref() else {
         return std::ptr::null();
     };
@@ -158,7 +160,7 @@ pub unsafe extern "C" fn text_edit_get_text(app: *mut UnknownTargetApplication) 
 // ---------------------------------------------------------------------------
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_command(
+pub(crate) unsafe extern "C" fn text_edit_command(
     app: *mut UnknownTargetApplication,
     json_ptr: *const u8,
     json_len: usize,
@@ -200,7 +202,7 @@ pub unsafe extern "C" fn text_edit_command(
 /// The session owns all undo during editing. Document-level undo is not
 /// involved until the session exits.
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_undo(app: *mut UnknownTargetApplication) -> bool {
+pub(crate) unsafe extern "C" fn text_edit_undo(app: *mut UnknownTargetApplication) -> bool {
     let Some(app) = app.as_mut() else {
         return false;
     };
@@ -209,7 +211,7 @@ pub unsafe extern "C" fn text_edit_undo(app: *mut UnknownTargetApplication) -> b
 
 /// Redo within the text editing session.
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_redo(app: *mut UnknownTargetApplication) -> bool {
+pub(crate) unsafe extern "C" fn text_edit_redo(app: *mut UnknownTargetApplication) -> bool {
     let Some(app) = app.as_mut() else {
         return false;
     };
@@ -221,7 +223,7 @@ pub unsafe extern "C" fn text_edit_redo(app: *mut UnknownTargetApplication) -> b
 // ---------------------------------------------------------------------------
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_pointer_down(
+pub(crate) unsafe extern "C" fn text_edit_pointer_down(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -233,7 +235,7 @@ pub unsafe extern "C" fn text_edit_pointer_down(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_pointer_move(
+pub(crate) unsafe extern "C" fn text_edit_pointer_move(
     app: *mut UnknownTargetApplication,
     x: f32,
     y: f32,
@@ -243,7 +245,7 @@ pub unsafe extern "C" fn text_edit_pointer_move(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_pointer_up(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn text_edit_pointer_up(app: *mut UnknownTargetApplication) {
     let Some(app) = app.as_mut() else { return };
     app.text_edit_pointer_up();
 }
@@ -253,7 +255,7 @@ pub unsafe extern "C" fn text_edit_pointer_up(app: *mut UnknownTargetApplication
 // ---------------------------------------------------------------------------
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_ime_set_preedit(
+pub(crate) unsafe extern "C" fn text_edit_ime_set_preedit(
     app: *mut UnknownTargetApplication,
     text_ptr: *const u8,
     text_len: usize,
@@ -264,7 +266,7 @@ pub unsafe extern "C" fn text_edit_ime_set_preedit(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_ime_commit(
+pub(crate) unsafe extern "C" fn text_edit_ime_commit(
     app: *mut UnknownTargetApplication,
     text_ptr: *const u8,
     text_len: usize,
@@ -275,7 +277,7 @@ pub unsafe extern "C" fn text_edit_ime_commit(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_ime_cancel(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn text_edit_ime_cancel(app: *mut UnknownTargetApplication) {
     let Some(app) = app.as_mut() else { return };
     app.text_edit_ime_cancel();
 }
@@ -285,7 +287,7 @@ pub unsafe extern "C" fn text_edit_ime_cancel(app: *mut UnknownTargetApplication
 // ---------------------------------------------------------------------------
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_get_selected_text(
+pub(crate) unsafe extern "C" fn text_edit_get_selected_text(
     app: *mut UnknownTargetApplication,
 ) -> *const u8 {
     let Some(app) = app.as_ref() else {
@@ -298,7 +300,7 @@ pub unsafe extern "C" fn text_edit_get_selected_text(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_get_selected_html(
+pub(crate) unsafe extern "C" fn text_edit_get_selected_html(
     app: *mut UnknownTargetApplication,
 ) -> *const u8 {
     let Some(app) = app.as_ref() else {
@@ -311,7 +313,7 @@ pub unsafe extern "C" fn text_edit_get_selected_html(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_paste_text(
+pub(crate) unsafe extern "C" fn text_edit_paste_text(
     app: *mut UnknownTargetApplication,
     text_ptr: *const u8,
     text_len: usize,
@@ -324,7 +326,7 @@ pub unsafe extern "C" fn text_edit_paste_text(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_paste_html(
+pub(crate) unsafe extern "C" fn text_edit_paste_html(
     app: *mut UnknownTargetApplication,
     html_ptr: *const u8,
     html_len: usize,
@@ -341,7 +343,9 @@ pub unsafe extern "C" fn text_edit_paste_html(
 // ---------------------------------------------------------------------------
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_get_caret_rect(app: *mut UnknownTargetApplication) -> *const u8 {
+pub(crate) unsafe extern "C" fn text_edit_get_caret_rect(
+    app: *mut UnknownTargetApplication,
+) -> *const u8 {
     let Some(app) = app.as_mut() else {
         return std::ptr::null();
     };
@@ -353,7 +357,7 @@ pub unsafe extern "C" fn text_edit_get_caret_rect(app: *mut UnknownTargetApplica
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_get_selection_rects(
+pub(crate) unsafe extern "C" fn text_edit_get_selection_rects(
     app: *mut UnknownTargetApplication,
 ) -> *const u8 {
     let Some(app) = app.as_mut() else {
@@ -392,37 +396,40 @@ pub unsafe extern "C" fn text_edit_get_selection_rects(
 // ---------------------------------------------------------------------------
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_toggle_bold(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn text_edit_toggle_bold(app: *mut UnknownTargetApplication) {
     let Some(app) = app.as_mut() else { return };
     app.text_edit_toggle_bold();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_toggle_italic(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn text_edit_toggle_italic(app: *mut UnknownTargetApplication) {
     let Some(app) = app.as_mut() else { return };
     app.text_edit_toggle_italic();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_toggle_underline(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn text_edit_toggle_underline(app: *mut UnknownTargetApplication) {
     let Some(app) = app.as_mut() else { return };
     app.text_edit_toggle_underline();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_toggle_strikethrough(app: *mut UnknownTargetApplication) {
+pub(crate) unsafe extern "C" fn text_edit_toggle_strikethrough(app: *mut UnknownTargetApplication) {
     let Some(app) = app.as_mut() else { return };
     app.text_edit_toggle_strikethrough();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_set_font_size(app: *mut UnknownTargetApplication, size: f32) {
+pub(crate) unsafe extern "C" fn text_edit_set_font_size(
+    app: *mut UnknownTargetApplication,
+    size: f32,
+) {
     let Some(app) = app.as_mut() else { return };
     app.text_edit_set_font_size(size);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_set_font_family(
+pub(crate) unsafe extern "C" fn text_edit_set_font_family(
     app: *mut UnknownTargetApplication,
     family_ptr: *const u8,
     family_len: usize,
@@ -435,7 +442,7 @@ pub unsafe extern "C" fn text_edit_set_font_family(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_set_color(
+pub(crate) unsafe extern "C" fn text_edit_set_color(
     app: *mut UnknownTargetApplication,
     r: f32,
     g: f32,
@@ -451,7 +458,7 @@ pub unsafe extern "C" fn text_edit_set_color(
 // ---------------------------------------------------------------------------
 
 #[no_mangle]
-pub unsafe extern "C" fn text_edit_tick(app: *mut UnknownTargetApplication) -> bool {
+pub(crate) unsafe extern "C" fn text_edit_tick(app: *mut UnknownTargetApplication) -> bool {
     let Some(app) = app.as_mut() else {
         return false;
     };

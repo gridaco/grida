@@ -1,7 +1,7 @@
 use super::*;
 use std::collections::HashMap;
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // Horizontal flex container: SpaceBetween, Center
     let h_container = Node::Container(ContainerNodeRec {
         active: true,

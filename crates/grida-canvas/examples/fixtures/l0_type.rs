@@ -40,7 +40,7 @@ fn tspan(
     })
 }
 
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let y_gap = 50.0;
 
     // Regular 16px, Left/Top

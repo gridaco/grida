@@ -262,8 +262,6 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
     }
 
     struct SceneMeta {
-        #[allow(dead_code)]
-        id: String,
         name: String,
         background_color: Option<CGColor>,
     }
@@ -330,9 +328,8 @@ fn decode_all_inner(bytes: &[u8]) -> Result<DecodeResult, FbsDecodeError> {
                         let bg = sn.scene_background_color().map(decode_rgba32f_to_cg_color);
                         get_or_assign_id(id.clone());
                         scene_metas.insert(
-                            id.clone(),
+                            id,
                             SceneMeta {
-                                id,
                                 name,
                                 background_color: bg,
                             },

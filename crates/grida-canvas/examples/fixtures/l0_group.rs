@@ -3,7 +3,7 @@ use math2::transform::AffineTransform;
 use std::collections::HashMap;
 
 /// Group node features: grouping children, opacity inheritance, blend modes, nesting.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     // ── [1] Simple group with two children ──────────────────────────────
     let g1 = Node::Group(GroupNodeRec {
         active: true,

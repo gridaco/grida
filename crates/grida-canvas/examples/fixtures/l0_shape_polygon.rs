@@ -3,7 +3,7 @@ use cg::cg::stroke_width::SingularStrokeWidth;
 use math2::transform::AffineTransform;
 
 /// Regular polygons and star polygons with varying point counts and parameters.
-pub fn build() -> Scene {
+pub(crate) fn build() -> Scene {
     let s = 120.0;
     let gap = 140.0;
 
