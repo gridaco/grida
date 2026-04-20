@@ -40,6 +40,15 @@ pub fn diff_node(old: &Node, new: &Node) -> ChangeKind {
     let paint = paint_differs(old, new);
     let other = other_differs(old, new);
 
+    // A Container's position is a Taffy input — the Layout fast path
+    // skips Taffy, leaving `layout_result[container_id]` stale. Force
+    // Full to run `rebuild_scene_caches` so `resolve_layout` reads
+    // fresh coordinates. Tray and leaves bypass `layout_result` in
+    // `resolve_layout`, so their motion keeps the fast path.
+    if motion && matches!(new, Node::Container(_)) {
+        return ChangeKind::Full;
+    }
+
     classify(motion, paint, other)
 }
 
