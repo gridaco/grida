@@ -107,19 +107,19 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Positioning
 
-| CSS Property                     | Status | Notes                                             |
-| -------------------------------- | ------ | ------------------------------------------------- |
-| `position: static`               | ✅     | Default                                           |
-| `position: relative`             | ✅     | Via Taffy                                         |
-| `position: absolute`             | ✅     | Via Taffy                                         |
-| `position: fixed`                | ❌     |                                                   |
-| `position: sticky`               | ❌     |                                                   |
-| `top`, `right`, `bottom`, `left` | ✅     | Extracted as CssLength (px/%/auto)                |
-| `inset` (shorthand)              | ❌     |                                                   |
-| `inset-block`, `inset-inline`    | ✅     | Stylo cascade maps to top/right/bottom/left (LTR) |
+| CSS Property                     | Status | Notes                                                                               |
+| -------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| `position: static`               | ✅     | Default                                                                             |
+| `position: relative`             | ✅     | Via Taffy                                                                           |
+| `position: absolute`             | ✅     | Via Taffy                                                                           |
+| `position: fixed`                | ❌     |                                                                                     |
+| `position: sticky`               | ❌     |                                                                                     |
+| `top`, `right`, `bottom`, `left` | ✅     | Extracted as CssLength (px/%/auto)                                                  |
+| `inset` (shorthand)              | ❌     |                                                                                     |
+| `inset-block`, `inset-inline`    | ✅     | Stylo cascade maps to top/right/bottom/left (LTR)                                   |
 | `z-index`                        | ✅     | Sibling paint order (§9.9.1 subset; no stacking contexts for opacity/transform yet) |
-| `float`                          | ❌     | Recognized in collect, no layout effect           |
-| `clear`                          | ❌     | Recognized in collect, no layout effect           |
+| `float`                          | ❌     | Recognized in collect, no layout effect                                             |
+| `clear`                          | ❌     | Recognized in collect, no layout effect                                             |
 
 ### Flexbox
 
@@ -178,24 +178,24 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Background
 
-| CSS Property                    | Status | Notes                                                                    |
-| ------------------------------- | ------ | ------------------------------------------------------------------------ |
-| `background-color`              | ✅     | Solid color with border-radius                                           |
-| `background-image: url()`       | ✅     | Via `ImageProvider` trait                                                |
-| `linear-gradient()`             | ✅     | All directions + angles, multi-stop, px / % / currentcolor stops         |
-| `radial-gradient()`             | ✅     | Shape (circle/ellipse), extent keywords, explicit radii, position        |
-| `conic-gradient()`              | ✅     | `from <angle> at <position>`, repeating variant                          |
-| `repeating-*-gradient()`        | ✅     | Px and % stops both tile correctly                                       |
-| Gradient `color-interpolation-method` | ⚠️ | Extraction + Skia wiring done; explicit `in <space>` syntax gated by Stylo's `layout.css.gradient-color-interpolation-method` pref (default off). Auto path (sRGB vs Oklab based on stop colors) works. |
-| Multi-layer backgrounds         | ✅     | Stacked gradient + solid + URL layers                                    |
-| `background-position`           | ✅     | Per-layer, px/%/keyword per axis                                         |
-| `background-size`               | ✅     | `cover`/`contain`/`auto`/explicit (with aspect preservation)             |
-| `background-repeat`             | ✅     | `repeat`/`no-repeat`/`repeat-x`/`repeat-y`; `space`/`round` → repeat     |
-| `background-origin`             | ✅     | `border-box`/`padding-box`/`content-box`                                 |
-| `background-clip`               | ✅     | `border-box`/`padding-box`/`content-box`; border-box clip honors radius  |
-| `background-attachment`         | ❌     |                                                                          |
-| `background-blend-mode`         | ❌     | Different from `mix-blend-mode`                                          |
-| `background` (shorthand)        | ✅     | Color, gradient, url(), size, position, repeat, clip, origin layers      |
+| CSS Property                          | Status | Notes                                                                                                                                                                                                   |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `background-color`                    | ✅     | Solid color with border-radius                                                                                                                                                                          |
+| `background-image: url()`             | ✅     | Via `ImageProvider` trait                                                                                                                                                                               |
+| `linear-gradient()`                   | ✅     | All directions + angles, multi-stop, px / % / currentcolor stops                                                                                                                                        |
+| `radial-gradient()`                   | ✅     | Shape (circle/ellipse), extent keywords, explicit radii, position                                                                                                                                       |
+| `conic-gradient()`                    | ✅     | `from <angle> at <position>`, repeating variant                                                                                                                                                         |
+| `repeating-*-gradient()`              | ✅     | Px and % stops both tile correctly                                                                                                                                                                      |
+| Gradient `color-interpolation-method` | ⚠️     | Extraction + Skia wiring done; explicit `in <space>` syntax gated by Stylo's `layout.css.gradient-color-interpolation-method` pref (default off). Auto path (sRGB vs Oklab based on stop colors) works. |
+| Multi-layer backgrounds               | ✅     | Stacked gradient + solid + URL layers                                                                                                                                                                   |
+| `background-position`                 | ✅     | Per-layer, px/%/keyword per axis                                                                                                                                                                        |
+| `background-size`                     | ✅     | `cover`/`contain`/`auto`/explicit (with aspect preservation)                                                                                                                                            |
+| `background-repeat`                   | ✅     | `repeat`/`no-repeat`/`repeat-x`/`repeat-y`; `space`/`round` → repeat                                                                                                                                    |
+| `background-origin`                   | ✅     | `border-box`/`padding-box`/`content-box`                                                                                                                                                                |
+| `background-clip`                     | ✅     | `border-box`/`padding-box`/`content-box`; border-box clip honors radius                                                                                                                                 |
+| `background-attachment`               | ❌     |                                                                                                                                                                                                         |
+| `background-blend-mode`               | ❌     | Different from `mix-blend-mode`                                                                                                                                                                         |
+| `background` (shorthand)              | ✅     | Color, gradient, url(), size, position, repeat, clip, origin layers                                                                                                                                     |
 
 ### Border
 
@@ -313,26 +313,26 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Text Decoration
 
-| CSS Property                  | Status | Notes                                                       |
-| ----------------------------- | ------ | ----------------------------------------------------------- |
-| `text-decoration` (shorthand) | ✅     | underline, line-through, overline (bitfield — simultaneous) |
-| `text-decoration-line`        | ✅     |                                                             |
+| CSS Property                  | Status | Notes                                                          |
+| ----------------------------- | ------ | -------------------------------------------------------------- |
+| `text-decoration` (shorthand) | ✅     | underline, line-through, overline (bitfield — simultaneous)    |
+| `text-decoration-line`        | ✅     |                                                                |
 | `text-decoration-style`       | ✅     | solid/double/dotted/dashed/wavy via Skia `TextDecorationStyle` |
-| `text-decoration-color`       | ✅     | `currentcolor` falls back to text color                     |
-| `text-decoration-thickness`   | ❌     |                                                             |
-| `text-decoration-skip-ink`    | ❌     |                                                             |
-| `text-underline-position`     | ❌     |                                                             |
-| `text-underline-offset`       | ❌     |                                                             |
+| `text-decoration-color`       | ✅     | `currentcolor` falls back to text color                        |
+| `text-decoration-thickness`   | ❌     |                                                                |
+| `text-decoration-skip-ink`    | ❌     |                                                                |
+| `text-underline-position`     | ❌     |                                                                |
+| `text-underline-offset`       | ❌     |                                                                |
 
 ### Text Shadow & Emphasis
 
-| CSS Property             | Status | Notes              |
-| ------------------------ | ------ | ------------------ |
+| CSS Property             | Status | Notes                                                            |
+| ------------------------ | ------ | ---------------------------------------------------------------- |
 | `text-shadow`            | ✅     | Offset + blur + color; stacked, via Skia `TextStyle::add_shadow` |
-| `text-emphasis`          | ❌     |                    |
-| `text-emphasis-style`    | ❌     |                    |
-| `text-emphasis-color`    | ❌     |                    |
-| `text-emphasis-position` | ❌     |                    |
+| `text-emphasis`          | ❌     |                                                                  |
+| `text-emphasis-style`    | ❌     |                                                                  |
+| `text-emphasis-color`    | ❌     |                                                                  |
+| `text-emphasis-position` | ❌     |                                                                  |
 
 ### Writing Modes & BiDi
 
@@ -387,18 +387,18 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Transform
 
-| CSS Property          | Status | Notes                                          |
-| --------------------- | ------ | ---------------------------------------------- |
-| `transform`           | ✅     | 2D: translate, rotate, scale, skew, matrix     |
-| `transform-origin`    | ✅     | Percentage-based origins (default 50% 50%)     |
-| `transform-box`       | ❌     |                                                |
-| `transform-style`     | ❌     |                                                |
-| `translate`           | ✅     | Standalone longhand, applies before `transform:`        |
-| `rotate`              | ✅     | Standalone longhand; 2D and z-axis-only 3D `rotate3d`   |
-| `scale`               | ✅     | Standalone longhand, uniform and `sx sy`                |
-| `perspective`         | ❌     |                                                |
-| `perspective-origin`  | ❌     |                                                |
-| `backface-visibility` | ❌     |                                                |
+| CSS Property          | Status | Notes                                                 |
+| --------------------- | ------ | ----------------------------------------------------- |
+| `transform`           | ✅     | 2D: translate, rotate, scale, skew, matrix            |
+| `transform-origin`    | ✅     | Percentage-based origins (default 50% 50%)            |
+| `transform-box`       | ❌     |                                                       |
+| `transform-style`     | ❌     |                                                       |
+| `translate`           | ✅     | Standalone longhand, applies before `transform:`      |
+| `rotate`              | ✅     | Standalone longhand; 2D and z-axis-only 3D `rotate3d` |
+| `scale`               | ✅     | Standalone longhand, uniform and `sx sy`              |
+| `perspective`         | ❌     |                                                       |
+| `perspective-origin`  | ❌     |                                                       |
+| `backface-visibility` | ❌     |                                                       |
 
 ### Filter & Effects
 
@@ -500,7 +500,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `image-rendering`   | ❌     |                                       |
 | `image-orientation` | ❌     |                                       |
 | `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown |
-| `object-position`   | ❌     |                                       |
+| `object-position`   | ✅     | Per-axis px / % / keywords            |
 | `object-view-box`   | ❌     |                                       |
 
 ### Shape (Floats)

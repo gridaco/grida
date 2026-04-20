@@ -1556,6 +1556,59 @@ code block
         );
     }
 
+    // ── object-position on <img> ─────────────────────────────────────
+
+    fn find_replaced(el: &style::StyledElement) -> Option<&style::ReplacedContent> {
+        if let Some(ref r) = el.replaced {
+            return Some(r);
+        }
+        for c in &el.children {
+            if let style::StyledNode::Element(child) = c {
+                if let Some(r) = find_replaced(child) {
+                    return Some(r);
+                }
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn test_object_position_default_center() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<img src="x.png" style="width:100px;height:100px">"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let r = find_replaced(&root).expect("replaced");
+        assert_eq!(r.object_position.x, types::CssLength::Percent(0.5));
+        assert_eq!(r.object_position.y, types::CssLength::Percent(0.5));
+    }
+
+    #[test]
+    fn test_object_position_keywords() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<img src="x.png" style="width:100px;height:100px;object-position:left top">"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let r = find_replaced(&root).expect("replaced");
+        assert_eq!(r.object_position.x, types::CssLength::Percent(0.0));
+        assert_eq!(r.object_position.y, types::CssLength::Percent(0.0));
+
+        let html2 =
+            r#"<img src="x.png" style="width:100px;height:100px;object-position:right bottom">"#;
+        let root = collect::collect_styled_tree(html2).unwrap().unwrap();
+        let r = find_replaced(&root).expect("replaced");
+        assert_eq!(r.object_position.x, types::CssLength::Percent(1.0));
+        assert_eq!(r.object_position.y, types::CssLength::Percent(1.0));
+    }
+
+    #[test]
+    fn test_object_position_px_and_percent() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<img src="x.png" style="width:100px;height:100px;object-position:20px 50%">"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let r = find_replaced(&root).expect("replaced");
+        assert_eq!(r.object_position.x, types::CssLength::Px(20.0));
+        assert_eq!(r.object_position.y, types::CssLength::Percent(0.5));
+    }
+
     // ── Gradient stop px positions ──────────────────────────────────
 
     #[test]

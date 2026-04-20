@@ -250,10 +250,12 @@ fn collect_element_with_counter(
 
     let is_void_widget = detect_widget(&tag, node_data, dom, &mut el);
 
-    // Extract object-fit from Stylo for replaced elements (<img>)
+    // Extract object-fit / object-position from Stylo for replaced
+    // elements (<img>).
     if el.replaced.is_some() {
         use style::properties::longhands::object_fit::computed_value::T as StyloObjectFit;
-        let of = style.get_position().clone_object_fit();
+        let pos = style.get_position();
+        let of = pos.clone_object_fit();
         let object_fit = match of {
             StyloObjectFit::Fill => types::ObjectFit::Fill,
             StyloObjectFit::Contain => types::ObjectFit::Contain,
@@ -261,8 +263,14 @@ fn collect_element_with_counter(
             StyloObjectFit::None => types::ObjectFit::None,
             StyloObjectFit::ScaleDown => types::ObjectFit::ScaleDown,
         };
+        let op = pos.clone_object_position();
+        let object_position = BackgroundPosition {
+            x: length_percentage_to_css(&op.horizontal),
+            y: length_percentage_to_css(&op.vertical),
+        };
         if let Some(ref mut replaced) = el.replaced {
             replaced.object_fit = object_fit;
+            replaced.object_position = object_position;
         }
     }
 
@@ -362,6 +370,10 @@ fn detect_img_element(node: &DemoNode) -> ReplacedContent {
         attr_width,
         attr_height,
         object_fit: types::ObjectFit::Fill, // HTML spec default for <img>
+        object_position: BackgroundPosition {
+            x: CssLength::Percent(0.5),
+            y: CssLength::Percent(0.5),
+        },
     }
 }
 

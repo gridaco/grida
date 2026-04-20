@@ -606,15 +606,25 @@ fn paint_replaced(
         let box_fit = content.object_fit.to_box_fit(img_w, img_h, w, h);
         let t = box_fit.calculate_transform((img_w, img_h), (w, h));
 
+        // Override the box-fit's default (center) translation with
+        // `object-position`. Fitted size is derived from the scale
+        // components of the box-fit transform.
+        let sx = t.matrix[0][0];
+        let sy = t.matrix[1][1];
+        let fitted_w = img_w * sx.abs();
+        let fitted_h = img_h * sy.abs();
+        let tx = resolve_bg_position_axis(content.object_position.x, w, fitted_w);
+        let ty = resolve_bg_position_axis(content.object_position.y, h, fitted_h);
+
         let paint = Paint::default();
         canvas.save();
         canvas.concat(&skia_safe::Matrix::new_all(
-            t.matrix[0][0],
+            sx,
             t.matrix[0][1],
-            t.matrix[0][2],
+            tx,
             t.matrix[1][0],
-            t.matrix[1][1],
-            t.matrix[1][2],
+            sy,
+            ty,
             0.0,
             0.0,
             1.0,

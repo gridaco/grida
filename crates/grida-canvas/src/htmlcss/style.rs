@@ -169,6 +169,9 @@ pub struct ReplacedContent {
     pub attr_height: Option<u32>,
     /// CSS `object-fit` — how the image content fits its box.
     pub object_fit: super::types::ObjectFit,
+    /// CSS `object-position` — where the content sits inside the box
+    /// after `object-fit` scaling. Defaults to center (50% 50%).
+    pub object_position: BackgroundPosition,
 }
 
 /// Consecutive inline items merged into a single paragraph.
