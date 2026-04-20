@@ -1208,33 +1208,118 @@ fn paint_borders(
 
     let b = &style.border;
 
-    if b.top.width > 0.0 && b.top.style != types::BorderStyle::None {
-        let paint = border_paint(&b.top);
-        let by = b.top.width / 2.0;
-        canvas.draw_line((0.0, by), (w, by), &paint);
-    }
-
-    if b.bottom.width > 0.0 && b.bottom.style != types::BorderStyle::None {
-        let paint = border_paint(&b.bottom);
-        let by = h - b.bottom.width / 2.0;
-        canvas.draw_line((0.0, by), (w, by), &paint);
-    }
-
-    if b.left.width > 0.0 && b.left.style != types::BorderStyle::None {
-        let paint = border_paint(&b.left);
-        let bx = b.left.width / 2.0;
-        canvas.draw_line((bx, 0.0), (bx, h), &paint);
-    }
-
-    if b.right.width > 0.0 && b.right.style != types::BorderStyle::None {
-        let paint = border_paint(&b.right);
-        let bx = w - b.right.width / 2.0;
-        canvas.draw_line((bx, 0.0), (bx, h), &paint);
+    for pos in [SidePos::Top, SidePos::Bottom, SidePos::Left, SidePos::Right] {
+        let side = match pos {
+            SidePos::Top => &b.top,
+            SidePos::Bottom => &b.bottom,
+            SidePos::Left => &b.left,
+            SidePos::Right => &b.right,
+        };
+        if side.width <= 0.0 || side.style == types::BorderStyle::None {
+            continue;
+        }
+        paint_border_side(canvas, pos, side, w, h);
     }
 }
 
-fn border_paint(side: &BorderSide) -> Paint {
-    stroke_paint(side.color, side.width, side.style)
+#[derive(Copy, Clone)]
+enum SidePos {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+/// Paint a single border side. Handles all CSS `border-style` variants:
+/// - `solid` / `dashed` / `dotted`: direct stroke using the side's color.
+/// - `double`: two parallel strokes at 1/3 width each, separated by a 1/3 gap.
+/// - `groove` / `inset`: top/left darkened, bottom/right lightened.
+/// - `ridge` / `outset`: top/left lightened, bottom/right darkened.
+fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h: f32) {
+    use types::BorderStyle;
+
+    let (p1, p2) = side_endpoints(pos, side.width, w, h);
+
+    if side.style == BorderStyle::Double {
+        // Two strokes of width/3 separated by width/3 gap. Offset each
+        // perpendicularly by ±(width/3).
+        let sub_w = side.width / 3.0;
+        let (n_dx, n_dy) = side_inward_normal(pos);
+        // Outer stroke (toward the element's outer edge).
+        let paint = stroke_paint(side.color, sub_w, BorderStyle::Solid);
+        let out_off = -sub_w;
+        let outer_p1 = (p1.0 + n_dx * out_off, p1.1 + n_dy * out_off);
+        let outer_p2 = (p2.0 + n_dx * out_off, p2.1 + n_dy * out_off);
+        canvas.draw_line(outer_p1, outer_p2, &paint);
+        // Inner stroke.
+        let in_off = sub_w;
+        let inner_p1 = (p1.0 + n_dx * in_off, p1.1 + n_dy * in_off);
+        let inner_p2 = (p2.0 + n_dx * in_off, p2.1 + n_dy * in_off);
+        canvas.draw_line(inner_p1, inner_p2, &paint);
+        return;
+    }
+
+    let effective_color = shaded_color(side.color, side.style, pos);
+    let paint = stroke_paint(effective_color, side.width, side.style);
+    canvas.draw_line(p1, p2, &paint);
+}
+
+fn side_endpoints(pos: SidePos, width: f32, w: f32, h: f32) -> ((f32, f32), (f32, f32)) {
+    let half = width / 2.0;
+    match pos {
+        SidePos::Top => ((0.0, half), (w, half)),
+        SidePos::Bottom => ((0.0, h - half), (w, h - half)),
+        SidePos::Left => ((half, 0.0), (half, h)),
+        SidePos::Right => ((w - half, 0.0), (w - half, h)),
+    }
+}
+
+/// Unit vector pointing inward from the side's centerline.
+fn side_inward_normal(pos: SidePos) -> (f32, f32) {
+    match pos {
+        SidePos::Top => (0.0, 1.0),
+        SidePos::Bottom => (0.0, -1.0),
+        SidePos::Left => (1.0, 0.0),
+        SidePos::Right => (-1.0, 0.0),
+    }
+}
+
+/// Per-side color treatment for 3D-effect border styles.
+/// CSS 2.1 leaves the exact shading to the implementation; we use
+/// 50%-toward-black for "darker" and 50%-toward-white for "lighter",
+/// matching common browser behavior.
+fn shaded_color(c: CGColor, style: types::BorderStyle, pos: SidePos) -> CGColor {
+    use types::BorderStyle::*;
+    let side_is_tl = matches!(pos, SidePos::Top | SidePos::Left);
+    let darken = |c: CGColor| CGColor {
+        r: c.r / 2,
+        g: c.g / 2,
+        b: c.b / 2,
+        a: c.a,
+    };
+    let lighten = |c: CGColor| CGColor {
+        r: ((c.r as u16 + 255) / 2) as u8,
+        g: ((c.g as u16 + 255) / 2) as u8,
+        b: ((c.b as u16 + 255) / 2) as u8,
+        a: c.a,
+    };
+    match style {
+        Inset | Groove => {
+            if side_is_tl {
+                darken(c)
+            } else {
+                lighten(c)
+            }
+        }
+        Outset | Ridge => {
+            if side_is_tl {
+                lighten(c)
+            } else {
+                darken(c)
+            }
+        }
+        _ => c,
+    }
 }
 
 /// Shared stroke paint builder for border sides and outline.

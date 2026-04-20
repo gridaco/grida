@@ -1415,6 +1415,69 @@ code block
         }
     }
 
+    // ── Border style variants (double/groove/ridge/inset/outset) ─────
+
+    /// Probe: `double` border paints two parallel bands with a gap between.
+    /// Top band (outer) is colored, middle (gap) is transparent/bg, inner
+    /// band is colored again.
+    #[test]
+    fn test_border_double_probe() {
+        let _guard = crate::stylo_test::lock();
+        // 9px double border — 3px outer, 3px gap, 3px inner.
+        let html = r#"<div style="width:40px;height:40px;background:#ffffff;border:9px double #ff0000;box-sizing:border-box"></div>"#;
+        let px = rasterize_rgba(html, 40, 40);
+        // Center of outer stroke (y=1) should be red.
+        let outer = pixel_at(&px, 20, 1, 40);
+        assert_eq!(
+            [outer[0], outer[1], outer[2]],
+            [255, 0, 0],
+            "outer band red"
+        );
+        // Center of gap (y=4) should be background white.
+        let gap = pixel_at(&px, 20, 4, 40);
+        assert_eq!([gap[0], gap[1], gap[2]], [255, 255, 255], "gap white");
+        // Center of inner stroke (y=7) should be red.
+        let inner = pixel_at(&px, 20, 7, 40);
+        assert_eq!(
+            [inner[0], inner[1], inner[2]],
+            [255, 0, 0],
+            "inner band red"
+        );
+    }
+
+    /// Probe: `inset` on a gray color — top side darker, bottom side
+    /// lighter than the base color.
+    #[test]
+    fn test_border_inset_top_darker_bottom_lighter() {
+        let _guard = crate::stylo_test::lock();
+        // 10px inset border, #808080 base.
+        let html = r#"<div style="width:60px;height:60px;background:#ffffff;border:10px inset #808080;box-sizing:border-box"></div>"#;
+        let px = rasterize_rgba(html, 60, 60);
+        let top = pixel_at(&px, 30, 3, 60);
+        let bottom = pixel_at(&px, 30, 56, 60);
+        // Top should be darker: 0x80/2 = 0x40.
+        assert!(top[0] < 100, "top darker than 128, got {}", top[0]);
+        // Bottom should be lighter: (0x80 + 0xff)/2 ≈ 0xbf.
+        assert!(
+            bottom[0] > 150,
+            "bottom lighter than 128, got {}",
+            bottom[0]
+        );
+    }
+
+    /// `outset` is the inverse of `inset` — top/left lighter, bottom/right
+    /// darker.
+    #[test]
+    fn test_border_outset_top_lighter_bottom_darker() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:60px;height:60px;background:#ffffff;border:10px outset #808080;box-sizing:border-box"></div>"#;
+        let px = rasterize_rgba(html, 60, 60);
+        let top = pixel_at(&px, 30, 3, 60);
+        let bottom = pixel_at(&px, 30, 56, 60);
+        assert!(top[0] > 150, "top lighter than 128, got {}", top[0]);
+        assert!(bottom[0] < 100, "bottom darker than 128, got {}", bottom[0]);
+    }
+
     // ── Gradient stop px positions ──────────────────────────────────
 
     #[test]
