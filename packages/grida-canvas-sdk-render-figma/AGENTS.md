@@ -11,14 +11,14 @@ Headless Figma renderer — render `.fig` and REST API JSON to PNG/JPEG/WebP/PDF
 
 **devDependencies** — Build-time / bundled into `dist`. Uses `workspace:*` for monorepo packages.
 
-- `@grida/io-figma`, `@grida/schema` — bundled via tsup `noExternal` regex.
+- `@grida/io-figma`, `@grida/schema` — bundled via tsdown `deps.alwaysBundle` regex.
 - Other `@grida/*` pulled in transitively are bundled too.
 
 **Note:** Project is premature; only a few packages are published on npm. The split between deps and devDeps reflects this. Will be cleaned up with proper semver + changeset; all runtime deps will live in `dependencies` once everything is published.
 
 ## Build
 
-tsup bundles all `@grida/*` except `@grida/canvas-wasm`. `external: ["@grida/canvas-wasm", "commander"]`; `noExternal: [/^@grida\/(?!canvas-wasm$)/]`.
+tsdown bundles all `@grida/*` except `@grida/canvas-wasm`. `deps.neverBundle: ["@grida/canvas-wasm", "commander"]`; `deps.alwaysBundle: [/^@grida\/(?!canvas-wasm$)/]`.
 
 ## Smoke test
 

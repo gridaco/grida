@@ -234,7 +234,7 @@ class ApplicationFactory {
     const ptr = this.module._init(
       canvas.width,
       canvas.height,
-      options.use_embedded_fonts,
+      options.use_embedded_fonts ?? true,
       encodeConfigFlags(options.config)
     );
     const _ = new Scene(this.module, ptr);

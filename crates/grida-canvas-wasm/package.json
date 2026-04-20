@@ -20,8 +20,8 @@
   ],
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "prepack": "just build",
     "prepublishOnly": "[ $(du -sk dist 2>/dev/null | cut -f1) -lt 20480 ]",
     "serve": "serve -p 4020",

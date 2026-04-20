@@ -24,7 +24,7 @@ This will regenerate `src/grida.ts` and `src/grida/**` from the source schema.
 
 ## Building
 
-The package builds to both CommonJS and ESM formats using `tsup`:
+The package builds to both CommonJS and ESM formats using `tsdown`:
 
 ```bash
 pnpm --filter @grida/format build

@@ -14,8 +14,8 @@
     "lucide-react": "^0.511.0",
     "next": "16.2.4",
     "pdfjs-dist": "4.8.69",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "^19",
+    "react-dom": "^19",
     "react-pageflip": "^2.0.3",
     "react-pdf": "^9.2.1"
   },

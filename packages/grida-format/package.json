@@ -9,8 +9,8 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsdown --platform neutral src/index.ts --format cjs --format esm --dts",
+    "dev": "tsdown --platform neutral src/index.ts --format cjs --format esm --dts --watch",
     "flatc:clean": "rm -rf src/grida src/grida.ts",
     "flatc:generate": "pnpm flatc:clean && python3 ../../bin/activate-flatc -- --ts --ts-no-import-ext -o src ../../format/grida.fbs",
     "generate": "pnpm flatc:generate",

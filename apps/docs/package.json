@@ -27,8 +27,8 @@
     "clsx": "^2.1.1",
     "katex": "^0.16.11",
     "prism-react-renderer": "^2.4.1",
-    "react": "19.2.1",
-    "react-dom": "19.2.1",
+    "react": "^19",
+    "react-dom": "^19",
     "rehype-katex": "^7.0.0",
     "remark-math": "^6.0.0"
   },

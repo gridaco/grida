@@ -2,11 +2,13 @@
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
-    "lib": ["es2017", "es7", "es6", "dom"],
+    "lib": ["es2020", "dom"],
     "declaration": true,
     "esModuleInterop": true,
     "sourceMap": true,
     "experimentalDecorators": true,
-    "noUnusedLocals": false
+    "noUnusedLocals": false,
+    "strict": false,
+    "ignoreDeprecations": "6.0"
   }
 }
