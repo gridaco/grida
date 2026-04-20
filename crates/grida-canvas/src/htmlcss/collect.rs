@@ -899,11 +899,15 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Padding (resolved to px)
     el.padding = extract_padding(style);
 
+    // Text color (inherited) — must be resolved before any
+    // `currentcolor`-aware extraction (background gradients, border image).
+    el.color = abs_color_to_cg(&style.get_inherited_text().color);
+
     // Border
     el.border = extract_border(style);
 
     // Border image (9-slice)
-    el.border_image = extract_border_image(style);
+    el.border_image = extract_border_image(style, el.color);
 
     // Border radius
     el.border_radius = extract_border_radius(style);
@@ -950,10 +954,7 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     }
 
     // Background
-    el.background = extract_background(style);
-
-    // Text color (inherited)
-    el.color = abs_color_to_cg(&style.get_inherited_text().color);
+    el.background = extract_background(style, el.color);
 
     // Font properties (inherited)
     el.font = extract_font(style);
@@ -1144,10 +1145,10 @@ fn extract_border(style: &ComputedValues) -> BorderBox {
 /// Returns `Some(BorderImage)` when `border-image-source` is set to a
 /// non-none value. The source image URL is extracted the same way as
 /// `background-image: url()` — via `GenericImage::Url` / `ComputedUrl`.
-fn extract_border_image(style: &ComputedValues) -> Option<BorderImage> {
+fn extract_border_image(style: &ComputedValues, current_color: CGColor) -> Option<BorderImage> {
     let b = style.get_border();
 
-    let source = convert_image(&b.border_image_source)?;
+    let source = convert_image(&b.border_image_source, current_color)?;
 
     // border-image-slice: BorderImageSlice { offsets: Rect<NonNegative<NumberOrPercentage>>, fill }
     let slice_computed = &b.border_image_slice;
@@ -1285,7 +1286,10 @@ fn extract_outline(style: &ComputedValues) -> Outline {
 ///
 /// Shared by `extract_background` and `extract_border_image` — both need
 /// the same URL/gradient conversion from Stylo's computed image type.
-fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
+fn convert_image(
+    image: &style::values::computed::Image,
+    current_color: CGColor,
+) -> Option<StyleImage> {
     use style::values::computed::url::ComputedUrl;
     use style::values::generics::image::{GenericGradient, GenericImage};
 
@@ -1309,7 +1313,7 @@ fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
                 flags,
                 ..
             } => {
-                let stops = gradient_items_to_stops(items);
+                let stops = gradient_items_to_stops(items, current_color);
                 if stops.is_empty() {
                     return None;
                 }
@@ -1327,7 +1331,7 @@ fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
                 flags,
                 ..
             } => {
-                let stops = gradient_items_to_stops(items);
+                let stops = gradient_items_to_stops(items, current_color);
                 if stops.is_empty() {
                     return None;
                 }
@@ -1347,7 +1351,7 @@ fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
                 flags,
                 ..
             } => {
-                let stops = conic_gradient_items_to_stops(items);
+                let stops = conic_gradient_items_to_stops(items, current_color);
                 if stops.is_empty() {
                     return None;
                 }
@@ -1443,7 +1447,7 @@ fn extract_inset(style: &ComputedValues) -> CssEdgeInsets {
     }
 }
 
-fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
+fn extract_background(style: &ComputedValues, current_color: CGColor) -> Vec<BackgroundLayer> {
     let bg = style.get_background();
     let mut layers: Vec<BackgroundLayer> = Vec::new();
 
@@ -1472,7 +1476,7 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
     let origins = &bg.background_origin.0;
 
     for (i, image) in bg.background_image.0.iter().enumerate() {
-        let Some(source) = convert_image(image) else {
+        let Some(source) = convert_image(image, current_color) else {
             continue;
         };
         let size = sizes
@@ -1683,31 +1687,34 @@ fn extract_gradient_angle(direction: &style::values::computed::image::LineDirect
 }
 
 /// Convert Stylo gradient items to GradientStops.
+///
+/// `currentcolor` stops (unresolvable to absolute) resolve to `current_color`
+/// (the element's computed `color`), per CSS Color 3 §4.4.
 fn gradient_items_to_stops(
     items: &[style::values::generics::image::GenericGradientItem<
         style::values::computed::Color,
         style::values::computed::LengthPercentage,
     >],
+    current_color: CGColor,
 ) -> Vec<GradientStop> {
     use style::values::generics::image::GenericGradientItem;
+
+    let resolve = |color: &style::values::computed::Color| -> CGColor {
+        color
+            .as_absolute()
+            .map(abs_color_to_cg)
+            .unwrap_or(current_color)
+    };
 
     let mut raw: Vec<(Option<f32>, CGColor)> = Vec::new();
     for item in items {
         match item {
             GenericGradientItem::SimpleColorStop(color) => {
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((None, c));
+                raw.push((None, resolve(color)));
             }
             GenericGradientItem::ComplexColorStop { color, position } => {
                 let offset = position.to_percentage().map(|p| p.0);
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((offset, c));
+                raw.push((offset, resolve(color)));
             }
             GenericGradientItem::InterpolationHint(_) => {}
         }
@@ -1722,35 +1729,38 @@ fn gradient_items_to_stops(
 }
 
 /// Convert conic-gradient items to GradientStops.
+///
+/// `currentcolor` stops resolve to `current_color`; see
+/// `gradient_items_to_stops` for details.
 fn conic_gradient_items_to_stops(
     items: &[style::values::generics::image::GenericGradientItem<
         style::values::computed::Color,
         style::values::computed::AngleOrPercentage,
     >],
+    current_color: CGColor,
 ) -> Vec<GradientStop> {
     use style::values::computed::AngleOrPercentage;
     use style::values::generics::image::GenericGradientItem;
+
+    let resolve = |color: &style::values::computed::Color| -> CGColor {
+        color
+            .as_absolute()
+            .map(abs_color_to_cg)
+            .unwrap_or(current_color)
+    };
 
     let mut raw: Vec<(Option<f32>, CGColor)> = Vec::new();
     for item in items {
         match item {
             GenericGradientItem::SimpleColorStop(color) => {
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((None, c));
+                raw.push((None, resolve(color)));
             }
             GenericGradientItem::ComplexColorStop { color, position } => {
                 let offset = match position {
                     AngleOrPercentage::Percentage(p) => Some(p.0),
                     AngleOrPercentage::Angle(a) => Some(a.degrees() / 360.0),
                 };
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((offset, c));
+                raw.push((offset, resolve(color)));
             }
             GenericGradientItem::InterpolationHint(_) => {}
         }

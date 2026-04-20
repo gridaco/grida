@@ -1343,6 +1343,95 @@ code block
         );
     }
 
+    // ── currentcolor in gradient stops ───────────────────────────────
+
+    /// `currentcolor` in a gradient stop resolves to the element's
+    /// computed `color`, not transparent.
+    #[test]
+    fn test_gradient_stop_currentcolor_resolves() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="color:#ff0000;background:linear-gradient(90deg,currentcolor,#ffffff)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let img = find_bg_image(&root).expect("bg image").clone();
+        match img.source {
+            style::StyleImage::LinearGradient(g) => {
+                assert_eq!(g.stops.len(), 2);
+                assert_eq!(
+                    (g.stops[0].color.r, g.stops[0].color.g, g.stops[0].color.b),
+                    (255, 0, 0),
+                    "currentcolor should resolve to element's red"
+                );
+                // White end stop.
+                assert_eq!(
+                    (g.stops[1].color.r, g.stops[1].color.g, g.stops[1].color.b),
+                    (255, 255, 255)
+                );
+            }
+            other => panic!("expected LinearGradient, got {other:?}"),
+        }
+    }
+
+    /// Inherited `color` propagates — child with no explicit color inherits
+    /// parent's color, and `currentcolor` in its gradient resolves to that.
+    #[test]
+    fn test_gradient_stop_currentcolor_inherited() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="color:#0000ff"><div style="background:radial-gradient(circle,currentcolor,#ffffff)">x</div></div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let img = find_bg_image(&root).expect("bg image").clone();
+        match img.source {
+            style::StyleImage::RadialGradient(g) => {
+                assert_eq!(
+                    (g.stops[0].color.r, g.stops[0].color.g, g.stops[0].color.b),
+                    (0, 0, 255),
+                    "inherited color should drive currentcolor"
+                );
+            }
+            other => panic!("expected RadialGradient, got {other:?}"),
+        }
+    }
+
+    /// `currentcolor` works in conic gradients too.
+    #[test]
+    fn test_gradient_stop_currentcolor_conic() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="color:#00aa00;background:conic-gradient(currentcolor,#ffffff,currentcolor)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let img = find_bg_image(&root).expect("bg image").clone();
+        match img.source {
+            style::StyleImage::ConicGradient(g) => {
+                assert_eq!(
+                    (g.stops[0].color.r, g.stops[0].color.g, g.stops[0].color.b),
+                    (0, 170, 0),
+                    "first stop is currentcolor"
+                );
+                assert_eq!(
+                    (g.stops[2].color.r, g.stops[2].color.g, g.stops[2].color.b),
+                    (0, 170, 0),
+                    "last stop is currentcolor"
+                );
+            }
+            other => panic!("expected ConicGradient, got {other:?}"),
+        }
+    }
+
+    /// Pixel probe: a linear gradient with `currentcolor` start and white end
+    /// on a `color: red` element paints red at the left edge, white at right.
+    #[test]
+    fn test_gradient_currentcolor_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:100px;height:100px;color:#ff0000;background:linear-gradient(90deg,currentcolor 0 50%,#ffffff 50% 100%)"></div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+        let left = pixel_at(&px, 10, 50, 100);
+        assert_eq!([left[0], left[1], left[2]], [255, 0, 0], "left edge red");
+        let right = pixel_at(&px, 90, 50, 100);
+        assert_eq!(
+            [right[0], right[1], right[2]],
+            [255, 255, 255],
+            "right edge white"
+        );
+    }
+
     /// Without z-index, source order wins (red later = on top).
     #[test]
     fn test_z_index_source_order_default() {

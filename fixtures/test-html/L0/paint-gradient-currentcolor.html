@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: currentcolor in gradient stops</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .rect {
+        width: 140px;
+        height: 140px;
+        border: 1px solid #ccc;
+      }
+      .red {
+        color: #ff0000;
+      }
+      .blue {
+        color: #0000ff;
+      }
+      /* currentcolor should resolve to the element's `color`. */
+      .lin-cc {
+        background: linear-gradient(90deg, currentcolor, #ffffff);
+      }
+      .rad-cc {
+        background: radial-gradient(circle, currentcolor 0%, #ffffff 100%);
+      }
+      .conic-cc {
+        background: conic-gradient(currentcolor, #ffffff, currentcolor);
+      }
+      /* Inheritance — child inherits its own resolved color. */
+      .parent-blue {
+        color: #0000ff;
+      }
+      .child-inherits {
+        background: linear-gradient(90deg, currentcolor, #ffffff);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">linear currentcolor (red)</div>
+        <div class="rect red lin-cc"></div>
+      </div>
+      <div>
+        <div class="label">linear currentcolor (blue)</div>
+        <div class="rect blue lin-cc"></div>
+      </div>
+      <div>
+        <div class="label">radial currentcolor (red)</div>
+        <div class="rect red rad-cc"></div>
+      </div>
+      <div>
+        <div class="label">conic currentcolor (red→white→red)</div>
+        <div class="rect red conic-cc"></div>
+      </div>
+      <div>
+        <div class="label">inherited color (blue)</div>
+        <div class="parent-blue">
+          <div class="rect child-inherits"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
