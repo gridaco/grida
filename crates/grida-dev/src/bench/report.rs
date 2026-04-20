@@ -59,7 +59,7 @@ pub struct ScenarioParams {
 }
 
 /// Unified pass stats with per-stage breakdown (used for both pan and zoom).
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, Default)]
 pub struct PassStats {
     pub avg_us: u64,
     pub fps: f64,

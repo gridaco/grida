@@ -1,17 +1,16 @@
 //! [`ChangeKind`], [`Damage`], and [`GlobalFlag`] taxonomy.
 //!
-//! Four per-node variants (`None`, `Geometry`, `Paint`, `Full`) plus a
+//! Four per-node variants (`None`, `Layout`, `Paint`, `Full`) plus a
 //! small set of global flags for orthogonal invalidations. Splitting
-//! `Full` further (`Size` / `Layout` / `Structural`) or `Paint`
-//! (`PaintFill` / `PaintEffect`) is future work; the classifier
-//! contract in [`super::scene_dirty`] absorbs those additions without
-//! rewiring downstream consumers.
+//! `Full` or `Paint` further (`PaintFill` / `PaintEffect`) is future
+//! work; the classifier contract in [`super::scene_dirty`] absorbs
+//! those additions without rewiring downstream consumers.
 
 /// What changed on a node.
 ///
 /// Produced by the differ (or directly emitted by a mutation API when
 /// the caller already knows the change shape, e.g.
-/// `MutationCommand::Translate` → `Geometry`). Consumed by
+/// `MutationCommand::Translate` → `Layout`). Consumed by
 /// [`super::SceneDirty::apply`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ChangeKind {
@@ -24,16 +23,17 @@ pub enum ChangeKind {
     /// on `Container`/`Tray`. Both are surfaced uniformly by
     /// [`super::lens::motion_of`].
     ///
-    /// Downstream work: per-subtree geometry update (world transforms +
-    /// bounds) + in-place layer-base patch + R-tree rebounds. No
-    /// layout recompute, no effect-tree rebuild, no layer-list
-    /// rebuild.
-    Geometry,
+    /// Semantically a layout change: a node's position in space is
+    /// a layout concern, regardless of whether a flex recompute is
+    /// needed. The downstream cache-refresh strategy (whether to
+    /// re-run Taffy, whether to rebuild geometry per-subtree, etc.)
+    /// is a separate concern owned by the dispatcher.
+    Layout,
 
     /// Paint-only properties changed (fill, stroke, blend mode,
     /// opacity, compatible effects).
     ///
-    /// No layout, no geometry, no effect-tree rebuild. The downstream
+    /// No layout, no geometry, no effect-tree rebuild. Downstream
     /// work is LayerList rebuild (paint fields are cached on layer
     /// structs) plus per-node picture-cache invalidation + viewport
     /// damage.

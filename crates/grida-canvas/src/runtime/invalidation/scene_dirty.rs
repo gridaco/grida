@@ -9,7 +9,7 @@
 //! | ---------- | :----: | :------: | :---------: | :--------: | :----: |
 //! | None       |        |          |             |            |        |
 //! | Paint      |        |          |             |            |  Full  |
-//! | Geometry   |        |    id    |             |            |  Full  |
+//! | Layout     |        |    id    |             |            |  Full  |
 //! | Full       |   id   |    id    |     id      |     ✓      |  Full  |
 
 use std::collections::HashSet;
@@ -69,7 +69,7 @@ impl SceneDirty {
                 self.paint_touched.insert(id);
             }
 
-            ChangeKind::Geometry => {
+            ChangeKind::Layout => {
                 self.geometry.insert(id);
                 self.damage = self.damage.merge(Damage::Full);
                 self.paint_touched.insert(id);
@@ -161,9 +161,9 @@ mod tests {
     }
 
     #[test]
-    fn geometry_sets_geometry_and_damage() {
+    fn layout_sets_geometry_and_damage() {
         let mut d = SceneDirty::new();
-        d.apply(1, ChangeKind::Geometry);
+        d.apply(1, ChangeKind::Layout);
         assert!(d.layout.is_empty());
         assert!(d.geometry.contains(&1));
         assert!(d.effect_tree.is_empty());
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn multiple_kinds_accumulate() {
         let mut d = SceneDirty::new();
-        d.apply(1, ChangeKind::Geometry);
+        d.apply(1, ChangeKind::Layout);
         d.apply(2, ChangeKind::Paint);
         d.apply(3, ChangeKind::Full);
         assert!(d.geometry.contains(&1));

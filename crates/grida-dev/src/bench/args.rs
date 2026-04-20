@@ -45,6 +45,20 @@ pub struct BenchArgs {
     /// (or leave empty) to pick the first root node.
     #[arg(long = "translate")]
     pub translate: Option<String>,
+    /// Run a mutation benchmark of a specific kind.
+    ///
+    /// Kinds: `translate-root`, `translate-leaf`, `resize`, `paint`, `delete`, `all`.
+    ///
+    /// - `translate-root` — drag the first root container (largest subtree).
+    /// - `translate-leaf` — drag the deepest leaf (smallest subtree, realistic drag).
+    /// - `resize` — alternate width/height on the first resizable leaf.
+    /// - `paint` — alternate fill color on the first paintable leaf.
+    /// - `delete` — delete + reinsert a subtree each cycle (pairs deletion with insertion).
+    /// - `all` — run every kind sequentially, reporting each.
+    ///
+    /// When omitted, and `--translate` is also omitted, standard camera passes run.
+    #[arg(long = "mutation")]
+    pub mutation: Option<String>,
 }
 
 #[derive(Args, Debug)]
