@@ -184,7 +184,7 @@ function __self_evt_on_click(
         reportError(e);
       }
 
-      self_try_insert_node(draft, parent, nnode);
+      self_try_insert_node(draft, parent, nnode, context);
       self_select_cursor_tool(draft);
       self_selectNode(draft, "reset", nnode.id);
 
@@ -495,7 +495,7 @@ function __self_evt_on_drag_start(
         (nnode as grida.program.nodes.ContainerNode).fill = undefined;
       }
 
-      self_try_insert_node(draft, parent, nnode);
+      self_try_insert_node(draft, parent, nnode, context);
       self_select_tool(draft, { type: "cursor" }, context);
       self_selectNode(draft, "reset", nnode.id);
       __self_start_gesture_insert_and_resize_draw_new_node(draft, context, {
@@ -1155,7 +1155,13 @@ function __before_end_insert_and_resize(
     if (id === pending.node_id) return;
     const rect = context.geometry.getNodeAbsoluteBoundingRect(id)!;
     if (cmath.rect.contains(container_rect, rect)) {
-      const moved = self_moveNode(draft, id, pending.node_id);
+      const moved = self_moveNode(
+        draft,
+        id,
+        pending.node_id,
+        undefined,
+        context
+      );
       if (!moved) return;
       const child = dq.__getNodeById(
         draft,

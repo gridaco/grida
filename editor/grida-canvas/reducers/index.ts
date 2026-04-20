@@ -17,12 +17,7 @@ import grida from "@grida/schema";
 import type vn from "@grida/vn";
 import { editor } from "@/grida-canvas";
 import { perf } from "../perf";
-import {
-  EFFECT_NONE,
-  effectFromPatches,
-  effectNodes,
-  type Effect,
-} from "../sync";
+import { appendPatchOps, OpBuffer, type OpLog } from "../sync";
 
 enablePatches();
 
@@ -52,32 +47,21 @@ export type ReducerContext = {
     get(): editor.state.IMinimalDocumentState | null;
     set(snapshot: editor.state.IMinimalDocumentState | null): void;
   };
+
+  /** Per-dispatch op sink; reset before recipe, drained after. */
+  mutation_buffer: OpBuffer;
 };
 
-/**
- * Reducer output tuple.
- *
- * The 4th slot (`Effect`) is the authoritative signal the WASM subscriber
- * uses to decide between full re-encode, per-node replace, or skip. It is
- * **not** derived from `patches` at the subscriber — the bypass path
- * produces no patches but still mutates nodes, so routing from patches
- * alone silently falls back to full sync and defeats the bypass. See
- * `../sync.ts` for the protocol.
- */
 export type ReducerResult = [
   editor.state.IEditorState,
   Patch[],
   Patch[],
-  Effect,
+  OpLog,
 ];
 
 /**
- * Actions that enter the mutable-bypass branch. These are the gesture
- * hot-loop actions where Immer proxy/finalize overhead dominates — we
- * clone the specific state sub-objects they write to and run the recipe
- * directly on the clone. The bypass branch is also responsible for
- * producing an {@link Effect} that names the mutated nodes (since the
- * patches array it returns is always empty).
+ * Actions that skip Immer and run the recipe directly on a cloned
+ * sub-tree. Gesture hot loops where proxy/finalize overhead dominates.
  */
 const BYPASS_ACTION_TYPES: ReadonlySet<Action["type"]> = new Set<
   Action["type"]
@@ -94,57 +78,55 @@ export function canBypassImmer(action: Action): boolean {
 }
 
 /**
- * Compute the WASM-sync {@link Effect} for an action that took the
- * mutable-bypass path, by inspecting which node slots the bypass
- * cloned (and therefore may have mutated).
- *
- * Must stay aligned with the cloning strategy in the bypass branch —
- * every node slot we clone for mutation must appear in the effect.
- * The `scene_id` root is only reported for `guide` gestures (the only
- * gesture that actually writes to scene guides); all other clone-for-
- * safety cases on the scene root are no-ops on the wire since the
- * replacement bytes are identical.
+ * Emit `replace_node` ops for every node slot the bypass may have
+ * mutated. Must stay in lockstep with the clone logic in the bypass
+ * branch below.
  */
-function effectForBypassAction(
+function replaceNodeOpsForBypass(
   state: editor.state.IEditorState,
-  action: Action
-): Effect {
-  // Hover/raycast actions never mutate document.nodes[*]; they update
-  // pointer / hover / hit state only.
+  action: Action,
+  buffer: OpBuffer
+): void {
   if (
     action.type === "event-target/event/on-pointer-move" ||
     action.type === "event-target/event/on-pointer-move-raycast"
   ) {
-    return EFFECT_NONE;
+    return;
   }
 
   if (action.type === "node/change/*") {
     const nodeId = (action as { node_id: string }).node_id;
-    if (typeof nodeId !== "string") return EFFECT_NONE;
-    return effectNodes(new Set([nodeId]), new Set());
+    if (typeof nodeId === "string") {
+      buffer.push({ kind: "replace_node", id: nodeId });
+    }
+    return;
   }
 
-  // event-target/event/on-drag — collect mutated node ids from gesture
-  // and content-edit-mode state. Mirrors the bypass clone logic below.
-  const replace = new Set<string>();
   const gesture = state.gesture;
   if (gesture.type !== "idle" && "selection" in gesture && gesture.selection) {
-    for (const id of gesture.selection) replace.add(id);
+    for (const id of gesture.selection) {
+      buffer.push({ kind: "replace_node", id });
+    }
   }
-  if (gesture.type === "draw") replace.add(gesture.node_id);
+  if (gesture.type === "draw") {
+    buffer.push({ kind: "replace_node", id: gesture.node_id });
+  }
   if (
     (gesture.type === "sort" || gesture.type === "gap") &&
     gesture.layout?.objects
   ) {
-    for (const o of gesture.layout.objects) replace.add(o.id);
+    for (const o of gesture.layout.objects) {
+      buffer.push({ kind: "replace_node", id: o.id });
+    }
   }
-  if (gesture.type === "brush") replace.add(gesture.node_id);
+  if (gesture.type === "brush") {
+    buffer.push({ kind: "replace_node", id: gesture.node_id });
+  }
   if (gesture.type === "guide" && state.scene_id) {
-    replace.add(state.scene_id);
+    buffer.push({ kind: "replace_node", id: state.scene_id });
   }
   const cem = state.content_edit_mode;
-  if (cem) replace.add(cem.node_id);
-  return effectNodes(replace, new Set());
+  if (cem) buffer.push({ kind: "replace_node", id: cem.node_id });
 }
 
 /** Deep-clone a vector network so VectorNetworkEditor can mutate in-place. */
@@ -177,6 +159,10 @@ export default function reducer(
   ) {
     context.logger?.("debug:action", action.type, action);
   }
+
+  // Reset the per-dispatch op buffer. Mutation sites push into it as
+  // they run; we drain it below to produce the dispatch's OpLog.
+  context.mutation_buffer.reset();
 
   const __perf_end = perf.start("reducer.immer_produce", {
     action_type: action.type,
@@ -469,11 +455,16 @@ export default function reducer(
   }
   __perf_end();
 
-  const effect: Effect = opts?.skipPatches
-    ? effectForBypassAction(state, action)
-    : effectFromPatches(patches);
+  // Structural ops were already pushed by the tracked-Graph wrapper
+  // during the recipe. Append node-property ops from whichever channel
+  // the dispatch used.
+  if (opts?.skipPatches) {
+    replaceNodeOpsForBypass(state, action, context.mutation_buffer);
+  } else {
+    appendPatchOps(patches, context.mutation_buffer);
+  }
 
-  return [nextState, patches, inversePatches, effect];
+  return [nextState, patches, inversePatches, context.mutation_buffer.ops];
 }
 
 function _reducer<S extends editor.state.IEditorState>(

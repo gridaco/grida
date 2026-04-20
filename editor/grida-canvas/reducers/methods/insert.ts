@@ -5,11 +5,14 @@ import { dq } from "@/grida-canvas/query";
 import tree from "@grida/tree";
 import assert from "assert";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
+import { createTrackedGraph } from "../utils/tracked-graph";
+import type { ReducerContext } from "..";
 
 export function self_insertSubDocument<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   parent_id: string | null,
-  sub: grida.program.document.IPackedSceneDocument
+  sub: grida.program.document.IPackedSceneDocument,
+  context: ReducerContext
 ) {
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.nodes[
@@ -30,9 +33,9 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
   }
 
   // Use Graph.import() - mutates draft.document directly (scene is now a node!)
-  const graphInstance = new tree.graph.Graph(
-    draft.document,
-    EDITOR_GRAPH_POLICY
+  const graphInstance = createTrackedGraph(
+    new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
+    context.mutation_buffer
   );
 
   // Import sub-document (handles nodes, links, and attachment atomically)
@@ -63,7 +66,8 @@ export function self_insertSubDocument<S extends editor.state.IEditorState>(
 export function self_try_insert_node<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   parent_id: string | null,
-  node: grida.program.nodes.Node // TODO: NodePrototype
+  node: grida.program.nodes.Node, // TODO: NodePrototype
+  context: ReducerContext
 ): string {
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.nodes[
@@ -82,9 +86,9 @@ export function self_try_insert_node<S extends editor.state.IEditorState>(
   }
 
   // Use Graph.import() - mutates draft.document directly (scene is now a node!)
-  const graphInstance = new tree.graph.Graph(
-    draft.document,
-    EDITOR_GRAPH_POLICY
+  const graphInstance = createTrackedGraph(
+    new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
+    context.mutation_buffer
   );
 
   // Import single node (mutates draft.document directly)

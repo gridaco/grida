@@ -195,6 +195,15 @@ pub trait ApplicationApi {
         false
     }
 
+    /// Atomically replace a parent's children list. Structural
+    /// primitive that covers reparent / reorder / insert / remove.
+    /// Returns `false` for unknown ids or a cyclic edit.
+    fn sync_links(&mut self, parent_user_id: &str, children_user_ids: &[&str]) -> bool {
+        let _ = parent_user_id;
+        let _ = children_user_ids;
+        false
+    }
+
     // static demo scenes
     /// Load a simple demo scene with a few colored rectangles.
     fn load_dummy_scene(&mut self);
@@ -924,6 +933,50 @@ impl ApplicationApi for UnknownTargetApplication {
         }
 
         self.renderer.mark_global(GlobalFlag::Layout);
+        self.queue();
+        true
+    }
+
+    fn sync_links(&mut self, parent_user_id: &str, children_user_ids: &[&str]) -> bool {
+        let Some(parent_internal) = self.id_mapping.get(parent_user_id).copied() else {
+            return false;
+        };
+
+        // Resolve all child ids before mutating — all-or-nothing.
+        let mut children_internal: Vec<crate::node::schema::NodeId> =
+            Vec::with_capacity(children_user_ids.len());
+        for child_user in children_user_ids {
+            let Some(child_internal) = self.id_mapping.get(*child_user).copied() else {
+                return false;
+            };
+            children_internal.push(child_internal);
+        }
+
+        let Some(scene) = self.renderer.scene.as_mut() else {
+            return false;
+        };
+
+        let diff = match scene
+            .graph
+            .set_children(&parent_internal, children_internal)
+        {
+            Ok(d) => d,
+            Err(_) => return false,
+        };
+
+        // Mark Full on the parent, every entered node, and every old
+        // parent a child was detached from. `left` nodes stay in the
+        // repository as orphans until a subsequent mutation disposes
+        // of them.
+        use crate::runtime::invalidation::ChangeKind;
+        self.renderer
+            .mark_node_change_kind(parent_internal, ChangeKind::Full);
+        for id in &diff.entered {
+            self.renderer.mark_node_change_kind(*id, ChangeKind::Full);
+        }
+        for id in &diff.old_parents_of_entered {
+            self.renderer.mark_node_change_kind(*id, ChangeKind::Full);
+        }
         self.queue();
         true
     }

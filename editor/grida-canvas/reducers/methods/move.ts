@@ -5,12 +5,15 @@ import tree from "@grida/tree";
 import { dq } from "@/grida-canvas/query";
 import assert from "assert";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
+import { createTrackedGraph } from "../utils/tracked-graph";
+import type { ReducerContext } from "..";
 
 export function self_moveNode<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   source_id: string,
   target_id: string,
-  order?: number
+  order: number | undefined,
+  context: ReducerContext
 ): boolean {
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.nodes[
@@ -42,7 +45,10 @@ export function self_moveNode<S extends editor.state.IEditorState>(
   }
 
   // Use Graph.mv() - mutates draft.document directly (scene is now a node!)
-  const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
+  const graph = createTrackedGraph(
+    new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
+    context.mutation_buffer
+  );
   graph.mv(source_id, target_id, order);
 
   // Update context from graph's cached LUT

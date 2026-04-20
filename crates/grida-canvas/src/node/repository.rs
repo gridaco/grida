@@ -38,6 +38,11 @@ impl NodeRepository {
         self.nodes.get(id)
     }
 
+    /// Returns `true` if `id` is present in the repository.
+    pub fn contains(&self, id: &NodeId) -> bool {
+        self.nodes.contains_key(id)
+    }
+
     /// Gets a mutable reference to a node by its ID
     pub fn get_mut(&mut self, id: &NodeId) -> Option<&mut Node> {
         self.nodes.get_mut(id)

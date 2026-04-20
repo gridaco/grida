@@ -7,6 +7,7 @@ import cmath from "@grida/cmath";
 import tree from "@grida/tree";
 import { self_moveNode } from "./move";
 import { self_insertSubDocument } from "./insert";
+import { createTrackedGraph } from "../utils/tracked-graph";
 import * as modeProperties from "@/grida-canvas/utils/properties";
 import cg from "@grida/cg";
 import "core-js/features/object/group-by";
@@ -127,12 +128,13 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
         () => context.idgen.next()
-      )
+      ),
+      context
     )[0];
 
     // Move nodes in their preserved order
     g.forEach((id) => {
-      self_moveNode(draft, id, wrapperId);
+      self_moveNode(draft, id, wrapperId, undefined, context);
     });
 
     g.forEach((id) => {
@@ -171,7 +173,8 @@ export function self_wrapNodes<S extends editor.state.IEditorState>(
 export function self_ungroup<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   groupNodeId: string,
-  geometry: editor.api.IDocumentGeometryQuery
+  geometry: editor.api.IDocumentGeometryQuery,
+  context: ReducerContext
 ): string[] {
   const node = dq.__getNodeById(draft, groupNodeId);
 
@@ -215,7 +218,7 @@ export function self_ungroup<S extends editor.state.IEditorState>(
   const children_to_move: string[] = [...nodeChildren];
   children_to_move.forEach((child_id) => {
     // Move the child to the node's parent
-    self_moveNode(draft, child_id, target_parent);
+    self_moveNode(draft, child_id, target_parent, undefined, context);
 
     // Adjust the child's position to preserve absolute position
     const child = dq.__getNodeById(draft, child_id);
@@ -237,7 +240,10 @@ export function self_ungroup<S extends editor.state.IEditorState>(
   });
 
   // Use Graph.unlink() - mutates draft.document directly (scene is now a node!)
-  const graphInstance = new tree.graph.Graph(draft.document);
+  const graphInstance = createTrackedGraph(
+    new tree.graph.Graph(draft.document),
+    context.mutation_buffer
+  );
   graphInstance.unlink(groupNodeId);
 
   // Update context from graph's cached LUT
@@ -330,12 +336,13 @@ export function self_wrapNodesAsBooleanOperation<
       grida.program.nodes.factory.create_packed_scene_document_from_prototype(
         prototype,
         () => context.idgen.next()
-      )
+      ),
+      context
     )[0];
 
     // Move nodes in their preserved order
     g.forEach((id) => {
-      self_moveNode(draft, id, wrapperId);
+      self_moveNode(draft, id, wrapperId, undefined, context);
     });
 
     g.forEach((id) => {

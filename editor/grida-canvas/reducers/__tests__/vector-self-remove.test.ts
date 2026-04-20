@@ -1,6 +1,7 @@
 import surfaceReducer from "../surface.reducer";
 import type { SurfaceAction } from "@/grida-canvas/action";
 import type { ReducerContext } from "@/grida-canvas/reducers";
+import { createReducerContext } from "@/grida-canvas/__tests__/utils/stubs";
 import grida from "@grida/schema";
 import { editor } from "@/grida-canvas";
 
@@ -67,7 +68,7 @@ describe("surface reducer - vector self remove", () => {
     const next = surfaceReducer(
       state,
       { type: "surface/content-edit-mode/try-exit" } as SurfaceAction,
-      {} as ReducerContext
+      createReducerContext() as unknown as ReducerContext
     );
 
     expect(next.document.nodes[node_id]).toBeUndefined();

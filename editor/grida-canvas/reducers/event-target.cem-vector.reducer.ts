@@ -409,7 +409,7 @@ export function create_new_vector_node(
   vector.layout_inset_left = relpos[0];
   vector.layout_inset_top = relpos[1];
 
-  self_try_insert_node(draft, parent, vector);
+  self_try_insert_node(draft, parent, vector, context);
   self_selectNode(draft, "reset", vector.id);
 
   draft.content_edit_mode = {
@@ -761,7 +761,7 @@ export function on_draw_pointer_down(
 
   // insert a new vector node
   const parent = __get_insertion_target(draft);
-  self_try_insert_node(draft, parent, vector);
+  self_try_insert_node(draft, parent, vector, context);
 
   // position relative to the parent
   let node_relative_pos = draft.pointer.position;

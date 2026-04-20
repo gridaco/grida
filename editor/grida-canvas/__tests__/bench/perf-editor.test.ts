@@ -543,7 +543,7 @@ describe("perf-editor: routing invariants", () => {
 
   test("node/change/* dispatches route through per-node sync", () => {
     const before = countSpans("dispatch.wasm.sync_document");
-    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const beforePerNode = countSpans("dispatch.wasm.op_apply");
     const N = 10;
     for (let i = 0; i < N; i++) {
       h.ed.doc.dispatch(
@@ -556,12 +556,12 @@ describe("perf-editor: routing invariants", () => {
       );
     }
     expect(countSpans("dispatch.wasm.sync_document") - before).toBe(0);
-    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(N);
+    expect(countSpans("dispatch.wasm.op_apply") - beforePerNode).toBe(N);
   });
 
   test("pointer-move (no raycast) emits EFFECT_NONE (neither sync path fires)", () => {
     const beforeFull = countSpans("dispatch.wasm.sync_document");
-    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const beforePerNode = countSpans("dispatch.wasm.op_apply");
     const N = 10;
     for (let i = 0; i < N; i++) {
       h.ed.doc.dispatch(
@@ -574,7 +574,7 @@ describe("perf-editor: routing invariants", () => {
       );
     }
     expect(countSpans("dispatch.wasm.sync_document") - beforeFull).toBe(0);
-    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(0);
+    expect(countSpans("dispatch.wasm.op_apply") - beforePerNode).toBe(0);
   });
 
   test("drag per-frame does not fall back to full sync_document", async () => {
@@ -589,7 +589,7 @@ describe("perf-editor: routing invariants", () => {
     );
 
     const before = countSpans("dispatch.wasm.sync_document");
-    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const beforePerNode = countSpans("dispatch.wasm.op_apply");
     const N = 10;
     for (let i = 1; i <= N; i++) {
       h.ed.doc.dispatch(
@@ -616,6 +616,6 @@ describe("perf-editor: routing invariants", () => {
     // the whole document every frame — which pushes 60fps drag past the
     // frame budget at 10K+ nodes.
     expect(countSpans("dispatch.wasm.sync_document") - before).toBe(0);
-    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(N);
+    expect(countSpans("dispatch.wasm.op_apply") - beforePerNode).toBe(N);
   });
 });

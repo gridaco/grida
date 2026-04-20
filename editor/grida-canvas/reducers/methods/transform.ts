@@ -17,6 +17,7 @@ import assert from "assert";
 import grida from "@grida/schema";
 import tree from "@grida/tree";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
+import { createTrackedGraph } from "../utils/tracked-graph";
 import type { ReducerContext } from "..";
 import { self_update_gesture_scale } from "./scale";
 import { perf } from "@/grida-canvas/perf";
@@ -208,7 +209,7 @@ function __self_update_gesture_transform_translate(
             }
           );
 
-        self_insertSubDocument(draft, parent_id, sub);
+        self_insertSubDocument(draft, parent_id, sub, context);
       });
 
       // reset the original node (these were previously the selection, moving targets.)
@@ -239,7 +240,7 @@ function __self_update_gesture_transform_translate(
 
       try {
         initial_clone_ids.forEach((clone) => {
-          self_try_remove_node(draft, clone);
+          self_try_remove_node(draft, clone, context);
         });
       } catch {}
 
@@ -322,9 +323,15 @@ function __self_update_gesture_transform_translate(
       // Hoist Graph construction outside the loop — Graph holds a reference
       // to draft.document (not a copy), so mv() mutations are visible across
       // iterations and the generation counter ensures lut recomputes.
-      const graphInstance = new tree.graph.Graph(
-        draft.document,
-        EDITOR_GRAPH_POLICY
+      //
+      // Wrap in `createTrackedGraph` so every structural mutation the
+      // recipe performs below (mv into the new parent) emits sync_links
+      // ops directly into the dispatch's op buffer. This is what closes
+      // the mid-drag reparent sync hole — the bypass path's old
+      // predictor had no way to see these mutations.
+      const graphInstance = createTrackedGraph(
+        new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
+        context.mutation_buffer
       );
       // update the parent of the current selection
       current_selection.forEach((node_id: string) => {

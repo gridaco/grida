@@ -65,6 +65,13 @@ declare namespace canvas {
       id_ptr: number,
       id_len: number
     ): boolean;
+    _sync_links(
+      state: GridaCanvasApplicationPtr,
+      parent_ptr: number,
+      parent_len: number,
+      children_ptr: number,
+      children_len: number
+    ): boolean;
     _load_dummy_scene(state: GridaCanvasApplicationPtr): void;
     _load_benchmark_scene(
       state: GridaCanvasApplicationPtr,

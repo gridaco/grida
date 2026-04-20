@@ -2442,7 +2442,7 @@ export namespace editor.api {
     editor: T,
     action?: Action,
     patches?: editor.history.Patch[],
-    effect?: import("./sync").Effect
+    ops?: import("./sync").OpLog
   ) => void;
 
   export type SubscriptionWithSelectorCallbackFn<T, E = unknown> = (
@@ -2451,7 +2451,7 @@ export namespace editor.api {
     previous: T,
     action?: Action,
     patches?: editor.history.Patch[],
-    effect?: import("./sync").Effect
+    ops?: import("./sync").OpLog
   ) => void;
 
   export class EditorConsumerVerboseError extends Error {

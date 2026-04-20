@@ -42,7 +42,7 @@ export function self_duplicateNode<S extends editor.state.IEditorState>(
     const parent_id = dq.getParentId(draft.document_ctx, origin_id);
 
     // insert the sub document
-    const clone_id = self_insertSubDocument(draft, parent_id, sub)[0];
+    const clone_id = self_insertSubDocument(draft, parent_id, sub, context)[0];
 
     // apply the delta
     if (nextdelta) {

@@ -38,6 +38,37 @@ if (typeof globalThis.reportError === "undefined") {
   ).reportError = (_err: unknown) => {};
 }
 
+// `Editor._scheduleWasmRedraw` (reached via `mountHeadless`) uses
+// requestAnimationFrame. Polyfill to setImmediate so scheduled redraws
+// drain and `dispose()` cancels cleanly.
+{
+  type RafCb = (ts: number) => void;
+  type RafGlobals = {
+    requestAnimationFrame?: (cb: RafCb) => number;
+    cancelAnimationFrame?: (id: number) => void;
+  };
+  if (typeof (globalThis as RafGlobals).requestAnimationFrame !== "function") {
+    const handles = new Map<number, NodeJS.Immediate>();
+    let next = 1;
+    (globalThis as RafGlobals).requestAnimationFrame = (cb: RafCb) => {
+      const id = next++;
+      const h = setImmediate(() => {
+        handles.delete(id);
+        cb(performance.now());
+      });
+      handles.set(id, h);
+      return id;
+    };
+    (globalThis as RafGlobals).cancelAnimationFrame = (id: number) => {
+      const h = handles.get(id);
+      if (h) {
+        clearImmediate(h);
+        handles.delete(id);
+      }
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Setup: 100-node scene with WASM geometry
 // ---------------------------------------------------------------------------
@@ -460,6 +491,191 @@ describe("Translate gesture with hierarchy change", () => {
         ? `Position discontinuities (${errors.length} frames):\n${errors.slice(0, 10).join("\n")}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ""}`
         : "";
     expect(errorSummary).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mid-drag reparent into a container at non-zero position
+//
+// Regression harness for the WASM-side reparent sync bug: the bypass path
+// used to emit a `nodes`-only effect for drag dispatches, so the WASM
+// scene graph never learned about mid-drag reparents. The TS side would
+// store the new local coords relative to the container, but WASM (still
+// seeing the rectangle under the scene root) would render it at those
+// relative coords in world space — a visible jump by the container's
+// position.
+//
+// The test exercises the whole reducer → OpLog → WASM sync pipeline with
+// a container at (300, 200). After the drag crosses into the container,
+// both sides must agree on the rectangle's WORLD position.
+// ---------------------------------------------------------------------------
+
+describe("Translate reparent emits structural sync ops", () => {
+  // Regression contract for the mid-drag reparent sync bug.
+  //
+  // Before the op-log redesign, the bypass path's effect classifier
+  // predicted "only node-property changes" from the action type +
+  // gesture state. The reducer's translate path could secretly call
+  // `graphInstance.mv(...)` when the drag crossed a container, but
+  // that structural change was never communicated to WASM — the WASM
+  // scene graph stayed rooted at the old parent, and the node
+  // re-rendered at `layout_inset_*` interpreted in the wrong
+  // coordinate space (visible as a jump by the container's origin).
+  //
+  // Asserting on the emitted OpLog (not on rendered pixels) pins the
+  // regression at the API surface the WASM subscriber consumes and
+  // decouples the test from WASM layout-cache flush timing.
+  let ed: Editor;
+  let canvas: import("@grida/canvas-wasm").Canvas;
+  const capturedOps: Array<{
+    kind: string;
+    id?: string;
+    parent?: string;
+    children?: readonly string[];
+  }> = [];
+
+  beforeAll(async () => {
+    // Container at (300, 200) — non-zero origin is what exposes the
+    // sync bug: if the WASM scene graph doesn't learn about the mid-
+    // drag reparent, it renders r0 at its layout_inset_* (relative to
+    // the container) interpreted as scene-space coords, producing a
+    // world rect offset by (-300, -200) vs. what TS computes.
+    const container = {
+      ...containerNode("c0", "Container"),
+      layout_inset_left: 300,
+      layout_inset_top: 200,
+      layout_target_width: 600,
+      layout_target_height: 400,
+    };
+    const rect0 = rectNode("r0", {
+      name: "Rect0",
+      x: 1000,
+      y: 300,
+      width: 100,
+      height: 100,
+    });
+    const doc: grida.program.document.Document = {
+      scenes_ref: ["scene"],
+      links: { scene: ["c0", "r0"] },
+      nodes: {
+        scene: sceneNode("scene", "Scene"),
+        c0: container as grida.program.nodes.Node,
+        r0: rect0,
+      },
+      entry_scene_id: "scene",
+      images: {},
+      bitmaps: {},
+      properties: {},
+    };
+
+    const r = await createEditor(doc);
+    ed = r.ed;
+    canvas = r.canvas;
+    ed.doc.dispatch({ type: "load", scene: "scene" }, { recording: "silent" });
+
+    // Capture every dispatch's OpLog into a flat list of op snapshots.
+    ed.doc.subscribe((_, _action, _patches, ops) => {
+      if (!ops) return;
+      for (const op of ops) capturedOps.push({ ...op });
+    });
+  }, 120_000);
+
+  afterAll(() => {
+    canvas.dispose();
+    ed.dispose();
+  });
+
+  test("mid-drag reparent emits sync_links(old) and sync_links(new) in the op log", () => {
+    capturedOps.length = 0;
+
+    // Select r0 and start a translate gesture.
+    ed.doc.select(["r0"]);
+    ed.doc.dispatch(
+      {
+        type: "event-target/event/on-pointer-down",
+        node_ids_from_point: ["r0"],
+        shiftKey: false,
+      } as Action,
+      { recording: "silent" }
+    );
+    ed.doc.dispatch(
+      {
+        type: "event-target/event/on-drag-start",
+        shiftKey: false,
+        event: { movement: [0, 0], delta: [0, 0] },
+      } as Action,
+      { recording: "begin-gesture" }
+    );
+
+    // Drag r0 left 600px. r0 starts at (1000, 300) and must cross into
+    // the container at (300, 200)–(900, 600). To trigger the reducer's
+    // reparent branch, `draft.hits` must contain "c0" while the drag
+    // is inside c0's bounds — simulate that with a raycast dispatch
+    // on each frame.
+    const FRAMES = 600;
+    for (let i = 1; i <= FRAMES; i++) {
+      // Once r0 crosses into the container horizontally, publish the
+      // hit so the reducer's hierarchy-change path activates.
+      const r0_x_now = 1000 - i; // reducer's coord space, not snap-adjusted
+      const inside_c0 = r0_x_now < 900 && r0_x_now > 300;
+      ed.doc.dispatch(
+        {
+          type: "event-target/event/on-pointer-move-raycast",
+          node_ids_from_point: inside_c0 ? ["c0"] : [],
+        } as Action,
+        { recording: "silent" }
+      );
+      ed.doc.dispatch(
+        {
+          type: "event-target/event/on-drag",
+          event: { movement: [-i, 0], delta: [-1, 0] },
+        } as Action,
+        { recording: "silent" }
+      );
+    }
+
+    ed.doc.dispatch(
+      {
+        type: "event-target/event/on-drag-end",
+        shiftKey: false,
+        node_ids_from_area: undefined,
+        event: { movement: [-FRAMES, 0], delta: [0, 0] },
+      } as Action,
+      { recording: "end-gesture" }
+    );
+
+    // TS-side correctness: the reducer reparented r0 under c0.
+    expect(ed.doc.state.document_ctx.lu_parent["r0"]).toBe("c0");
+
+    // Contract: the drag produced sync_links ops that detach r0 from
+    // scene and attach it under c0. Before the op-log redesign, zero
+    // sync_links ops were emitted during drag — this test fails loud
+    // if the regression returns.
+    const structural = capturedOps.filter((o) => o.kind === "sync_links");
+
+    const detachIdx = structural.findIndex(
+      (o) => o.parent === "scene" && !(o.children ?? []).includes("r0")
+    );
+    const attachIdx = structural.findIndex(
+      (o) => o.parent === "c0" && (o.children ?? []).includes("r0")
+    );
+
+    expect(detachIdx).toBeGreaterThanOrEqual(0);
+    expect(attachIdx).toBeGreaterThanOrEqual(0);
+    // Detach must come before attach so adjacency lists never transiently
+    // hold duplicate references to the same child.
+    expect(detachIdx).toBeLessThan(attachIdx);
+
+    // Final consistency: after the drag, the last sync_links ops for
+    // each parent should show r0 only under c0.
+    const lastScene = [...structural]
+      .reverse()
+      .find((o) => o.parent === "scene");
+    const lastC0 = [...structural].reverse().find((o) => o.parent === "c0");
+    expect(lastScene).toBeDefined();
+    expect(lastScene!.children).not.toContain("r0");
+    expect(lastC0).toBeDefined();
+    expect(lastC0!.children).toContain("r0");
   });
 });
 

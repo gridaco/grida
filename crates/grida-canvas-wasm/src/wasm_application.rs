@@ -263,6 +263,44 @@ pub(crate) unsafe extern "C" fn delete_node(
 }
 
 #[no_mangle]
+/// js::_sync_links
+///
+/// Atomically replace a parent's children list. Children are passed
+/// as their user ids joined by `\n` in the buffer at
+/// `(children_ptr, children_len)`; empty buffer means no children.
+/// Node ids must not contain newlines. See [`ApplicationApi::sync_links`].
+pub(crate) unsafe extern "C" fn sync_links(
+    app: *mut UnknownTargetApplication,
+    parent_ptr: *const u8,
+    parent_len: usize,
+    children_ptr: *const u8,
+    children_len: usize,
+) -> bool {
+    let Some(app) = app.as_mut() else {
+        return false;
+    };
+    let Some(parent_id) = __str_from_ptr_len(parent_ptr, parent_len) else {
+        return false;
+    };
+
+    let children_blob: String = if children_len == 0 || children_ptr.is_null() {
+        String::new()
+    } else {
+        match __str_from_ptr_len(children_ptr, children_len) {
+            Some(s) => s,
+            None => return false,
+        }
+    };
+
+    let children: Vec<&str> = children_blob
+        .split('\n')
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    app.sync_links(&parent_id, &children)
+}
+
+#[no_mangle]
 /// js::_pointer_move
 ///
 /// Legacy path — updates devtools hit test only, does NOT dispatch through
