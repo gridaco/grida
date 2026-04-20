@@ -178,22 +178,24 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Background
 
-| CSS Property              | Status | Notes                               |
-| ------------------------- | ------ | ----------------------------------- |
-| `background-color`        | ✅     | Solid color with border-radius      |
-| `background-image: url()` | ✅     | Via `ImageProvider` trait           |
-| `linear-gradient()`       | ✅     | All directions + angles, multi-stop |
-| `radial-gradient()`       | ✅     | Circle/ellipse                      |
-| `conic-gradient()`        | ✅     | Sweep gradient                      |
-| Multi-layer backgrounds   | ✅     | Stacked gradient + solid layers     |
-| `background-position`     | ❌     |                                     |
-| `background-size`         | ❌     |                                     |
-| `background-repeat`       | ❌     |                                     |
-| `background-origin`       | ❌     |                                     |
-| `background-clip`         | ❌     |                                     |
-| `background-attachment`   | ❌     |                                     |
-| `background-blend-mode`   | ❌     | Different from `mix-blend-mode`     |
-| `background` (shorthand)  | ⚠️     | Color, gradient, and url() layers   |
+| CSS Property                    | Status | Notes                                                                    |
+| ------------------------------- | ------ | ------------------------------------------------------------------------ |
+| `background-color`              | ✅     | Solid color with border-radius                                           |
+| `background-image: url()`       | ✅     | Via `ImageProvider` trait                                                |
+| `linear-gradient()`             | ✅     | All directions + angles, multi-stop, px / % / currentcolor stops         |
+| `radial-gradient()`             | ✅     | Shape (circle/ellipse), extent keywords, explicit radii, position        |
+| `conic-gradient()`              | ✅     | `from <angle> at <position>`, repeating variant                          |
+| `repeating-*-gradient()`        | ✅     | Px and % stops both tile correctly                                       |
+| Gradient `color-interpolation-method` | ⚠️ | Extraction + Skia wiring done; explicit `in <space>` syntax gated by Stylo's `layout.css.gradient-color-interpolation-method` pref (default off). Auto path (sRGB vs Oklab based on stop colors) works. |
+| Multi-layer backgrounds         | ✅     | Stacked gradient + solid + URL layers                                    |
+| `background-position`           | ✅     | Per-layer, px/%/keyword per axis                                         |
+| `background-size`               | ✅     | `cover`/`contain`/`auto`/explicit (with aspect preservation)             |
+| `background-repeat`             | ✅     | `repeat`/`no-repeat`/`repeat-x`/`repeat-y`; `space`/`round` → repeat     |
+| `background-origin`             | ✅     | `border-box`/`padding-box`/`content-box`                                 |
+| `background-clip`               | ✅     | `border-box`/`padding-box`/`content-box`; border-box clip honors radius  |
+| `background-attachment`         | ❌     |                                                                          |
+| `background-blend-mode`         | ❌     | Different from `mix-blend-mode`                                          |
+| `background` (shorthand)        | ✅     | Color, gradient, url(), size, position, repeat, clip, origin layers      |
 
 ### Border
 
@@ -201,12 +203,12 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | -------------------------- | ------ | ----------------------------------------------------- |
 | `border-width` (all sides) | ✅     |                                                       |
 | `border-color` (all sides) | ✅     |                                                       |
-| `border-style` (all sides) | ✅     | solid/dashed/dotted painted; rest fallback            |
-| `border-style: groove`     | ❌     | Enum defined, paint falls back to solid               |
-| `border-style: ridge`      | ❌     | Enum defined, paint falls back to solid               |
-| `border-style: inset`      | ❌     | Enum defined, paint falls back to solid               |
-| `border-style: outset`     | ❌     | Enum defined, paint falls back to solid               |
-| `border-style: double`     | ❌     | Enum defined, paint falls back to solid               |
+| `border-style` (all sides) | ✅     | All 9 styles painted                                  |
+| `border-style: groove`     | ✅     | Per-side darken/lighten (50% shade)                   |
+| `border-style: ridge`      | ✅     | Per-side lighten/darken (inverse of groove)           |
+| `border-style: inset`      | ✅     | Top/left darker, bottom/right lighter                 |
+| `border-style: outset`     | ✅     | Inverse of inset                                      |
+| `border-style: double`     | ✅     | Two 1/3-width strokes with 1/3 gap                    |
 | `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)                |
 | `border` (shorthand)       | ✅     |                                                       |
 | `border-image`             | ✅     | 9-slice via `ImageProvider`                           |
@@ -315,8 +317,8 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | ----------------------------- | ------ | ----------------------------------------------------------- |
 | `text-decoration` (shorthand) | ✅     | underline, line-through, overline (bitfield — simultaneous) |
 | `text-decoration-line`        | ✅     |                                                             |
-| `text-decoration-style`       | ⚠️     | Field defined, not extracted from Stylo                     |
-| `text-decoration-color`       | ⚠️     | Field defined, not extracted from Stylo                     |
+| `text-decoration-style`       | ✅     | solid/double/dotted/dashed/wavy via Skia `TextDecorationStyle` |
+| `text-decoration-color`       | ✅     | `currentcolor` falls back to text color                     |
 | `text-decoration-thickness`   | ❌     |                                                             |
 | `text-decoration-skip-ink`    | ❌     |                                                             |
 | `text-underline-position`     | ❌     |                                                             |
@@ -326,7 +328,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 | CSS Property             | Status | Notes              |
 | ------------------------ | ------ | ------------------ |
-| `text-shadow`            | ❌     | Not in type schema |
+| `text-shadow`            | ✅     | Offset + blur + color; stacked, via Skia `TextStyle::add_shadow` |
 | `text-emphasis`          | ❌     |                    |
 | `text-emphasis-style`    | ❌     |                    |
 | `text-emphasis-color`    | ❌     |                    |
@@ -391,9 +393,9 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `transform-origin`    | ✅     | Percentage-based origins (default 50% 50%)     |
 | `transform-box`       | ❌     |                                                |
 | `transform-style`     | ❌     |                                                |
-| `translate`           | ❌     | Individual property (use `transform:` instead) |
-| `rotate`              | ❌     | Individual property (use `transform:` instead) |
-| `scale`               | ❌     | Individual property (use `transform:` instead) |
+| `translate`           | ✅     | Standalone longhand, applies before `transform:`        |
+| `rotate`              | ✅     | Standalone longhand; 2D and z-axis-only 3D `rotate3d`   |
+| `scale`               | ✅     | Standalone longhand, uniform and `sx sy`                |
 | `perspective`         | ❌     |                                                |
 | `perspective-origin`  | ❌     |                                                |
 | `backface-visibility` | ❌     |                                                |
