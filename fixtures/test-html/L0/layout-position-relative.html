@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- probe: (25,25)=#0000ff (175,125)=#0000ff (75,25)=#ffffff -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: position: relative with offsets</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+      }
+      .row {
+        display: flex;
+        width: 300px;
+        height: 300px;
+      }
+      .box {
+        width: 50px;
+        height: 50px;
+        background: #0000ff;
+        flex: none;
+      }
+      .shifted {
+        position: relative;
+        top: 100px;
+        left: 100px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="box"></div>
+      <div class="box shifted"></div>
+    </div>
+  </body>
+</html>

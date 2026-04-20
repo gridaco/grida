@@ -70,8 +70,8 @@ paint-outline.html                      outline, outline-offset
 # --- layout ---
 layout-block.html                       block flow
 layout-display-none.html                display: none skips elements
-layout-position-relative.html           position: relative with offsets
-layout-position-absolute.html           position: absolute
+layout-position-relative.html           position: relative with offsets (probe)
+layout-position-absolute.html           position: absolute with insets (probe)
 layout-overflow-hidden.html             overflow: hidden clip
 layout-visibility-hidden.html           visibility: hidden/collapse
 

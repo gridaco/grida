@@ -820,6 +820,65 @@ code block
         }
     }
 
+    /// Verify `top`/`right`/`bottom`/`left` are extracted from Stylo.
+    /// Regression test for a stub that previously returned `auto` for all sides.
+    #[test]
+    fn test_inset_extraction_px() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="position:absolute;top:100px;left:50px;right:10px;bottom:20px">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        fn find_positioned<'a>(
+            el: &'a style::StyledElement,
+        ) -> Option<&'a style::StyledElement> {
+            if el.inset.top != types::CssLength::Auto
+                || el.inset.left != types::CssLength::Auto
+            {
+                return Some(el);
+            }
+            for child in &el.children {
+                if let style::StyledNode::Element(c) = child {
+                    if let Some(f) = find_positioned(c) {
+                        return Some(f);
+                    }
+                }
+            }
+            None
+        }
+        let el = find_positioned(&root).expect("positioned element should exist");
+        assert_eq!(el.inset.top, types::CssLength::Px(100.0));
+        assert_eq!(el.inset.left, types::CssLength::Px(50.0));
+        assert_eq!(el.inset.right, types::CssLength::Px(10.0));
+        assert_eq!(el.inset.bottom, types::CssLength::Px(20.0));
+    }
+
+    /// Percentage insets survive the computed-values path.
+    #[test]
+    fn test_inset_extraction_percent() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="position:absolute;top:25%;left:50%">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        fn find_positioned<'a>(
+            el: &'a style::StyledElement,
+        ) -> Option<&'a style::StyledElement> {
+            if el.inset.top != types::CssLength::Auto
+                || el.inset.left != types::CssLength::Auto
+            {
+                return Some(el);
+            }
+            for child in &el.children {
+                if let style::StyledNode::Element(c) = child {
+                    if let Some(f) = find_positioned(c) {
+                        return Some(f);
+                    }
+                }
+            }
+            None
+        }
+        let el = find_positioned(&root).expect("positioned element should exist");
+        assert_eq!(el.inset.top, types::CssLength::Percent(0.25));
+        assert_eq!(el.inset.left, types::CssLength::Percent(0.5));
+    }
+
     /// Verify no transform yields empty vec.
     #[test]
     fn test_transform_none() {

@@ -1380,9 +1380,30 @@ fn extract_max_size(
     }
 }
 
-fn extract_inset(_style: &ComputedValues) -> CssEdgeInsets {
-    // TODO: extract top/right/bottom/left inset for positioned elements
-    CssEdgeInsets::default()
+fn extract_inset(style: &ComputedValues) -> CssEdgeInsets {
+    fn extract_side(v: style::values::computed::Inset) -> CssLength {
+        use style::values::computed::Inset;
+        match v {
+            Inset::Auto => CssLength::Auto,
+            Inset::LengthPercentage(lp) => {
+                if let Some(len) = lp.to_length() {
+                    CssLength::Px(len.px())
+                } else if let Some(pct) = lp.to_percentage() {
+                    CssLength::Percent(pct.0)
+                } else {
+                    CssLength::Auto
+                }
+            }
+            // Anchor positioning — not supported, fall back to auto.
+            _ => CssLength::Auto,
+        }
+    }
+    CssEdgeInsets {
+        top: extract_side(style.clone_top()),
+        right: extract_side(style.clone_right()),
+        bottom: extract_side(style.clone_bottom()),
+        left: extract_side(style.clone_left()),
+    }
 }
 
 fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
