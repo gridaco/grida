@@ -1,5 +1,4 @@
-import type { Draft } from "immer";
-import { safeOriginal } from "./utils/immer";
+import { type Draft, original } from "immer";
 import { updateState } from "./utils/immer";
 
 import type {
@@ -610,7 +609,7 @@ function __self_evt_on_drag(
   // Read from original to avoid proxying large objects (document.nodes,
   // gesture) until we know which branch we're in. Only access the draft
   // for actual writes.
-  const orig = safeOriginal(draft as Draft<editor.state.IEditorState>)!;
+  const orig = original(draft as Draft<editor.state.IEditorState>)!;
   const {
     event: { movement, delta },
   } = <EditorEventTarget_Drag>action;

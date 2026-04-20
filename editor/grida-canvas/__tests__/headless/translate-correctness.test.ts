@@ -497,13 +497,13 @@ describe("Translate gesture with hierarchy change", () => {
 // ---------------------------------------------------------------------------
 // Mid-drag reparent into a container at non-zero position
 //
-// Regression harness for the WASM-side reparent sync bug: the bypass path
-// used to emit a `nodes`-only effect for drag dispatches, so the WASM
-// scene graph never learned about mid-drag reparents. The TS side would
-// store the new local coords relative to the container, but WASM (still
-// seeing the rectangle under the scene root) would render it at those
-// relative coords in world space — a visible jump by the container's
-// position.
+// Regression harness for the WASM-side reparent sync bug: the pre-op-log
+// sync protocol predicted "only node-property changes" for drag
+// dispatches, so the WASM scene graph never learned about mid-drag
+// reparents. The TS side would store the new local coords relative to
+// the container, but WASM (still seeing the rectangle under the scene
+// root) would render it at those relative coords in world space — a
+// visible jump by the container's position.
 //
 // The test exercises the whole reducer → OpLog → WASM sync pipeline with
 // a container at (300, 200). After the drag crosses into the container,
@@ -513,10 +513,10 @@ describe("Translate gesture with hierarchy change", () => {
 describe("Translate reparent emits structural sync ops", () => {
   // Regression contract for the mid-drag reparent sync bug.
   //
-  // Before the op-log redesign, the bypass path's effect classifier
-  // predicted "only node-property changes" from the action type +
-  // gesture state. The reducer's translate path could secretly call
-  // `graphInstance.mv(...)` when the drag crossed a container, but
+  // The legacy sync protocol predicted "only node-property changes"
+  // from the action type + gesture state. The reducer's translate path
+  // could secretly call `graphInstance.mv(...)` when the drag crossed
+  // a container, but
   // that structural change was never communicated to WASM — the WASM
   // scene graph stayed rooted at the old parent, and the node
   // re-rendered at `layout_inset_*` interpreted in the wrong

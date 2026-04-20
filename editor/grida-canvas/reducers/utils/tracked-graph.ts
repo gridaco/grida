@@ -19,8 +19,8 @@ type Op = Parameters<OpBuffer["push"]>[0];
  * |                        | `sync_links(target, ...)` (inner `mv` silenced) |
  *
  * Node-property changes don't come through `Graph`; the reducer emits
- * `replace_node` ops for those from Immer patches / bypass clone set.
- * If an underlying method throws, no op is emitted — the buffer stays
+ * `replace_node` ops for those by lifting Immer patches. If an
+ * underlying method throws, no op is emitted — the buffer stays
  * consistent with the graph.
  */
 export function createTrackedGraph<T extends Graph>(

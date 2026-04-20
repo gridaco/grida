@@ -1,5 +1,5 @@
 import type { Draft } from "immer";
-import { safeOriginal } from "../utils/immer";
+import { original } from "immer";
 import { editor } from "@/grida-canvas";
 import { self_insertSubDocument } from "./insert";
 import { self_try_remove_node } from "./delete";
@@ -142,7 +142,7 @@ function __self_update_gesture_transform_translate(
   // draft.gesture — reading it from the draft causes Immer to proxy the
   // entire snapshot, and finalization walks all of it. By reading immutable
   // gesture fields from original(), we avoid this entirely.
-  const orig = safeOriginal(draft)!;
+  const orig = original(draft)!;
 
   const scene = orig.document.nodes[
     draft.scene_id
@@ -326,9 +326,7 @@ function __self_update_gesture_transform_translate(
       //
       // Wrap in `createTrackedGraph` so every structural mutation the
       // recipe performs below (mv into the new parent) emits sync_links
-      // ops directly into the dispatch's op buffer. This is what closes
-      // the mid-drag reparent sync hole — the bypass path's old
-      // predictor had no way to see these mutations.
+      // ops directly into the dispatch's op buffer.
       const graphInstance = createTrackedGraph(
         new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
         context.mutation_buffer

@@ -1,11 +1,12 @@
 /**
  * WASM-sync op log — ordered mutations the subscriber forwards 1:1 to WASM.
  *
- * Mutation sites emit ops into an {@link OpBuffer} as they run (tracked
- * `Graph` wrapper for structural edits; Immer patch lift or bypass clone
- * set for node property changes). Consumers MUST apply ops in order:
- * a `sync_links` that references a freshly inserted node is only valid
- * after that node has been delivered by a prior `replace_node`.
+ * Mutation sites emit ops into an {@link OpBuffer} as they run: the
+ * tracked-`Graph` wrapper for structural edits and {@link appendPatchOps}
+ * for node property changes (lifted from the Immer patch stream).
+ * Consumers MUST apply ops in order: a `sync_links` that references a
+ * freshly inserted node is only valid after that node has been delivered
+ * by a prior `replace_node`.
  */
 
 export type Op =
@@ -45,10 +46,14 @@ type PatchWalkResult =
     };
 
 /**
- * Classify Immer patches as structural (anything under `document.*`
- * other than `document.nodes[id]`) or as a pair of node-id sets.
- * Shared by the in-buffer appender below and the standalone
- * {@link opLogFromPatches}.
+ * Classify Immer patches into a pair of node-id sets. Patches touching
+ * `document.*` other than `document.nodes[id]` or `document.links` fall
+ * through to `structural: true`, which the caller maps to a full
+ * `full_resync`. `document.links` is intentionally ignored: the
+ * tracked-Graph wrapper observes structural edits and emits precise
+ * `sync_links` ops, so the corresponding Immer patches would otherwise
+ * cause a redundant (and destructive) full resync that collapses the
+ * whole batch.
  */
 function walkPatches(patches: readonly MinimalPatch[]): PatchWalkResult {
   const replaced = new Set<string>();
@@ -56,6 +61,7 @@ function walkPatches(patches: readonly MinimalPatch[]): PatchWalkResult {
   for (const patch of patches) {
     const path = patch.path;
     if (path[0] !== "document") continue;
+    if (path[1] === "links") continue;
     if (path[1] !== "nodes") return { structural: true };
     const nodeId = path[2];
     if (typeof nodeId !== "string") return { structural: true };

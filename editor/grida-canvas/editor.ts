@@ -1,6 +1,6 @@
 import { produce, applyPatches, produceWithPatches } from "immer";
 import { editor, type Action } from ".";
-import reducer, { type ReducerContext, canBypassImmer } from "./reducers";
+import reducer, { type ReducerContext } from "./reducers";
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { TCanvasEventTargetDragGestureState } from "./action";
@@ -394,7 +394,7 @@ class EditorDocumentStore
   /**
    * Per-dispatch op buffer. Shared across dispatches — the reducer
    * resets it at the start of each recipe. Mutation sites (tracked
-   * Graph, Immer patch lift, bypass clone tracker) push {@link Op}s
+   * Graph, Immer patch lift) push {@link Op}s
    * into it; the reducer drains and returns the log to the subscriber
    * in `editor.ts`.
    *
@@ -670,10 +670,7 @@ class EditorDocumentStore
       const [nextState, patches, inversePatches, ops] = reducer(
         this.mstate,
         action,
-        context,
-        {
-          skipPatches: recording === "silent" && canBypassImmer(action),
-        }
+        context
       );
       __perf_end_reducer();
 
