@@ -1,6 +1,6 @@
 ---
-title: Notifications email aux repondants
-description: Apprenez a envoyer un email de confirmation personnalise aux repondants apres une soumission de formulaire dans Grida Forms (email verifie CIAM requis).
+title: Notifications email aux répondants
+description: Apprenez à envoyer un email de confirmation personnalisé aux répondants après une soumission de formulaire dans Grida Forms (email vérifié CIAM requis).
 keywords:
   - grida
   - forms
@@ -12,29 +12,29 @@ doc_tasks:
   - update
 ---
 
-### Notifications email aux repondants
+### Notifications email aux répondants
 
-Les notifications email aux repondants vous permettent d'envoyer un **email de confirmation personnalise** a la personne qui a soumis votre formulaire.
+Les notifications email aux répondants vous permettent d'envoyer un **email de confirmation personnalisé** à la personne qui a soumis votre formulaire.
 
 C'est utile pour des formulaires d'inscription ou d'enregistrement lorsque vous voulez :
 
 - confirmer la soumission
-- partager les prochaines etapes
-- inclure une reference comme un identifiant de soumission
+- partager les prochaines étapes
+- inclure une référence comme un identifiant de soumission
 
-### Avant de commencer (CIAM / email verifie)
+### Avant de commencer (CIAM / email vérifié)
 
-Grida envoie des emails aux repondants **uniquement lorsque CIAM est utilise** et que le repondant a une **adresse email verifiee**.
+Grida envoie des emails aux répondants **uniquement lorsque CIAM est utilisé** et que le répondant a une **adresse email vérifiée**.
 
-Concretement, cela signifie :
+Concrètement, cela signifie :
 
-- votre formulaire doit inclure un champ `challenge_email` (verification email CIAM)
-- l'email est envoye a l'adresse email verifiee associee a la soumission (et non a un champ libre quelconque)
+- votre formulaire doit inclure un champ `challenge_email` (vérification email CIAM)
+- l'email est envoyé à l'adresse email vérifiée associée à la soumission (et non à un champ libre quelconque)
 
-### Comment activer les notifications email aux repondants
+### Comment activer les notifications email aux répondants
 
-1. Ouvrez votre **Form** dans l'editeur Grida.
-2. Dans la barre laterale gauche, cliquez sur [**Connect**](https://grida.co/_/connect).
+1. Ouvrez votre **Form** dans l'éditeur Grida.
+2. Dans la barre latérale gauche, cliquez sur [**Connect**](https://grida.co/_/connect).
 3. Cliquez sur [**Channels**](https://grida.co/_/connect/channels).
 4. Dans **Email Notifications**, trouvez **Respondent email notifications**.
 5. Activez **Enable**.
@@ -42,21 +42,21 @@ Concretement, cela signifie :
 
 ### Comment personnaliser l'email
 
-1. Ouvrez [**Connect -> Channels**](https://grida.co/_/connect/channels) -> **Email Notifications** (meme ecran que ci-dessus).
+1. Ouvrez [**Connect -> Channels**](https://grida.co/_/connect/channels) -> **Email Notifications** (même écran que ci-dessus).
 2. Configurez les champs de l'email :
-   - **Reply-To** (optionnel) : adresse ou les reponses doivent etre envoyees (par ex. `support@yourdomain.com`)
-   - **Subject** : modele d'objet de l'email
-   - **From name** (optionnel) : nom d'affichage de l'expediteur (par ex. `Acme Support`)
-   - **Body (HTML)** : modele du corps de l'email en HTML
-3. Utilisez l'aperçu integre pour verifier l'objet et le contenu.
+   - **Reply-To** (optionnel) : adresse où les réponses doivent être envoyées (par ex. `support@yourdomain.com`)
+   - **Subject** : modèle d'objet de l'email
+   - **From name** (optionnel) : nom d'affichage de l'expéditeur (par ex. `Acme Support`)
+   - **Body (HTML)** : modèle du corps de l'email en HTML
+3. Utilisez l'aperçu intégré pour vérifier l'objet et le contenu.
 4. Cliquez sur **Save**.
 
-### Ce qui est envoye (vue d'ensemble)
+### Ce qui est envoyé (vue d'ensemble)
 
-- **Destinataire** : l'**email verifie** du repondant (CIAM)
-- **Email expediteur** : une adresse no-reply fixe (le nom d'affichage peut etre personnalise avec **From name**)
-- **Moment d'envoi** : apres une soumission de formulaire reussie
-  - si CIAM n'est pas present ou si l'email n'est pas verifie, l'envoi est ignore
+- **Destinataire** : l'**email vérifié** du répondant (CIAM)
+- **Email expéditeur** : une adresse no-reply fixe (le nom d'affichage peut être personnalisé avec **From name**)
+- **Moment d'envoi** : après une soumission de formulaire réussie
+  - si CIAM n'est pas présent ou si l'email n'est pas vérifié, l'envoi est ignoré
 
 ### Templates (variables Handlebars)
 
@@ -65,7 +65,7 @@ L'objet et le corps prennent en charge les variables de template.
 #### Variables disponibles
 
 - `{{form_title}}`
-- `{{response.idx}}` (index formate de la soumission)
+- `{{response.idx}}` (index formaté de la soumission)
 - `{{fields.<field_name>}}` (champs soumis par nom de champ)
 
 #### Exemples
@@ -73,22 +73,22 @@ L'objet et le corps prennent en charge les variables de template.
 Objet :
 
 ```txt
-Merci pour votre inscription a {{form_title}}
+Merci pour votre inscription à {{form_title}}
 ```
 
 Corps (HTML) :
 
 ```html
 <h1>Merci, {{fields.first_name}} !</h1>
-<p>Nous avons bien recu votre soumission pour {{form_title}}.</p>
-<p>Votre numero d'inscription : {{response.idx}}</p>
+<p>Nous avons bien reçu votre soumission pour {{form_title}}.</p>
+<p>Votre numéro d'inscription : {{response.idx}}</p>
 ```
 
-### Depannage
+### Dépannage
 
-Si les emails ne sont pas envoyes :
+Si les emails ne sont pas envoyés :
 
-- **CIAM non active** : verifiez que votre formulaire inclut un champ `challenge_email`
-- **Email non verifie** : le repondant doit terminer la verification ; les emails non verifies sont ignores
-- **Corps du message manquant** : l'envoi est ignore si le corps est vide
-- **Fiabilite de la livraison** : l'envoi est actuellement best-effort inline. Des retries ou une file d'attente pourront etre ajoutes plus tard.
+- **CIAM non activé** : vérifiez que votre formulaire inclut un champ `challenge_email`
+- **Email non vérifié** : le répondant doit terminer la vérification ; les emails non vérifiés sont ignorés
+- **Corps du message manquant** : l'envoi est ignoré si le corps est vide
+- **Fiabilité de la livraison** : l'envoi est actuellement best-effort inline. Des retries ou une file d'attente pourront être ajoutés plus tard.

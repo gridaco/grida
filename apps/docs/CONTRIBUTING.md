@@ -46,6 +46,7 @@ format: md
 - Add `doc_tasks: [translate]` on the source doc when translation is still pending.
 - For a page like `docs/platform/index.md`, place the Korean translation at `docs/platform/translations/ko/index.md`.
 - Add `translations/meta.json` in that directory if it does not already exist.
+- Locale docs are copied into Docusaurus i18n output with the `translations/<locale>/` segment removed. Keep internal relative doc links aligned with the English source doc unless a translation intentionally changes the document structure.
 
 ## Validation
 

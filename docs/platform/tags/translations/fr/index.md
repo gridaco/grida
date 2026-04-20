@@ -1,6 +1,6 @@
 ---
 title: Tags
-description: Comprendre le fonctionnement des tags dans Grida pour la categorisation, la segmentation et le filtrage.
+description: Comprendre le fonctionnement des tags dans Grida pour la catégorisation, la segmentation et le filtrage.
 keywords:
   - grida
   - platform
@@ -12,7 +12,7 @@ format: md
 
 # Tags
 
-Les tags sont des etiquettes utilisees pour categoriser, segmenter et filtrer les ressources de votre projet. Ils vous aident a organiser vos donnees de facon claire et flexible.
+Les tags sont des étiquettes utilisées pour catégoriser, segmenter et filtrer les ressources de votre projet. Ils vous aident à organiser vos données de façon claire et flexible.
 
 ## Structure d'un tag
 
@@ -22,17 +22,17 @@ Un tag se compose de :
 | ------------- | ----------------------------------------- | ----------- | ------ | ------------------------ |
 | `name`        | identifiant unique du tag                 | Oui         | text   | `"premium-user"`         |
 | `color`       | indicateur visuel pour le tag             | Non         | hex    | `"#ff0000"`              |
-| `description` | contexte ou details optionnels sur le tag | Non         | text   | `"High-value customers"` |
+| `description` | contexte ou détails optionnels sur le tag | Non         | text   | `"High-value customers"` |
 
-## Fonctionnalites
+## Fonctionnalités
 
 - **Scope projet :** les tags sont uniques dans le contexte d'un projet.
-- **Creation automatique :** les tags sont crees automatiquement s'ils n'existent pas quand vous les associez a une ressource.
-- **Gestion simple :** renommer un tag met automatiquement a jour toutes les references associees.
+- **Création automatique :** les tags sont créés automatiquement s'ils n'existent pas quand vous les associez à une ressource.
+- **Gestion simple :** renommer un tag met automatiquement à jour toutes les références associées.
 
 ## Exemple d'utilisation
 
-Lorsque vous associez des tags a une ressource, utilisez la structure suivante :
+Lorsque vous associez des tags à une ressource, utilisez la structure suivante :
 
 ```json
 {
@@ -43,11 +43,11 @@ Lorsque vous associez des tags a une ressource, utilisez la structure suivante :
 ## Bonnes pratiques
 
 - Utilisez des noms clairs et descriptifs pour les identifier facilement.
-- Utilisez les couleurs pour distinguer visuellement les categories de tags.
-- Revoyez et nettoyez regulierement vos tags pour garder votre projet organise.
+- Utilisez les couleurs pour distinguer visuellement les catégories de tags.
+- Revoyez et nettoyez régulièrement vos tags pour garder votre projet organisé.
 
 ## Ressources prises en charge
 
 Actuellement, les tags sont pris en charge pour les ressources suivantes :
 
-- [**Customer**](../customers/index.md) : organisez, segmentez et gerez efficacement vos clients avec des tags.
+- [**Clients**](../customers/index.md) : organisez, segmentez et gérez efficacement vos clients avec des tags.

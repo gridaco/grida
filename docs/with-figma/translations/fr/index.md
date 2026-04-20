@@ -14,13 +14,13 @@ doc_tasks:
 
 # Grida avec Figma
 
-Grida s'integre naturellement a Figma, ce qui permet aux designers de transferer leur travail entre les deux outils sans friction.
+Grida s'intègre naturellement à Figma, ce qui permet aux designers de transférer leur travail entre les deux outils sans friction.
 
-> **⚠️ Important Notice**
+> **⚠️ Important**
 >
-> L'integration presse-papiers avec Figma repose sur le format interne de Figma, qui peut changer sans preavis. Si le collage depuis Figma cesse de fonctionner, veuillez [signaler un probleme](https://github.com/gridaco/grida/issues/new).
+> L'intégration presse-papiers avec Figma repose sur le format interne de Figma, qui peut changer sans préavis. Si le collage depuis Figma cesse de fonctionner, veuillez [signaler un problème](https://github.com/gridaco/grida/issues/new).
 
-## Fonctionnalites
+## Fonctionnalités
 
 ### Assistant
 
@@ -31,28 +31,28 @@ La documentation Grida Assistant maintenue se trouve maintenant dans cette secti
 
 ### Importer depuis Figma
 
-Copiez des noeuds depuis Figma et collez-les directement dans Grida. L'editeur detecte automatiquement le format du presse-papiers Figma et convertit les noeuds vers le format natif Grida, en preservant :
+Copiez des nœuds depuis Figma et collez-les directement dans Grida. L'éditeur détecte automatiquement le format du presse-papiers Figma et convertit les nœuds vers le format natif Grida, en préservant :
 
-- la hierarchie et la structure des noeuds
-- les proprietes visuelles (fills, strokes, effects, transforms)
+- la hiérarchie et la structure des nœuds
+- les propriétés visuelles (fills, strokes, effects, transforms)
 - les styles et contenus texte
-- les donnees vectorielles et les paths
+- les données vectorielles et les paths
 - les relations entre composants
 
 **En savoir plus** : [Copy & Paste from Figma](../editor/features/copy-paste-figma.md)
 
-### Types de noeuds pris en charge
+### Types de nœuds pris en charge
 
-Grida prend en charge l'import des types de noeuds Figma les plus courants :
+Grida prend en charge l'import des types de nœuds Figma les plus courants :
 
 - **Conteneurs** : Frames, Components, Component Instances, Sections, Groups
 - **Formes** : Rectangles, Ellipses, Lines, Polygons, Stars
 - **Vecteurs** : Vector paths, Boolean operations
-- **Texte** : Text nodes avec preservation complete du style
+- **Texte** : Text nodes avec préservation complète du style
 
-### Compatibilite des proprietes
+### Compatibilité des propriétés
 
-Le pipeline de conversion mappe les proprietes Figma vers leurs equivalents Grida :
+Le pipeline de conversion mappe les propriétés Figma vers leurs équivalents Grida :
 
 - **Effects** : Drop shadows, inner shadows, layer blur, background blur
 - **Strokes** : Weight, align, cap, join, dash patterns, miter limit
@@ -62,13 +62,13 @@ Le pipeline de conversion mappe les proprietes Figma vers leurs equivalents Grid
 
 ## Guides
 
-- [Comment obtenir un token d'acces personnel Figma](./guides/how-to-get-personal-access-token.md)
+- [Comment obtenir un token d'accès personnel Figma](./guides/how-to-get-personal-access-token.md)
 - [Comment obtenir un lien partageable vers un design Figma](./guides/how-to-get-sharable-design-link.md)
-- [Comment enregistrer une copie locale en .fig](./guides/how-to-get-fig-file.md)
+- [Comment enregistrer une copie locale en `.fig`](./guides/how-to-get-fig-file.md)
 
-## Details techniques
+## Détails techniques
 
-Pour les details d'implementation et l'architecture du pipeline de conversion, voir :
+Pour les détails d'implémentation et l'architecture du pipeline de conversion, voir :
 
 - [Figma Import Technical Spec](../editor/features/copy-paste-figma.md)
 - [Figma IO Package Documentation](https://grida.co/docs/reference/io-figma)
