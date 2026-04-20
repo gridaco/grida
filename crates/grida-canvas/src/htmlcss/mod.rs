@@ -879,6 +879,268 @@ code block
         assert_eq!(el.inset.left, types::CssLength::Percent(0.5));
     }
 
+    // ── Gradient extraction ──────────────────────────────────────────
+
+    fn find_bg_image(el: &style::StyledElement) -> Option<&style::StyleImage> {
+        for layer in &el.background {
+            if let style::BackgroundLayer::Image(img) = layer {
+                return Some(img);
+            }
+        }
+        for child in &el.children {
+            if let style::StyledNode::Element(c) = child {
+                if let Some(img) = find_bg_image(c) {
+                    return Some(img);
+                }
+            }
+        }
+        None
+    }
+
+    fn expect_radial(html: &str) -> style::RadialGradient {
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        match find_bg_image(&root).expect("no background image") {
+            style::StyleImage::RadialGradient(g) => g.clone(),
+            other => panic!("expected RadialGradient, got {:?}", other),
+        }
+    }
+
+    fn expect_conic(html: &str) -> style::ConicGradient {
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        match find_bg_image(&root).expect("no background image") {
+            style::StyleImage::ConicGradient(g) => g.clone(),
+            other => panic!("expected ConicGradient, got {:?}", other),
+        }
+    }
+
+    fn expect_linear(html: &str) -> style::LinearGradient {
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        match find_bg_image(&root).expect("no background image") {
+            style::StyleImage::LinearGradient(g) => g.clone(),
+            other => panic!("expected LinearGradient, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_radial_shape() {
+        let _guard = crate::stylo_test::lock();
+        assert_eq!(
+            expect_radial(r#"<div style="background:radial-gradient(circle,red,blue)">x</div>"#)
+                .shape,
+            style::RadialShape::Circle
+        );
+        assert_eq!(
+            expect_radial(r#"<div style="background:radial-gradient(ellipse,red,blue)">x</div>"#)
+                .shape,
+            style::RadialShape::Ellipse
+        );
+        // Default (no shape keyword) → ellipse
+        assert_eq!(
+            expect_radial(r#"<div style="background:radial-gradient(red,blue)">x</div>"#).shape,
+            style::RadialShape::Ellipse
+        );
+    }
+
+    #[test]
+    fn test_radial_size_extent() {
+        let _guard = crate::stylo_test::lock();
+        assert_eq!(
+            expect_radial(
+                r#"<div style="background:radial-gradient(circle closest-side,red,blue)">x</div>"#
+            )
+            .size,
+            style::RadialSize::ClosestSide
+        );
+        assert_eq!(
+            expect_radial(
+                r#"<div style="background:radial-gradient(circle farthest-corner,red,blue)">x</div>"#
+            )
+            .size,
+            style::RadialSize::FarthestCorner
+        );
+        // Default → farthest-corner
+        assert_eq!(
+            expect_radial(r#"<div style="background:radial-gradient(red,blue)">x</div>"#).size,
+            style::RadialSize::FarthestCorner
+        );
+    }
+
+    #[test]
+    fn test_radial_size_explicit() {
+        let _guard = crate::stylo_test::lock();
+        assert_eq!(
+            expect_radial(r#"<div style="background:radial-gradient(circle 40px,red,blue)">x</div>"#)
+                .size,
+            style::RadialSize::Explicit {
+                x: types::CssLength::Px(40.0),
+                y: types::CssLength::Px(40.0),
+            }
+        );
+        assert_eq!(
+            expect_radial(
+                r#"<div style="background:radial-gradient(ellipse 80px 30px,red,blue)">x</div>"#
+            )
+            .size,
+            style::RadialSize::Explicit {
+                x: types::CssLength::Px(80.0),
+                y: types::CssLength::Px(30.0),
+            }
+        );
+    }
+
+    #[test]
+    fn test_radial_position() {
+        let _guard = crate::stylo_test::lock();
+        let g = expect_radial(
+            r#"<div style="background:radial-gradient(circle at 25% 75%,red,blue)">x</div>"#,
+        );
+        assert_eq!(g.center.x, types::CssLength::Percent(0.25));
+        assert_eq!(g.center.y, types::CssLength::Percent(0.75));
+
+        let g = expect_radial(
+            r#"<div style="background:radial-gradient(circle at 30px 30px,red,blue)">x</div>"#,
+        );
+        assert_eq!(g.center.x, types::CssLength::Px(30.0));
+        assert_eq!(g.center.y, types::CssLength::Px(30.0));
+
+        // Default → center (50% 50%)
+        let g = expect_radial(r#"<div style="background:radial-gradient(red,blue)">x</div>"#);
+        assert_eq!(g.center.x, types::CssLength::Percent(0.5));
+        assert_eq!(g.center.y, types::CssLength::Percent(0.5));
+    }
+
+    #[test]
+    fn test_conic_from_angle() {
+        let _guard = crate::stylo_test::lock();
+        let g =
+            expect_conic(r#"<div style="background:conic-gradient(from 45deg,red,blue)">x</div>"#);
+        assert!((g.from_angle_deg - 45.0).abs() < 0.01);
+
+        // Default → 0deg
+        let g = expect_conic(r#"<div style="background:conic-gradient(red,blue)">x</div>"#);
+        assert!(g.from_angle_deg.abs() < 0.01);
+    }
+
+    #[test]
+    fn test_conic_position() {
+        let _guard = crate::stylo_test::lock();
+        let g =
+            expect_conic(r#"<div style="background:conic-gradient(at 25% 75%,red,blue)">x</div>"#);
+        assert_eq!(g.center.x, types::CssLength::Percent(0.25));
+        assert_eq!(g.center.y, types::CssLength::Percent(0.75));
+
+        // Default → center
+        let g = expect_conic(r#"<div style="background:conic-gradient(red,blue)">x</div>"#);
+        assert_eq!(g.center.x, types::CssLength::Percent(0.5));
+        assert_eq!(g.center.y, types::CssLength::Percent(0.5));
+    }
+
+    #[test]
+    fn test_gradient_repeating() {
+        let _guard = crate::stylo_test::lock();
+        assert!(
+            expect_linear(
+                r#"<div style="background:repeating-linear-gradient(red 0,red 10px,blue 10px,blue 20px)">x</div>"#
+            )
+            .repeating
+        );
+        assert!(
+            expect_radial(
+                r#"<div style="background:repeating-radial-gradient(red 0,red 10px,blue 10px,blue 20px)">x</div>"#
+            )
+            .repeating
+        );
+        assert!(
+            expect_conic(
+                r#"<div style="background:repeating-conic-gradient(red 0 30deg,blue 30deg 60deg)">x</div>"#
+            )
+            .repeating
+        );
+
+        // Non-repeating counterparts
+        assert!(
+            !expect_linear(r#"<div style="background:linear-gradient(red,blue)">x</div>"#)
+                .repeating
+        );
+        assert!(
+            !expect_radial(r#"<div style="background:radial-gradient(red,blue)">x</div>"#)
+                .repeating
+        );
+        assert!(
+            !expect_conic(r#"<div style="background:conic-gradient(red,blue)">x</div>"#)
+                .repeating
+        );
+    }
+
+    /// Rasterize a picture and return RGBA pixels (reading back through the
+    /// image's own `ImageInfo`, so byte order matches the platform).
+    fn rasterize_rgba(html: &str, w: i32, h: i32) -> Vec<[u8; 4]> {
+        let fonts = test_fonts();
+        let pic = test_render(html, w as f32, h as f32, &fonts).expect("render");
+        let mut surface = skia_safe::surfaces::raster_n32_premul((w, h)).expect("surface");
+        surface.canvas().clear(skia_safe::Color::WHITE);
+        surface.canvas().draw_picture(&pic, None, None);
+        let img = surface.image_snapshot();
+        // Force RGBA8888 readback regardless of platform N32 order.
+        let info = skia_safe::ImageInfo::new(
+            (w, h),
+            skia_safe::ColorType::RGBA8888,
+            skia_safe::AlphaType::Premul,
+            None,
+        );
+        let row_bytes = info.min_row_bytes();
+        let mut raw = vec![0u8; row_bytes * h as usize];
+        img.read_pixels(
+            &info,
+            &mut raw,
+            row_bytes,
+            skia_safe::IPoint::new(0, 0),
+            skia_safe::image::CachingHint::Allow,
+        );
+        let mut rgba = Vec::with_capacity((w * h) as usize);
+        for i in 0..(w * h) as usize {
+            let off = i * 4;
+            rgba.push([raw[off], raw[off + 1], raw[off + 2], raw[off + 3]]);
+        }
+        rgba
+    }
+
+    fn pixel_at(pixels: &[[u8; 4]], x: i32, y: i32, w: i32) -> [u8; 4] {
+        pixels[(y * w + x) as usize]
+    }
+
+    /// Probe test for the conic default-path 90° rotation fix.
+    ///
+    /// CSS conic 0° is at 12 o'clock; Skia's sweep gradient defaults to 3 o'clock.
+    /// Without the paint-time offset, the default-path `conic-gradient(...)` is
+    /// rotated 90° CCW. This test pins the quadrant-to-color mapping.
+    #[test]
+    fn test_conic_default_quadrants() {
+        let _guard = crate::stylo_test::lock();
+        // 100×100 box, sharp quadrant transitions, no text/fonts.
+        let html = r#"
+<div style="width:100px;height:100px;background:conic-gradient(
+  #ff0000 0deg 90deg,
+  #00ff00 90deg 180deg,
+  #0000ff 180deg 270deg,
+  #ffff00 270deg 360deg
+)"></div>"#;
+        // Render into a surface matching the div — body's default margin is 0
+        // for our fixtures. Render into 100×100 directly.
+        let px = rasterize_rgba(html, 100, 100);
+
+        // Interior quadrant centers — far enough from boundaries to avoid AA.
+        let tr = pixel_at(&px, 75, 25, 100); // top-right: CSS 45°  → red
+        let br = pixel_at(&px, 75, 75, 100); // bottom-right: CSS 135° → green
+        let bl = pixel_at(&px, 25, 75, 100); // bottom-left: CSS 225° → blue
+        let tl = pixel_at(&px, 25, 25, 100); // top-left: CSS 315° → yellow
+
+        assert_eq!([tr[0], tr[1], tr[2]], [255, 0, 0], "top-right should be red");
+        assert_eq!([br[0], br[1], br[2]], [0, 255, 0], "bottom-right should be green");
+        assert_eq!([bl[0], bl[1], bl[2]], [0, 0, 255], "bottom-left should be blue");
+        assert_eq!([tl[0], tl[1], tl[2]], [255, 255, 0], "top-left should be yellow");
+    }
+
     /// Verify no transform yields empty vec.
     #[test]
     fn test_transform_none() {

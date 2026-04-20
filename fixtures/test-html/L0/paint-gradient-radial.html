@@ -36,12 +36,51 @@
         color: #fff;
       }
 
-      .simple {
+      /* shape */
+      .circle {
         background: radial-gradient(circle, #f00, #000);
       }
+      .ellipse {
+        background: radial-gradient(ellipse, #f00, #000);
+      }
+
+      /* stops */
       .multi-stop {
         background: radial-gradient(circle, #f00, #0f0 40%, #00f 80%, #000);
       }
+
+      /* position */
+      .at-top-left {
+        background: radial-gradient(circle at top left, #f00, #000);
+      }
+      .at-bottom-right {
+        background: radial-gradient(circle at bottom right, #f00, #000);
+      }
+      .at-center {
+        background: radial-gradient(circle at 25% 75%, #f00, #000);
+      }
+      .at-px {
+        background: radial-gradient(circle at 30px 30px, #f00, #000);
+      }
+
+      /* size */
+      .closest-side {
+        background: radial-gradient(circle closest-side, #f00, #000);
+      }
+      .farthest-corner {
+        background: radial-gradient(circle farthest-corner, #f00, #000);
+      }
+      .closest-corner {
+        background: radial-gradient(circle closest-corner at 25% 25%, #f00, #000);
+      }
+      .explicit-radius {
+        background: radial-gradient(circle 40px, #f00, #000);
+      }
+      .ellipse-radii {
+        background: radial-gradient(ellipse 80px 30px at center, #f00, #000);
+      }
+
+      /* stacked */
       .stacked {
         background-color: #000;
         background-image: radial-gradient(
@@ -55,12 +94,52 @@
   <body>
     <div class="grid">
       <div>
-        <div class="label">simple (2 stops)</div>
-        <div class="rect simple">simple</div>
+        <div class="label">circle</div>
+        <div class="rect circle">circle</div>
       </div>
       <div>
-        <div class="label">multi-stop (4 colors)</div>
+        <div class="label">ellipse</div>
+        <div class="rect ellipse">ellipse</div>
+      </div>
+      <div>
+        <div class="label">multi-stop</div>
         <div class="rect multi-stop">multi-stop</div>
+      </div>
+      <div>
+        <div class="label">at top left</div>
+        <div class="rect at-top-left">at top left</div>
+      </div>
+      <div>
+        <div class="label">at bottom right</div>
+        <div class="rect at-bottom-right">at bottom right</div>
+      </div>
+      <div>
+        <div class="label">at 25% 75%</div>
+        <div class="rect at-center">at 25% 75%</div>
+      </div>
+      <div>
+        <div class="label">at 30px 30px</div>
+        <div class="rect at-px">at 30px</div>
+      </div>
+      <div>
+        <div class="label">closest-side</div>
+        <div class="rect closest-side">closest-side</div>
+      </div>
+      <div>
+        <div class="label">farthest-corner</div>
+        <div class="rect farthest-corner">farthest-corner</div>
+      </div>
+      <div>
+        <div class="label">closest-corner @ 25% 25%</div>
+        <div class="rect closest-corner">closest-corner</div>
+      </div>
+      <div>
+        <div class="label">circle 40px</div>
+        <div class="rect explicit-radius">circle 40px</div>
+      </div>
+      <div>
+        <div class="label">ellipse 80px 30px</div>
+        <div class="rect ellipse-radii">ellipse 80×30</div>
       </div>
       <div>
         <div class="label">stacked on solid bg</div>

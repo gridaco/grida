@@ -1295,7 +1295,10 @@ fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
         }
         GenericImage::Gradient(gradient) => match gradient.as_ref() {
             GenericGradient::Linear {
-                direction, items, ..
+                direction,
+                items,
+                flags,
+                ..
             } => {
                 let stops = gradient_items_to_stops(items);
                 if stops.is_empty() {
@@ -1305,21 +1308,46 @@ fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
                 Some(StyleImage::LinearGradient(LinearGradient {
                     angle_deg,
                     stops,
+                    repeating: is_repeating(flags),
                 }))
             }
-            GenericGradient::Radial { items, .. } => {
+            GenericGradient::Radial {
+                shape,
+                position,
+                items,
+                flags,
+                ..
+            } => {
                 let stops = gradient_items_to_stops(items);
                 if stops.is_empty() {
                     return None;
                 }
-                Some(StyleImage::RadialGradient(RadialGradient { stops }))
+                let (rshape, rsize) = extract_radial_shape(shape);
+                Some(StyleImage::RadialGradient(RadialGradient {
+                    shape: rshape,
+                    size: rsize,
+                    center: extract_gradient_position(position),
+                    stops,
+                    repeating: is_repeating(flags),
+                }))
             }
-            GenericGradient::Conic { items, .. } => {
+            GenericGradient::Conic {
+                angle,
+                position,
+                items,
+                flags,
+                ..
+            } => {
                 let stops = conic_gradient_items_to_stops(items);
                 if stops.is_empty() {
                     return None;
                 }
-                Some(StyleImage::ConicGradient(ConicGradient { stops }))
+                Some(StyleImage::ConicGradient(ConicGradient {
+                    from_angle_deg: angle.degrees(),
+                    center: extract_gradient_position(position),
+                    stops,
+                    repeating: is_repeating(flags),
+                }))
             }
         },
         _ => None,
@@ -1426,6 +1454,74 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
     }
 
     layers
+}
+
+fn is_repeating(flags: &style::values::generics::image::GradientFlags) -> bool {
+    use style::values::generics::image::GradientFlags;
+    flags.contains(GradientFlags::REPEATING)
+}
+
+/// Convert Stylo's ending shape (radial shape + size) into our split form.
+fn extract_radial_shape(
+    shape: &style::values::computed::image::EndingShape,
+) -> (RadialShape, RadialSize) {
+    use style::values::computed::image::EndingShape;
+    use style::values::generics::image::{Circle, Ellipse, ShapeExtent};
+
+    fn size_from_extent(e: ShapeExtent) -> RadialSize {
+        match e {
+            ShapeExtent::ClosestSide | ShapeExtent::Contain => RadialSize::ClosestSide,
+            ShapeExtent::ClosestCorner => RadialSize::ClosestCorner,
+            ShapeExtent::FarthestSide => RadialSize::FarthestSide,
+            ShapeExtent::FarthestCorner | ShapeExtent::Cover => RadialSize::FarthestCorner,
+        }
+    }
+
+    match shape {
+        EndingShape::Circle(c) => {
+            let size = match c {
+                Circle::Radius(r) => {
+                    let px = r.0.px();
+                    RadialSize::Explicit {
+                        x: CssLength::Px(px),
+                        y: CssLength::Px(px),
+                    }
+                }
+                Circle::Extent(e) => size_from_extent(*e),
+            };
+            (RadialShape::Circle, size)
+        }
+        EndingShape::Ellipse(e) => {
+            let size = match e {
+                Ellipse::Radii(rx, ry) => RadialSize::Explicit {
+                    x: length_percentage_to_css(&rx.0),
+                    y: length_percentage_to_css(&ry.0),
+                },
+                Ellipse::Extent(ex) => size_from_extent(*ex),
+            };
+            (RadialShape::Ellipse, size)
+        }
+    }
+}
+
+fn extract_gradient_position(
+    pos: &style::values::computed::Position,
+) -> GradientPosition {
+    GradientPosition {
+        x: length_percentage_to_css(&pos.horizontal),
+        y: length_percentage_to_css(&pos.vertical),
+    }
+}
+
+/// Map a Stylo `LengthPercentage` → our `CssLength`.
+fn length_percentage_to_css(lp: &style::values::computed::LengthPercentage) -> CssLength {
+    if let Some(len) = lp.to_length() {
+        CssLength::Px(len.px())
+    } else if let Some(pct) = lp.to_percentage() {
+        CssLength::Percent(pct.0)
+    } else {
+        CssLength::Auto
+    }
 }
 
 /// Extract the CSS gradient angle in degrees.

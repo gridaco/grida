@@ -417,26 +417,77 @@ pub enum BackgroundLayer {
     Image(StyleImage),
 }
 
-/// CSS `linear-gradient()`.
+/// CSS `linear-gradient()` / `repeating-linear-gradient()`.
 #[derive(Debug, Clone)]
 pub struct LinearGradient {
     /// Angle in CSS degrees (0 = to top, 90 = to right, 180 = to bottom).
     pub angle_deg: f32,
     pub stops: Vec<GradientStop>,
+    pub repeating: bool,
 }
 
-/// CSS `radial-gradient()`.
+/// CSS `radial-gradient()` / `repeating-radial-gradient()`.
 #[derive(Debug, Clone)]
 pub struct RadialGradient {
+    pub shape: RadialShape,
+    pub size: RadialSize,
+    pub center: GradientPosition,
     pub stops: Vec<GradientStop>,
-    // TODO: shape (circle/ellipse), size, position
+    pub repeating: bool,
 }
 
-/// CSS `conic-gradient()`.
+/// CSS `conic-gradient()` / `repeating-conic-gradient()`.
 #[derive(Debug, Clone)]
 pub struct ConicGradient {
+    /// `from <angle>` — CSS degrees measured clockwise from 12 o'clock.
+    /// 0 = top (default). Paint-time conversion adjusts for Skia's +x origin.
+    pub from_angle_deg: f32,
+    pub center: GradientPosition,
     pub stops: Vec<GradientStop>,
-    // TODO: from angle, at position
+    pub repeating: bool,
+}
+
+/// Radial gradient shape.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum RadialShape {
+    Circle,
+    /// CSS default when shape omitted.
+    #[default]
+    Ellipse,
+}
+
+/// Radial gradient extent.
+///
+/// `Explicit` carries radii resolved at paint time (percent against box size).
+/// For circles, only `x` is meaningful (parser guarantees `y == x`).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum RadialSize {
+    ClosestSide,
+    ClosestCorner,
+    FarthestSide,
+    /// CSS default when size omitted.
+    #[default]
+    FarthestCorner,
+    Explicit {
+        x: CssLength,
+        y: CssLength,
+    },
+}
+
+/// Center of a radial or conic gradient. CSS default is `50% 50%`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GradientPosition {
+    pub x: CssLength,
+    pub y: CssLength,
+}
+
+impl Default for GradientPosition {
+    fn default() -> Self {
+        Self {
+            x: CssLength::Percent(0.5),
+            y: CssLength::Percent(0.5),
+        }
+    }
 }
 
 /// A gradient color stop.

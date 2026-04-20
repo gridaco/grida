@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Repeating Gradients</title>
+    <!--
+      NOTE: stops use % (not px). Px-unit stops in repeating gradients are
+      not yet supported — they auto-distribute to 0..100% and the cycle
+      fraction collapses to 1.0 (no tiling). Fix requires preserving raw
+      stop positions through the data model (StopPosition::{Px, Percent}).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .rect {
+        width: 180px;
+        height: 180px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #000;
+      }
+
+      /* repeating-linear — 5 red/white stripes across the gradient line */
+      .rep-linear-h {
+        background: repeating-linear-gradient(
+          90deg,
+          #f00 0 10%,
+          #fff 10% 20%
+        );
+      }
+      .rep-linear-diag {
+        background: repeating-linear-gradient(
+          45deg,
+          #14a 0 10%,
+          #fff 10% 20%
+        );
+      }
+
+      /* repeating-radial — 5 concentric rings */
+      .rep-radial {
+        background: repeating-radial-gradient(
+          circle,
+          #f00 0 10%,
+          #fff 10% 20%
+        );
+      }
+
+      /* repeating-conic — 6 segments */
+      .rep-conic {
+        background: repeating-conic-gradient(
+          #f00 0 30deg,
+          #fff 30deg 60deg
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">repeating-linear 90deg (10% cycle)</div>
+        <div class="rect rep-linear-h">stripes</div>
+      </div>
+      <div>
+        <div class="label">repeating-linear 45deg</div>
+        <div class="rect rep-linear-diag">diagonal</div>
+      </div>
+      <div>
+        <div class="label">repeating-radial (10% cycle)</div>
+        <div class="rect rep-radial">rings</div>
+      </div>
+      <div>
+        <div class="label">repeating-conic (60deg cycle)</div>
+        <div class="rect rep-conic">pinwheel</div>
+      </div>
+    </div>
+  </body>
+</html>

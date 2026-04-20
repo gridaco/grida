@@ -441,7 +441,10 @@ fn paint_replaced(
 // ─── Gradient shaders ────────────────────────────────────────────────
 
 use skia_safe::gradient_shader::{Gradient, GradientColors, Interpolation};
-use skia_safe::scalar;
+use skia_safe::{Point, TileMode};
+
+use super::style::{GradientPosition, RadialShape, RadialSize};
+use super::types::CssLength;
 
 fn build_gradient_data(stops: &[GradientStop]) -> (Vec<skia_safe::Color4f>, Vec<f32>) {
     let colors: Vec<skia_safe::Color4f> = stops
@@ -459,11 +462,118 @@ fn build_gradient_data(stops: &[GradientStop]) -> (Vec<skia_safe::Color4f>, Vec<
     (colors, positions)
 }
 
-fn make_gradient<'a>(colors: &'a [skia_safe::Color4f], positions: &'a [f32]) -> Gradient<'a> {
+/// Resolve a `CssLength` against an axis length (width or height) to pixels.
+/// `Auto` is not expected for gradient position/size — falls back to `fallback`.
+fn resolve_length(len: CssLength, axis: f32, fallback: f32) -> f32 {
+    match len {
+        CssLength::Px(px) => px,
+        CssLength::Percent(pct) => pct * axis,
+        CssLength::Auto => fallback,
+    }
+}
+
+fn resolve_center(pos: &GradientPosition, w: f32, h: f32) -> (f32, f32) {
+    (
+        resolve_length(pos.x, w, w / 2.0),
+        resolve_length(pos.y, h, h / 2.0),
+    )
+}
+
+/// If `repeating`, rescale stop positions so one cycle spans 0..1 and return
+/// `(scaled_positions, cycle)`. For non-repeating, `cycle = 1.0` and positions
+/// pass through unchanged. Callers multiply `cycle` into their gradient extent
+/// (line length / radius / sweep angle) to shrink a non-repeating gradient
+/// down to a single repeating unit.
+///
+/// The cycle is the last stop offset, floored at `1e-6` to avoid division by
+/// zero on degenerate input (e.g. all stops at position 0).
+fn repeat_scale(positions: Vec<f32>, repeating: bool) -> (Vec<f32>, f32) {
+    if !repeating {
+        return (positions, 1.0);
+    }
+    let cycle = positions.iter().copied().fold(0f32, f32::max).max(1e-6);
+    let scaled = positions.iter().map(|p| p / cycle).collect();
+    (scaled, cycle)
+}
+
+fn make_gradient<'a>(
+    colors: &'a [skia_safe::Color4f],
+    positions: &'a [f32],
+    tile: TileMode,
+) -> Gradient<'a> {
     Gradient::new(
-        GradientColors::new(colors, Some(positions), skia_safe::TileMode::Clamp, None),
+        GradientColors::new(colors, Some(positions), tile, None),
         Interpolation::default(),
     )
+}
+
+fn tile_mode(repeating: bool) -> TileMode {
+    if repeating {
+        TileMode::Repeat
+    } else {
+        TileMode::Clamp
+    }
+}
+
+/// Resolve radial ending-shape radii to paint-space (rx, ry) in pixels.
+///
+/// CSS `<radial-extent>` keywords are defined per the spec:
+///   * side distances are signed offsets from the center to each box edge.
+///   * corner distance is sqrt(hside² + vside²).
+///   * For ellipse-corner, the ellipse keeps the aspect ratio of the side
+///     pair and passes through the target corner, which means `k = √2`
+///     scaling of the side distances.
+fn radial_radii(
+    shape: RadialShape,
+    size: RadialSize,
+    cx: f32,
+    cy: f32,
+    w: f32,
+    h: f32,
+) -> (f32, f32) {
+    if let RadialSize::Explicit { x, y } = size {
+        return (
+            resolve_length(x, w, w / 2.0).max(1e-6),
+            resolve_length(y, h, h / 2.0).max(1e-6),
+        );
+    }
+
+    let cs_x = cx.min(w - cx).abs();
+    let fs_x = cx.max(w - cx).abs();
+    let cs_y = cy.min(h - cy).abs();
+    let fs_y = cy.max(h - cy).abs();
+
+    let (rx, ry) = match (shape, size) {
+        (RadialShape::Circle, RadialSize::ClosestSide) => {
+            let r = cs_x.min(cs_y);
+            (r, r)
+        }
+        (RadialShape::Circle, RadialSize::FarthestSide) => {
+            let r = fs_x.max(fs_y);
+            (r, r)
+        }
+        (RadialShape::Circle, RadialSize::ClosestCorner) => {
+            let r = (cs_x * cs_x + cs_y * cs_y).sqrt();
+            (r, r)
+        }
+        (RadialShape::Circle, RadialSize::FarthestCorner) => {
+            let r = (fs_x * fs_x + fs_y * fs_y).sqrt();
+            (r, r)
+        }
+        (RadialShape::Ellipse, RadialSize::ClosestSide) => (cs_x, cs_y),
+        (RadialShape::Ellipse, RadialSize::FarthestSide) => (fs_x, fs_y),
+        (RadialShape::Ellipse, RadialSize::ClosestCorner) => {
+            let k = std::f32::consts::SQRT_2;
+            (cs_x * k, cs_y * k)
+        }
+        (RadialShape::Ellipse, RadialSize::FarthestCorner) => {
+            let k = std::f32::consts::SQRT_2;
+            (fs_x * k, fs_y * k)
+        }
+        // Explicit handled above.
+        _ => unreachable!(),
+    };
+    (rx.max(1e-6), ry.max(1e-6))
 }
 
 fn build_linear_gradient_shader(
@@ -471,7 +581,7 @@ fn build_linear_gradient_shader(
     w: f32,
     h: f32,
 ) -> Option<skia_safe::Shader> {
-    let (colors, positions) = build_gradient_data(&grad.stops);
+    let (colors, raw_positions) = build_gradient_data(&grad.stops);
     if colors.len() < 2 {
         return None;
     }
@@ -482,12 +592,18 @@ fn build_linear_gradient_shader(
     let cos = rad.cos();
     let cx = w / 2.0;
     let cy = h / 2.0;
-    // Half-length covers the box diagonal
+    // Half-length covers the projected extent of the box along the gradient line.
     let half_len = (w * sin.abs() + h * cos.abs()) / 2.0;
-    let p1 = skia_safe::Point::new(cx - sin * half_len, cy + cos * half_len);
-    let p2 = skia_safe::Point::new(cx + sin * half_len, cy - cos * half_len);
+    let p1 = Point::new(cx - sin * half_len, cy + cos * half_len);
+    let p2_full = Point::new(cx + sin * half_len, cy - cos * half_len);
 
-    let gradient = make_gradient(&colors, &positions);
+    let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
+    let p2 = Point::new(
+        p1.x + cycle * (p2_full.x - p1.x),
+        p1.y + cycle * (p2_full.y - p1.y),
+    );
+
+    let gradient = make_gradient(&colors, &positions, tile_mode(grad.repeating));
     skia_safe::shaders::linear_gradient((p1, p2), &gradient, None)
 }
 
@@ -496,34 +612,51 @@ fn build_radial_gradient_shader(
     w: f32,
     h: f32,
 ) -> Option<skia_safe::Shader> {
-    let (colors, positions) = build_gradient_data(&grad.stops);
+    let (colors, raw_positions) = build_gradient_data(&grad.stops);
     if colors.len() < 2 {
         return None;
     }
 
-    let matrix = skia_safe::Matrix::scale((w, h));
-    let gradient = make_gradient(&colors, &positions);
-    skia_safe::shaders::radial_gradient(
-        (skia_safe::Point::new(0.5, 0.5), 0.5 as scalar),
-        &gradient,
-        Some(&matrix),
-    )
+    let (cx, cy) = resolve_center(&grad.center, w, h);
+    let (rx_full, ry_full) = radial_radii(grad.shape, grad.size, cx, cy, w, h);
+
+    let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
+    let (rx, ry) = (rx_full * cycle, ry_full * cycle);
+
+    // Unit-radius radial at origin; local matrix maps shader → paint space:
+    // (shader point p) → (cx + rx·p.x, cy + ry·p.y). Works for circles and
+    // ellipses uniformly.
+    let mut matrix = skia_safe::Matrix::scale((rx, ry));
+    matrix.post_translate((cx, cy));
+
+    let gradient = make_gradient(&colors, &positions, tile_mode(grad.repeating));
+    skia_safe::shaders::radial_gradient((Point::new(0.0, 0.0), 1.0), &gradient, Some(&matrix))
 }
 
 fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<skia_safe::Shader> {
-    let (colors, positions) = build_gradient_data(&grad.stops);
+    let (colors, raw_positions) = build_gradient_data(&grad.stops);
     if colors.len() < 2 {
         return None;
     }
 
-    let matrix = skia_safe::Matrix::scale((w, h));
-    let gradient = make_gradient(&colors, &positions);
-    skia_safe::shaders::sweep_gradient(
-        skia_safe::Point::new(0.5, 0.5),
-        (0.0 as scalar, 360.0 as scalar),
-        &gradient,
-        Some(&matrix),
-    )
+    let (cx, cy) = resolve_center(&grad.center, w, h);
+
+    let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
+    let sweep_deg = 360.0 * cycle;
+
+    // CSS conic: stop 0 sits at `from` angle, measured from 12 o'clock (top),
+    // clockwise. Skia sweep_gradient: stop 0 sits at +x (3 o'clock).
+    // The mapping from CSS angle φ to Skia's atan2 angle θ is θ = φ − 90°,
+    // so start = from − 90° places stop 0 at the right CSS angle.
+    let start = grad.from_angle_deg - 90.0;
+    let end = start + sweep_deg;
+
+    // Always `Repeat`: `atan2` returns angles in (−π, π], so parts of the
+    // circle fall below a negative `start` under `Clamp` and collapse onto
+    // the first stop. For non-repeating conic the sweep still covers a full
+    // 360° cycle, so `Repeat` produces no visible tiling.
+    let gradient = make_gradient(&colors, &positions, TileMode::Repeat);
+    skia_safe::shaders::sweep_gradient(Point::new(cx, cy), (start, end), &gradient, None)
 }
 
 // ─── Border image painting (Chromium: NinePieceImagePainter) ────────
