@@ -929,14 +929,23 @@ impl Renderer {
             .borrow_mut()
             .invalidate_by_id(node_id);
 
+        // Invalidate per-node paint caches directly. We must NOT route
+        // through `mark_node_change_kind`: every `ChangeKind` variant
+        // with a dirty signal triggers an `apply_changes` branch that
+        // rebuilds `LayerList` from the scene graph (`rebuild_scene_caches`
+        // for Full, `rebuild_geometry_and_layers_partial` for Layout,
+        // `rebuild_layer_vec` for Paint). The rebuild reads `node.text`
+        // from the graph — during an editing session the node still holds
+        // the pre-session text, so the rebuild would overwrite the
+        // in-place layer edit we just did and revert the display to the
+        // stale node text.
+        self.scene_cache.picture.invalidate_node(node_id);
+        self.scene_cache.compositor.invalidate(&node_id);
+        self.compositor_atlas.free_node(&node_id);
+
         // Invalidate the pan image cache so mouse-move frames don't blit
         // stale content while text is being edited.
         self.pan_image_cache = None;
-
-        // Record the change. apply_changes() will handle per-node
-        // picture/compositor/atlas invalidation and viewport caches.
-        // Text edits change measured size → route through Full.
-        self.mark_node_change_kind(node_id, super::invalidation::ChangeKind::Full);
     }
 
     /// Update the shape bounding rect for a text node's layer.
@@ -2084,6 +2093,29 @@ impl Renderer {
         }
 
         if has_data_changes && !global.scene_load {
+            // Promote Layout → Full for motion-dirty children of a
+            // Container: their position flows through `layout_result`
+            // (Leaf branch in `resolve_layout`), which the Layout fast
+            // path leaves stale. Mirrors the Container-motion
+            // promotion in `diff_node` for the parent-side case.
+            // `InitialContainer`, Group, and BoolOp parents don't
+            // route through `layout_result` and don't need promotion.
+            if !dirty.geometry.is_empty() {
+                if let Some(scene) = self.scene.as_ref() {
+                    let schema_geo = scene.graph.geo_data();
+                    let dirty_layout = &mut dirty.layout;
+                    let geom = &self.scene_cache.geometry;
+                    dirty_layout.extend(dirty.geometry.iter().copied().filter(|id| {
+                        geom.get_entry(id)
+                            .and_then(|e| e.parent)
+                            .and_then(|pid| schema_geo.get(&pid))
+                            .is_some_and(|g| {
+                                matches!(g.kind, crate::node::scene_graph::GeoNodeKind::Container)
+                            })
+                    }));
+                }
+            }
+
             let needs_layout = global.layout
                 || global.font_loaded
                 || !dirty.layout.is_empty()
@@ -2105,6 +2137,20 @@ impl Renderer {
                     );
                 }
                 self.rebuild_scene_caches();
+
+                // Pictures are recorded against each node's world
+                // bounds. When an ancestor's transform changes, every
+                // descendant's cached picture is stale. The Layout
+                // fast path widens `paint_touched` via the `affected`
+                // set; do the equivalent here for the Full path.
+                if let Some(scene) = self.scene.as_ref() {
+                    for root in dirty.layout.iter().chain(dirty.geometry.iter()) {
+                        dirty.paint_touched.insert(*root);
+                        if let Ok(desc) = scene.graph.descendants(root) {
+                            dirty.paint_touched.extend(desc);
+                        }
+                    }
+                }
             } else if needs_geometry {
                 // Layout fast path (ChangeKind::Layout): per-subtree
                 // geometry-cache update + partial layer/R-tree patch.

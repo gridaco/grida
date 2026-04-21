@@ -266,6 +266,54 @@ export class Scene {
   }
 
   /**
+   * Atomically replace a parent's entire children list.
+   *
+   * This is the single structural-mutation primitive. It covers every
+   * structural edit the host can express in terms of "parent P now has
+   * these children, in this order":
+   *
+   * - **Reorder**: same set, different order.
+   * - **Reparent**: emit two calls — one for the old parent (child
+   *   removed), one for the new parent (child inserted at the target
+   *   index).
+   * - **Insert new node**: first `replaceNode(bytes)` to deliver the
+   *   node data, then `syncLinks(parent, [...existing, new_id])` to
+   *   link it into the tree.
+   * - **Remove from tree**: `syncLinks(parent, [...without_id])`, then
+   *   `deleteNode(id)` to dispose.
+   *
+   * The call is atomic: the scene graph's cycle / duplicate / unknown-id
+   * checks run before any mutation, and the graph is unchanged on
+   * failure. On success, the renderer invalidates just the affected
+   * subtrees (the parent, any nodes that entered, and any nodes' old
+   * parents) — not a full re-encode.
+   *
+   * Returns `false` if the parent id is unknown, any child id is
+   * unknown, or the edit would create a cycle. Node ids must not
+   * contain the `\n` character (used as the wire delimiter).
+   */
+  syncLinks(parentId: string, childrenIds: readonly string[]): boolean {
+    this._assertAlive();
+    const [pPtr, pLen] = this._alloc_string(parentId);
+    // Wire format: children ids joined by '\n'. Empty array → empty
+    // buffer (unlinks all children). The Rust side tolerates leading /
+    // trailing newlines so callers don't have to care.
+    const childrenBlob = childrenIds.join("\n");
+    const [cPtr, cLen] =
+      childrenBlob.length === 0 ? [0, 0] : this._alloc_string(childrenBlob);
+    const ok = this.module._sync_links(
+      this.appptr,
+      pPtr,
+      pLen - 1,
+      cPtr,
+      cLen === 0 ? 0 : cLen - 1
+    );
+    this._free_string(pPtr, pLen);
+    if (cLen !== 0) this._free_string(cPtr, cLen);
+    return ok;
+  }
+
+  /**
    * @deprecated - test use only
    */
   loadDummyScene() {

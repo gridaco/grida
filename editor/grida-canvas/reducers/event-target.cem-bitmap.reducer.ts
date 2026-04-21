@@ -59,7 +59,7 @@ export function prepare_bitmap_node(
       version: 0,
     };
 
-    self_try_insert_node(draft, parent, bitmap);
+    self_try_insert_node(draft, parent, bitmap, context);
 
     const node = dq.__getNodeById(
       draft,

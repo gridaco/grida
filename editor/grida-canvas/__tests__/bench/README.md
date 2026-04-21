@@ -84,24 +84,23 @@ enables collection globally with zero overhead when off.
 
 ## How sync routing works
 
-The `__wasm_on_document_change` subscriber does **not** inspect Immer
-patches to pick a sync strategy. Routing is driven by a first-class
-`Effect` type (`grida-canvas/sync.ts`) the reducer returns alongside the
-new state:
+Every dispatch produces an `OpLog` (`grida-canvas/sync.ts`) that the
+`__wasm_on_document_change` subscriber applies 1:1 against the WASM
+scene. Ops are emitted from two observation channels during the
+reducer recipe:
 
-- `none` — selection / marquee / hover only; the subscriber no-ops.
-- `nodes` — bounded set of node ids whose props changed or were
-  removed; the subscriber calls `replaceNode` / `deleteNode`
-  (`dispatch.wasm.per_node_sync`).
-- `structural` — scene graph / links / bitmaps / properties changed;
-  the subscriber re-encodes the whole scene
-  (`dispatch.wasm.sync_document`).
+- `replace_node` / `delete_node` — lifted from Immer patches at
+  `document.nodes[id]` by `appendPatchOps`.
+- `sync_links` / `delete_node` — emitted by the tracked-`Graph`
+  wrapper on every structural mutation (`mv`, `rm`, `unlink`,
+  `order`, `import`).
 
-Both the Immer path (via `effectFromPatches(patches)`) and the mutable
-bypass path (via `effectForBypassAction(state, action)`) produce the
-same Effect protocol, so the hot gesture loop — which uses the bypass
-and emits **no patches** — still routes through the fast per-node sync
-instead of silently falling back to a full re-encode. Regressions are
+A `full_resync` op is only produced when patches touch a
+`document.*` field that has no dedicated observation channel (e.g.
+`document.bitmaps`). The subscriber applies non-`full_resync` batches
+via `Scene.replaceNode` / `Scene.deleteNode` / `Scene.syncLinks`
+(`dispatch.wasm.op_apply`) and only re-encodes the whole scene
+(`dispatch.wasm.sync_document`) on `full_resync`. Regressions are
 guarded by span-count invariants in
 [`perf-editor.test.ts`](./perf-editor.test.ts) ("routing invariants").
 

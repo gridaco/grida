@@ -4,7 +4,7 @@
  * These tests exercise the **real WASM sync path** through
  * `Editor.mountHeadless()`, so numbers attribute to the same spans
  * the browser trace shows (`dispatch.wasm.sync_document.*`,
- * `dispatch.wasm.per_node_sync`, `dispatch.reducer`, etc).
+ * `dispatch.wasm.op_apply`, `dispatch.reducer`, etc).
  *
  * Opt-in instrumentation:
  *

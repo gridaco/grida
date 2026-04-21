@@ -105,11 +105,22 @@ User action (click, drag, keystroke)
   → dispatch(action, recording)
     → Immer produceWithPatches(state, draft => { ... })
       → sub-reducers (document, event-target, surface)
+      → tracked-Graph wrapper emits sync_links / delete_node ops
+    → appendPatchOps(patches, buffer) lifts document.nodes patches
+      into replace_node / delete_node ops
     → history.record(patches)
     → postDispatchHooks
-    → emit(action, patches)
+    → emit(action, patches, opLog)
+      → __wasm_on_document_change applies opLog 1:1 to WASM
       → React selectors + equality checks
 ```
+
+The op-log produced during the recipe is the single WASM-sync channel.
+Structural edges come from the tracked-`Graph` wrapper; node-property
+changes are lifted from Immer patches via `appendPatchOps`. The
+subscriber applies ops directly (`Scene.replaceNode` /
+`Scene.deleteNode` / `Scene.syncLinks`) or falls back to a full
+re-encode only when the batch contains a `full_resync` op.
 
 ### Performance-Sensitive Operation Categories
 
@@ -187,10 +198,14 @@ in category order rather than by specific name:
    spikes into hundreds of ms as the tree grows.
 3. **Document snapshot** — deep-clone at gesture boundaries; pays
    twice per gesture (start + end).
-4. **WASM sync (full reload vs. patch path)** — compare the full-reload
-   span count against the patch-path span count. If the full reload
-   fires for every dispatch and the patch path rarely fires, too many
-   actions are routing through the slow path.
+4. **WASM sync (full reload vs. op-apply)** — compare
+   `dispatch.wasm.sync_document` (full reload) against
+   `dispatch.wasm.op_apply` (per-op replay). If the full reload fires
+   for every dispatch and op_apply rarely fires, too many actions are
+   routing through the slow path — usually a missing observation
+   channel that forces `full_resync` (e.g. a mutation under
+   `document.*` outside `document.nodes[id]` that no tracked channel
+   covers).
 5. **Gesture / query compute** — snap targets, hover ray, tree
    traversal. Usually small but can dominate at high selection count.
 

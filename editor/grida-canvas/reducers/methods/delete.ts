@@ -6,13 +6,16 @@ import { self_select_cursor_tool } from "./tool";
 import tree from "@grida/tree";
 import assert from "assert";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
+import { createTrackedGraph } from "../utils/tracked-graph";
+import type { ReducerContext } from "..";
 
 /**
  * @returns if the node is handled (removed or deactivated)
  */
 export function self_try_remove_node<S extends editor.state.IEditorState>(
   draft: Draft<S>,
-  node_id: string
+  node_id: string,
+  context: ReducerContext
 ): boolean {
   assert(draft.scene_id, "scene_id is not set");
   const scene = draft.document.nodes[
@@ -40,9 +43,9 @@ export function self_try_remove_node<S extends editor.state.IEditorState>(
   }
 
   // Use tree.graph.Graph - mutates draft.document directly (scene is now a node!)
-  const graphInstance = new tree.graph.Graph(
-    draft.document,
-    EDITOR_GRAPH_POLICY
+  const graphInstance = createTrackedGraph(
+    new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
+    context.mutation_buffer
   );
 
   // Remove node and its subtree (mutates draft.document directly)

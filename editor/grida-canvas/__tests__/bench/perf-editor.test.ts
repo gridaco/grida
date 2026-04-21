@@ -512,14 +512,14 @@ describe.skipIf(!HAS_BENCH_GRIDA)("perf-editor: bench.grida", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Routing invariants — guard the Effect protocol against regressions.
+// Routing invariants — guard op-log routing against regressions.
 //
-// These tests do not measure *time*; they measure which WASM sync path was
-// taken per dispatch. A regression that silently reintroduces a full
-// document re-encode on the hot path (e.g. by breaking the bypass / Effect
-// wiring) is invisible to wall-clock microbenches because the reduced
-// throughput hides in averages — but the span counts change by an order of
-// magnitude. Asserting on them catches it immediately.
+// These tests measure which WASM sync path each dispatch takes, not wall
+// time. A regression that silently routes hot-path dispatches through
+// the full document re-encode path (`dispatch.wasm.sync_document`)
+// instead of the op-apply path (`dispatch.wasm.op_apply`) is invisible
+// in wall-clock microbenches — throughput hides it in averages — but the
+// span counts change by an order of magnitude and catch it immediately.
 // ---------------------------------------------------------------------------
 
 function countSpans(label: string): number {
@@ -543,7 +543,7 @@ describe("perf-editor: routing invariants", () => {
 
   test("node/change/* dispatches route through per-node sync", () => {
     const before = countSpans("dispatch.wasm.sync_document");
-    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const beforePerNode = countSpans("dispatch.wasm.op_apply");
     const N = 10;
     for (let i = 0; i < N; i++) {
       h.ed.doc.dispatch(
@@ -556,12 +556,12 @@ describe("perf-editor: routing invariants", () => {
       );
     }
     expect(countSpans("dispatch.wasm.sync_document") - before).toBe(0);
-    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(N);
+    expect(countSpans("dispatch.wasm.op_apply") - beforePerNode).toBe(N);
   });
 
   test("pointer-move (no raycast) emits EFFECT_NONE (neither sync path fires)", () => {
     const beforeFull = countSpans("dispatch.wasm.sync_document");
-    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const beforePerNode = countSpans("dispatch.wasm.op_apply");
     const N = 10;
     for (let i = 0; i < N; i++) {
       h.ed.doc.dispatch(
@@ -574,7 +574,7 @@ describe("perf-editor: routing invariants", () => {
       );
     }
     expect(countSpans("dispatch.wasm.sync_document") - beforeFull).toBe(0);
-    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(0);
+    expect(countSpans("dispatch.wasm.op_apply") - beforePerNode).toBe(0);
   });
 
   test("drag per-frame does not fall back to full sync_document", async () => {
@@ -589,7 +589,7 @@ describe("perf-editor: routing invariants", () => {
     );
 
     const before = countSpans("dispatch.wasm.sync_document");
-    const beforePerNode = countSpans("dispatch.wasm.per_node_sync");
+    const beforePerNode = countSpans("dispatch.wasm.op_apply");
     const N = 10;
     for (let i = 1; i <= N; i++) {
       h.ed.doc.dispatch(
@@ -611,11 +611,16 @@ describe("perf-editor: routing invariants", () => {
       { recording: "end-gesture" }
     );
 
-    // Per-frame drag MUST route through per_node_sync. A regression here
-    // means the bypass/Effect wiring broke and the hot path is re-encoding
-    // the whole document every frame — which pushes 60fps drag past the
-    // frame budget at 10K+ nodes.
+    // Per-frame drag MUST NOT fall back to full `sync_document` — that
+    // re-encodes the whole scene every frame and blows the 60fps budget
+    // at 10K+ nodes. Each frame that produces a position delta emits
+    // one `op_apply`; snap/quantize can suppress a handful, but a
+    // regression that routes most frames off the op-apply path (e.g.
+    // via `full_resync` batch collapse) drops the count to near zero.
+    // `>= N/2` catches that while tolerating normal snap/quantize slop.
     expect(countSpans("dispatch.wasm.sync_document") - before).toBe(0);
-    expect(countSpans("dispatch.wasm.per_node_sync") - beforePerNode).toBe(N);
+    const opApplyCount = countSpans("dispatch.wasm.op_apply") - beforePerNode;
+    expect(opApplyCount).toBeGreaterThanOrEqual(Math.floor(N / 2));
+    expect(opApplyCount).toBeLessThanOrEqual(N);
   });
 });

@@ -1,5 +1,4 @@
-import type { Draft } from "immer";
-import { safeOriginal } from "./utils/immer";
+import { type Draft, original } from "immer";
 import { updateState } from "./utils/immer";
 
 import type {
@@ -184,7 +183,7 @@ function __self_evt_on_click(
         reportError(e);
       }
 
-      self_try_insert_node(draft, parent, nnode);
+      self_try_insert_node(draft, parent, nnode, context);
       self_select_cursor_tool(draft);
       self_selectNode(draft, "reset", nnode.id);
 
@@ -495,7 +494,7 @@ function __self_evt_on_drag_start(
         (nnode as grida.program.nodes.ContainerNode).fill = undefined;
       }
 
-      self_try_insert_node(draft, parent, nnode);
+      self_try_insert_node(draft, parent, nnode, context);
       self_select_tool(draft, { type: "cursor" }, context);
       self_selectNode(draft, "reset", nnode.id);
       __self_start_gesture_insert_and_resize_draw_new_node(draft, context, {
@@ -610,7 +609,7 @@ function __self_evt_on_drag(
   // Read from original to avoid proxying large objects (document.nodes,
   // gesture) until we know which branch we're in. Only access the draft
   // for actual writes.
-  const orig = safeOriginal(draft as Draft<editor.state.IEditorState>)!;
+  const orig = original(draft as Draft<editor.state.IEditorState>)!;
   const {
     event: { movement, delta },
   } = <EditorEventTarget_Drag>action;
@@ -1155,7 +1154,13 @@ function __before_end_insert_and_resize(
     if (id === pending.node_id) return;
     const rect = context.geometry.getNodeAbsoluteBoundingRect(id)!;
     if (cmath.rect.contains(container_rect, rect)) {
-      const moved = self_moveNode(draft, id, pending.node_id);
+      const moved = self_moveNode(
+        draft,
+        id,
+        pending.node_id,
+        undefined,
+        context
+      );
       if (!moved) return;
       const child = dq.__getNodeById(
         draft,

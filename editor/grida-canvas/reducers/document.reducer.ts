@@ -64,6 +64,7 @@ import type { ReducerContext } from ".";
 import cg from "@grida/cg";
 import vn from "@grida/vn";
 import tree from "@grida/tree";
+import { createTrackedGraph } from "./utils/tracked-graph";
 import { EDITOR_GRAPH_POLICY } from "@/grida-canvas/policy";
 import { generateKeyBetween } from "@grida/sequence";
 import "core-js/features/object/group-by";
@@ -186,7 +187,10 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return updateState(state, (draft) => {
         // Use Graph.rm() to remove scene and all its children
-        const graph = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
+        const graph = createTrackedGraph(
+          new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
+          context.mutation_buffer
+        );
         const __removed_ids = graph.rm(scene_id);
 
         // Remove from scenes_ref array
@@ -272,7 +276,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               prototype,
               () => context.idgen.next()
             );
-          self_insertSubDocument(draft, new_scene_id, sub);
+          self_insertSubDocument(draft, new_scene_id, sub, context);
         }
       });
     }
@@ -485,7 +489,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
         if (action.type === "cut") {
           target_node_ids.forEach((node_id) => {
-            self_try_remove_node(draft, node_id);
+            self_try_remove_node(draft, node_id, context);
           });
         }
       });
@@ -683,7 +687,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               }
             }
 
-            self_insertSubDocument(draft, parent, sub);
+            self_insertSubDocument(draft, parent, sub, context);
           }
         }
       });
@@ -778,7 +782,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
         const target_parent = target;
 
-        self_try_insert_node(draft, target_parent, node);
+        self_try_insert_node(draft, target_parent, node, context);
 
         self_select_tool(draft, { type: "cursor" }, context);
         self_selectNode(draft, "reset", node.id);
@@ -818,7 +822,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const target_node_ids = action.target;
 
       return updateState(state, (draft) => {
-        __self_delete_nodes(draft, target_node_ids, "on");
+        __self_delete_nodes(draft, target_node_ids, "on", context);
       });
     }
     case "insert": {
@@ -921,7 +925,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       }
 
       return updateState(state, (draft) => {
-        self_insertSubDocument(draft, parent, sub);
+        self_insertSubDocument(draft, parent, sub, context);
       });
     }
     case "order": {
@@ -929,7 +933,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
 
       return updateState(state, (draft) => {
         for (const node_id of target_node_ids) {
-          __self_order(draft, node_id, order);
+          __self_order(draft, node_id, order, context);
         }
       });
     }
@@ -937,7 +941,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { source, target, index } = action;
       return updateState(state, (draft) => {
         for (const node_id of source) {
-          self_moveNode(draft, node_id, target, index);
+          self_moveNode(draft, node_id, target, index, context);
         }
       });
       break;
@@ -1151,7 +1155,8 @@ export default function documentReducer<S extends editor.state.IEditorState>(
             __self_order(
               draft,
               node_id,
-              editor.a11y.a11y_direction_to_order[direction]
+              editor.a11y.a11y_direction_to_order[direction],
+              context
             );
           }
 
@@ -1375,7 +1380,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
           // [reorder children according to guessed layout]
           const ordered = lay.orders.map((i) => children[i]);
           ordered.forEach((child_id, index) => {
-            self_moveNode(draft, child_id, container_id, index);
+            self_moveNode(draft, child_id, container_id, index, context);
           });
 
           // [reset children position]
@@ -1479,13 +1484,14 @@ export default function documentReducer<S extends editor.state.IEditorState>(
               grida.program.nodes.factory.create_packed_scene_document_from_prototype(
                 container_prototype,
                 () => context.idgen.next()
-              )
+              ),
+              context
             )[0];
 
             // [move children to container]
             const ordered = layout.orders.map((i) => children[i]);
             ordered.forEach((child_id) => {
-              self_moveNode(draft, child_id, container_id);
+              self_moveNode(draft, child_id, container_id, undefined, context);
             });
 
             // [reset children position]
@@ -1546,7 +1552,7 @@ export default function documentReducer<S extends editor.state.IEditorState>(
       const { target } = action;
 
       return updateState(state, (draft) => {
-        self_ungroup(draft, target, context.geometry);
+        self_ungroup(draft, target, context.geometry, context);
       });
     }
     case "group-op": {
@@ -2295,10 +2301,10 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
   node.layout_inset_left! -= parent_rect.x;
   node.layout_inset_top! -= parent_rect.y;
 
-  self_try_insert_node(draft, parent_id, node);
-  __self_delete_nodes(draft, group, "on");
+  self_try_insert_node(draft, parent_id, node, context);
+  __self_delete_nodes(draft, group, "on", context);
   // Use scene_id instead of "<root>" since scenes are now nodes
-  self_moveNode(draft, id, parent_id ?? draft.scene_id!, order);
+  self_moveNode(draft, id, parent_id ?? draft.scene_id!, order, context);
 
   return id;
 }
@@ -2306,7 +2312,8 @@ function __flatten_group_with_union<S extends editor.state.IEditorState>(
 function __self_delete_nodes<S extends editor.state.IEditorState>(
   draft: Draft<S>,
   target_node_ids: string[],
-  scene_deletion_protection: "on" | "off" = "on"
+  scene_deletion_protection: "on" | "off",
+  context: ReducerContext
 ) {
   // Filter out scene nodes if protection is enabled
   // Scenes should only be deleted via the "scenes/delete" action, not through regular node deletion
@@ -2338,12 +2345,16 @@ function __self_delete_nodes<S extends editor.state.IEditorState>(
       // the deleting node cannot be.. in content edit mode
       node_id !== draft.content_edit_mode?.node_id
     ) {
-      self_try_remove_node(draft, node_id);
+      self_try_remove_node(draft, node_id, context);
     }
   }
 
   // Clean up empty boolean/group nodes after deletion
-  __self_post_hierarchy_change_commit(draft, Array.from(parent_ids_to_check));
+  __self_post_hierarchy_change_commit(
+    draft,
+    Array.from(parent_ids_to_check),
+    context
+  );
 }
 
 /**
@@ -2352,7 +2363,7 @@ function __self_delete_nodes<S extends editor.state.IEditorState>(
  */
 function __self_post_hierarchy_change_commit<
   S extends editor.state.IEditorState,
->(draft: Draft<S>, parent_ids_to_check: string[]) {
+>(draft: Draft<S>, parent_ids_to_check: string[], context: ReducerContext) {
   const nodes_to_check = new Set<string>(parent_ids_to_check);
 
   // Check each parent node to see if it's now empty
@@ -2367,7 +2378,7 @@ function __self_post_hierarchy_change_commit<
 
       if (children_refs?.length === 0) {
         // Remove the empty boolean/group node
-        self_try_remove_node(draft, parent_id);
+        self_try_remove_node(draft, parent_id, context);
 
         // Recursively check the parent of this removed node
         const grandparent_id = dq.getParentId(draft.document_ctx, parent_id);
@@ -2429,12 +2440,16 @@ function __self_delete_vector_network_selection(
 function __self_order(
   draft: Draft<editor.state.IEditorState>,
   node_id: string,
-  order: "back" | "front" | "backward" | "forward" | number
+  order: "back" | "front" | "backward" | "forward" | number,
+  context: ReducerContext
 ) {
   assert(draft.scene_id, "scene_id is required for order");
 
   // Use Graph.order() - mutates draft.document directly (scene is now a node!)
-  const graphData = new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY);
+  const graphData = createTrackedGraph(
+    new tree.graph.Graph(draft.document, EDITOR_GRAPH_POLICY),
+    context.mutation_buffer
+  );
   graphData.order(node_id, order);
 
   // Update context from graph's cached LUT

@@ -371,7 +371,8 @@ function __try_restore_vector_mode_original_node(
  * original primitive node that existed before entering the mode.
  */
 function __self_before_exit_content_edit_mode(
-  draft: Draft<editor.state.IEditorState>
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
 ) {
   const mode = draft.content_edit_mode;
 
@@ -390,7 +391,7 @@ function __self_before_exit_content_edit_mode(
         current.vector_network.segments.length < 1 ||
         current.vector_network.vertices.length < 2
       ) {
-        self_try_remove_node(draft, mode.node_id);
+        self_try_remove_node(draft, mode.node_id, context);
         break;
       }
 
@@ -406,7 +407,7 @@ function __self_before_exit_content_edit_mode(
       ) as grida.program.nodes.TextSpanNode;
       // when text is empty, remove that. - (when perfectly empty)
       if (typeof current.text === "string" && current.text === "") {
-        self_try_remove_node(draft, mode.node_id);
+        self_try_remove_node(draft, mode.node_id, context);
       }
       break;
     }
@@ -417,9 +418,10 @@ function __self_before_exit_content_edit_mode(
  * Attempts to exit the current content edit mode.
  */
 function __self_try_exit_content_edit_mode(
-  draft: Draft<editor.state.IEditorState>
+  draft: Draft<editor.state.IEditorState>,
+  context: ReducerContext
 ) {
-  __self_before_exit_content_edit_mode(draft);
+  __self_before_exit_content_edit_mode(draft, context);
   draft.content_edit_mode = undefined;
   self_revert_tool(draft);
 }
@@ -1011,7 +1013,7 @@ export default function surfaceReducer<S extends editor.state.IEditorState>(
         break;
       }
       case "surface/content-edit-mode/try-exit": {
-        __self_try_exit_content_edit_mode(draft);
+        __self_try_exit_content_edit_mode(draft, context);
         break;
       }
       case "surface/tool": {

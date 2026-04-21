@@ -1,11 +1,12 @@
 import type { Action, EditorAction } from "../action";
 import {
   enablePatches,
+  original,
   produceWithPatches,
   type Draft,
   type Patch,
 } from "immer";
-import { safeOriginal, updateState } from "./utils/immer";
+import { updateState } from "./utils/immer";
 import {
   self_update_gesture_transform,
   self_updateSurfaceHoverState,
@@ -14,15 +15,9 @@ import { self_clearSelection } from "./methods/select";
 import eventTargetReducer from "./event-target.reducer";
 import documentReducer from "./document.reducer";
 import grida from "@grida/schema";
-import type vn from "@grida/vn";
 import { editor } from "@/grida-canvas";
 import { perf } from "../perf";
-import {
-  EFFECT_NONE,
-  effectFromPatches,
-  effectNodes,
-  type Effect,
-} from "../sync";
+import { appendPatchOps, OpBuffer, type OpLog } from "../sync";
 
 enablePatches();
 
@@ -52,120 +47,22 @@ export type ReducerContext = {
     get(): editor.state.IMinimalDocumentState | null;
     set(snapshot: editor.state.IMinimalDocumentState | null): void;
   };
+
+  /** Per-dispatch op sink; reset before recipe, drained after. */
+  mutation_buffer: OpBuffer;
 };
 
-/**
- * Reducer output tuple.
- *
- * The 4th slot (`Effect`) is the authoritative signal the WASM subscriber
- * uses to decide between full re-encode, per-node replace, or skip. It is
- * **not** derived from `patches` at the subscriber — the bypass path
- * produces no patches but still mutates nodes, so routing from patches
- * alone silently falls back to full sync and defeats the bypass. See
- * `../sync.ts` for the protocol.
- */
 export type ReducerResult = [
   editor.state.IEditorState,
   Patch[],
   Patch[],
-  Effect,
+  OpLog,
 ];
-
-/**
- * Actions that enter the mutable-bypass branch. These are the gesture
- * hot-loop actions where Immer proxy/finalize overhead dominates — we
- * clone the specific state sub-objects they write to and run the recipe
- * directly on the clone. The bypass branch is also responsible for
- * producing an {@link Effect} that names the mutated nodes (since the
- * patches array it returns is always empty).
- */
-const BYPASS_ACTION_TYPES: ReadonlySet<Action["type"]> = new Set<
-  Action["type"]
->([
-  "event-target/event/on-drag",
-  "event-target/event/on-pointer-move",
-  "event-target/event/on-pointer-move-raycast",
-  "node/change/*",
-]);
-
-/** @internal Is this action eligible for the mutable bypass path? */
-export function canBypassImmer(action: Action): boolean {
-  return BYPASS_ACTION_TYPES.has(action.type);
-}
-
-/**
- * Compute the WASM-sync {@link Effect} for an action that took the
- * mutable-bypass path, by inspecting which node slots the bypass
- * cloned (and therefore may have mutated).
- *
- * Must stay aligned with the cloning strategy in the bypass branch —
- * every node slot we clone for mutation must appear in the effect.
- * The `scene_id` root is only reported for `guide` gestures (the only
- * gesture that actually writes to scene guides); all other clone-for-
- * safety cases on the scene root are no-ops on the wire since the
- * replacement bytes are identical.
- */
-function effectForBypassAction(
-  state: editor.state.IEditorState,
-  action: Action
-): Effect {
-  // Hover/raycast actions never mutate document.nodes[*]; they update
-  // pointer / hover / hit state only.
-  if (
-    action.type === "event-target/event/on-pointer-move" ||
-    action.type === "event-target/event/on-pointer-move-raycast"
-  ) {
-    return EFFECT_NONE;
-  }
-
-  if (action.type === "node/change/*") {
-    const nodeId = (action as { node_id: string }).node_id;
-    if (typeof nodeId !== "string") return EFFECT_NONE;
-    return effectNodes(new Set([nodeId]), new Set());
-  }
-
-  // event-target/event/on-drag — collect mutated node ids from gesture
-  // and content-edit-mode state. Mirrors the bypass clone logic below.
-  const replace = new Set<string>();
-  const gesture = state.gesture;
-  if (gesture.type !== "idle" && "selection" in gesture && gesture.selection) {
-    for (const id of gesture.selection) replace.add(id);
-  }
-  if (gesture.type === "draw") replace.add(gesture.node_id);
-  if (
-    (gesture.type === "sort" || gesture.type === "gap") &&
-    gesture.layout?.objects
-  ) {
-    for (const o of gesture.layout.objects) replace.add(o.id);
-  }
-  if (gesture.type === "brush") replace.add(gesture.node_id);
-  if (gesture.type === "guide" && state.scene_id) {
-    replace.add(state.scene_id);
-  }
-  const cem = state.content_edit_mode;
-  if (cem) replace.add(cem.node_id);
-  return effectNodes(replace, new Set());
-}
-
-/** Deep-clone a vector network so VectorNetworkEditor can mutate in-place. */
-function cloneVectorNetwork(network: vn.VectorNetwork): vn.VectorNetwork {
-  return {
-    vertices: network.vertices.map(
-      (v): vn.VectorNetworkVertex => [...v] as vn.VectorNetworkVertex
-    ),
-    segments: network.segments.map((s) => ({
-      ...s,
-      ta: [...s.ta] as [number, number],
-      tb: [...s.tb] as [number, number],
-    })),
-  };
-}
 
 export default function reducer(
   state: editor.state.IEditorState,
   action: Action,
-  context: ReducerContext,
-  opts?: { skipPatches?: boolean }
+  context: ReducerContext
 ): ReducerResult {
   if (
     state.debug &&
@@ -178,13 +75,14 @@ export default function reducer(
     context.logger?.("debug:action", action.type, action);
   }
 
+  // Reset the per-dispatch op buffer. Mutation sites push into it as
+  // they run; we drain it below to produce the dispatch's OpLog.
+  context.mutation_buffer.reset();
+
   const __perf_end = perf.start("reducer.immer_produce", {
     action_type: action.type,
   });
 
-  // When patches are not needed (recording: "silent"), use produce()
-  // instead of produceWithPatches(). produce() still creates proxies but
-  // skips the patch-generation bookkeeping.
   const recipe = (draft: Draft<editor.state.IEditorState>) => {
     switch (action.type) {
       case "__internal/webfonts#webfontList": {
@@ -253,7 +151,7 @@ export default function reducer(
     // first place. Currently, all reducers run freely and we revert the
     // document fields after the fact.
     if (!draft.editable) {
-      const orig = safeOriginal(draft)!;
+      const orig = original(draft)!;
       draft.document.nodes = orig.document.nodes as Draft<
         typeof orig.document.nodes
       >;
@@ -272,208 +170,18 @@ export default function reducer(
     }
   };
 
-  let nextState: editor.state.IEditorState;
-  let patches: Patch[];
-  let inversePatches: Patch[];
-
-  if (opts?.skipPatches) {
-    // ── Mutable bypass: skip Immer entirely ──
-    // Create a mutable clone of the state. The recipe runs on this clone
-    // directly — no proxies, no finalization. The clone IS the next state.
-    //
-    // Strategy: deep-clone everything EXCEPT `document.nodes` and
-    // `document.links` (which are large). For those, use shallow spread
-    // + targeted cloning of entries that will be mutated.
-    //
-    // structuredClone on the non-document parts is ~0.2ms (small objects).
-    // Spreading `nodes` (1K entries) and `links` (1K entries) is <0.01ms.
-    // Avoid spreading the entire nodes/links dicts (O(N) at 136K nodes).
-    // Instead, check if they're frozen. If already mutable (from a prior
-    // bypass dispatch), reuse them directly — only clone individual entries
-    // that will be written to.
-    const nodesFrozen = Object.isFrozen(state.document.nodes);
-    const mutableNodes = nodesFrozen
-      ? { ...state.document.nodes }
-      : state.document.nodes;
-
-    // Clone each node that's in the current selection so writes to
-    // layout_inset_left/top don't mutate the frozen original node.
-    const gesture = state.gesture;
-    if (
-      gesture.type !== "idle" &&
-      "selection" in gesture &&
-      gesture.selection
-    ) {
-      for (const id of gesture.selection) {
-        if (mutableNodes[id]) {
-          mutableNodes[id] = { ...mutableNodes[id] };
-        }
-      }
-    }
-
-    // Clone the content-edit-mode target node so writes to
-    // layout_inset_left/top and internal data don't mutate the frozen
-    // original during drag gestures.
-    const cem = state.content_edit_mode;
-    if (cem && mutableNodes[cem.node_id]) {
-      const vid = cem.node_id;
-      if (cem.type === "vector") {
-        // VectorNetworkEditor mutates segments in-place (e.g. updateTangent
-        // writes seg.ta/seg.tb), so deep-clone vector_network too.
-        const vnode = mutableNodes[vid] as grida.program.nodes.VectorNode;
-        mutableNodes[vid] = {
-          ...vnode,
-          vector_network: vnode.vector_network
-            ? cloneVectorNetwork(vnode.vector_network)
-            : vnode.vector_network,
-        };
-      } else {
-        // width (stroke_width_profile), bitmap (layout props), etc.
-        mutableNodes[vid] = { ...mutableNodes[vid] };
-      }
-    }
-
-    // Clone the draw gesture's target node (line/pencil/arrow).
-    // GestureDraw uses gesture.node_id, not gesture.selection.
-    if (gesture.type === "draw" && mutableNodes[gesture.node_id]) {
-      const dnode = mutableNodes[
-        gesture.node_id
-      ] as grida.program.nodes.VectorNode;
-      mutableNodes[gesture.node_id] = {
-        ...dnode,
-        vector_network: dnode.vector_network
-          ? cloneVectorNetwork(dnode.vector_network)
-          : dnode.vector_network,
-      };
-    }
-
-    // Clone all nodes in the sort/gap gesture's layout — the sort gesture
-    // rewrites layout_inset_left/top on every sibling (transform.ts:543-551),
-    // and the gap gesture does the same (event-target.reducer.ts:937-943).
-    if (
-      (gesture.type === "sort" || gesture.type === "gap") &&
-      gesture.layout?.objects
-    ) {
-      for (const obj of gesture.layout.objects) {
-        if (mutableNodes[obj.id]) {
-          mutableNodes[obj.id] = { ...mutableNodes[obj.id] };
-        }
-      }
-    }
-
-    // Clone the brush gesture's target node.
-    if (gesture.type === "brush" && mutableNodes[gesture.node_id]) {
-      mutableNodes[gesture.node_id] = { ...mutableNodes[gesture.node_id] };
-    }
-
-    // Also clone the scene node for guide gesture (writes to guides[i].offset)
-    if (state.scene_id && mutableNodes[state.scene_id]) {
-      const snode = mutableNodes[
-        state.scene_id
-      ] as grida.program.nodes.SceneNode;
-      mutableNodes[state.scene_id] = {
-        ...snode,
-        guides: snode.guides ? snode.guides.map((g) => ({ ...g })) : [],
-      };
-    }
-
-    // Same strategy for links — skip the O(N) clone when already mutable.
-    const linksFrozen = Object.isFrozen(state.document.links);
-    let mutableLinks: Record<string, string[]>;
-    if (linksFrozen) {
-      mutableLinks = {};
-      for (const key in state.document.links) {
-        const arr = state.document.links[key];
-        mutableLinks[key] = arr ? [...arr] : [];
-      }
-    } else {
-      mutableLinks = state.document.links as Record<string, string[]>;
-    }
-
-    // Build the gesture clone. Sort/gap write to gesture.layout.objects,
-    // so deep-clone layout when present.
-    let mutableGesture: editor.gesture.GestureState;
-    if (gesture.type === "sort" || gesture.type === "gap") {
-      mutableGesture = {
-        ...gesture,
-        layout: {
-          ...gesture.layout,
-          objects: gesture.layout.objects.map((o) => ({ ...o })),
-        },
-      };
-    } else {
-      mutableGesture = { ...gesture };
-    }
-
-    // Build the content_edit_mode clone.
-    let mutableCem = cem ? { ...cem } : cem;
-    if (mutableCem?.type === "vector") {
-      mutableCem = {
-        ...mutableCem,
-        selection: { ...mutableCem.selection },
-        selection_neighbouring_vertices: [
-          ...mutableCem.selection_neighbouring_vertices,
-        ],
-      };
-    } else if (mutableCem?.type === "width") {
-      mutableCem = {
-        ...mutableCem,
-        variable_width_profile: {
-          ...mutableCem.variable_width_profile,
-          stops: mutableCem.variable_width_profile.stops.map((s) => ({ ...s })),
-        },
-      };
-    }
-
-    const mutable = {
-      ...state,
-      document: {
-        ...state.document,
-        nodes: mutableNodes,
-        links: mutableLinks,
-        // Brush gesture writes to document.bitmaps[imageRef]; clone when
-        // in bitmap content-edit mode so the dict is mutable.
-        ...(cem?.type === "bitmap"
-          ? { bitmaps: { ...state.document.bitmaps } }
-          : {}),
-      },
-      document_ctx: { ...state.document_ctx },
-      gesture: mutableGesture,
-      // marquee: { a, b, additive } — .b is written during marquee drag
-      marquee: state.marquee ? { ...state.marquee } : state.marquee,
-      // lasso: { points, additive } — .points is pushed to during lasso drag
-      lasso: state.lasso
-        ? { ...state.lasso, points: [...state.lasso.points] }
-        : state.lasso,
-      content_edit_mode: mutableCem,
-      // pointer: read-only during on-drag but clone for safety
-      pointer: { ...state.pointer },
-      // hits: read (slice) during translate hierarchy check
-      hits: state.hits ? [...state.hits] : [],
-      // Stash the original frozen state so code that uses safeOriginal()
-      // can fall back to it when running outside Immer.
-      __original: state,
-    };
-
-    // Run the recipe on the mutable object (cast as Draft for type compat)
-    recipe(mutable as unknown as Draft<editor.state.IEditorState>);
-
-    // Remove the stashed original before exposing as the new state
-    delete (mutable as { __original?: unknown }).__original;
-
-    nextState = mutable as unknown as editor.state.IEditorState;
-    patches = [];
-    inversePatches = [];
-  } else {
-    [nextState, patches, inversePatches] = produceWithPatches(state, recipe);
-  }
+  const [nextState, patches, inversePatches] = produceWithPatches(
+    state,
+    recipe
+  );
   __perf_end();
 
-  const effect: Effect = opts?.skipPatches
-    ? effectForBypassAction(state, action)
-    : effectFromPatches(patches);
+  // Structural ops were already pushed by the tracked-Graph wrapper
+  // during the recipe. Node-property ops are lifted from the Immer
+  // patch stream here.
+  appendPatchOps(patches, context.mutation_buffer);
 
-  return [nextState, patches, inversePatches, effect];
+  return [nextState, patches, inversePatches, context.mutation_buffer.ops];
 }
 
 function _reducer<S extends editor.state.IEditorState>(

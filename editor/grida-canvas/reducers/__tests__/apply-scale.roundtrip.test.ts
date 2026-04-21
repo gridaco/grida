@@ -1,4 +1,5 @@
 import reducer, { type ReducerContext } from "../index";
+import { OpBuffer } from "../../sync";
 import type { Action } from "../../action";
 import { editor } from "@/grida-canvas";
 import grida from "@grida/schema";
@@ -243,6 +244,7 @@ function createContext(
         _snapshot = s;
       },
     },
+    mutation_buffer: new OpBuffer(),
   };
 }
 

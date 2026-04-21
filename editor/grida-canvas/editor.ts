@@ -1,6 +1,6 @@
 import { produce, applyPatches, produceWithPatches } from "immer";
 import { editor, type Action } from ".";
-import reducer, { type ReducerContext, canBypassImmer } from "./reducers";
+import reducer, { type ReducerContext } from "./reducers";
 import type { tokens } from "@grida/tokens";
 import type { BitmapEditorBrush } from "@grida/bitmap";
 import type { TCanvasEventTargetDragGestureState } from "./action";
@@ -50,11 +50,12 @@ import { describeDocumentTree } from "./utils/cmd-tree";
 import { computeRenderPolicyFlagsForOutlineFeature } from "./render-policy-flags";
 import { perf } from "./perf";
 import {
-  EFFECT_NONE,
-  EFFECT_STRUCTURAL,
-  effectFromPatches,
-  mergeEffect,
-  type Effect,
+  EMPTY_OP_LOG,
+  FULL_RESYNC_OP_LOG,
+  OpBuffer,
+  opLogFromPatches,
+  type Op,
+  type OpLog,
 } from "./sync";
 
 const __DEV__ = process.env.NODE_ENV === "development";
@@ -390,6 +391,18 @@ class EditorDocumentStore
    */
   private _gesture_snapshot: editor.state.IMinimalDocumentState | null = null;
 
+  /**
+   * Per-dispatch op buffer. Shared across dispatches — the reducer
+   * resets it at the start of each recipe. Mutation sites (tracked
+   * Graph, Immer patch lift) push {@link Op}s
+   * into it; the reducer drains and returns the log to the subscriber
+   * in `editor.ts`.
+   *
+   * Held outside the Immer draft tree — ephemeral per-dispatch scratch,
+   * never proxied.
+   */
+  private readonly _mutation_buffer = new OpBuffer();
+
   private readonly _historyAdapter = new EditorHistoryAdapter();
   get historySnapshot() {
     return this._historyAdapter.snapshot;
@@ -470,14 +483,14 @@ class EditorDocumentStore
       this._tid++;
       // Gesture abort restores an unknown subset of the document state;
       // full re-encode is the safe choice here.
-      this.emit(undefined, [], EFFECT_STRUCTURAL);
+      this.emit(undefined, [], FULL_RESYNC_OP_LOG);
     }
 
     const patches = this._historyAdapter.undo();
     if (!patches) return;
 
     this._tid++;
-    this.emit(undefined, patches, effectFromPatches(patches));
+    this.emit(undefined, patches, opLogFromPatches(patches));
   }
 
   public redo() {
@@ -487,7 +500,7 @@ class EditorDocumentStore
     if (!patches) return;
 
     this._tid++;
-    this.emit(undefined, patches, effectFromPatches(patches));
+    this.emit(undefined, patches, opLogFromPatches(patches));
   }
 
   get isGestureActive(): boolean {
@@ -528,7 +541,7 @@ class EditorDocumentStore
     // Preview discard restores an unknown subset of the document; force
     // a full re-encode so the renderer can't diverge from the reverted
     // state.
-    this.emit(undefined, [], EFFECT_STRUCTURAL);
+    this.emit(undefined, [], FULL_RESYNC_OP_LOG);
   }
 
   get isPreviewActive(): boolean {
@@ -538,9 +551,9 @@ class EditorDocumentStore
   private emit(
     action: Action | undefined,
     patches: editor.history.Patch[],
-    effect: Effect
+    ops: OpLog
   ) {
-    this.listeners.forEach((l) => l(this, action, patches, effect));
+    this.listeners.forEach((l) => l(this, action, patches, ops));
   }
 
   // TODO(@grida/history): Migrate to dispatch(…, { recording: "silent" })
@@ -580,7 +593,7 @@ class EditorDocumentStore
   private apply(reducer: (draft: editor.state.IEditorState) => void) {
     const [state, patches] = produceWithPatches(this.mstate, reducer);
     this.mstate = state;
-    this.emit(undefined, patches, effectFromPatches(patches));
+    this.emit(undefined, patches, opLogFromPatches(patches));
   }
 
   /**
@@ -593,7 +606,7 @@ class EditorDocumentStore
     // This path surfaces no patches — the renderer can't tell what
     // changed, so force a full re-encode. `reduce()` is deprecated and
     // not on any hot path.
-    this.emit(undefined, [], EFFECT_STRUCTURAL);
+    this.emit(undefined, [], FULL_RESYNC_OP_LOG);
   }
 
   public dispatch(
@@ -628,6 +641,7 @@ class EditorDocumentStore
           this._gesture_snapshot = s;
         },
       },
+      mutation_buffer: this._mutation_buffer,
     };
 
     const actions = Array.isArray(action) ? action : [action];
@@ -643,7 +657,9 @@ class EditorDocumentStore
 
     let lastAction: Action;
     let allPatches: editor.history.Patch[] = [];
-    let batchEffect: Effect = EFFECT_NONE;
+    // Accumulated in dispatch order — ops have causal dependencies
+    // (structural before referencing prop-changes) that must survive.
+    const batchOps: Op[] = [];
 
     for (const action of actions) {
       const beforeState = this.mstate;
@@ -651,19 +667,10 @@ class EditorDocumentStore
       const __perf_end_reducer = perf.start("dispatch.reducer", {
         action_type: action.type,
       });
-      // Mutable bypass is safe only for actions whose write set is fully
-      // enumerated by the bypass clone logic in `reducers/index.ts` —
-      // and only under `recording: "silent"` (bypass produces no patches,
-      // which history only tolerates when recording is off). Using the
-      // shared `canBypassImmer()` predicate keeps reducer/dispatch in
-      // lockstep; there is no separate whitelist to drift.
-      const [nextState, patches, inversePatches, effect] = reducer(
+      const [nextState, patches, inversePatches, ops] = reducer(
         this.mstate,
         action,
-        context,
-        {
-          skipPatches: recording === "silent" && canBypassImmer(action),
-        }
+        context
       );
       __perf_end_reducer();
 
@@ -685,8 +692,17 @@ class EditorDocumentStore
 
       lastAction = action;
       allPatches = allPatches.concat(patches);
-      batchEffect = mergeEffect(batchEffect, effect);
+      for (const op of ops) batchOps.push(op);
     }
+
+    // If any action in the batch requested a full resync, collapse
+    // the batch to a single resync op — individual ops become
+    // redundant once the subscriber re-encodes everything.
+    const batchOpLog: OpLog = batchOps.some((op) => op.kind === "full_resync")
+      ? FULL_RESYNC_OP_LOG
+      : batchOps.length === 0
+        ? EMPTY_OP_LOG
+        : batchOps;
 
     this._tid++;
 
@@ -700,7 +716,7 @@ class EditorDocumentStore
     const __perf_end_emit = perf.start("dispatch.emit", {
       listener_count: this.listeners.size,
     });
-    this.emit(lastAction!, allPatches, batchEffect);
+    this.emit(lastAction!, allPatches, batchOpLog);
     __perf_end_emit();
 
     __perf_end_dispatch();
@@ -726,7 +742,7 @@ class EditorDocumentStore
       _: this,
       action?: Action,
       patches?: editor.history.Patch[],
-      effect?: Effect
+      ops?: OpLog
     ) => {
       const next = selector(this.mstate);
       if (!isEqual(previous, next)) {
@@ -735,7 +751,7 @@ class EditorDocumentStore
         // [1]
         previous = next;
         // [2]
-        fn(this, next, prev, action, patches, effect);
+        fn(this, next, prev, action, patches, ops);
       }
     };
 
@@ -834,7 +850,7 @@ class EditorDocumentStore
     // `document/reset` is always a wholesale state swap — the structural
     // effect forces a full `__wasm_sync_document` re-encode in the
     // subscriber.
-    this.emit(resetAction, [], EFFECT_STRUCTURAL);
+    this.emit(resetAction, [], FULL_RESYNC_OP_LOG);
     return this._tid;
   }
 
@@ -3563,8 +3579,8 @@ export class Editor
 
     this.doc.subscribeWithSelector(
       (state) => state.document,
-      (_, document, _prev, action, _patches, effect) => {
-        this.__wasm_on_document_change(document, action, effect);
+      (_, document, _prev, action, _patches, ops) => {
+        this.__wasm_on_document_change(document, action, ops);
       }
     );
 
@@ -3808,26 +3824,11 @@ export class Editor
     }
   }
 
-  /**
-   * Document subscriber body — dispatches on the reducer-provided
-   * {@link Effect} to pick between fast per-node sync (`replaceNode` /
-   * `deleteNode`) and a full `__wasm_sync_document` re-encode.
-   *
-   * The Effect is authoritative — it is computed by whoever owns the
-   * mutation (reducer / bypass / history replay), not derived from
-   * patches at the subscriber. See `./sync.ts` for the rationale.
-   *
-   * When no effect is provided (legacy callers, unknown edits) we fall
-   * back to a full re-encode: it's the only choice that can't diverge
-   * the renderer from the state.
-   *
-   * Perf spans (`dispatch.wasm.sync`, `dispatch.wasm.per_node_sync`) let
-   * benchmarks attribute time to the strategy that ran.
-   */
+  /** Apply the reducer-produced {@link OpLog} to the WASM scene 1:1. */
   private __wasm_on_document_change(
     document: grida.program.document.Document,
     action: Action | undefined,
-    effect: Effect | undefined
+    ops: OpLog | undefined
   ) {
     if (!this._m_wasm_canvas_scene) return;
     const surface = this._m_wasm_canvas_scene;
@@ -3836,7 +3837,7 @@ export class Editor
       this.__wasm_sync_document(surface, document, this.doc.state.scene_id);
     };
 
-    // `document/reset` always needs a full re-encode AND a viewport re-fit.
+    // `document/reset` rebinds scene identity; always full re-encode + refit.
     if (action?.type === "document/reset") {
       fullSync();
       this.camera.fit("<scene>");
@@ -3844,63 +3845,68 @@ export class Editor
       return;
     }
 
-    // Missing effect = caller didn't participate in the Effect protocol.
-    // Safe default is the full re-encode.
-    if (!effect || effect.kind === "structural") {
+    // Missing log = caller didn't participate in the protocol.
+    if (!ops) {
       fullSync();
       end();
       return;
     }
-    if (effect.kind === "none") {
+
+    if (ops.length === 0) {
       end();
       return;
     }
 
-    // effect.kind === "nodes"
-    const endApply = perf.start("dispatch.wasm.per_node_sync", {
-      replaces: effect.replace.size,
-      removes: effect.remove.size,
+    const endApply = perf.start("dispatch.wasm.op_apply", {
+      op_count: ops.length,
     });
-    const applied = this.__wasm_apply_per_node_sync(surface, document, effect);
+    const outcome = this.__wasm_apply_op_log(surface, document, ops);
     endApply();
 
-    if (applied) {
+    if (outcome === "ok") {
       this._scheduleWasmRedraw();
     } else {
-      // A per-node op returning false means the WASM side rejected the
-      // change — typically a missing node id (effect referenced a slot
-      // that doesn't exist in the decoded scene) or a malformed encoded
-      // node. Fall back to full sync for correctness, but warn loudly:
-      // this should never happen in steady state and silently falling
-      // back hides real bugs behind a 100ms re-encode.
       fullSync();
-      console.warn(
-        "[grida-canvas] per-node sync failed; fell back to full re-encode. " +
-          "This is a correctness fallback, not a hot path — investigate.",
-        {
-          action: action?.type,
-          replaces: Array.from(effect.replace),
-          removes: Array.from(effect.remove),
-        }
-      );
+      if (outcome === "failed") {
+        console.warn(
+          "[grida-canvas] op-log apply failed; fell back to full re-encode.",
+          {
+            action: action?.type,
+            op_count: ops.length,
+            kinds: ops.map((o) => o.kind),
+          }
+        );
+      }
     }
     end();
   }
 
-  private __wasm_apply_per_node_sync(
+  private __wasm_apply_op_log(
     surface: Scene,
     document: grida.program.document.Document,
-    effect: Extract<Effect, { kind: "nodes" }>
-  ): boolean {
-    for (const id of effect.remove) {
-      if (!surface.deleteNode(id)) return false;
+    ops: OpLog
+  ): "ok" | "failed" | "full_resync" {
+    for (const op of ops) {
+      switch (op.kind) {
+        case "replace_node": {
+          const node = document.nodes[op.id];
+          // Benign race: an earlier op in the same batch removed this id.
+          if (!node) continue;
+          if (!surface.replaceNode(io.GRID.encodeNode(node))) return "failed";
+          break;
+        }
+        case "delete_node":
+          // WASM tolerates unknown ids; treat false as idempotent success.
+          surface.deleteNode(op.id);
+          break;
+        case "sync_links":
+          if (!surface.syncLinks(op.parent, op.children)) return "failed";
+          break;
+        case "full_resync":
+          return "full_resync";
+      }
     }
-    for (const id of effect.replace) {
-      const node = document.nodes[id];
-      if (!node) return false;
-      if (!surface.replaceNode(io.GRID.encodeNode(node))) return false;
-    }
-    return true;
+    return "ok";
   }
 
   /**

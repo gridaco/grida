@@ -3,6 +3,7 @@
  */
 import { editor } from "@/grida-canvas";
 import type { ReducerContext } from "@/grida-canvas/reducers";
+import { OpBuffer } from "@/grida-canvas/sync";
 import grida from "@grida/schema";
 
 /**
@@ -42,6 +43,7 @@ export function createReducerContext(
         _snapshot = s;
       },
     },
+    mutation_buffer: new OpBuffer(),
     ...overrides,
   };
 }

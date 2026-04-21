@@ -5,7 +5,7 @@ use super::schema::{
 use crate::cache::fast_hash::DenseNodeMap;
 use crate::cg::prelude::*;
 use math2::transform::AffineTransform;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Parent reference in the scene graph
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -27,6 +27,14 @@ pub enum SceneGraphError {
         index: usize,
         len: usize,
     },
+    /// A `set_children` call included the parent id itself in its
+    /// children list, or a descendant that would cycle back.
+    CyclicLink {
+        parent: NodeId,
+        child: NodeId,
+    },
+    /// A `set_children` call included the same child id twice.
+    DuplicateChild(NodeId),
 }
 
 impl std::fmt::Display for SceneGraphError {
@@ -42,6 +50,14 @@ impl std::fmt::Display for SceneGraphError {
                     parent, index, len
                 )
             }
+            SceneGraphError::CyclicLink { parent, child } => write!(
+                f,
+                "Cyclic link: node {} cannot be a child of {} (would form a cycle)",
+                child, parent
+            ),
+            SceneGraphError::DuplicateChild(id) => {
+                write!(f, "Duplicate child id in new children list: {}", id)
+            }
         }
     }
 }
@@ -49,6 +65,28 @@ impl std::fmt::Display for SceneGraphError {
 impl std::error::Error for SceneGraphError {}
 
 pub type SceneGraphResult<T> = Result<T, SceneGraphError>;
+
+/// Description of what [`SceneGraph::set_children`] changed, so
+/// callers can scope invalidation to the affected subtrees.
+#[derive(Debug, Clone)]
+pub struct SetChildrenDiff {
+    pub old_children: Vec<NodeId>,
+    pub new_children: Vec<NodeId>,
+    /// Ids newly linked under this parent (detached from their previous
+    /// location). Their world transform chain must be re-derived.
+    pub entered: Vec<NodeId>,
+    /// Ids removed from this parent. Still in the node repository —
+    /// callers must re-attach or `delete_node` to dispose.
+    pub left: Vec<NodeId>,
+    /// Old parents of `entered` children (excluding the new parent and
+    /// the root). Their children lists mutated and need the same
+    /// invalidation as the new parent.
+    pub old_parents_of_entered: Vec<NodeId>,
+    /// True when the retained set (nodes in both old and new) is in
+    /// a different order than before. Affects z-order / layer list
+    /// even when membership is unchanged.
+    pub order_changed: bool,
+}
 
 // ---------------------------------------------------------------------------
 // NodeGeoData — compact, schema-level geometry data per node
@@ -775,6 +813,125 @@ impl SceneGraph {
         Ok(())
     }
 
+    /// Atomically replace `parent_id`'s children list. Subsumes
+    /// reparent / reorder / insert-into-tree / remove-from-tree.
+    ///
+    /// Returns a diff the caller uses to scope invalidation.
+    ///
+    /// # Errors
+    ///
+    /// `ParentNotFound` / `NodeNotFound` for unknown ids, `DuplicateChild`
+    /// for repeated entries, `CyclicLink` if a child equals or is an
+    /// ancestor of `parent_id`. On error the graph is unchanged.
+    pub fn set_children(
+        &mut self,
+        parent_id: &NodeId,
+        new_children: Vec<NodeId>,
+    ) -> SceneGraphResult<SetChildrenDiff> {
+        if !self.nodes.contains(parent_id) {
+            return Err(SceneGraphError::ParentNotFound(*parent_id));
+        }
+
+        let mut new_set: HashSet<NodeId> = HashSet::with_capacity(new_children.len());
+        for id in &new_children {
+            if !self.nodes.contains(id) {
+                return Err(SceneGraphError::NodeNotFound(*id));
+            }
+            if !new_set.insert(*id) {
+                return Err(SceneGraphError::DuplicateChild(*id));
+            }
+        }
+
+        // Build a reverse lookup once: child_id → parent_id. Reused
+        // for ancestor-walk (cycle check) and entered-detach below.
+        let mut child_to_parent: HashMap<NodeId, NodeId> = HashMap::with_capacity(self.links.len());
+        for (p, children) in &self.links {
+            for c in children {
+                child_to_parent.insert(*c, p);
+            }
+        }
+
+        // Ancestor-walk: none of the proposed children may equal
+        // `parent_id` or be an ancestor of it.
+        let mut ancestors: HashSet<NodeId> = HashSet::new();
+        ancestors.insert(*parent_id);
+        let mut cursor = child_to_parent.get(parent_id).copied();
+        while let Some(a) = cursor {
+            if !ancestors.insert(a) {
+                break; // defensive: malformed graph with a cycle
+            }
+            cursor = child_to_parent.get(&a).copied();
+        }
+        for id in &new_children {
+            if ancestors.contains(id) {
+                return Err(SceneGraphError::CyclicLink {
+                    parent: *parent_id,
+                    child: *id,
+                });
+            }
+        }
+
+        // ---------------- validation done; commit ----------------
+
+        let old_children: Vec<NodeId> = self.links.get(parent_id).cloned().unwrap_or_default();
+        let old_set: HashSet<NodeId> = old_children.iter().copied().collect();
+
+        let entered: Vec<NodeId> = new_children
+            .iter()
+            .copied()
+            .filter(|id| !old_set.contains(id))
+            .collect();
+        let left: Vec<NodeId> = old_children
+            .iter()
+            .copied()
+            .filter(|id| !new_set.contains(id))
+            .collect();
+
+        // Retained-set order change: compare the subsequences of old
+        // and new that only contain retained ids.
+        let retained_old: Vec<NodeId> = old_children
+            .iter()
+            .copied()
+            .filter(|id| new_set.contains(id))
+            .collect();
+        let retained_new: Vec<NodeId> = new_children
+            .iter()
+            .copied()
+            .filter(|id| old_set.contains(id))
+            .collect();
+        let order_changed = retained_old != retained_new;
+
+        // Detach each entered child from its previous location. Use
+        // the precomputed parent map; children with no entry were
+        // roots.
+        let mut old_parents_seen: HashSet<NodeId> = HashSet::new();
+        let mut old_parents_of_entered: Vec<NodeId> = Vec::new();
+        for id in &entered {
+            match child_to_parent.get(id).copied() {
+                None => self.roots.retain(|r| r != id),
+                Some(op) => {
+                    if let Some(list) = self.links.get_mut(&op) {
+                        list.retain(|c| c != id);
+                    }
+                    if op != *parent_id && old_parents_seen.insert(op) {
+                        old_parents_of_entered.push(op);
+                    }
+                }
+            }
+        }
+
+        self.links.insert(*parent_id, new_children.clone());
+
+        Ok(SetChildrenDiff {
+            old_children,
+            new_children,
+            entered,
+            left,
+            old_parents_of_entered,
+            order_changed,
+        })
+    }
+
     /// Remove a node from the scene roots list, if present.
     ///
     /// No-op when the id is not a root. Scene-root children are tracked in
@@ -1140,6 +1297,124 @@ mod tests {
         let children = graph.get_children(&id_a).unwrap();
         assert_eq!(children.len(), 1);
         assert_eq!(children[0], id_c);
+    }
+
+    // ---------------------------------------------------------------
+    // set_children — structural mutation primitive
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn set_children_reorder() {
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+        let b = g.append_child(create_test_node(), Parent::NodeId(a));
+        let c = g.append_child(create_test_node(), Parent::NodeId(a));
+        let d = g.append_child(create_test_node(), Parent::NodeId(a));
+
+        let diff = g.set_children(&a, vec![d, b, c]).unwrap();
+        assert_eq!(g.get_children(&a).unwrap(), &vec![d, b, c]);
+        assert!(diff.entered.is_empty());
+        assert!(diff.left.is_empty());
+        assert!(diff.order_changed);
+    }
+
+    #[test]
+    fn set_children_reparent_between_containers() {
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+        let b = g.append_child(create_test_node(), Parent::Root);
+        let x = g.append_child(create_test_node(), Parent::NodeId(a));
+
+        let diff = g.set_children(&b, vec![x]).unwrap();
+        let empty: Vec<NodeId> = vec![];
+        assert_eq!(g.get_children(&a).unwrap(), &empty); // unlinked from a
+        assert_eq!(g.get_children(&b).unwrap(), &vec![x]); // linked under b
+        assert_eq!(diff.entered, vec![x]);
+        assert!(diff.left.is_empty());
+    }
+
+    #[test]
+    fn set_children_removes_retained_from_old_parent() {
+        // When a child moves from A to B, A's children list must lose
+        // the child — otherwise the graph has two parents for one node.
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+        let b = g.append_child(create_test_node(), Parent::Root);
+        let x = g.append_child(create_test_node(), Parent::NodeId(a));
+        let y = g.append_child(create_test_node(), Parent::NodeId(a));
+
+        g.set_children(&b, vec![x]).unwrap();
+        // x is no longer under a; y still is
+        assert_eq!(g.get_children(&a).unwrap(), &vec![y]);
+        assert_eq!(g.get_parent(&x), Some(b));
+    }
+
+    #[test]
+    fn set_children_detects_left_on_unlink() {
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+        let x = g.append_child(create_test_node(), Parent::NodeId(a));
+
+        let diff = g.set_children(&a, vec![]).unwrap();
+        assert!(diff.left.contains(&x));
+        assert!(diff.entered.is_empty());
+    }
+
+    #[test]
+    fn set_children_rejects_duplicates() {
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+        let x = g.append_child(create_test_node(), Parent::NodeId(a));
+
+        let err = g.set_children(&a, vec![x, x]).unwrap_err();
+        assert!(matches!(err, SceneGraphError::DuplicateChild(_)));
+        // State unchanged
+        assert_eq!(g.get_children(&a).unwrap(), &vec![x]);
+    }
+
+    #[test]
+    fn set_children_rejects_self_as_child() {
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+
+        let err = g.set_children(&a, vec![a]).unwrap_err();
+        assert!(matches!(err, SceneGraphError::CyclicLink { .. }));
+    }
+
+    #[test]
+    fn set_children_rejects_ancestor_as_child() {
+        // a > b > c — asking `c` to have `a` as a child would cycle.
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+        let b = g.append_child(create_test_node(), Parent::NodeId(a));
+        let c = g.append_child(create_test_node(), Parent::NodeId(b));
+
+        let err = g.set_children(&c, vec![a]).unwrap_err();
+        assert!(matches!(err, SceneGraphError::CyclicLink { .. }));
+    }
+
+    #[test]
+    fn set_children_rejects_unknown_node() {
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+
+        // NodeId is a u32; pick one that can't have been handed out.
+        let phantom: NodeId = 9_999_999;
+        let err = g.set_children(&a, vec![phantom]).unwrap_err();
+        assert!(matches!(err, SceneGraphError::NodeNotFound(_)));
+    }
+
+    #[test]
+    fn set_children_unparented_to_parent() {
+        // A child previously in the roots list can be adopted via set_children.
+        let mut g = SceneGraph::new();
+        let a = g.append_child(create_test_node(), Parent::Root);
+        let r = g.append_child(create_test_node(), Parent::Root);
+
+        let diff = g.set_children(&a, vec![r]).unwrap();
+        assert_eq!(g.get_parent(&r), Some(a));
+        assert!(!g.is_root(&r)); // removed from roots
+        assert!(diff.entered.contains(&r));
     }
 
     #[test]
