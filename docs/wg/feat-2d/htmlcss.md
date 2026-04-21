@@ -94,57 +94,57 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `min-width`, `max-width`      | ✅     | Via Taffy                                       |
 | `min-height`, `max-height`    | ✅     | Via Taffy                                       |
 | `aspect-ratio`                | ⚠️     | Via Taffy; broken in flex layouts ([taffy#804]) |
-| `inline-size`, `block-size`   | ❌     | Logical sizing not mapped                       |
-| `min-inline-size`, etc.       | ❌     | Logical sizing not mapped                       |
+| `inline-size`, `block-size`   | ✅     | Stylo cascade maps to width/height (LTR)        |
+| `min-inline-size`, etc.       | ✅     | Stylo cascade maps to min/max width/height      |
 | `padding` (all sides)         | ✅     | px values                                       |
 | `margin` (all sides)          | ✅     | px, auto; collapsing via Taffy block flow       |
 | `box-sizing`                  | ✅     | Via Taffy                                       |
 | `overflow`                    | ✅     | hidden/clip via canvas clip_rect                |
 | `overflow-x`, `overflow-y`    | ⚠️     | Mapped to single overflow axis                  |
-| `overflow-clip-margin`        | ❌     |                                                 |
+| `overflow-clip-margin`        | ✅     | px expands the clip rect when `overflow: clip`  |
 | `overflow-wrap` / `word-wrap` | ❌     |                                                 |
 | `resize`                      | ❌     |                                                 |
 
 ### Positioning
 
-| CSS Property                     | Status | Notes                                   |
-| -------------------------------- | ------ | --------------------------------------- |
-| `position: static`               | ✅     | Default                                 |
-| `position: relative`             | ✅     | Via Taffy                               |
-| `position: absolute`             | ✅     | Via Taffy                               |
-| `position: fixed`                | ❌     |                                         |
-| `position: sticky`               | ❌     |                                         |
-| `top`, `right`, `bottom`, `left` | ⚠️     | Stub in collect.rs, returns defaults    |
-| `inset` (shorthand)              | ❌     |                                         |
-| `inset-block`, `inset-inline`    | ❌     | Logical insets not mapped               |
-| `z-index`                        | ⚠️     | Stored but not used for paint order     |
-| `float`                          | ❌     | Recognized in collect, no layout effect |
-| `clear`                          | ❌     | Recognized in collect, no layout effect |
+| CSS Property                     | Status | Notes                                                                               |
+| -------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| `position: static`               | ✅     | Default                                                                             |
+| `position: relative`             | ✅     | Via Taffy                                                                           |
+| `position: absolute`             | ✅     | Via Taffy                                                                           |
+| `position: fixed`                | ❌     |                                                                                     |
+| `position: sticky`               | ❌     |                                                                                     |
+| `top`, `right`, `bottom`, `left` | ✅     | Extracted as CssLength (px/%/auto)                                                  |
+| `inset` (shorthand)              | ❌     |                                                                                     |
+| `inset-block`, `inset-inline`    | ✅     | Stylo cascade maps to top/right/bottom/left (LTR)                                   |
+| `z-index`                        | ✅     | Sibling paint order (§9.9.1 subset; no stacking contexts for opacity/transform yet) |
+| `float`                          | ❌     | Recognized in collect, no layout effect                                             |
+| `clear`                          | ❌     | Recognized in collect, no layout effect                                             |
 
 ### Flexbox
 
-| CSS Property      | Status | Notes                       |
-| ----------------- | ------ | --------------------------- |
-| `flex-direction`  | ✅     | Via Taffy                   |
-| `flex-wrap`       | ✅     | Via Taffy                   |
-| `flex-flow`       | ✅     | Shorthand; direction + wrap |
-| `align-items`     | ✅     | Via Taffy                   |
-| `align-self`      | ✅     | Via Taffy                   |
-| `align-content`   | ✅     | Via Taffy                   |
-| `justify-content` | ✅     | Via Taffy                   |
-| `justify-items`   | ❌     |                             |
-| `justify-self`    | ❌     |                             |
-| `place-content`   | ❌     | Shorthand                   |
-| `place-items`     | ❌     | Shorthand                   |
-| `place-self`      | ❌     | Shorthand                   |
-| `flex-grow`       | ✅     | Via Taffy                   |
-| `flex-shrink`     | ✅     | Via Taffy                   |
-| `flex-basis`      | ✅     | Via Taffy                   |
-| `flex`            | ✅     | Shorthand                   |
-| `gap`             | ✅     | Via Taffy                   |
-| `row-gap`         | ✅     | Via Taffy                   |
-| `column-gap`      | ✅     | Via Taffy                   |
-| `order`           | ❌     |                             |
+| CSS Property      | Status | Notes                                   |
+| ----------------- | ------ | --------------------------------------- |
+| `flex-direction`  | ✅     | Via Taffy                               |
+| `flex-wrap`       | ✅     | Via Taffy                               |
+| `flex-flow`       | ✅     | Shorthand; direction + wrap             |
+| `align-items`     | ✅     | Via Taffy                               |
+| `align-self`      | ✅     | Via Taffy                               |
+| `align-content`   | ✅     | Via Taffy                               |
+| `justify-content` | ✅     | Via Taffy                               |
+| `justify-items`   | ✅     | Via Taffy (grid)                        |
+| `justify-self`    | ✅     | Via Taffy (grid)                        |
+| `place-content`   | ✅     | Shorthand — cascades to align + justify |
+| `place-items`     | ✅     | Shorthand — cascades to align + justify |
+| `place-self`      | ✅     | Shorthand — cascades to align + justify |
+| `flex-grow`       | ✅     | Via Taffy                               |
+| `flex-shrink`     | ✅     | Via Taffy                               |
+| `flex-basis`      | ✅     | Via Taffy                               |
+| `flex`            | ✅     | Shorthand                               |
+| `gap`             | ✅     | Via Taffy                               |
+| `row-gap`         | ✅     | Via Taffy                               |
+| `column-gap`      | ✅     | Via Taffy                               |
+| `order`           | ❌     |                                         |
 
 ### Grid
 
@@ -178,56 +178,58 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Background
 
-| CSS Property              | Status | Notes                               |
-| ------------------------- | ------ | ----------------------------------- |
-| `background-color`        | ✅     | Solid color with border-radius      |
-| `background-image: url()` | ✅     | Via `ImageProvider` trait           |
-| `linear-gradient()`       | ✅     | All directions + angles, multi-stop |
-| `radial-gradient()`       | ✅     | Circle/ellipse                      |
-| `conic-gradient()`        | ✅     | Sweep gradient                      |
-| Multi-layer backgrounds   | ✅     | Stacked gradient + solid layers     |
-| `background-position`     | ❌     |                                     |
-| `background-size`         | ❌     |                                     |
-| `background-repeat`       | ❌     |                                     |
-| `background-origin`       | ❌     |                                     |
-| `background-clip`         | ❌     |                                     |
-| `background-attachment`   | ❌     |                                     |
-| `background-blend-mode`   | ❌     | Different from `mix-blend-mode`     |
-| `background` (shorthand)  | ⚠️     | Color, gradient, and url() layers   |
+| CSS Property                          | Status | Notes                                                                                                                                                                                                   |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `background-color`                    | ✅     | Solid color with border-radius                                                                                                                                                                          |
+| `background-image: url()`             | ✅     | Via `ImageProvider` trait                                                                                                                                                                               |
+| `linear-gradient()`                   | ✅     | All directions + angles, multi-stop, px / % / currentcolor stops                                                                                                                                        |
+| `radial-gradient()`                   | ✅     | Shape (circle/ellipse), extent keywords, explicit radii, position                                                                                                                                       |
+| `conic-gradient()`                    | ✅     | `from <angle> at <position>`, repeating variant                                                                                                                                                         |
+| `repeating-*-gradient()`              | ✅     | Px and % stops both tile correctly                                                                                                                                                                      |
+| Gradient `color-interpolation-method` | ⚠️     | Extraction + Skia wiring done; explicit `in <space>` syntax gated by Stylo's `layout.css.gradient-color-interpolation-method` pref (default off). Auto path (sRGB vs Oklab based on stop colors) works. |
+| Multi-layer backgrounds               | ✅     | Stacked gradient + solid + URL layers                                                                                                                                                                   |
+| `background-position`                 | ✅     | Per-layer, px/%/keyword per axis                                                                                                                                                                        |
+| `background-size`                     | ✅     | `cover`/`contain`/`auto`/explicit (with aspect preservation)                                                                                                                                            |
+| `background-repeat`                   | ⚠️     | `repeat`/`no-repeat`/`repeat-x`/`repeat-y`; `space` and `round` currently fall back to `repeat`                                                                                                         |
+| `background-origin`                   | ✅     | `border-box`/`padding-box`/`content-box`                                                                                                                                                                |
+| `background-clip`                     | ✅     | `border-box`/`padding-box`/`content-box`; border-box clip honors radius                                                                                                                                 |
+| `background-attachment`               | ❌     |                                                                                                                                                                                                         |
+| `background-blend-mode`               | ❌     | Different from `mix-blend-mode`                                                                                                                                                                         |
+| `background` (shorthand)              | ✅     | Color, gradient, url(), size, position, repeat, clip, origin layers                                                                                                                                     |
 
 ### Border
 
-| CSS Property               | Status | Notes                                      |
-| -------------------------- | ------ | ------------------------------------------ |
-| `border-width` (all sides) | ✅     |                                            |
-| `border-color` (all sides) | ✅     |                                            |
-| `border-style` (all sides) | ✅     | solid/dashed/dotted painted; rest fallback |
-| `border-style: groove`     | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: ridge`      | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: inset`      | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: outset`     | ❌     | Enum defined, paint falls back to solid    |
-| `border-style: double`     | ❌     | Enum defined, paint falls back to solid    |
-| `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)     |
-| `border` (shorthand)       | ✅     |                                            |
-| `border-image`             | ✅     | 9-slice via `ImageProvider`                |
-| `border-image-outset`      | ✅     | Extends border-image area                  |
-| `border-image-repeat`      | ✅     | stretch/repeat/round/space                 |
-| `border-image-slice`       | ✅     | px values; `fill` keyword                  |
-| `border-image-source`      | ✅     | url() via `ImageProvider`                  |
-| `border-image-width`       | ✅     | px values; falls back to border-width      |
-| `border-collapse`          | ❌     |                                            |
-| `border-spacing`           | ❌     |                                            |
-| Logical border properties  | ❌     | `border-block-*`, `border-inline-*`        |
+| CSS Property               | Status | Notes                                                 |
+| -------------------------- | ------ | ----------------------------------------------------- |
+| `border-width` (all sides) | ✅     |                                                       |
+| `border-color` (all sides) | ✅     |                                                       |
+| `border-style` (all sides) | ✅     | All 9 styles painted                                  |
+| `border-style: groove`     | ✅     | Per-side darken/lighten (50% shade)                   |
+| `border-style: ridge`      | ✅     | Per-side lighten/darken (inverse of groove)           |
+| `border-style: inset`      | ✅     | Top/left darker, bottom/right lighter                 |
+| `border-style: outset`     | ✅     | Inverse of inset                                      |
+| `border-style: double`     | ✅     | Two 1/3-width strokes with 1/3 gap                    |
+| `border-radius`            | ✅     | Per-corner elliptical (separate rx/ry)                |
+| `border` (shorthand)       | ✅     |                                                       |
+| `border-image`             | ✅     | 9-slice via `ImageProvider`                           |
+| `border-image-outset`      | ✅     | Extends border-image area                             |
+| `border-image-repeat`      | ✅     | stretch/repeat/round/space                            |
+| `border-image-slice`       | ✅     | px values; `fill` keyword                             |
+| `border-image-source`      | ✅     | url() via `ImageProvider`                             |
+| `border-image-width`       | ✅     | px values; falls back to border-width                 |
+| `border-collapse`          | ❌     |                                                       |
+| `border-spacing`           | ❌     |                                                       |
+| Logical border properties  | ✅     | `border-block-*`, `border-inline-*` via Stylo cascade |
 
 ### Outline
 
-| CSS Property     | Status | Notes                                             |
-| ---------------- | ------ | ------------------------------------------------- |
-| `outline`        | ✅     | Shorthand; solid/dashed/dotted painted            |
-| `outline-color`  | ✅     | currentcolor fallback                             |
-| `outline-style`  | ✅     | auto treated as solid; groove/ridge/etc. fallback |
-| `outline-width`  | ✅     |                                                   |
-| `outline-offset` | ✅     | Positive (outward) and negative (inward)          |
+| CSS Property     | Status | Notes                                                                            |
+| ---------------- | ------ | -------------------------------------------------------------------------------- |
+| `outline`        | ✅     | Shorthand; solid/dashed/dotted painted                                           |
+| `outline-color`  | ✅     | currentcolor fallback                                                            |
+| `outline-style`  | ✅     | solid/dashed/dotted/double painted; groove/ridge/inset/outset fall back to solid |
+| `outline-width`  | ✅     |                                                                                  |
+| `outline-offset` | ✅     | Positive (outward) and negative (inward)                                         |
 
 ### Box Shadow
 
@@ -280,57 +282,57 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Text Layout
 
-| CSS Property                  | Status | Notes                                       |
-| ----------------------------- | ------ | ------------------------------------------- |
-| `line-height`                 | ✅     | normal, number, length                      |
-| `letter-spacing`              | ✅     |                                             |
-| `word-spacing`                | ✅     |                                             |
-| `text-align`                  | ✅     | left, right, center, justify                |
-| `text-align-last`             | ❌     |                                             |
-| `text-justify`                | ❌     |                                             |
-| `text-indent`                 | ❌     | Field defined in FontProps, not extracted   |
-| `text-transform`              | ✅     | uppercase, lowercase, capitalize            |
-| `white-space`                 | ✅     | normal, pre, pre-wrap, pre-line, nowrap     |
-| `white-space-collapse`        | ❌     |                                             |
-| `word-break`                  | ❌     |                                             |
-| `overflow-wrap` / `word-wrap` | ❌     |                                             |
-| `line-break`                  | ❌     |                                             |
-| `hyphens`                     | ❌     |                                             |
-| `hyphenate-character`         | ❌     |                                             |
-| `hyphenate-limit-chars`       | ❌     |                                             |
-| `tab-size`                    | ❌     |                                             |
-| `text-overflow`               | ❌     | Enum defined (Clip/Ellipsis), not extracted |
-| `text-wrap`                   | ❌     |                                             |
-| `text-wrap-mode`              | ❌     |                                             |
-| `text-wrap-style`             | ❌     |                                             |
-| `hanging-punctuation`         | ❌     |                                             |
-| `text-spacing-trim`           | ❌     |                                             |
-| `text-autospace`              | ❌     |                                             |
-| `widows`                      | ❌     |                                             |
-| `orphans`                     | ❌     |                                             |
+| CSS Property                  | Status | Notes                                                                     |
+| ----------------------------- | ------ | ------------------------------------------------------------------------- |
+| `line-height`                 | ✅     | normal, number, length                                                    |
+| `letter-spacing`              | ✅     |                                                                           |
+| `word-spacing`                | ✅     |                                                                           |
+| `text-align`                  | ✅     | left, right, center, justify                                              |
+| `text-align-last`             | ❌     |                                                                           |
+| `text-justify`                | ❌     |                                                                           |
+| `text-indent`                 | ✅     | px + % resolved against container; negative (hanging) indent clamped to 0 |
+| `text-transform`              | ✅     | uppercase, lowercase, capitalize                                          |
+| `white-space`                 | ✅     | normal, pre, pre-wrap, pre-line, nowrap                                   |
+| `white-space-collapse`        | ❌     |                                                                           |
+| `word-break`                  | ❌     |                                                                           |
+| `overflow-wrap` / `word-wrap` | ❌     |                                                                           |
+| `line-break`                  | ❌     |                                                                           |
+| `hyphens`                     | ❌     |                                                                           |
+| `hyphenate-character`         | ❌     |                                                                           |
+| `hyphenate-limit-chars`       | ❌     |                                                                           |
+| `tab-size`                    | ❌     |                                                                           |
+| `text-overflow`               | ❌     | Enum defined (Clip/Ellipsis), not extracted                               |
+| `text-wrap`                   | ❌     |                                                                           |
+| `text-wrap-mode`              | ❌     |                                                                           |
+| `text-wrap-style`             | ❌     |                                                                           |
+| `hanging-punctuation`         | ❌     |                                                                           |
+| `text-spacing-trim`           | ❌     |                                                                           |
+| `text-autospace`              | ❌     |                                                                           |
+| `widows`                      | ❌     |                                                                           |
+| `orphans`                     | ❌     |                                                                           |
 
 ### Text Decoration
 
-| CSS Property                  | Status | Notes                                                       |
-| ----------------------------- | ------ | ----------------------------------------------------------- |
-| `text-decoration` (shorthand) | ✅     | underline, line-through, overline (bitfield — simultaneous) |
-| `text-decoration-line`        | ✅     |                                                             |
-| `text-decoration-style`       | ⚠️     | Field defined, not extracted from Stylo                     |
-| `text-decoration-color`       | ⚠️     | Field defined, not extracted from Stylo                     |
-| `text-decoration-thickness`   | ❌     |                                                             |
-| `text-decoration-skip-ink`    | ❌     |                                                             |
-| `text-underline-position`     | ❌     |                                                             |
-| `text-underline-offset`       | ❌     |                                                             |
+| CSS Property                  | Status | Notes                                                          |
+| ----------------------------- | ------ | -------------------------------------------------------------- |
+| `text-decoration` (shorthand) | ✅     | underline, line-through, overline (bitfield — simultaneous)    |
+| `text-decoration-line`        | ✅     |                                                                |
+| `text-decoration-style`       | ✅     | solid/double/dotted/dashed/wavy via Skia `TextDecorationStyle` |
+| `text-decoration-color`       | ✅     | `currentcolor` falls back to text color                        |
+| `text-decoration-thickness`   | ❌     |                                                                |
+| `text-decoration-skip-ink`    | ❌     |                                                                |
+| `text-underline-position`     | ❌     |                                                                |
+| `text-underline-offset`       | ❌     |                                                                |
 
 ### Text Shadow & Emphasis
 
-| CSS Property             | Status | Notes              |
-| ------------------------ | ------ | ------------------ |
-| `text-shadow`            | ❌     | Not in type schema |
-| `text-emphasis`          | ❌     |                    |
-| `text-emphasis-style`    | ❌     |                    |
-| `text-emphasis-color`    | ❌     |                    |
-| `text-emphasis-position` | ❌     |                    |
+| CSS Property             | Status | Notes                                                            |
+| ------------------------ | ------ | ---------------------------------------------------------------- |
+| `text-shadow`            | ✅     | Offset + blur + color; stacked, via Skia `TextStyle::add_shadow` |
+| `text-emphasis`          | ❌     |                                                                  |
+| `text-emphasis-style`    | ❌     |                                                                  |
+| `text-emphasis-color`    | ❌     |                                                                  |
+| `text-emphasis-position` | ❌     |                                                                  |
 
 ### Writing Modes & BiDi
 
@@ -385,37 +387,37 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Transform
 
-| CSS Property          | Status | Notes                                          |
-| --------------------- | ------ | ---------------------------------------------- |
-| `transform`           | ✅     | 2D: translate, rotate, scale, skew, matrix     |
-| `transform-origin`    | ✅     | Percentage-based origins (default 50% 50%)     |
-| `transform-box`       | ❌     |                                                |
-| `transform-style`     | ❌     |                                                |
-| `translate`           | ❌     | Individual property (use `transform:` instead) |
-| `rotate`              | ❌     | Individual property (use `transform:` instead) |
-| `scale`               | ❌     | Individual property (use `transform:` instead) |
-| `perspective`         | ❌     |                                                |
-| `perspective-origin`  | ❌     |                                                |
-| `backface-visibility` | ❌     |                                                |
+| CSS Property          | Status | Notes                                                 |
+| --------------------- | ------ | ----------------------------------------------------- |
+| `transform`           | ✅     | 2D: translate, rotate, scale, skew, matrix            |
+| `transform-origin`    | ✅     | Percentage-based origins (default 50% 50%)            |
+| `transform-box`       | ❌     |                                                       |
+| `transform-style`     | ❌     |                                                       |
+| `translate`           | ✅     | Standalone longhand, applies before `transform:`      |
+| `rotate`              | ✅     | Standalone longhand; 2D and z-axis-only 3D `rotate3d` |
+| `scale`               | ✅     | Standalone longhand, uniform and `sx sy`              |
+| `perspective`         | ❌     |                                                       |
+| `perspective-origin`  | ❌     |                                                       |
+| `backface-visibility` | ❌     |                                                       |
 
 ### Filter & Effects
 
-| CSS Property      | Status | Notes |
-| ----------------- | ------ | ----- |
-| `filter`          | ❌     |       |
-| `backdrop-filter` | ❌     |       |
-| `clip-path`       | ❌     |       |
-| `clip-rule`       | ❌     |       |
-| `mask`            | ❌     |       |
-| `mask-image`      | ❌     |       |
-| `mask-clip`       | ❌     |       |
-| `mask-composite`  | ❌     |       |
-| `mask-mode`       | ❌     |       |
-| `mask-origin`     | ❌     |       |
-| `mask-position`   | ❌     |       |
-| `mask-repeat`     | ❌     |       |
-| `mask-size`       | ❌     |       |
-| `mask-type`       | ❌     |       |
+| CSS Property      | Status | Notes                                                                                   |
+| ----------------- | ------ | --------------------------------------------------------------------------------------- |
+| `filter`          | ✅     | blur + 8 color filters + drop-shadow; `url()` SVG refs TODO                             |
+| `backdrop-filter` | ❌     |                                                                                         |
+| `clip-path`       | ✅     | `inset()` / `circle()` / `ellipse()` / `polygon()`; `url()` and `path()`/`shape()` TODO |
+| `clip-rule`       | ❌     |                                                                                         |
+| `mask`            | ❌     |                                                                                         |
+| `mask-image`      | ❌     |                                                                                         |
+| `mask-clip`       | ❌     |                                                                                         |
+| `mask-composite`  | ❌     |                                                                                         |
+| `mask-mode`       | ❌     |                                                                                         |
+| `mask-origin`     | ❌     |                                                                                         |
+| `mask-position`   | ❌     |                                                                                         |
+| `mask-repeat`     | ❌     |                                                                                         |
+| `mask-size`       | ❌     |                                                                                         |
+| `mask-type`       | ❌     |                                                                                         |
 
 ### CSS Motion Path (Offset)
 
@@ -493,13 +495,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Image Rendering
 
-| CSS Property        | Status | Notes                                 |
-| ------------------- | ------ | ------------------------------------- |
-| `image-rendering`   | ❌     |                                       |
-| `image-orientation` | ❌     |                                       |
-| `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown |
-| `object-position`   | ❌     |                                       |
-| `object-view-box`   | ❌     |                                       |
+| CSS Property        | Status | Notes                                                  |
+| ------------------- | ------ | ------------------------------------------------------ |
+| `image-rendering`   | ✅     | `auto` → bilinear; `pixelated`/`crisp-edges` → nearest |
+| `image-orientation` | ❌     |                                                        |
+| `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown                  |
+| `object-position`   | ✅     | Per-axis px / % / keywords                             |
+| `object-view-box`   | ❌     |                                                        |
 
 ### Shape (Floats)
 

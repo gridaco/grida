@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: background-position</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .rect {
+        width: 160px;
+        height: 120px;
+        border: 1px solid #ccc;
+        background-repeat: no-repeat;
+        background-size: 60px 40px;
+        background-image: linear-gradient(
+          to right,
+          #ff0000 0 50%,
+          #0000ff 50% 100%
+        );
+      }
+      .pos-0 {
+        background-position: 0 0;
+      }
+      .pos-center {
+        background-position: center;
+      }
+      .pos-bottom-right {
+        background-position: 100% 100%;
+      }
+      .pos-px {
+        background-position: 20px 30px;
+      }
+      .pos-mix {
+        background-position: 50% 10px;
+      }
+      .pos-keywords {
+        background-position: right top;
+      }
+      .pos-neg {
+        background-position: -20px -10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">0 0 (top-left)</div>
+        <div class="rect pos-0"></div>
+      </div>
+      <div>
+        <div class="label">center</div>
+        <div class="rect pos-center"></div>
+      </div>
+      <div>
+        <div class="label">100% 100% (bottom-right)</div>
+        <div class="rect pos-bottom-right"></div>
+      </div>
+      <div>
+        <div class="label">20px 30px</div>
+        <div class="rect pos-px"></div>
+      </div>
+      <div>
+        <div class="label">50% 10px</div>
+        <div class="rect pos-mix"></div>
+      </div>
+      <div>
+        <div class="label">right top</div>
+        <div class="rect pos-keywords"></div>
+      </div>
+      <div>
+        <div class="label">-20px -10px</div>
+        <div class="rect pos-neg"></div>
+      </div>
+    </div>
+  </body>
+</html>

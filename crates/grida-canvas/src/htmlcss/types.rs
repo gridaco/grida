@@ -126,12 +126,35 @@ pub enum JustifyContent {
 }
 
 /// A CSS length value. Percentages are kept as-is for Taffy to resolve.
+///
+/// `Calc` preserves mixed `calc()` expressions like `calc(100% - 10px)`
+/// until paint time, when the box dimension is known. The stored form is
+/// `percent * basis + px`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum CssLength {
     #[default]
     Auto,
     Px(f32),
     Percent(f32),
+    /// Mixed calc: `percent * basis + px`.
+    Calc {
+        px: f32,
+        percent: f32,
+    },
+}
+
+impl CssLength {
+    /// Resolve to a concrete pixel value given a reference dimension.
+    /// `Auto` resolves to `0.0`.
+    #[inline]
+    pub fn resolve_px(&self, basis: f32) -> f32 {
+        match self {
+            CssLength::Auto => 0.0,
+            CssLength::Px(v) => *v,
+            CssLength::Percent(p) => basis * p,
+            CssLength::Calc { px, percent } => basis * percent + px,
+        }
+    }
 }
 
 /// CSS line-height (inherited text property).
@@ -168,6 +191,19 @@ pub enum TextOverflow {
     #[default]
     Clip,
     Ellipsis,
+}
+
+/// CSS `image-rendering` — quality hint for scaled raster images.
+///
+/// Maps to Skia `SamplingOptions`:
+/// - `Auto` → bilinear filtering (default)
+/// - `CrispEdges` / `Pixelated` → nearest-neighbor (sharp pixel edges)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImageRendering {
+    #[default]
+    Auto,
+    CrispEdges,
+    Pixelated,
 }
 
 /// CSS `vertical-align` property (inline-level).

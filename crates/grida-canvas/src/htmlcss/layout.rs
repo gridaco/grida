@@ -3,7 +3,7 @@
 //! Builds a Taffy tree from the styled IR, runs CSS layout (block flow,
 //! flexbox, grid), and produces positioned boxes with resolved dimensions.
 
-use crate::cg::prelude::CGColor;
+use crate::cg::prelude::{CGColor, TextDecorationStyle as CgTextDecorationStyle};
 use crate::runtime::font_repository::FontRepository;
 
 use skia_safe::font_style;
@@ -146,6 +146,7 @@ fn build_taffy_node(
                         leaf_style,
                         TextMeasure {
                             items: vec![InlineRunItem::Text(run.clone())],
+                            text_indent: run.font.text_indent,
                         },
                     )
                     .unwrap();
@@ -161,6 +162,7 @@ fn build_taffy_node(
                         leaf_style,
                         TextMeasure {
                             items: group.items.clone(),
+                            text_indent: group.text_indent,
                         },
                     )
                     .unwrap();
@@ -181,6 +183,7 @@ fn build_taffy_node(
 #[derive(Debug, Clone)]
 struct TextMeasure {
     items: Vec<InlineRunItem>,
+    text_indent: types::CssLength,
 }
 
 /// Taffy measure callback — builds a Skia Paragraph at the given available
@@ -207,6 +210,25 @@ fn text_measure_func(
     // (Chromium: LineBreaker processes kOpenTag/kText/kCloseTag)
     let ps = ParagraphStyle::new();
     let mut builder = ParagraphBuilder::new(&ps, fonts);
+
+    // text-indent: prepend a width-reserving placeholder. Because it sits
+    // before any glyphs it only shifts the first visual line — subsequent
+    // wrapped lines start at x=0 as expected.
+    let indent_basis = match available_space.width {
+        AvailableSpace::Definite(w) => known_dimensions.width.unwrap_or(w),
+        _ => 0.0,
+    };
+    let indent_px = resolve_text_indent(ctx.text_indent, indent_basis);
+    if indent_px > 0.0 {
+        builder.add_placeholder(&skia_safe::textlayout::PlaceholderStyle::new(
+            indent_px,
+            0.01,
+            skia_safe::textlayout::PlaceholderAlignment::Baseline,
+            skia_safe::textlayout::TextBaseline::Alphabetic,
+            0.0,
+        ));
+    }
+
     for item in &ctx.items {
         match item {
             InlineRunItem::Text(run) => {
@@ -391,7 +413,9 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
             types::FlexWrap::WrapReverse => taffy::FlexWrap::WrapReverse,
         },
         align_items: Some(map_align_items(el.align_items)),
+        justify_items: Some(map_align_items(el.justify_items)),
         justify_content: Some(map_justify_content(el.justify_content)),
+        align_content: el.align_content.map(map_justify_content),
         gap: taffy::Size {
             width: LengthPercentage::length(el.column_gap),
             height: LengthPercentage::length(el.row_gap),
@@ -399,13 +423,8 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
         flex_grow: el.flex_grow,
         flex_shrink: el.flex_shrink,
         flex_basis: css_length_to_dim(el.flex_basis),
-        align_self: el.align_self.map(|a| match a {
-            types::AlignItems::Start => taffy::AlignSelf::FlexStart,
-            types::AlignItems::End => taffy::AlignSelf::FlexEnd,
-            types::AlignItems::Center => taffy::AlignSelf::Center,
-            types::AlignItems::Stretch => taffy::AlignSelf::Stretch,
-            types::AlignItems::Baseline => taffy::AlignSelf::Baseline,
-        }),
+        align_self: el.align_self.map(map_align_self),
+        justify_self: el.justify_self.map(map_align_self),
         overflow: taffy::Point {
             x: map_overflow(el.overflow_x),
             y: map_overflow(el.overflow_y),
@@ -504,6 +523,17 @@ fn css_length_to_dim(len: types::CssLength) -> Dimension {
         types::CssLength::Px(px) => Dimension::length(px),
         types::CssLength::Percent(pct) => Dimension::percent(pct),
         types::CssLength::Auto => Dimension::auto(),
+        // Taffy has no `calc()` variant; pick the dominant term.
+        // `to_length()` already folds pure-px calcs to `Px`, so a Calc
+        // we see here has a non-trivial percent component in the common
+        // case (e.g. `calc(100% - 10px)` → keep the 100%).
+        types::CssLength::Calc { px, percent } => {
+            if percent != 0.0 {
+                Dimension::percent(percent)
+            } else {
+                Dimension::length(px)
+            }
+        }
     }
 }
 
@@ -512,7 +542,28 @@ fn css_length_to_lpa(len: types::CssLength) -> LengthPercentageAuto {
         types::CssLength::Px(px) => LengthPercentageAuto::length(px),
         types::CssLength::Percent(pct) => LengthPercentageAuto::percent(pct),
         types::CssLength::Auto => LengthPercentageAuto::auto(),
+        types::CssLength::Calc { px, percent } => {
+            if percent != 0.0 {
+                LengthPercentageAuto::percent(percent)
+            } else {
+                LengthPercentageAuto::length(px)
+            }
+        }
     }
+}
+
+/// Resolve a CSS `text-indent` value to pixels against the available width.
+/// Percentages with a zero/unknown basis collapse to 0 (at intrinsic-sizing
+/// time we have no basis; the actual layout width is used when known).
+pub(crate) fn resolve_text_indent(indent: types::CssLength, basis: f32) -> f32 {
+    // Negative text-indent (hanging indent) is clamped to 0 at the
+    // resolve site so callers can treat the returned px uniformly.
+    // CSS allows negative values, but our paragraph path (Skia
+    // `PlaceholderStyle`) can't reserve negative space, and shifting
+    // only the first line outside the paragraph bounds isn't supported
+    // by the Paragraph-based text stack. Documented as a known
+    // limitation in `docs/wg/feat-2d/htmlcss.md`.
+    indent.resolve_px(basis).max(0.0)
 }
 
 fn map_align_items(a: types::AlignItems) -> taffy::AlignItems {
@@ -522,6 +573,16 @@ fn map_align_items(a: types::AlignItems) -> taffy::AlignItems {
         types::AlignItems::Center => taffy::AlignItems::Center,
         types::AlignItems::Stretch => taffy::AlignItems::Stretch,
         types::AlignItems::Baseline => taffy::AlignItems::Baseline,
+    }
+}
+
+fn map_align_self(a: types::AlignItems) -> taffy::AlignSelf {
+    match a {
+        types::AlignItems::Start => taffy::AlignSelf::FlexStart,
+        types::AlignItems::End => taffy::AlignSelf::FlexEnd,
+        types::AlignItems::Center => taffy::AlignSelf::Center,
+        types::AlignItems::Stretch => taffy::AlignSelf::Stretch,
+        types::AlignItems::Baseline => taffy::AlignSelf::Baseline,
     }
 }
 
@@ -777,11 +838,30 @@ pub(crate) fn build_skia_text_style(font: &FontProps, color: &CGColor) -> TextSt
     }
     if decoration != textlayout::TextDecoration::NO_DECORATION {
         ts.set_decoration_type(decoration);
-        ts.set_decoration_style(textlayout::TextDecorationStyle::Solid);
-        ts.set_decoration_color(skia_safe::Color::from_argb(
-            color.a, color.r, color.g, color.b,
-        ));
+        let dec_style = match font.decoration_style {
+            CgTextDecorationStyle::Solid => textlayout::TextDecorationStyle::Solid,
+            CgTextDecorationStyle::Double => textlayout::TextDecorationStyle::Double,
+            CgTextDecorationStyle::Dotted => textlayout::TextDecorationStyle::Dotted,
+            CgTextDecorationStyle::Dashed => textlayout::TextDecorationStyle::Dashed,
+            CgTextDecorationStyle::Wavy => textlayout::TextDecorationStyle::Wavy,
+        };
+        ts.set_decoration_style(dec_style);
+        let dc = font.decoration_color.unwrap_or(*color);
+        ts.set_decoration_color(skia_safe::Color::from_argb(dc.a, dc.r, dc.g, dc.b));
         ts.set_decoration_thickness_multiplier(1.0);
+    }
+
+    // text-shadow: stacked in source order, painted bottom-up by Skia.
+    // CSS blur radius → Skia blur sigma (Gaussian). Empirically sigma ≈ blur / 2.
+    for sh in &font.text_shadow {
+        // CSS `text-shadow` blur length is a Gaussian sigma per CSS Text
+        // Decoration §5, matching Skia's `TextShadow` blur_sigma.
+        let sigma = sh.blur as f64;
+        ts.add_shadow(textlayout::TextShadow::new(
+            skia_safe::Color::from_argb(sh.color.a, sh.color.r, sh.color.g, sh.color.b),
+            skia_safe::Point::new(sh.offset_x, sh.offset_y),
+            sigma,
+        ));
     }
 
     ts

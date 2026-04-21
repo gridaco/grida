@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>
+      Layout: grid alignment (justify-items / justify-self / align-content)
+    </title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+      .cell {
+        width: 180px;
+      }
+      .g {
+        display: grid;
+        grid-template: 60px 60px / 80px 80px;
+        gap: 4px;
+        width: 164px;
+        height: 124px;
+        background: #f0f0f0;
+        padding: 0;
+      }
+      .item {
+        width: 30px;
+        height: 30px;
+        background: #3366cc;
+      }
+      .ji-center {
+        justify-items: center;
+      }
+      .ji-end {
+        justify-items: end;
+      }
+      .ai-center {
+        align-items: center;
+      }
+      .ac-center {
+        align-content: center;
+        grid-template: 40px 40px / 80px 80px;
+      }
+      .ac-space-between {
+        align-content: space-between;
+      }
+      .self-override .item:nth-child(2) {
+        justify-self: end;
+        align-self: end;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">baseline (default stretch)</div>
+        <div class="g">
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="label">justify-items: center</div>
+        <div class="g ji-center">
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="label">justify-items: end</div>
+        <div class="g ji-end">
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="label">align-items: center + justify: center</div>
+        <div class="g ai-center ji-center">
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="label">align-content: center (short tracks)</div>
+        <div class="g ac-center">
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="label">align-content: space-between</div>
+        <div class="g ac-space-between ac-center">
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="label">align-self + justify-self override</div>
+        <div class="g ji-center ai-center self-override">
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+          <div class="item"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

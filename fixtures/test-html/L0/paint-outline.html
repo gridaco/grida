@@ -76,6 +76,13 @@
         outline-offset: 6px;
         border-radius: 12px;
       }
+      .outline-double {
+        outline: 9px double #000;
+      }
+      .outline-double-radius {
+        outline: 9px double #c00;
+        border-radius: 12px;
+      }
     </style>
   </head>
   <body>
@@ -117,6 +124,13 @@
         <div class="columns">
           <div class="box outline-radius">radius</div>
           <div class="box outline-radius-offset">radius + offset</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">outline: 9px double</div>
+        <div class="columns">
+          <div class="box outline-double">double</div>
+          <div class="box outline-double-radius">double + radius</div>
         </div>
       </div>
     </div>

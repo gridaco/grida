@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Conic Gradient</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .rect {
+        width: 180px;
+        height: 180px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      /* default — red should start at top (12 o'clock), sweep clockwise */
+      .default {
+        background: conic-gradient(#f00, #ff0, #0f0, #00f, #f00);
+      }
+
+      /* quadrants — tests that 0deg == top (CSS), not +x (Skia default) */
+      .quadrants {
+        background: conic-gradient(
+          #f00 0deg 90deg,
+          #0f0 90deg 180deg,
+          #00f 180deg 270deg,
+          #ff0 270deg 360deg
+        );
+      }
+
+      /* from <angle> */
+      .from-45 {
+        background: conic-gradient(from 45deg, #f00, #ff0, #0f0, #00f, #f00);
+      }
+      .from-180 {
+        background: conic-gradient(from 180deg, #f00, #ff0, #0f0, #00f, #f00);
+      }
+
+      /* at <position> */
+      .at-top-left {
+        background: conic-gradient(at top left, #f00, #ff0, #0f0, #00f, #f00);
+      }
+      .at-percent {
+        background: conic-gradient(at 25% 75%, #f00, #ff0, #0f0, #00f, #f00);
+      }
+
+      /* from + at combined */
+      .from-at {
+        background: conic-gradient(
+          from 90deg at 25% 25%,
+          #f00,
+          #0f0,
+          #00f,
+          #f00
+        );
+      }
+
+      /* pie slices */
+      .pie {
+        background: conic-gradient(
+          #e11 0 25%,
+          #1a1 25% 50%,
+          #14a 50% 75%,
+          #e91 75% 100%
+        );
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">default (rainbow, red at top)</div>
+        <div class="rect default">default</div>
+      </div>
+      <div>
+        <div class="label">quadrants (TR=red,BR=green,BL=blue,TL=yellow)</div>
+        <div class="rect quadrants">quadrants</div>
+      </div>
+      <div>
+        <div class="label">from 45deg</div>
+        <div class="rect from-45">from 45</div>
+      </div>
+      <div>
+        <div class="label">from 180deg (red at bottom)</div>
+        <div class="rect from-180">from 180</div>
+      </div>
+      <div>
+        <div class="label">at top left</div>
+        <div class="rect at-top-left">at TL</div>
+      </div>
+      <div>
+        <div class="label">at 25% 75%</div>
+        <div class="rect at-percent">at 25/75</div>
+      </div>
+      <div>
+        <div class="label">from 90deg at 25% 25%</div>
+        <div class="rect from-at">from+at</div>
+      </div>
+      <div>
+        <div class="label">pie</div>
+        <div class="rect pie">pie</div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -78,7 +78,18 @@ pub struct StyledElement {
     pub blend_mode: BlendMode,
     pub overflow_x: Overflow,
     pub overflow_y: Overflow,
+    /// CSS `overflow-clip-margin` — additional px margin around the clip
+    /// rect when `overflow: clip` is active. Ignored for `hidden`,
+    /// `scroll`, or `auto`.
+    pub overflow_clip_margin: f32,
     pub box_shadow: Vec<BoxShadow>,
+    /// CSS `filter` chain, applied in order to the element and its
+    /// descendants via a paint layer wrapped in a Skia `ImageFilter`.
+    pub filter: Vec<FilterFunction>,
+    /// CSS `clip-path` — clips the element and its descendants to a
+    /// basic shape. Evaluated at paint time against the element's
+    /// border box.
+    pub clip_path: ClipPath,
 
     // ── Transform (rare non-inherited) ──
     /// CSS `transform` operations, preserving unresolved percentage/length
@@ -99,6 +110,14 @@ pub struct StyledElement {
     pub flex_wrap: FlexWrap,
     pub align_items: AlignItems,
     pub justify_content: JustifyContent,
+    /// Per-cell alignment of grid items along the inline axis.
+    /// Ignored by flex containers.
+    pub justify_items: AlignItems,
+    /// Content-level alignment of rows along the block axis (grid) or
+    /// cross-axis when `flex-wrap: wrap` (flex). `None` means the CSS
+    /// default (`normal`, which behaves like `stretch`) — defer to
+    /// Taffy so it can pick the layout-method-appropriate behavior.
+    pub align_content: Option<JustifyContent>,
     pub row_gap: f32,
     pub column_gap: f32,
 
@@ -107,6 +126,8 @@ pub struct StyledElement {
     pub flex_shrink: f32,
     pub flex_basis: CssLength,
     pub align_self: Option<AlignItems>,
+    /// Overrides the parent's `justify-items` for this grid cell.
+    pub justify_self: Option<AlignItems>,
 
     // ── Grid container (rare non-inherited) ──
     pub grid_template_columns: Vec<GridTemplateEntry>,
@@ -169,6 +190,13 @@ pub struct ReplacedContent {
     pub attr_height: Option<u32>,
     /// CSS `object-fit` — how the image content fits its box.
     pub object_fit: super::types::ObjectFit,
+    /// CSS `object-position` — where the content sits inside the box
+    /// after `object-fit` scaling. The CSS initial value is `50% 50%`,
+    /// which differs from `BackgroundPosition::default()` (`0% 0%`);
+    /// construction paths for `<img>` should use
+    /// `BackgroundPosition::center()` so the image is centered by
+    /// default rather than pinned to the top-left.
+    pub object_position: BackgroundPosition,
 }
 
 /// Consecutive inline items merged into a single paragraph.
@@ -180,6 +208,10 @@ pub struct ReplacedContent {
 pub struct InlineGroup {
     pub items: Vec<InlineRunItem>,
     pub text_align: TextAlign,
+    /// Inherited `text-indent` of the containing block. Applied as a
+    /// first-line-only inline-start offset by prepending a Skia
+    /// placeholder to the Paragraph.
+    pub text_indent: CssLength,
 }
 
 /// An item within an inline formatting context.
@@ -381,6 +413,157 @@ pub struct BoxShadow {
     pub inset: bool,
 }
 
+/// CSS `clip-path` basic shapes.
+///
+/// Positions and lengths resolve against the element's border box at
+/// paint time. `Url` (SVG `clipPath` reference) and `path()` / `shape()`
+/// are not yet plumbed.
+#[derive(Debug, Clone, Default)]
+pub enum ClipPath {
+    #[default]
+    None,
+    /// `inset(<top> <right> <bottom> <left> [round <radius>])`.
+    ///
+    /// Radii are stored as `CssLength` per corner/axis so percentage
+    /// values survive collect. Resolution to px happens in
+    /// `apply_clip_path` against the inset clip rect.
+    Inset {
+        top: CssLength,
+        right: CssLength,
+        bottom: CssLength,
+        left: CssLength,
+        radius: InsetCornerRadii,
+    },
+    /// `circle(<radius> at <cx> <cy>)`.
+    Circle {
+        cx: CssLength,
+        cy: CssLength,
+        radius: ShapeRadius,
+    },
+    /// `ellipse(<rx> <ry> at <cx> <cy>)`.
+    Ellipse {
+        cx: CssLength,
+        cy: CssLength,
+        rx: ShapeRadius,
+        ry: ShapeRadius,
+    },
+    /// `polygon([<fill-rule>,] <point-list>)`.
+    Polygon {
+        points: Vec<(CssLength, CssLength)>,
+        even_odd: bool,
+    },
+}
+
+/// Per-corner radii for `clip-path: inset(... round ...)`. Each axis
+/// holds a `CssLength` so percentage radii (resolved against the
+/// inset clip rect) survive to paint time.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InsetCornerRadii {
+    pub tl_x: CssLength,
+    pub tl_y: CssLength,
+    pub tr_x: CssLength,
+    pub tr_y: CssLength,
+    pub br_x: CssLength,
+    pub br_y: CssLength,
+    pub bl_x: CssLength,
+    pub bl_y: CssLength,
+}
+
+impl Default for InsetCornerRadii {
+    fn default() -> Self {
+        let zero = CssLength::Px(0.0);
+        Self {
+            tl_x: zero,
+            tl_y: zero,
+            tr_x: zero,
+            tr_y: zero,
+            br_x: zero,
+            br_y: zero,
+            bl_x: zero,
+            bl_y: zero,
+        }
+    }
+}
+
+impl InsetCornerRadii {
+    /// Returns true when every axis is definitely zero. Percentage
+    /// values with a non-zero fraction are treated as non-zero even
+    /// though the resolved px amount depends on the clip rect.
+    pub fn is_zero(&self) -> bool {
+        let is_z = |v: CssLength| match v {
+            CssLength::Px(p) => p == 0.0,
+            CssLength::Percent(p) => p == 0.0,
+            CssLength::Calc { px, percent } => px == 0.0 && percent == 0.0,
+            CssLength::Auto => true,
+        };
+        is_z(self.tl_x)
+            && is_z(self.tl_y)
+            && is_z(self.tr_x)
+            && is_z(self.tr_y)
+            && is_z(self.br_x)
+            && is_z(self.br_y)
+            && is_z(self.bl_x)
+            && is_z(self.bl_y)
+    }
+}
+
+/// Radius expression used by `circle()` and `ellipse()` in `clip-path`.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ShapeRadius {
+    /// Explicit length or percentage against the reference box axis.
+    Length(CssLength),
+    /// `closest-side` — distance from center to nearest edge.
+    /// Default per CSS Shapes spec when `circle()` is written without
+    /// an explicit radius.
+    #[default]
+    ClosestSide,
+    /// `farthest-side` — distance from center to farthest edge.
+    FarthestSide,
+}
+
+/// CSS `filter` functions. Scope covers the color/blur filters
+/// representable via `skia_safe::image_filters::blur`, drop-shadow, or
+/// a 4×5 color matrix. SVG `url()` filter references are not yet
+/// plumbed.
+#[derive(Debug, Clone, Copy)]
+pub enum FilterFunction {
+    /// `blur(<length>)` — Gaussian blur. Value is CSS px; Skia sigma is `px / 2`.
+    Blur(f32),
+    /// `brightness(<number>)` — 1.0 is identity.
+    Brightness(f32),
+    /// `contrast(<number>)` — 1.0 is identity.
+    Contrast(f32),
+    /// `grayscale(<0..1>)` — 0 is identity, 1 is full grayscale.
+    Grayscale(f32),
+    /// `hue-rotate(<angle>)` — radians.
+    HueRotate(f32),
+    /// `invert(<0..1>)` — 0 is identity, 1 is fully inverted.
+    Invert(f32),
+    /// `opacity(<0..1>)` — 1 is identity.
+    Opacity(f32),
+    /// `saturate(<number>)` — 1.0 is identity; 0 is grayscale.
+    Saturate(f32),
+    /// `sepia(<0..1>)` — 0 is identity, 1 is full sepia tone.
+    Sepia(f32),
+    /// `drop-shadow(<offset-x> <offset-y> <blur> <color>)` — Gaussian
+    /// shadow of the alpha silhouette, composed behind the source.
+    DropShadow {
+        offset_x: f32,
+        offset_y: f32,
+        blur: f32,
+        color: CGColor,
+    },
+}
+
+/// CSS `text-shadow` entry — one shadow in a comma-separated list.
+#[derive(Debug, Clone, Copy)]
+pub struct TextShadow {
+    pub offset_x: f32,
+    pub offset_y: f32,
+    pub blur: f32,
+    pub color: CGColor,
+}
+
 // ─── Background Sub-types (StyleBackgroundData) ─────────────────────
 
 /// A CSS image value — polymorphic like Chromium's `StyleImage`.
@@ -412,37 +595,220 @@ pub enum StyleImage {
 pub enum BackgroundLayer {
     /// Solid color fill (CSS `background-color`).
     Solid(CGColor),
-    /// Image layer: gradient or URL-referenced image.
-    /// Chromium: `FillLayer::image_` field holding a `StyleImage*`.
-    Image(StyleImage),
+    /// Image layer with full CSS geometry (size, position, repeat, clip, origin).
+    /// Chromium: `FillLayer` with image, size, position, repeat, clip, origin.
+    Image(BackgroundImage),
 }
 
-/// CSS `linear-gradient()`.
+/// A CSS background image layer with geometry.
+#[derive(Debug, Clone)]
+pub struct BackgroundImage {
+    pub source: StyleImage,
+    pub size: BackgroundSize,
+    pub position: BackgroundPosition,
+    pub repeat: BackgroundRepeat,
+    pub clip: BackgroundBox,
+    pub origin: BackgroundBox,
+}
+
+/// CSS `background-size`.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum BackgroundSize {
+    /// `auto` / `auto auto` — use intrinsic size; fall back to 100% 100%.
+    #[default]
+    Auto,
+    /// `cover`
+    Cover,
+    /// `contain`
+    Contain,
+    /// `<width> <height>` with `auto` permitted on either axis.
+    Explicit { width: CssLength, height: CssLength },
+}
+
+/// CSS `background-position` resolved to a 2D offset.
+/// Each axis is `Px`/`Percent`; `Auto` is treated as `Percent(0.0)`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BackgroundPosition {
+    pub x: CssLength,
+    pub y: CssLength,
+}
+
+impl Default for BackgroundPosition {
+    /// `0% 0%` — the CSS initial value for `background-position`.
+    ///
+    /// NOTE: this is **not** the right default for `object-position`,
+    /// which is `50% 50%`. Use `BackgroundPosition::center()` at
+    /// construction time whenever the context calls for a centered
+    /// default.
+    fn default() -> Self {
+        BackgroundPosition {
+            x: CssLength::Percent(0.0),
+            y: CssLength::Percent(0.0),
+        }
+    }
+}
+
+impl BackgroundPosition {
+    /// `50% 50%` — the CSS initial value for `object-position`.
+    pub fn center() -> Self {
+        BackgroundPosition {
+            x: CssLength::Percent(0.5),
+            y: CssLength::Percent(0.5),
+        }
+    }
+}
+
+/// CSS `background-repeat` keyword, per axis.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum BackgroundRepeatKeyword {
+    #[default]
+    Repeat,
+    NoRepeat,
+    Space,
+    Round,
+}
+
+/// CSS `background-repeat` as an `(x, y)` pair.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct BackgroundRepeat {
+    pub x: BackgroundRepeatKeyword,
+    pub y: BackgroundRepeatKeyword,
+}
+
+/// Common box reference for `background-clip` and `background-origin`.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum BackgroundBox {
+    #[default]
+    BorderBox,
+    PaddingBox,
+    ContentBox,
+}
+
+/// CSS gradient `color-interpolation-method` — the color space where color
+/// stops are blended.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum GradientColorSpace {
+    #[default]
+    Oklab,
+    Srgb,
+    SrgbLinear,
+    Hsl,
+    Hwb,
+    Lab,
+    Lch,
+    Oklch,
+    DisplayP3,
+    Rec2020,
+    A98Rgb,
+    ProphotoRgb,
+    XyzD50,
+    XyzD65,
+}
+
+/// Hue interpolation strategy for cylindrical color spaces (HSL, HWB, LCH, OKLCH).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum GradientHueMethod {
+    #[default]
+    Shorter,
+    Longer,
+    Increasing,
+    Decreasing,
+}
+
+/// Resolved CSS `color-interpolation-method` on a gradient.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct GradientInterpolation {
+    pub color_space: GradientColorSpace,
+    pub hue_method: GradientHueMethod,
+}
+
+/// CSS `linear-gradient()` / `repeating-linear-gradient()`.
 #[derive(Debug, Clone)]
 pub struct LinearGradient {
     /// Angle in CSS degrees (0 = to top, 90 = to right, 180 = to bottom).
     pub angle_deg: f32,
     pub stops: Vec<GradientStop>,
+    pub repeating: bool,
+    pub interpolation: GradientInterpolation,
 }
 
-/// CSS `radial-gradient()`.
+/// CSS `radial-gradient()` / `repeating-radial-gradient()`.
 #[derive(Debug, Clone)]
 pub struct RadialGradient {
+    pub shape: RadialShape,
+    pub size: RadialSize,
+    pub center: GradientPosition,
     pub stops: Vec<GradientStop>,
-    // TODO: shape (circle/ellipse), size, position
+    pub repeating: bool,
+    pub interpolation: GradientInterpolation,
 }
 
-/// CSS `conic-gradient()`.
+/// CSS `conic-gradient()` / `repeating-conic-gradient()`.
 #[derive(Debug, Clone)]
 pub struct ConicGradient {
+    /// `from <angle>` — CSS degrees measured clockwise from 12 o'clock.
+    /// 0 = top (default). Paint-time conversion adjusts for Skia's +x origin.
+    pub from_angle_deg: f32,
+    pub center: GradientPosition,
     pub stops: Vec<GradientStop>,
-    // TODO: from angle, at position
+    pub repeating: bool,
+    pub interpolation: GradientInterpolation,
+}
+
+/// Radial gradient shape.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum RadialShape {
+    Circle,
+    /// CSS default when shape omitted.
+    #[default]
+    Ellipse,
+}
+
+/// Radial gradient extent.
+///
+/// `Explicit` carries radii resolved at paint time (percent against box size).
+/// For circles, only `x` is meaningful (parser guarantees `y == x`).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum RadialSize {
+    ClosestSide,
+    ClosestCorner,
+    FarthestSide,
+    /// CSS default when size omitted.
+    #[default]
+    FarthestCorner,
+    Explicit {
+        x: CssLength,
+        y: CssLength,
+    },
+}
+
+/// Center of a radial or conic gradient. CSS default is `50% 50%`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GradientPosition {
+    pub x: CssLength,
+    pub y: CssLength,
+}
+
+impl Default for GradientPosition {
+    fn default() -> Self {
+        Self {
+            x: CssLength::Percent(0.5),
+            y: CssLength::Percent(0.5),
+        }
+    }
 }
 
 /// A gradient color stop.
 #[derive(Debug, Clone, Copy)]
 pub struct GradientStop {
-    pub offset: f32, // 0.0 = start, 1.0 = end
+    /// Stop position. When `offset_is_px` is false this is a fraction
+    /// of the gradient line (0.0 = start, 1.0 = end) resolved at
+    /// extraction time. When true it is a raw px offset along the
+    /// gradient line, resolved to a fraction at paint time using the
+    /// geometry-dependent line length. Only meaningful for
+    /// linear/radial — conic stop positions are always angular.
+    pub offset: f32,
+    pub offset_is_px: bool,
     pub color: CGColor,
 }
 
@@ -469,10 +835,15 @@ pub struct FontProps {
     pub decoration_line_through: bool,
     pub decoration_style: TextDecorationStyle,
     pub decoration_color: Option<CGColor>,
+    /// CSS `text-shadow`. Inherited. Bottom-to-top paint order.
+    pub text_shadow: Vec<TextShadow>,
     pub white_space: WhiteSpace,
-    pub text_indent: f32,
+    pub text_indent: CssLength,
     pub text_overflow: TextOverflow,
     pub vertical_align: VerticalAlign,
+    /// CSS `image-rendering` — quality hint for raster images used by
+    /// `<img>`, `background-image: url()`, and border-image.
+    pub image_rendering: super::types::ImageRendering,
     // TODO: word-break, overflow-wrap, tab-size
 }
 
@@ -493,10 +864,12 @@ impl Default for FontProps {
             decoration_line_through: false,
             decoration_style: TextDecorationStyle::Solid,
             decoration_color: None,
+            text_shadow: Vec::new(),
             white_space: WhiteSpace::Normal,
-            text_indent: 0.0,
+            text_indent: CssLength::Px(0.0),
             text_overflow: TextOverflow::Clip,
             vertical_align: VerticalAlign::Baseline,
+            image_rendering: super::types::ImageRendering::Auto,
         }
     }
 }
@@ -663,7 +1036,10 @@ impl Default for StyledElement {
             blend_mode: BlendMode::Normal,
             overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
+            overflow_clip_margin: 0.0,
             box_shadow: Vec::new(),
+            filter: Vec::new(),
+            clip_path: ClipPath::None,
             transform: Vec::new(),
             transform_origin: TransformOrigin::default(),
             position: Position::Static,
@@ -675,12 +1051,15 @@ impl Default for StyledElement {
             flex_wrap: FlexWrap::default(),
             align_items: AlignItems::default(),
             justify_content: JustifyContent::default(),
+            justify_items: AlignItems::default(),
+            align_content: None,
             row_gap: 0.0,
             column_gap: 0.0,
             flex_grow: 0.0,
             flex_shrink: 1.0,
             flex_basis: CssLength::Auto,
             align_self: None,
+            justify_self: None,
             grid_template_columns: Vec::new(),
             grid_template_rows: Vec::new(),
             grid_auto_columns: Vec::new(),

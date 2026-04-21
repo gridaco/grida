@@ -250,10 +250,12 @@ fn collect_element_with_counter(
 
     let is_void_widget = detect_widget(&tag, node_data, dom, &mut el);
 
-    // Extract object-fit from Stylo for replaced elements (<img>)
+    // Extract object-fit / object-position from Stylo for replaced
+    // elements (<img>).
     if el.replaced.is_some() {
         use style::properties::longhands::object_fit::computed_value::T as StyloObjectFit;
-        let of = style.get_position().clone_object_fit();
+        let pos = style.get_position();
+        let of = pos.clone_object_fit();
         let object_fit = match of {
             StyloObjectFit::Fill => types::ObjectFit::Fill,
             StyloObjectFit::Contain => types::ObjectFit::Contain,
@@ -261,8 +263,14 @@ fn collect_element_with_counter(
             StyloObjectFit::None => types::ObjectFit::None,
             StyloObjectFit::ScaleDown => types::ObjectFit::ScaleDown,
         };
+        let op = pos.clone_object_position();
+        let object_position = BackgroundPosition {
+            x: length_percentage_to_css(&op.horizontal),
+            y: length_percentage_to_css(&op.vertical),
+        };
         if let Some(ref mut replaced) = el.replaced {
             replaced.object_fit = object_fit;
+            replaced.object_position = object_position;
         }
     }
 
@@ -316,6 +324,7 @@ fn collect_element_with_counter(
                         flush_inline_group(
                             &mut pending_inline,
                             parent_text_align,
+                            el.font.text_indent,
                             &mut el.children,
                         );
                         el.children.push(StyledNode::Element(child));
@@ -327,7 +336,12 @@ fn collect_element_with_counter(
     }
 
     // Flush any trailing inline content
-    flush_inline_group(&mut pending_inline, parent_text_align, &mut el.children);
+    flush_inline_group(
+        &mut pending_inline,
+        parent_text_align,
+        el.font.text_indent,
+        &mut el.children,
+    );
 
     el
 }
@@ -362,6 +376,7 @@ fn detect_img_element(node: &DemoNode) -> ReplacedContent {
         attr_width,
         attr_height,
         object_fit: types::ObjectFit::Fill, // HTML spec default for <img>
+        object_position: BackgroundPosition::center(),
     }
 }
 
@@ -663,6 +678,7 @@ fn inject_synthetic_text(el: &mut StyledElement, text: &str, color: CGColor) {
             decoration: None,
         })],
         text_align: el.font.text_align,
+        text_indent: el.font.text_indent,
     }));
 }
 
@@ -795,6 +811,7 @@ fn build_inline_decoration(el: &StyledElement) -> Option<InlineBoxDecoration> {
 fn flush_inline_group(
     pending: &mut Vec<InlineRunItem>,
     text_align: TextAlign,
+    text_indent: CssLength,
     children: &mut Vec<StyledNode>,
 ) {
     if pending.is_empty() {
@@ -812,7 +829,11 @@ fn flush_inline_group(
         return;
     }
 
-    children.push(StyledNode::InlineGroup(InlineGroup { items, text_align }));
+    children.push(StyledNode::InlineGroup(InlineGroup {
+        items,
+        text_align,
+        text_indent,
+    }));
 }
 
 // ─── CSS property extraction ─────────────────────────────────────────
@@ -867,6 +888,7 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     let bx = style.get_box();
     el.overflow_x = map_overflow(bx.overflow_x);
     el.overflow_y = map_overflow(bx.overflow_y);
+    el.overflow_clip_margin = style.get_margin().clone_overflow_clip_margin().px();
 
     // Position
     {
@@ -899,11 +921,15 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Padding (resolved to px)
     el.padding = extract_padding(style);
 
+    // Text color (inherited) — must be resolved before any
+    // `currentcolor`-aware extraction (background gradients, border image).
+    el.color = abs_color_to_cg(&style.get_inherited_text().color);
+
     // Border
-    el.border = extract_border(style);
+    el.border = extract_border(style, el.color);
 
     // Border image (9-slice)
-    el.border_image = extract_border_image(style);
+    el.border_image = extract_border_image(style, el.color);
 
     // Border radius
     el.border_radius = extract_border_radius(style);
@@ -940,17 +966,25 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Inset (for positioned elements)
     el.inset = extract_inset(style);
 
-    // Background
-    el.background = extract_background(style);
+    // z-index (None when keyword `auto`)
+    {
+        use style::values::generics::position::ZIndex;
+        el.z_index = match style.get_position().clone_z_index() {
+            ZIndex::Integer(i) => Some(i),
+            ZIndex::Auto => None,
+        };
+    }
 
-    // Text color (inherited)
-    el.color = abs_color_to_cg(&style.get_inherited_text().color);
+    // Background
+    el.background = extract_background(style, el.color);
 
     // Font properties (inherited)
-    el.font = extract_font(style);
+    el.font = extract_font(style, el.color);
 
     // Box shadow
-    el.box_shadow = extract_box_shadow(style);
+    el.box_shadow = extract_box_shadow(style, el.color);
+    el.filter = extract_filter(style, el.color);
+    el.clip_path = extract_clip_path(style);
 
     // Transform
     el.transform = extract_transform(style);
@@ -977,31 +1011,14 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
             FlexWr::Wrap => types::FlexWrap::Wrap,
             FlexWr::WrapReverse => types::FlexWrap::WrapReverse,
         };
-        // align-items
-        let ai = style.clone_align_items();
-        let ai_flags = ai.0.value();
-        use style::values::specified::align::AlignFlags;
-        el.align_items = match ai_flags {
-            f if f == AlignFlags::CENTER => types::AlignItems::Center,
-            f if f == AlignFlags::FLEX_START || f == AlignFlags::START => types::AlignItems::Start,
-            f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::AlignItems::End,
-            f if f == AlignFlags::BASELINE => types::AlignItems::Baseline,
-            _ => types::AlignItems::Stretch,
-        };
-        // justify-content
-        let jc = style.clone_justify_content();
-        let jc_flags = jc.primary().value();
-        el.justify_content = match jc_flags {
-            f if f == AlignFlags::CENTER => types::JustifyContent::Center,
-            f if f == AlignFlags::FLEX_START || f == AlignFlags::START => {
-                types::JustifyContent::Start
-            }
-            f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::JustifyContent::End,
-            f if f == AlignFlags::SPACE_BETWEEN => types::JustifyContent::SpaceBetween,
-            f if f == AlignFlags::SPACE_AROUND => types::JustifyContent::SpaceAround,
-            f if f == AlignFlags::SPACE_EVENLY => types::JustifyContent::SpaceEvenly,
-            _ => types::JustifyContent::Start,
-        };
+        // align-items / justify-content — delegate to the shared helpers
+        // so `safe`/`unsafe`/`legacy` modifier bits are masked out
+        // (`AlignFlags` is a bitflags type; exact `==` on the whole
+        // flag set would fail for e.g. `align-items: safe center`).
+        el.align_items = align_flags_to_items(style.clone_align_items().0.value());
+        el.justify_content =
+            align_flags_to_explicit_justify(style.clone_justify_content().primary().value())
+                .unwrap_or(types::JustifyContent::Start);
         // gap
         use style::values::generics::length::LengthPercentageOrNormal;
         let gap_to_px =
@@ -1015,6 +1032,31 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
             };
         el.row_gap = gap_to_px(&pos.row_gap);
         el.column_gap = gap_to_px(&pos.column_gap);
+
+        // justify-items: per-cell alignment on the inline axis for grid.
+        let ji_flags = style.clone_justify_items().computed.0.value();
+        el.justify_items = align_flags_to_items(ji_flags);
+
+        // align-content: row-track alignment (grid) or cross-axis content
+        // alignment when flex-wrap splits lines. `normal`/`stretch` (the
+        // defaults) leave `None` so Taffy uses the layout-method-appropriate
+        // default (stretch behavior) instead of packing to start.
+        let ac_flags = style.clone_align_content().primary().value();
+        el.align_content = align_flags_to_explicit_justify(ac_flags);
+    }
+
+    // Per-child align-self / justify-self. Non-auto values override the
+    // container's align-items / justify-items respectively.
+    {
+        use style::values::specified::align::AlignFlags;
+        let as_flags = style.clone_align_self().value();
+        if as_flags != AlignFlags::AUTO {
+            el.align_self = Some(align_flags_to_items(as_flags));
+        }
+        let js_flags = style.clone_justify_self().value();
+        if js_flags != AlignFlags::AUTO {
+            el.justify_self = Some(align_flags_to_items(js_flags));
+        }
     }
 
     // Flex child
@@ -1096,14 +1138,18 @@ fn map_border_style(bs: style::values::specified::border::BorderStyle) -> types:
     }
 }
 
-fn extract_border(style: &ComputedValues) -> BorderBox {
+fn extract_border(style: &ComputedValues, current_color: CGColor) -> BorderBox {
     let b = style.get_border();
 
+    // `border-*-color` defaults to `currentcolor`, which Stylo leaves
+    // unresolved to absolute. Fall back to the element's computed text
+    // color so `border: solid` on red text draws a red border, not an
+    // unexpected opaque black one.
     let extract_color = |color: &style::values::computed::Color| -> CGColor {
         color
             .as_absolute()
             .map(abs_color_to_cg)
-            .unwrap_or(CGColor::BLACK)
+            .unwrap_or(current_color)
     };
 
     BorderBox {
@@ -1135,10 +1181,10 @@ fn extract_border(style: &ComputedValues) -> BorderBox {
 /// Returns `Some(BorderImage)` when `border-image-source` is set to a
 /// non-none value. The source image URL is extracted the same way as
 /// `background-image: url()` — via `GenericImage::Url` / `ComputedUrl`.
-fn extract_border_image(style: &ComputedValues) -> Option<BorderImage> {
+fn extract_border_image(style: &ComputedValues, current_color: CGColor) -> Option<BorderImage> {
     let b = style.get_border();
 
-    let source = convert_image(&b.border_image_source)?;
+    let source = convert_image(&b.border_image_source, current_color)?;
 
     // border-image-slice: BorderImageSlice { offsets: Rect<NonNegative<NumberOrPercentage>>, fill }
     let slice_computed = &b.border_image_slice;
@@ -1276,7 +1322,10 @@ fn extract_outline(style: &ComputedValues) -> Outline {
 ///
 /// Shared by `extract_background` and `extract_border_image` — both need
 /// the same URL/gradient conversion from Stylo's computed image type.
-fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
+fn convert_image(
+    image: &style::values::computed::Image,
+    current_color: CGColor,
+) -> Option<StyleImage> {
     use style::values::computed::url::ComputedUrl;
     use style::values::generics::image::{GenericGradient, GenericImage};
 
@@ -1295,9 +1344,13 @@ fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
         }
         GenericImage::Gradient(gradient) => match gradient.as_ref() {
             GenericGradient::Linear {
-                direction, items, ..
+                direction,
+                items,
+                flags,
+                color_interpolation_method,
+                ..
             } => {
-                let stops = gradient_items_to_stops(items);
+                let stops = gradient_items_to_stops(items, current_color);
                 if stops.is_empty() {
                     return None;
                 }
@@ -1305,24 +1358,91 @@ fn convert_image(image: &style::values::computed::Image) -> Option<StyleImage> {
                 Some(StyleImage::LinearGradient(LinearGradient {
                     angle_deg,
                     stops,
+                    repeating: is_repeating(flags),
+                    interpolation: extract_gradient_interpolation(color_interpolation_method),
                 }))
             }
-            GenericGradient::Radial { items, .. } => {
-                let stops = gradient_items_to_stops(items);
+            GenericGradient::Radial {
+                shape,
+                position,
+                items,
+                flags,
+                color_interpolation_method,
+                ..
+            } => {
+                let stops = gradient_items_to_stops(items, current_color);
                 if stops.is_empty() {
                     return None;
                 }
-                Some(StyleImage::RadialGradient(RadialGradient { stops }))
+                let (rshape, rsize) = extract_radial_shape(shape);
+                Some(StyleImage::RadialGradient(RadialGradient {
+                    shape: rshape,
+                    size: rsize,
+                    center: extract_gradient_position(position),
+                    stops,
+                    repeating: is_repeating(flags),
+                    interpolation: extract_gradient_interpolation(color_interpolation_method),
+                }))
             }
-            GenericGradient::Conic { items, .. } => {
-                let stops = conic_gradient_items_to_stops(items);
+            GenericGradient::Conic {
+                angle,
+                position,
+                items,
+                flags,
+                color_interpolation_method,
+                ..
+            } => {
+                let stops = conic_gradient_items_to_stops(items, current_color);
                 if stops.is_empty() {
                     return None;
                 }
-                Some(StyleImage::ConicGradient(ConicGradient { stops }))
+                Some(StyleImage::ConicGradient(ConicGradient {
+                    from_angle_deg: angle.degrees(),
+                    center: extract_gradient_position(position),
+                    stops,
+                    repeating: is_repeating(flags),
+                    interpolation: extract_gradient_interpolation(color_interpolation_method),
+                }))
             }
         },
         _ => None,
+    }
+}
+
+fn extract_gradient_interpolation(
+    m: &style::color::mix::ColorInterpolationMethod,
+) -> GradientInterpolation {
+    use style::color::mix::HueInterpolationMethod as HIM;
+    use style::color::ColorSpace as CS;
+    let color_space = match m.space {
+        CS::Srgb => GradientColorSpace::Srgb,
+        CS::SrgbLinear => GradientColorSpace::SrgbLinear,
+        CS::Hsl => GradientColorSpace::Hsl,
+        CS::Hwb => GradientColorSpace::Hwb,
+        CS::Lab => GradientColorSpace::Lab,
+        CS::Lch => GradientColorSpace::Lch,
+        CS::Oklab => GradientColorSpace::Oklab,
+        CS::Oklch => GradientColorSpace::Oklch,
+        CS::DisplayP3 => GradientColorSpace::DisplayP3,
+        CS::Rec2020 => GradientColorSpace::Rec2020,
+        CS::A98Rgb => GradientColorSpace::A98Rgb,
+        CS::ProphotoRgb => GradientColorSpace::ProphotoRgb,
+        CS::XyzD50 => GradientColorSpace::XyzD50,
+        CS::XyzD65 => GradientColorSpace::XyzD65,
+        // Skia has no linear display-p3; fall back to display-p3 (gamma-encoded).
+        CS::DisplayP3Linear => GradientColorSpace::DisplayP3,
+    };
+    // Stylo's `Specified` has no Skia equivalent; map to Shorter (the default
+    // and what CSS Color 4 falls back to in most contexts).
+    let hue_method = match m.hue {
+        HIM::Shorter | HIM::Specified => GradientHueMethod::Shorter,
+        HIM::Longer => GradientHueMethod::Longer,
+        HIM::Increasing => GradientHueMethod::Increasing,
+        HIM::Decreasing => GradientHueMethod::Decreasing,
+    };
+    GradientInterpolation {
+        color_space,
+        hue_method,
     }
 }
 
@@ -1380,12 +1500,33 @@ fn extract_max_size(
     }
 }
 
-fn extract_inset(_style: &ComputedValues) -> CssEdgeInsets {
-    // TODO: extract top/right/bottom/left inset for positioned elements
-    CssEdgeInsets::default()
+fn extract_inset(style: &ComputedValues) -> CssEdgeInsets {
+    fn extract_side(v: style::values::computed::Inset) -> CssLength {
+        use style::values::computed::Inset;
+        match v {
+            Inset::Auto => CssLength::Auto,
+            Inset::LengthPercentage(lp) => {
+                if let Some(len) = lp.to_length() {
+                    CssLength::Px(len.px())
+                } else if let Some(pct) = lp.to_percentage() {
+                    CssLength::Percent(pct.0)
+                } else {
+                    CssLength::Auto
+                }
+            }
+            // Anchor positioning — not supported, fall back to auto.
+            _ => CssLength::Auto,
+        }
+    }
+    CssEdgeInsets {
+        top: extract_side(style.clone_top()),
+        right: extract_side(style.clone_right()),
+        bottom: extract_side(style.clone_bottom()),
+        left: extract_side(style.clone_left()),
+    }
 }
 
-fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
+fn extract_background(style: &ComputedValues, current_color: CGColor) -> Vec<BackgroundLayer> {
     let bg = style.get_background();
     let mut layers: Vec<BackgroundLayer> = Vec::new();
 
@@ -1397,14 +1538,216 @@ fn extract_background(style: &ComputedValues) -> Vec<BackgroundLayer> {
         }
     }
 
-    // 2. Background image layers (gradients and URL images on top)
-    for image in bg.background_image.0.iter() {
-        if let Some(style_image) = convert_image(image) {
-            layers.push(BackgroundLayer::Image(style_image));
+    // 2. Background image layers (gradients and URL images on top of
+    //    the color). CSS paints the FIRST image in source order on top
+    //    of the stack — later images sit underneath. We iterate in
+    //    reverse source order so the resulting `layers` vector is
+    //    bottom-to-top, matching the paint-phase iteration.
+    //    CSS cycles shorter per-layer longhands to match the image count.
+    let cycle = |n: usize, i: usize| -> usize {
+        if n == 0 {
+            0
+        } else {
+            i % n
         }
+    };
+    let sizes = &bg.background_size.0;
+    let px = &bg.background_position_x.0;
+    let py = &bg.background_position_y.0;
+    let reps = &bg.background_repeat.0;
+    let clips = &bg.background_clip.0;
+    let origins = &bg.background_origin.0;
+
+    for (i, image) in bg.background_image.0.iter().enumerate().rev() {
+        let Some(source) = convert_image(image, current_color) else {
+            continue;
+        };
+        let size = sizes
+            .get(cycle(sizes.len(), i))
+            .map(extract_bg_size)
+            .unwrap_or_default();
+        let position = BackgroundPosition {
+            x: px
+                .get(cycle(px.len(), i))
+                .map(length_percentage_to_css)
+                .unwrap_or(CssLength::Percent(0.0)),
+            y: py
+                .get(cycle(py.len(), i))
+                .map(length_percentage_to_css)
+                .unwrap_or(CssLength::Percent(0.0)),
+        };
+        let repeat = reps
+            .get(cycle(reps.len(), i))
+            .map(extract_bg_repeat)
+            .unwrap_or_default();
+        let clip = clips
+            .get(cycle(clips.len(), i))
+            .map(extract_bg_clip)
+            .unwrap_or(BackgroundBox::BorderBox);
+        let origin = origins
+            .get(cycle(origins.len(), i))
+            .map(extract_bg_origin)
+            .unwrap_or(BackgroundBox::PaddingBox);
+
+        layers.push(BackgroundLayer::Image(BackgroundImage {
+            source,
+            size,
+            position,
+            repeat,
+            clip,
+            origin,
+        }));
     }
 
     layers
+}
+
+fn extract_bg_size(sz: &style::values::computed::BackgroundSize) -> BackgroundSize {
+    use style::values::generics::background::BackgroundSize as G;
+    use style::values::generics::length::GenericLengthPercentageOrAuto as LPA;
+    match sz {
+        G::Cover => BackgroundSize::Cover,
+        G::Contain => BackgroundSize::Contain,
+        G::ExplicitSize { width, height } => {
+            let to_len =
+                |v: &LPA<style::values::computed::NonNegativeLengthPercentage>| -> CssLength {
+                    match v {
+                        LPA::Auto => CssLength::Auto,
+                        LPA::LengthPercentage(lp) => length_percentage_to_css(&lp.0),
+                    }
+                };
+            let w = to_len(width);
+            let h = to_len(height);
+            // Canonicalize the initial value — `auto auto` → `Auto`.
+            if matches!((w, h), (CssLength::Auto, CssLength::Auto)) {
+                BackgroundSize::Auto
+            } else {
+                BackgroundSize::Explicit {
+                    width: w,
+                    height: h,
+                }
+            }
+        }
+    }
+}
+
+fn extract_bg_repeat(
+    r: &style::properties::longhands::background_repeat::single_value::computed_value::T,
+) -> BackgroundRepeat {
+    // Stylo's BackgroundRepeat is `(Keyword, Keyword)`.
+    use style::values::specified::background::BackgroundRepeatKeyword as K;
+    let map = |k: K| -> BackgroundRepeatKeyword {
+        match k {
+            K::Repeat => BackgroundRepeatKeyword::Repeat,
+            K::NoRepeat => BackgroundRepeatKeyword::NoRepeat,
+            K::Space => BackgroundRepeatKeyword::Space,
+            K::Round => BackgroundRepeatKeyword::Round,
+        }
+    };
+    BackgroundRepeat {
+        x: map(r.0),
+        y: map(r.1),
+    }
+}
+
+fn extract_bg_clip(
+    v: &style::properties::longhands::background_clip::single_value::computed_value::T,
+) -> BackgroundBox {
+    use style::properties::longhands::background_clip::single_value::computed_value::T;
+    match v {
+        T::BorderBox => BackgroundBox::BorderBox,
+        T::PaddingBox => BackgroundBox::PaddingBox,
+        T::ContentBox => BackgroundBox::ContentBox,
+    }
+}
+
+fn extract_bg_origin(
+    v: &style::properties::longhands::background_origin::single_value::computed_value::T,
+) -> BackgroundBox {
+    use style::properties::longhands::background_origin::single_value::computed_value::T;
+    match v {
+        T::BorderBox => BackgroundBox::BorderBox,
+        T::PaddingBox => BackgroundBox::PaddingBox,
+        T::ContentBox => BackgroundBox::ContentBox,
+    }
+}
+
+fn is_repeating(flags: &style::values::generics::image::GradientFlags) -> bool {
+    use style::values::generics::image::GradientFlags;
+    flags.contains(GradientFlags::REPEATING)
+}
+
+/// Convert Stylo's ending shape (radial shape + size) into our split form.
+fn extract_radial_shape(
+    shape: &style::values::computed::image::EndingShape,
+) -> (RadialShape, RadialSize) {
+    use style::values::computed::image::EndingShape;
+    use style::values::generics::image::{Circle, Ellipse, ShapeExtent};
+
+    fn size_from_extent(e: ShapeExtent) -> RadialSize {
+        match e {
+            ShapeExtent::ClosestSide | ShapeExtent::Contain => RadialSize::ClosestSide,
+            ShapeExtent::ClosestCorner => RadialSize::ClosestCorner,
+            ShapeExtent::FarthestSide => RadialSize::FarthestSide,
+            ShapeExtent::FarthestCorner | ShapeExtent::Cover => RadialSize::FarthestCorner,
+        }
+    }
+
+    match shape {
+        EndingShape::Circle(c) => {
+            let size = match c {
+                Circle::Radius(r) => {
+                    let px = r.0.px();
+                    RadialSize::Explicit {
+                        x: CssLength::Px(px),
+                        y: CssLength::Px(px),
+                    }
+                }
+                Circle::Extent(e) => size_from_extent(*e),
+            };
+            (RadialShape::Circle, size)
+        }
+        EndingShape::Ellipse(e) => {
+            let size = match e {
+                Ellipse::Radii(rx, ry) => RadialSize::Explicit {
+                    x: length_percentage_to_css(&rx.0),
+                    y: length_percentage_to_css(&ry.0),
+                },
+                Ellipse::Extent(ex) => size_from_extent(*ex),
+            };
+            (RadialShape::Ellipse, size)
+        }
+    }
+}
+
+fn extract_gradient_position(pos: &style::values::computed::Position) -> GradientPosition {
+    GradientPosition {
+        x: length_percentage_to_css(&pos.horizontal),
+        y: length_percentage_to_css(&pos.vertical),
+    }
+}
+
+/// Map a Stylo `LengthPercentage` → our `CssLength`.
+///
+/// For mixed `calc()` values (e.g. `calc(100% - 10px)`), both `to_length`
+/// and `to_percentage` return `None`. We decompose by probing `resolve()`
+/// at two known bases: `resolve(0)` yields the pure px term, and
+/// `(resolve(100) - resolve(0)) / 100` yields the percent coefficient.
+fn length_percentage_to_css(lp: &style::values::computed::LengthPercentage) -> CssLength {
+    if let Some(len) = lp.to_length() {
+        return CssLength::Px(len.px());
+    }
+    if let Some(pct) = lp.to_percentage() {
+        return CssLength::Percent(pct.0);
+    }
+    use style::values::computed::Length;
+    let at_zero = lp.resolve(Length::new(0.0)).px();
+    let at_hundred = lp.resolve(Length::new(100.0)).px();
+    let percent = (at_hundred - at_zero) / 100.0;
+    CssLength::Calc {
+        px: at_zero,
+        percent,
+    }
 }
 
 /// Extract the CSS gradient angle in degrees.
@@ -1439,74 +1782,150 @@ fn extract_gradient_angle(direction: &style::values::computed::image::LineDirect
 }
 
 /// Convert Stylo gradient items to GradientStops.
+///
+/// `currentcolor` stops (unresolvable to absolute) resolve to `current_color`
+/// (the element's computed `color`), per CSS Color 3 §4.4.
 fn gradient_items_to_stops(
     items: &[style::values::generics::image::GenericGradientItem<
         style::values::computed::Color,
         style::values::computed::LengthPercentage,
     >],
+    current_color: CGColor,
 ) -> Vec<GradientStop> {
     use style::values::generics::image::GenericGradientItem;
 
-    let mut raw: Vec<(Option<f32>, CGColor)> = Vec::new();
+    let resolve = |color: &style::values::computed::Color| -> CGColor {
+        color
+            .as_absolute()
+            .map(abs_color_to_cg)
+            .unwrap_or(current_color)
+    };
+
+    // Each element: (position, is_px, color). Px-positioned stops are
+    // normalized to gradient-line fractions at paint time where the line
+    // length is known.
+    let mut raw: Vec<(Option<f32>, bool, CGColor)> = Vec::new();
     for item in items {
         match item {
             GenericGradientItem::SimpleColorStop(color) => {
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((None, c));
+                raw.push((None, false, resolve(color)));
             }
             GenericGradientItem::ComplexColorStop { color, position } => {
-                let offset = position.to_percentage().map(|p| p.0);
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((offset, c));
+                let (offset, is_px) = if let Some(pct) = position.to_percentage() {
+                    (Some(pct.0), false)
+                } else if let Some(len) = position.to_length() {
+                    (Some(len.px()), true)
+                } else {
+                    (None, false)
+                };
+                raw.push((offset, is_px, resolve(color)));
             }
             GenericGradientItem::InterpolationHint(_) => {}
         }
     }
-    auto_distribute_stops(&mut raw);
+    auto_distribute_stops_typed(&mut raw);
     raw.into_iter()
-        .map(|(o, c)| GradientStop {
+        .map(|(o, is_px, c)| GradientStop {
             offset: o.unwrap_or(0.0),
+            offset_is_px: is_px,
             color: c,
         })
         .collect()
 }
 
+/// Like `auto_distribute_stops`, but carries an `is_px` flag per stop.
+///
+/// First and last auto stops default to `0%` and `100%` respectively. Interior
+/// runs of auto stops are linearly interpolated between their bookends. When
+/// bookends use different units we inherit the previous stop's unit; exact
+/// resolution defers to paint-time which has the gradient-line length.
+fn auto_distribute_stops_typed(raw: &mut [(Option<f32>, bool, CGColor)]) {
+    let n = raw.len();
+    if n == 0 {
+        return;
+    }
+    if raw[0].0.is_none() {
+        raw[0].0 = Some(0.0);
+        raw[0].1 = false;
+    }
+    if raw[n - 1].0.is_none() {
+        raw[n - 1].0 = Some(1.0);
+        raw[n - 1].1 = false;
+    }
+    let mut i = 1;
+    while i < n - 1 {
+        if raw[i].0.is_some() {
+            i += 1;
+            continue;
+        }
+        let mut j = i + 1;
+        while j < n && raw[j].0.is_none() {
+            j += 1;
+        }
+        let prev = raw[i - 1].0.unwrap();
+        let next = raw[j].0.unwrap();
+        let prev_is_px = raw[i - 1].1;
+        let next_is_px = raw[j].1;
+        if prev_is_px == next_is_px {
+            // Same-unit run: interpolate linearly in the bookend unit.
+            let count = (j - i + 1) as f32;
+            for (k, slot) in (i..j).enumerate() {
+                let t = (k + 1) as f32 / count;
+                raw[slot].0 = Some(prev + t * (next - prev));
+                raw[slot].1 = prev_is_px;
+            }
+        } else {
+            // Mixed-unit run (e.g. `10px`…`100%`). Raw linear interpolation
+            // of the numeric values mixes px and fraction units and
+            // produces nonsense (a fraction-space halfway of `10px`/`100%`
+            // is not `55px`). Until we carry stops as a unit-tagged
+            // calc-like representation all the way to paint time, snap
+            // every interior auto stop to the previous bookend's position.
+            // This keeps CSS's non-decreasing ordering rule and degrades
+            // to a hard color transition at `prev` rather than placing
+            // the interior stops at incorrect numeric positions.
+            for entry in raw.iter_mut().take(j).skip(i) {
+                entry.0 = Some(prev);
+                entry.1 = prev_is_px;
+            }
+        }
+        i = j;
+    }
+}
+
 /// Convert conic-gradient items to GradientStops.
+///
+/// `currentcolor` stops resolve to `current_color`; see
+/// `gradient_items_to_stops` for details.
 fn conic_gradient_items_to_stops(
     items: &[style::values::generics::image::GenericGradientItem<
         style::values::computed::Color,
         style::values::computed::AngleOrPercentage,
     >],
+    current_color: CGColor,
 ) -> Vec<GradientStop> {
     use style::values::computed::AngleOrPercentage;
     use style::values::generics::image::GenericGradientItem;
+
+    let resolve = |color: &style::values::computed::Color| -> CGColor {
+        color
+            .as_absolute()
+            .map(abs_color_to_cg)
+            .unwrap_or(current_color)
+    };
 
     let mut raw: Vec<(Option<f32>, CGColor)> = Vec::new();
     for item in items {
         match item {
             GenericGradientItem::SimpleColorStop(color) => {
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((None, c));
+                raw.push((None, resolve(color)));
             }
             GenericGradientItem::ComplexColorStop { color, position } => {
                 let offset = match position {
                     AngleOrPercentage::Percentage(p) => Some(p.0),
                     AngleOrPercentage::Angle(a) => Some(a.degrees() / 360.0),
                 };
-                let c = color
-                    .as_absolute()
-                    .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::TRANSPARENT);
-                raw.push((offset, c));
+                raw.push((offset, resolve(color)));
             }
             GenericGradientItem::InterpolationHint(_) => {}
         }
@@ -1515,6 +1934,7 @@ fn conic_gradient_items_to_stops(
     raw.into_iter()
         .map(|(o, c)| GradientStop {
             offset: o.unwrap_or(0.0),
+            offset_is_px: false,
             color: c,
         })
         .collect()
@@ -1555,18 +1975,20 @@ fn auto_distribute_stops(raw: &mut [(Option<f32>, CGColor)]) {
     }
 }
 
-fn extract_box_shadow(style: &ComputedValues) -> Vec<BoxShadow> {
+fn extract_box_shadow(style: &ComputedValues, current_color: CGColor) -> Vec<BoxShadow> {
     let shadows = style.clone_box_shadow();
     shadows
         .0
         .iter()
         .map(|s| {
+            // Per CSS, omitted or `currentcolor` shadows resolve to the
+            // element's computed `color`, not opaque black.
             let color = s
                 .base
                 .color
                 .as_absolute()
                 .map(abs_color_to_cg)
-                .unwrap_or(CGColor::BLACK);
+                .unwrap_or(current_color);
             BoxShadow {
                 offset_x: s.base.horizontal.px(),
                 offset_y: s.base.vertical.px(),
@@ -1575,6 +1997,158 @@ fn extract_box_shadow(style: &ComputedValues) -> Vec<BoxShadow> {
                 color,
                 inset: s.inset,
             }
+        })
+        .collect()
+}
+
+fn extract_clip_path(style: &ComputedValues) -> ClipPath {
+    use style::values::computed::basic_shape::ClipPath as ComputedClipPath;
+    use style::values::generics::basic_shape::{
+        FillRule, GenericBasicShape, GenericClipPath, GenericShapeRadius,
+    };
+    use style::values::generics::position::GenericPositionOrAuto;
+
+    let cp: ComputedClipPath = style.clone_clip_path();
+    match cp {
+        GenericClipPath::None => ClipPath::None,
+        GenericClipPath::Url(_) => ClipPath::None,
+        GenericClipPath::Box(_) => ClipPath::None,
+        GenericClipPath::Shape(shape, _) => {
+            let resolve_pos = |p: &GenericPositionOrAuto<
+                style::values::computed::Position,
+            >| -> (CssLength, CssLength) {
+                match p {
+                    GenericPositionOrAuto::Position(pos) => (
+                        length_percentage_to_css(&pos.horizontal),
+                        length_percentage_to_css(&pos.vertical),
+                    ),
+                    // `at auto` means center per spec.
+                    GenericPositionOrAuto::Auto => {
+                        (CssLength::Percent(0.5), CssLength::Percent(0.5))
+                    }
+                }
+            };
+            let resolve_radius = |r: &GenericShapeRadius<
+                style::values::computed::NonNegativeLengthPercentage,
+            >|
+             -> ShapeRadius {
+                match r {
+                    GenericShapeRadius::Length(lp) => {
+                        ShapeRadius::Length(length_percentage_to_css(&lp.0))
+                    }
+                    GenericShapeRadius::ClosestSide => ShapeRadius::ClosestSide,
+                    GenericShapeRadius::FarthestSide => ShapeRadius::FarthestSide,
+                }
+            };
+            match *shape {
+                GenericBasicShape::Rect(inset) => {
+                    let sides = &inset.rect;
+                    ClipPath::Inset {
+                        top: length_percentage_to_css(&sides.0),
+                        right: length_percentage_to_css(&sides.1),
+                        bottom: length_percentage_to_css(&sides.2),
+                        left: length_percentage_to_css(&sides.3),
+                        radius: extract_inset_corner_radii(&inset.round),
+                    }
+                }
+                GenericBasicShape::Circle(circle) => {
+                    let (cx, cy) = resolve_pos(&circle.position);
+                    ClipPath::Circle {
+                        cx,
+                        cy,
+                        radius: resolve_radius(&circle.radius),
+                    }
+                }
+                GenericBasicShape::Ellipse(ellipse) => {
+                    let (cx, cy) = resolve_pos(&ellipse.position);
+                    ClipPath::Ellipse {
+                        cx,
+                        cy,
+                        rx: resolve_radius(&ellipse.semiaxis_x),
+                        ry: resolve_radius(&ellipse.semiaxis_y),
+                    }
+                }
+                GenericBasicShape::Polygon(poly) => {
+                    let points = poly
+                        .coordinates
+                        .iter()
+                        .map(|c| {
+                            (
+                                length_percentage_to_css(&c.0),
+                                length_percentage_to_css(&c.1),
+                            )
+                        })
+                        .collect();
+                    ClipPath::Polygon {
+                        points,
+                        even_odd: matches!(poly.fill, FillRule::Evenodd),
+                    }
+                }
+                GenericBasicShape::PathOrShape(_) => ClipPath::None,
+            }
+        }
+    }
+}
+
+/// Map Stylo's `GenericBorderRadius<NonNegativeLengthPercentage>` onto our
+/// `CornerRadii`. Percentages stay unresolved — paint time turns them
+/// into px against the clip rect's own dimensions.
+fn extract_inset_corner_radii(
+    radius: &style::values::generics::border::GenericBorderRadius<
+        style::values::computed::NonNegativeLengthPercentage,
+    >,
+) -> InsetCornerRadii {
+    // Preserve px vs percent per axis. `clip-path: inset(... round ...)`
+    // radii resolve against the inset clip rect at paint time, so we
+    // can't flatten percentages to px here.
+    let lp = |v: &style::values::computed::LengthPercentage| -> CssLength {
+        length_percentage_to_css(v)
+    };
+    InsetCornerRadii {
+        tl_x: lp(&radius.top_left.0.width.0),
+        tl_y: lp(&radius.top_left.0.height.0),
+        tr_x: lp(&radius.top_right.0.width.0),
+        tr_y: lp(&radius.top_right.0.height.0),
+        br_x: lp(&radius.bottom_right.0.width.0),
+        br_y: lp(&radius.bottom_right.0.height.0),
+        bl_x: lp(&radius.bottom_left.0.width.0),
+        bl_y: lp(&radius.bottom_left.0.height.0),
+    }
+}
+
+fn extract_filter(style: &ComputedValues, current_color: CGColor) -> Vec<FilterFunction> {
+    use style::values::generics::effects::GenericFilter;
+    style
+        .clone_filter()
+        .0
+        .iter()
+        .filter_map(|f| match f {
+            GenericFilter::Blur(len) => Some(FilterFunction::Blur(len.0.px())),
+            GenericFilter::Brightness(n) => Some(FilterFunction::Brightness(n.0)),
+            GenericFilter::Contrast(n) => Some(FilterFunction::Contrast(n.0)),
+            GenericFilter::Grayscale(n) => Some(FilterFunction::Grayscale(n.0)),
+            GenericFilter::HueRotate(a) => Some(FilterFunction::HueRotate(a.radians())),
+            GenericFilter::Invert(n) => Some(FilterFunction::Invert(n.0)),
+            GenericFilter::Opacity(n) => Some(FilterFunction::Opacity(n.0)),
+            GenericFilter::Saturate(n) => Some(FilterFunction::Saturate(n.0)),
+            GenericFilter::Sepia(n) => Some(FilterFunction::Sepia(n.0)),
+            GenericFilter::DropShadow(s) => {
+                // Omitted / `currentcolor` shadow color resolves to the
+                // element's computed `color` per CSS Filters §10.4.
+                let color = s
+                    .color
+                    .as_absolute()
+                    .map(abs_color_to_cg)
+                    .unwrap_or(current_color);
+                Some(FilterFunction::DropShadow {
+                    offset_x: s.horizontal.px(),
+                    offset_y: s.vertical.px(),
+                    blur: s.blur.0.px(),
+                    color,
+                })
+            }
+            // `Url` (SVG filter refs) not plumbed.
+            _ => None,
         })
         .collect()
 }
@@ -1702,7 +2276,7 @@ fn extract_grid_placement(
     types::GridPlacement::Auto
 }
 
-fn extract_font(style: &ComputedValues) -> FontProps {
+fn extract_font(style: &ComputedValues, current_color: CGColor) -> FontProps {
     let font = style.get_font();
     let inherited_text = style.get_inherited_text();
 
@@ -1783,6 +2357,66 @@ fn extract_font(style: &ComputedValues) -> FontProps {
     props.decoration_overline = td_line.intersects(StyloTextDecorationLine::OVERLINE);
     props.decoration_line_through = td_line.intersects(StyloTextDecorationLine::LINE_THROUGH);
 
+    // text-decoration-style: solid|double|dotted|dashed|wavy (MozNone → Solid).
+    {
+        use style::properties::longhands::text_decoration_style::computed_value::T as TDS;
+        props.decoration_style = match style.clone_text_decoration_style() {
+            TDS::Solid | TDS::MozNone => TextDecorationStyle::Solid,
+            TDS::Double => TextDecorationStyle::Double,
+            TDS::Dotted => TextDecorationStyle::Dotted,
+            TDS::Dashed => TextDecorationStyle::Dashed,
+            TDS::Wavy => TextDecorationStyle::Wavy,
+        };
+    }
+
+    // text-decoration-color: `currentcolor` (unresolvable to absolute) stays
+    // None and paint falls back to the element's text color.
+    props.decoration_color = style
+        .clone_text_decoration_color()
+        .as_absolute()
+        .map(abs_color_to_cg);
+
+    // text-shadow: inherited list. Stylo gives us resolved absolute colors
+    // (falling back to currentcolor resolved against text color).
+    props.text_shadow = style
+        .clone_text_shadow()
+        .0
+        .iter()
+        .map(|s| {
+            // CSS Text Decoration §3: `text-shadow` defaults to and
+            // `currentcolor` resolves to the element's computed `color`.
+            let color = s
+                .color
+                .as_absolute()
+                .map(abs_color_to_cg)
+                .unwrap_or(current_color);
+            TextShadow {
+                offset_x: s.horizontal.px(),
+                offset_y: s.vertical.px(),
+                blur: s.blur.0.px(),
+                color,
+            }
+        })
+        .collect();
+
+    // text-indent: first-line inline-start indent. `hanging` / `each-line`
+    // modifier keywords are not honored — we apply indent only to the
+    // first visual line of the first paragraph, matching the common case.
+    {
+        let ti = style.clone_text_indent();
+        props.text_indent = length_percentage_to_css(&ti.length);
+    }
+
+    // image-rendering: quality hint for raster images.
+    {
+        use style::values::specified::image::ImageRendering as IR;
+        props.image_rendering = match style.clone_image_rendering() {
+            IR::CrispEdges => types::ImageRendering::CrispEdges,
+            IR::Pixelated => types::ImageRendering::Pixelated,
+            _ => types::ImageRendering::Auto,
+        };
+    }
+
     // White-space (decomposed into collapse + wrap in modern CSS/Stylo)
     {
         use style::properties::longhands::text_wrap_mode::computed_value::T as TWM;
@@ -1830,13 +2464,14 @@ fn extract_blend_mode(style: &ComputedValues) -> BlendMode {
 /// Returns an empty Vec for `transform: none`.
 fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
     use style::values::computed::transform::TransformOperation;
+    use style::values::generics::transform::{
+        GenericRotate as Rotate, GenericScale as Scale, GenericTranslate as Translate,
+    };
     use types::{LengthPercentage as LP, TransformOp};
 
-    let transform = style.get_box().clone_transform();
+    let bx = style.get_box();
+    let transform = bx.clone_transform();
     let ops = &transform.0;
-    if ops.is_empty() {
-        return Vec::new();
-    }
 
     let resolve_lp = |lp: &style::values::computed::LengthPercentage| -> LP {
         if let Some(pct) = lp.to_percentage() {
@@ -1848,7 +2483,42 @@ fn extract_transform(style: &ComputedValues) -> Vec<types::TransformOp> {
         }
     };
 
-    let mut result = Vec::with_capacity(ops.len());
+    let mut result: Vec<TransformOp> = Vec::with_capacity(ops.len() + 3);
+
+    // CSS Transforms 2: individual transform properties apply first, in the
+    // order translate → rotate → scale, then the `transform` shorthand.
+    // https://drafts.csswg.org/css-transforms-2/#individual-transforms
+    match bx.clone_translate() {
+        Translate::None => {}
+        Translate::Translate(tx, ty, _tz) => {
+            result.push(TransformOp::Translate(resolve_lp(&tx), resolve_lp(&ty)));
+        }
+    }
+    match bx.clone_rotate() {
+        Rotate::None => {}
+        Rotate::Rotate(angle) => {
+            result.push(TransformOp::Rotate(angle.radians()));
+        }
+        // 3D rotate: only honor if the rotation axis is close to the Z axis (0,0,z).
+        Rotate::Rotate3D(x, y, z, angle) => {
+            if x == 0.0 && y == 0.0 && z != 0.0 {
+                let radians = angle.radians();
+                let signed = if z > 0.0 { radians } else { -radians };
+                result.push(TransformOp::Rotate(signed));
+            }
+        }
+    }
+    match bx.clone_scale() {
+        Scale::None => {}
+        Scale::Scale(sx, sy, _sz) => {
+            result.push(TransformOp::Scale(sx, sy));
+        }
+    }
+
+    if ops.is_empty() && result.is_empty() {
+        return Vec::new();
+    }
+
     for op in ops.iter() {
         let ir_op = match op {
             TransformOperation::Matrix(mat) => {
@@ -1904,6 +2574,49 @@ fn extract_transform_origin(style: &ComputedValues) -> types::TransformOrigin {
     types::TransformOrigin {
         x: resolve(&origin.horizontal),
         y: resolve(&origin.vertical),
+    }
+}
+
+fn align_flags_to_items(flags: style::values::specified::align::AlignFlags) -> types::AlignItems {
+    // NOTE: the caller is expected to pass the keyword-only portion of
+    // the flags (i.e. already through `AlignFlags::value()`), which
+    // masks off `safe`/`unsafe`/`legacy` modifier bits. The keyword
+    // enum is stored in the lower 5 bits as a packed integer (not as
+    // independent bits), so `==` is the right comparison — `contains()`
+    // would wrongly report e.g. `SPACE_BETWEEN` as containing `CENTER`
+    // because their bit patterns overlap.
+    use style::values::specified::align::AlignFlags;
+    match flags {
+        f if f == AlignFlags::CENTER => types::AlignItems::Center,
+        f if f == AlignFlags::FLEX_START || f == AlignFlags::START => types::AlignItems::Start,
+        f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::AlignItems::End,
+        f if f == AlignFlags::BASELINE => types::AlignItems::Baseline,
+        _ => types::AlignItems::Stretch,
+    }
+}
+
+/// Map align/justify flags to an optional `JustifyContent`. Returns
+/// `None` for values that should defer to the layout method's default
+/// (`normal`, `stretch`, and anything else unrecognized). Used by
+/// `align-content` where the CSS default is "behaves like stretch",
+/// not "pack to start".
+fn align_flags_to_explicit_justify(
+    flags: style::values::specified::align::AlignFlags,
+) -> Option<types::JustifyContent> {
+    // See `align_flags_to_items` — caller passes keyword-only flags
+    // (post `.value()`); use `==` rather than `contains()` because the
+    // low-5-bit keyword values overlap bitwise.
+    use style::values::specified::align::AlignFlags;
+    match flags {
+        f if f == AlignFlags::CENTER => Some(types::JustifyContent::Center),
+        f if f == AlignFlags::FLEX_START || f == AlignFlags::START => {
+            Some(types::JustifyContent::Start)
+        }
+        f if f == AlignFlags::FLEX_END || f == AlignFlags::END => Some(types::JustifyContent::End),
+        f if f == AlignFlags::SPACE_BETWEEN => Some(types::JustifyContent::SpaceBetween),
+        f if f == AlignFlags::SPACE_AROUND => Some(types::JustifyContent::SpaceAround),
+        f if f == AlignFlags::SPACE_EVENLY => Some(types::JustifyContent::SpaceEvenly),
+        _ => None,
     }
 }
 

@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- probe: (125,125)=#ff0000 (25,25)=#ffffff (275,275)=#ffffff -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: position: absolute with insets</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+      }
+      .anchor {
+        position: relative;
+        width: 300px;
+        height: 300px;
+      }
+      .box {
+        position: absolute;
+        top: 100px;
+        left: 100px;
+        width: 50px;
+        height: 50px;
+        background: #ff0000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="anchor">
+      <div class="box"></div>
+    </div>
+  </body>
+</html>

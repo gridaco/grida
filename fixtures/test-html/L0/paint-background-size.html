@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: background-size</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .rect {
+        width: 160px;
+        height: 120px;
+        border: 1px solid #ccc;
+        background-repeat: no-repeat;
+        background-image: linear-gradient(
+          135deg,
+          #ff0000 0 50%,
+          #0000ff 50% 100%
+        );
+      }
+      .bg-cover {
+        background-size: cover;
+      }
+      .bg-contain {
+        background-size: contain;
+      }
+      .bg-auto {
+        background-size: auto;
+      }
+      .bg-px {
+        background-size: 80px 40px;
+      }
+      .bg-percent {
+        background-size: 50% 50%;
+      }
+      .bg-width-only {
+        background-size: 80px;
+      }
+      .bg-height-only {
+        background-size: auto 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">cover</div>
+        <div class="rect bg-cover"></div>
+      </div>
+      <div>
+        <div class="label">contain</div>
+        <div class="rect bg-contain"></div>
+      </div>
+      <div>
+        <div class="label">auto (no intrinsic → 100%)</div>
+        <div class="rect bg-auto"></div>
+      </div>
+      <div>
+        <div class="label">80px 40px</div>
+        <div class="rect bg-px"></div>
+      </div>
+      <div>
+        <div class="label">50% 50%</div>
+        <div class="rect bg-percent"></div>
+      </div>
+      <div>
+        <div class="label">80px (auto height)</div>
+        <div class="rect bg-width-only"></div>
+      </div>
+      <div>
+        <div class="label">auto 40px</div>
+        <div class="rect bg-height-only"></div>
+      </div>
+    </div>
+  </body>
+</html>

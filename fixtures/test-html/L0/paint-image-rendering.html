@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: image-rendering</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      img {
+        width: 160px;
+        height: 160px;
+        border: 1px solid #ccc;
+      }
+      .auto {
+        image-rendering: auto;
+      }
+      .pixelated {
+        image-rendering: pixelated;
+      }
+      .crisp {
+        image-rendering: crisp-edges;
+      }
+      .bg-swatch {
+        width: 160px;
+        height: 40px;
+        border: 1px solid #ccc;
+        background-image: url(../../images/checker.png);
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">img auto (default)</div>
+        <img class="auto" src="../../images/checker.png" alt="checker" />
+      </div>
+      <div>
+        <div class="label">img pixelated</div>
+        <img class="pixelated" src="../../images/checker.png" alt="checker" />
+      </div>
+      <div>
+        <div class="label">img crisp-edges</div>
+        <img class="crisp" src="../../images/checker.png" alt="checker" />
+      </div>
+      <div>
+        <div class="label">bg auto (upscaled 16×)</div>
+        <div class="bg-swatch auto"></div>
+      </div>
+      <div>
+        <div class="label">bg pixelated (upscaled 16×)</div>
+        <div class="bg-swatch pixelated"></div>
+      </div>
+    </div>
+  </body>
+</html>

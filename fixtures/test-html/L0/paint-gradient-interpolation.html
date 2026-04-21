@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: gradient color interpolation (auto-selected)</title>
+    <!--
+      NOTE: the explicit `linear-gradient(… in <colorspace>, …)` syntax is
+      gated in Stylo behind `layout.css.gradient-color-interpolation-method`
+      which defaults to false in this workspace. Until that pref flips,
+      the interpolation space is auto-selected: sRGB when all stops use
+      legacy rgb/hsl/hwb notation, Oklab when at least one stop uses a
+      modern color function (oklab/oklch/lab/lch/color()).
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .rect {
+        width: 220px;
+        height: 40px;
+        border: 1px solid #ccc;
+      }
+      /* Legacy stops only → sRGB interpolation. Mid shows muddy gray. */
+      .srgb {
+        background: linear-gradient(90deg, #ffff00, #0000ff);
+      }
+      /* Modern oklab() stop → Oklab interpolation. Mid is perceptually
+         midway, richer than sRGB's muddy green. */
+      .oklab {
+        background: linear-gradient(90deg, oklab(0.95 -0.05 0.2), #0000ff);
+      }
+      /* oklch() stops — clean perceptual-hue path. */
+      .oklch {
+        background: linear-gradient(
+          90deg,
+          oklch(70% 0.2 20),
+          oklch(70% 0.2 260)
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">legacy stops → sRGB auto (muddy gray mid)</div>
+        <div class="rect srgb"></div>
+      </div>
+      <div>
+        <div class="label">oklab() stop → Oklab auto</div>
+        <div class="rect oklab"></div>
+      </div>
+      <div>
+        <div class="label">oklch() stops → Oklab auto</div>
+        <div class="rect oklch"></div>
+      </div>
+    </div>
+  </body>
+</html>

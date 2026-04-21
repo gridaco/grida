@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text: text-indent</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .p {
+        width: 320px;
+        background: #f5f5f5;
+        padding: 8px;
+        line-height: 1.4;
+      }
+      .indent-px {
+        text-indent: 40px;
+      }
+      .indent-pct {
+        text-indent: 20%;
+      }
+      .indent-large {
+        text-indent: 80px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">baseline (no indent)</div>
+        <div class="p">
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+          eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        </div>
+      </div>
+      <div>
+        <div class="label">text-indent: 40px</div>
+        <div class="p indent-px">
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+          eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        </div>
+      </div>
+      <div>
+        <div class="label">text-indent: 20% (of width)</div>
+        <div class="p indent-pct">
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+          eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        </div>
+      </div>
+      <div>
+        <div class="label">text-indent: 80px</div>
+        <div class="p indent-large">
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+          eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -16,11 +16,13 @@ use skia_safe::{Canvas, ClipOp, Color, Paint, PaintStyle, PictureRecorder, Rect}
 
 use super::layout::{build_skia_text_style, LayoutBox, LayoutNode};
 use super::style::{
-    BackgroundLayer, BorderSide, ConicGradient, GradientStop, InlineBoxDecoration, InlineGroup,
+    BackgroundBox, BackgroundImage, BackgroundLayer, BackgroundRepeatKeyword, BackgroundSize,
+    BorderSide, ConicGradient, FilterFunction, GradientStop, InlineBoxDecoration, InlineGroup,
     InlineRunItem, LinearGradient, Outline, RadialGradient, StyleImage, StyledElement, TextRun,
     WidgetAppearance,
 };
 use super::types;
+use super::types::CssLength;
 use super::ImageProvider;
 
 /// Paint a `LayoutBox` tree into a Skia `Picture`.
@@ -73,8 +75,8 @@ fn paint_box(
     let w = layout.width;
     let h = layout.height;
 
-    // ── Save state for opacity / clip ──
-    let needs_layer = style.opacity < 1.0;
+    // ── Save state for opacity / filter / clip ──
+    let needs_layer = style.opacity < 1.0 || !style.filter.is_empty();
     let needs_clip = style.overflow_x != types::Overflow::Visible
         || style.overflow_y != types::Overflow::Visible;
 
@@ -103,13 +105,37 @@ fn paint_box(
         }
     }
 
+    // CSS `clip-path` — applied **outside** the opacity/filter layer so
+    // filter output (blur halos, drop-shadow extents) is still clipped to
+    // the shape. Spec: the clip-path shapes the element's entire rendering,
+    // including any filter effects.
+    let has_clip_path = !matches!(style.clip_path, super::style::ClipPath::None);
+    if has_clip_path {
+        canvas.save();
+        apply_clip_path(canvas, &style.clip_path, w, h);
+    }
+
     if needs_layer {
         let mut layer_paint = Paint::default();
         layer_paint.set_alpha((style.opacity * 255.0) as u8);
+        let has_filter = !style.filter.is_empty();
+        if has_filter {
+            if let Some(filter) = build_filter_chain(&style.filter) {
+                layer_paint.set_image_filter(filter);
+            }
+        }
+        // Skia clips a layer's output to its `bounds` hint, including any
+        // filter outset. Blur / drop-shadow extend the visible region past
+        // the source box, so when a filter is active we omit `bounds` and
+        // let Skia size the layer from the filter's own fast-bounds.
         let bounds = Rect::from_xywh(0.0, 0.0, w, h);
-        let layer_rec = skia_safe::canvas::SaveLayerRec::default()
-            .paint(&layer_paint)
-            .bounds(&bounds);
+        let layer_rec = if has_filter {
+            skia_safe::canvas::SaveLayerRec::default().paint(&layer_paint)
+        } else {
+            skia_safe::canvas::SaveLayerRec::default()
+                .paint(&layer_paint)
+                .bounds(&bounds)
+        };
         canvas.save_layer(&layer_rec);
     }
 
@@ -117,8 +143,27 @@ fn paint_box(
     // outside the box) is not clipped. Outline still participates in the
     // opacity layer above.
     if needs_clip {
+        // `overflow-clip-margin` expands the clip rect outward per axis,
+        // but only on axes that use `overflow: clip`. `hidden`/`scroll`/
+        // `auto` ignore the margin per spec, so e.g.
+        // `overflow-x: clip; overflow-y: hidden` only expands horizontally.
+        let base_margin = style.overflow_clip_margin.max(0.0);
+        let margin_x = if style.overflow_x == types::Overflow::Clip {
+            base_margin
+        } else {
+            0.0
+        };
+        let margin_y = if style.overflow_y == types::Overflow::Clip {
+            base_margin
+        } else {
+            0.0
+        };
         canvas.save();
-        canvas.clip_rect(Rect::from_xywh(0.0, 0.0, w, h), ClipOp::Intersect, true);
+        canvas.clip_rect(
+            Rect::from_xywh(-margin_x, -margin_y, w + margin_x * 2.0, h + margin_y * 2.0),
+            ClipOp::Intersect,
+            true,
+        );
     }
 
     // ── Phase 1: Background (Chromium: kBlockBackground) ──
@@ -153,32 +198,77 @@ fn paint_box(
             cw,
             ch,
             &style.border_radius,
+            style.font.image_rendering,
             images,
         );
     }
 
-    // ── Phase 2: Children (Chromium: kForeground for inlines, recurse for blocks) ──
-    for child in &layout.children {
+    // ── Phase 2: Children — z-index aware (simplified stacking) ──
+    //
+    // Per CSS 2.1 §9.9.1, positioned children with an explicit `z-index`
+    // paint in three passes around the default flow: negative → flow →
+    // non-negative. We don't model full stacking contexts (opacity,
+    // transform, etc.) yet — only the sibling-z-index ordering case.
+    //
+    // A child participates in z-ordered painting when it's a Box with
+    // `position != static` AND `z_index.is_some()`. All other nodes
+    // (text runs, inline groups, static boxes) paint in source order in
+    // the middle pass.
+    fn z_key(child: &LayoutNode) -> Option<i32> {
         match child {
-            LayoutNode::Box(child_box) => {
-                paint_box(canvas, child_box, fonts, images);
+            LayoutNode::Box(b) => {
+                if b.style.position == types::Position::Static {
+                    None
+                } else {
+                    b.style.z_index
+                }
             }
-            LayoutNode::Text {
-                run,
-                x: tx,
-                y: ty,
-                width: tw,
-            } => {
-                paint_text(canvas, run, *tx, *ty, *tw, fonts);
+            _ => None,
+        }
+    }
+    fn paint_child(
+        canvas: &Canvas,
+        child: &LayoutNode,
+        fonts: &FontCollection,
+        images: &dyn ImageProvider,
+    ) {
+        match child {
+            LayoutNode::Box(child_box) => paint_box(canvas, child_box, fonts, images),
+            LayoutNode::Text { run, x, y, width } => paint_text(canvas, run, *x, *y, *width, fonts),
+            LayoutNode::InlineGroup { group, x, y, width } => {
+                paint_inline_group(canvas, group, *x, *y, *width, fonts)
             }
-            LayoutNode::InlineGroup {
-                group,
-                x: gx,
-                y: gy,
-                width: gw,
-            } => {
-                paint_inline_group(canvas, group, *gx, *gy, *gw, fonts);
+        }
+    }
+
+    let any_explicit_z = layout.children.iter().any(|c| z_key(c).is_some());
+    if !any_explicit_z {
+        for child in &layout.children {
+            paint_child(canvas, child, fonts, images);
+        }
+    } else {
+        // Stable-partition into three buckets preserving source order.
+        let mut back: Vec<(i32, usize)> = Vec::new();
+        let mut middle: Vec<usize> = Vec::new();
+        let mut front: Vec<(i32, usize)> = Vec::new();
+        for (i, child) in layout.children.iter().enumerate() {
+            match z_key(child) {
+                Some(z) if z < 0 => back.push((z, i)),
+                Some(z) => front.push((z, i)),
+                None => middle.push(i),
             }
+        }
+        // Stable sort by z; source order preserved for equal z.
+        back.sort_by_key(|(z, _)| *z);
+        front.sort_by_key(|(z, _)| *z);
+        for (_, i) in &back {
+            paint_child(canvas, &layout.children[*i], fonts, images);
+        }
+        for i in &middle {
+            paint_child(canvas, &layout.children[*i], fonts, images);
+        }
+        for (_, i) in &front {
+            paint_child(canvas, &layout.children[*i], fonts, images);
         }
     }
 
@@ -190,12 +280,16 @@ fn paint_box(
     }
 
     // ── Phase 4: Outline (Chromium: PaintPhase::kSelfOutlineOnly) ──
-    // Painted outside the overflow clip but inside the opacity layer.
+    // Painted outside the overflow clip but inside the opacity/filter layer
+    // so outline participates in the filter (e.g. blur on the whole box).
     paint_outline(canvas, style, w, h);
 
     // ── Restore ──
     if needs_layer {
-        canvas.restore(); // layer
+        canvas.restore(); // layer (filter composited, then clipped by clip-path below)
+    }
+    if has_clip_path {
+        canvas.restore(); // pop clip-path
     }
     canvas.restore(); // translate
 }
@@ -319,47 +413,237 @@ fn paint_background(
     let r = &style.border_radius;
 
     for layer in &style.background {
-        let mut paint = Paint::default();
-        paint.set_style(PaintStyle::Fill);
-        paint.set_anti_alias(true);
-
         match layer {
             BackgroundLayer::Solid(c) => {
                 if c.a == 0 {
                     continue;
                 }
+                let mut paint = Paint::default();
+                paint.set_style(PaintStyle::Fill);
+                paint.set_anti_alias(true);
                 paint.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
-            }
-            BackgroundLayer::Image(style_image) => {
-                if let Some(image) = resolve_style_image(style_image, w, h, images) {
-                    let src_rect = Rect::from_wh(image.width() as f32, image.height() as f32);
-                    canvas.save();
-                    if !r.is_zero() {
-                        let mut rrect = skia_safe::RRect::new();
-                        rrect.set_rect_radii(rect, &r.to_skia_radii());
-                        canvas.clip_rrect(rrect, ClipOp::Intersect, true);
-                    }
-                    // TODO: background-size, background-position, background-repeat
-                    canvas.draw_image_rect(
-                        &image,
-                        Some((&src_rect, skia_safe::canvas::SrcRectConstraint::Fast)),
-                        rect,
-                        &paint,
-                    );
-                    canvas.restore();
+                if r.is_zero() {
+                    canvas.draw_rect(rect, &paint);
+                } else {
+                    let mut rrect = skia_safe::RRect::new();
+                    rrect.set_rect_radii(rect, &r.to_skia_radii());
+                    canvas.draw_rrect(rrect, &paint);
                 }
-                continue;
             }
-        }
-
-        if r.is_zero() {
-            canvas.draw_rect(rect, &paint);
-        } else {
-            let mut rrect = skia_safe::RRect::new();
-            rrect.set_rect_radii(rect, &r.to_skia_radii());
-            canvas.draw_rrect(rrect, &paint);
+            BackgroundLayer::Image(img) => {
+                paint_background_image_layer(canvas, style, w, h, img, images);
+            }
         }
     }
+}
+
+/// Rect of a CSS box reference (`border-box`, `padding-box`, `content-box`)
+/// within an element's local coordinates (border-box origin).
+fn box_reference_rect(style: &StyledElement, w: f32, h: f32, which: BackgroundBox) -> Rect {
+    let b = &style.border;
+    let p = &style.padding;
+    match which {
+        BackgroundBox::BorderBox => Rect::from_xywh(0.0, 0.0, w, h),
+        BackgroundBox::PaddingBox => Rect::from_xywh(
+            b.left.width,
+            b.top.width,
+            (w - b.left.width - b.right.width).max(0.0),
+            (h - b.top.width - b.bottom.width).max(0.0),
+        ),
+        BackgroundBox::ContentBox => Rect::from_xywh(
+            b.left.width + p.left,
+            b.top.width + p.top,
+            (w - b.left.width - b.right.width - p.left - p.right).max(0.0),
+            (h - b.top.width - b.bottom.width - p.top - p.bottom).max(0.0),
+        ),
+    }
+}
+
+/// Resolve a `CssLength` as an axis-independent length value with a container
+/// basis for percentages. Used for `background-size` axis values where `%`
+/// is relative to the positioning area and `auto` carries intrinsic semantics.
+fn resolve_bg_length(v: CssLength, basis: f32) -> Option<f32> {
+    match v {
+        CssLength::Auto => None,
+        CssLength::Px(px) => Some(px),
+        CssLength::Percent(p) => Some(basis * p),
+        CssLength::Calc { px, percent } => Some(basis * percent + px),
+    }
+}
+
+/// Resolve `background-size` to concrete `(tile_w, tile_h)` given the
+/// positioning area size and the image's intrinsic size (if any).
+fn resolve_bg_size(
+    size: BackgroundSize,
+    area_w: f32,
+    area_h: f32,
+    intrinsic: Option<(f32, f32)>,
+) -> (f32, f32) {
+    match size {
+        BackgroundSize::Cover => {
+            let (iw, ih) = intrinsic.unwrap_or((area_w.max(1.0), area_h.max(1.0)));
+            let s = (area_w / iw).max(area_h / ih);
+            (iw * s, ih * s)
+        }
+        BackgroundSize::Contain => {
+            let (iw, ih) = intrinsic.unwrap_or((area_w.max(1.0), area_h.max(1.0)));
+            let s = (area_w / iw).min(area_h / ih);
+            (iw * s, ih * s)
+        }
+        BackgroundSize::Auto => intrinsic.unwrap_or((area_w, area_h)),
+        BackgroundSize::Explicit { width, height } => {
+            let w_resolved = resolve_bg_length(width, area_w);
+            let h_resolved = resolve_bg_length(height, area_h);
+            match (w_resolved, h_resolved) {
+                (Some(w), Some(h)) => (w, h),
+                (Some(w), None) => match intrinsic {
+                    Some((iw, ih)) if iw > 0.0 => (w, ih * (w / iw)),
+                    _ => (w, area_h),
+                },
+                (None, Some(h)) => match intrinsic {
+                    Some((iw, ih)) if ih > 0.0 => (iw * (h / ih), h),
+                    _ => (area_w, h),
+                },
+                (None, None) => intrinsic.unwrap_or((area_w, area_h)),
+            }
+        }
+    }
+}
+
+/// Resolve a `background-position` axis value.
+/// - `Px(p)` → `p` (raw offset from origin)
+/// - `Percent(p)` → `(area - tile) * p` (CSS rule: 0% = flush-left, 100% = flush-right)
+/// - `Calc` → percent resolved against `(area - tile)`, plus px offset
+/// - `Auto` → 0
+fn resolve_bg_position_axis(v: CssLength, area: f32, tile: f32) -> f32 {
+    match v {
+        CssLength::Px(p) => p,
+        CssLength::Percent(p) => (area - tile) * p,
+        CssLength::Calc { px, percent } => (area - tile) * percent + px,
+        CssLength::Auto => 0.0,
+    }
+}
+
+fn repeat_keyword_to_tile_mode(k: BackgroundRepeatKeyword) -> skia_safe::TileMode {
+    match k {
+        BackgroundRepeatKeyword::NoRepeat => skia_safe::TileMode::Decal,
+        // Space / Round fall back to plain repeat (P1 follow-up).
+        _ => skia_safe::TileMode::Repeat,
+    }
+}
+
+fn paint_background_image_layer(
+    canvas: &Canvas,
+    style: &StyledElement,
+    w: f32,
+    h: f32,
+    img: &BackgroundImage,
+    images: &dyn ImageProvider,
+) {
+    let origin_rect = box_reference_rect(style, w, h, img.origin);
+    let clip_rect = box_reference_rect(style, w, h, img.clip);
+    if origin_rect.width() <= 0.0 || origin_rect.height() <= 0.0 {
+        return;
+    }
+    if clip_rect.width() <= 0.0 || clip_rect.height() <= 0.0 {
+        return;
+    }
+
+    // Intrinsic size: URL images carry pixel dimensions; gradients don't.
+    let intrinsic = match &img.source {
+        StyleImage::Url(url) => images
+            .get(url)
+            .map(|im| (im.width() as f32, im.height() as f32)),
+        _ => None,
+    };
+
+    let (tile_w, tile_h) = resolve_bg_size(
+        img.size,
+        origin_rect.width(),
+        origin_rect.height(),
+        intrinsic,
+    );
+    if tile_w <= 0.0 || tile_h <= 0.0 {
+        return;
+    }
+
+    // Resolve the source image. For gradients, rasterize at tile size so the
+    // resulting image maps 1:1 onto a single tile via the shader's local matrix.
+    let src_image = match &img.source {
+        StyleImage::Url(url) => images.get(url).cloned(),
+        _ => resolve_style_image(&img.source, tile_w, tile_h, images),
+    };
+    let Some(src_image) = src_image else {
+        return;
+    };
+
+    let px =
+        resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w) + origin_rect.left;
+    let py =
+        resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h) + origin_rect.top;
+
+    let sx = tile_w / src_image.width() as f32;
+    let sy = tile_h / src_image.height() as f32;
+    let mut local = skia_safe::Matrix::scale((sx, sy));
+    local.post_translate((px, py));
+
+    let tmx = repeat_keyword_to_tile_mode(img.repeat.x);
+    let tmy = repeat_keyword_to_tile_mode(img.repeat.y);
+
+    let shader = src_image.to_shader(
+        Some((tmx, tmy)),
+        sampling_for(style.font.image_rendering),
+        Some(&local),
+    );
+    let Some(shader) = shader else {
+        return;
+    };
+
+    let mut paint = Paint::default();
+    paint.set_style(PaintStyle::Fill);
+    paint.set_anti_alias(true);
+    paint.set_shader(shader);
+
+    canvas.save();
+    // Clip to the referenced box with radii shrunk to match the box's
+    // inner edge. border-box uses the declared `border-radius` as-is;
+    // padding-box and content-box shrink each corner radius by the
+    // distance from the border-box corner to the inset-box corner
+    // (CSS Backgrounds §5: "the edges of the background layer are
+    // rounded to match the inner edge").
+    if !style.border_radius.is_zero() {
+        let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
+        let radii = inset_radii(&style.border_radius, border_rect, clip_rect);
+        let mut rrect = skia_safe::RRect::new();
+        rrect.set_rect_radii(clip_rect, &radii);
+        canvas.clip_rrect(rrect, ClipOp::Intersect, true);
+    } else {
+        canvas.clip_rect(clip_rect, ClipOp::Intersect, true);
+    }
+    canvas.draw_rect(clip_rect, &paint);
+    canvas.restore();
+}
+
+/// Shrink a `border-radius` inward to match an inset clip rect.
+/// Each corner radius is reduced by the distance from the outer rect's
+/// corner to the inner rect's corner, clamped to zero.
+fn inset_radii(r: &super::style::CornerRadii, outer: Rect, inner: Rect) -> [skia_safe::Point; 4] {
+    let left_inset = (inner.left - outer.left).max(0.0);
+    let right_inset = (outer.right - inner.right).max(0.0);
+    let top_inset = (inner.top - outer.top).max(0.0);
+    let bottom_inset = (outer.bottom - inner.bottom).max(0.0);
+    // Per CSS Backgrounds §5: the inner curve shrinks each axis of a
+    // corner radius by the inset on that axis — horizontal insets shrink
+    // the x component, vertical insets shrink the y component. Using the
+    // max of both would over-shrink one axis under asymmetric
+    // border/padding and produce too-square inset clips.
+    let shrink = |base: f32, inset: f32| (base - inset).max(0.0);
+    [
+        skia_safe::Point::new(shrink(r.tl_x, left_inset), shrink(r.tl_y, top_inset)),
+        skia_safe::Point::new(shrink(r.tr_x, right_inset), shrink(r.tr_y, top_inset)),
+        skia_safe::Point::new(shrink(r.br_x, right_inset), shrink(r.br_y, bottom_inset)),
+        skia_safe::Point::new(shrink(r.bl_x, left_inset), shrink(r.bl_y, bottom_inset)),
+    ]
 }
 
 // ─── Replaced element painting (Chromium: ReplacedPainter) ──────────
@@ -376,6 +660,7 @@ fn paint_replaced(
     w: f32,
     h: f32,
     border_radius: &super::style::CornerRadii,
+    image_rendering: types::ImageRendering,
     images: &dyn ImageProvider,
 ) {
     canvas.save();
@@ -401,20 +686,35 @@ fn paint_replaced(
         let box_fit = content.object_fit.to_box_fit(img_w, img_h, w, h);
         let t = box_fit.calculate_transform((img_w, img_h), (w, h));
 
+        // Override the box-fit's default (center) translation with
+        // `object-position`. Fitted size is derived from the scale
+        // components of the box-fit transform.
+        let sx = t.matrix[0][0];
+        let sy = t.matrix[1][1];
+        let fitted_w = img_w * sx.abs();
+        let fitted_h = img_h * sy.abs();
+        let tx = resolve_bg_position_axis(content.object_position.x, w, fitted_w);
+        let ty = resolve_bg_position_axis(content.object_position.y, h, fitted_h);
+
         let paint = Paint::default();
         canvas.save();
         canvas.concat(&skia_safe::Matrix::new_all(
-            t.matrix[0][0],
+            sx,
             t.matrix[0][1],
-            t.matrix[0][2],
+            tx,
             t.matrix[1][0],
-            t.matrix[1][1],
-            t.matrix[1][2],
+            sy,
+            ty,
             0.0,
             0.0,
             1.0,
         ));
-        canvas.draw_image(image, (0.0, 0.0), Some(&paint));
+        canvas.draw_image_with_sampling_options(
+            image,
+            (0.0, 0.0),
+            sampling_for(image_rendering),
+            Some(&paint),
+        );
         canvas.restore();
     } else {
         // Placeholder: light gray rect
@@ -438,12 +738,404 @@ fn paint_replaced(
     canvas.restore();
 }
 
+/// Map CSS `image-rendering` to Skia `SamplingOptions`.
+/// - `Auto` → bilinear filtering (the documented default; Skia's
+///   `SamplingOptions::default()` is actually `Nearest`, so we spell
+///   `FilterMode::Linear` explicitly).
+/// - `CrispEdges` / `Pixelated` → nearest-neighbor, preserving hard pixel
+///   edges typical of pixel art / retro graphics.
+fn sampling_for(rendering: types::ImageRendering) -> skia_safe::SamplingOptions {
+    let mode = match rendering {
+        types::ImageRendering::Auto => skia_safe::FilterMode::Linear,
+        types::ImageRendering::CrispEdges | types::ImageRendering::Pixelated => {
+            skia_safe::FilterMode::Nearest
+        }
+    };
+    skia_safe::SamplingOptions::from(mode)
+}
+
+// ─── clip-path ───────────────────────────────────────────────────────
+
+/// Apply a CSS `clip-path` against the element's border box `(w, h)`.
+/// Caller is responsible for `canvas.save()` / `canvas.restore()`.
+fn apply_clip_path(canvas: &Canvas, clip: &super::style::ClipPath, w: f32, h: f32) {
+    use super::style::ClipPath;
+
+    let resolve = |len: super::types::CssLength, basis: f32| -> f32 { len.resolve_px(basis) };
+
+    match clip {
+        ClipPath::None => {}
+        ClipPath::Inset {
+            top,
+            right,
+            bottom,
+            left,
+            radius,
+        } => {
+            let t = resolve(*top, h);
+            let r = resolve(*right, w);
+            let b = resolve(*bottom, h);
+            let l = resolve(*left, w);
+            let rect = Rect::from_ltrb(l, t, w - r, h - b);
+            if radius.is_zero() {
+                canvas.clip_rect(rect, ClipOp::Intersect, true);
+            } else {
+                // Percent radii resolve against the inset clip rect —
+                // x-axis against its width, y-axis against its height.
+                let rw = rect.width().max(0.0);
+                let rh = rect.height().max(0.0);
+                let radii = [
+                    skia_safe::Point::new(resolve(radius.tl_x, rw), resolve(radius.tl_y, rh)),
+                    skia_safe::Point::new(resolve(radius.tr_x, rw), resolve(radius.tr_y, rh)),
+                    skia_safe::Point::new(resolve(radius.br_x, rw), resolve(radius.br_y, rh)),
+                    skia_safe::Point::new(resolve(radius.bl_x, rw), resolve(radius.bl_y, rh)),
+                ];
+                let mut rrect = skia_safe::RRect::new();
+                rrect.set_rect_radii(rect, &radii);
+                canvas.clip_rrect(rrect, ClipOp::Intersect, true);
+            }
+        }
+        ClipPath::Circle { cx, cy, radius } => {
+            let cx_px = resolve(*cx, w);
+            let cy_px = resolve(*cy, h);
+            let r = resolve_circle_radius(*radius, (cx_px, cy_px), (w, h));
+            let mut builder = skia_safe::PathBuilder::new();
+            builder.add_circle((cx_px, cy_px), r, None);
+            canvas.clip_path(&builder.detach(), ClipOp::Intersect, true);
+        }
+        ClipPath::Ellipse { cx, cy, rx, ry } => {
+            let cx_px = resolve(*cx, w);
+            let cy_px = resolve(*cy, h);
+            let rx_px = resolve_shape_radius(*rx, (cx_px, cy_px), (w, h), true);
+            let ry_px = resolve_shape_radius(*ry, (cx_px, cy_px), (w, h), false);
+            let rect = Rect::from_xywh(cx_px - rx_px, cy_px - ry_px, rx_px * 2.0, ry_px * 2.0);
+            let mut builder = skia_safe::PathBuilder::new();
+            builder.add_oval(rect, None, None);
+            canvas.clip_path(&builder.detach(), ClipOp::Intersect, true);
+        }
+        ClipPath::Polygon { points, even_odd } => {
+            if points.len() < 3 {
+                return;
+            }
+            let fill_type = if *even_odd {
+                skia_safe::PathFillType::EvenOdd
+            } else {
+                skia_safe::PathFillType::Winding
+            };
+            let mut builder = skia_safe::PathBuilder::new_with_fill_type(fill_type);
+            let first = (resolve(points[0].0, w), resolve(points[0].1, h));
+            builder.move_to(first);
+            for (x, y) in &points[1..] {
+                builder.line_to((resolve(*x, w), resolve(*y, h)));
+            }
+            builder.close();
+            canvas.clip_path(&builder.detach(), ClipOp::Intersect, true);
+        }
+    }
+}
+
+/// Resolve a `ShapeRadius` into a pixel length. `is_x` controls whether
+/// `closest-side`/`farthest-side` use the horizontal or vertical axis
+/// (ellipse uses one radius per axis).
+/// Resolve a `circle()` radius per CSS Shapes §3.1: `closest-side` is
+/// the minimum of the four distances from the center to the reference
+/// box edges; `farthest-side` is the maximum. Percentage radii use the
+/// "normalized diagonal" basis `sqrt((w² + h²) / 2)` so `circle(50%)`
+/// on a square box matches `min(w, h) * 50% * √2 / √2 = w * 50%`.
+fn resolve_circle_radius(
+    r: super::style::ShapeRadius,
+    center: (f32, f32),
+    size: (f32, f32),
+) -> f32 {
+    use super::style::ShapeRadius;
+    let (w, h) = size;
+    let (cx, cy) = center;
+    let dists = [cx, w - cx, cy, h - cy];
+    match r {
+        ShapeRadius::Length(len) => len.resolve_px(((w * w + h * h) / 2.0).sqrt()),
+        ShapeRadius::ClosestSide => dists.iter().copied().fold(f32::INFINITY, f32::min).max(0.0),
+        ShapeRadius::FarthestSide => dists.iter().copied().fold(0.0f32, f32::max),
+    }
+}
+
+fn resolve_shape_radius(
+    r: super::style::ShapeRadius,
+    center: (f32, f32),
+    size: (f32, f32),
+    is_x: bool,
+) -> f32 {
+    use super::style::ShapeRadius;
+    match r {
+        ShapeRadius::Length(len) => {
+            // For circle() the spec resolves against sqrt((w²+h²)/2);
+            // for ellipse() rx uses w, ry uses h. We approximate
+            // circle's case by passing `is_x=true` with `size.0`.
+            let basis = if is_x { size.0 } else { size.1 };
+            len.resolve_px(basis)
+        }
+        ShapeRadius::ClosestSide => {
+            let (w, h) = size;
+            let (cx, cy) = center;
+            if is_x {
+                cx.min(w - cx).max(0.0)
+            } else {
+                cy.min(h - cy).max(0.0)
+            }
+        }
+        ShapeRadius::FarthestSide => {
+            let (w, h) = size;
+            let (cx, cy) = center;
+            if is_x {
+                cx.max(w - cx).max(0.0)
+            } else {
+                cy.max(h - cy).max(0.0)
+            }
+        }
+    }
+}
+
+// ─── Filter chain ────────────────────────────────────────────────────
+
+/// Compose a CSS `filter:` chain into a single Skia `ImageFilter` applied
+/// to the element's layer paint. Returns `None` for an empty chain (the
+/// caller skips `set_image_filter` entirely).
+///
+/// Each color filter is wrapped as an `image_filter::color_filter` and
+/// composed in list order (first filter = innermost in the Skia chain,
+/// applied first to the source pixels).
+fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilter> {
+    use skia_safe::{color_filters, image_filters};
+    let mut chain: Option<skia_safe::ImageFilter> = None;
+    for f in filters {
+        let next: Option<skia_safe::ImageFilter> = match *f {
+            FilterFunction::Blur(px) => {
+                // CSS Filter Effects §11.4.4: the `blur()` length argument
+                // IS the Gaussian standard deviation, and Skia's
+                // `image_filters::blur` also takes a sigma, so the CSS
+                // value maps 1:1 without halving.
+                let sigma = px.max(0.0);
+                if sigma <= 0.0 {
+                    None
+                } else {
+                    image_filters::blur((sigma, sigma), None, chain.clone(), None)
+                }
+            }
+            FilterFunction::Brightness(b) => {
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        b, 0.0, 0.0, 0.0, 0.0, //
+                        0.0, b, 0.0, 0.0, 0.0, //
+                        0.0, 0.0, b, 0.0, 0.0, //
+                        0.0, 0.0, 0.0, 1.0, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::Contrast(c) => {
+                let t = (1.0 - c) * 0.5;
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        c, 0.0, 0.0, 0.0, t, //
+                        0.0, c, 0.0, 0.0, t, //
+                        0.0, 0.0, c, 0.0, t, //
+                        0.0, 0.0, 0.0, 1.0, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::Grayscale(amount) => {
+                // Lerp between identity and luma-weighted grayscale.
+                // Luma weights (Rec. 709): R=0.2126 G=0.7152 B=0.0722.
+                let a = amount.clamp(0.0, 1.0);
+                let lr = 0.2126;
+                let lg = 0.7152;
+                let lb = 0.0722;
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        1.0 - a + a * lr,
+                        a * lg,
+                        a * lb,
+                        0.0,
+                        0.0, //
+                        a * lr,
+                        1.0 - a + a * lg,
+                        a * lb,
+                        0.0,
+                        0.0, //
+                        a * lr,
+                        a * lg,
+                        1.0 - a + a * lb,
+                        0.0,
+                        0.0, //
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::HueRotate(rad) => {
+                // Standard hue-rotation matrix around the gray axis.
+                let c = rad.cos();
+                let s = rad.sin();
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        0.213 + c * 0.787 - s * 0.213,
+                        0.715 - c * 0.715 - s * 0.715,
+                        0.072 - c * 0.072 + s * 0.928,
+                        0.0,
+                        0.0, //
+                        0.213 - c * 0.213 + s * 0.143,
+                        0.715 + c * 0.285 + s * 0.140,
+                        0.072 - c * 0.072 - s * 0.283,
+                        0.0,
+                        0.0, //
+                        0.213 - c * 0.213 - s * 0.787,
+                        0.715 - c * 0.715 + s * 0.715,
+                        0.072 + c * 0.928 + s * 0.072,
+                        0.0,
+                        0.0, //
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::Invert(amount) => {
+                // new = v + (1 - 2v) * a = v * (1 - 2a) + a
+                let a = amount.clamp(0.0, 1.0);
+                let k = 1.0 - 2.0 * a;
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        k, 0.0, 0.0, 0.0, a, //
+                        0.0, k, 0.0, 0.0, a, //
+                        0.0, 0.0, k, 0.0, a, //
+                        0.0, 0.0, 0.0, 1.0, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::Opacity(o) => {
+                let a = o.clamp(0.0, 1.0);
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        1.0, 0.0, 0.0, 0.0, 0.0, //
+                        0.0, 1.0, 0.0, 0.0, 0.0, //
+                        0.0, 0.0, 1.0, 0.0, 0.0, //
+                        0.0, 0.0, 0.0, a, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::Saturate(s) => {
+                let mut cm = skia_safe::ColorMatrix::default();
+                cm.set_saturation(s);
+                let cf = color_filters::matrix(&cm, None);
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::Sepia(amount) => {
+                // Lerp between identity and the classic sepia tone matrix
+                // (https://drafts.fxtf.org/filter-effects-1/#sepiaEquivalent).
+                let a = amount.clamp(0.0, 1.0);
+                let lerp = |ident: f32, sepia: f32| ident + a * (sepia - ident);
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        lerp(1.0, 0.393),
+                        lerp(0.0, 0.769),
+                        lerp(0.0, 0.189),
+                        0.0,
+                        0.0,
+                        lerp(0.0, 0.349),
+                        lerp(1.0, 0.686),
+                        lerp(0.0, 0.168),
+                        0.0,
+                        0.0,
+                        lerp(0.0, 0.272),
+                        lerp(0.0, 0.534),
+                        lerp(1.0, 0.131),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.clone(), None)
+            }
+            FilterFunction::DropShadow {
+                offset_x,
+                offset_y,
+                blur,
+                color,
+            } => {
+                // CSS `drop-shadow()`'s blur length is a Gaussian sigma,
+                // matching Skia's `drop_shadow` parameter; no halving.
+                let sigma = blur.max(0.0);
+                let color4f = skia_safe::Color4f::new(
+                    color.r as f32 / 255.0,
+                    color.g as f32 / 255.0,
+                    color.b as f32 / 255.0,
+                    color.a as f32 / 255.0,
+                );
+                image_filters::drop_shadow(
+                    (offset_x, offset_y),
+                    (sigma, sigma),
+                    color4f,
+                    None,
+                    chain.clone(),
+                    None,
+                )
+            }
+        };
+        // `blur(0)` returns None as a no-op identity, and Skia's factory
+        // functions can fail unexpectedly. In both cases preserve the
+        // chain we accumulated so far rather than silently discarding
+        // prior filters.
+        if let Some(n) = next {
+            chain = Some(n);
+        }
+    }
+    chain
+}
+
 // ─── Gradient shaders ────────────────────────────────────────────────
 
 use skia_safe::gradient_shader::{Gradient, GradientColors, Interpolation};
-use skia_safe::scalar;
+use skia_safe::{Point, TileMode};
+
+use super::style::{GradientPosition, RadialShape, RadialSize};
 
 fn build_gradient_data(stops: &[GradientStop]) -> (Vec<skia_safe::Color4f>, Vec<f32>) {
+    build_gradient_data_with_line_length(stops, f32::INFINITY)
+}
+
+/// Convert stops to Skia color and position vectors, normalizing any px
+/// positions against the gradient-line length `L`. If all stops are
+/// fraction-based `L` may be any value (it's only consulted for px stops).
+///
+/// After normalization this also clamps each position to be >= its
+/// predecessor, matching CSS's "stops must be non-decreasing" rule. Skia
+/// asserts strictly increasing positions in debug builds; we clamp to
+/// equal to preserve author intent (shared stops create hard color
+/// transitions).
+fn build_gradient_data_with_line_length(
+    stops: &[GradientStop],
+    line_length: f32,
+) -> (Vec<skia_safe::Color4f>, Vec<f32>) {
     let colors: Vec<skia_safe::Color4f> = stops
         .iter()
         .map(|s| {
@@ -455,15 +1147,177 @@ fn build_gradient_data(stops: &[GradientStop]) -> (Vec<skia_safe::Color4f>, Vec<
             )
         })
         .collect();
-    let positions: Vec<f32> = stops.iter().map(|s| s.offset).collect();
+
+    let inv_l = if line_length > 1e-6 {
+        1.0 / line_length
+    } else {
+        0.0
+    };
+    let mut positions: Vec<f32> = stops
+        .iter()
+        .map(|s| {
+            if s.offset_is_px {
+                s.offset * inv_l
+            } else {
+                s.offset
+            }
+        })
+        .collect();
+
+    // CSS: each stop position is clamped to at least the previous stop.
+    for i in 1..positions.len() {
+        if positions[i] < positions[i - 1] {
+            positions[i] = positions[i - 1];
+        }
+    }
+
     (colors, positions)
 }
 
-fn make_gradient<'a>(colors: &'a [skia_safe::Color4f], positions: &'a [f32]) -> Gradient<'a> {
-    Gradient::new(
-        GradientColors::new(colors, Some(positions), skia_safe::TileMode::Clamp, None),
-        Interpolation::default(),
+/// Resolve a `CssLength` against an axis length (width or height) to pixels.
+/// `Auto` is not expected for gradient position/size — falls back to `fallback`.
+fn resolve_length(len: CssLength, axis: f32, fallback: f32) -> f32 {
+    match len {
+        CssLength::Auto => fallback,
+        _ => len.resolve_px(axis),
+    }
+}
+
+fn resolve_center(pos: &GradientPosition, w: f32, h: f32) -> (f32, f32) {
+    (
+        resolve_length(pos.x, w, w / 2.0),
+        resolve_length(pos.y, h, h / 2.0),
     )
+}
+
+/// If `repeating`, rescale stop positions so one cycle spans 0..1 and return
+/// `(scaled_positions, cycle)`. For non-repeating, `cycle = 1.0` and positions
+/// pass through unchanged. Callers multiply `cycle` into their gradient extent
+/// (line length / radius / sweep angle) to shrink a non-repeating gradient
+/// down to a single repeating unit.
+///
+/// The cycle is the last stop offset, floored at `1e-6` to avoid division by
+/// zero on degenerate input (e.g. all stops at position 0).
+fn repeat_scale(positions: Vec<f32>, repeating: bool) -> (Vec<f32>, f32) {
+    if !repeating {
+        return (positions, 1.0);
+    }
+    let cycle = positions.iter().copied().fold(0f32, f32::max).max(1e-6);
+    let scaled = positions.iter().map(|p| p / cycle).collect();
+    (scaled, cycle)
+}
+
+fn make_gradient<'a>(
+    colors: &'a [skia_safe::Color4f],
+    positions: &'a [f32],
+    tile: TileMode,
+    interpolation: super::style::GradientInterpolation,
+) -> Gradient<'a> {
+    Gradient::new(
+        GradientColors::new(colors, Some(positions), tile, None),
+        to_skia_interpolation(interpolation),
+    )
+}
+
+fn to_skia_interpolation(v: super::style::GradientInterpolation) -> Interpolation {
+    use super::style::{GradientColorSpace as CS, GradientHueMethod as HM};
+    use skia_safe::gradient_shader::interpolation::{ColorSpace, HueMethod, InPremul};
+    let color_space = match v.color_space {
+        CS::Oklab => ColorSpace::OKLab,
+        CS::Srgb => ColorSpace::SRGB,
+        CS::SrgbLinear => ColorSpace::SRGBLinear,
+        CS::Hsl => ColorSpace::HSL,
+        CS::Hwb => ColorSpace::HWB,
+        CS::Lab => ColorSpace::Lab,
+        CS::Lch => ColorSpace::LCH,
+        CS::Oklch => ColorSpace::OKLCH,
+        CS::DisplayP3 => ColorSpace::DisplayP3,
+        CS::Rec2020 => ColorSpace::Rec2020,
+        CS::A98Rgb => ColorSpace::A98RGB,
+        CS::ProphotoRgb => ColorSpace::ProphotoRGB,
+        // XYZ spaces have no Skia equivalent; fall back to destination (sRGB-like).
+        CS::XyzD50 | CS::XyzD65 => ColorSpace::Destination,
+    };
+    let hue_method = match v.hue_method {
+        HM::Shorter => HueMethod::Shorter,
+        HM::Longer => HueMethod::Longer,
+        HM::Increasing => HueMethod::Increasing,
+        HM::Decreasing => HueMethod::Decreasing,
+    };
+    Interpolation {
+        in_premul: InPremul::No,
+        color_space,
+        hue_method,
+    }
+}
+
+fn tile_mode(repeating: bool) -> TileMode {
+    if repeating {
+        TileMode::Repeat
+    } else {
+        TileMode::Clamp
+    }
+}
+
+/// Resolve radial ending-shape radii to paint-space (rx, ry) in pixels.
+///
+/// CSS `<radial-extent>` keywords are defined per the spec:
+///   * side distances are signed offsets from the center to each box edge.
+///   * corner distance is sqrt(hside² + vside²).
+///   * For ellipse-corner, the ellipse keeps the aspect ratio of the side
+///     pair and passes through the target corner, which means `k = √2`
+///     scaling of the side distances.
+fn radial_radii(
+    shape: RadialShape,
+    size: RadialSize,
+    cx: f32,
+    cy: f32,
+    w: f32,
+    h: f32,
+) -> (f32, f32) {
+    if let RadialSize::Explicit { x, y } = size {
+        return (
+            resolve_length(x, w, w / 2.0).max(1e-6),
+            resolve_length(y, h, h / 2.0).max(1e-6),
+        );
+    }
+
+    let cs_x = cx.min(w - cx).abs();
+    let fs_x = cx.max(w - cx).abs();
+    let cs_y = cy.min(h - cy).abs();
+    let fs_y = cy.max(h - cy).abs();
+
+    let (rx, ry) = match (shape, size) {
+        (RadialShape::Circle, RadialSize::ClosestSide) => {
+            let r = cs_x.min(cs_y);
+            (r, r)
+        }
+        (RadialShape::Circle, RadialSize::FarthestSide) => {
+            let r = fs_x.max(fs_y);
+            (r, r)
+        }
+        (RadialShape::Circle, RadialSize::ClosestCorner) => {
+            let r = (cs_x * cs_x + cs_y * cs_y).sqrt();
+            (r, r)
+        }
+        (RadialShape::Circle, RadialSize::FarthestCorner) => {
+            let r = (fs_x * fs_x + fs_y * fs_y).sqrt();
+            (r, r)
+        }
+        (RadialShape::Ellipse, RadialSize::ClosestSide) => (cs_x, cs_y),
+        (RadialShape::Ellipse, RadialSize::FarthestSide) => (fs_x, fs_y),
+        (RadialShape::Ellipse, RadialSize::ClosestCorner) => {
+            let k = std::f32::consts::SQRT_2;
+            (cs_x * k, cs_y * k)
+        }
+        (RadialShape::Ellipse, RadialSize::FarthestCorner) => {
+            let k = std::f32::consts::SQRT_2;
+            (fs_x * k, fs_y * k)
+        }
+        // Explicit handled above.
+        _ => unreachable!(),
+    };
+    (rx.max(1e-6), ry.max(1e-6))
 }
 
 fn build_linear_gradient_shader(
@@ -471,23 +1325,36 @@ fn build_linear_gradient_shader(
     w: f32,
     h: f32,
 ) -> Option<skia_safe::Shader> {
-    let (colors, positions) = build_gradient_data(&grad.stops);
-    if colors.len() < 2 {
-        return None;
-    }
-
     // CSS: 0deg = to top, 90deg = to right. Convert to start/end points.
     let rad = grad.angle_deg.to_radians();
     let sin = rad.sin();
     let cos = rad.cos();
     let cx = w / 2.0;
     let cy = h / 2.0;
-    // Half-length covers the box diagonal
+    // Half-length covers the projected extent of the box along the gradient line.
     let half_len = (w * sin.abs() + h * cos.abs()) / 2.0;
-    let p1 = skia_safe::Point::new(cx - sin * half_len, cy + cos * half_len);
-    let p2 = skia_safe::Point::new(cx + sin * half_len, cy - cos * half_len);
+    let line_length = 2.0 * half_len;
 
-    let gradient = make_gradient(&colors, &positions);
+    let (colors, raw_positions) = build_gradient_data_with_line_length(&grad.stops, line_length);
+    if colors.len() < 2 {
+        return None;
+    }
+
+    let p1 = Point::new(cx - sin * half_len, cy + cos * half_len);
+    let p2_full = Point::new(cx + sin * half_len, cy - cos * half_len);
+
+    let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
+    let p2 = Point::new(
+        p1.x + cycle * (p2_full.x - p1.x),
+        p1.y + cycle * (p2_full.y - p1.y),
+    );
+
+    let gradient = make_gradient(
+        &colors,
+        &positions,
+        tile_mode(grad.repeating),
+        grad.interpolation,
+    );
     skia_safe::shaders::linear_gradient((p1, p2), &gradient, None)
 }
 
@@ -496,34 +1363,85 @@ fn build_radial_gradient_shader(
     w: f32,
     h: f32,
 ) -> Option<skia_safe::Shader> {
-    let (colors, positions) = build_gradient_data(&grad.stops);
+    let (cx, cy) = resolve_center(&grad.center, w, h);
+    let (rx_full, ry_full) = radial_radii(grad.shape, grad.size, cx, cy, w, h);
+
+    // Use the larger axis as the gradient line length for px stop
+    // resolution. For circles rx = ry; for ellipses this is a reasonable
+    // convention — CSS defines the ending shape's "gradient line" as
+    // radius-like distance from the center.
+    let line_length = rx_full.max(ry_full);
+
+    let (colors, raw_positions) = build_gradient_data_with_line_length(&grad.stops, line_length);
     if colors.len() < 2 {
         return None;
     }
 
-    let matrix = skia_safe::Matrix::scale((w, h));
-    let gradient = make_gradient(&colors, &positions);
-    skia_safe::shaders::radial_gradient(
-        (skia_safe::Point::new(0.5, 0.5), 0.5 as scalar),
-        &gradient,
-        Some(&matrix),
-    )
+    let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
+    let (rx, ry) = (rx_full * cycle, ry_full * cycle);
+
+    // Unit-radius radial at origin; local matrix maps shader → paint space:
+    // (shader point p) → (cx + rx·p.x, cy + ry·p.y). Works for circles and
+    // ellipses uniformly.
+    let mut matrix = skia_safe::Matrix::scale((rx, ry));
+    matrix.post_translate((cx, cy));
+
+    let gradient = make_gradient(
+        &colors,
+        &positions,
+        tile_mode(grad.repeating),
+        grad.interpolation,
+    );
+    skia_safe::shaders::radial_gradient((Point::new(0.0, 0.0), 1.0), &gradient, Some(&matrix))
 }
 
 fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<skia_safe::Shader> {
-    let (colors, positions) = build_gradient_data(&grad.stops);
+    let (mut colors, raw_positions) = build_gradient_data(&grad.stops);
     if colors.len() < 2 {
         return None;
     }
 
-    let matrix = skia_safe::Matrix::scale((w, h));
-    let gradient = make_gradient(&colors, &positions);
-    skia_safe::shaders::sweep_gradient(
-        skia_safe::Point::new(0.5, 0.5),
-        (0.0 as scalar, 360.0 as scalar),
-        &gradient,
-        Some(&matrix),
-    )
+    let (cx, cy) = resolve_center(&grad.center, w, h);
+
+    let (mut positions, cycle) = repeat_scale(raw_positions, grad.repeating);
+    let sweep_deg = 360.0 * cycle;
+
+    // CSS conic: stop 0 sits at `from` angle, measured from 12 o'clock (top),
+    // clockwise. Skia sweep_gradient: stop 0 sits at +x (3 o'clock).
+    // The mapping from CSS angle φ to Skia's atan2 angle θ is θ = φ − 90°,
+    // so start = from − 90° places stop 0 at the right CSS angle.
+    let start = grad.from_angle_deg - 90.0;
+    let end = start + sweep_deg;
+
+    // We must use `TileMode::Repeat` for the geometry: `atan2` returns
+    // angles in (−π, π], so points in the top-left CSS quadrant map to
+    // positions < 0 relative to the start angle. Under `Clamp` those
+    // collapse to the first stop.
+    //
+    // But for non-repeating conics with stops that don't span the full
+    // [0, 1] range (e.g. `conic-gradient(red 25%, blue 75%)`), raw
+    // Repeat would wrap before the first and after the last stop,
+    // producing unwanted tiling. Clamp-like semantics are restored by
+    // duplicating the endpoints to pad the range to [0, 1].
+    if !grad.repeating {
+        if let Some(&first_pos) = positions.first() {
+            if first_pos > 0.0 {
+                let first_color = colors[0];
+                positions.insert(0, 0.0);
+                colors.insert(0, first_color);
+            }
+        }
+        if let Some(&last_pos) = positions.last() {
+            if last_pos < 1.0 {
+                let last_color = *colors.last().unwrap();
+                positions.push(1.0);
+                colors.push(last_color);
+            }
+        }
+    }
+
+    let gradient = make_gradient(&colors, &positions, TileMode::Repeat, grad.interpolation);
+    skia_safe::shaders::sweep_gradient(Point::new(cx, cy), (start, end), &gradient, None)
 }
 
 // ─── Border image painting (Chromium: NinePieceImagePainter) ────────
@@ -781,33 +1699,186 @@ fn paint_borders(
 
     let b = &style.border;
 
-    if b.top.width > 0.0 && b.top.style != types::BorderStyle::None {
-        let paint = border_paint(&b.top);
-        let by = b.top.width / 2.0;
-        canvas.draw_line((0.0, by), (w, by), &paint);
+    // Fast path: uniform sides with a non-zero border-radius. Stroke a
+    // single RRect so the border traces the rounded corners instead of
+    // falling back to per-side straight lines.
+    let uniform = b.top.width == b.bottom.width
+        && b.top.width == b.left.width
+        && b.top.width == b.right.width
+        && b.top.style == b.bottom.style
+        && b.top.style == b.left.style
+        && b.top.style == b.right.style
+        && b.top.color == b.bottom.color
+        && b.top.color == b.left.color
+        && b.top.color == b.right.color;
+    if uniform
+        && b.top.width > 0.0
+        && b.top.style != types::BorderStyle::None
+        && !style.border_radius.is_zero()
+    {
+        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius, w, h);
+        return;
     }
 
-    if b.bottom.width > 0.0 && b.bottom.style != types::BorderStyle::None {
-        let paint = border_paint(&b.bottom);
-        let by = h - b.bottom.width / 2.0;
-        canvas.draw_line((0.0, by), (w, by), &paint);
-    }
-
-    if b.left.width > 0.0 && b.left.style != types::BorderStyle::None {
-        let paint = border_paint(&b.left);
-        let bx = b.left.width / 2.0;
-        canvas.draw_line((bx, 0.0), (bx, h), &paint);
-    }
-
-    if b.right.width > 0.0 && b.right.style != types::BorderStyle::None {
-        let paint = border_paint(&b.right);
-        let bx = w - b.right.width / 2.0;
-        canvas.draw_line((bx, 0.0), (bx, h), &paint);
+    for pos in [SidePos::Top, SidePos::Bottom, SidePos::Left, SidePos::Right] {
+        let side = match pos {
+            SidePos::Top => &b.top,
+            SidePos::Bottom => &b.bottom,
+            SidePos::Left => &b.left,
+            SidePos::Right => &b.right,
+        };
+        if side.width <= 0.0 || side.style == types::BorderStyle::None {
+            continue;
+        }
+        paint_border_side(canvas, pos, side, w, h);
     }
 }
 
-fn border_paint(side: &BorderSide) -> Paint {
-    stroke_paint(side.color, side.width, side.style)
+/// Stroke the border as a single RRect so `border-radius` is honored.
+/// Only called for borders where all four sides share width/style/color.
+/// Handles `double` as two concentric RRects (1/3 width each with gap).
+fn paint_uniform_rounded_border(
+    canvas: &Canvas,
+    side: &BorderSide,
+    radius: &super::style::CornerRadii,
+    w: f32,
+    h: f32,
+) {
+    let stroke_center = |inset: f32| -> skia_safe::RRect {
+        let rect = Rect::from_xywh(
+            inset,
+            inset,
+            (w - 2.0 * inset).max(0.0),
+            (h - 2.0 * inset).max(0.0),
+        );
+        let mut rrect = skia_safe::RRect::new();
+        let shrunk = shrink_radii(radius, inset);
+        rrect.set_rect_radii(rect, &shrunk);
+        rrect
+    };
+    if side.style == types::BorderStyle::Double {
+        let sub_w = side.width / 3.0;
+        let paint = stroke_paint(side.color, sub_w, types::BorderStyle::Solid);
+        // Outer ring: stroke center near the outside edge.
+        let outer_inset = sub_w / 2.0;
+        canvas.draw_rrect(stroke_center(outer_inset), &paint);
+        // Inner ring: stroke center near the inside edge.
+        let inner_inset = side.width - sub_w / 2.0;
+        canvas.draw_rrect(stroke_center(inner_inset), &paint);
+        return;
+    }
+    let paint = stroke_paint(side.color, side.width, side.style);
+    canvas.draw_rrect(stroke_center(side.width / 2.0), &paint);
+}
+
+fn shrink_radii(r: &super::style::CornerRadii, inset: f32) -> [skia_safe::Point; 4] {
+    let s = |v: f32| (v - inset).max(0.0);
+    [
+        skia_safe::Point::new(s(r.tl_x), s(r.tl_y)),
+        skia_safe::Point::new(s(r.tr_x), s(r.tr_y)),
+        skia_safe::Point::new(s(r.br_x), s(r.br_y)),
+        skia_safe::Point::new(s(r.bl_x), s(r.bl_y)),
+    ]
+}
+
+#[derive(Copy, Clone)]
+enum SidePos {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+/// Paint a single border side. Handles all CSS `border-style` variants:
+/// - `solid` / `dashed` / `dotted`: direct stroke using the side's color.
+/// - `double`: two parallel strokes at 1/3 width each, separated by a 1/3 gap.
+/// - `groove` / `inset`: top/left darkened, bottom/right lightened.
+/// - `ridge` / `outset`: top/left lightened, bottom/right darkened.
+fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h: f32) {
+    use types::BorderStyle;
+
+    let (p1, p2) = side_endpoints(pos, side.width, w, h);
+
+    if side.style == BorderStyle::Double {
+        // Two strokes of width/3 separated by width/3 gap. Offset each
+        // perpendicularly by ±(width/3).
+        let sub_w = side.width / 3.0;
+        let (n_dx, n_dy) = side_inward_normal(pos);
+        // Outer stroke (toward the element's outer edge).
+        let paint = stroke_paint(side.color, sub_w, BorderStyle::Solid);
+        let out_off = -sub_w;
+        let outer_p1 = (p1.0 + n_dx * out_off, p1.1 + n_dy * out_off);
+        let outer_p2 = (p2.0 + n_dx * out_off, p2.1 + n_dy * out_off);
+        canvas.draw_line(outer_p1, outer_p2, &paint);
+        // Inner stroke.
+        let in_off = sub_w;
+        let inner_p1 = (p1.0 + n_dx * in_off, p1.1 + n_dy * in_off);
+        let inner_p2 = (p2.0 + n_dx * in_off, p2.1 + n_dy * in_off);
+        canvas.draw_line(inner_p1, inner_p2, &paint);
+        return;
+    }
+
+    let effective_color = shaded_color(side.color, side.style, pos);
+    let paint = stroke_paint(effective_color, side.width, side.style);
+    canvas.draw_line(p1, p2, &paint);
+}
+
+fn side_endpoints(pos: SidePos, width: f32, w: f32, h: f32) -> ((f32, f32), (f32, f32)) {
+    let half = width / 2.0;
+    match pos {
+        SidePos::Top => ((0.0, half), (w, half)),
+        SidePos::Bottom => ((0.0, h - half), (w, h - half)),
+        SidePos::Left => ((half, 0.0), (half, h)),
+        SidePos::Right => ((w - half, 0.0), (w - half, h)),
+    }
+}
+
+/// Unit vector pointing inward from the side's centerline.
+fn side_inward_normal(pos: SidePos) -> (f32, f32) {
+    match pos {
+        SidePos::Top => (0.0, 1.0),
+        SidePos::Bottom => (0.0, -1.0),
+        SidePos::Left => (1.0, 0.0),
+        SidePos::Right => (-1.0, 0.0),
+    }
+}
+
+/// Per-side color treatment for 3D-effect border styles.
+/// CSS 2.1 leaves the exact shading to the implementation; we use
+/// 50%-toward-black for "darker" and 50%-toward-white for "lighter",
+/// matching common browser behavior.
+fn shaded_color(c: CGColor, style: types::BorderStyle, pos: SidePos) -> CGColor {
+    use types::BorderStyle::*;
+    let side_is_tl = matches!(pos, SidePos::Top | SidePos::Left);
+    let darken = |c: CGColor| CGColor {
+        r: c.r / 2,
+        g: c.g / 2,
+        b: c.b / 2,
+        a: c.a,
+    };
+    let lighten = |c: CGColor| CGColor {
+        r: ((c.r as u16 + 255) / 2) as u8,
+        g: ((c.g as u16 + 255) / 2) as u8,
+        b: ((c.b as u16 + 255) / 2) as u8,
+        a: c.a,
+    };
+    match style {
+        Inset | Groove => {
+            if side_is_tl {
+                darken(c)
+            } else {
+                lighten(c)
+            }
+        }
+        Outset | Ridge => {
+            if side_is_tl {
+                lighten(c)
+            } else {
+                darken(c)
+            }
+        }
+        _ => c,
+    }
 }
 
 /// Shared stroke paint builder for border sides and outline.
@@ -855,6 +1926,20 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
         return;
     }
 
+    let r = &style.border_radius;
+
+    if outline.style == types::BorderStyle::Double {
+        // Two concentric 1/3-width strokes separated by a 1/3-width gap.
+        // Outer stroke center sits at `offset + 5w/6`; inner at `offset + w/6`.
+        let sub_w = outline.width / 3.0;
+        let outer_expand = outline.offset + outline.width - sub_w / 2.0;
+        let inner_expand = outline.offset + sub_w / 2.0;
+        let paint = stroke_paint(outline.color, sub_w, types::BorderStyle::Solid);
+        draw_outline_ring(canvas, w, h, outer_expand, r, &paint);
+        draw_outline_ring(canvas, w, h, inner_expand, r, &paint);
+        return;
+    }
+
     let paint = outline_paint(outline);
 
     // The stroke is centered on the outline path. The path sits at
@@ -863,17 +1948,25 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
     let half_w = outline.width / 2.0;
     let expand = outline.offset + half_w;
 
-    let outline_rect = Rect::from_xywh(-expand, -expand, w + expand * 2.0, h + expand * 2.0);
+    draw_outline_ring(canvas, w, h, expand, r, &paint);
+}
 
-    let r = &style.border_radius;
+fn draw_outline_ring(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    expand: f32,
+    r: &super::style::CornerRadii,
+    paint: &Paint,
+) {
+    let rect = Rect::from_xywh(-expand, -expand, w + expand * 2.0, h + expand * 2.0);
     if r.is_zero() {
-        canvas.draw_rect(outline_rect, &paint);
+        canvas.draw_rect(rect, paint);
     } else {
-        // Expand corner radii proportionally (Chromium: ComputeCornerRadii)
         let radii = expand_radii(r, expand);
         let mut rrect = skia_safe::RRect::new();
-        rrect.set_rect_radii(outline_rect, &radii);
-        canvas.draw_rrect(rrect, &paint);
+        rrect.set_rect_radii(rect, &radii);
+        canvas.draw_rrect(rrect, paint);
     }
 }
 
@@ -911,9 +2004,11 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
+            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
+            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur / 2.0,
+                shadow.blur,
                 false,
             ));
         }
@@ -970,9 +2065,11 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
+            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
+            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur / 2.0,
+                shadow.blur,
                 false,
             ));
         }
@@ -1036,6 +2133,18 @@ fn paint_text(canvas: &Canvas, run: &TextRun, x: f32, y: f32, width: f32, fonts:
     ps.set_text_align(align);
 
     let mut builder = ParagraphBuilder::new(&ps, fonts);
+
+    let indent_px = super::layout::resolve_text_indent(run.font.text_indent, width);
+    if indent_px > 0.0 {
+        builder.add_placeholder(&textlayout::PlaceholderStyle::new(
+            indent_px,
+            0.01,
+            textlayout::PlaceholderAlignment::Baseline,
+            textlayout::TextBaseline::Alphabetic,
+            0.0,
+        ));
+    }
+
     let ts = build_skia_text_style(&run.font, &run.color);
     builder.push_style(&ts);
     builder.add_text(&run.text);
@@ -1082,6 +2191,11 @@ fn paint_inline_group(
     // Text occupies its byte length.
     const PLACEHOLDER_OFFSET: usize = 1;
 
+    // text-indent: leading placeholder that shifts only the first visual
+    // line. Must run before any decoration-range tracking so the offsets
+    // stay in sync with the rendered paragraph.
+    let indent_px = super::layout::resolve_text_indent(group.text_indent, width);
+
     struct DecoRange {
         range_start: usize,
         range_end: usize,
@@ -1090,6 +2204,17 @@ fn paint_inline_group(
     let mut deco_stack: Vec<(usize, InlineBoxDecoration)> = Vec::new();
     let mut deco_ranges: Vec<DecoRange> = Vec::new();
     let mut offset: usize = 0;
+
+    if indent_px > 0.0 {
+        builder.add_placeholder(&PlaceholderStyle::new(
+            indent_px,
+            0.01,
+            PlaceholderAlignment::Baseline,
+            TextBaseline::Alphabetic,
+            0.0,
+        ));
+        offset += PLACEHOLDER_OFFSET;
+    }
 
     for item in &group.items {
         match item {
