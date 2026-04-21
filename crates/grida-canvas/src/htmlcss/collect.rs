@@ -926,7 +926,7 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     el.color = abs_color_to_cg(&style.get_inherited_text().color);
 
     // Border
-    el.border = extract_border(style);
+    el.border = extract_border(style, el.color);
 
     // Border image (9-slice)
     el.border_image = extract_border_image(style, el.color);
@@ -1011,31 +1011,14 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
             FlexWr::Wrap => types::FlexWrap::Wrap,
             FlexWr::WrapReverse => types::FlexWrap::WrapReverse,
         };
-        // align-items
-        let ai = style.clone_align_items();
-        let ai_flags = ai.0.value();
-        use style::values::specified::align::AlignFlags;
-        el.align_items = match ai_flags {
-            f if f == AlignFlags::CENTER => types::AlignItems::Center,
-            f if f == AlignFlags::FLEX_START || f == AlignFlags::START => types::AlignItems::Start,
-            f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::AlignItems::End,
-            f if f == AlignFlags::BASELINE => types::AlignItems::Baseline,
-            _ => types::AlignItems::Stretch,
-        };
-        // justify-content
-        let jc = style.clone_justify_content();
-        let jc_flags = jc.primary().value();
-        el.justify_content = match jc_flags {
-            f if f == AlignFlags::CENTER => types::JustifyContent::Center,
-            f if f == AlignFlags::FLEX_START || f == AlignFlags::START => {
-                types::JustifyContent::Start
-            }
-            f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::JustifyContent::End,
-            f if f == AlignFlags::SPACE_BETWEEN => types::JustifyContent::SpaceBetween,
-            f if f == AlignFlags::SPACE_AROUND => types::JustifyContent::SpaceAround,
-            f if f == AlignFlags::SPACE_EVENLY => types::JustifyContent::SpaceEvenly,
-            _ => types::JustifyContent::Start,
-        };
+        // align-items / justify-content — delegate to the shared helpers
+        // so `safe`/`unsafe`/`legacy` modifier bits are masked out
+        // (`AlignFlags` is a bitflags type; exact `==` on the whole
+        // flag set would fail for e.g. `align-items: safe center`).
+        el.align_items = align_flags_to_items(style.clone_align_items().0.value());
+        el.justify_content =
+            align_flags_to_explicit_justify(style.clone_justify_content().primary().value())
+                .unwrap_or(types::JustifyContent::Start);
         // gap
         use style::values::generics::length::LengthPercentageOrNormal;
         let gap_to_px =
@@ -1155,14 +1138,18 @@ fn map_border_style(bs: style::values::specified::border::BorderStyle) -> types:
     }
 }
 
-fn extract_border(style: &ComputedValues) -> BorderBox {
+fn extract_border(style: &ComputedValues, current_color: CGColor) -> BorderBox {
     let b = style.get_border();
 
+    // `border-*-color` defaults to `currentcolor`, which Stylo leaves
+    // unresolved to absolute. Fall back to the element's computed text
+    // color so `border: solid` on red text draws a red border, not an
+    // unexpected opaque black one.
     let extract_color = |color: &style::values::computed::Color| -> CGColor {
         color
             .as_absolute()
             .map(abs_color_to_cg)
-            .unwrap_or(CGColor::BLACK)
+            .unwrap_or(current_color)
     };
 
     BorderBox {
@@ -2579,6 +2566,13 @@ fn extract_transform_origin(style: &ComputedValues) -> types::TransformOrigin {
 }
 
 fn align_flags_to_items(flags: style::values::specified::align::AlignFlags) -> types::AlignItems {
+    // NOTE: the caller is expected to pass the keyword-only portion of
+    // the flags (i.e. already through `AlignFlags::value()`), which
+    // masks off `safe`/`unsafe`/`legacy` modifier bits. The keyword
+    // enum is stored in the lower 5 bits as a packed integer (not as
+    // independent bits), so `==` is the right comparison — `contains()`
+    // would wrongly report e.g. `SPACE_BETWEEN` as containing `CENTER`
+    // because their bit patterns overlap.
     use style::values::specified::align::AlignFlags;
     match flags {
         f if f == AlignFlags::CENTER => types::AlignItems::Center,
@@ -2597,6 +2591,9 @@ fn align_flags_to_items(flags: style::values::specified::align::AlignFlags) -> t
 fn align_flags_to_explicit_justify(
     flags: style::values::specified::align::AlignFlags,
 ) -> Option<types::JustifyContent> {
+    // See `align_flags_to_items` — caller passes keyword-only flags
+    // (post `.value()`); use `==` rather than `contains()` because the
+    // low-5-bit keyword values overlap bitwise.
     use style::values::specified::align::AlignFlags;
     match flags {
         f if f == AlignFlags::CENTER => Some(types::JustifyContent::Center),

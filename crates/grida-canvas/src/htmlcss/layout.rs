@@ -538,11 +538,19 @@ fn css_length_to_lpa(len: types::CssLength) -> LengthPercentageAuto {
 /// Percentages with a zero/unknown basis collapse to 0 (at intrinsic-sizing
 /// time we have no basis; the actual layout width is used when known).
 pub(crate) fn resolve_text_indent(indent: types::CssLength, basis: f32) -> f32 {
-    match indent {
+    // Negative text-indent (hanging indent) is clamped to 0 at the
+    // resolve site so callers can treat the returned px uniformly.
+    // CSS allows negative values, but our paragraph path (Skia
+    // `PlaceholderStyle`) can't reserve negative space, and shifting
+    // only the first line outside the paragraph bounds isn't supported
+    // by the Paragraph-based text stack. Documented as a known
+    // limitation in `docs/wg/feat-2d/htmlcss.md`.
+    let raw = match indent {
         types::CssLength::Px(px) => px,
-        types::CssLength::Percent(p) => (basis * p).max(0.0),
+        types::CssLength::Percent(p) => basis * p,
         types::CssLength::Auto => 0.0,
-    }
+    };
+    raw.max(0.0)
 }
 
 fn map_align_items(a: types::AlignItems) -> taffy::AlignItems {
@@ -833,7 +841,9 @@ pub(crate) fn build_skia_text_style(font: &FontProps, color: &CGColor) -> TextSt
     // text-shadow: stacked in source order, painted bottom-up by Skia.
     // CSS blur radius → Skia blur sigma (Gaussian). Empirically sigma ≈ blur / 2.
     for sh in &font.text_shadow {
-        let sigma = (sh.blur as f64) * 0.5;
+        // CSS `text-shadow` blur length is a Gaussian sigma per CSS Text
+        // Decoration §5, matching Skia's `TextShadow` blur_sigma.
+        let sigma = sh.blur as f64;
         ts.add_shadow(textlayout::TextShadow::new(
             skia_safe::Color::from_argb(sh.color.a, sh.color.r, sh.color.g, sh.color.b),
             skia_safe::Point::new(sh.offset_x, sh.offset_y),

@@ -142,19 +142,24 @@ fn paint_box(
     // outside the box) is not clipped. Outline still participates in the
     // opacity layer above.
     if needs_clip {
-        // `overflow-clip-margin` expands the clip rect outward; only
-        // meaningful when at least one axis is `clip` (hidden/scroll/auto
-        // ignore it per spec).
-        let has_clip_axis =
-            style.overflow_x == types::Overflow::Clip || style.overflow_y == types::Overflow::Clip;
-        let margin = if has_clip_axis {
-            style.overflow_clip_margin.max(0.0)
+        // `overflow-clip-margin` expands the clip rect outward per axis,
+        // but only on axes that use `overflow: clip`. `hidden`/`scroll`/
+        // `auto` ignore the margin per spec, so e.g.
+        // `overflow-x: clip; overflow-y: hidden` only expands horizontally.
+        let base_margin = style.overflow_clip_margin.max(0.0);
+        let margin_x = if style.overflow_x == types::Overflow::Clip {
+            base_margin
+        } else {
+            0.0
+        };
+        let margin_y = if style.overflow_y == types::Overflow::Clip {
+            base_margin
         } else {
             0.0
         };
         canvas.save();
         canvas.clip_rect(
-            Rect::from_xywh(-margin, -margin, w + margin * 2.0, h + margin * 2.0),
+            Rect::from_xywh(-margin_x, -margin_y, w + margin_x * 2.0, h + margin_y * 2.0),
             ClipOp::Intersect,
             true,
         );
@@ -622,24 +627,17 @@ fn inset_radii(r: &super::style::CornerRadii, outer: Rect, inner: Rect) -> [skia
     let right_inset = (outer.right - inner.right).max(0.0);
     let top_inset = (inner.top - outer.top).max(0.0);
     let bottom_inset = (outer.bottom - inner.bottom).max(0.0);
-    let shrink = |base: f32, a: f32, b: f32| (base - a.max(b)).max(0.0);
+    // Per CSS Backgrounds §5: the inner curve shrinks each axis of a
+    // corner radius by the inset on that axis — horizontal insets shrink
+    // the x component, vertical insets shrink the y component. Using the
+    // max of both would over-shrink one axis under asymmetric
+    // border/padding and produce too-square inset clips.
+    let shrink = |base: f32, inset: f32| (base - inset).max(0.0);
     [
-        skia_safe::Point::new(
-            shrink(r.tl_x, left_inset, top_inset),
-            shrink(r.tl_y, left_inset, top_inset),
-        ),
-        skia_safe::Point::new(
-            shrink(r.tr_x, right_inset, top_inset),
-            shrink(r.tr_y, right_inset, top_inset),
-        ),
-        skia_safe::Point::new(
-            shrink(r.br_x, right_inset, bottom_inset),
-            shrink(r.br_y, right_inset, bottom_inset),
-        ),
-        skia_safe::Point::new(
-            shrink(r.bl_x, left_inset, bottom_inset),
-            shrink(r.bl_y, left_inset, bottom_inset),
-        ),
+        skia_safe::Point::new(shrink(r.tl_x, left_inset), shrink(r.tl_y, top_inset)),
+        skia_safe::Point::new(shrink(r.tr_x, right_inset), shrink(r.tr_y, top_inset)),
+        skia_safe::Point::new(shrink(r.br_x, right_inset), shrink(r.br_y, bottom_inset)),
+        skia_safe::Point::new(shrink(r.bl_x, left_inset), shrink(r.bl_y, bottom_inset)),
     ]
 }
 
@@ -920,7 +918,11 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
     for f in filters {
         let next: Option<skia_safe::ImageFilter> = match *f {
             FilterFunction::Blur(px) => {
-                let sigma = (px * 0.5).max(0.0);
+                // CSS Filter Effects §11.4.4: the `blur()` length argument
+                // IS the Gaussian standard deviation, and Skia's
+                // `image_filters::blur` also takes a sigma, so the CSS
+                // value maps 1:1 without halving.
+                let sigma = px.max(0.0);
                 if sigma <= 0.0 {
                     None
                 } else {
@@ -1089,7 +1091,9 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                 blur,
                 color,
             } => {
-                let sigma = (blur * 0.5).max(0.0);
+                // CSS `drop-shadow()`'s blur length is a Gaussian sigma,
+                // matching Skia's `drop_shadow` parameter; no halving.
+                let sigma = blur.max(0.0);
                 let color4f = skia_safe::Color4f::new(
                     color.r as f32 / 255.0,
                     color.g as f32 / 255.0,
@@ -1705,6 +1709,27 @@ fn paint_borders(
 
     let b = &style.border;
 
+    // Fast path: uniform sides with a non-zero border-radius. Stroke a
+    // single RRect so the border traces the rounded corners instead of
+    // falling back to per-side straight lines.
+    let uniform = b.top.width == b.bottom.width
+        && b.top.width == b.left.width
+        && b.top.width == b.right.width
+        && b.top.style == b.bottom.style
+        && b.top.style == b.left.style
+        && b.top.style == b.right.style
+        && b.top.color == b.bottom.color
+        && b.top.color == b.left.color
+        && b.top.color == b.right.color;
+    if uniform
+        && b.top.width > 0.0
+        && b.top.style != types::BorderStyle::None
+        && !style.border_radius.is_zero()
+    {
+        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius, w, h);
+        return;
+    }
+
     for pos in [SidePos::Top, SidePos::Bottom, SidePos::Left, SidePos::Right] {
         let side = match pos {
             SidePos::Top => &b.top,
@@ -1717,6 +1742,53 @@ fn paint_borders(
         }
         paint_border_side(canvas, pos, side, w, h);
     }
+}
+
+/// Stroke the border as a single RRect so `border-radius` is honored.
+/// Only called for borders where all four sides share width/style/color.
+/// Handles `double` as two concentric RRects (1/3 width each with gap).
+fn paint_uniform_rounded_border(
+    canvas: &Canvas,
+    side: &BorderSide,
+    radius: &super::style::CornerRadii,
+    w: f32,
+    h: f32,
+) {
+    let stroke_center = |inset: f32| -> skia_safe::RRect {
+        let rect = Rect::from_xywh(
+            inset,
+            inset,
+            (w - 2.0 * inset).max(0.0),
+            (h - 2.0 * inset).max(0.0),
+        );
+        let mut rrect = skia_safe::RRect::new();
+        let shrunk = shrink_radii(radius, inset);
+        rrect.set_rect_radii(rect, &shrunk);
+        rrect
+    };
+    if side.style == types::BorderStyle::Double {
+        let sub_w = side.width / 3.0;
+        let paint = stroke_paint(side.color, sub_w, types::BorderStyle::Solid);
+        // Outer ring: stroke center near the outside edge.
+        let outer_inset = sub_w / 2.0;
+        canvas.draw_rrect(stroke_center(outer_inset), &paint);
+        // Inner ring: stroke center near the inside edge.
+        let inner_inset = side.width - sub_w / 2.0;
+        canvas.draw_rrect(stroke_center(inner_inset), &paint);
+        return;
+    }
+    let paint = stroke_paint(side.color, side.width, side.style);
+    canvas.draw_rrect(stroke_center(side.width / 2.0), &paint);
+}
+
+fn shrink_radii(r: &super::style::CornerRadii, inset: f32) -> [skia_safe::Point; 4] {
+    let s = |v: f32| (v - inset).max(0.0);
+    [
+        skia_safe::Point::new(s(r.tl_x), s(r.tl_y)),
+        skia_safe::Point::new(s(r.tr_x), s(r.tr_y)),
+        skia_safe::Point::new(s(r.br_x), s(r.br_y)),
+        skia_safe::Point::new(s(r.bl_x), s(r.bl_y)),
+    ]
 }
 
 #[derive(Copy, Clone)]
@@ -1942,9 +2014,11 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
+            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
+            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur / 2.0,
+                shadow.blur,
                 false,
             ));
         }
@@ -2001,9 +2075,11 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
+            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
+            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur / 2.0,
+                shadow.blur,
                 false,
             ));
         }
