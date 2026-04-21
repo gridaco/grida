@@ -181,6 +181,7 @@ fn paint_box(
             cw,
             ch,
             &style.border_radius,
+            style.font.image_rendering,
             images,
         );
     }
@@ -570,7 +571,7 @@ fn paint_background_image_layer(
 
     let shader = src_image.to_shader(
         Some((tmx, tmy)),
-        skia_safe::SamplingOptions::default(),
+        sampling_for(style.font.image_rendering),
         Some(&local),
     );
     let Some(shader) = shader else {
@@ -611,6 +612,7 @@ fn paint_replaced(
     w: f32,
     h: f32,
     border_radius: &super::style::CornerRadii,
+    image_rendering: types::ImageRendering,
     images: &dyn ImageProvider,
 ) {
     canvas.save();
@@ -659,7 +661,12 @@ fn paint_replaced(
             0.0,
             1.0,
         ));
-        canvas.draw_image(image, (0.0, 0.0), Some(&paint));
+        canvas.draw_image_with_sampling_options(
+            image,
+            (0.0, 0.0),
+            sampling_for(image_rendering),
+            Some(&paint),
+        );
         canvas.restore();
     } else {
         // Placeholder: light gray rect
@@ -681,6 +688,19 @@ fn paint_replaced(
     }
 
     canvas.restore();
+}
+
+/// Map CSS `image-rendering` to Skia `SamplingOptions`.
+/// - `Auto` → linear filtering (Skia default).
+/// - `CrispEdges` / `Pixelated` → nearest-neighbor, preserving hard pixel
+///   edges typical of pixel art / retro graphics.
+fn sampling_for(rendering: types::ImageRendering) -> skia_safe::SamplingOptions {
+    match rendering {
+        types::ImageRendering::Auto => skia_safe::SamplingOptions::default(),
+        types::ImageRendering::CrispEdges | types::ImageRendering::Pixelated => {
+            skia_safe::SamplingOptions::from(skia_safe::FilterMode::Nearest)
+        }
+    }
 }
 
 // ─── clip-path ───────────────────────────────────────────────────────

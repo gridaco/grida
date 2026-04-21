@@ -495,13 +495,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Image Rendering
 
-| CSS Property        | Status | Notes                                 |
-| ------------------- | ------ | ------------------------------------- |
-| `image-rendering`   | ❌     |                                       |
-| `image-orientation` | ❌     |                                       |
-| `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown |
-| `object-position`   | ✅     | Per-axis px / % / keywords            |
-| `object-view-box`   | ❌     |                                       |
+| CSS Property        | Status | Notes                                                  |
+| ------------------- | ------ | ------------------------------------------------------ |
+| `image-rendering`   | ✅     | `auto` → bilinear; `pixelated`/`crisp-edges` → nearest |
+| `image-orientation` | ❌     |                                                        |
+| `object-fit`        | ✅     | Fill, Contain, Cover, None, ScaleDown                  |
+| `object-position`   | ✅     | Per-axis px / % / keywords                             |
+| `object-view-box`   | ❌     |                                                        |
 
 ### Shape (Floats)
 

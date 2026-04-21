@@ -2381,6 +2381,16 @@ fn extract_font(style: &ComputedValues) -> FontProps {
         props.text_indent = length_percentage_to_css(&ti.length);
     }
 
+    // image-rendering: quality hint for raster images.
+    {
+        use style::values::specified::image::ImageRendering as IR;
+        props.image_rendering = match style.clone_image_rendering() {
+            IR::CrispEdges => types::ImageRendering::CrispEdges,
+            IR::Pixelated => types::ImageRendering::Pixelated,
+            _ => types::ImageRendering::Auto,
+        };
+    }
+
     // White-space (decomposed into collapse + wrap in modern CSS/Stylo)
     {
         use style::properties::longhands::text_wrap_mode::computed_value::T as TWM;

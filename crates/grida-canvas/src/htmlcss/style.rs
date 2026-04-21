@@ -771,6 +771,9 @@ pub struct FontProps {
     pub text_indent: CssLength,
     pub text_overflow: TextOverflow,
     pub vertical_align: VerticalAlign,
+    /// CSS `image-rendering` — quality hint for raster images used by
+    /// `<img>`, `background-image: url()`, and border-image.
+    pub image_rendering: super::types::ImageRendering,
     // TODO: word-break, overflow-wrap, tab-size
 }
 
@@ -796,6 +799,7 @@ impl Default for FontProps {
             text_indent: CssLength::Px(0.0),
             text_overflow: TextOverflow::Clip,
             vertical_align: VerticalAlign::Baseline,
+            image_rendering: super::types::ImageRendering::Auto,
         }
     }
 }

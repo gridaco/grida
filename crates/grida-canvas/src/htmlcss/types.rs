@@ -170,6 +170,19 @@ pub enum TextOverflow {
     Ellipsis,
 }
 
+/// CSS `image-rendering` — quality hint for scaled raster images.
+///
+/// Maps to Skia `SamplingOptions`:
+/// - `Auto` → bilinear filtering (default)
+/// - `CrispEdges` / `Pixelated` → nearest-neighbor (sharp pixel edges)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImageRendering {
+    #[default]
+    Auto,
+    CrispEdges,
+    Pixelated,
+}
+
 /// CSS `vertical-align` property (inline-level).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerticalAlign {

@@ -1589,6 +1589,58 @@ code block
         );
     }
 
+    // ── image-rendering ──────────────────────────────────────────────
+
+    #[test]
+    fn test_image_rendering_default_auto() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div>x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.font.image_rendering, types::ImageRendering::Auto);
+    }
+
+    #[test]
+    fn test_image_rendering_pixelated() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="image-rendering:pixelated">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.font.image_rendering, types::ImageRendering::Pixelated);
+    }
+
+    #[test]
+    fn test_image_rendering_crisp_edges() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="image-rendering:crisp-edges">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.font.image_rendering, types::ImageRendering::CrispEdges);
+    }
+
+    /// `image-rendering` is inherited through the cascade.
+    #[test]
+    fn test_image_rendering_inherited() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="image-rendering:pixelated"><img src="x.png"/></div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        fn find_img<'a>(el: &'a style::StyledElement) -> Option<&'a style::StyledElement> {
+            if el.tag == "img" {
+                return Some(el);
+            }
+            for c in &el.children {
+                if let style::StyledNode::Element(child) = c {
+                    if let Some(f) = find_img(child) {
+                        return Some(f);
+                    }
+                }
+            }
+            None
+        }
+        let img = find_img(&root).expect("img");
+        assert_eq!(img.font.image_rendering, types::ImageRendering::Pixelated);
+    }
+
     // ── text-indent ──────────────────────────────────────────────────
 
     #[test]
