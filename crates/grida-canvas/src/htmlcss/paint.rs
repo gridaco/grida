@@ -783,8 +783,18 @@ fn apply_clip_path(canvas: &Canvas, clip: &super::style::ClipPath, w: f32, h: f3
             if radius.is_zero() {
                 canvas.clip_rect(rect, ClipOp::Intersect, true);
             } else {
+                // Percent radii resolve against the inset clip rect —
+                // x-axis against its width, y-axis against its height.
+                let rw = rect.width().max(0.0);
+                let rh = rect.height().max(0.0);
+                let radii = [
+                    skia_safe::Point::new(resolve(radius.tl_x, rw), resolve(radius.tl_y, rh)),
+                    skia_safe::Point::new(resolve(radius.tr_x, rw), resolve(radius.tr_y, rh)),
+                    skia_safe::Point::new(resolve(radius.br_x, rw), resolve(radius.br_y, rh)),
+                    skia_safe::Point::new(resolve(radius.bl_x, rw), resolve(radius.bl_y, rh)),
+                ];
                 let mut rrect = skia_safe::RRect::new();
-                rrect.set_rect_radii(rect, &radius.to_skia_radii());
+                rrect.set_rect_radii(rect, &radii);
                 canvas.clip_rrect(rrect, ClipOp::Intersect, true);
             }
         }
@@ -914,7 +924,7 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                 if sigma <= 0.0 {
                     None
                 } else {
-                    image_filters::blur((sigma, sigma), None, chain.take(), None)
+                    image_filters::blur((sigma, sigma), None, chain.clone(), None)
                 }
             }
             FilterFunction::Brightness(b) => {
@@ -927,7 +937,7 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     ],
                     None,
                 );
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::Contrast(c) => {
                 let t = (1.0 - c) * 0.5;
@@ -940,7 +950,7 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     ],
                     None,
                 );
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::Grayscale(amount) => {
                 // Lerp between identity and luma-weighted grayscale.
@@ -974,7 +984,7 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     ],
                     None,
                 );
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::HueRotate(rad) => {
                 // Standard hue-rotation matrix around the gray axis.
@@ -1005,7 +1015,7 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     ],
                     None,
                 );
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::Invert(amount) => {
                 // new = v + (1 - 2v) * a = v * (1 - 2a) + a
@@ -1020,7 +1030,7 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     ],
                     None,
                 );
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::Opacity(o) => {
                 let a = o.clamp(0.0, 1.0);
@@ -1033,13 +1043,13 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     ],
                     None,
                 );
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::Saturate(s) => {
                 let mut cm = skia_safe::ColorMatrix::default();
                 cm.set_saturation(s);
                 let cf = color_filters::matrix(&cm, None);
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::Sepia(amount) => {
                 // Lerp between identity and the classic sepia tone matrix
@@ -1071,7 +1081,7 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     ],
                     None,
                 );
-                image_filters::color_filter(cf, chain.take(), None)
+                image_filters::color_filter(cf, chain.clone(), None)
             }
             FilterFunction::DropShadow {
                 offset_x,
@@ -1091,12 +1101,18 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                     (sigma, sigma),
                     color4f,
                     None,
-                    chain.take(),
+                    chain.clone(),
                     None,
                 )
             }
         };
-        chain = next;
+        // `blur(0)` returns None as a no-op identity, and Skia's factory
+        // functions can fail unexpectedly. In both cases preserve the
+        // chain we accumulated so far rather than silently discarding
+        // prior filters.
+        if let Some(n) = next {
+            chain = Some(n);
+        }
     }
     chain
 }

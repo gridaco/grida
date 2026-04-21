@@ -1870,7 +1870,7 @@ code block
                 assert_eq!(right, types::CssLength::Px(20.0));
                 assert_eq!(bottom, types::CssLength::Px(30.0));
                 assert_eq!(left, types::CssLength::Px(40.0));
-                assert_eq!(radius.tl_x, 6.0);
+                assert_eq!(radius.tl_x, types::CssLength::Px(6.0));
             }
             ref other => panic!("expected Inset, got {other:?}"),
         }

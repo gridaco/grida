@@ -191,7 +191,11 @@ pub struct ReplacedContent {
     /// CSS `object-fit` — how the image content fits its box.
     pub object_fit: super::types::ObjectFit,
     /// CSS `object-position` — where the content sits inside the box
-    /// after `object-fit` scaling. Defaults to center (50% 50%).
+    /// after `object-fit` scaling. The CSS initial value is `50% 50%`,
+    /// which differs from `BackgroundPosition::default()` (`0% 0%`);
+    /// construction paths for `<img>` should use
+    /// `BackgroundPosition::center()` so the image is centered by
+    /// default rather than pinned to the top-left.
     pub object_position: BackgroundPosition,
 }
 
@@ -419,12 +423,16 @@ pub enum ClipPath {
     #[default]
     None,
     /// `inset(<top> <right> <bottom> <left> [round <radius>])`.
+    ///
+    /// Radii are stored as `CssLength` per corner/axis so percentage
+    /// values survive collect. Resolution to px happens in
+    /// `apply_clip_path` against the inset clip rect.
     Inset {
         top: CssLength,
         right: CssLength,
         bottom: CssLength,
         left: CssLength,
-        radius: CornerRadii,
+        radius: InsetCornerRadii,
     },
     /// `circle(<radius> at <cx> <cy>)`.
     Circle {
@@ -444,6 +452,58 @@ pub enum ClipPath {
         points: Vec<(CssLength, CssLength)>,
         even_odd: bool,
     },
+}
+
+/// Per-corner radii for `clip-path: inset(... round ...)`. Each axis
+/// holds a `CssLength` so percentage radii (resolved against the
+/// inset clip rect) survive to paint time.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InsetCornerRadii {
+    pub tl_x: CssLength,
+    pub tl_y: CssLength,
+    pub tr_x: CssLength,
+    pub tr_y: CssLength,
+    pub br_x: CssLength,
+    pub br_y: CssLength,
+    pub bl_x: CssLength,
+    pub bl_y: CssLength,
+}
+
+impl Default for InsetCornerRadii {
+    fn default() -> Self {
+        let zero = CssLength::Px(0.0);
+        Self {
+            tl_x: zero,
+            tl_y: zero,
+            tr_x: zero,
+            tr_y: zero,
+            br_x: zero,
+            br_y: zero,
+            bl_x: zero,
+            bl_y: zero,
+        }
+    }
+}
+
+impl InsetCornerRadii {
+    /// Returns true when every axis is definitely zero. Percentage
+    /// values with a non-zero fraction are treated as non-zero even
+    /// though the resolved px amount depends on the clip rect.
+    pub fn is_zero(&self) -> bool {
+        let is_z = |v: CssLength| match v {
+            CssLength::Px(p) => p == 0.0,
+            CssLength::Percent(p) => p == 0.0,
+            CssLength::Auto => true,
+        };
+        is_z(self.tl_x)
+            && is_z(self.tl_y)
+            && is_z(self.tr_x)
+            && is_z(self.tr_y)
+            && is_z(self.br_x)
+            && is_z(self.br_y)
+            && is_z(self.bl_x)
+            && is_z(self.bl_y)
+    }
 }
 
 /// Radius expression used by `circle()` and `ellipse()` in `clip-path`.
@@ -573,10 +633,26 @@ pub struct BackgroundPosition {
 }
 
 impl Default for BackgroundPosition {
+    /// `0% 0%` — the CSS initial value for `background-position`.
+    ///
+    /// NOTE: this is **not** the right default for `object-position`,
+    /// which is `50% 50%`. Use `BackgroundPosition::center()` at
+    /// construction time whenever the context calls for a centered
+    /// default.
     fn default() -> Self {
         BackgroundPosition {
             x: CssLength::Percent(0.0),
             y: CssLength::Percent(0.0),
+        }
+    }
+}
+
+impl BackgroundPosition {
+    /// `50% 50%` — the CSS initial value for `object-position`.
+    pub fn center() -> Self {
+        BackgroundPosition {
+            x: CssLength::Percent(0.5),
+            y: CssLength::Percent(0.5),
         }
     }
 }

@@ -376,10 +376,7 @@ fn detect_img_element(node: &DemoNode) -> ReplacedContent {
         attr_width,
         attr_height,
         object_fit: types::ObjectFit::Fill, // HTML spec default for <img>
-        object_position: BackgroundPosition {
-            x: CssLength::Percent(0.5),
-            y: CssLength::Percent(0.5),
-        },
+        object_position: BackgroundPosition::center(),
     }
 }
 
@@ -1869,11 +1866,29 @@ fn auto_distribute_stops_typed(raw: &mut [(Option<f32>, bool, CGColor)]) {
         let prev = raw[i - 1].0.unwrap();
         let next = raw[j].0.unwrap();
         let prev_is_px = raw[i - 1].1;
-        let count = (j - i + 1) as f32;
-        for (k, slot) in (i..j).enumerate() {
-            let t = (k + 1) as f32 / count;
-            raw[slot].0 = Some(prev + t * (next - prev));
-            raw[slot].1 = prev_is_px;
+        let next_is_px = raw[j].1;
+        if prev_is_px == next_is_px {
+            // Same-unit run: interpolate linearly in the bookend unit.
+            let count = (j - i + 1) as f32;
+            for (k, slot) in (i..j).enumerate() {
+                let t = (k + 1) as f32 / count;
+                raw[slot].0 = Some(prev + t * (next - prev));
+                raw[slot].1 = prev_is_px;
+            }
+        } else {
+            // Mixed-unit run (e.g. `10px`…`100%`). Raw linear interpolation
+            // of the numeric values mixes px and fraction units and
+            // produces nonsense (a fraction-space halfway of `10px`/`100%`
+            // is not `55px`). Until we carry stops as a unit-tagged
+            // calc-like representation all the way to paint time, snap
+            // every interior auto stop to the previous bookend's position.
+            // This keeps CSS's non-decreasing ordering rule and degrades
+            // to a hard color transition at `prev` rather than placing
+            // the interior stops at incorrect numeric positions.
+            for entry in raw.iter_mut().take(j).skip(i) {
+                entry.0 = Some(prev);
+                entry.1 = prev_is_px;
+            }
         }
         i = j;
     }
@@ -2034,7 +2049,7 @@ fn extract_clip_path(style: &ComputedValues) -> ClipPath {
                         right: length_percentage_to_css(&sides.1),
                         bottom: length_percentage_to_css(&sides.2),
                         left: length_percentage_to_css(&sides.3),
-                        radius: extract_border_radius_from_generic(&inset.round),
+                        radius: extract_inset_corner_radii(&inset.round),
                     }
                 }
                 GenericBasicShape::Circle(circle) => {
@@ -2079,18 +2094,18 @@ fn extract_clip_path(style: &ComputedValues) -> ClipPath {
 /// Map Stylo's `GenericBorderRadius<NonNegativeLengthPercentage>` onto our
 /// `CornerRadii`. Percentages stay unresolved — paint time turns them
 /// into px against the clip rect's own dimensions.
-fn extract_border_radius_from_generic(
+fn extract_inset_corner_radii(
     radius: &style::values::generics::border::GenericBorderRadius<
         style::values::computed::NonNegativeLengthPercentage,
     >,
-) -> CornerRadii {
-    // Percentages in clip-path `inset()` resolve to px against the clip
-    // rect, not the border box. For now we resolve to px here and lose
-    // the percent; paint-time resolution is a follow-up.
-    let lp = |v: &style::values::computed::LengthPercentage| -> f32 {
-        v.to_length().map(|l| l.px()).unwrap_or(0.0)
+) -> InsetCornerRadii {
+    // Preserve px vs percent per axis. `clip-path: inset(... round ...)`
+    // radii resolve against the inset clip rect at paint time, so we
+    // can't flatten percentages to px here.
+    let lp = |v: &style::values::computed::LengthPercentage| -> CssLength {
+        length_percentage_to_css(v)
     };
-    CornerRadii {
+    InsetCornerRadii {
         tl_x: lp(&radius.top_left.0.width.0),
         tl_y: lp(&radius.top_left.0.height.0),
         tr_x: lp(&radius.top_right.0.width.0),
