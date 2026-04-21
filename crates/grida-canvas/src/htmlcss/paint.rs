@@ -108,13 +108,24 @@ fn paint_box(
     if needs_layer {
         let mut layer_paint = Paint::default();
         layer_paint.set_alpha((style.opacity * 255.0) as u8);
-        if let Some(filter) = build_filter_chain(&style.filter) {
-            layer_paint.set_image_filter(filter);
+        let has_filter = !style.filter.is_empty();
+        if has_filter {
+            if let Some(filter) = build_filter_chain(&style.filter) {
+                layer_paint.set_image_filter(filter);
+            }
         }
+        // Skia clips a layer's output to its `bounds` hint, including any
+        // filter outset. Blur / drop-shadow extend the visible region past
+        // the source box, so when a filter is active we omit `bounds` and
+        // let Skia size the layer from the filter's own fast-bounds.
         let bounds = Rect::from_xywh(0.0, 0.0, w, h);
-        let layer_rec = skia_safe::canvas::SaveLayerRec::default()
-            .paint(&layer_paint)
-            .bounds(&bounds);
+        let layer_rec = if has_filter {
+            skia_safe::canvas::SaveLayerRec::default().paint(&layer_paint)
+        } else {
+            skia_safe::canvas::SaveLayerRec::default()
+                .paint(&layer_paint)
+                .bounds(&bounds)
+        };
         canvas.save_layer(&layer_rec);
     }
 
@@ -584,18 +595,52 @@ fn paint_background_image_layer(
     paint.set_shader(shader);
 
     canvas.save();
-    // Clip to the referenced box. border-box clip respects border-radius;
-    // padding/content-box clip uses the inset rect.
-    if img.clip == BackgroundBox::BorderBox && !style.border_radius.is_zero() {
+    // Clip to the referenced box with radii shrunk to match the box's
+    // inner edge. border-box uses the declared `border-radius` as-is;
+    // padding-box and content-box shrink each corner radius by the
+    // distance from the border-box corner to the inset-box corner
+    // (CSS Backgrounds §5: "the edges of the background layer are
+    // rounded to match the inner edge").
+    if !style.border_radius.is_zero() {
         let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
+        let radii = inset_radii(&style.border_radius, border_rect, clip_rect);
         let mut rrect = skia_safe::RRect::new();
-        rrect.set_rect_radii(border_rect, &style.border_radius.to_skia_radii());
+        rrect.set_rect_radii(clip_rect, &radii);
         canvas.clip_rrect(rrect, ClipOp::Intersect, true);
     } else {
         canvas.clip_rect(clip_rect, ClipOp::Intersect, true);
     }
     canvas.draw_rect(clip_rect, &paint);
     canvas.restore();
+}
+
+/// Shrink a `border-radius` inward to match an inset clip rect.
+/// Each corner radius is reduced by the distance from the outer rect's
+/// corner to the inner rect's corner, clamped to zero.
+fn inset_radii(r: &super::style::CornerRadii, outer: Rect, inner: Rect) -> [skia_safe::Point; 4] {
+    let left_inset = (inner.left - outer.left).max(0.0);
+    let right_inset = (outer.right - inner.right).max(0.0);
+    let top_inset = (inner.top - outer.top).max(0.0);
+    let bottom_inset = (outer.bottom - inner.bottom).max(0.0);
+    let shrink = |base: f32, a: f32, b: f32| (base - a.max(b)).max(0.0);
+    [
+        skia_safe::Point::new(
+            shrink(r.tl_x, left_inset, top_inset),
+            shrink(r.tl_y, left_inset, top_inset),
+        ),
+        skia_safe::Point::new(
+            shrink(r.tr_x, right_inset, top_inset),
+            shrink(r.tr_y, right_inset, top_inset),
+        ),
+        skia_safe::Point::new(
+            shrink(r.br_x, right_inset, bottom_inset),
+            shrink(r.br_y, right_inset, bottom_inset),
+        ),
+        skia_safe::Point::new(
+            shrink(r.bl_x, left_inset, bottom_inset),
+            shrink(r.bl_y, left_inset, bottom_inset),
+        ),
+    ]
 }
 
 // ─── Replaced element painting (Chromium: ReplacedPainter) ──────────
@@ -691,16 +736,19 @@ fn paint_replaced(
 }
 
 /// Map CSS `image-rendering` to Skia `SamplingOptions`.
-/// - `Auto` → linear filtering (Skia default).
+/// - `Auto` → bilinear filtering (the documented default; Skia's
+///   `SamplingOptions::default()` is actually `Nearest`, so we spell
+///   `FilterMode::Linear` explicitly).
 /// - `CrispEdges` / `Pixelated` → nearest-neighbor, preserving hard pixel
 ///   edges typical of pixel art / retro graphics.
 fn sampling_for(rendering: types::ImageRendering) -> skia_safe::SamplingOptions {
-    match rendering {
-        types::ImageRendering::Auto => skia_safe::SamplingOptions::default(),
+    let mode = match rendering {
+        types::ImageRendering::Auto => skia_safe::FilterMode::Linear,
         types::ImageRendering::CrispEdges | types::ImageRendering::Pixelated => {
-            skia_safe::SamplingOptions::from(skia_safe::FilterMode::Nearest)
+            skia_safe::FilterMode::Nearest
         }
-    }
+    };
+    skia_safe::SamplingOptions::from(mode)
 }
 
 // ─── clip-path ───────────────────────────────────────────────────────
@@ -743,7 +791,7 @@ fn apply_clip_path(canvas: &Canvas, clip: &super::style::ClipPath, w: f32, h: f3
         ClipPath::Circle { cx, cy, radius } => {
             let cx_px = resolve(*cx, w);
             let cy_px = resolve(*cy, h);
-            let r = resolve_shape_radius(*radius, (cx_px, cy_px), (w, h), true);
+            let r = resolve_circle_radius(*radius, (cx_px, cy_px), (w, h));
             let mut builder = skia_safe::PathBuilder::new();
             builder.add_circle((cx_px, cy_px), r, None);
             canvas.clip_path(&builder.detach(), ClipOp::Intersect, true);
@@ -782,6 +830,31 @@ fn apply_clip_path(canvas: &Canvas, clip: &super::style::ClipPath, w: f32, h: f3
 /// Resolve a `ShapeRadius` into a pixel length. `is_x` controls whether
 /// `closest-side`/`farthest-side` use the horizontal or vertical axis
 /// (ellipse uses one radius per axis).
+/// Resolve a `circle()` radius per CSS Shapes §3.1: `closest-side` is
+/// the minimum of the four distances from the center to the reference
+/// box edges; `farthest-side` is the maximum. Percentage radii use the
+/// "normalized diagonal" basis `sqrt((w² + h²) / 2)` so `circle(50%)`
+/// on a square box matches `min(w, h) * 50% * √2 / √2 = w * 50%`.
+fn resolve_circle_radius(
+    r: super::style::ShapeRadius,
+    center: (f32, f32),
+    size: (f32, f32),
+) -> f32 {
+    use super::style::ShapeRadius;
+    let (w, h) = size;
+    let (cx, cy) = center;
+    let dists = [cx, w - cx, cy, h - cy];
+    match r {
+        ShapeRadius::Length(len) => match len {
+            super::types::CssLength::Px(px) => px,
+            super::types::CssLength::Percent(p) => ((w * w + h * h) / 2.0).sqrt() * p,
+            super::types::CssLength::Auto => 0.0,
+        },
+        ShapeRadius::ClosestSide => dists.iter().copied().fold(f32::INFINITY, f32::min).max(0.0),
+        ShapeRadius::FarthestSide => dists.iter().copied().fold(0.0f32, f32::max),
+    }
+}
+
 fn resolve_shape_radius(
     r: super::style::ShapeRadius,
     center: (f32, f32),
@@ -1313,14 +1386,14 @@ fn build_radial_gradient_shader(
 }
 
 fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<skia_safe::Shader> {
-    let (colors, raw_positions) = build_gradient_data(&grad.stops);
+    let (mut colors, raw_positions) = build_gradient_data(&grad.stops);
     if colors.len() < 2 {
         return None;
     }
 
     let (cx, cy) = resolve_center(&grad.center, w, h);
 
-    let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
+    let (mut positions, cycle) = repeat_scale(raw_positions, grad.repeating);
     let sweep_deg = 360.0 * cycle;
 
     // CSS conic: stop 0 sits at `from` angle, measured from 12 o'clock (top),
@@ -1330,10 +1403,33 @@ fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<s
     let start = grad.from_angle_deg - 90.0;
     let end = start + sweep_deg;
 
-    // Always `Repeat`: `atan2` returns angles in (−π, π], so parts of the
-    // circle fall below a negative `start` under `Clamp` and collapse onto
-    // the first stop. For non-repeating conic the sweep still covers a full
-    // 360° cycle, so `Repeat` produces no visible tiling.
+    // We must use `TileMode::Repeat` for the geometry: `atan2` returns
+    // angles in (−π, π], so points in the top-left CSS quadrant map to
+    // positions < 0 relative to the start angle. Under `Clamp` those
+    // collapse to the first stop.
+    //
+    // But for non-repeating conics with stops that don't span the full
+    // [0, 1] range (e.g. `conic-gradient(red 25%, blue 75%)`), raw
+    // Repeat would wrap before the first and after the last stop,
+    // producing unwanted tiling. Clamp-like semantics are restored by
+    // duplicating the endpoints to pad the range to [0, 1].
+    if !grad.repeating {
+        if let Some(&first_pos) = positions.first() {
+            if first_pos > 0.0 {
+                let first_color = colors[0];
+                positions.insert(0, 0.0);
+                colors.insert(0, first_color);
+            }
+        }
+        if let Some(&last_pos) = positions.last() {
+            if last_pos < 1.0 {
+                let last_color = *colors.last().unwrap();
+                positions.push(1.0);
+                colors.push(last_color);
+            }
+        }
+    }
+
     let gradient = make_gradient(&colors, &positions, TileMode::Repeat, grad.interpolation);
     skia_safe::shaders::sweep_gradient(Point::new(cx, cy), (start, end), &gradient, None)
 }

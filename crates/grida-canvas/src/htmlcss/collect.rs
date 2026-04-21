@@ -982,11 +982,11 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     el.background = extract_background(style, el.color);
 
     // Font properties (inherited)
-    el.font = extract_font(style);
+    el.font = extract_font(style, el.color);
 
     // Box shadow
-    el.box_shadow = extract_box_shadow(style);
-    el.filter = extract_filter(style);
+    el.box_shadow = extract_box_shadow(style, el.color);
+    el.filter = extract_filter(style, el.color);
     el.clip_path = extract_clip_path(style);
 
     // Transform
@@ -1058,9 +1058,11 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
         el.justify_items = align_flags_to_items(ji_flags);
 
         // align-content: row-track alignment (grid) or cross-axis content
-        // alignment when flex-wrap splits lines.
+        // alignment when flex-wrap splits lines. `normal`/`stretch` (the
+        // defaults) leave `None` so Taffy uses the layout-method-appropriate
+        // default (stretch behavior) instead of packing to start.
         let ac_flags = style.clone_align_content().primary().value();
-        el.align_content = align_flags_to_justify(ac_flags);
+        el.align_content = align_flags_to_explicit_justify(ac_flags);
     }
 
     // Per-child align-self / justify-self. Non-auto values override the
@@ -1552,7 +1554,11 @@ fn extract_background(style: &ComputedValues, current_color: CGColor) -> Vec<Bac
         }
     }
 
-    // 2. Background image layers (gradients and URL images on top).
+    // 2. Background image layers (gradients and URL images on top of
+    //    the color). CSS paints the FIRST image in source order on top
+    //    of the stack — later images sit underneath. We iterate in
+    //    reverse source order so the resulting `layers` vector is
+    //    bottom-to-top, matching the paint-phase iteration.
     //    CSS cycles shorter per-layer longhands to match the image count.
     let cycle = |n: usize, i: usize| -> usize {
         if n == 0 {
@@ -1568,7 +1574,7 @@ fn extract_background(style: &ComputedValues, current_color: CGColor) -> Vec<Bac
     let clips = &bg.background_clip.0;
     let origins = &bg.background_origin.0;
 
-    for (i, image) in bg.background_image.0.iter().enumerate() {
+    for (i, image) in bg.background_image.0.iter().enumerate().rev() {
         let Some(source) = convert_image(image, current_color) else {
             continue;
         };
@@ -1955,18 +1961,20 @@ fn auto_distribute_stops(raw: &mut [(Option<f32>, CGColor)]) {
     }
 }
 
-fn extract_box_shadow(style: &ComputedValues) -> Vec<BoxShadow> {
+fn extract_box_shadow(style: &ComputedValues, current_color: CGColor) -> Vec<BoxShadow> {
     let shadows = style.clone_box_shadow();
     shadows
         .0
         .iter()
         .map(|s| {
+            // Per CSS, omitted or `currentcolor` shadows resolve to the
+            // element's computed `color`, not opaque black.
             let color = s
                 .base
                 .color
                 .as_absolute()
                 .map(abs_color_to_cg)
-                .unwrap_or(CGColor::BLACK);
+                .unwrap_or(current_color);
             BoxShadow {
                 offset_x: s.base.horizontal.px(),
                 offset_y: s.base.vertical.px(),
@@ -2094,7 +2102,7 @@ fn extract_border_radius_from_generic(
     }
 }
 
-fn extract_filter(style: &ComputedValues) -> Vec<FilterFunction> {
+fn extract_filter(style: &ComputedValues, current_color: CGColor) -> Vec<FilterFunction> {
     use style::values::generics::effects::GenericFilter;
     style
         .clone_filter()
@@ -2111,11 +2119,13 @@ fn extract_filter(style: &ComputedValues) -> Vec<FilterFunction> {
             GenericFilter::Saturate(n) => Some(FilterFunction::Saturate(n.0)),
             GenericFilter::Sepia(n) => Some(FilterFunction::Sepia(n.0)),
             GenericFilter::DropShadow(s) => {
+                // Omitted / `currentcolor` shadow color resolves to the
+                // element's computed `color` per CSS Filters §10.4.
                 let color = s
                     .color
                     .as_absolute()
                     .map(abs_color_to_cg)
-                    .unwrap_or(CGColor::BLACK);
+                    .unwrap_or(current_color);
                 Some(FilterFunction::DropShadow {
                     offset_x: s.horizontal.px(),
                     offset_y: s.vertical.px(),
@@ -2252,7 +2262,7 @@ fn extract_grid_placement(
     types::GridPlacement::Auto
 }
 
-fn extract_font(style: &ComputedValues) -> FontProps {
+fn extract_font(style: &ComputedValues, current_color: CGColor) -> FontProps {
     let font = style.get_font();
     let inherited_text = style.get_inherited_text();
 
@@ -2359,11 +2369,13 @@ fn extract_font(style: &ComputedValues) -> FontProps {
         .0
         .iter()
         .map(|s| {
+            // CSS Text Decoration §3: `text-shadow` defaults to and
+            // `currentcolor` resolves to the element's computed `color`.
             let color = s
                 .color
                 .as_absolute()
                 .map(abs_color_to_cg)
-                .unwrap_or(CGColor::BLACK);
+                .unwrap_or(current_color);
             TextShadow {
                 offset_x: s.horizontal.px(),
                 offset_y: s.vertical.px(),
@@ -2562,18 +2574,25 @@ fn align_flags_to_items(flags: style::values::specified::align::AlignFlags) -> t
     }
 }
 
-fn align_flags_to_justify(
+/// Map align/justify flags to an optional `JustifyContent`. Returns
+/// `None` for values that should defer to the layout method's default
+/// (`normal`, `stretch`, and anything else unrecognized). Used by
+/// `align-content` where the CSS default is "behaves like stretch",
+/// not "pack to start".
+fn align_flags_to_explicit_justify(
     flags: style::values::specified::align::AlignFlags,
-) -> types::JustifyContent {
+) -> Option<types::JustifyContent> {
     use style::values::specified::align::AlignFlags;
     match flags {
-        f if f == AlignFlags::CENTER => types::JustifyContent::Center,
-        f if f == AlignFlags::FLEX_START || f == AlignFlags::START => types::JustifyContent::Start,
-        f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::JustifyContent::End,
-        f if f == AlignFlags::SPACE_BETWEEN => types::JustifyContent::SpaceBetween,
-        f if f == AlignFlags::SPACE_AROUND => types::JustifyContent::SpaceAround,
-        f if f == AlignFlags::SPACE_EVENLY => types::JustifyContent::SpaceEvenly,
-        _ => types::JustifyContent::Start,
+        f if f == AlignFlags::CENTER => Some(types::JustifyContent::Center),
+        f if f == AlignFlags::FLEX_START || f == AlignFlags::START => {
+            Some(types::JustifyContent::Start)
+        }
+        f if f == AlignFlags::FLEX_END || f == AlignFlags::END => Some(types::JustifyContent::End),
+        f if f == AlignFlags::SPACE_BETWEEN => Some(types::JustifyContent::SpaceBetween),
+        f if f == AlignFlags::SPACE_AROUND => Some(types::JustifyContent::SpaceAround),
+        f if f == AlignFlags::SPACE_EVENLY => Some(types::JustifyContent::SpaceEvenly),
+        _ => None,
     }
 }
 

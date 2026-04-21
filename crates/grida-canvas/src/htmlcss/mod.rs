@@ -1030,6 +1030,9 @@ code block
     fn test_bg_per_layer_cycling() {
         let _guard = crate::stylo_test::lock();
         // Two gradient layers; single repeat/clip/origin values must cycle.
+        // Per CSS Backgrounds §3.1 the first source image paints on top,
+        // so extraction stores layers bottom-to-top: the source-index-1
+        // layer (40px) is painted first, source-index-0 (20px) last.
         let html = r#"<div style="
             background-image:linear-gradient(red,red),linear-gradient(blue,blue);
             background-size:20px 20px,40px 40px;
@@ -1060,18 +1063,20 @@ code block
             })
             .collect();
         assert_eq!(imgs.len(), 2, "should have 2 image layers");
+        // imgs[0] = bottom layer = source-index-1 (the second `background-image`).
         assert_eq!(
             imgs[0].size,
             style::BackgroundSize::Explicit {
-                width: types::CssLength::Px(20.0),
-                height: types::CssLength::Px(20.0),
+                width: types::CssLength::Px(40.0),
+                height: types::CssLength::Px(40.0),
             }
         );
+        // imgs[1] = top layer = source-index-0 (the first `background-image`).
         assert_eq!(
             imgs[1].size,
             style::BackgroundSize::Explicit {
-                width: types::CssLength::Px(40.0),
-                height: types::CssLength::Px(40.0),
+                width: types::CssLength::Px(20.0),
+                height: types::CssLength::Px(20.0),
             }
         );
         assert_eq!(imgs[0].repeat.x, style::BackgroundRepeatKeyword::NoRepeat);
@@ -1735,7 +1740,7 @@ code block
         let html = r#"<div style="display:grid;align-content:space-between">x</div>"#;
         let root = collect::collect_styled_tree(html).unwrap().unwrap();
         let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
-        assert_eq!(el.align_content, types::JustifyContent::SpaceBetween);
+        assert_eq!(el.align_content, Some(types::JustifyContent::SpaceBetween));
     }
 
     /// Probe: `justify-items: center; align-items: center` on a grid

@@ -114,8 +114,10 @@ pub struct StyledElement {
     /// Ignored by flex containers.
     pub justify_items: AlignItems,
     /// Content-level alignment of rows along the block axis (grid) or
-    /// cross-axis when `flex-wrap: wrap` (flex).
-    pub align_content: JustifyContent,
+    /// cross-axis when `flex-wrap: wrap` (flex). `None` means the CSS
+    /// default (`normal`, which behaves like `stretch`) — defer to
+    /// Taffy so it can pick the layout-method-appropriate behavior.
+    pub align_content: Option<JustifyContent>,
     pub row_gap: f32,
     pub column_gap: f32,
 
@@ -445,27 +447,23 @@ pub enum ClipPath {
 }
 
 /// Radius expression used by `circle()` and `ellipse()` in `clip-path`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum ShapeRadius {
     /// Explicit length or percentage against the reference box axis.
     Length(CssLength),
     /// `closest-side` — distance from center to nearest edge.
+    /// Default per CSS Shapes spec when `circle()` is written without
+    /// an explicit radius.
+    #[default]
     ClosestSide,
     /// `farthest-side` — distance from center to farthest edge.
     FarthestSide,
 }
 
-impl Default for ShapeRadius {
-    fn default() -> Self {
-        // `circle()` with no explicit radius defaults to `closest-side`
-        // per CSS Shapes spec.
-        ShapeRadius::ClosestSide
-    }
-}
-
-/// CSS `filter` functions. Scope is limited to the color/blur filters
-/// representable via `skia_safe::image_filters::blur` or a 4×5 color
-/// matrix. `drop-shadow()` and `url()` references are not yet plumbed.
+/// CSS `filter` functions. Scope covers the color/blur filters
+/// representable via `skia_safe::image_filters::blur`, drop-shadow, or
+/// a 4×5 color matrix. SVG `url()` filter references are not yet
+/// plumbed.
 #[derive(Debug, Clone, Copy)]
 pub enum FilterFunction {
     /// `blur(<length>)` — Gaussian blur. Value is CSS px; Skia sigma is `px / 2`.
@@ -553,9 +551,10 @@ pub struct BackgroundImage {
 }
 
 /// CSS `background-size`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum BackgroundSize {
     /// `auto` / `auto auto` — use intrinsic size; fall back to 100% 100%.
+    #[default]
     Auto,
     /// `cover`
     Cover,
@@ -563,12 +562,6 @@ pub enum BackgroundSize {
     Contain,
     /// `<width> <height>` with `auto` permitted on either axis.
     Explicit { width: CssLength, height: CssLength },
-}
-
-impl Default for BackgroundSize {
-    fn default() -> Self {
-        BackgroundSize::Auto
-    }
 }
 
 /// CSS `background-position` resolved to a 2D offset.
@@ -982,7 +975,7 @@ impl Default for StyledElement {
             align_items: AlignItems::default(),
             justify_content: JustifyContent::default(),
             justify_items: AlignItems::default(),
-            align_content: JustifyContent::default(),
+            align_content: None,
             row_gap: 0.0,
             column_gap: 0.0,
             flex_grow: 0.0,

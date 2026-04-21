@@ -415,7 +415,7 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
         align_items: Some(map_align_items(el.align_items)),
         justify_items: Some(map_align_items(el.justify_items)),
         justify_content: Some(map_justify_content(el.justify_content)),
-        align_content: Some(map_justify_content(el.align_content)),
+        align_content: el.align_content.map(map_justify_content),
         gap: taffy::Size {
             width: LengthPercentage::length(el.column_gap),
             height: LengthPercentage::length(el.row_gap),
