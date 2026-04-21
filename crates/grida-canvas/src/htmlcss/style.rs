@@ -202,6 +202,10 @@ pub struct ReplacedContent {
 pub struct InlineGroup {
     pub items: Vec<InlineRunItem>,
     pub text_align: TextAlign,
+    /// Inherited `text-indent` of the containing block. Applied as a
+    /// first-line-only inline-start offset by prepending a Skia
+    /// placeholder to the Paragraph.
+    pub text_indent: CssLength,
 }
 
 /// An item within an inline formatting context.
@@ -764,7 +768,7 @@ pub struct FontProps {
     /// CSS `text-shadow`. Inherited. Bottom-to-top paint order.
     pub text_shadow: Vec<TextShadow>,
     pub white_space: WhiteSpace,
-    pub text_indent: f32,
+    pub text_indent: CssLength,
     pub text_overflow: TextOverflow,
     pub vertical_align: VerticalAlign,
     // TODO: word-break, overflow-wrap, tab-size
@@ -789,7 +793,7 @@ impl Default for FontProps {
             decoration_color: None,
             text_shadow: Vec::new(),
             white_space: WhiteSpace::Normal,
-            text_indent: 0.0,
+            text_indent: CssLength::Px(0.0),
             text_overflow: TextOverflow::Clip,
             vertical_align: VerticalAlign::Baseline,
         }

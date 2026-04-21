@@ -1935,6 +1935,18 @@ fn paint_text(canvas: &Canvas, run: &TextRun, x: f32, y: f32, width: f32, fonts:
     ps.set_text_align(align);
 
     let mut builder = ParagraphBuilder::new(&ps, fonts);
+
+    let indent_px = super::layout::resolve_text_indent(run.font.text_indent, width);
+    if indent_px > 0.0 {
+        builder.add_placeholder(&textlayout::PlaceholderStyle::new(
+            indent_px,
+            0.01,
+            textlayout::PlaceholderAlignment::Baseline,
+            textlayout::TextBaseline::Alphabetic,
+            0.0,
+        ));
+    }
+
     let ts = build_skia_text_style(&run.font, &run.color);
     builder.push_style(&ts);
     builder.add_text(&run.text);
@@ -1981,6 +1993,11 @@ fn paint_inline_group(
     // Text occupies its byte length.
     const PLACEHOLDER_OFFSET: usize = 1;
 
+    // text-indent: leading placeholder that shifts only the first visual
+    // line. Must run before any decoration-range tracking so the offsets
+    // stay in sync with the rendered paragraph.
+    let indent_px = super::layout::resolve_text_indent(group.text_indent, width);
+
     struct DecoRange {
         range_start: usize,
         range_end: usize,
@@ -1989,6 +2006,17 @@ fn paint_inline_group(
     let mut deco_stack: Vec<(usize, InlineBoxDecoration)> = Vec::new();
     let mut deco_ranges: Vec<DecoRange> = Vec::new();
     let mut offset: usize = 0;
+
+    if indent_px > 0.0 {
+        builder.add_placeholder(&PlaceholderStyle::new(
+            indent_px,
+            0.01,
+            PlaceholderAlignment::Baseline,
+            TextBaseline::Alphabetic,
+            0.0,
+        ));
+        offset += PLACEHOLDER_OFFSET;
+    }
 
     for item in &group.items {
         match item {

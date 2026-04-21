@@ -282,34 +282,34 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Text Layout
 
-| CSS Property                  | Status | Notes                                       |
-| ----------------------------- | ------ | ------------------------------------------- |
-| `line-height`                 | ✅     | normal, number, length                      |
-| `letter-spacing`              | ✅     |                                             |
-| `word-spacing`                | ✅     |                                             |
-| `text-align`                  | ✅     | left, right, center, justify                |
-| `text-align-last`             | ❌     |                                             |
-| `text-justify`                | ❌     |                                             |
-| `text-indent`                 | ❌     | Field defined in FontProps, not extracted   |
-| `text-transform`              | ✅     | uppercase, lowercase, capitalize            |
-| `white-space`                 | ✅     | normal, pre, pre-wrap, pre-line, nowrap     |
-| `white-space-collapse`        | ❌     |                                             |
-| `word-break`                  | ❌     |                                             |
-| `overflow-wrap` / `word-wrap` | ❌     |                                             |
-| `line-break`                  | ❌     |                                             |
-| `hyphens`                     | ❌     |                                             |
-| `hyphenate-character`         | ❌     |                                             |
-| `hyphenate-limit-chars`       | ❌     |                                             |
-| `tab-size`                    | ❌     |                                             |
-| `text-overflow`               | ❌     | Enum defined (Clip/Ellipsis), not extracted |
-| `text-wrap`                   | ❌     |                                             |
-| `text-wrap-mode`              | ❌     |                                             |
-| `text-wrap-style`             | ❌     |                                             |
-| `hanging-punctuation`         | ❌     |                                             |
-| `text-spacing-trim`           | ❌     |                                             |
-| `text-autospace`              | ❌     |                                             |
-| `widows`                      | ❌     |                                             |
-| `orphans`                     | ❌     |                                             |
+| CSS Property                  | Status | Notes                                                                     |
+| ----------------------------- | ------ | ------------------------------------------------------------------------- |
+| `line-height`                 | ✅     | normal, number, length                                                    |
+| `letter-spacing`              | ✅     |                                                                           |
+| `word-spacing`                | ✅     |                                                                           |
+| `text-align`                  | ✅     | left, right, center, justify                                              |
+| `text-align-last`             | ❌     |                                                                           |
+| `text-justify`                | ❌     |                                                                           |
+| `text-indent`                 | ✅     | px + % resolved against container; negative (hanging) indent clamped to 0 |
+| `text-transform`              | ✅     | uppercase, lowercase, capitalize                                          |
+| `white-space`                 | ✅     | normal, pre, pre-wrap, pre-line, nowrap                                   |
+| `white-space-collapse`        | ❌     |                                                                           |
+| `word-break`                  | ❌     |                                                                           |
+| `overflow-wrap` / `word-wrap` | ❌     |                                                                           |
+| `line-break`                  | ❌     |                                                                           |
+| `hyphens`                     | ❌     |                                                                           |
+| `hyphenate-character`         | ❌     |                                                                           |
+| `hyphenate-limit-chars`       | ❌     |                                                                           |
+| `tab-size`                    | ❌     |                                                                           |
+| `text-overflow`               | ❌     | Enum defined (Clip/Ellipsis), not extracted                               |
+| `text-wrap`                   | ❌     |                                                                           |
+| `text-wrap-mode`              | ❌     |                                                                           |
+| `text-wrap-style`             | ❌     |                                                                           |
+| `hanging-punctuation`         | ❌     |                                                                           |
+| `text-spacing-trim`           | ❌     |                                                                           |
+| `text-autospace`              | ❌     |                                                                           |
+| `widows`                      | ❌     |                                                                           |
+| `orphans`                     | ❌     |                                                                           |
 
 ### Text Decoration
 

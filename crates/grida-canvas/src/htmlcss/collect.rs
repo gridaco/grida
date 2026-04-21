@@ -324,6 +324,7 @@ fn collect_element_with_counter(
                         flush_inline_group(
                             &mut pending_inline,
                             parent_text_align,
+                            el.font.text_indent,
                             &mut el.children,
                         );
                         el.children.push(StyledNode::Element(child));
@@ -335,7 +336,12 @@ fn collect_element_with_counter(
     }
 
     // Flush any trailing inline content
-    flush_inline_group(&mut pending_inline, parent_text_align, &mut el.children);
+    flush_inline_group(
+        &mut pending_inline,
+        parent_text_align,
+        el.font.text_indent,
+        &mut el.children,
+    );
 
     el
 }
@@ -675,6 +681,7 @@ fn inject_synthetic_text(el: &mut StyledElement, text: &str, color: CGColor) {
             decoration: None,
         })],
         text_align: el.font.text_align,
+        text_indent: el.font.text_indent,
     }));
 }
 
@@ -807,6 +814,7 @@ fn build_inline_decoration(el: &StyledElement) -> Option<InlineBoxDecoration> {
 fn flush_inline_group(
     pending: &mut Vec<InlineRunItem>,
     text_align: TextAlign,
+    text_indent: CssLength,
     children: &mut Vec<StyledNode>,
 ) {
     if pending.is_empty() {
@@ -824,7 +832,11 @@ fn flush_inline_group(
         return;
     }
 
-    children.push(StyledNode::InlineGroup(InlineGroup { items, text_align }));
+    children.push(StyledNode::InlineGroup(InlineGroup {
+        items,
+        text_align,
+        text_indent,
+    }));
 }
 
 // ─── CSS property extraction ─────────────────────────────────────────
@@ -2360,6 +2372,14 @@ fn extract_font(style: &ComputedValues) -> FontProps {
             }
         })
         .collect();
+
+    // text-indent: first-line inline-start indent. `hanging` / `each-line`
+    // modifier keywords are not honored — we apply indent only to the
+    // first visual line of the first paragraph, matching the common case.
+    {
+        let ti = style.clone_text_indent();
+        props.text_indent = length_percentage_to_css(&ti.length);
+    }
 
     // White-space (decomposed into collapse + wrap in modern CSS/Stylo)
     {

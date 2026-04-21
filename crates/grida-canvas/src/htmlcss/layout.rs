@@ -146,6 +146,7 @@ fn build_taffy_node(
                         leaf_style,
                         TextMeasure {
                             items: vec![InlineRunItem::Text(run.clone())],
+                            text_indent: run.font.text_indent,
                         },
                     )
                     .unwrap();
@@ -161,6 +162,7 @@ fn build_taffy_node(
                         leaf_style,
                         TextMeasure {
                             items: group.items.clone(),
+                            text_indent: group.text_indent,
                         },
                     )
                     .unwrap();
@@ -181,6 +183,7 @@ fn build_taffy_node(
 #[derive(Debug, Clone)]
 struct TextMeasure {
     items: Vec<InlineRunItem>,
+    text_indent: types::CssLength,
 }
 
 /// Taffy measure callback — builds a Skia Paragraph at the given available
@@ -207,6 +210,25 @@ fn text_measure_func(
     // (Chromium: LineBreaker processes kOpenTag/kText/kCloseTag)
     let ps = ParagraphStyle::new();
     let mut builder = ParagraphBuilder::new(&ps, fonts);
+
+    // text-indent: prepend a width-reserving placeholder. Because it sits
+    // before any glyphs it only shifts the first visual line — subsequent
+    // wrapped lines start at x=0 as expected.
+    let indent_basis = match available_space.width {
+        AvailableSpace::Definite(w) => known_dimensions.width.unwrap_or(w),
+        _ => 0.0,
+    };
+    let indent_px = resolve_text_indent(ctx.text_indent, indent_basis);
+    if indent_px > 0.0 {
+        builder.add_placeholder(&skia_safe::textlayout::PlaceholderStyle::new(
+            indent_px,
+            0.01,
+            skia_safe::textlayout::PlaceholderAlignment::Baseline,
+            skia_safe::textlayout::TextBaseline::Alphabetic,
+            0.0,
+        ));
+    }
+
     for item in &ctx.items {
         match item {
             InlineRunItem::Text(run) => {
@@ -509,6 +531,17 @@ fn css_length_to_lpa(len: types::CssLength) -> LengthPercentageAuto {
         types::CssLength::Px(px) => LengthPercentageAuto::length(px),
         types::CssLength::Percent(pct) => LengthPercentageAuto::percent(pct),
         types::CssLength::Auto => LengthPercentageAuto::auto(),
+    }
+}
+
+/// Resolve a CSS `text-indent` value to pixels against the available width.
+/// Percentages with a zero/unknown basis collapse to 0 (at intrinsic-sizing
+/// time we have no basis; the actual layout width is used when known).
+pub(crate) fn resolve_text_indent(indent: types::CssLength, basis: f32) -> f32 {
+    match indent {
+        types::CssLength::Px(px) => px,
+        types::CssLength::Percent(p) => (basis * p).max(0.0),
+        types::CssLength::Auto => 0.0,
     }
 }
 

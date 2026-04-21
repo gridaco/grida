@@ -1589,6 +1589,62 @@ code block
         );
     }
 
+    // ── text-indent ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_text_indent_px_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<p style="text-indent:40px">x</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").unwrap();
+        assert_eq!(el.font.text_indent, types::CssLength::Px(40.0));
+    }
+
+    #[test]
+    fn test_text_indent_percent_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<p style="text-indent:25%">x</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").unwrap();
+        assert_eq!(el.font.text_indent, types::CssLength::Percent(0.25));
+    }
+
+    /// Inherited through the cascade — child inherits parent's text-indent.
+    #[test]
+    fn test_text_indent_inherited() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="text-indent:30px"><p>x</p></div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "p").unwrap();
+        assert_eq!(el.font.text_indent, types::CssLength::Px(30.0));
+    }
+
+    /// The InlineGroup constructed during `flush_inline_group` carries
+    /// the containing block's text-indent so the paragraph builder has
+    /// access to it at paint/measure time.
+    #[test]
+    fn test_text_indent_propagates_to_inline_group() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<p style="text-indent:40px">hello</p>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        fn find_inline_group<'a>(el: &'a style::StyledElement) -> Option<&'a style::InlineGroup> {
+            for c in &el.children {
+                match c {
+                    style::StyledNode::InlineGroup(g) => return Some(g),
+                    style::StyledNode::Element(child) => {
+                        if let Some(g) = find_inline_group(child) {
+                            return Some(g);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            None
+        }
+        let group = find_inline_group(&root).expect("inline group");
+        assert_eq!(group.text_indent, types::CssLength::Px(40.0));
+    }
+
     // ── Grid alignment (justify-items / justify-self / align-content) ──
 
     #[test]
