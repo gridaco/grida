@@ -1621,6 +1621,53 @@ code block
         assert_eq!([p[0], p[1], p[2]], [255, 255, 255], "black → white");
     }
 
+    #[test]
+    fn test_filter_drop_shadow_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="filter:drop-shadow(4px 6px 2px #ff0000)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.filter.len(), 1);
+        match el.filter[0] {
+            style::FilterFunction::DropShadow {
+                offset_x,
+                offset_y,
+                blur,
+                color,
+            } => {
+                assert_eq!(offset_x, 4.0);
+                assert_eq!(offset_y, 6.0);
+                assert_eq!(blur, 2.0);
+                assert_eq!((color.r, color.g, color.b), (255, 0, 0));
+            }
+            ref other => panic!("expected DropShadow, got {other:?}"),
+        }
+    }
+
+    /// Probe: a sharp red drop-shadow on a solid black box produces red
+    /// pixels in the shadow region (down-and-right of the box).
+    #[test]
+    fn test_filter_drop_shadow_probe() {
+        let _guard = crate::stylo_test::lock();
+        // Body padding 20px places the box at (20,20)-(60,60); shadow
+        // offset 10,10 places the shadow at (30,30)-(70,70). Probe the
+        // strip that's shadow-only (past the box's right edge).
+        let html = r#"<div style="width:40px;height:40px;margin:20px;background:#000000;filter:drop-shadow(10px 10px 0 #ff0000)"></div>"#;
+        let px = rasterize_rgba(html, 80, 80);
+        let shadow = pixel_at(&px, 65, 65, 80);
+        assert_eq!(
+            [shadow[0], shadow[1], shadow[2]],
+            [255, 0, 0],
+            "shadow region red"
+        );
+        let box_px = pixel_at(&px, 30, 30, 80);
+        assert_eq!(
+            [box_px[0], box_px[1], box_px[2]],
+            [0, 0, 0],
+            "source still renders"
+        );
+    }
+
     /// Probe: `hue-rotate(180deg)` on pure red yields a cyan-ish tone.
     /// The standard W3C filter matrix preserves luma (~Y=54 for red),
     /// so the rotated color is roughly (0, 109, 109) — green≈blue, both

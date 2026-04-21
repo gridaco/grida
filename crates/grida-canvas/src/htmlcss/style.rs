@@ -410,6 +410,14 @@ pub enum FilterFunction {
     Saturate(f32),
     /// `sepia(<0..1>)` — 0 is identity, 1 is full sepia tone.
     Sepia(f32),
+    /// `drop-shadow(<offset-x> <offset-y> <blur> <color>)` — Gaussian
+    /// shadow of the alpha silhouette, composed behind the source.
+    DropShadow {
+        offset_x: f32,
+        offset_y: f32,
+        blur: f32,
+        color: CGColor,
+    },
 }
 
 /// CSS `text-shadow` entry — one shadow in a comma-separated list.

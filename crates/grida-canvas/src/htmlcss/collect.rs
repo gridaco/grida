@@ -1958,7 +1958,20 @@ fn extract_filter(style: &ComputedValues) -> Vec<FilterFunction> {
             GenericFilter::Opacity(n) => Some(FilterFunction::Opacity(n.0)),
             GenericFilter::Saturate(n) => Some(FilterFunction::Saturate(n.0)),
             GenericFilter::Sepia(n) => Some(FilterFunction::Sepia(n.0)),
-            // DropShadow and Url not yet plumbed.
+            GenericFilter::DropShadow(s) => {
+                let color = s
+                    .color
+                    .as_absolute()
+                    .map(abs_color_to_cg)
+                    .unwrap_or(CGColor::BLACK);
+                Some(FilterFunction::DropShadow {
+                    offset_x: s.horizontal.px(),
+                    offset_y: s.vertical.px(),
+                    blur: s.blur.0.px(),
+                    color,
+                })
+            }
+            // `Url` (SVG filter refs) not plumbed.
             _ => None,
         })
         .collect()

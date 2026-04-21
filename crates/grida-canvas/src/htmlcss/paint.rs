@@ -835,6 +835,28 @@ fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilt
                 );
                 image_filters::color_filter(cf, chain.take(), None)
             }
+            FilterFunction::DropShadow {
+                offset_x,
+                offset_y,
+                blur,
+                color,
+            } => {
+                let sigma = (blur * 0.5).max(0.0);
+                let color4f = skia_safe::Color4f::new(
+                    color.r as f32 / 255.0,
+                    color.g as f32 / 255.0,
+                    color.b as f32 / 255.0,
+                    color.a as f32 / 255.0,
+                );
+                image_filters::drop_shadow(
+                    (offset_x, offset_y),
+                    (sigma, sigma),
+                    color4f,
+                    None,
+                    chain.take(),
+                    None,
+                )
+            }
         };
         chain = next;
     }

@@ -68,6 +68,12 @@
       .chain {
         filter: grayscale(1) brightness(1.2) contrast(1.4);
       }
+      .drop-shadow-sharp {
+        filter: drop-shadow(6px 6px 0 #ff0000);
+      }
+      .drop-shadow-soft {
+        filter: drop-shadow(2px 4px 8px rgba(0, 0, 0, 0.5));
+      }
     </style>
   </head>
   <body>
@@ -123,6 +129,14 @@
       <div>
         <div class="label">grayscale + brightness + contrast</div>
         <div class="swatch chain">text</div>
+      </div>
+      <div>
+        <div class="label">drop-shadow 6px 6px red (sharp)</div>
+        <div class="swatch drop-shadow-sharp">text</div>
+      </div>
+      <div>
+        <div class="label">drop-shadow soft</div>
+        <div class="swatch drop-shadow-soft">text</div>
       </div>
     </div>
   </body>
