@@ -223,13 +223,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Outline
 
-| CSS Property     | Status | Notes                                             |
-| ---------------- | ------ | ------------------------------------------------- |
-| `outline`        | ✅     | Shorthand; solid/dashed/dotted painted            |
-| `outline-color`  | ✅     | currentcolor fallback                             |
-| `outline-style`  | ✅     | auto treated as solid; groove/ridge/etc. fallback |
-| `outline-width`  | ✅     |                                                   |
-| `outline-offset` | ✅     | Positive (outward) and negative (inward)          |
+| CSS Property     | Status | Notes                                                                            |
+| ---------------- | ------ | -------------------------------------------------------------------------------- |
+| `outline`        | ✅     | Shorthand; solid/dashed/dotted painted                                           |
+| `outline-color`  | ✅     | currentcolor fallback                                                            |
+| `outline-style`  | ✅     | solid/dashed/dotted/double painted; groove/ridge/inset/outset fall back to solid |
+| `outline-width`  | ✅     |                                                                                  |
+| `outline-offset` | ✅     | Positive (outward) and negative (inward)                                         |
 
 ### Box Shadow
 

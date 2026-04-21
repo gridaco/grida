@@ -1445,6 +1445,39 @@ code block
         );
     }
 
+    /// Probe: `outline: 9px double` — two concentric stroked rings with a
+    /// 3px gap. Scan the top strip to find: gap (white) → outer (red) →
+    /// background (white) → inner (red) → box (white). We check the
+    /// outer, gap, and inner bands.
+    #[test]
+    fn test_outline_double_probe() {
+        let _guard = crate::stylo_test::lock();
+        // Box is 40×40, placed at margin:12 so outline (9px) has room.
+        // Outline lives OUTSIDE the element; at (12-9, …) the outer band
+        // starts. Outline thirds are 3px each: outer=[-9,-6], gap=[-6,-3],
+        // inner=[-3,0] from the box edge.
+        let html = r#"<div style="width:40px;height:40px;margin:12px;background:#ffffff;outline:9px double #ff0000"></div>"#;
+        let px = rasterize_rgba(html, 80, 80);
+        // Box top edge is at y=12. Sample at column x=32 (in the box's horizontal range).
+        // Outer band y ∈ [3, 6]: red. Sample at y=4.
+        let outer = pixel_at(&px, 32, 4, 80);
+        assert_eq!(
+            [outer[0], outer[1], outer[2]],
+            [255, 0, 0],
+            "outer ring red"
+        );
+        // Gap y ∈ [6, 9]: white. Sample y=7.
+        let gap = pixel_at(&px, 32, 7, 80);
+        assert_eq!([gap[0], gap[1], gap[2]], [255, 255, 255], "gap white");
+        // Inner band y ∈ [9, 12]: red. Sample y=10.
+        let inner = pixel_at(&px, 32, 10, 80);
+        assert_eq!(
+            [inner[0], inner[1], inner[2]],
+            [255, 0, 0],
+            "inner ring red"
+        );
+    }
+
     /// Probe: `inset` on a gray color — top side darker, bottom side
     /// lighter than the base color.
     #[test]

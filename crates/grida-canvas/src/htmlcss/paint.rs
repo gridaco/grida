@@ -1718,6 +1718,20 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
         return;
     }
 
+    let r = &style.border_radius;
+
+    if outline.style == types::BorderStyle::Double {
+        // Two concentric 1/3-width strokes separated by a 1/3-width gap.
+        // Outer stroke center sits at `offset + 5w/6`; inner at `offset + w/6`.
+        let sub_w = outline.width / 3.0;
+        let outer_expand = outline.offset + outline.width - sub_w / 2.0;
+        let inner_expand = outline.offset + sub_w / 2.0;
+        let paint = stroke_paint(outline.color, sub_w, types::BorderStyle::Solid);
+        draw_outline_ring(canvas, w, h, outer_expand, r, &paint);
+        draw_outline_ring(canvas, w, h, inner_expand, r, &paint);
+        return;
+    }
+
     let paint = outline_paint(outline);
 
     // The stroke is centered on the outline path. The path sits at
@@ -1726,17 +1740,25 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
     let half_w = outline.width / 2.0;
     let expand = outline.offset + half_w;
 
-    let outline_rect = Rect::from_xywh(-expand, -expand, w + expand * 2.0, h + expand * 2.0);
+    draw_outline_ring(canvas, w, h, expand, r, &paint);
+}
 
-    let r = &style.border_radius;
+fn draw_outline_ring(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    expand: f32,
+    r: &super::style::CornerRadii,
+    paint: &Paint,
+) {
+    let rect = Rect::from_xywh(-expand, -expand, w + expand * 2.0, h + expand * 2.0);
     if r.is_zero() {
-        canvas.draw_rect(outline_rect, &paint);
+        canvas.draw_rect(rect, paint);
     } else {
-        // Expand corner radii proportionally (Chromium: ComputeCornerRadii)
         let radii = expand_radii(r, expand);
         let mut rrect = skia_safe::RRect::new();
-        rrect.set_rect_radii(outline_rect, &radii);
-        canvas.draw_rrect(rrect, &paint);
+        rrect.set_rect_radii(rect, &radii);
+        canvas.draw_rrect(rrect, paint);
     }
 }
 
