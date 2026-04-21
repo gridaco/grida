@@ -1589,6 +1589,75 @@ code block
         );
     }
 
+    // ── Grid alignment (justify-items / justify-self / align-content) ──
+
+    #[test]
+    fn test_justify_items_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="display:grid;justify-items:center">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.justify_items, types::AlignItems::Center);
+    }
+
+    #[test]
+    fn test_justify_self_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="display:grid"><div style="justify-self:end">x</div></div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        // Find inner div (the one with justify-self).
+        fn find_inner<'a>(el: &'a style::StyledElement) -> Option<&'a style::StyledElement> {
+            for c in &el.children {
+                if let style::StyledNode::Element(child) = c {
+                    if child.tag == "div" {
+                        return Some(child);
+                    }
+                }
+            }
+            None
+        }
+        let outer = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        let inner = find_inner(outer).expect("inner div");
+        assert_eq!(inner.justify_self, Some(types::AlignItems::End));
+    }
+
+    #[test]
+    fn test_align_content_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="display:grid;align-content:space-between">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.align_content, types::JustifyContent::SpaceBetween);
+    }
+
+    /// Probe: `justify-items: center; align-items: center` on a grid
+    /// centers the 20×20 red item within its 60×60 cell. The cell spans
+    /// (0,0)-(60,60); item center should be at (30,30). Probe the cell
+    /// corners (should be white) and item center (red).
+    #[test]
+    fn test_grid_justify_items_center_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="display:grid;grid-template:60px / 60px;justify-items:center;align-items:center;width:60px;height:60px;background:#ffffff">
+  <div style="width:20px;height:20px;background:#ff0000"></div>
+</div>"#;
+        let px = rasterize_rgba(html, 60, 60);
+        // Cell corner — item should NOT be here.
+        let corner = pixel_at(&px, 5, 5, 60);
+        assert_eq!(
+            [corner[0], corner[1], corner[2]],
+            [255, 255, 255],
+            "corner empty"
+        );
+        // Item center (cell center).
+        let center = pixel_at(&px, 30, 30, 60);
+        assert_eq!(
+            [center[0], center[1], center[2]],
+            [255, 0, 0],
+            "item centered"
+        );
+    }
+
     // ── overflow-clip-margin ─────────────────────────────────────────
 
     #[test]

@@ -110,6 +110,12 @@ pub struct StyledElement {
     pub flex_wrap: FlexWrap,
     pub align_items: AlignItems,
     pub justify_content: JustifyContent,
+    /// Per-cell alignment of grid items along the inline axis.
+    /// Ignored by flex containers.
+    pub justify_items: AlignItems,
+    /// Content-level alignment of rows along the block axis (grid) or
+    /// cross-axis when `flex-wrap: wrap` (flex).
+    pub align_content: JustifyContent,
     pub row_gap: f32,
     pub column_gap: f32,
 
@@ -118,6 +124,8 @@ pub struct StyledElement {
     pub flex_shrink: f32,
     pub flex_basis: CssLength,
     pub align_self: Option<AlignItems>,
+    /// Overrides the parent's `justify-items` for this grid cell.
+    pub justify_self: Option<AlignItems>,
 
     // ── Grid container (rare non-inherited) ──
     pub grid_template_columns: Vec<GridTemplateEntry>,
@@ -965,12 +973,15 @@ impl Default for StyledElement {
             flex_wrap: FlexWrap::default(),
             align_items: AlignItems::default(),
             justify_content: JustifyContent::default(),
+            justify_items: AlignItems::default(),
+            align_content: JustifyContent::default(),
             row_gap: 0.0,
             column_gap: 0.0,
             flex_grow: 0.0,
             flex_shrink: 1.0,
             flex_basis: CssLength::Auto,
             align_self: None,
+            justify_self: None,
             grid_template_columns: Vec::new(),
             grid_template_rows: Vec::new(),
             grid_auto_columns: Vec::new(),

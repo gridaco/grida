@@ -391,7 +391,9 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
             types::FlexWrap::WrapReverse => taffy::FlexWrap::WrapReverse,
         },
         align_items: Some(map_align_items(el.align_items)),
+        justify_items: Some(map_align_items(el.justify_items)),
         justify_content: Some(map_justify_content(el.justify_content)),
+        align_content: Some(map_justify_content(el.align_content)),
         gap: taffy::Size {
             width: LengthPercentage::length(el.column_gap),
             height: LengthPercentage::length(el.row_gap),
@@ -399,13 +401,8 @@ fn element_to_taffy_style(el: &StyledElement) -> taffy::Style {
         flex_grow: el.flex_grow,
         flex_shrink: el.flex_shrink,
         flex_basis: css_length_to_dim(el.flex_basis),
-        align_self: el.align_self.map(|a| match a {
-            types::AlignItems::Start => taffy::AlignSelf::FlexStart,
-            types::AlignItems::End => taffy::AlignSelf::FlexEnd,
-            types::AlignItems::Center => taffy::AlignSelf::Center,
-            types::AlignItems::Stretch => taffy::AlignSelf::Stretch,
-            types::AlignItems::Baseline => taffy::AlignSelf::Baseline,
-        }),
+        align_self: el.align_self.map(map_align_self),
+        justify_self: el.justify_self.map(map_align_self),
         overflow: taffy::Point {
             x: map_overflow(el.overflow_x),
             y: map_overflow(el.overflow_y),
@@ -522,6 +519,16 @@ fn map_align_items(a: types::AlignItems) -> taffy::AlignItems {
         types::AlignItems::Center => taffy::AlignItems::Center,
         types::AlignItems::Stretch => taffy::AlignItems::Stretch,
         types::AlignItems::Baseline => taffy::AlignItems::Baseline,
+    }
+}
+
+fn map_align_self(a: types::AlignItems) -> taffy::AlignSelf {
+    match a {
+        types::AlignItems::Start => taffy::AlignSelf::FlexStart,
+        types::AlignItems::End => taffy::AlignSelf::FlexEnd,
+        types::AlignItems::Center => taffy::AlignSelf::Center,
+        types::AlignItems::Stretch => taffy::AlignSelf::Stretch,
+        types::AlignItems::Baseline => taffy::AlignSelf::Baseline,
     }
 }
 

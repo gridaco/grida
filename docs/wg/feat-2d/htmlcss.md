@@ -123,28 +123,28 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Flexbox
 
-| CSS Property      | Status | Notes                       |
-| ----------------- | ------ | --------------------------- |
-| `flex-direction`  | ✅     | Via Taffy                   |
-| `flex-wrap`       | ✅     | Via Taffy                   |
-| `flex-flow`       | ✅     | Shorthand; direction + wrap |
-| `align-items`     | ✅     | Via Taffy                   |
-| `align-self`      | ✅     | Via Taffy                   |
-| `align-content`   | ✅     | Via Taffy                   |
-| `justify-content` | ✅     | Via Taffy                   |
-| `justify-items`   | ❌     |                             |
-| `justify-self`    | ❌     |                             |
-| `place-content`   | ❌     | Shorthand                   |
-| `place-items`     | ❌     | Shorthand                   |
-| `place-self`      | ❌     | Shorthand                   |
-| `flex-grow`       | ✅     | Via Taffy                   |
-| `flex-shrink`     | ✅     | Via Taffy                   |
-| `flex-basis`      | ✅     | Via Taffy                   |
-| `flex`            | ✅     | Shorthand                   |
-| `gap`             | ✅     | Via Taffy                   |
-| `row-gap`         | ✅     | Via Taffy                   |
-| `column-gap`      | ✅     | Via Taffy                   |
-| `order`           | ❌     |                             |
+| CSS Property      | Status | Notes                                   |
+| ----------------- | ------ | --------------------------------------- |
+| `flex-direction`  | ✅     | Via Taffy                               |
+| `flex-wrap`       | ✅     | Via Taffy                               |
+| `flex-flow`       | ✅     | Shorthand; direction + wrap             |
+| `align-items`     | ✅     | Via Taffy                               |
+| `align-self`      | ✅     | Via Taffy                               |
+| `align-content`   | ✅     | Via Taffy                               |
+| `justify-content` | ✅     | Via Taffy                               |
+| `justify-items`   | ✅     | Via Taffy (grid)                        |
+| `justify-self`    | ✅     | Via Taffy (grid)                        |
+| `place-content`   | ✅     | Shorthand — cascades to align + justify |
+| `place-items`     | ✅     | Shorthand — cascades to align + justify |
+| `place-self`      | ✅     | Shorthand — cascades to align + justify |
+| `flex-grow`       | ✅     | Via Taffy                               |
+| `flex-shrink`     | ✅     | Via Taffy                               |
+| `flex-basis`      | ✅     | Via Taffy                               |
+| `flex`            | ✅     | Shorthand                               |
+| `gap`             | ✅     | Via Taffy                               |
+| `row-gap`         | ✅     | Via Taffy                               |
+| `column-gap`      | ✅     | Via Taffy                               |
+| `order`           | ❌     |                                         |
 
 ### Grid
 

@@ -1040,6 +1040,29 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
             };
         el.row_gap = gap_to_px(&pos.row_gap);
         el.column_gap = gap_to_px(&pos.column_gap);
+
+        // justify-items: per-cell alignment on the inline axis for grid.
+        let ji_flags = style.clone_justify_items().computed.0.value();
+        el.justify_items = align_flags_to_items(ji_flags);
+
+        // align-content: row-track alignment (grid) or cross-axis content
+        // alignment when flex-wrap splits lines.
+        let ac_flags = style.clone_align_content().primary().value();
+        el.align_content = align_flags_to_justify(ac_flags);
+    }
+
+    // Per-child align-self / justify-self. Non-auto values override the
+    // container's align-items / justify-items respectively.
+    {
+        use style::values::specified::align::AlignFlags;
+        let as_flags = style.clone_align_self().value();
+        if as_flags != AlignFlags::AUTO {
+            el.align_self = Some(align_flags_to_items(as_flags));
+        }
+        let js_flags = style.clone_justify_self().value();
+        if js_flags != AlignFlags::AUTO {
+            el.justify_self = Some(align_flags_to_items(js_flags));
+        }
     }
 
     // Flex child
@@ -2495,6 +2518,32 @@ fn extract_transform_origin(style: &ComputedValues) -> types::TransformOrigin {
     types::TransformOrigin {
         x: resolve(&origin.horizontal),
         y: resolve(&origin.vertical),
+    }
+}
+
+fn align_flags_to_items(flags: style::values::specified::align::AlignFlags) -> types::AlignItems {
+    use style::values::specified::align::AlignFlags;
+    match flags {
+        f if f == AlignFlags::CENTER => types::AlignItems::Center,
+        f if f == AlignFlags::FLEX_START || f == AlignFlags::START => types::AlignItems::Start,
+        f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::AlignItems::End,
+        f if f == AlignFlags::BASELINE => types::AlignItems::Baseline,
+        _ => types::AlignItems::Stretch,
+    }
+}
+
+fn align_flags_to_justify(
+    flags: style::values::specified::align::AlignFlags,
+) -> types::JustifyContent {
+    use style::values::specified::align::AlignFlags;
+    match flags {
+        f if f == AlignFlags::CENTER => types::JustifyContent::Center,
+        f if f == AlignFlags::FLEX_START || f == AlignFlags::START => types::JustifyContent::Start,
+        f if f == AlignFlags::FLEX_END || f == AlignFlags::END => types::JustifyContent::End,
+        f if f == AlignFlags::SPACE_BETWEEN => types::JustifyContent::SpaceBetween,
+        f if f == AlignFlags::SPACE_AROUND => types::JustifyContent::SpaceAround,
+        f if f == AlignFlags::SPACE_EVENLY => types::JustifyContent::SpaceEvenly,
+        _ => types::JustifyContent::Start,
     }
 }
 
