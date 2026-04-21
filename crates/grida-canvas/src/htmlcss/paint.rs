@@ -131,8 +131,22 @@ fn paint_box(
     // outside the box) is not clipped. Outline still participates in the
     // opacity layer above.
     if needs_clip {
+        // `overflow-clip-margin` expands the clip rect outward; only
+        // meaningful when at least one axis is `clip` (hidden/scroll/auto
+        // ignore it per spec).
+        let has_clip_axis =
+            style.overflow_x == types::Overflow::Clip || style.overflow_y == types::Overflow::Clip;
+        let margin = if has_clip_axis {
+            style.overflow_clip_margin.max(0.0)
+        } else {
+            0.0
+        };
         canvas.save();
-        canvas.clip_rect(Rect::from_xywh(0.0, 0.0, w, h), ClipOp::Intersect, true);
+        canvas.clip_rect(
+            Rect::from_xywh(-margin, -margin, w + margin * 2.0, h + margin * 2.0),
+            ClipOp::Intersect,
+            true,
+        );
     }
 
     // ── Phase 1: Background (Chromium: kBlockBackground) ──

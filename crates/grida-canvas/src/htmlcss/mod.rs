@@ -1589,6 +1589,76 @@ code block
         );
     }
 
+    // ── overflow-clip-margin ─────────────────────────────────────────
+
+    #[test]
+    fn test_overflow_clip_margin_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="overflow:clip;overflow-clip-margin:12px">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.overflow_clip_margin, 12.0);
+    }
+
+    #[test]
+    fn test_overflow_clip_margin_default_zero() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="overflow:clip">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.overflow_clip_margin, 0.0);
+    }
+
+    /// Probe: `overflow: clip; overflow-clip-margin: 10px` on a 40×40
+    /// parent with a 60×40 red child painted at 0,0 — the margin expands
+    /// the clip rect 10px outward, so a pixel 5px past the parent's right
+    /// edge (but within the expanded clip) renders red. A pixel 15px past
+    /// falls outside even the expanded clip → background white.
+    #[test]
+    fn test_overflow_clip_margin_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="margin:20px;width:40px;height:40px;overflow:clip;overflow-clip-margin:10px;background:#ffffff">
+  <div style="width:60px;height:40px;background:#ff0000"></div>
+</div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+        // Parent at (20,20)-(60,60); margin expands clip to (10,10)-(70,70).
+        // Child extends from (20,20) to (80,60). Sample at (65, 30) which
+        // is inside the 10px margin zone: should be red.
+        let in_margin = pixel_at(&px, 65, 30, 100);
+        assert_eq!(
+            [in_margin[0], in_margin[1], in_margin[2]],
+            [255, 0, 0],
+            "inside clip-margin zone → red"
+        );
+        // Sample at (75, 30) — past the expanded clip → background white.
+        let outside = pixel_at(&px, 75, 30, 100);
+        assert_eq!(
+            [outside[0], outside[1], outside[2]],
+            [255, 255, 255],
+            "past clip-margin → white"
+        );
+    }
+
+    /// `overflow: hidden` must ignore `overflow-clip-margin` per CSS spec.
+    #[test]
+    fn test_overflow_hidden_ignores_clip_margin() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"
+<div style="margin:20px;width:40px;height:40px;overflow:hidden;overflow-clip-margin:10px;background:#ffffff">
+  <div style="width:60px;height:40px;background:#ff0000"></div>
+</div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+        // Sample 5px past the parent's right edge — for hidden, margin is
+        // ignored so this pixel is outside the clip → white.
+        let past = pixel_at(&px, 65, 30, 100);
+        assert_eq!(
+            [past[0], past[1], past[2]],
+            [255, 255, 255],
+            "hidden clips exactly at box edge"
+        );
+    }
+
     // ── clip-path ────────────────────────────────────────────────────
 
     #[test]

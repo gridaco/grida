@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: overflow-clip-margin</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      .parent {
+        position: relative;
+        width: 120px;
+        height: 60px;
+        background: #f0f0f0;
+        border: 1px dashed #bbb;
+      }
+      .overflow {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 180px;
+        height: 40px;
+        background: #3366cc;
+        color: #fff;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      .visible {
+        overflow: visible;
+      }
+      .hidden {
+        overflow: hidden;
+      }
+      .clip-no-margin {
+        overflow: clip;
+      }
+      .clip-margin-16 {
+        overflow: clip;
+        overflow-clip-margin: 16px;
+      }
+      /* hidden ignores overflow-clip-margin per spec */
+      .hidden-margin-ignored {
+        overflow: hidden;
+        overflow-clip-margin: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">overflow: visible (baseline)</div>
+        <div class="parent visible"><div class="overflow">inside</div></div>
+      </div>
+      <div>
+        <div class="label">overflow: hidden</div>
+        <div class="parent hidden"><div class="overflow">inside</div></div>
+      </div>
+      <div>
+        <div class="label">overflow: clip (no margin)</div>
+        <div class="parent clip-no-margin">
+          <div class="overflow">inside</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">overflow: clip; margin 16px</div>
+        <div class="parent clip-margin-16">
+          <div class="overflow">inside</div>
+        </div>
+      </div>
+      <div>
+        <div class="label">hidden ignores margin</div>
+        <div class="parent hidden-margin-ignored">
+          <div class="overflow">inside</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

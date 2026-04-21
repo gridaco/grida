@@ -879,6 +879,7 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     let bx = style.get_box();
     el.overflow_x = map_overflow(bx.overflow_x);
     el.overflow_y = map_overflow(bx.overflow_y);
+    el.overflow_clip_margin = style.get_margin().clone_overflow_clip_margin().px();
 
     // Position
     {

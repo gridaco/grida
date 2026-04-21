@@ -78,6 +78,10 @@ pub struct StyledElement {
     pub blend_mode: BlendMode,
     pub overflow_x: Overflow,
     pub overflow_y: Overflow,
+    /// CSS `overflow-clip-margin` — additional px margin around the clip
+    /// rect when `overflow: clip` is active. Ignored for `hidden`,
+    /// `scroll`, or `auto`.
+    pub overflow_clip_margin: f32,
     pub box_shadow: Vec<BoxShadow>,
     /// CSS `filter` chain, applied in order to the element and its
     /// descendants via a paint layer wrapped in a Skia `ImageFilter`.
@@ -946,6 +950,7 @@ impl Default for StyledElement {
             blend_mode: BlendMode::Normal,
             overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
+            overflow_clip_margin: 0.0,
             box_shadow: Vec::new(),
             filter: Vec::new(),
             clip_path: ClipPath::None,

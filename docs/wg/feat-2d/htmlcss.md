@@ -101,7 +101,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `box-sizing`                  | ✅     | Via Taffy                                       |
 | `overflow`                    | ✅     | hidden/clip via canvas clip_rect                |
 | `overflow-x`, `overflow-y`    | ⚠️     | Mapped to single overflow axis                  |
-| `overflow-clip-margin`        | ❌     |                                                 |
+| `overflow-clip-margin`        | ✅     | px expands the clip rect when `overflow: clip`  |
 | `overflow-wrap` / `word-wrap` | ❌     |                                                 |
 | `resize`                      | ❌     |                                                 |
 
