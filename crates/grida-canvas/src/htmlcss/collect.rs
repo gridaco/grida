@@ -974,6 +974,7 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Box shadow
     el.box_shadow = extract_box_shadow(style);
     el.filter = extract_filter(style);
+    el.clip_path = extract_clip_path(style);
 
     // Transform
     el.transform = extract_transform(style);
@@ -1940,6 +1941,121 @@ fn extract_box_shadow(style: &ComputedValues) -> Vec<BoxShadow> {
             }
         })
         .collect()
+}
+
+fn extract_clip_path(style: &ComputedValues) -> ClipPath {
+    use style::values::computed::basic_shape::ClipPath as ComputedClipPath;
+    use style::values::generics::basic_shape::{
+        FillRule, GenericBasicShape, GenericClipPath, GenericShapeRadius,
+    };
+    use style::values::generics::position::GenericPositionOrAuto;
+
+    let cp: ComputedClipPath = style.clone_clip_path();
+    match cp {
+        GenericClipPath::None => ClipPath::None,
+        GenericClipPath::Url(_) => ClipPath::None,
+        GenericClipPath::Box(_) => ClipPath::None,
+        GenericClipPath::Shape(shape, _) => {
+            let resolve_pos = |p: &GenericPositionOrAuto<
+                style::values::computed::Position,
+            >| -> (CssLength, CssLength) {
+                match p {
+                    GenericPositionOrAuto::Position(pos) => (
+                        length_percentage_to_css(&pos.horizontal),
+                        length_percentage_to_css(&pos.vertical),
+                    ),
+                    // `at auto` means center per spec.
+                    GenericPositionOrAuto::Auto => {
+                        (CssLength::Percent(0.5), CssLength::Percent(0.5))
+                    }
+                }
+            };
+            let resolve_radius = |r: &GenericShapeRadius<
+                style::values::computed::NonNegativeLengthPercentage,
+            >|
+             -> ShapeRadius {
+                match r {
+                    GenericShapeRadius::Length(lp) => {
+                        ShapeRadius::Length(length_percentage_to_css(&lp.0))
+                    }
+                    GenericShapeRadius::ClosestSide => ShapeRadius::ClosestSide,
+                    GenericShapeRadius::FarthestSide => ShapeRadius::FarthestSide,
+                }
+            };
+            match *shape {
+                GenericBasicShape::Rect(inset) => {
+                    let sides = &inset.rect;
+                    ClipPath::Inset {
+                        top: length_percentage_to_css(&sides.0),
+                        right: length_percentage_to_css(&sides.1),
+                        bottom: length_percentage_to_css(&sides.2),
+                        left: length_percentage_to_css(&sides.3),
+                        radius: extract_border_radius_from_generic(&inset.round),
+                    }
+                }
+                GenericBasicShape::Circle(circle) => {
+                    let (cx, cy) = resolve_pos(&circle.position);
+                    ClipPath::Circle {
+                        cx,
+                        cy,
+                        radius: resolve_radius(&circle.radius),
+                    }
+                }
+                GenericBasicShape::Ellipse(ellipse) => {
+                    let (cx, cy) = resolve_pos(&ellipse.position);
+                    ClipPath::Ellipse {
+                        cx,
+                        cy,
+                        rx: resolve_radius(&ellipse.semiaxis_x),
+                        ry: resolve_radius(&ellipse.semiaxis_y),
+                    }
+                }
+                GenericBasicShape::Polygon(poly) => {
+                    let points = poly
+                        .coordinates
+                        .iter()
+                        .map(|c| {
+                            (
+                                length_percentage_to_css(&c.0),
+                                length_percentage_to_css(&c.1),
+                            )
+                        })
+                        .collect();
+                    ClipPath::Polygon {
+                        points,
+                        even_odd: matches!(poly.fill, FillRule::Evenodd),
+                    }
+                }
+                GenericBasicShape::PathOrShape(_) => ClipPath::None,
+            }
+        }
+    }
+}
+
+/// Map Stylo's `GenericBorderRadius<NonNegativeLengthPercentage>` onto our
+/// `CornerRadii`. Percentages stay unresolved — paint time turns them
+/// into px against the clip rect's own dimensions.
+fn extract_border_radius_from_generic(
+    radius: &style::values::generics::border::GenericBorderRadius<
+        style::values::computed::NonNegativeLengthPercentage,
+    >,
+) -> CornerRadii {
+    // Percentages in clip-path `inset()` resolve to px against the clip
+    // rect, not the border box. For now we resolve to px here and lose
+    // the percent; paint-time resolution is a follow-up.
+    let lp = |v: &style::values::computed::LengthPercentage| -> f32 {
+        v.to_length().map(|l| l.px()).unwrap_or(0.0)
+    };
+    CornerRadii {
+        tl_x: lp(&radius.top_left.0.width.0),
+        tl_y: lp(&radius.top_left.0.height.0),
+        tr_x: lp(&radius.top_right.0.width.0),
+        tr_y: lp(&radius.top_right.0.height.0),
+        br_x: lp(&radius.bottom_right.0.width.0),
+        br_y: lp(&radius.bottom_right.0.height.0),
+        bl_x: lp(&radius.bottom_left.0.width.0),
+        bl_y: lp(&radius.bottom_left.0.height.0),
+    }
 }
 
 fn extract_filter(style: &ComputedValues) -> Vec<FilterFunction> {

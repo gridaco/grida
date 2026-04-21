@@ -118,6 +118,15 @@ fn paint_box(
         canvas.save_layer(&layer_rec);
     }
 
+    // CSS `clip-path` — applied inside the opacity/filter layer but
+    // outside the overflow clip, so it affects backgrounds/borders and
+    // is itself clipped by overflow when present.
+    let has_clip_path = !matches!(style.clip_path, super::style::ClipPath::None);
+    if has_clip_path {
+        canvas.save();
+        apply_clip_path(canvas, &style.clip_path, w, h);
+    }
+
     // Overflow clip gets its own save/restore so that outline (which paints
     // outside the box) is not clipped. Outline still participates in the
     // opacity layer above.
@@ -236,6 +245,9 @@ fn paint_box(
 
     if needs_clip {
         canvas.restore(); // pop overflow clip
+    }
+    if has_clip_path {
+        canvas.restore(); // pop clip-path
     }
 
     // ── Phase 4: Outline (Chromium: PaintPhase::kSelfOutlineOnly) ──
@@ -655,6 +667,125 @@ fn paint_replaced(
     }
 
     canvas.restore();
+}
+
+// ─── clip-path ───────────────────────────────────────────────────────
+
+/// Apply a CSS `clip-path` against the element's border box `(w, h)`.
+/// Caller is responsible for `canvas.save()` / `canvas.restore()`.
+fn apply_clip_path(canvas: &Canvas, clip: &super::style::ClipPath, w: f32, h: f32) {
+    use super::style::ClipPath;
+
+    let resolve = |len: super::types::CssLength, basis: f32| -> f32 {
+        match len {
+            super::types::CssLength::Px(px) => px,
+            super::types::CssLength::Percent(p) => basis * p,
+            super::types::CssLength::Auto => 0.0,
+        }
+    };
+
+    match clip {
+        ClipPath::None => {}
+        ClipPath::Inset {
+            top,
+            right,
+            bottom,
+            left,
+            radius,
+        } => {
+            let t = resolve(*top, h);
+            let r = resolve(*right, w);
+            let b = resolve(*bottom, h);
+            let l = resolve(*left, w);
+            let rect = Rect::from_ltrb(l, t, w - r, h - b);
+            if radius.is_zero() {
+                canvas.clip_rect(rect, ClipOp::Intersect, true);
+            } else {
+                let mut rrect = skia_safe::RRect::new();
+                rrect.set_rect_radii(rect, &radius.to_skia_radii());
+                canvas.clip_rrect(rrect, ClipOp::Intersect, true);
+            }
+        }
+        ClipPath::Circle { cx, cy, radius } => {
+            let cx_px = resolve(*cx, w);
+            let cy_px = resolve(*cy, h);
+            let r = resolve_shape_radius(*radius, (cx_px, cy_px), (w, h), true);
+            let mut builder = skia_safe::PathBuilder::new();
+            builder.add_circle((cx_px, cy_px), r, None);
+            canvas.clip_path(&builder.detach(), ClipOp::Intersect, true);
+        }
+        ClipPath::Ellipse { cx, cy, rx, ry } => {
+            let cx_px = resolve(*cx, w);
+            let cy_px = resolve(*cy, h);
+            let rx_px = resolve_shape_radius(*rx, (cx_px, cy_px), (w, h), true);
+            let ry_px = resolve_shape_radius(*ry, (cx_px, cy_px), (w, h), false);
+            let rect = Rect::from_xywh(cx_px - rx_px, cy_px - ry_px, rx_px * 2.0, ry_px * 2.0);
+            let mut builder = skia_safe::PathBuilder::new();
+            builder.add_oval(rect, None, None);
+            canvas.clip_path(&builder.detach(), ClipOp::Intersect, true);
+        }
+        ClipPath::Polygon { points, even_odd } => {
+            if points.len() < 3 {
+                return;
+            }
+            let fill_type = if *even_odd {
+                skia_safe::PathFillType::EvenOdd
+            } else {
+                skia_safe::PathFillType::Winding
+            };
+            let mut builder = skia_safe::PathBuilder::new_with_fill_type(fill_type);
+            let first = (resolve(points[0].0, w), resolve(points[0].1, h));
+            builder.move_to(first);
+            for (x, y) in &points[1..] {
+                builder.line_to((resolve(*x, w), resolve(*y, h)));
+            }
+            builder.close();
+            canvas.clip_path(&builder.detach(), ClipOp::Intersect, true);
+        }
+    }
+}
+
+/// Resolve a `ShapeRadius` into a pixel length. `is_x` controls whether
+/// `closest-side`/`farthest-side` use the horizontal or vertical axis
+/// (ellipse uses one radius per axis).
+fn resolve_shape_radius(
+    r: super::style::ShapeRadius,
+    center: (f32, f32),
+    size: (f32, f32),
+    is_x: bool,
+) -> f32 {
+    use super::style::ShapeRadius;
+    match r {
+        ShapeRadius::Length(len) => match len {
+            super::types::CssLength::Px(px) => px,
+            super::types::CssLength::Percent(p) => {
+                // For circle() the spec resolves against sqrt((w²+h²)/2);
+                // for ellipse() rx uses w, ry uses h. We approximate
+                // circle's case by passing `is_x=true` with `size.0`.
+                let basis = if is_x { size.0 } else { size.1 };
+                basis * p
+            }
+            super::types::CssLength::Auto => 0.0,
+        },
+        ShapeRadius::ClosestSide => {
+            let (w, h) = size;
+            let (cx, cy) = center;
+            if is_x {
+                cx.min(w - cx).max(0.0)
+            } else {
+                cy.min(h - cy).max(0.0)
+            }
+        }
+        ShapeRadius::FarthestSide => {
+            let (w, h) = size;
+            let (cx, cy) = center;
+            if is_x {
+                cx.max(w - cx).max(0.0)
+            } else {
+                cy.max(h - cy).max(0.0)
+            }
+        }
+    }
 }
 
 // ─── Filter chain ────────────────────────────────────────────────────

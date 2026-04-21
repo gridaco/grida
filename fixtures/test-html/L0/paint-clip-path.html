@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: clip-path</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .swatch {
+        width: 120px;
+        height: 120px;
+        background: linear-gradient(135deg, #ff0066, #3366cc);
+      }
+      .inset-simple {
+        clip-path: inset(20px);
+      }
+      .inset-sides {
+        clip-path: inset(10px 30px 20px 40px);
+      }
+      .inset-round {
+        clip-path: inset(12px round 20px);
+      }
+      .circle {
+        clip-path: circle(40px at center);
+      }
+      .circle-closest {
+        clip-path: circle(closest-side at 30% 30%);
+      }
+      .ellipse {
+        clip-path: ellipse(50px 30px at center);
+      }
+      .polygon-diamond {
+        clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+      }
+      .polygon-star {
+        clip-path: polygon(
+          50% 0,
+          61% 35%,
+          98% 35%,
+          68% 57%,
+          79% 91%,
+          50% 70%,
+          21% 91%,
+          32% 57%,
+          2% 35%,
+          39% 35%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">none (baseline)</div>
+        <div class="swatch"></div>
+      </div>
+      <div>
+        <div class="label">inset(20px)</div>
+        <div class="swatch inset-simple"></div>
+      </div>
+      <div>
+        <div class="label">inset(10 30 20 40)</div>
+        <div class="swatch inset-sides"></div>
+      </div>
+      <div>
+        <div class="label">inset(12px round 20px)</div>
+        <div class="swatch inset-round"></div>
+      </div>
+      <div>
+        <div class="label">circle(40px at center)</div>
+        <div class="swatch circle"></div>
+      </div>
+      <div>
+        <div class="label">circle(closest-side at 30% 30%)</div>
+        <div class="swatch circle-closest"></div>
+      </div>
+      <div>
+        <div class="label">ellipse(50 30 at center)</div>
+        <div class="swatch ellipse"></div>
+      </div>
+      <div>
+        <div class="label">polygon (diamond)</div>
+        <div class="swatch polygon-diamond"></div>
+      </div>
+      <div>
+        <div class="label">polygon (star)</div>
+        <div class="swatch polygon-star"></div>
+      </div>
+    </div>
+  </body>
+</html>

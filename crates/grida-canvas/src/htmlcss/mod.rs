@@ -1556,6 +1556,124 @@ code block
         );
     }
 
+    // ── clip-path ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_clip_path_none_default() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div>x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert!(matches!(el.clip_path, style::ClipPath::None));
+    }
+
+    #[test]
+    fn test_clip_path_inset_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="clip-path:inset(10px 20px 30px 40px round 6px)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        match el.clip_path {
+            style::ClipPath::Inset {
+                top,
+                right,
+                bottom,
+                left,
+                ref radius,
+            } => {
+                assert_eq!(top, types::CssLength::Px(10.0));
+                assert_eq!(right, types::CssLength::Px(20.0));
+                assert_eq!(bottom, types::CssLength::Px(30.0));
+                assert_eq!(left, types::CssLength::Px(40.0));
+                assert_eq!(radius.tl_x, 6.0);
+            }
+            ref other => panic!("expected Inset, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_clip_path_circle_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="clip-path:circle(40px at 50% 50%)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        match el.clip_path {
+            style::ClipPath::Circle { cx, cy, radius } => {
+                assert_eq!(cx, types::CssLength::Percent(0.5));
+                assert_eq!(cy, types::CssLength::Percent(0.5));
+                assert_eq!(
+                    radius,
+                    style::ShapeRadius::Length(types::CssLength::Px(40.0))
+                );
+            }
+            ref other => panic!("expected Circle, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_clip_path_polygon_extract() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        match el.clip_path {
+            style::ClipPath::Polygon {
+                ref points,
+                even_odd,
+            } => {
+                assert_eq!(points.len(), 4);
+                assert!(!even_odd);
+                assert_eq!(points[0].0, types::CssLength::Percent(0.5));
+                assert_eq!(points[0].1, types::CssLength::Px(0.0));
+            }
+            ref other => panic!("expected Polygon, got {other:?}"),
+        }
+    }
+
+    /// Probe: `inset(20px)` on a 100×100 red box clips the outer ring
+    /// away — pixels at (5,5) are background-white, pixels at (50,50)
+    /// are still red.
+    #[test]
+    fn test_clip_path_inset_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:100px;height:100px;background:#ff0000;clip-path:inset(20px)"></div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+        let outer = pixel_at(&px, 5, 5, 100);
+        assert_eq!(
+            [outer[0], outer[1], outer[2]],
+            [255, 255, 255],
+            "clipped ring → white"
+        );
+        let inner = pixel_at(&px, 50, 50, 100);
+        assert_eq!(
+            [inner[0], inner[1], inner[2]],
+            [255, 0, 0],
+            "inset region red"
+        );
+    }
+
+    /// Probe: `circle(40px at center)` on a 100×100 red box — corners
+    /// are clipped (distance √50² ≈ 70 from center > 40), center is
+    /// still red.
+    #[test]
+    fn test_clip_path_circle_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:100px;height:100px;background:#ff0000;clip-path:circle(40px at center)"></div>"#;
+        let px = rasterize_rgba(html, 100, 100);
+        let corner = pixel_at(&px, 5, 5, 100);
+        assert_eq!(
+            [corner[0], corner[1], corner[2]],
+            [255, 255, 255],
+            "corner clipped"
+        );
+        let center = pixel_at(&px, 50, 50, 100);
+        assert_eq!(
+            [center[0], center[1], center[2]],
+            [255, 0, 0],
+            "center visible"
+        );
+    }
+
     // ── CSS `filter` ─────────────────────────────────────────────────
 
     #[test]

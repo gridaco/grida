@@ -82,6 +82,10 @@ pub struct StyledElement {
     /// CSS `filter` chain, applied in order to the element and its
     /// descendants via a paint layer wrapped in a Skia `ImageFilter`.
     pub filter: Vec<FilterFunction>,
+    /// CSS `clip-path` — clips the element and its descendants to a
+    /// basic shape. Evaluated at paint time against the element's
+    /// border box.
+    pub clip_path: ClipPath,
 
     // ── Transform (rare non-inherited) ──
     /// CSS `transform` operations, preserving unresolved percentage/length
@@ -385,6 +389,62 @@ pub struct BoxShadow {
     pub spread: f32,
     pub color: CGColor,
     pub inset: bool,
+}
+
+/// CSS `clip-path` basic shapes.
+///
+/// Positions and lengths resolve against the element's border box at
+/// paint time. `Url` (SVG `clipPath` reference) and `path()` / `shape()`
+/// are not yet plumbed.
+#[derive(Debug, Clone, Default)]
+pub enum ClipPath {
+    #[default]
+    None,
+    /// `inset(<top> <right> <bottom> <left> [round <radius>])`.
+    Inset {
+        top: CssLength,
+        right: CssLength,
+        bottom: CssLength,
+        left: CssLength,
+        radius: CornerRadii,
+    },
+    /// `circle(<radius> at <cx> <cy>)`.
+    Circle {
+        cx: CssLength,
+        cy: CssLength,
+        radius: ShapeRadius,
+    },
+    /// `ellipse(<rx> <ry> at <cx> <cy>)`.
+    Ellipse {
+        cx: CssLength,
+        cy: CssLength,
+        rx: ShapeRadius,
+        ry: ShapeRadius,
+    },
+    /// `polygon([<fill-rule>,] <point-list>)`.
+    Polygon {
+        points: Vec<(CssLength, CssLength)>,
+        even_odd: bool,
+    },
+}
+
+/// Radius expression used by `circle()` and `ellipse()` in `clip-path`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ShapeRadius {
+    /// Explicit length or percentage against the reference box axis.
+    Length(CssLength),
+    /// `closest-side` — distance from center to nearest edge.
+    ClosestSide,
+    /// `farthest-side` — distance from center to farthest edge.
+    FarthestSide,
+}
+
+impl Default for ShapeRadius {
+    fn default() -> Self {
+        // `circle()` with no explicit radius defaults to `closest-side`
+        // per CSS Shapes spec.
+        ShapeRadius::ClosestSide
+    }
 }
 
 /// CSS `filter` functions. Scope is limited to the color/blur filters
@@ -888,6 +948,7 @@ impl Default for StyledElement {
             overflow_y: Overflow::Visible,
             box_shadow: Vec::new(),
             filter: Vec::new(),
+            clip_path: ClipPath::None,
             transform: Vec::new(),
             transform_origin: TransformOrigin::default(),
             position: Position::Static,
