@@ -523,6 +523,17 @@ fn css_length_to_dim(len: types::CssLength) -> Dimension {
         types::CssLength::Px(px) => Dimension::length(px),
         types::CssLength::Percent(pct) => Dimension::percent(pct),
         types::CssLength::Auto => Dimension::auto(),
+        // Taffy has no `calc()` variant; pick the dominant term.
+        // `to_length()` already folds pure-px calcs to `Px`, so a Calc
+        // we see here has a non-trivial percent component in the common
+        // case (e.g. `calc(100% - 10px)` → keep the 100%).
+        types::CssLength::Calc { px, percent } => {
+            if percent != 0.0 {
+                Dimension::percent(percent)
+            } else {
+                Dimension::length(px)
+            }
+        }
     }
 }
 
@@ -531,6 +542,13 @@ fn css_length_to_lpa(len: types::CssLength) -> LengthPercentageAuto {
         types::CssLength::Px(px) => LengthPercentageAuto::length(px),
         types::CssLength::Percent(pct) => LengthPercentageAuto::percent(pct),
         types::CssLength::Auto => LengthPercentageAuto::auto(),
+        types::CssLength::Calc { px, percent } => {
+            if percent != 0.0 {
+                LengthPercentageAuto::percent(percent)
+            } else {
+                LengthPercentageAuto::length(px)
+            }
+        }
     }
 }
 
@@ -545,12 +563,7 @@ pub(crate) fn resolve_text_indent(indent: types::CssLength, basis: f32) -> f32 {
     // only the first line outside the paragraph bounds isn't supported
     // by the Paragraph-based text stack. Documented as a known
     // limitation in `docs/wg/feat-2d/htmlcss.md`.
-    let raw = match indent {
-        types::CssLength::Px(px) => px,
-        types::CssLength::Percent(p) => basis * p,
-        types::CssLength::Auto => 0.0,
-    };
-    raw.max(0.0)
+    indent.resolve_px(basis).max(0.0)
 }
 
 fn map_align_items(a: types::AlignItems) -> taffy::AlignItems {

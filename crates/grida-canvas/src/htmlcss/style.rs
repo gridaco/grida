@@ -493,6 +493,7 @@ impl InsetCornerRadii {
         let is_z = |v: CssLength| match v {
             CssLength::Px(p) => p == 0.0,
             CssLength::Percent(p) => p == 0.0,
+            CssLength::Calc { px, percent } => px == 0.0 && percent == 0.0,
             CssLength::Auto => true,
         };
         is_z(self.tl_x)

@@ -1728,13 +1728,25 @@ fn extract_gradient_position(pos: &style::values::computed::Position) -> Gradien
 }
 
 /// Map a Stylo `LengthPercentage` → our `CssLength`.
+///
+/// For mixed `calc()` values (e.g. `calc(100% - 10px)`), both `to_length`
+/// and `to_percentage` return `None`. We decompose by probing `resolve()`
+/// at two known bases: `resolve(0)` yields the pure px term, and
+/// `(resolve(100) - resolve(0)) / 100` yields the percent coefficient.
 fn length_percentage_to_css(lp: &style::values::computed::LengthPercentage) -> CssLength {
     if let Some(len) = lp.to_length() {
-        CssLength::Px(len.px())
-    } else if let Some(pct) = lp.to_percentage() {
-        CssLength::Percent(pct.0)
-    } else {
-        CssLength::Auto
+        return CssLength::Px(len.px());
+    }
+    if let Some(pct) = lp.to_percentage() {
+        return CssLength::Percent(pct.0);
+    }
+    use style::values::computed::Length;
+    let at_zero = lp.resolve(Length::new(0.0)).px();
+    let at_hundred = lp.resolve(Length::new(100.0)).px();
+    let percent = (at_hundred - at_zero) / 100.0;
+    CssLength::Calc {
+        px: at_zero,
+        percent,
     }
 }
 

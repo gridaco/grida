@@ -105,6 +105,16 @@ fn paint_box(
         }
     }
 
+    // CSS `clip-path` — applied **outside** the opacity/filter layer so
+    // filter output (blur halos, drop-shadow extents) is still clipped to
+    // the shape. Spec: the clip-path shapes the element's entire rendering,
+    // including any filter effects.
+    let has_clip_path = !matches!(style.clip_path, super::style::ClipPath::None);
+    if has_clip_path {
+        canvas.save();
+        apply_clip_path(canvas, &style.clip_path, w, h);
+    }
+
     if needs_layer {
         let mut layer_paint = Paint::default();
         layer_paint.set_alpha((style.opacity * 255.0) as u8);
@@ -127,15 +137,6 @@ fn paint_box(
                 .bounds(&bounds)
         };
         canvas.save_layer(&layer_rec);
-    }
-
-    // CSS `clip-path` — applied inside the opacity/filter layer but
-    // outside the overflow clip, so it affects backgrounds/borders and
-    // is itself clipped by overflow when present.
-    let has_clip_path = !matches!(style.clip_path, super::style::ClipPath::None);
-    if has_clip_path {
-        canvas.save();
-        apply_clip_path(canvas, &style.clip_path, w, h);
     }
 
     // Overflow clip gets its own save/restore so that outline (which paints
@@ -277,17 +278,18 @@ fn paint_box(
     if needs_clip {
         canvas.restore(); // pop overflow clip
     }
-    if has_clip_path {
-        canvas.restore(); // pop clip-path
-    }
 
     // ── Phase 4: Outline (Chromium: PaintPhase::kSelfOutlineOnly) ──
-    // Painted outside the overflow clip but inside the opacity layer.
+    // Painted outside the overflow clip but inside the opacity/filter layer
+    // so outline participates in the filter (e.g. blur on the whole box).
     paint_outline(canvas, style, w, h);
 
     // ── Restore ──
     if needs_layer {
-        canvas.restore(); // layer
+        canvas.restore(); // layer (filter composited, then clipped by clip-path below)
+    }
+    if has_clip_path {
+        canvas.restore(); // pop clip-path
     }
     canvas.restore(); // translate
 }
@@ -465,6 +467,7 @@ fn resolve_bg_length(v: CssLength, basis: f32) -> Option<f32> {
         CssLength::Auto => None,
         CssLength::Px(px) => Some(px),
         CssLength::Percent(p) => Some(basis * p),
+        CssLength::Calc { px, percent } => Some(basis * percent + px),
     }
 }
 
@@ -510,11 +513,13 @@ fn resolve_bg_size(
 /// Resolve a `background-position` axis value.
 /// - `Px(p)` → `p` (raw offset from origin)
 /// - `Percent(p)` → `(area - tile) * p` (CSS rule: 0% = flush-left, 100% = flush-right)
+/// - `Calc` → percent resolved against `(area - tile)`, plus px offset
 /// - `Auto` → 0
 fn resolve_bg_position_axis(v: CssLength, area: f32, tile: f32) -> f32 {
     match v {
         CssLength::Px(p) => p,
         CssLength::Percent(p) => (area - tile) * p,
+        CssLength::Calc { px, percent } => (area - tile) * percent + px,
         CssLength::Auto => 0.0,
     }
 }
@@ -756,13 +761,7 @@ fn sampling_for(rendering: types::ImageRendering) -> skia_safe::SamplingOptions 
 fn apply_clip_path(canvas: &Canvas, clip: &super::style::ClipPath, w: f32, h: f32) {
     use super::style::ClipPath;
 
-    let resolve = |len: super::types::CssLength, basis: f32| -> f32 {
-        match len {
-            super::types::CssLength::Px(px) => px,
-            super::types::CssLength::Percent(p) => basis * p,
-            super::types::CssLength::Auto => 0.0,
-        }
-    };
+    let resolve = |len: super::types::CssLength, basis: f32| -> f32 { len.resolve_px(basis) };
 
     match clip {
         ClipPath::None => {}
@@ -853,11 +852,7 @@ fn resolve_circle_radius(
     let (cx, cy) = center;
     let dists = [cx, w - cx, cy, h - cy];
     match r {
-        ShapeRadius::Length(len) => match len {
-            super::types::CssLength::Px(px) => px,
-            super::types::CssLength::Percent(p) => ((w * w + h * h) / 2.0).sqrt() * p,
-            super::types::CssLength::Auto => 0.0,
-        },
+        ShapeRadius::Length(len) => len.resolve_px(((w * w + h * h) / 2.0).sqrt()),
         ShapeRadius::ClosestSide => dists.iter().copied().fold(f32::INFINITY, f32::min).max(0.0),
         ShapeRadius::FarthestSide => dists.iter().copied().fold(0.0f32, f32::max),
     }
@@ -871,17 +866,13 @@ fn resolve_shape_radius(
 ) -> f32 {
     use super::style::ShapeRadius;
     match r {
-        ShapeRadius::Length(len) => match len {
-            super::types::CssLength::Px(px) => px,
-            super::types::CssLength::Percent(p) => {
-                // For circle() the spec resolves against sqrt((w²+h²)/2);
-                // for ellipse() rx uses w, ry uses h. We approximate
-                // circle's case by passing `is_x=true` with `size.0`.
-                let basis = if is_x { size.0 } else { size.1 };
-                basis * p
-            }
-            super::types::CssLength::Auto => 0.0,
-        },
+        ShapeRadius::Length(len) => {
+            // For circle() the spec resolves against sqrt((w²+h²)/2);
+            // for ellipse() rx uses w, ry uses h. We approximate
+            // circle's case by passing `is_x=true` with `size.0`.
+            let basis = if is_x { size.0 } else { size.1 };
+            len.resolve_px(basis)
+        }
         ShapeRadius::ClosestSide => {
             let (w, h) = size;
             let (cx, cy) = center;
@@ -1187,9 +1178,8 @@ fn build_gradient_data_with_line_length(
 /// `Auto` is not expected for gradient position/size — falls back to `fallback`.
 fn resolve_length(len: CssLength, axis: f32, fallback: f32) -> f32 {
     match len {
-        CssLength::Px(px) => px,
-        CssLength::Percent(pct) => pct * axis,
         CssLength::Auto => fallback,
+        _ => len.resolve_px(axis),
     }
 }
 
