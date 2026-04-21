@@ -1556,6 +1556,91 @@ code block
         );
     }
 
+    // ── CSS `filter` ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_filter_extract_single() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="filter:blur(4px)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.filter.len(), 1);
+        match el.filter[0] {
+            style::FilterFunction::Blur(px) => assert_eq!(px, 4.0),
+            ref other => panic!("expected Blur, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_filter_extract_chain() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="filter:grayscale(1) brightness(1.2) contrast(1.4)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.filter.len(), 3);
+        assert!(matches!(el.filter[0], style::FilterFunction::Grayscale(_)));
+        assert!(matches!(el.filter[1], style::FilterFunction::Brightness(_)));
+        assert!(matches!(el.filter[2], style::FilterFunction::Contrast(_)));
+    }
+
+    #[test]
+    fn test_filter_extract_all_functions() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="filter:blur(2px) brightness(1.1) contrast(1.2) grayscale(0.3) hue-rotate(90deg) invert(0.5) opacity(0.8) saturate(1.5) sepia(0.4)">x</div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+        let el = find_el_with(&root, &|e| e.tag == "div").unwrap();
+        assert_eq!(el.filter.len(), 9);
+    }
+
+    /// Probe: `grayscale(1)` on pure red should equalize RGB channels.
+    #[test]
+    fn test_filter_grayscale_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html =
+            r#"<div style="width:40px;height:40px;background:#ff0000;filter:grayscale(1)"></div>"#;
+        let px = rasterize_rgba(html, 40, 40);
+        let p = pixel_at(&px, 20, 20, 40);
+        assert!(p[0] < 100, "red crushed, got {}", p[0]);
+        assert!(p[1] > 20, "green raised, got {}", p[1]);
+        assert!(
+            (p[0] as i32 - p[1] as i32).abs() < 10,
+            "r≈g in grayscale, got r={} g={}",
+            p[0],
+            p[1]
+        );
+    }
+
+    /// Probe: `invert(1)` flips #000000 → #ffffff.
+    #[test]
+    fn test_filter_invert_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html =
+            r#"<div style="width:40px;height:40px;background:#000000;filter:invert(1)"></div>"#;
+        let px = rasterize_rgba(html, 40, 40);
+        let p = pixel_at(&px, 20, 20, 40);
+        assert_eq!([p[0], p[1], p[2]], [255, 255, 255], "black → white");
+    }
+
+    /// Probe: `hue-rotate(180deg)` on pure red yields a cyan-ish tone.
+    /// The standard W3C filter matrix preserves luma (~Y=54 for red),
+    /// so the rotated color is roughly (0, 109, 109) — green≈blue, both
+    /// clearly present but not peak-white.
+    #[test]
+    fn test_filter_hue_rotate_probe() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div style="width:40px;height:40px;background:#ff0000;filter:hue-rotate(180deg)"></div>"#;
+        let px = rasterize_rgba(html, 40, 40);
+        let p = pixel_at(&px, 20, 20, 40);
+        assert!(p[0] < 30, "red crushed, got {}", p[0]);
+        assert!(p[1] > 80 && p[2] > 80, "g+b raised, got {p:?}");
+        assert!(
+            (p[1] as i32 - p[2] as i32).abs() < 10,
+            "g≈b for cyan, got g={} b={}",
+            p[1],
+            p[2]
+        );
+    }
+
     // ── object-position on <img> ─────────────────────────────────────
 
     fn find_replaced(el: &style::StyledElement) -> Option<&style::ReplacedContent> {

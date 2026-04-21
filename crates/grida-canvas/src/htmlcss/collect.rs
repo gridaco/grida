@@ -973,6 +973,7 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
 
     // Box shadow
     el.box_shadow = extract_box_shadow(style);
+    el.filter = extract_filter(style);
 
     // Transform
     el.transform = extract_transform(style);
@@ -1937,6 +1938,28 @@ fn extract_box_shadow(style: &ComputedValues) -> Vec<BoxShadow> {
                 color,
                 inset: s.inset,
             }
+        })
+        .collect()
+}
+
+fn extract_filter(style: &ComputedValues) -> Vec<FilterFunction> {
+    use style::values::generics::effects::GenericFilter;
+    style
+        .clone_filter()
+        .0
+        .iter()
+        .filter_map(|f| match f {
+            GenericFilter::Blur(len) => Some(FilterFunction::Blur(len.0.px())),
+            GenericFilter::Brightness(n) => Some(FilterFunction::Brightness(n.0)),
+            GenericFilter::Contrast(n) => Some(FilterFunction::Contrast(n.0)),
+            GenericFilter::Grayscale(n) => Some(FilterFunction::Grayscale(n.0)),
+            GenericFilter::HueRotate(a) => Some(FilterFunction::HueRotate(a.radians())),
+            GenericFilter::Invert(n) => Some(FilterFunction::Invert(n.0)),
+            GenericFilter::Opacity(n) => Some(FilterFunction::Opacity(n.0)),
+            GenericFilter::Saturate(n) => Some(FilterFunction::Saturate(n.0)),
+            GenericFilter::Sepia(n) => Some(FilterFunction::Sepia(n.0)),
+            // DropShadow and Url not yet plumbed.
+            _ => None,
         })
         .collect()
 }

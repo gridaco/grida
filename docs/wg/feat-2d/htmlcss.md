@@ -402,22 +402,22 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Filter & Effects
 
-| CSS Property      | Status | Notes |
-| ----------------- | ------ | ----- |
-| `filter`          | ❌     |       |
-| `backdrop-filter` | ❌     |       |
-| `clip-path`       | ❌     |       |
-| `clip-rule`       | ❌     |       |
-| `mask`            | ❌     |       |
-| `mask-image`      | ❌     |       |
-| `mask-clip`       | ❌     |       |
-| `mask-composite`  | ❌     |       |
-| `mask-mode`       | ❌     |       |
-| `mask-origin`     | ❌     |       |
-| `mask-position`   | ❌     |       |
-| `mask-repeat`     | ❌     |       |
-| `mask-size`       | ❌     |       |
-| `mask-type`       | ❌     |       |
+| CSS Property      | Status | Notes                                                                                                                             |
+| ----------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `filter`          | ✅     | blur + 8 color filters (brightness/contrast/grayscale/hue-rotate/invert/opacity/saturate/sepia); `drop-shadow()` and `url()` TODO |
+| `backdrop-filter` | ❌     |                                                                                                                                   |
+| `clip-path`       | ❌     |                                                                                                                                   |
+| `clip-rule`       | ❌     |                                                                                                                                   |
+| `mask`            | ❌     |                                                                                                                                   |
+| `mask-image`      | ❌     |                                                                                                                                   |
+| `mask-clip`       | ❌     |                                                                                                                                   |
+| `mask-composite`  | ❌     |                                                                                                                                   |
+| `mask-mode`       | ❌     |                                                                                                                                   |
+| `mask-origin`     | ❌     |                                                                                                                                   |
+| `mask-position`   | ❌     |                                                                                                                                   |
+| `mask-repeat`     | ❌     |                                                                                                                                   |
+| `mask-size`       | ❌     |                                                                                                                                   |
+| `mask-type`       | ❌     |                                                                                                                                   |
 
 ### CSS Motion Path (Offset)
 

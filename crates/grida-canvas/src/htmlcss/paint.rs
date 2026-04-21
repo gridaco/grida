@@ -17,8 +17,9 @@ use skia_safe::{Canvas, ClipOp, Color, Paint, PaintStyle, PictureRecorder, Rect}
 use super::layout::{build_skia_text_style, LayoutBox, LayoutNode};
 use super::style::{
     BackgroundBox, BackgroundImage, BackgroundLayer, BackgroundRepeatKeyword, BackgroundSize,
-    BorderSide, ConicGradient, GradientStop, InlineBoxDecoration, InlineGroup, InlineRunItem,
-    LinearGradient, Outline, RadialGradient, StyleImage, StyledElement, TextRun, WidgetAppearance,
+    BorderSide, ConicGradient, FilterFunction, GradientStop, InlineBoxDecoration, InlineGroup,
+    InlineRunItem, LinearGradient, Outline, RadialGradient, StyleImage, StyledElement, TextRun,
+    WidgetAppearance,
 };
 use super::types;
 use super::types::CssLength;
@@ -74,8 +75,8 @@ fn paint_box(
     let w = layout.width;
     let h = layout.height;
 
-    // ── Save state for opacity / clip ──
-    let needs_layer = style.opacity < 1.0;
+    // ── Save state for opacity / filter / clip ──
+    let needs_layer = style.opacity < 1.0 || !style.filter.is_empty();
     let needs_clip = style.overflow_x != types::Overflow::Visible
         || style.overflow_y != types::Overflow::Visible;
 
@@ -107,6 +108,9 @@ fn paint_box(
     if needs_layer {
         let mut layer_paint = Paint::default();
         layer_paint.set_alpha((style.opacity * 255.0) as u8);
+        if let Some(filter) = build_filter_chain(&style.filter) {
+            layer_paint.set_image_filter(filter);
+        }
         let bounds = Rect::from_xywh(0.0, 0.0, w, h);
         let layer_rec = skia_safe::canvas::SaveLayerRec::default()
             .paint(&layer_paint)
@@ -651,6 +655,190 @@ fn paint_replaced(
     }
 
     canvas.restore();
+}
+
+// ─── Filter chain ────────────────────────────────────────────────────
+
+/// Compose a CSS `filter:` chain into a single Skia `ImageFilter` applied
+/// to the element's layer paint. Returns `None` for an empty chain (the
+/// caller skips `set_image_filter` entirely).
+///
+/// Each color filter is wrapped as an `image_filter::color_filter` and
+/// composed in list order (first filter = innermost in the Skia chain,
+/// applied first to the source pixels).
+fn build_filter_chain(filters: &[FilterFunction]) -> Option<skia_safe::ImageFilter> {
+    use skia_safe::{color_filters, image_filters};
+    let mut chain: Option<skia_safe::ImageFilter> = None;
+    for f in filters {
+        let next: Option<skia_safe::ImageFilter> = match *f {
+            FilterFunction::Blur(px) => {
+                let sigma = (px * 0.5).max(0.0);
+                if sigma <= 0.0 {
+                    None
+                } else {
+                    image_filters::blur((sigma, sigma), None, chain.take(), None)
+                }
+            }
+            FilterFunction::Brightness(b) => {
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        b, 0.0, 0.0, 0.0, 0.0, //
+                        0.0, b, 0.0, 0.0, 0.0, //
+                        0.0, 0.0, b, 0.0, 0.0, //
+                        0.0, 0.0, 0.0, 1.0, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+            FilterFunction::Contrast(c) => {
+                let t = (1.0 - c) * 0.5;
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        c, 0.0, 0.0, 0.0, t, //
+                        0.0, c, 0.0, 0.0, t, //
+                        0.0, 0.0, c, 0.0, t, //
+                        0.0, 0.0, 0.0, 1.0, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+            FilterFunction::Grayscale(amount) => {
+                // Lerp between identity and luma-weighted grayscale.
+                // Luma weights (Rec. 709): R=0.2126 G=0.7152 B=0.0722.
+                let a = amount.clamp(0.0, 1.0);
+                let lr = 0.2126;
+                let lg = 0.7152;
+                let lb = 0.0722;
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        1.0 - a + a * lr,
+                        a * lg,
+                        a * lb,
+                        0.0,
+                        0.0, //
+                        a * lr,
+                        1.0 - a + a * lg,
+                        a * lb,
+                        0.0,
+                        0.0, //
+                        a * lr,
+                        a * lg,
+                        1.0 - a + a * lb,
+                        0.0,
+                        0.0, //
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+            FilterFunction::HueRotate(rad) => {
+                // Standard hue-rotation matrix around the gray axis.
+                let c = rad.cos();
+                let s = rad.sin();
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        0.213 + c * 0.787 - s * 0.213,
+                        0.715 - c * 0.715 - s * 0.715,
+                        0.072 - c * 0.072 + s * 0.928,
+                        0.0,
+                        0.0, //
+                        0.213 - c * 0.213 + s * 0.143,
+                        0.715 + c * 0.285 + s * 0.140,
+                        0.072 - c * 0.072 - s * 0.283,
+                        0.0,
+                        0.0, //
+                        0.213 - c * 0.213 - s * 0.787,
+                        0.715 - c * 0.715 + s * 0.715,
+                        0.072 + c * 0.928 + s * 0.072,
+                        0.0,
+                        0.0, //
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+            FilterFunction::Invert(amount) => {
+                // new = v + (1 - 2v) * a = v * (1 - 2a) + a
+                let a = amount.clamp(0.0, 1.0);
+                let k = 1.0 - 2.0 * a;
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        k, 0.0, 0.0, 0.0, a, //
+                        0.0, k, 0.0, 0.0, a, //
+                        0.0, 0.0, k, 0.0, a, //
+                        0.0, 0.0, 0.0, 1.0, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+            FilterFunction::Opacity(o) => {
+                let a = o.clamp(0.0, 1.0);
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        1.0, 0.0, 0.0, 0.0, 0.0, //
+                        0.0, 1.0, 0.0, 0.0, 0.0, //
+                        0.0, 0.0, 1.0, 0.0, 0.0, //
+                        0.0, 0.0, 0.0, a, 0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+            FilterFunction::Saturate(s) => {
+                let mut cm = skia_safe::ColorMatrix::default();
+                cm.set_saturation(s);
+                let cf = color_filters::matrix(&cm, None);
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+            FilterFunction::Sepia(amount) => {
+                // Lerp between identity and the classic sepia tone matrix
+                // (https://drafts.fxtf.org/filter-effects-1/#sepiaEquivalent).
+                let a = amount.clamp(0.0, 1.0);
+                let lerp = |ident: f32, sepia: f32| ident + a * (sepia - ident);
+                let cf = color_filters::matrix_row_major(
+                    &[
+                        lerp(1.0, 0.393),
+                        lerp(0.0, 0.769),
+                        lerp(0.0, 0.189),
+                        0.0,
+                        0.0,
+                        lerp(0.0, 0.349),
+                        lerp(1.0, 0.686),
+                        lerp(0.0, 0.168),
+                        0.0,
+                        0.0,
+                        lerp(0.0, 0.272),
+                        lerp(0.0, 0.534),
+                        lerp(1.0, 0.131),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                    None,
+                );
+                image_filters::color_filter(cf, chain.take(), None)
+            }
+        };
+        chain = next;
+    }
+    chain
 }
 
 // ─── Gradient shaders ────────────────────────────────────────────────

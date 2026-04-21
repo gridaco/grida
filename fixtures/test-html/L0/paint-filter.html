@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: filter</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .swatch {
+        width: 120px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        background: linear-gradient(90deg, #ff0066, #3366cc);
+      }
+      .blur {
+        filter: blur(6px);
+      }
+      .brightness-low {
+        filter: brightness(0.5);
+      }
+      .brightness-high {
+        filter: brightness(1.8);
+      }
+      .contrast {
+        filter: contrast(1.8);
+      }
+      .grayscale {
+        filter: grayscale(1);
+      }
+      .hue-rotate {
+        filter: hue-rotate(180deg);
+      }
+      .invert {
+        filter: invert(1);
+      }
+      .opacity {
+        filter: opacity(0.4);
+      }
+      .saturate-high {
+        filter: saturate(2);
+      }
+      .saturate-low {
+        filter: saturate(0);
+      }
+      .sepia {
+        filter: sepia(1);
+      }
+      .chain {
+        filter: grayscale(1) brightness(1.2) contrast(1.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">none (baseline)</div>
+        <div class="swatch">text</div>
+      </div>
+      <div>
+        <div class="label">blur(6px)</div>
+        <div class="swatch blur">text</div>
+      </div>
+      <div>
+        <div class="label">brightness(0.5)</div>
+        <div class="swatch brightness-low">text</div>
+      </div>
+      <div>
+        <div class="label">brightness(1.8)</div>
+        <div class="swatch brightness-high">text</div>
+      </div>
+      <div>
+        <div class="label">contrast(1.8)</div>
+        <div class="swatch contrast">text</div>
+      </div>
+      <div>
+        <div class="label">grayscale(1)</div>
+        <div class="swatch grayscale">text</div>
+      </div>
+      <div>
+        <div class="label">hue-rotate(180deg)</div>
+        <div class="swatch hue-rotate">text</div>
+      </div>
+      <div>
+        <div class="label">invert(1)</div>
+        <div class="swatch invert">text</div>
+      </div>
+      <div>
+        <div class="label">opacity(0.4)</div>
+        <div class="swatch opacity">text</div>
+      </div>
+      <div>
+        <div class="label">saturate(0)</div>
+        <div class="swatch saturate-low">text</div>
+      </div>
+      <div>
+        <div class="label">saturate(2)</div>
+        <div class="swatch saturate-high">text</div>
+      </div>
+      <div>
+        <div class="label">sepia(1)</div>
+        <div class="swatch sepia">text</div>
+      </div>
+      <div>
+        <div class="label">grayscale + brightness + contrast</div>
+        <div class="swatch chain">text</div>
+      </div>
+    </div>
+  </body>
+</html>

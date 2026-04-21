@@ -79,6 +79,9 @@ pub struct StyledElement {
     pub overflow_x: Overflow,
     pub overflow_y: Overflow,
     pub box_shadow: Vec<BoxShadow>,
+    /// CSS `filter` chain, applied in order to the element and its
+    /// descendants via a paint layer wrapped in a Skia `ImageFilter`.
+    pub filter: Vec<FilterFunction>,
 
     // ── Transform (rare non-inherited) ──
     /// CSS `transform` operations, preserving unresolved percentage/length
@@ -382,6 +385,31 @@ pub struct BoxShadow {
     pub spread: f32,
     pub color: CGColor,
     pub inset: bool,
+}
+
+/// CSS `filter` functions. Scope is limited to the color/blur filters
+/// representable via `skia_safe::image_filters::blur` or a 4×5 color
+/// matrix. `drop-shadow()` and `url()` references are not yet plumbed.
+#[derive(Debug, Clone, Copy)]
+pub enum FilterFunction {
+    /// `blur(<length>)` — Gaussian blur. Value is CSS px; Skia sigma is `px / 2`.
+    Blur(f32),
+    /// `brightness(<number>)` — 1.0 is identity.
+    Brightness(f32),
+    /// `contrast(<number>)` — 1.0 is identity.
+    Contrast(f32),
+    /// `grayscale(<0..1>)` — 0 is identity, 1 is full grayscale.
+    Grayscale(f32),
+    /// `hue-rotate(<angle>)` — radians.
+    HueRotate(f32),
+    /// `invert(<0..1>)` — 0 is identity, 1 is fully inverted.
+    Invert(f32),
+    /// `opacity(<0..1>)` — 1 is identity.
+    Opacity(f32),
+    /// `saturate(<number>)` — 1.0 is identity; 0 is grayscale.
+    Saturate(f32),
+    /// `sepia(<0..1>)` — 0 is identity, 1 is full sepia tone.
+    Sepia(f32),
 }
 
 /// CSS `text-shadow` entry — one shadow in a comma-separated list.
@@ -851,6 +879,7 @@ impl Default for StyledElement {
             overflow_x: Overflow::Visible,
             overflow_y: Overflow::Visible,
             box_shadow: Vec::new(),
+            filter: Vec::new(),
             transform: Vec::new(),
             transform_origin: TransformOrigin::default(),
             position: Position::Static,
