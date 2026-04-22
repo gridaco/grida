@@ -39,7 +39,19 @@ program
   .option("--mask <mode>", "scoring denominator: alpha|none", "alpha")
   .option("--diff-out <path>", "if set, write a diff PNG to this path")
   .option("--json", "emit machine-readable JSON to stdout", false)
-  .action(async (actual: string, expected: string, opts: CompareCmdOpts) => {
+  .action(async function (
+    this: Command,
+    actual: string,
+    expected: string,
+    _opts: CompareCmdOpts
+  ) {
+    // Commander v12 quirk: the root program also declares --threshold / --json /
+    // --aa / --bg / --mask (for the suite runner). When long option names
+    // collide between the root program and a subcommand, CLI values bind to
+    // the root's option store, and the subcommand's action receives its local
+    // defaults. Use optsWithGlobals() so CLI-provided values take precedence
+    // over subcommand defaults.
+    const opts = this.optsWithGlobals() as CompareCmdOpts;
     const threshold = parseNumber(opts.threshold, "--threshold", 0, 1);
     const bg = parseBg(opts.bg);
     const mask = parseMask(opts.mask);
