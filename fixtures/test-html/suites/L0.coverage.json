@@ -59,6 +59,7 @@
     { "path": "../L0/paint-mix-blend-mode.html" },
     { "path": "../L0/paint-filter-chain.html" },
     { "path": "../L0/layout-grid-gap-asym.html" },
-    { "path": "../L0/paint-transform-combined.html" }
+    { "path": "../L0/paint-transform-combined.html" },
+    { "path": "../L0/paint-transform-origin.html" }
   ]
 }
