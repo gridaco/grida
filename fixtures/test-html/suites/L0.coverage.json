@@ -57,6 +57,7 @@
     { "path": "../L0/paint-border-radius-individual.html" },
     { "path": "../L0/paint-filter-simple.html" },
     { "path": "../L0/paint-mix-blend-mode.html" },
-    { "path": "../L0/paint-filter-chain.html" }
+    { "path": "../L0/paint-filter-chain.html" },
+    { "path": "../L0/layout-grid-gap-asym.html" }
   ]
 }
