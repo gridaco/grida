@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Margin Auto Centering</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .wrap {
+        width: 400px;
+        background: #eee;
+        padding: 12px 0;
+        margin-bottom: 16px;
+        box-sizing: border-box;
+      }
+
+      .box {
+        width: 160px;
+        height: 40px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .center {
+        margin: 0 auto;
+      }
+      .push-right {
+        margin-left: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="box center"></div>
+    </div>
+    <div class="wrap">
+      <div class="box push-right"></div>
+    </div>
+  </body>
+</html>
