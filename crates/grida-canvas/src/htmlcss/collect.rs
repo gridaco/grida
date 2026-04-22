@@ -2771,10 +2771,10 @@ fn map_overflow(ov: style::values::specified::box_::Overflow) -> types::Overflow
 fn abs_color_to_cg(color: &AbsoluteColor) -> CGColor {
     let srgb = color.to_color_space(ColorSpace::Srgb);
     CGColor::from_rgba(
-        (srgb.components.0.clamp(0.0, 1.0) * 255.0) as u8,
-        (srgb.components.1.clamp(0.0, 1.0) * 255.0) as u8,
-        (srgb.components.2.clamp(0.0, 1.0) * 255.0) as u8,
-        (srgb.alpha.clamp(0.0, 1.0) * 255.0) as u8,
+        (srgb.components.0.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.components.1.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.components.2.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
     )
 }
 
