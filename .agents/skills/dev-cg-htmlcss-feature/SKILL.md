@@ -1,24 +1,18 @@
 ---
-name: cg-htmlcss-feature
+name: dev-cg-htmlcss-feature
 description: >
-  Drive a single CSS feature end-to-end in the cg htmlcss renderer using a
-  five-phase loop: audit, ground (spec + Blink/stylo prior art), fixture,
-  implement, verify. Use when the user explicitly asks for a full feature
-  cycle on an htmlcss property (e.g. "full loop on border-radius", "bring
-  <property> to Chromium parity"). Not for small fixes or paper-cuts — this
-  is an opt-in conductor over /research, /fixtures, /cg-reftest with strict
-  gate policy (L0.exact at floor 1.0, threshold 0, aa off). Relevant paths:
-  crates/grida-canvas/src/htmlcss/, fixtures/test-html/L0/,
-  fixtures/test-html/suites/L0.exact.json, fixtures/test-html/suites/L0.coverage.json.
+  Manual-invocation only. Five-phase feature loop (audit → ground →
+  fixture → implement → verify) for driving a single CSS feature to
+  Chromium parity in the cg htmlcss renderer.
 ---
 
 # cg-htmlcss — feature loop
 
-**What this is.** A heavy, opt-in loop for driving a single CSS feature
-forward in the cg htmlcss renderer. Load this skill when the user asks
-for a full feature cycle; skip it for small fixes. The loop is a
-conductor over `/research`, `/fixtures`, and `/cg-reftest` — they
-auto-trigger on their own for narrower work.
+**What this is.** A heavy, manually-invoked loop for driving a single
+CSS feature forward in the cg htmlcss renderer. Do not auto-trigger;
+load only when the user explicitly runs it. The loop is a conductor
+over `/research`, `/fixtures`, and `/cg-reftest` — those auto-trigger
+on their own for narrower work.
 
 **Lifecycle.** Expect this skill to grow as new divergence patterns
 surface. It will likely go stale in parts once htmlcss hits
@@ -299,7 +293,7 @@ without the conversation.
 
 ```text
 Drive the htmlcss feature loop for: <property or behavior>.
-Follow the cg-htmlcss-feature skill (.agents/skills/cg-htmlcss-feature/SKILL.md).
+Follow the dev-cg-htmlcss-feature skill (.agents/skills/dev-cg-htmlcss-feature/SKILL.md).
 
 Scope:
 - Feature:    <e.g. `border-radius` percentage values>
