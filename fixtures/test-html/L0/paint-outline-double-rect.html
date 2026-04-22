@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Outline Double (rectangular)</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .box {
+        width: 120px;
+        height: 80px;
+        background: #eee;
+        box-sizing: border-box;
+      }
+
+      .o-9 {
+        outline: 9px double #000;
+      }
+      .o-9-offset {
+        outline: 9px double #000;
+        outline-offset: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">9px double</div>
+        <div class="box o-9"></div>
+      </div>
+      <div>
+        <div class="label">9px double + offset 6</div>
+        <div class="box o-9-offset"></div>
+      </div>
+    </div>
+  </body>
+</html>
