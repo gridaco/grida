@@ -37,6 +37,7 @@
     { "path": "../L0/paint-overflow-hidden.html" },
     { "path": "../L0/paint-visibility.html" },
     { "path": "../L0/paint-display-none.html" },
-    { "path": "../L0/layout-flex-row-basic.html" }
+    { "path": "../L0/layout-flex-row-basic.html" },
+    { "path": "../L0/layout-flex-column-basic.html" }
   ]
 }
