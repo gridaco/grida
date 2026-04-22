@@ -56,68 +56,117 @@ pub(crate) fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, S
 /// Mirrors Chromium's `ListItemOrdinal` which tracks per-item values.
 struct ListCounter {
     value: i32,
+    /// HTML `<ol type="i">`-style override. Takes precedence over CSS
+    /// `list-style-type` and provides Roman numerals even though Stylo's
+    /// servo build does not parse `list-style-type: lower-roman`.
+    type_override: Option<types::ListStyleType>,
 }
 
-/// Generate marker text for a list item.
+/// Output of marker generation: either a geometric symbol (painted as
+/// an ellipse or rect) or a formatted text string (counters with
+/// prefix/suffix).
 ///
-/// Mirrors Chromium's `ListMarker::MarkerText()` which uses `CounterStyle`
-/// to produce the prefix (bullet character or formatted number).
-fn generate_marker_text<T: std::fmt::Debug>(lst: &T, ordinal: i32) -> Option<String> {
-    // Stylo's ListStyleType wraps the property enum.
-    // Use debug format to identify the type since the enum may be generated.
-    // Stylo's servo-mode ListStyleType is a keyword enum.
-    // Use Debug format to match variants since the type is generated.
-    //
-    // Supported by Stylo (servo): disc, none, circle, square, decimal,
-    // lower-alpha, upper-alpha, disclosure-open, disclosure-closed, and
-    // various CJK/Indic scripts.
-    //
-    // NOT supported by Stylo (servo): lower-roman, upper-roman.
-    // These parse as invalid and fall back to `disc`.
+/// Mirrors Chromium's `ListStyleCategory::{kSymbol, kLanguage}` split.
+enum MarkerOutput {
+    Symbol(types::SymbolMarkerKind),
+    Text(String),
+}
+
+/// Parse Stylo's generated `ListStyleType` enum into our typed
+/// [`types::ListStyleType`] via `Debug` string matching. Stylo's
+/// servo-mode enum is generated and not structurally accessible, so we
+/// fall back to string inspection. Unrecognized keywords return `None`
+/// and callers fall back to `disc`. Does not recognize `lower-roman`
+/// or `upper-roman` — servo Stylo parses them as invalid.
+fn parse_stylo_list_style_type<T: std::fmt::Debug>(lst: &T) -> Option<types::ListStyleType> {
+    use types::ListStyleType as L;
     let debug = format!("{:?}", lst);
-
     if debug.contains("None") {
-        return None;
+        return Some(L::None);
     }
-
-    // Symbol markers (Chromium: ListStyleCategory::kSymbol)
     if debug.contains("Disc") {
-        return Some("\u{2022} ".to_string()); // •
+        return Some(L::Disc);
     }
     if debug.contains("Circle") {
-        return Some("\u{25E6} ".to_string()); // ◦
+        return Some(L::Circle);
     }
     if debug.contains("Square") {
-        return Some("\u{25AA} ".to_string()); // ▪
+        return Some(L::Square);
     }
-
-    // Ordinal markers (Chromium: ListStyleCategory::kLanguage)
+    if debug.contains("DecimalLeadingZero") {
+        return Some(L::DecimalLeadingZero);
+    }
     if debug.contains("Decimal") {
-        return Some(format!("{}. ", ordinal));
+        return Some(L::Decimal);
     }
     if debug.contains("LowerAlpha") {
-        if (1..=26).contains(&ordinal) {
-            let ch = (b'a' + (ordinal - 1) as u8) as char;
-            return Some(format!("{}. ", ch));
-        }
-        return Some(format!("{}. ", ordinal));
+        return Some(L::LowerAlpha);
     }
     if debug.contains("UpperAlpha") {
-        if (1..=26).contains(&ordinal) {
-            let ch = (b'A' + (ordinal - 1) as u8) as char;
-            return Some(format!("{}. ", ch));
-        }
-        return Some(format!("{}. ", ordinal));
+        return Some(L::UpperAlpha);
     }
     if debug.contains("LowerRoman") {
-        return Some(format!("{}. ", to_roman(ordinal).to_lowercase()));
+        return Some(L::LowerRoman);
     }
     if debug.contains("UpperRoman") {
-        return Some(format!("{}. ", to_roman(ordinal)));
+        return Some(L::UpperRoman);
     }
+    None
+}
 
-    // Default fallback: disc bullet
-    Some("\u{2022} ".to_string())
+/// Marker output for a Stylo-reported list-style-type. Unknown values
+/// fall back to `disc` (matching CSS spec for unrecognized keywords).
+fn generate_marker_output<T: std::fmt::Debug>(lst: &T, ordinal: i32) -> Option<MarkerOutput> {
+    marker_output_for_type(
+        parse_stylo_list_style_type(lst).unwrap_or(types::ListStyleType::Disc),
+        ordinal,
+    )
+}
+
+/// Marker output for an explicit `ListStyleType`. Used both by the
+/// Stylo path (via [`generate_marker_output`]) and by the HTML
+/// attribute path (`<ol type>` / `<ul type>`).
+fn marker_output_for_type(ty: types::ListStyleType, ordinal: i32) -> Option<MarkerOutput> {
+    use types::ListStyleType as L;
+    use types::SymbolMarkerKind as S;
+    // Base-26 alphabetic counter per CSS Counter Styles 3 — after `z`
+    // comes `aa`, `ab`, … so `type="a" start="27"` renders `aa.`.
+    // Non-positive ordinals fall back to decimal (the alphabetic system
+    // has no representation for 0 or negatives).
+    let alpha = |base: u8| {
+        if ordinal <= 0 {
+            return format!("{}. ", ordinal);
+        }
+        let mut n = ordinal;
+        let mut s = String::new();
+        while n > 0 {
+            n -= 1;
+            s.insert(0, (base + (n % 26) as u8) as char);
+            n /= 26;
+        }
+        format!("{s}. ")
+    };
+    // `decimal-leading-zero` pads to two digits, matching CSS and
+    // browsers (01., 02., … 09., 10., 11., …).
+    let decimal_leading_zero = |n: i32| {
+        if n < 0 {
+            format!("-{:02}. ", (n as i64).unsigned_abs())
+        } else {
+            format!("{:02}. ", n)
+        }
+    };
+    Some(match ty {
+        L::None => return None,
+        L::Disc => MarkerOutput::Symbol(S::Disc),
+        L::Circle => MarkerOutput::Symbol(S::Circle),
+        L::Square => MarkerOutput::Symbol(S::Square),
+        L::Decimal => MarkerOutput::Text(format!("{}. ", ordinal)),
+        L::DecimalLeadingZero => MarkerOutput::Text(decimal_leading_zero(ordinal)),
+        L::LowerAlpha => MarkerOutput::Text(alpha(b'a')),
+        L::UpperAlpha => MarkerOutput::Text(alpha(b'A')),
+        L::LowerRoman => MarkerOutput::Text(format!("{}. ", to_roman(ordinal).to_lowercase())),
+        L::UpperRoman => MarkerOutput::Text(format!("{}. ", to_roman(ordinal))),
+    })
 }
 
 /// Convert an integer to Roman numeral string.
@@ -215,31 +264,86 @@ fn collect_element_with_counter(
 
     // Initialize counter for <ol>/<ul> elements
     let mut child_counter: Option<ListCounter> = if tag == "ol" {
-        // Check for start attribute via Stylo — defaults to 1
-        // Stylo doesn't expose HTML attributes directly, but the UA stylesheet
-        // + author CSS handle `counter-reset`. We default to 1.
-        Some(ListCounter { value: 1 })
+        // HTML `<ol type="i">` overrides CSS list-style-type per the HTML
+        // spec. This also routes around Stylo's servo-mode inability to
+        // parse `list-style-type: lower-roman`/`upper-roman`.
+        let dom = adapter::dom();
+        let node = dom.node(element.node_id());
+        let type_override = get_element_attr(node, "type").and_then(|t| match t.as_str() {
+            "1" => Some(types::ListStyleType::Decimal),
+            "a" => Some(types::ListStyleType::LowerAlpha),
+            "A" => Some(types::ListStyleType::UpperAlpha),
+            "i" => Some(types::ListStyleType::LowerRoman),
+            "I" => Some(types::ListStyleType::UpperRoman),
+            _ => None,
+        });
+        // `<ol start="N">` sets the starting ordinal. Negative and zero
+        // values are permitted by the HTML spec.
+        let start = get_element_attr(node, "start")
+            .and_then(|s| s.trim().parse::<i32>().ok())
+            .unwrap_or(1);
+        Some(ListCounter {
+            value: start,
+            type_override,
+        })
     } else if tag == "ul" || tag == "menu" {
-        Some(ListCounter { value: 0 }) // unordered, counter not used for numbering
+        // Unordered lists still seed the list-item counter at 1 —
+        // author CSS may set `list-style-type` to a numeric style
+        // (decimal, lower-alpha, …) on a `<ul>`. Legacy HTML
+        // `<ul type="disc|circle|square">` is obsolete but widely
+        // honored; read it so fixtures relying on the attribute render
+        // the expected bullet shape without needing CSS.
+        let dom = adapter::dom();
+        let node = dom.node(element.node_id());
+        let type_override = get_element_attr(node, "type").and_then(|t| {
+            // HTML4 specifies the attribute as case-insensitive.
+            match t.to_ascii_lowercase().as_str() {
+                "disc" => Some(types::ListStyleType::Disc),
+                "circle" => Some(types::ListStyleType::Circle),
+                "square" => Some(types::ListStyleType::Square),
+                _ => None,
+            }
+        });
+        Some(ListCounter {
+            value: 1,
+            type_override,
+        })
     } else {
         None
     };
 
     // Use parent's counter if this is a list item
     let marker_prefix = if is_list_item {
-        let list_style = style.get_list();
-        let lst = list_style.clone_list_style_type();
+        // `<li value="N">` resets this item's ordinal and seeds the counter
+        // for subsequent siblings (HTML §4.4.8). Applied before the counter
+        // is read below.
+        if let Some(ref mut counter) = list_counter {
+            let dom = adapter::dom();
+            let node = dom.node(element.node_id());
+            if let Some(v) =
+                get_element_attr(node, "value").and_then(|s| s.trim().parse::<i32>().ok())
+            {
+                counter.value = v;
+            }
+        }
 
-        // Get ordinal from parent counter
-        let ordinal = if let Some(ref mut counter) = list_counter {
+        // Get ordinal from parent counter; also inherit its HTML
+        // `<ol type>` override if set.
+        let (ordinal, type_override) = if let Some(ref mut counter) = list_counter {
             let val = counter.value;
             counter.value += 1;
-            val
+            (val, counter.type_override)
         } else {
-            1
+            (1, None)
         };
 
-        generate_marker_text(&lst, ordinal)
+        if let Some(ov) = type_override {
+            marker_output_for_type(ov, ordinal)
+        } else {
+            let list_style = style.get_list();
+            let lst = list_style.clone_list_style_type();
+            generate_marker_output(&lst, ordinal)
+        }
     } else {
         None
     };
@@ -281,14 +385,26 @@ fn collect_element_with_counter(
     let parent_color = el.color;
     let parent_white_space = el.font.white_space;
 
-    // Inject list marker as first inline content (Chromium: ::marker pseudo-element)
+    // Inject list marker as first inline content (Chromium: ::marker pseudo-element).
     if let Some(marker) = marker_prefix {
-        pending_inline.push(InlineRunItem::Text(TextRun {
-            text: marker,
-            font: parent_font.clone(),
-            color: parent_color,
-            decoration: None,
-        }));
+        match marker {
+            MarkerOutput::Symbol(kind) => {
+                // Bullet gap is baked into `SymbolMarker::placeholder_size`.
+                pending_inline.push(InlineRunItem::SymbolMarker(SymbolMarker {
+                    kind,
+                    color: parent_color,
+                    font_size: parent_font.size,
+                }));
+            }
+            MarkerOutput::Text(text) => {
+                pending_inline.push(InlineRunItem::Text(TextRun {
+                    text,
+                    font: parent_font.clone(),
+                    color: parent_color,
+                    decoration: None,
+                }));
+            }
+        }
     }
 
     // Void widget elements (<input>) have no DOM children to collect.
@@ -324,6 +440,7 @@ fn collect_element_with_counter(
                         flush_inline_group(
                             &mut pending_inline,
                             parent_text_align,
+                            el.font.direction,
                             el.font.text_indent,
                             &mut el.children,
                         );
@@ -339,6 +456,7 @@ fn collect_element_with_counter(
     flush_inline_group(
         &mut pending_inline,
         parent_text_align,
+        el.font.direction,
         el.font.text_indent,
         &mut el.children,
     );
@@ -678,6 +796,7 @@ fn inject_synthetic_text(el: &mut StyledElement, text: &str, color: CGColor) {
             decoration: None,
         })],
         text_align: el.font.text_align,
+        direction: el.font.direction,
         text_indent: el.font.text_indent,
     }));
 }
@@ -811,6 +930,7 @@ fn build_inline_decoration(el: &StyledElement) -> Option<InlineBoxDecoration> {
 fn flush_inline_group(
     pending: &mut Vec<InlineRunItem>,
     text_align: TextAlign,
+    direction: types::Direction,
     text_indent: CssLength,
     children: &mut Vec<StyledNode>,
 ) {
@@ -823,7 +943,9 @@ fn flush_inline_group(
     // (e.g. "\n  " between <div> and <p>) that should not create a block.
     let all_whitespace = items.iter().all(|item| match item {
         InlineRunItem::Text(r) => r.text.trim().is_empty(),
-        InlineRunItem::OpenBox { .. } | InlineRunItem::CloseBox { .. } => false,
+        InlineRunItem::OpenBox { .. }
+        | InlineRunItem::CloseBox { .. }
+        | InlineRunItem::SymbolMarker(_) => false,
     });
     if all_whitespace {
         return;
@@ -832,6 +954,7 @@ fn flush_inline_group(
     children.push(StyledNode::InlineGroup(InlineGroup {
         items,
         text_align,
+        direction,
         text_indent,
     }));
 }
@@ -2322,15 +2445,29 @@ fn extract_font(style: &ComputedValues, current_color: CGColor) -> FontProps {
         ..Default::default()
     };
 
-    // Text align
+    // Direction (ltr / rtl) — inherited. Affects Skia paragraph base
+    // direction for bidi reordering.
+    {
+        use style::properties::longhands::direction::computed_value::T as StyloDir;
+        props.direction = match style.get_inherited_box().clone_direction() {
+            StyloDir::Ltr => types::Direction::Ltr,
+            StyloDir::Rtl => types::Direction::Rtl,
+        };
+    }
+
+    // Text align. Logical `start` / `end` keywords resolve against the
+    // already-extracted `direction`: in LTR, `start` = left; in RTL,
+    // `start` = right.
     use style::values::specified::text::TextAlignKeyword;
+    let (logical_start, logical_end) = match props.direction {
+        types::Direction::Ltr => (TextAlign::Left, TextAlign::Right),
+        types::Direction::Rtl => (TextAlign::Right, TextAlign::Left),
+    };
     props.text_align = match inherited_text.text_align {
-        TextAlignKeyword::Start | TextAlignKeyword::Left | TextAlignKeyword::MozLeft => {
-            TextAlign::Left
-        }
-        TextAlignKeyword::End | TextAlignKeyword::Right | TextAlignKeyword::MozRight => {
-            TextAlign::Right
-        }
+        TextAlignKeyword::Start => logical_start,
+        TextAlignKeyword::End => logical_end,
+        TextAlignKeyword::Left | TextAlignKeyword::MozLeft => TextAlign::Left,
+        TextAlignKeyword::Right | TextAlignKeyword::MozRight => TextAlign::Right,
         TextAlignKeyword::Center | TextAlignKeyword::MozCenter => TextAlign::Center,
         TextAlignKeyword::Justify => TextAlign::Justify,
     };

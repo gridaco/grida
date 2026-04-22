@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>List: &lt;ul type&gt; HTML attribute</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+      ul {
+        margin: 0;
+        padding-left: 28px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">no attr (default: disc)</div>
+        <ul>
+          <li>alpha</li>
+          <li>beta</li>
+          <li>gamma</li>
+        </ul>
+      </div>
+      <div class="cell">
+        <div class="label">type="disc"</div>
+        <ul type="disc">
+          <li>alpha</li>
+          <li>beta</li>
+          <li>gamma</li>
+        </ul>
+      </div>
+      <div class="cell">
+        <div class="label">type="circle"</div>
+        <ul type="circle">
+          <li>alpha</li>
+          <li>beta</li>
+          <li>gamma</li>
+        </ul>
+      </div>
+      <div class="cell">
+        <div class="label">type="square"</div>
+        <ul type="square">
+          <li>alpha</li>
+          <li>beta</li>
+          <li>gamma</li>
+        </ul>
+      </div>
+      <div class="cell">
+        <div class="label">type="CIRCLE" (case-insensitive)</div>
+        <ul type="CIRCLE">
+          <li>alpha</li>
+          <li>beta</li>
+        </ul>
+      </div>
+      <div class="cell">
+        <div class="label">nested: square outer, circle inner</div>
+        <ul type="square">
+          <li>
+            outer one
+            <ul type="circle">
+              <li>inner a</li>
+              <li>inner b</li>
+            </ul>
+          </li>
+          <li>outer two</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

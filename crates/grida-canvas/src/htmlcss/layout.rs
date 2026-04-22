@@ -147,6 +147,7 @@ fn build_taffy_node(
                         TextMeasure {
                             items: vec![InlineRunItem::Text(run.clone())],
                             text_indent: run.font.text_indent,
+                            direction: run.font.direction,
                         },
                     )
                     .unwrap();
@@ -163,6 +164,7 @@ fn build_taffy_node(
                         TextMeasure {
                             items: group.items.clone(),
                             text_indent: group.text_indent,
+                            direction: group.direction,
                         },
                     )
                     .unwrap();
@@ -184,6 +186,7 @@ fn build_taffy_node(
 struct TextMeasure {
     items: Vec<InlineRunItem>,
     text_indent: types::CssLength,
+    direction: types::Direction,
 }
 
 /// Taffy measure callback — builds a Skia Paragraph at the given available
@@ -208,7 +211,8 @@ fn text_measure_func(
 
     // Build Paragraph with placeholders for inline box spacing
     // (Chromium: LineBreaker processes kOpenTag/kText/kCloseTag)
-    let ps = ParagraphStyle::new();
+    let mut ps = ParagraphStyle::new();
+    ps.set_text_direction(direction_to_skia(ctx.direction));
     let mut builder = ParagraphBuilder::new(&ps, fonts);
 
     // text-indent: prepend a width-reserving placeholder. Because it sits
@@ -248,6 +252,16 @@ fn text_measure_func(
                         0.0,
                     ));
                 }
+            }
+            InlineRunItem::SymbolMarker(m) => {
+                let (w, h) = m.placeholder_size();
+                builder.add_placeholder(&skia_safe::textlayout::PlaceholderStyle::new(
+                    w,
+                    h,
+                    skia_safe::textlayout::PlaceholderAlignment::AboveBaseline,
+                    skia_safe::textlayout::TextBaseline::Alphabetic,
+                    0.0,
+                ));
             }
         }
     }
@@ -865,4 +879,12 @@ pub(crate) fn build_skia_text_style(font: &FontProps, color: &CGColor) -> TextSt
     }
 
     ts
+}
+
+/// Map CSS `direction` to Skia's `ParagraphStyle` text direction.
+pub(crate) fn direction_to_skia(dir: types::Direction) -> skia_safe::textlayout::TextDirection {
+    match dir {
+        types::Direction::Ltr => skia_safe::textlayout::TextDirection::LTR,
+        types::Direction::Rtl => skia_safe::textlayout::TextDirection::RTL,
+    }
 }

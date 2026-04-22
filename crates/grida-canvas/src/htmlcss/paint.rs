@@ -524,12 +524,76 @@ fn resolve_bg_position_axis(v: CssLength, area: f32, tile: f32) -> f32 {
     }
 }
 
+/// Map a `background-repeat` keyword to a Skia `TileMode` for the
+/// shader path. `Round` is collapsed to `Repeat` — the round-specific
+/// tile-size adjustment is applied by the caller before constructing
+/// the shader. `Space` is handled via an explicit draw loop (see
+/// [`paint_background_image_layer`]) and should never reach here.
 fn repeat_keyword_to_tile_mode(k: BackgroundRepeatKeyword) -> skia_safe::TileMode {
     match k {
         BackgroundRepeatKeyword::NoRepeat => skia_safe::TileMode::Decal,
-        // Space / Round fall back to plain repeat (P1 follow-up).
-        _ => skia_safe::TileMode::Repeat,
+        BackgroundRepeatKeyword::Repeat | BackgroundRepeatKeyword::Round => {
+            skia_safe::TileMode::Repeat
+        }
+        // Space reaches here only if the caller forgot to branch; use
+        // `Repeat` as a safe fallback rather than panicking.
+        BackgroundRepeatKeyword::Space => skia_safe::TileMode::Repeat,
     }
+}
+
+/// Tile start offsets along one axis relative to the positioning area.
+///
+/// - `NoRepeat` → `[pos]` (single copy at the resolved background-position).
+/// - `Repeat` / `Round` → offsets seeded at `pos`, spanning `[0, area]` after
+///   clipping (caller supplies the already-adjusted tile size for `Round`).
+/// - `Space` → edge-pinned offsets with whitespace distributed evenly
+///   between copies; `pos` is ignored when two or more copies fit.
+///   When fewer than two fit the spec permits arbitrary positioning —
+///   we apply `pos` so the fallback matches `no-repeat` behavior.
+fn axis_tile_positions(
+    keyword: BackgroundRepeatKeyword,
+    area: f32,
+    tile: f32,
+    pos: f32,
+) -> Vec<f32> {
+    if tile <= 0.0 {
+        return Vec::new();
+    }
+    match keyword {
+        BackgroundRepeatKeyword::NoRepeat => vec![pos],
+        BackgroundRepeatKeyword::Space => space_axis_positions(area, tile, pos),
+        BackgroundRepeatKeyword::Repeat | BackgroundRepeatKeyword::Round => {
+            repeat_axis_positions(area, tile, pos)
+        }
+    }
+}
+
+/// CSS `background-repeat: space` on one axis. If at least two copies fit,
+/// the first and last are pinned to the edges of the positioning area and
+/// the remaining whitespace is distributed evenly between copies. If fewer
+/// than two fit, the spec permits arbitrary position — we honor
+/// `background-position` (same as `no-repeat`).
+fn space_axis_positions(area: f32, tile: f32, pos: f32) -> Vec<f32> {
+    let n = (area / tile).floor() as i32;
+    if n < 2 {
+        return vec![pos];
+    }
+    let gap = (area - n as f32 * tile) / (n - 1) as f32;
+    (0..n).map(|k| k as f32 * (tile + gap)).collect()
+}
+
+/// Tile start offsets for `repeat` on one axis, seeded at `pos`. The first
+/// offset sits in `(-tile, 0]` so the repeating strip fills `[0, area]`
+/// after clipping.
+fn repeat_axis_positions(area: f32, tile: f32, pos: f32) -> Vec<f32> {
+    let first = pos - (pos / tile).ceil() * tile;
+    let mut out = Vec::new();
+    let mut x = first;
+    while x < area {
+        out.push(x);
+        x += tile;
+    }
+    out
 }
 
 fn paint_background_image_layer(
@@ -557,7 +621,7 @@ fn paint_background_image_layer(
         _ => None,
     };
 
-    let (tile_w, tile_h) = resolve_bg_size(
+    let (mut tile_w, mut tile_h) = resolve_bg_size(
         img.size,
         origin_rect.width(),
         origin_rect.height(),
@@ -565,6 +629,17 @@ fn paint_background_image_layer(
     );
     if tile_w <= 0.0 || tile_h <= 0.0 {
         return;
+    }
+
+    // `background-repeat: round` scales the tile so an integer number of
+    // copies fit exactly along the axis (CSS Backgrounds §3.4).
+    if img.repeat.x == BackgroundRepeatKeyword::Round {
+        let n = (origin_rect.width() / tile_w).round().max(1.0);
+        tile_w = origin_rect.width() / n;
+    }
+    if img.repeat.y == BackgroundRepeatKeyword::Round {
+        let n = (origin_rect.height() / tile_h).round().max(1.0);
+        tile_h = origin_rect.height() / n;
     }
 
     // Resolve the source image. For gradients, rasterize at tile size so the
@@ -576,33 +651,6 @@ fn paint_background_image_layer(
     let Some(src_image) = src_image else {
         return;
     };
-
-    let px =
-        resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w) + origin_rect.left;
-    let py =
-        resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h) + origin_rect.top;
-
-    let sx = tile_w / src_image.width() as f32;
-    let sy = tile_h / src_image.height() as f32;
-    let mut local = skia_safe::Matrix::scale((sx, sy));
-    local.post_translate((px, py));
-
-    let tmx = repeat_keyword_to_tile_mode(img.repeat.x);
-    let tmy = repeat_keyword_to_tile_mode(img.repeat.y);
-
-    let shader = src_image.to_shader(
-        Some((tmx, tmy)),
-        sampling_for(style.font.image_rendering),
-        Some(&local),
-    );
-    let Some(shader) = shader else {
-        return;
-    };
-
-    let mut paint = Paint::default();
-    paint.set_style(PaintStyle::Fill);
-    paint.set_anti_alias(true);
-    paint.set_shader(shader);
 
     canvas.save();
     // Clip to the referenced box with radii shrunk to match the box's
@@ -620,7 +668,54 @@ fn paint_background_image_layer(
     } else {
         canvas.clip_rect(clip_rect, ClipOp::Intersect, true);
     }
-    canvas.draw_rect(clip_rect, &paint);
+
+    let needs_space_loop = img.repeat.x == BackgroundRepeatKeyword::Space
+        || img.repeat.y == BackgroundRepeatKeyword::Space;
+
+    if needs_space_loop {
+        // `space` distributes whitespace between copies, which a single
+        // tiled shader can't express. Draw each copy individually.
+        let pos_x = resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w);
+        let pos_y = resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h);
+        let xs = axis_tile_positions(img.repeat.x, origin_rect.width(), tile_w, pos_x);
+        let ys = axis_tile_positions(img.repeat.y, origin_rect.height(), tile_h, pos_y);
+        let sampling = sampling_for(style.font.image_rendering);
+        let paint = Paint::default();
+        for y in &ys {
+            for x in &xs {
+                let dst =
+                    Rect::from_xywh(origin_rect.left + *x, origin_rect.top + *y, tile_w, tile_h);
+                canvas
+                    .draw_image_rect_with_sampling_options(&src_image, None, dst, sampling, &paint);
+            }
+        }
+    } else {
+        let px = resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w)
+            + origin_rect.left;
+        let py = resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h)
+            + origin_rect.top;
+
+        let sx = tile_w / src_image.width() as f32;
+        let sy = tile_h / src_image.height() as f32;
+        let mut local = skia_safe::Matrix::scale((sx, sy));
+        local.post_translate((px, py));
+
+        let tmx = repeat_keyword_to_tile_mode(img.repeat.x);
+        let tmy = repeat_keyword_to_tile_mode(img.repeat.y);
+
+        if let Some(shader) = src_image.to_shader(
+            Some((tmx, tmy)),
+            sampling_for(style.font.image_rendering),
+            Some(&local),
+        ) {
+            let mut paint = Paint::default();
+            paint.set_style(PaintStyle::Fill);
+            paint.set_anti_alias(true);
+            paint.set_shader(shader);
+            canvas.draw_rect(clip_rect, &paint);
+        }
+    }
+
     canvas.restore();
 }
 
@@ -2122,6 +2217,46 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 
 // ─── Text painting (Chromium: TextPainter) ───────────────────────────
 
+/// Paint a geometric list-item marker (disc/circle/square).
+///
+/// Mirrors Chromium's `TextFragmentPainter::PaintSymbol`: filled ellipse
+/// for disc, 1px-stroked ellipse for circle, filled rect for square.
+/// `placeholder` is in canvas-absolute coordinates.
+fn paint_symbol_marker(
+    canvas: &Canvas,
+    marker: &super::style::SymbolMarker,
+    placeholder: Rect,
+    direction: super::types::Direction,
+) {
+    let bullet = marker.bullet_rect(placeholder, direction);
+
+    let mut paint = Paint::default();
+    paint.set_anti_alias(true);
+    paint.set_color(Color::from_argb(
+        marker.color.a,
+        marker.color.r,
+        marker.color.g,
+        marker.color.b,
+    ));
+
+    use super::types::SymbolMarkerKind::*;
+    match marker.kind {
+        Disc => {
+            paint.set_style(PaintStyle::Fill);
+            canvas.draw_oval(bullet, &paint);
+        }
+        Circle => {
+            paint.set_style(PaintStyle::Stroke);
+            paint.set_stroke_width(1.0);
+            canvas.draw_oval(bullet, &paint);
+        }
+        Square => {
+            paint.set_style(PaintStyle::Fill);
+            canvas.draw_rect(bullet, &paint);
+        }
+    }
+}
+
 fn paint_text(canvas: &Canvas, run: &TextRun, x: f32, y: f32, width: f32, fonts: &FontCollection) {
     let mut ps = ParagraphStyle::new();
     let align = match run.font.text_align {
@@ -2131,6 +2266,7 @@ fn paint_text(canvas: &Canvas, run: &TextRun, x: f32, y: f32, width: f32, fonts:
         TextAlign::Justify => textlayout::TextAlign::Justify,
     };
     ps.set_text_align(align);
+    ps.set_text_direction(super::layout::direction_to_skia(run.font.direction));
 
     let mut builder = ParagraphBuilder::new(&ps, fonts);
 
@@ -2182,6 +2318,7 @@ fn paint_inline_group(
         TextAlign::Justify => textlayout::TextAlign::Justify,
     };
     ps.set_text_align(align);
+    ps.set_text_direction(super::layout::direction_to_skia(group.direction));
 
     let mut builder = ParagraphBuilder::new(&ps, fonts);
 
@@ -2205,6 +2342,12 @@ fn paint_inline_group(
     let mut deco_ranges: Vec<DecoRange> = Vec::new();
     let mut offset: usize = 0;
 
+    // `(placeholder_index, marker)` pairs — Skia returns
+    // `get_rects_for_placeholders()` in insertion order, so the index
+    // is just the placeholder count at push time.
+    let mut marker_placeholders: Vec<(usize, super::style::SymbolMarker)> = Vec::new();
+    let mut ph_idx: usize = 0;
+
     if indent_px > 0.0 {
         builder.add_placeholder(&PlaceholderStyle::new(
             indent_px,
@@ -2214,6 +2357,7 @@ fn paint_inline_group(
             0.0,
         ));
         offset += PLACEHOLDER_OFFSET;
+        ph_idx += 1;
     }
 
     for item in &group.items {
@@ -2238,6 +2382,7 @@ fn paint_inline_group(
                         0.0,
                     ));
                     offset += PLACEHOLDER_OFFSET;
+                    ph_idx += 1;
                 }
                 // Record start AFTER the open placeholder
                 deco_stack.push((offset, decoration.clone()));
@@ -2260,13 +2405,37 @@ fn paint_inline_group(
                         0.0,
                     ));
                     offset += PLACEHOLDER_OFFSET;
+                    ph_idx += 1;
                 }
+            }
+            InlineRunItem::SymbolMarker(m) => {
+                let (w, h) = m.placeholder_size();
+                builder.add_placeholder(&PlaceholderStyle::new(
+                    w,
+                    h,
+                    PlaceholderAlignment::AboveBaseline,
+                    TextBaseline::Alphabetic,
+                    0.0,
+                ));
+                marker_placeholders.push((ph_idx, *m));
+                offset += PLACEHOLDER_OFFSET;
+                ph_idx += 1;
             }
         }
     }
 
     let mut para = builder.build();
     para.layout(width);
+
+    // Pass 0: Paint geometric list-item markers.
+    if !marker_placeholders.is_empty() {
+        let ph_rects = para.get_rects_for_placeholders();
+        for (idx, marker) in &marker_placeholders {
+            if let Some(tb) = ph_rects.get(*idx) {
+                paint_symbol_marker(canvas, marker, tb.rect.with_offset((x, y)), group.direction);
+            }
+        }
+    }
 
     // Pass 1: Paint inline box decorations (Chromium: InlineBoxPainter)
     for deco_range in &deco_ranges {

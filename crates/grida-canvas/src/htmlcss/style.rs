@@ -208,6 +208,9 @@ pub struct ReplacedContent {
 pub struct InlineGroup {
     pub items: Vec<InlineRunItem>,
     pub text_align: TextAlign,
+    /// Inherited `direction` — sets the paragraph's base bidi
+    /// direction (LTR / RTL). Passed to Skia's `ParagraphStyle`.
+    pub direction: super::types::Direction,
     /// Inherited `text-indent` of the containing block. Applied as a
     /// first-line-only inline-start offset by prepending a Skia
     /// placeholder to the Paragraph.
@@ -220,6 +223,8 @@ pub struct InlineGroup {
 /// - `Text` → `kText` — a contiguous span of styled text
 /// - `OpenBox` → `kOpenTag` — start of an inline box (adds inline-start spacing)
 /// - `CloseBox` → `kCloseTag` — end of an inline box (adds inline-end spacing)
+/// - `SymbolMarker` → `ListStyleCategory::kSymbol` — geometric list-item
+///   marker (disc/circle/square), painted as ellipse/rect rather than text.
 #[derive(Debug, Clone)]
 pub enum InlineRunItem {
     /// Text content with uniform styling.
@@ -237,6 +242,55 @@ pub enum InlineRunItem {
         /// Inline-end spacing = padding + border + margin (inline-end side).
         inline_size: f32,
     },
+    /// Geometric list-item marker (disc/circle/square). Reserved as a
+    /// Skia placeholder at measure time; painted as
+    /// `draw_oval`/`draw_rect` at the placeholder's rect.
+    SymbolMarker(SymbolMarker),
+}
+
+/// A geometric list-item marker for `list-style-type: disc | circle | square`.
+///
+/// `font_size` is captured so the marker can compute its own dimensions
+/// (bullet ≈ `ascent / 3` ≈ `font_size / 4`) without re-threading the
+/// inherited font through layout and paint.
+#[derive(Debug, Clone, Copy)]
+pub struct SymbolMarker {
+    pub kind: super::types::SymbolMarkerKind,
+    pub color: CGColor,
+    pub font_size: f32,
+}
+
+impl SymbolMarker {
+    /// `(width, height)` of the Skia placeholder reserved for this
+    /// marker. Width = bullet + inline-end gap; height = ascent
+    /// approximation so the placeholder sits in the correct vertical
+    /// band above the baseline.
+    pub fn placeholder_size(&self) -> (f32, f32) {
+        let bullet = self.font_size * 0.25;
+        let gap = self.font_size * 0.5;
+        let ascent_approx = self.font_size * 0.75;
+        (bullet + gap, ascent_approx)
+    }
+
+    /// Rect (in the same coordinate space as `placeholder`) where the
+    /// bullet geometry should be painted — `bullet_width` square,
+    /// inset 1px from the inline-start edge, vertically centered.
+    /// `direction` determines which edge is inline-start so the gap
+    /// sits between the bullet and the text in both LTR and RTL.
+    pub fn bullet_rect(
+        &self,
+        placeholder: skia_safe::Rect,
+        direction: super::types::Direction,
+    ) -> skia_safe::Rect {
+        let bullet = self.font_size * 0.25;
+        let cy = (placeholder.top + placeholder.bottom) * 0.5;
+        let left = match direction {
+            super::types::Direction::Ltr => placeholder.left + 1.0,
+            super::types::Direction::Rtl => placeholder.right - bullet - 1.0,
+        };
+        let top = cy - bullet * 0.5;
+        skia_safe::Rect::from_xywh(left, top, bullet, bullet)
+    }
 }
 
 // ─── Box Model Sub-types (StyleSurroundData) ─────────────────────────
@@ -828,6 +882,7 @@ pub struct FontProps {
     pub word_spacing: f32,
     pub text_align: TextAlign,
     pub text_transform: TextTransform,
+    pub direction: super::types::Direction,
     /// Bitfield: multiple decorations can be active simultaneously.
     /// CSS `text-decoration-line: underline line-through` sets both.
     pub decoration_underline: bool,
@@ -859,6 +914,7 @@ impl Default for FontProps {
             word_spacing: 0.0,
             text_align: TextAlign::Left,
             text_transform: TextTransform::None,
+            direction: super::types::Direction::Ltr,
             decoration_underline: false,
             decoration_overline: false,
             decoration_line_through: false,

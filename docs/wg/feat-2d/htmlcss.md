@@ -190,7 +190,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | Multi-layer backgrounds               | ✅     | Stacked gradient + solid + URL layers                                                                                                                                                                   |
 | `background-position`                 | ✅     | Per-layer, px/%/keyword per axis                                                                                                                                                                        |
 | `background-size`                     | ✅     | `cover`/`contain`/`auto`/explicit (with aspect preservation)                                                                                                                                            |
-| `background-repeat`                   | ⚠️     | `repeat`/`no-repeat`/`repeat-x`/`repeat-y`; `space` and `round` currently fall back to `repeat`                                                                                                         |
+| `background-repeat`                   | ✅     | `repeat`/`no-repeat`/`repeat-x`/`repeat-y`/`space`/`round`; `space` distributes whitespace between edge-pinned copies, `round` scales tile to fit integer copies                                        |
 | `background-origin`                   | ✅     | `border-box`/`padding-box`/`content-box`                                                                                                                                                                |
 | `background-clip`                     | ✅     | `border-box`/`padding-box`/`content-box`; border-box clip honors radius                                                                                                                                 |
 | `background-attachment`               | ❌     |                                                                                                                                                                                                         |
@@ -336,13 +336,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Writing Modes & BiDi
 
-| CSS Property           | Status | Notes |
-| ---------------------- | ------ | ----- |
-| `direction`            | ❌     |       |
-| `writing-mode`         | ❌     |       |
-| `unicode-bidi`         | ❌     |       |
-| `text-orientation`     | ❌     |       |
-| `text-combine-upright` | ❌     |       |
+| CSS Property           | Status | Notes                                                                                  |
+| ---------------------- | ------ | -------------------------------------------------------------------------------------- |
+| `direction`            | ✅     | ltr/rtl — Skia paragraph base direction; also resolves logical `text-align: start/end` |
+| `writing-mode`         | ❌     |                                                                                        |
+| `unicode-bidi`         | ❌     |                                                                                        |
+| `text-orientation`     | ❌     |                                                                                        |
+| `text-combine-upright` | ❌     |                                                                                        |
 
 ### Inline Layout & Alignment
 
@@ -364,17 +364,17 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Lists
 
-| Feature                        | Status | Notes                                         |
-| ------------------------------ | ------ | --------------------------------------------- |
-| `<ul>` with disc/circle/square | ✅     | Marker text prepended to list item content    |
-| `<ol>` with decimal numbering  | ✅     | Auto-incrementing counter                     |
-| `lower-alpha`, `upper-alpha`   | ✅     |                                               |
-| `lower-roman`, `upper-roman`   | ❌     | Stylo servo-mode limitation (servo/stylo#349) |
-| `list-style-type: none`        | ✅     |                                               |
-| `list-style-image`             | ❌     |                                               |
-| `list-style-position`          | ❌     |                                               |
-| `list-style` (shorthand)       | ⚠️     | type only                                     |
-| Nested lists                   | ✅     | Independent counters per list                 |
+| Feature                        | Status | Notes                                                                           |
+| ------------------------------ | ------ | ------------------------------------------------------------------------------- |
+| `<ul>` with disc/circle/square | ✅     | Marker text prepended to list item content                                      |
+| `<ol>` with decimal numbering  | ✅     | Auto-incrementing counter                                                       |
+| `lower-alpha`, `upper-alpha`   | ✅     |                                                                                 |
+| `lower-roman`, `upper-roman`   | ⚠️     | Via HTML `<ol type="i">`/`"I"` attribute (Stylo servo can't parse the CSS form) |
+| `list-style-type: none`        | ✅     |                                                                                 |
+| `list-style-image`             | ❌     |                                                                                 |
+| `list-style-position`          | ❌     |                                                                                 |
+| `list-style` (shorthand)       | ⚠️     | type only                                                                       |
+| Nested lists                   | ✅     | Independent counters per list                                                   |
 
 ### Visual Effects
 

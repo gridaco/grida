@@ -206,6 +206,18 @@ pub enum ImageRendering {
     Pixelated,
 }
 
+/// CSS `direction` property — inline base direction.
+///
+/// Inherited. Affects bidi reordering, the meaning of logical
+/// `start`/`end` keywords, and the default text alignment in
+/// absence of an explicit `text-align`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Direction {
+    #[default]
+    Ltr,
+    Rtl,
+}
+
 /// CSS `vertical-align` property (inline-level).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerticalAlign {
@@ -218,6 +230,22 @@ pub enum VerticalAlign {
     TextBottom,
     Sub,
     Super,
+}
+
+/// Symbol marker kinds — painted geometrically rather than as Unicode
+/// glyphs so they stay proportional to the font metrics regardless of
+/// platform font coverage.
+///
+/// Mirrors Chromium's `ListStyleCategory::kSymbol` paint path
+/// (`core/paint/text_fragment_painter.cc::PaintSymbol`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SymbolMarkerKind {
+    /// Filled ellipse.
+    Disc,
+    /// 1px-stroked ellipse.
+    Circle,
+    /// Filled square.
+    Square,
 }
 
 /// CSS `list-style-type` property.
