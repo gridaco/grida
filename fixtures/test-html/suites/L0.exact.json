@@ -52,6 +52,7 @@
     { "path": "../L0/layout-flex-grow.html" },
     { "path": "../L0/paint-color-hex-alpha.html" },
     { "path": "../L0/layout-flex-wrap.html" },
-    { "path": "../L0/layout-grid-basic.html" }
+    { "path": "../L0/layout-grid-basic.html" },
+    { "path": "../L0/layout-grid-fr.html" }
   ]
 }
