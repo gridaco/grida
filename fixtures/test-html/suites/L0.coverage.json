@@ -14,7 +14,7 @@
     },
     {
       "path": "../L0/box-padding.html",
-      "viewport": { "width": 600, "height": 222 }
+      "viewport": { "width": 600, "height": 256 }
     },
     { "path": "../L0/paint-background-solid.html" },
     { "path": "../L0/paint-opacity.html" },

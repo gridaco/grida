@@ -16,6 +16,11 @@
     {
       "path": "../L0/box-dimensions.html",
       "viewport": { "width": 600, "height": 522 }
-    }
+    },
+    {
+      "path": "../L0/box-padding.html",
+      "viewport": { "width": 600, "height": 256 }
+    },
+    { "path": "../L0/paint-opacity.html" }
   ]
 }

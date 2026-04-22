@@ -117,7 +117,7 @@ fn paint_box(
 
     if needs_layer {
         let mut layer_paint = Paint::default();
-        layer_paint.set_alpha((style.opacity * 255.0) as u8);
+        layer_paint.set_alpha_f(style.opacity);
         let has_filter = !style.filter.is_empty();
         if has_filter {
             if let Some(filter) = build_filter_chain(&style.filter) {
