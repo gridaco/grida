@@ -1,18 +1,26 @@
-# cg-htmlcss — feature loop prompt
+---
+name: cg-htmlcss-feature
+description: >
+  Drive a single CSS feature end-to-end in the cg htmlcss renderer using a
+  five-phase loop: audit, ground (spec + Blink/stylo prior art), fixture,
+  implement, verify. Use when the user explicitly asks for a full feature
+  cycle on an htmlcss property (e.g. "full loop on border-radius", "bring
+  <property> to Chromium parity"). Not for small fixes or paper-cuts — this
+  is an opt-in conductor over /research, /fixtures, /cg-reftest with strict
+  gate policy (L0.exact at floor 1.0, threshold 0, aa off). Relevant paths:
+  crates/grida-canvas/src/htmlcss/, fixtures/test-html/L0/,
+  fixtures/test-html/suites/L0.exact.json, fixtures/test-html/suites/L0.coverage.json.
+---
 
-**What this is.** A pastable prompt template for driving a single CSS
-feature forward in the cg htmlcss renderer. Paste the template at the
-bottom into a new task; the reference above it is context an agent
-can read to follow the loop honestly.
+# cg-htmlcss — feature loop
 
-**Why this is a prompt and not a skill.** The 5-phase loop is
-deliberately heavy — audit + ground + fixture + implement + verify.
-It's overkill for small fixes, and it's already a conductor over
-`/research`, `/fixtures`, `/cg-reftest`, which auto-trigger correctly
-on their own. Opt-in invocation is right: paste it when you want the
-full cycle; skip it for paper-cuts.
+**What this is.** A heavy, opt-in loop for driving a single CSS feature
+forward in the cg htmlcss renderer. Load this skill when the user asks
+for a full feature cycle; skip it for small fixes. The loop is a
+conductor over `/research`, `/fixtures`, and `/cg-reftest` — they
+auto-trigger on their own for narrower work.
 
-**Lifecycle.** Expect this file to grow as new divergence patterns
+**Lifecycle.** Expect this skill to grow as new divergence patterns
 surface. It will likely go stale in parts once htmlcss hits
 Chromium-parity on L0/L1; treat the _phase structure_ as durable and
 the _property-specific callouts_ as advisory.
@@ -245,7 +253,7 @@ upstream is advisory; verify is the truth.
   fixture here is "we know about this case and intend to fix it."
   Promoting to exact is "we now match Blink."
 
-Automation rules downstream of this prompt (CI gating, auto-merge,
+Automation rules downstream of this skill (CI gating, auto-merge,
 etc.) must assert on the `report.json` emitted by `@grida/reftest`
 and **not** on free-text agent assertions. The agent's job is to
 drive the loop; the report is the contract.
@@ -291,7 +299,7 @@ without the conversation.
 
 ```text
 Drive the htmlcss feature loop for: <property or behavior>.
-Follow .agents/prompts/cg-htmlcss-feature.md.
+Follow the cg-htmlcss-feature skill (.agents/skills/cg-htmlcss-feature/SKILL.md).
 
 Scope:
 - Feature:    <e.g. `border-radius` percentage values>
