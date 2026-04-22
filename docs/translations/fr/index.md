@@ -21,7 +21,7 @@ Ce site est le point d'entrée principal de la documentation produit. Si vous d�
 
 ## Commencer ici
 
-- Utilisez [Editor](./editor/features/README.md) si vous travaillez dans l'éditeur Grida et cherchez des docs de fonctionnalités ou d'aide sur les workflows.
+- Utilisez [Editor](./editor/features/index.md) si vous travaillez dans l'éditeur Grida et cherchez des docs de fonctionnalités ou d'aide sur les workflows.
 - Utilisez [With Figma](./with-figma/index.md) si vous importez depuis Figma, utilisez Assistant ou configurez un workflow lié à Figma.
 - Utilisez [Forms](./forms/respondent-email-notifications.md) si vous travaillez sur des flux de formulaire, des notifications ou le traitement des réponses.
 - Utilisez [Platform](./platform/index.md) si vous travaillez avec l'infrastructure produit, les clients, les tags ou les fonctionnalités de plateforme.
@@ -29,7 +29,7 @@ Ce site est le point d'entrée principal de la documentation produit. Si vous d�
 
 ## Domaines produit
 
-- [Editor](./editor/features/README.md) pour les fonctionnalités de l'éditeur et les interactions.
+- [Editor](./editor/features/index.md) pour les fonctionnalités de l'éditeur et les interactions.
 - [With Figma](./with-figma/index.md) pour les guides d'interopérabilité, les workflows d'import et la surface produit Assistant maintenue.
 - [Forms](./forms/respondent-email-notifications.md) pour les docs utilisateur liées aux formulaires.
 - [Platform](./platform/index.md) pour les docs produit et plateforme.

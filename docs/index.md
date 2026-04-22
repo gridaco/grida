@@ -21,7 +21,7 @@ This site is the main entry point for product documentation. If you are new to G
 
 ## Start Here
 
-- Use [Editor](./editor/features/README.md) if you are working inside the Grida editor and want feature docs or workflow help.
+- Use [Editor](./editor/features/index.md) if you are working inside the Grida editor and want feature docs or workflow help.
 - Use [With Figma](./with-figma/index.md) if you are importing from Figma, using Assistant, or working through Figma-related setup.
 - Use [Forms](./forms/respondent-email-notifications.md) if you are building form flows, notifications, or response handling.
 - Use [Platform](./platform/index.md) if you are working with product infrastructure, customers, tags, or platform features.
@@ -29,7 +29,7 @@ This site is the main entry point for product documentation. If you are new to G
 
 ## Product Areas
 
-- [Editor](./editor/features/README.md) for editor capabilities and interaction docs.
+- [Editor](./editor/features/index.md) for editor capabilities and interaction docs.
 - [With Figma](./with-figma/index.md) for interoperability guides, import workflows, and the maintained Assistant product surface.
 - [Forms](./forms/respondent-email-notifications.md) for forms-specific user docs.
 - [Platform](./platform/index.md) for product/platform docs.
