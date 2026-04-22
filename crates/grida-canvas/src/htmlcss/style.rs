@@ -223,6 +223,8 @@ pub struct InlineGroup {
 /// - `Text` → `kText` — a contiguous span of styled text
 /// - `OpenBox` → `kOpenTag` — start of an inline box (adds inline-start spacing)
 /// - `CloseBox` → `kCloseTag` — end of an inline box (adds inline-end spacing)
+/// - `SymbolMarker` → `ListStyleCategory::kSymbol` — geometric list-item
+///   marker (disc/circle/square), painted as ellipse/rect rather than text.
 #[derive(Debug, Clone)]
 pub enum InlineRunItem {
     /// Text content with uniform styling.
@@ -240,6 +242,46 @@ pub enum InlineRunItem {
         /// Inline-end spacing = padding + border + margin (inline-end side).
         inline_size: f32,
     },
+    /// Geometric list-item marker (disc/circle/square). Reserved as a
+    /// Skia placeholder at measure time; painted as
+    /// `draw_oval`/`draw_rect` at the placeholder's rect.
+    SymbolMarker(SymbolMarker),
+}
+
+/// A geometric list-item marker for `list-style-type: disc | circle | square`.
+///
+/// `font_size` is captured so the marker can compute its own dimensions
+/// (bullet ≈ `ascent / 3` ≈ `font_size / 4`) without re-threading the
+/// inherited font through layout and paint.
+#[derive(Debug, Clone, Copy)]
+pub struct SymbolMarker {
+    pub kind: super::types::SymbolMarkerKind,
+    pub color: CGColor,
+    pub font_size: f32,
+}
+
+impl SymbolMarker {
+    /// `(width, height)` of the Skia placeholder reserved for this
+    /// marker. Width = bullet + inline-end gap; height = ascent
+    /// approximation so the placeholder sits in the correct vertical
+    /// band above the baseline.
+    pub fn placeholder_size(&self) -> (f32, f32) {
+        let bullet = self.font_size * 0.25;
+        let gap = self.font_size * 0.5;
+        let ascent_approx = self.font_size * 0.75;
+        (bullet + gap, ascent_approx)
+    }
+
+    /// Rect (in the same coordinate space as `placeholder`) where the
+    /// bullet geometry should be painted — `bullet_width` square,
+    /// inset 1px from the placeholder's left edge, vertically centered.
+    pub fn bullet_rect(&self, placeholder: skia_safe::Rect) -> skia_safe::Rect {
+        let bullet = self.font_size * 0.25;
+        let cy = (placeholder.top + placeholder.bottom) * 0.5;
+        let left = placeholder.left + 1.0;
+        let top = cy - bullet * 0.5;
+        skia_safe::Rect::from_xywh(left, top, bullet, bullet)
+    }
 }
 
 // ─── Box Model Sub-types (StyleSurroundData) ─────────────────────────

@@ -2215,6 +2215,41 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 
 // ─── Text painting (Chromium: TextPainter) ───────────────────────────
 
+/// Paint a geometric list-item marker (disc/circle/square).
+///
+/// Mirrors Chromium's `TextFragmentPainter::PaintSymbol`: filled ellipse
+/// for disc, 1px-stroked ellipse for circle, filled rect for square.
+/// `placeholder` is in canvas-absolute coordinates.
+fn paint_symbol_marker(canvas: &Canvas, marker: &super::style::SymbolMarker, placeholder: Rect) {
+    let bullet = marker.bullet_rect(placeholder);
+
+    let mut paint = Paint::default();
+    paint.set_anti_alias(true);
+    paint.set_color(Color::from_argb(
+        marker.color.a,
+        marker.color.r,
+        marker.color.g,
+        marker.color.b,
+    ));
+
+    use super::types::SymbolMarkerKind::*;
+    match marker.kind {
+        Disc => {
+            paint.set_style(PaintStyle::Fill);
+            canvas.draw_oval(bullet, &paint);
+        }
+        Circle => {
+            paint.set_style(PaintStyle::Stroke);
+            paint.set_stroke_width(1.0);
+            canvas.draw_oval(bullet, &paint);
+        }
+        Square => {
+            paint.set_style(PaintStyle::Fill);
+            canvas.draw_rect(bullet, &paint);
+        }
+    }
+}
+
 fn paint_text(canvas: &Canvas, run: &TextRun, x: f32, y: f32, width: f32, fonts: &FontCollection) {
     let mut ps = ParagraphStyle::new();
     let align = match run.font.text_align {
@@ -2300,6 +2335,12 @@ fn paint_inline_group(
     let mut deco_ranges: Vec<DecoRange> = Vec::new();
     let mut offset: usize = 0;
 
+    // `(placeholder_index, marker)` pairs — Skia returns
+    // `get_rects_for_placeholders()` in insertion order, so the index
+    // is just the placeholder count at push time.
+    let mut marker_placeholders: Vec<(usize, super::style::SymbolMarker)> = Vec::new();
+    let mut ph_idx: usize = 0;
+
     if indent_px > 0.0 {
         builder.add_placeholder(&PlaceholderStyle::new(
             indent_px,
@@ -2309,6 +2350,7 @@ fn paint_inline_group(
             0.0,
         ));
         offset += PLACEHOLDER_OFFSET;
+        ph_idx += 1;
     }
 
     for item in &group.items {
@@ -2333,6 +2375,7 @@ fn paint_inline_group(
                         0.0,
                     ));
                     offset += PLACEHOLDER_OFFSET;
+                    ph_idx += 1;
                 }
                 // Record start AFTER the open placeholder
                 deco_stack.push((offset, decoration.clone()));
@@ -2355,13 +2398,37 @@ fn paint_inline_group(
                         0.0,
                     ));
                     offset += PLACEHOLDER_OFFSET;
+                    ph_idx += 1;
                 }
+            }
+            InlineRunItem::SymbolMarker(m) => {
+                let (w, h) = m.placeholder_size();
+                builder.add_placeholder(&PlaceholderStyle::new(
+                    w,
+                    h,
+                    PlaceholderAlignment::AboveBaseline,
+                    TextBaseline::Alphabetic,
+                    0.0,
+                ));
+                marker_placeholders.push((ph_idx, *m));
+                offset += PLACEHOLDER_OFFSET;
+                ph_idx += 1;
             }
         }
     }
 
     let mut para = builder.build();
     para.layout(width);
+
+    // Pass 0: Paint geometric list-item markers.
+    if !marker_placeholders.is_empty() {
+        let ph_rects = para.get_rects_for_placeholders();
+        for (idx, marker) in &marker_placeholders {
+            if let Some(tb) = ph_rects.get(*idx) {
+                paint_symbol_marker(canvas, marker, tb.rect.with_offset((x, y)));
+            }
+        }
+    }
 
     // Pass 1: Paint inline box decorations (Chromium: InlineBoxPainter)
     for deco_range in &deco_ranges {

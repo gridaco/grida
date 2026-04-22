@@ -253,6 +253,16 @@ fn text_measure_func(
                     ));
                 }
             }
+            InlineRunItem::SymbolMarker(m) => {
+                let (w, h) = m.placeholder_size();
+                builder.add_placeholder(&skia_safe::textlayout::PlaceholderStyle::new(
+                    w,
+                    h,
+                    skia_safe::textlayout::PlaceholderAlignment::AboveBaseline,
+                    skia_safe::textlayout::TextBaseline::Alphabetic,
+                    0.0,
+                ));
+            }
         }
     }
     let mut para = builder.build();

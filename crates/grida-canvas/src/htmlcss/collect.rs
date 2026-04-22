@@ -62,95 +62,91 @@ struct ListCounter {
     type_override: Option<types::ListStyleType>,
 }
 
-/// Generate marker text for a list item.
+/// Output of marker generation: either a geometric symbol (painted as
+/// an ellipse or rect) or a formatted text string (counters with
+/// prefix/suffix).
 ///
-/// Mirrors Chromium's `ListMarker::MarkerText()` which uses `CounterStyle`
-/// to produce the prefix (bullet character or formatted number).
-fn generate_marker_text<T: std::fmt::Debug>(lst: &T, ordinal: i32) -> Option<String> {
-    // Stylo's ListStyleType wraps the property enum.
-    // Use debug format to identify the type since the enum may be generated.
-    // Stylo's servo-mode ListStyleType is a keyword enum.
-    // Use Debug format to match variants since the type is generated.
-    //
-    // Supported by Stylo (servo): disc, none, circle, square, decimal,
-    // lower-alpha, upper-alpha, disclosure-open, disclosure-closed, and
-    // various CJK/Indic scripts.
-    //
-    // NOT supported by Stylo (servo): lower-roman, upper-roman.
-    // These parse as invalid and fall back to `disc`.
-    let debug = format!("{:?}", lst);
-
-    if debug.contains("None") {
-        return None;
-    }
-
-    // Symbol markers (Chromium: ListStyleCategory::kSymbol)
-    if debug.contains("Disc") {
-        return Some("\u{2022} ".to_string()); // •
-    }
-    if debug.contains("Circle") {
-        return Some("\u{25E6} ".to_string()); // ◦
-    }
-    if debug.contains("Square") {
-        return Some("\u{25AA} ".to_string()); // ▪
-    }
-
-    // Ordinal markers (Chromium: ListStyleCategory::kLanguage)
-    if debug.contains("Decimal") {
-        return Some(format!("{}. ", ordinal));
-    }
-    if debug.contains("LowerAlpha") {
-        if (1..=26).contains(&ordinal) {
-            let ch = (b'a' + (ordinal - 1) as u8) as char;
-            return Some(format!("{}. ", ch));
-        }
-        return Some(format!("{}. ", ordinal));
-    }
-    if debug.contains("UpperAlpha") {
-        if (1..=26).contains(&ordinal) {
-            let ch = (b'A' + (ordinal - 1) as u8) as char;
-            return Some(format!("{}. ", ch));
-        }
-        return Some(format!("{}. ", ordinal));
-    }
-    if debug.contains("LowerRoman") {
-        return Some(format!("{}. ", to_roman(ordinal).to_lowercase()));
-    }
-    if debug.contains("UpperRoman") {
-        return Some(format!("{}. ", to_roman(ordinal)));
-    }
-
-    // Default fallback: disc bullet
-    Some("\u{2022} ".to_string())
+/// Mirrors Chromium's `ListStyleCategory::{kSymbol, kLanguage}` split.
+enum MarkerOutput {
+    Symbol(types::SymbolMarkerKind),
+    Text(String),
 }
 
-/// Marker text for an explicit `ListStyleType` — used when the HTML
-/// `<ol type="...">` attribute forces a specific counter style.
-fn marker_text_for_type(ty: types::ListStyleType, ordinal: i32) -> Option<String> {
+/// Parse Stylo's generated `ListStyleType` enum into our typed
+/// [`types::ListStyleType`] via `Debug` string matching. Stylo's
+/// servo-mode enum is generated and not structurally accessible, so we
+/// fall back to string inspection. Unrecognized keywords return `None`
+/// and callers fall back to `disc`. Does not recognize `lower-roman`
+/// or `upper-roman` — servo Stylo parses them as invalid.
+fn parse_stylo_list_style_type<T: std::fmt::Debug>(lst: &T) -> Option<types::ListStyleType> {
     use types::ListStyleType as L;
-    match ty {
-        L::None => None,
-        L::Disc => Some("\u{2022} ".to_string()),
-        L::Circle => Some("\u{25E6} ".to_string()),
-        L::Square => Some("\u{25AA} ".to_string()),
-        L::Decimal | L::DecimalLeadingZero => Some(format!("{}. ", ordinal)),
-        L::LowerAlpha => {
-            if (1..=26).contains(&ordinal) {
-                Some(format!("{}. ", (b'a' + (ordinal - 1) as u8) as char))
-            } else {
-                Some(format!("{}. ", ordinal))
-            }
-        }
-        L::UpperAlpha => {
-            if (1..=26).contains(&ordinal) {
-                Some(format!("{}. ", (b'A' + (ordinal - 1) as u8) as char))
-            } else {
-                Some(format!("{}. ", ordinal))
-            }
-        }
-        L::LowerRoman => Some(format!("{}. ", to_roman(ordinal).to_lowercase())),
-        L::UpperRoman => Some(format!("{}. ", to_roman(ordinal))),
+    let debug = format!("{:?}", lst);
+    if debug.contains("None") {
+        return Some(L::None);
     }
+    if debug.contains("Disc") {
+        return Some(L::Disc);
+    }
+    if debug.contains("Circle") {
+        return Some(L::Circle);
+    }
+    if debug.contains("Square") {
+        return Some(L::Square);
+    }
+    if debug.contains("DecimalLeadingZero") {
+        return Some(L::DecimalLeadingZero);
+    }
+    if debug.contains("Decimal") {
+        return Some(L::Decimal);
+    }
+    if debug.contains("LowerAlpha") {
+        return Some(L::LowerAlpha);
+    }
+    if debug.contains("UpperAlpha") {
+        return Some(L::UpperAlpha);
+    }
+    if debug.contains("LowerRoman") {
+        return Some(L::LowerRoman);
+    }
+    if debug.contains("UpperRoman") {
+        return Some(L::UpperRoman);
+    }
+    None
+}
+
+/// Marker output for a Stylo-reported list-style-type. Unknown values
+/// fall back to `disc` (matching CSS spec for unrecognized keywords).
+fn generate_marker_output<T: std::fmt::Debug>(lst: &T, ordinal: i32) -> Option<MarkerOutput> {
+    marker_output_for_type(
+        parse_stylo_list_style_type(lst).unwrap_or(types::ListStyleType::Disc),
+        ordinal,
+    )
+}
+
+/// Marker output for an explicit `ListStyleType`. Used both by the
+/// Stylo path (via [`generate_marker_output`]) and by the HTML
+/// attribute path (`<ol type>` / `<ul type>`).
+fn marker_output_for_type(ty: types::ListStyleType, ordinal: i32) -> Option<MarkerOutput> {
+    use types::ListStyleType as L;
+    use types::SymbolMarkerKind as S;
+    let alpha = |base: u8| {
+        if (1..=26).contains(&ordinal) {
+            format!("{}. ", (base + (ordinal - 1) as u8) as char)
+        } else {
+            format!("{}. ", ordinal)
+        }
+    };
+    Some(match ty {
+        L::None => return None,
+        L::Disc => MarkerOutput::Symbol(S::Disc),
+        L::Circle => MarkerOutput::Symbol(S::Circle),
+        L::Square => MarkerOutput::Symbol(S::Square),
+        L::Decimal | L::DecimalLeadingZero => MarkerOutput::Text(format!("{}. ", ordinal)),
+        L::LowerAlpha => MarkerOutput::Text(alpha(b'a')),
+        L::UpperAlpha => MarkerOutput::Text(alpha(b'A')),
+        L::LowerRoman => MarkerOutput::Text(format!("{}. ", to_roman(ordinal).to_lowercase())),
+        L::UpperRoman => MarkerOutput::Text(format!("{}. ", to_roman(ordinal))),
+    })
 }
 
 /// Convert an integer to Roman numeral string.
@@ -272,10 +268,25 @@ fn collect_element_with_counter(
         })
     } else if tag == "ul" || tag == "menu" {
         // Unordered lists: counter exists for symmetry but is not consulted
-        // for numbering. No type override (ul uses disc/circle/square via CSS).
+        // for numbering. HTML legacy `<ul type="disc|circle|square">` is
+        // obsolete in the spec but widely honored by browsers; we read it
+        // so fixtures relying on the attribute (without CSS) render
+        // the expected bullet shape.
+        let dom = adapter::dom();
+        let node = dom.node(element.node_id());
+        let type_override = get_element_attr(node, "type").and_then(|t| {
+            // Match case-insensitively — HTML4 specified the attribute as
+            // case-insensitive.
+            match t.to_ascii_lowercase().as_str() {
+                "disc" => Some(types::ListStyleType::Disc),
+                "circle" => Some(types::ListStyleType::Circle),
+                "square" => Some(types::ListStyleType::Square),
+                _ => None,
+            }
+        });
         Some(ListCounter {
             value: 0,
-            type_override: None,
+            type_override,
         })
     } else {
         None
@@ -307,11 +318,11 @@ fn collect_element_with_counter(
         };
 
         if let Some(ov) = type_override {
-            marker_text_for_type(ov, ordinal)
+            marker_output_for_type(ov, ordinal)
         } else {
             let list_style = style.get_list();
             let lst = list_style.clone_list_style_type();
-            generate_marker_text(&lst, ordinal)
+            generate_marker_output(&lst, ordinal)
         }
     } else {
         None
@@ -354,14 +365,26 @@ fn collect_element_with_counter(
     let parent_color = el.color;
     let parent_white_space = el.font.white_space;
 
-    // Inject list marker as first inline content (Chromium: ::marker pseudo-element)
+    // Inject list marker as first inline content (Chromium: ::marker pseudo-element).
     if let Some(marker) = marker_prefix {
-        pending_inline.push(InlineRunItem::Text(TextRun {
-            text: marker,
-            font: parent_font.clone(),
-            color: parent_color,
-            decoration: None,
-        }));
+        match marker {
+            MarkerOutput::Symbol(kind) => {
+                // Bullet gap is baked into `SymbolMarker::placeholder_size`.
+                pending_inline.push(InlineRunItem::SymbolMarker(SymbolMarker {
+                    kind,
+                    color: parent_color,
+                    font_size: parent_font.size,
+                }));
+            }
+            MarkerOutput::Text(text) => {
+                pending_inline.push(InlineRunItem::Text(TextRun {
+                    text,
+                    font: parent_font.clone(),
+                    color: parent_color,
+                    decoration: None,
+                }));
+            }
+        }
     }
 
     // Void widget elements (<input>) have no DOM children to collect.
@@ -900,7 +923,9 @@ fn flush_inline_group(
     // (e.g. "\n  " between <div> and <p>) that should not create a block.
     let all_whitespace = items.iter().all(|item| match item {
         InlineRunItem::Text(r) => r.text.trim().is_empty(),
-        InlineRunItem::OpenBox { .. } | InlineRunItem::CloseBox { .. } => false,
+        InlineRunItem::OpenBox { .. }
+        | InlineRunItem::CloseBox { .. }
+        | InlineRunItem::SymbolMarker(_) => false,
     });
     if all_whitespace {
         return;
