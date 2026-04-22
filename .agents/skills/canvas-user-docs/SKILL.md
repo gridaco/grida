@@ -110,6 +110,12 @@ For workflows, before/after, or relationships a screenshot can't show.
 - WebP preferred, SVG for vector diagrams
 - Annotations: red (#FF3B30) circles/arrows, 2px stroke, 1-3 callouts max
 
+For SVG figures specifically — gestures, alignment, before/after diagrams that
+recreate canvas UI — use the **`canvas-docs-svg-kit`** skill. It provides a
+starter template, a primitives catalog (selection chrome, size badges, anchor
+pins, resize cursors, ripples), and finished examples to crib from. Saves you
+from re-deriving stroke widths, colors, and the half-pixel alignment tricks.
+
 ## Pre-Publish Checklist
 
 - `title` and `description` in frontmatter

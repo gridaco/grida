@@ -1,0 +1,163 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<!--
+  canvas-docs-svg-kit  ·  cursors
+
+  Focused catalog of every cursor symbol in the kit. Each cell shows the
+  cursor at its native size (with shadow), labelled with its `<use>` id and
+  natural width × height.
+
+  All paths are also defined in template.svg.
+  Source for canonical cursor look:
+    editor/public/assets/css-cursors-macos/*.png   (macOS-style PNG set)
+    editor/components/cursor/cursor-data.ts        (rotate inline SVG)
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 960 720"
+     width="960"
+     height="720"
+     font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg     { fill: #ECECEC; }
+      .doc-heading   { font-size: 24px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .doc-sub       { font-size: 13px; fill: #6b7280; }
+      .cell-bg       { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+      .cell-title    { font-size: 13px; fill: #0a0a0a; font-weight: 600; }
+      .cell-class    { font-size: 11px; fill: #6b7280; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .cell-meta     { font-size: 10px; fill: #9ca3af; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .cursor        { fill: #0a0a0a; stroke: #ffffff; stroke-width: 1.25; stroke-linejoin: round; }
+      .cursor-hand   { fill: #ffffff; stroke: #0a0a0a; stroke-width: 1.5; stroke-linejoin: round; }
+    </style>
+
+    <filter id="cursor-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+      <feOffset dx="0" dy="1"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <symbol id="cursor-pointer" viewBox="0 0 14 18" overflow="visible">
+      <path d="M 1 1 L 1 15 L 5 11.5 L 7.5 17 L 9.5 16 L 7 10.8 L 12 10.8 Z" class="cursor"/>
+    </symbol>
+    <symbol id="cursor-move" viewBox="0 0 24 24" overflow="visible">
+      <path d="M 12 2 L 16 6 L 14 6 L 14 10 L 18 10 L 18 8 L 22 12 L 18 16 L 18 14 L 14 14 L 14 18 L 16 18 L 12 22 L 8 18 L 10 18 L 10 14 L 6 14 L 6 16 L 2 12 L 6 8 L 6 10 L 10 10 L 10 6 L 8 6 Z" class="cursor"/>
+    </symbol>
+    <symbol id="cursor-grab" viewBox="0 0 16 18" overflow="visible">
+      <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M8.6 17.5Q7 17.5 6 17q-1.2-.5-2-1.5t-1.6-2.6L.6 8.2v-1q0-.4.7-.6H2q.4.3.6.7l1.6 2.9.2.2h.3V10l-1-7q-.1-.7.1-1a1 1 0 0 1 1-.5 1 1 0 0 1 1.1 1l1.1 5.2v-6q0-.6.4-1 .3-.3.9-.3a1.2 1.2 0 0 1 1.2 1.2v6l1-5.2a1 1 0 0 1 1-1h.3q.5 0 .8.5l.2 1-.9 5.3 1.2-3.5q.2-.5.5-.7a1 1 0 0 1 1.6.3q.3.3.2.9l-1.2 6.5a8 8 0 0 1-1.8 4.2q-1.4 1.5-4 1.5Z"
+            class="cursor-hand"/>
+    </symbol>
+    <symbol id="cursor-grabbing" viewBox="0 0 14 13" overflow="visible">
+      <path d="M6.71.5q.39 0 .73.2l.09.06a1 1 0 0 1 .43.83v.66q.1.05.18.03l.01-.03v-.01l.16-.54.05-.15a1 1 0 0 1 .82-.63q.59-.1 1.06.27.26.18.38.5.1.3.04.6l-.15.88-.01.1q.04.04.13.04h.05l.24-.39V2.9q.3-.4.76-.46.4-.05.74.14l.1.06q.42.32.43.83 0 .84-.13 1.63-.12.77-.35 1.74l-.05.27a8 8 0 0 1-1.05 2.67q-.7 1.11-1.89 1.67-1.18.56-2.8.56-1.85 0-3.28-.92a6 6 0 0 1-1.96-2.16l-.2-.4A8.5 8.5 0 0 1 .5 4.93c0-.51.11-1 .41-1.36a1.5 1.5 0 0 1 1.06-.58q.28-.02.5.04l.15.05.27.1.05.27.25 1.27.02.07v.01h.01l.03.01.02-.01v-.05L2.75 2.3q-.08-.3.03-.61.11-.32.37-.5.48-.36 1.07-.27.31.04.56.26.19.17.27.39l.05.14.15.53v.01l.01.02.05.01q.07 0 .14-.03v-.66a1 1 0 0 1 .42-.83q.38-.27.83-.26Z"
+            class="cursor-hand"/>
+    </symbol>
+    <symbol id="cursor-rotate" viewBox="0 0 26 24" overflow="visible">
+      <path fill="#000000" fill-rule="evenodd" clip-rule="evenodd"
+            d="M23 15.5h-6.43l2.65-2.79A7.72 7.72 0 0 0 13 9.5a7.72 7.72 0 0 0-6.22 3.21l2.65 2.79H3V8.75l1.74 1.83A10.5 10.5 0 0 1 13 6.5c3.32 0 6.3 1.59 8.26 4.08L23 8.75v6.75Z"/>
+      <path fill="none" stroke="#ffffff" stroke-width="0.75"
+            d="M23 15.88h.38V7.8l-.65.68-1.45 1.52A10.85 10.85 0 0 0 13 6.13c-3.3 0-6.25 1.5-8.28 3.88L3.27 8.5l-.64-.68v8.07h7.67l-.6-.64-2.43-2.55A7.32 7.32 0 0 1 13 9.88c2.3 0 4.36 1.08 5.73 2.8l-2.43 2.56-.6.63H23Z"/>
+    </symbol>
+    <symbol id="cursor-h" viewBox="0 0 28 16" overflow="visible">
+      <path d="M 4 8 L 9 4 L 9 6.5 L 19 6.5 L 19 4 L 24 8 L 19 12 L 19 9.5 L 9 9.5 L 9 12 Z" class="cursor"/>
+    </symbol>
+    <symbol id="cursor-v" viewBox="0 0 16 28" overflow="visible">
+      <path d="M 8 4 L 4 9 L 6.5 9 L 6.5 19 L 4 19 L 8 24 L 12 19 L 9.5 19 L 9.5 9 L 12 9 Z" class="cursor"/>
+    </symbol>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="720"/>
+
+  <text x="40" y="50" class="doc-heading">Cursors</text>
+  <text x="40" y="74" class="doc-sub">Stylised line-art cursors. For higher-fidelity reference see the macOS PNG set in editor/public/assets/css-cursors-macos/</text>
+
+  <!-- 4 columns × 2 rows = 8 cells, last cell unused -->
+  <!-- cell: 215 × 240, gap 20, starting at x=40, y=110 -->
+
+  <!-- pointer -->
+  <g transform="translate(40, 110)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">pointer</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-pointer"</text>
+    <text x="16" y="62" class="cell-meta">14 × 18 · hotspot 0,0</text>
+    <use href="#cursor-pointer" x="100" y="120" width="14" height="18" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">default arrow</text>
+  </g>
+
+  <!-- move -->
+  <g transform="translate(265, 110)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">move</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-move"</text>
+    <text x="16" y="62" class="cell-meta">24 × 24 · hotspot 12,12</text>
+    <use href="#cursor-move" x="95" y="115" width="24" height="24" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">4-direction translate</text>
+  </g>
+
+  <!-- grab -->
+  <g transform="translate(490, 110)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">grab</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-grab"</text>
+    <text x="16" y="62" class="cell-meta">16 × 18 · hotspot 8,9</text>
+    <use href="#cursor-grab" x="99" y="115" width="16" height="18" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">drag affordance (open)</text>
+  </g>
+
+  <!-- grabbing -->
+  <g transform="translate(715, 110)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">grabbing</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-grabbing"</text>
+    <text x="16" y="62" class="cell-meta">14 × 13 · hotspot 7,7</text>
+    <use href="#cursor-grabbing" x="100" y="118" width="14" height="13" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">drag in progress (closed)</text>
+  </g>
+
+  <!-- rotate -->
+  <g transform="translate(40, 370)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">rotate</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-rotate"</text>
+    <text x="16" y="62" class="cell-meta">26 × 24 · hotspot 13,12</text>
+    <use href="#cursor-rotate" x="94" y="115" width="26" height="24" filter="url(#cursor-shadow)"/>
+    <text x="107" y="200" class="cell-meta" text-anchor="middle">rotation drag</text>
+    <text x="107" y="216" class="cell-meta" text-anchor="middle">wrap in rotate(θ) to orient</text>
+  </g>
+
+  <!-- h-resize -->
+  <g transform="translate(275, 370)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">h-resize</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-h"</text>
+    <text x="16" y="62" class="cell-meta">28 × 16 · hotspot 14,8</text>
+    <use href="#cursor-h" x="93" y="119" width="28" height="16" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">edge resize, horizontal</text>
+  </g>
+
+  <!-- v-resize -->
+  <g transform="translate(490, 370)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">v-resize</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-v"</text>
+    <text x="16" y="62" class="cell-meta">16 × 28 · hotspot 8,14</text>
+    <use href="#cursor-v" x="99" y="113" width="16" height="28" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">edge resize, vertical</text>
+  </g>
+
+  <!-- empty cell as note -->
+  <g transform="translate(715, 370)">
+    <rect width="205" height="240" rx="8" fill="#fafafa" stroke="#e5e5e5" stroke-dasharray="3 3"/>
+    <text x="107" y="115" class="cell-class" text-anchor="middle">For a higher-fidelity</text>
+    <text x="107" y="135" class="cell-class" text-anchor="middle">cursor, embed the macOS</text>
+    <text x="107" y="155" class="cell-class" text-anchor="middle">PNG via base64 data URI.</text>
+    <text x="107" y="180" class="cell-meta" text-anchor="middle">editor/public/assets/</text>
+    <text x="107" y="195" class="cell-meta" text-anchor="middle">css-cursors-macos/*.png</text>
+  </g>
+
+  <!-- usage example -->
+  <text x="40" y="660" class="cell-title">Usage</text>
+  <g transform="translate(40, 675)">
+    <text x="0" y="14" class="cell-class">&lt;use href="#cursor-rotate" x="500" y="100" width="26" height="24" filter="url(#cursor-shadow)"/&gt;</text>
+  </g>
+</svg>

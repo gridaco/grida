@@ -1,0 +1,103 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<!--
+  canvas-docs-svg-kit  ·  meters
+
+  The meter primitive comes in two variants:
+    .badge          → size readout, blue (selection variant)
+    .badge-distance → distance / measurement readout, red (workbench red)
+
+  Both share the .badge-text class for inner text. Drop-shadow filter
+  matches the kit's #badge-shadow for visual consistency.
+
+  Source for the canonical look:
+    editor/grida-canvas-react/viewport/ui/size.tsx
+    editor/grida-canvas-react/viewport/ui/measurement.tsx
+    editor/grida-canvas-react/ui-config.ts (WorkbenchColors)
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 960 480"
+     width="960"
+     height="480"
+     font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg      { fill: #ECECEC; }
+      .doc-heading    { font-size: 24px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .doc-sub        { font-size: 13px; fill: #6b7280; }
+      .cell-bg        { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+      .cell-title     { font-size: 13px; fill: #0a0a0a; font-weight: 600; }
+      .cell-class     { font-size: 11px; fill: #6b7280; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .cell-meta      { font-size: 10px; fill: #9ca3af; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+      .badge          { fill: #0D99FF; }
+      .badge-distance { fill: #f44336; }
+      .badge-text     { font-size: 11px; fill: #ffffff; font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; letter-spacing: 0.3px; }
+    </style>
+
+    <filter id="badge-shadow" x="-20%" y="-20%" width="140%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+      <feOffset dx="0" dy="1"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="480"/>
+
+  <text x="40" y="50" class="doc-heading">Meters</text>
+  <text x="40" y="74" class="doc-sub">Two variants of the same pill: blue size, red distance. Same shape, same .badge-text.</text>
+
+  <!-- Size variant -->
+  <g transform="translate(40, 110)">
+    <rect width="440" height="280" rx="8" class="cell-bg"/>
+    <text x="20" y="30" class="cell-title">Size meter (selection)</text>
+    <text x="20" y="50" class="cell-class">.badge · .badge-text · #badge-shadow</text>
+
+    <g transform="translate(176, 100)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">280 × 90</text>
+    </g>
+
+    <g transform="translate(176, 140)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">auto × 120</text>
+    </g>
+
+    <g transform="translate(176, 180)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="60" height="22" rx="4" class="badge"/>
+      <text x="30" y="15" class="badge-text" text-anchor="middle">w × h</text>
+    </g>
+
+    <text x="220" y="240" class="cell-meta" text-anchor="middle">live size readout under selection</text>
+    <text x="220" y="256" class="cell-meta" text-anchor="middle">colour: WorkbenchColors.sky-ish</text>
+  </g>
+
+  <!-- Distance variant -->
+  <g transform="translate(500, 110)">
+    <rect width="420" height="280" rx="8" class="cell-bg"/>
+    <text x="20" y="30" class="cell-title">Distance meter (measurement)</text>
+    <text x="20" y="50" class="cell-class">.badge-distance · .badge-text · #badge-shadow</text>
+
+    <g transform="translate(166, 100)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge-distance"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">120 px</text>
+    </g>
+
+    <g transform="translate(166, 140)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge-distance"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">340 px</text>
+    </g>
+
+    <g transform="translate(166, 180)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="60" height="22" rx="4" class="badge-distance"/>
+      <text x="30" y="15" class="badge-text" text-anchor="middle">45°</text>
+    </g>
+
+    <text x="210" y="240" class="cell-meta" text-anchor="middle">measurement / dimension readout</text>
+    <text x="210" y="256" class="cell-meta" text-anchor="middle">colour: WorkbenchColors.red (#f44336)</text>
+  </g>
+
+  <text x="40" y="430" class="cell-title">Pattern</text>
+  <text x="40" y="456" class="cell-class">&lt;g transform="translate(x, y)" filter="url(#badge-shadow)"&gt;&lt;rect width="W" height="22" rx="4" class="badge[-distance]"/&gt;&lt;text x="W/2" y="15" class="badge-text" text-anchor="middle"&gt;…&lt;/text&gt;&lt;/g&gt;</text>
+</svg>
