@@ -1,0 +1,23 @@
+/*
+ * hide-text.css — zero glyph coverage, pin line-box height.
+ *
+ * Inject via sidecar on both sides of a refbrowser reftest for fixtures
+ * that aren't testing text rendering:
+ *
+ *   { "extra_css": ["../_reftest/hide-text.css"] }
+ *
+ * `color: transparent` drops glyph fill; `line-height: 1` pins line-box
+ * height to exactly font-size, removing Blink-vs-Skia metric drift.
+ * Layout is otherwise preserved (advance widths, line wrapping, block
+ * flow). Do not use for fixtures whose subject IS text.
+ */
+
+*,
+*::before,
+*::after {
+  color: transparent !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 !important;
+  caret-color: transparent !important;
+  line-height: 1 !important;
+}

@@ -32,10 +32,12 @@
     "smol-toml": "^1.6.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@types/node": "^24",
     "@types/pixelmatch": "^5.2.6",
     "@types/pngjs": "^6.0.5",
     "tsdown": "^0.21.9",
+    "tsx": "^4.19.0",
     "typescript": "^6",
     "vitest": "^4"
   },
