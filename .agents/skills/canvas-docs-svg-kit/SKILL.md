@@ -168,16 +168,16 @@ Font stack: `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue',
 
 The kit's primitives are stylised — close to the product but not pixel-clones. When a primitive is unclear or you need to match the actual UI more carefully, go to source:
 
-| Primitive                    | Source file (in `editor/`)                                                            | What to read for                                         |
-| ---------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Selection chrome / handles   | `grida-canvas-react/viewport/surface.tsx`                                             | Handle sizes, hover states, modifier behaviour           |
-| Size meter (live readout)    | `grida-canvas-react/viewport/ui/meter.tsx`                                            | Badge geometry, position relative to selection           |
-| Distance meter (measurement) | `grida-canvas-react/viewport/ui/measurement.tsx`, `vector-measurement.tsx`            | What measurement actually shows (distance, axis-aligned) |
-| Workbench colours            | `grida-canvas-react/ui-config.ts` → `WorkbenchColors`                                 | Canonical hex values: `sky #00a6f4`, `red #f44336`, etc. |
-| Keycap                       | `components/ui/kbd.tsx`                                                               | Pill geometry, font, fg/bg tokens                        |
-| Image-paint editor handles   | `grida-canvas-react/viewport/ui/surface-image-editor.tsx`                             | Translate / scale / rotate handle layout, cursors        |
-| Cursor PNG asset set         | `public/assets/css-cursors-macos/*.png` (move, grab, grabbing, \*-rotate, pointer, …) | Reference look for cursors the kit doesn't ship          |
-| Custom rotate cursor SVG     | `components/cursor/cursor-data.ts` → `template_rotate_svg(angle)`                     | The kit's `#cursor-rotate` symbol is lifted from here    |
+| Primitive                    | Source file (in `editor/`)                                                                                | What to read for                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Selection chrome / handles   | `grida-canvas-react/viewport/surface.tsx`                                                                 | Handle sizes, hover states, modifier behaviour           |
+| Size meter (live readout)    | `grida-canvas-react/viewport/ui/meter.tsx`                                                                | Badge geometry, position relative to selection           |
+| Distance meter (measurement) | `grida-canvas-react/viewport/ui/measurement.tsx`, `grida-canvas-react/viewport/ui/vector-measurement.tsx` | What measurement actually shows (distance, axis-aligned) |
+| Workbench colours            | `grida-canvas-react/ui-config.ts` → `WorkbenchColors`                                                     | Canonical hex values: `sky #00a6f4`, `red #f44336`, etc. |
+| Keycap                       | `components/ui/kbd.tsx`                                                                                   | Pill geometry, font, fg/bg tokens                        |
+| Image-paint editor handles   | `grida-canvas-react/viewport/ui/surface-image-editor.tsx`                                                 | Translate / scale / rotate handle layout, cursors        |
+| Cursor PNG asset set         | `public/assets/css-cursors-macos/*.png` (move, grab, grabbing, \*-rotate, pointer, …)                     | Reference look for cursors the kit doesn't ship          |
+| Custom rotate cursor SVG     | `components/cursor/cursor-data.ts` → `template_rotate_svg(angle)`                                         | The kit's `#cursor-rotate` symbol is lifted from here    |
 
 Rule of thumb: if you find yourself inventing a primitive that maps to a real product UI element, check the source first — the names and tokens above are usually nearby.
 
