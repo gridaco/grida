@@ -42,6 +42,7 @@
     { "path": "../L0/paint-background-clip-boxes.html" },
     { "path": "../L0/paint-border-translucent.html" },
     { "path": "../L0/paint-margin-simple.html" },
-    { "path": "../L0/paint-padding-simple.html" }
+    { "path": "../L0/paint-padding-simple.html" },
+    { "path": "../L0/paint-border-double-rect.html" }
   ]
 }
