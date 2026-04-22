@@ -43,6 +43,13 @@ edge case** that the codebase supports or intends to support. This includes:
   filename alone should tell you what's being tested.
 - **Labeled specimens.** Within a fixture, label each test case with the
   value being exercised so both humans and heuristics can identify regions.
+  Keep labels short, and pin the dimensions of any container holding a
+  label (flex item, grid cell, stretched block) so font-advance-width
+  differences between engines can't leak into box geometry. When a test
+  pipeline offers a text-neutralizing stylesheet (e.g.
+  `fixtures/test-html/_reftest/hide-text.css` for the htmlcss reftests),
+  prefer that over stripping the label — keeping the text helps the next
+  reader understand the fixture.
 - **Match the fixture's subject to the viewport policy.** For refbrowser
   fixtures under `fixtures/test-html/`, **paint / visual-property**
   fixtures should size their root to a preset viewport (via `min-height`)
