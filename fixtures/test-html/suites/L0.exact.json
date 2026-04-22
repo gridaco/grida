@@ -31,6 +31,7 @@
     { "path": "../L0/paint-box-shadow-inset-solid.html" },
     { "path": "../L0/paint-transform-translate.html" },
     { "path": "../L0/paint-transform-scale.html" },
-    { "path": "../L0/paint-opacity-levels.html" }
+    { "path": "../L0/paint-opacity-levels.html" },
+    { "path": "../L0/paint-position-absolute-simple.html" }
   ]
 }
