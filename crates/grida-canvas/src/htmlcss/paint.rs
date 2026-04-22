@@ -411,13 +411,13 @@ fn paint_background(
         return;
     }
 
-    let rect = Rect::from_xywh(0.0, 0.0, w, h);
     let resolved_r = style.border_radius.resolved(w, h);
     let r = &resolved_r;
+    let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
 
     for layer in &style.background {
         match layer {
-            BackgroundLayer::Solid(c) => {
+            BackgroundLayer::Solid { color: c, clip } => {
                 if c.a == 0 {
                     continue;
                 }
@@ -425,11 +425,13 @@ fn paint_background(
                 paint.set_style(PaintStyle::Fill);
                 paint.set_anti_alias(true);
                 paint.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
+                let fill_rect = box_reference_rect(style, w, h, *clip);
                 if r.is_zero() {
-                    canvas.draw_rect(rect, &paint);
+                    canvas.draw_rect(fill_rect, &paint);
                 } else {
+                    let radii = inset_radii(r, border_rect, fill_rect);
                     let mut rrect = skia_safe::RRect::new();
-                    rrect.set_rect_radii(rect, &r.to_skia_radii());
+                    rrect.set_rect_radii(fill_rect, &radii);
                     canvas.draw_rrect(rrect, &paint);
                 }
             }
@@ -1812,10 +1814,19 @@ fn paint_borders(
         && b.top.color == b.bottom.color
         && b.top.color == b.left.color
         && b.top.color == b.right.color;
+    // Stroke once as an RRect when sides are uniform *and* the style is
+    // one whose rendering doesn't depend on per-side color adjustments
+    // (inset / outset / groove / ridge darken/lighten per side). The
+    // per-side trapezoid path double-paints corners for translucent colors;
+    // the single-stroke path avoids that.
+    let uniform_stroke_style = matches!(
+        b.top.style,
+        types::BorderStyle::Solid | types::BorderStyle::Double
+    );
     if uniform
+        && uniform_stroke_style
         && b.top.width > 0.0
-        && b.top.style != types::BorderStyle::None
-        && !style.border_radius.is_zero()
+        && (b.top.style != types::BorderStyle::None || !style.border_radius.is_zero())
     {
         paint_uniform_rounded_border(canvas, &b.top, &style.border_radius.resolved(w, h), w, h);
         return;

@@ -698,8 +698,10 @@ pub enum StyleImage {
 /// slot. Our representation flattens this into a two-variant enum.
 #[derive(Debug, Clone)]
 pub enum BackgroundLayer {
-    /// Solid color fill (CSS `background-color`).
-    Solid(CGColor),
+    /// Solid color fill (CSS `background-color`). Per CSS Backgrounds 3
+    /// §2.5 the color uses the `background-clip` value from the *final*
+    /// layer entry.
+    Solid { color: CGColor, clip: BackgroundBox },
     /// Image layer with full CSS geometry (size, position, repeat, clip, origin).
     /// Chromium: `FillLayer` with image, size, position, repeat, clip, origin.
     Image(BackgroundImage),

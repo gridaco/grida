@@ -871,7 +871,7 @@ fn collect_inline_items(el: &StyledElement, items: &mut Vec<InlineRunItem>) {
 /// Returns `None` if the element has no visual box decoration.
 fn build_inline_decoration(el: &StyledElement) -> Option<InlineBoxDecoration> {
     let bg = el.background.first().and_then(|l| match l {
-        BackgroundLayer::Solid(c) if c.a > 0 => Some(*c),
+        BackgroundLayer::Solid { color, .. } if color.a > 0 => Some(*color),
         _ => None,
     });
 
@@ -1676,11 +1676,22 @@ fn extract_background(style: &ComputedValues, current_color: CGColor) -> Vec<Bac
     let bg = style.get_background();
     let mut layers: Vec<BackgroundLayer> = Vec::new();
 
-    // 1. Background color (bottom layer)
+    // 1. Background color (bottom layer). Per CSS Backgrounds 3 §2.5 the
+    //    color uses the `background-clip` value from the *final* layer
+    //    entry in the list.
     if let Some(abs) = bg.background_color.as_absolute() {
         let c = abs_color_to_cg(abs);
         if c.a > 0 {
-            layers.push(BackgroundLayer::Solid(c));
+            let color_clip = bg
+                .background_clip
+                .0
+                .last()
+                .map(extract_bg_clip)
+                .unwrap_or(BackgroundBox::BorderBox);
+            layers.push(BackgroundLayer::Solid {
+                color: c,
+                clip: color_clip,
+            });
         }
     }
 
