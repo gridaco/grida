@@ -206,6 +206,18 @@ pub enum ImageRendering {
     Pixelated,
 }
 
+/// CSS `direction` property — inline base direction.
+///
+/// Inherited. Affects bidi reordering, the meaning of logical
+/// `start`/`end` keywords, and the default text alignment in
+/// absence of an explicit `text-align`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Direction {
+    #[default]
+    Ltr,
+    Rtl,
+}
+
 /// CSS `vertical-align` property (inline-level).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerticalAlign {

@@ -56,6 +56,10 @@ pub(crate) fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, S
 /// Mirrors Chromium's `ListItemOrdinal` which tracks per-item values.
 struct ListCounter {
     value: i32,
+    /// HTML `<ol type="i">`-style override. Takes precedence over CSS
+    /// `list-style-type` and provides Roman numerals even though Stylo's
+    /// servo build does not parse `list-style-type: lower-roman`.
+    type_override: Option<types::ListStyleType>,
 }
 
 /// Generate marker text for a list item.
@@ -118,6 +122,35 @@ fn generate_marker_text<T: std::fmt::Debug>(lst: &T, ordinal: i32) -> Option<Str
 
     // Default fallback: disc bullet
     Some("\u{2022} ".to_string())
+}
+
+/// Marker text for an explicit `ListStyleType` — used when the HTML
+/// `<ol type="...">` attribute forces a specific counter style.
+fn marker_text_for_type(ty: types::ListStyleType, ordinal: i32) -> Option<String> {
+    use types::ListStyleType as L;
+    match ty {
+        L::None => None,
+        L::Disc => Some("\u{2022} ".to_string()),
+        L::Circle => Some("\u{25E6} ".to_string()),
+        L::Square => Some("\u{25AA} ".to_string()),
+        L::Decimal | L::DecimalLeadingZero => Some(format!("{}. ", ordinal)),
+        L::LowerAlpha => {
+            if (1..=26).contains(&ordinal) {
+                Some(format!("{}. ", (b'a' + (ordinal - 1) as u8) as char))
+            } else {
+                Some(format!("{}. ", ordinal))
+            }
+        }
+        L::UpperAlpha => {
+            if (1..=26).contains(&ordinal) {
+                Some(format!("{}. ", (b'A' + (ordinal - 1) as u8) as char))
+            } else {
+                Some(format!("{}. ", ordinal))
+            }
+        }
+        L::LowerRoman => Some(format!("{}. ", to_roman(ordinal).to_lowercase())),
+        L::UpperRoman => Some(format!("{}. ", to_roman(ordinal))),
+    }
 }
 
 /// Convert an integer to Roman numeral string.
@@ -215,31 +248,71 @@ fn collect_element_with_counter(
 
     // Initialize counter for <ol>/<ul> elements
     let mut child_counter: Option<ListCounter> = if tag == "ol" {
-        // Check for start attribute via Stylo — defaults to 1
-        // Stylo doesn't expose HTML attributes directly, but the UA stylesheet
-        // + author CSS handle `counter-reset`. We default to 1.
-        Some(ListCounter { value: 1 })
+        // HTML `<ol type="i">` overrides CSS list-style-type per the HTML
+        // spec. This also routes around Stylo's servo-mode inability to
+        // parse `list-style-type: lower-roman`/`upper-roman`.
+        let dom = adapter::dom();
+        let node = dom.node(element.node_id());
+        let type_override = get_element_attr(node, "type").and_then(|t| match t.as_str() {
+            "1" => Some(types::ListStyleType::Decimal),
+            "a" => Some(types::ListStyleType::LowerAlpha),
+            "A" => Some(types::ListStyleType::UpperAlpha),
+            "i" => Some(types::ListStyleType::LowerRoman),
+            "I" => Some(types::ListStyleType::UpperRoman),
+            _ => None,
+        });
+        // `<ol start="N">` sets the starting ordinal. Negative and zero
+        // values are permitted by the HTML spec.
+        let start = get_element_attr(node, "start")
+            .and_then(|s| s.trim().parse::<i32>().ok())
+            .unwrap_or(1);
+        Some(ListCounter {
+            value: start,
+            type_override,
+        })
     } else if tag == "ul" || tag == "menu" {
-        Some(ListCounter { value: 0 }) // unordered, counter not used for numbering
+        // Unordered lists: counter exists for symmetry but is not consulted
+        // for numbering. No type override (ul uses disc/circle/square via CSS).
+        Some(ListCounter {
+            value: 0,
+            type_override: None,
+        })
     } else {
         None
     };
 
     // Use parent's counter if this is a list item
     let marker_prefix = if is_list_item {
-        let list_style = style.get_list();
-        let lst = list_style.clone_list_style_type();
+        // `<li value="N">` resets this item's ordinal and seeds the counter
+        // for subsequent siblings (HTML §4.4.8). Applied before the counter
+        // is read below.
+        if let Some(ref mut counter) = list_counter {
+            let dom = adapter::dom();
+            let node = dom.node(element.node_id());
+            if let Some(v) =
+                get_element_attr(node, "value").and_then(|s| s.trim().parse::<i32>().ok())
+            {
+                counter.value = v;
+            }
+        }
 
-        // Get ordinal from parent counter
-        let ordinal = if let Some(ref mut counter) = list_counter {
+        // Get ordinal from parent counter; also inherit its HTML
+        // `<ol type>` override if set.
+        let (ordinal, type_override) = if let Some(ref mut counter) = list_counter {
             let val = counter.value;
             counter.value += 1;
-            val
+            (val, counter.type_override)
         } else {
-            1
+            (1, None)
         };
 
-        generate_marker_text(&lst, ordinal)
+        if let Some(ov) = type_override {
+            marker_text_for_type(ov, ordinal)
+        } else {
+            let list_style = style.get_list();
+            let lst = list_style.clone_list_style_type();
+            generate_marker_text(&lst, ordinal)
+        }
     } else {
         None
     };
@@ -324,6 +397,7 @@ fn collect_element_with_counter(
                         flush_inline_group(
                             &mut pending_inline,
                             parent_text_align,
+                            el.font.direction,
                             el.font.text_indent,
                             &mut el.children,
                         );
@@ -339,6 +413,7 @@ fn collect_element_with_counter(
     flush_inline_group(
         &mut pending_inline,
         parent_text_align,
+        el.font.direction,
         el.font.text_indent,
         &mut el.children,
     );
@@ -678,6 +753,7 @@ fn inject_synthetic_text(el: &mut StyledElement, text: &str, color: CGColor) {
             decoration: None,
         })],
         text_align: el.font.text_align,
+        direction: el.font.direction,
         text_indent: el.font.text_indent,
     }));
 }
@@ -811,6 +887,7 @@ fn build_inline_decoration(el: &StyledElement) -> Option<InlineBoxDecoration> {
 fn flush_inline_group(
     pending: &mut Vec<InlineRunItem>,
     text_align: TextAlign,
+    direction: types::Direction,
     text_indent: CssLength,
     children: &mut Vec<StyledNode>,
 ) {
@@ -832,6 +909,7 @@ fn flush_inline_group(
     children.push(StyledNode::InlineGroup(InlineGroup {
         items,
         text_align,
+        direction,
         text_indent,
     }));
 }
@@ -2322,15 +2400,29 @@ fn extract_font(style: &ComputedValues, current_color: CGColor) -> FontProps {
         ..Default::default()
     };
 
-    // Text align
+    // Direction (ltr / rtl) — inherited. Affects Skia paragraph base
+    // direction for bidi reordering.
+    {
+        use style::properties::longhands::direction::computed_value::T as StyloDir;
+        props.direction = match style.get_inherited_box().clone_direction() {
+            StyloDir::Ltr => types::Direction::Ltr,
+            StyloDir::Rtl => types::Direction::Rtl,
+        };
+    }
+
+    // Text align. Logical `start` / `end` keywords resolve against the
+    // already-extracted `direction`: in LTR, `start` = left; in RTL,
+    // `start` = right.
     use style::values::specified::text::TextAlignKeyword;
+    let (logical_start, logical_end) = match props.direction {
+        types::Direction::Ltr => (TextAlign::Left, TextAlign::Right),
+        types::Direction::Rtl => (TextAlign::Right, TextAlign::Left),
+    };
     props.text_align = match inherited_text.text_align {
-        TextAlignKeyword::Start | TextAlignKeyword::Left | TextAlignKeyword::MozLeft => {
-            TextAlign::Left
-        }
-        TextAlignKeyword::End | TextAlignKeyword::Right | TextAlignKeyword::MozRight => {
-            TextAlign::Right
-        }
+        TextAlignKeyword::Start => logical_start,
+        TextAlignKeyword::End => logical_end,
+        TextAlignKeyword::Left | TextAlignKeyword::MozLeft => TextAlign::Left,
+        TextAlignKeyword::Right | TextAlignKeyword::MozRight => TextAlign::Right,
         TextAlignKeyword::Center | TextAlignKeyword::MozCenter => TextAlign::Center,
         TextAlignKeyword::Justify => TextAlign::Justify,
     };

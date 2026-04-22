@@ -208,6 +208,9 @@ pub struct ReplacedContent {
 pub struct InlineGroup {
     pub items: Vec<InlineRunItem>,
     pub text_align: TextAlign,
+    /// Inherited `direction` — sets the paragraph's base bidi
+    /// direction (LTR / RTL). Passed to Skia's `ParagraphStyle`.
+    pub direction: super::types::Direction,
     /// Inherited `text-indent` of the containing block. Applied as a
     /// first-line-only inline-start offset by prepending a Skia
     /// placeholder to the Paragraph.
@@ -828,6 +831,7 @@ pub struct FontProps {
     pub word_spacing: f32,
     pub text_align: TextAlign,
     pub text_transform: TextTransform,
+    pub direction: super::types::Direction,
     /// Bitfield: multiple decorations can be active simultaneously.
     /// CSS `text-decoration-line: underline line-through` sets both.
     pub decoration_underline: bool,
@@ -859,6 +863,7 @@ impl Default for FontProps {
             word_spacing: 0.0,
             text_align: TextAlign::Left,
             text_transform: TextTransform::None,
+            direction: super::types::Direction::Ltr,
             decoration_underline: false,
             decoration_overline: false,
             decoration_line_through: false,

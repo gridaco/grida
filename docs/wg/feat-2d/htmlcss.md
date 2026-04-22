@@ -338,7 +338,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 | CSS Property           | Status | Notes |
 | ---------------------- | ------ | ----- |
-| `direction`            | ❌     |       |
+| `direction`            | ✅     | ltr/rtl — Skia paragraph base direction; also resolves logical `text-align: start/end` |
 | `writing-mode`         | ❌     |       |
 | `unicode-bidi`         | ❌     |       |
 | `text-orientation`     | ❌     |       |
@@ -369,7 +369,7 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 | `<ul>` with disc/circle/square | ✅     | Marker text prepended to list item content    |
 | `<ol>` with decimal numbering  | ✅     | Auto-incrementing counter                     |
 | `lower-alpha`, `upper-alpha`   | ✅     |                                               |
-| `lower-roman`, `upper-roman`   | ❌     | Stylo servo-mode limitation (servo/stylo#349) |
+| `lower-roman`, `upper-roman`   | ⚠️     | Via HTML `<ol type="i">`/`"I"` attribute (Stylo servo can't parse the CSS form) |
 | `list-style-type: none`        | ✅     |                                               |
 | `list-style-image`             | ❌     |                                               |
 | `list-style-position`          | ❌     |                                               |

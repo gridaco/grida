@@ -2224,6 +2224,7 @@ fn paint_text(canvas: &Canvas, run: &TextRun, x: f32, y: f32, width: f32, fonts:
         TextAlign::Justify => textlayout::TextAlign::Justify,
     };
     ps.set_text_align(align);
+    ps.set_text_direction(super::layout::direction_to_skia(run.font.direction));
 
     let mut builder = ParagraphBuilder::new(&ps, fonts);
 
@@ -2275,6 +2276,7 @@ fn paint_inline_group(
         TextAlign::Justify => textlayout::TextAlign::Justify,
     };
     ps.set_text_align(align);
+    ps.set_text_direction(super::layout::direction_to_skia(group.direction));
 
     let mut builder = ParagraphBuilder::new(&ps, fonts);
 
