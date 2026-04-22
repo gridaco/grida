@@ -171,7 +171,7 @@ The kit's primitives are stylised — close to the product but not pixel-clones.
 | Primitive                    | Source file (in `editor/`)                                                            | What to read for                                         |
 | ---------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Selection chrome / handles   | `grida-canvas-react/viewport/surface.tsx`                                             | Handle sizes, hover states, modifier behaviour           |
-| Size meter (live readout)    | `grida-canvas-react/viewport/ui/size.tsx`                                             | Badge geometry, position relative to selection           |
+| Size meter (live readout)    | `grida-canvas-react/viewport/ui/meter.tsx`                                            | Badge geometry, position relative to selection           |
 | Distance meter (measurement) | `grida-canvas-react/viewport/ui/measurement.tsx`, `vector-measurement.tsx`            | What measurement actually shows (distance, axis-aligned) |
 | Workbench colours            | `grida-canvas-react/ui-config.ts` → `WorkbenchColors`                                 | Canonical hex values: `sky #00a6f4`, `red #f44336`, etc. |
 | Keycap                       | `components/ui/kbd.tsx`                                                               | Pill geometry, font, fg/bg tokens                        |
