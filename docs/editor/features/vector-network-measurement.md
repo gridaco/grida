@@ -17,6 +17,8 @@ The feature activates when you:
 
 It uses the same visual system as regular measurements: guide lines, auxiliary lines, and distance labels showing top/right/bottom/left spacing.
 
+![Holding Alt while hovering a Bezier segment of a vector network displays axis-aligned X and Y distances from the selected vertex (A) to the parametric point under the cursor on the hovered curve (B), drawn as red guide lines with distance badges and dashed alignment helpers.](../resources/vector-network-measurement-alt-hover.svg)
+
 ### Measurement Triggers
 
 - **Segment hover**: When hovering over a curve segment, measures from selection to the parametric point on the curve
