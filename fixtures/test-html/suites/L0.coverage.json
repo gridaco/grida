@@ -29,6 +29,7 @@
     { "path": "../L0/paint-transform-scale.html" },
     { "path": "../L0/paint-transform-rotate.html" },
     { "path": "../L0/paint-opacity-levels.html" },
-    { "path": "../L0/paint-position-absolute-simple.html" }
+    { "path": "../L0/paint-position-absolute-simple.html" },
+    { "path": "../L0/paint-z-index-simple.html" }
   ]
 }
