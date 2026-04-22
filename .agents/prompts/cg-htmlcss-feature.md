@@ -21,7 +21,7 @@ the _property-specific callouts_ as advisory.
 
 ## The five phases
 
-```
+```text
 ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
 │ 1. AUDIT │→ │2. GROUND │→ │3. FIXTURE│→ │ 4. IMPL  │→ │5. VERIFY │
 └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘
@@ -289,7 +289,7 @@ passes (audit+ground+fixture → implement → verify), with a
 checkpoint at each pass that future-you or a reviewer can read
 without the conversation.
 
-```
+```text
 Drive the htmlcss feature loop for: <property or behavior>.
 Follow .agents/prompts/cg-htmlcss-feature.md.
 
