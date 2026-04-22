@@ -47,6 +47,7 @@
     { "path": "../L0/layout-flex-align-items.html" },
     { "path": "../L0/paint-margin-auto-center.html" },
     { "path": "../L0/layout-flex-grow.html" },
-    { "path": "../L0/paint-color-hex-alpha.html" }
+    { "path": "../L0/paint-color-hex-alpha.html" },
+    { "path": "../L0/layout-flex-wrap.html" }
   ]
 }
