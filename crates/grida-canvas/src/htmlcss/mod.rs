@@ -128,6 +128,45 @@ impl ImageProvider for PreloadedImages {
     }
 }
 
+/// Inject one or more author stylesheets into an HTML document string.
+///
+/// Concatenates `css_bodies` into a single `<style>` block inserted
+/// before `</head>`. Falls back to prepending when no `</head>` is
+/// present. Injected rules are the last author sheet, so they win
+/// cascade ties; mark rules `!important` to override non-important
+/// fixture rules regardless of source order.
+///
+/// # Example
+///
+/// ```ignore
+/// let css = std::fs::read_to_string("theme.css")?;
+/// let patched = htmlcss::with_extra_stylesheets(&html, &[css]);
+/// let picture = htmlcss::render(&patched, width, height, &fonts, &images)?;
+/// ```
+pub fn with_extra_stylesheets<S: AsRef<str>>(html: &str, css_bodies: &[S]) -> String {
+    if css_bodies.is_empty() {
+        return html.to_string();
+    }
+    let mut combined = String::new();
+    combined.push_str("<style>\n");
+    for body in css_bodies {
+        combined.push_str(body.as_ref());
+        combined.push('\n');
+    }
+    combined.push_str("</style>");
+
+    // HTML tag names are ASCII, so lowercasing the haystack is safe.
+    // One pass, correct for any casing of `</head>`.
+    if let Some(idx) = html.to_ascii_lowercase().find("</head>") {
+        let mut out = String::with_capacity(html.len() + combined.len());
+        out.push_str(&html[..idx]);
+        out.push_str(&combined);
+        out.push_str(&html[idx..]);
+        return out;
+    }
+    format!("{combined}{html}")
+}
+
 /// Render HTML+CSS to a Skia Picture.
 ///
 /// Images referenced by `<img src>` or `background-image: url()` are

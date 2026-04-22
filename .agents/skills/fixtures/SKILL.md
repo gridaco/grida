@@ -43,6 +43,16 @@ edge case** that the codebase supports or intends to support. This includes:
   filename alone should tell you what's being tested.
 - **Labeled specimens.** Within a fixture, label each test case with the
   value being exercised so both humans and heuristics can identify regions.
+- **Match the fixture's subject to the viewport policy.** For refbrowser
+  fixtures under `fixtures/test-html/`, **paint / visual-property**
+  fixtures should size their root to a preset viewport (via `min-height`)
+  so cg's cull and Chromium's screenshot have identical dimensions.
+  **Layout** fixtures (box-model, flex, grid, intrinsic sizing) must
+  NOT force a body size — the output dimensions _are_ what the test
+  measures; a `min-height` hack contaminates the result. See
+  [`fixtures/test-html/README.md`](../../../fixtures/test-html/README.md)
+  for the preset list, the paint-vs-layout rule, and the per-fixture
+  `viewport` workflow for layout tests.
 - **Don't duplicate.** Before adding a fixture, check if an existing one
   already covers the behavior. Extend or split rather than duplicate.
 

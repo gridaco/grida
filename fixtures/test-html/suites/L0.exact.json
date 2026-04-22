@@ -1,0 +1,21 @@
+{
+  "name": "L0.exact",
+  "description": "Byte-exact L0 fixtures. Every fixture here MUST stay at 100.00% similarity against the Chromium oracle. Any drop = real regression.",
+  "gate": {
+    "threshold": 0,
+    "aa": false,
+    "floor": 1.0
+  },
+  "defaults": {
+    "viewport": { "width": 600, "height": 800 },
+    "wait_for": ["fonts", "networkidle"],
+    "extra_css": ["../_reftest/hide-text.css"],
+    "full_page": true
+  },
+  "fixtures": [
+    {
+      "path": "../L0/box-dimensions.html",
+      "viewport": { "width": 600, "height": 522 }
+    }
+  ]
+}

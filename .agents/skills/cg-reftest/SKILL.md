@@ -28,25 +28,26 @@ How to design, name, and review visual rendering tests in this repo.
 
 Use these terms precisely. Misusing them erodes trust in test results.
 
-| Term                               | Definition                                                                                                                                                                                                                                                            |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Reftest**                        | A test that compares renderer output against an **independent reference** (oracle) whose correctness is established outside this project — e.g. a W3C-provided PNG for an SVG test case. The oracle is the source of truth; a mismatch means our renderer is wrong.   |
-| **Independent reference / oracle** | A rendering produced by a separate, trusted implementation or defined by a specification. We do not control its content.                                                                                                                                              |
-| **Golden test**                    | A test that compares renderer output against a **previously accepted snapshot** produced by our own renderer. There is no external truth — the golden file _is_ the expected output because a human reviewed and approved it. Also called a snapshot test.            |
-| **Snapshot test**                  | Synonym for golden test. The snapshot is a frozen output that we assert has not changed.                                                                                                                                                                              |
-| **Render regression test**         | Any test whose purpose is to detect _unintended changes_ in rendering output. Golden tests are regression tests. Reftests are correctness tests.                                                                                                                      |
-| **Pixel diff**                     | Byte-level comparison of two raster images. A single differing channel value is a failure (at zero tolerance).                                                                                                                                                        |
-| **Perceptual diff**                | Comparison in a perceptual color space (e.g. YIQ via the `dify` crate). Weights differences by human visual sensitivity. More forgiving than raw pixel diff but still quantifiable.                                                                                   |
-| **rendiff**                        | Rust crate (`rendiff` v0.2) for histogram-based pixel diffing. Computes a per-channel difference histogram; thresholds are expressed as `[(max_diff, max_count), ...]` pairs. Used in `flatten_rendiff.rs` for equivalence tests. Dep in `crates/grida-canvas/`.      |
-| **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida-dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                       |
-| **pixelmatch**                     | Pure-JS perceptual image comparison library. YIQ-based, AA-aware. Used by `@grida/reftest`. Zero native deps; same conceptual model as dify, slightly different threshold semantics — see parity notes below.                                                         |
-| **`@grida/reftest`**               | General-purpose, language-agnostic TS reftest CLI + library at `packages/grida-reftest/`. Takes two directories of PNGs, diffs, scores, writes the same bucket layout and JSON report as the Rust `grida-dev reftest`. Does NOT render anything — producers upstream. |
-| **`grida-dev reftest`**            | Rust reftest runner at `crates/grida-dev/src/reftest/`. SVG-specific: renders SVG via our own cg pipeline, then diffs against a reference PNG. Canonical for SVG. For non-SVG formats, use `@grida/reftest` with an upstream renderer.                                |
-| **refig**                          | Short for "Figma reftest." Fixture suites under `fixtures/local/refig/` containing `.fig` + `document.json` + `images/` + `exports/` (oracle PNGs from Figma's Images API). Consumed by a TS render step + `@grida/reftest`. See `fixtures/local/refig/README.md`.    |
-| **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify / pixelmatch). Required when rasterization is non-deterministic across platforms.                                              |
-| **Data test**                      | A test that asserts on the scene graph or computed values directly — no rendering needed. E.g. bounding box, resolved transform matrix, computed style. The cheapest possible assertion.                                                                              |
-| **Probe test**                     | A test that asserts correctness by reading pixel values at specific coordinates in the rendered output. Requires a purpose-built fixture with a minimal color palette and documented probe points. No full-image comparison needed.                                   |
-| **Probe-friendly fixture**         | A fixture explicitly designed for probe testing: minimal colors, no decorative elements, shapes at known coordinates. Often accompanied by a `.probe.json` file declaring expected pixel values at specific points.                                                   |
+| Term                               | Definition                                                                                                                                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Reftest**                        | A test that compares renderer output against an **independent reference** (oracle) whose correctness is established outside this project — e.g. a W3C-provided PNG for an SVG test case. The oracle is the source of truth; a mismatch means our renderer is wrong.       |
+| **Independent reference / oracle** | A rendering produced by a separate, trusted implementation or defined by a specification. We do not control its content.                                                                                                                                                  |
+| **Golden test**                    | A test that compares renderer output against a **previously accepted snapshot** produced by our own renderer. There is no external truth — the golden file _is_ the expected output because a human reviewed and approved it. Also called a snapshot test.                |
+| **Snapshot test**                  | Synonym for golden test. The snapshot is a frozen output that we assert has not changed.                                                                                                                                                                                  |
+| **Render regression test**         | Any test whose purpose is to detect _unintended changes_ in rendering output. Golden tests are regression tests. Reftests are correctness tests.                                                                                                                          |
+| **Pixel diff**                     | Byte-level comparison of two raster images. A single differing channel value is a failure (at zero tolerance).                                                                                                                                                            |
+| **Perceptual diff**                | Comparison in a perceptual color space (e.g. YIQ via the `dify` crate). Weights differences by human visual sensitivity. More forgiving than raw pixel diff but still quantifiable.                                                                                       |
+| **rendiff**                        | Rust crate (`rendiff` v0.2) for histogram-based pixel diffing. Computes a per-channel difference histogram; thresholds are expressed as `[(max_diff, max_count), ...]` pairs. Used in `flatten_rendiff.rs` for equivalence tests. Dep in `crates/grida-canvas/`.          |
+| **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida-dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                           |
+| **pixelmatch**                     | Pure-JS perceptual image comparison library. YIQ-based, AA-aware. Used by `@grida/reftest`. Zero native deps; same conceptual model as dify, slightly different threshold semantics — see parity notes below.                                                             |
+| **`@grida/reftest`**               | General-purpose, language-agnostic TS reftest CLI + library at `packages/grida-reftest/`. Takes two directories of PNGs, diffs, scores, writes the same bucket layout and JSON report as the Rust `grida-dev reftest`. Does NOT render anything — producers upstream.     |
+| **`grida-dev reftest`**            | Rust reftest runner at `crates/grida-dev/src/reftest/`. SVG-specific: renders SVG via our own cg pipeline, then diffs against a reference PNG. Canonical for SVG. For non-SVG formats, use `@grida/reftest` with an upstream renderer.                                    |
+| **refig**                          | Short for "Figma reftest." Fixture suites under `fixtures/local/refig/` containing `.fig` + `document.json` + `images/` + `exports/` (oracle PNGs from Figma's Images API). Consumed by a TS render step + `@grida/reftest`. See `fixtures/local/refig/README.md`.        |
+| **refbrowser**                     | Short for "headless-browser reftest." HTML/CSS fixtures under `fixtures/test-html/L0/` rendered by Playwright Chromium as the oracle vs. our `cg` htmlcss renderer. Producer script: `.agents/skills/cg-reftest/scripts/refbrowser_render.ts`; diff via `@grida/reftest`. |
+| **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify / pixelmatch). Required when rasterization is non-deterministic across platforms.                                                  |
+| **Data test**                      | A test that asserts on the scene graph or computed values directly — no rendering needed. E.g. bounding box, resolved transform matrix, computed style. The cheapest possible assertion.                                                                                  |
+| **Probe test**                     | A test that asserts correctness by reading pixel values at specific coordinates in the rendered output. Requires a purpose-built fixture with a minimal color palette and documented probe points. No full-image comparison needed.                                       |
+| **Probe-friendly fixture**         | A fixture explicitly designed for probe testing: minimal colors, no decorative elements, shapes at known coordinates. Often accompanied by a `.probe.json` file declaring expected pixel values at specific points.                                                       |
 
 ---
 
@@ -266,6 +267,301 @@ is the threshold where the renderer needs attention.
   `document.json` — not from a suite-wide viewport. The render step
   must honor each node's preset.
 
+### HTML/CSS — the refbrowser reftest pipeline
+
+HTML/CSS fixtures have **no pre-baked oracle** — the oracle is a real
+browser engine. Like refig, refbrowser renders the same fixture in two
+places and diffs the PNGs; unlike refig, both renders are reproducible
+locally (no cloud round-trip).
+
+```
+fixtures/test-html/
+├── L0/<name>.html                 ── fixtures
+├── _reftest/hide-text.css         ── shared helper stylesheets
+└── suites/
+    ├── L0.exact.json              ── must pass 100.00%; CI gate
+    └── L0.coverage.json           ── aspirational scope; tracks progress
+
+        │
+        ├── cargo run -p cg --example golden_htmlcss -- --suite <suite>
+        │       └─► $TMPDIR/grida-htmlcss-goldens/<name>.png   (cg actual)
+        │
+        └── refbrowser_render.ts --suite <suite>
+                └─► target/refbrowser/<suite>/expected/<name>.png   (Chromium oracle)
+
+                        ▼
+                reftest --actual-dir … --expected-dir … --threshold 0
+                        └─► target/reftests/<suite>/report.json + buckets
+```
+
+**Oracle**: headless Chromium via Playwright. Chromium's Blink is the
+reference implementation for most CSS features; divergence from Blink
+is a gap in our `cg` htmlcss pipeline (or a known difference documented
+in `docs/wg/feat-2d/htmlcss.md`).
+
+> **See also: web-platform-tests (WPT).** The W3C's
+> [wpt.live](https://wpt.live) suite is the standards-body reftest
+> harness — same concept as refbrowser, but cross-engine (Blink,
+> WebKit, Gecko) and backed by spec-author-written fixtures with
+> explicit pass criteria. Consider pulling WPT fixtures into
+> `fixtures/test-html/` when a CSS feature has a mature WPT section
+> and you want spec-conformance signal rather than just "matches
+> Chromium." Out of scope for this skill today; refbrowser is the
+> faster local loop.
+
+#### Suites: `L0.exact` vs `L0.coverage`
+
+Everything is driven by **suite JSON files** at
+`fixtures/test-html/suites/`. A suite enumerates fixtures, their
+per-fixture render config, and the gate policy.
+
+| Suite              | What it contains                                                                              | Gate                       |
+| ------------------ | --------------------------------------------------------------------------------------------- | -------------------------- |
+| `L0.exact.json`    | Fixtures currently at 100.00% byte-exact parity with Chromium. Any drop is a real regression. | `floor: 1.0`, strict diff. |
+| `L0.coverage.json` | All aspirational L0 fixtures — the full backlog. Scores land wherever they land.              | Informational only.        |
+
+**Promoting a fixture to `exact`** — once a fixture reaches 100.00%
+against the current suite config, move its entry from `coverage` →
+`exact`. Do **not** lower the exact suite's floor to fit new entries;
+the bar exists so regressions are loud.
+
+Per-fixture `.reftest.json` sidecars **do not exist** anymore. All
+config lives in the suite file.
+
+#### Suite JSON shape
+
+```json
+{
+  "name": "L0.exact",
+  "description": "Byte-exact fixtures; any drop = regression.",
+  "gate": { "threshold": 0, "aa": false, "floor": 1.0 },
+  "defaults": {
+    "wait_for": ["fonts", "networkidle"],
+    "extra_css": ["../_reftest/hide-text.css"],
+    "full_page": true
+  },
+  "fixtures": [
+    {
+      "path": "../L0/box-dimensions.html",
+      "viewport": { "width": 600, "height": 522 }
+    }
+  ]
+}
+```
+
+- `defaults` — applied to every fixture. Each fixture entry can override any field.
+- `fixtures[].path` and every `extra_css[]` path resolve **relative to the suite file**.
+- `viewport.height` must match cg's cull height for the diff to succeed; render cg once and read `WxH` to calibrate.
+- `gate.threshold` / `gate.aa` are inputs to the pixelmatch diff; `gate.floor` is the aggregate pass bar on similarity.
+
+#### The three-step pipeline
+
+**1. Render expecteds (browser oracle)**
+
+```sh
+# one-time: install Chromium for Playwright
+pnpm --filter @grida/reftest exec playwright install chromium
+
+# render the whole suite
+pnpm --filter @grida/reftest exec tsx \
+  .agents/skills/cg-reftest/scripts/refbrowser_render.ts \
+  --suite   fixtures/test-html/suites/L0.exact.json \
+  --out-dir target/refbrowser/L0.exact/expected
+```
+
+Ad-hoc single-file render (no suite, defaults only) — useful while authoring a fixture:
+
+```sh
+pnpm --filter @grida/reftest exec tsx \
+  .agents/skills/cg-reftest/scripts/refbrowser_render.ts \
+  --fixture fixtures/test-html/L0/paint-background-solid.html \
+  --out-dir /tmp/refbrowser-verify
+```
+
+**2. Render actuals (our pipeline)** — the `golden_htmlcss` example
+reads the same suite JSON, resolves `extra_css` relative to the suite
+file, and applies each stylesheet via
+`htmlcss::with_extra_stylesheets` before rendering, so the cascade is
+symmetric with Chromium.
+
+```sh
+cargo run -p cg --example golden_htmlcss -- \
+  --suite fixtures/test-html/suites/L0.exact.json
+
+mkdir -p target/refbrowser/L0.exact/actual
+cp "$TMPDIR"grida-htmlcss-goldens/*.png target/refbrowser/L0.exact/actual/
+```
+
+**3. Diff via `@grida/reftest`** — format-agnostic, same bucket layout
+and `report.json` schema as the Rust and refig runners.
+
+Default refbrowser diff: **`--threshold 0`** (pixelmatch strictest,
+AA off). Pass each fixture's similarity against the suite's
+`gate.floor` — for `L0.exact`, that's `1.0` (100.00% byte-exact).
+
+```sh
+pnpm --filter @grida/reftest exec reftest \
+  --actual-dir   target/refbrowser/L0.exact/actual \
+  --expected-dir target/refbrowser/L0.exact/expected \
+  --output-dir   target/reftests/L0.exact \
+  --bg white \
+  --threshold 0
+```
+
+> **Gate enforcement is not yet wired into the CLI.** Today, read
+> `report.json` and assert every `tests[].similarity_score ≥
+gate.floor` in a wrapper script or CI step. A `--suite` flag on
+> `@grida/reftest` that does this automatically is a pending
+> follow-up.
+
+Output: `S99/S95/S90/S75/err/` bucket directories + `report.json`.
+Pass bar: the suite's `gate.floor`. For `L0.exact`, anything below
+100.00% is a real divergence from Blink (rounding policy, layout
+math, AA emission, etc.) — not noise. See "Reading the score" below.
+
+### Reading the score — do not trust it naively
+
+The similarity score is `1 - diff_pixels / scoring_pixels`, where
+`scoring_pixels ≈ width × height` of the screenshot. **The denominator
+is the whole canvas, not the subject under test.**
+
+This has two consequences you must internalize before reading any
+report:
+
+1. **Background dominates the score.** A fixture that paints a
+   100×100 subject on a 600×800 canvas has 92% background. A renderer
+   that emits _nothing_ for the subject still scores ~92%. A
+   renderer that paints the subject at 50% accuracy scores ~96%.
+   Neither number means what it naively looks like.
+2. **Small fixtures inflate. Full-bleed fixtures are honest.** A
+   card-in-corner composition will always look "good" on the score
+   even when broken; a composition that fills the viewport gives
+   numeric feedback proportional to real error.
+
+**Fixture-authoring rule:** size the fixture so the subject under
+test fills as much of the canvas as practical. Viewport height
+tuned to the subject's bounding box (via the suite entry's
+`viewport.height`) is the usual lever. Padding/margins around the
+subject are scoring dead weight — use them only when the test is
+_about_ spacing.
+
+**Reviewing rule:** never report a similarity number without
+eyeballing the diff PNG. A 96% score on a sparse fixture and a 96%
+score on a full-bleed fixture are _orders of magnitude_ apart in
+severity. The diff image is the source of truth; the score is a
+coarse index.
+
+For a true "fraction of the subject that matches," author a
+probe-friendly fixture (see the probe test section) and assert on
+specific pixels, or mask the background to transparent so
+`mask: alpha` counts only subject pixels. Plain refbrowser scores
+cannot give you that signal.
+
+**Per-fixture fields inside a suite entry** — all optional,
+defaults shown; any field set on an entry overrides `defaults`.
+
+```json
+{
+  "path": "../L0/<name>.html",
+  "viewport": { "width": 600, "height": 800 },
+  "wait_for": ["fonts", "networkidle"],
+  "extra_css": [],
+  "full_page": true
+}
+```
+
+- `viewport` — Chromium viewport (px). Set height to match cg's cull
+  height; mismatched dims score 0.0 at diff time (`@grida/reftest`
+  requires identical dimensions).
+- `wait_for` — `"fonts"` awaits `document.fonts.ready`, `"networkidle"`
+  awaits 500ms of no-network-activity.
+- `extra_css` — CSS files to inject into **both** sides. Paths resolve
+  relative to the suite file. Playwright applies them via `addStyleTag`;
+  cg applies them via `htmlcss::with_extra_stylesheets` before rendering,
+  so the cascade is symmetric. Fields only meaningful to Chromium
+  (`viewport`, `wait_for`, `full_page`) are ignored by cg.
+- `full_page` — capture full scrollable area (default) vs. viewport.
+
+**Pre-built helper stylesheets** under `fixtures/test-html/_reftest/`:
+
+| File            | Effect                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `hide-text.css` | `color: transparent` + `line-height: 1`. Zeros glyph coverage and pins line-box height. Use when a fixture isn't testing text. |
+
+Add more helpers here as divergence patterns emerge. Keep each one
+scoped to a single concern (hide text, normalize scrollbars, force
+web fonts, etc.) so suites can compose them.
+
+**When to reach for `hide-text.css`** — any fixture whose subject is
+paint, layout, box model, flex, grid, or positioning. The text in
+those fixtures is typically decorative labels; its glyph rendering
+and `line-height: normal` metrics diverge between Blink and Skia and
+will dominate the diff otherwise.
+
+**When NOT to use it** — fixtures whose subject IS text:
+`text-decoration`, `text-shadow`, `text-align`, bidi, `writing-mode`,
+font features. For these, leave `extra_css` empty and accept a
+below-100 score; the reftest's value there is human review of the
+diff image, not the numeric score.
+
+**Authoring workflow** for a new fixture:
+
+1. Write the `.html` fixture under `fixtures/test-html/L0/`.
+2. Add an entry to `suites/L0.coverage.json` with at least
+   `{ "path": "../L0/<name>.html" }`.
+3. Render it once via `--suite L0.coverage.json` on the cg side; note
+   the reported `WxH` in the log.
+4. Set `viewport.height = H` on the entry; add `extra_css` helpers if
+   relevant (e.g. `hide-text.css` for non-text fixtures). `defaults`
+   in the suite likely already cover the common case.
+5. Run the refbrowser producer + diff against the same suite. Review
+   the diff PNG — if the diff is dominated by a known divergence zone
+   (see below), record it in the PR description, don't suppress it.
+6. If the fixture reaches 100.00% byte-exact, move its entry from
+   `L0.coverage.json` to `L0.exact.json`.
+
+**Known divergence surfaces** — areas where cg is not yet Blink-exact.
+These are **backlog items, not tolerance excuses**. Do not tune
+thresholds to suppress them. Document the specific divergence in the
+PR description; let the score carry the truth.
+
+- **Alpha compositing rounding** — `rgba()` backgrounds, `opacity`.
+  cg and Blink choose different rounding rules (half-up vs banker's,
+  premul vs straight, operand order), producing 1-unit channel
+  deltas. Small-delta territory but still a real policy divergence.
+- **Layout math under non-uniform padding / intrinsic sizing** —
+  block widths resolving 1-3 px off when computed through flex
+  children, asymmetric padding, or `width: auto` on transparent
+  content. Shows up as diff brackets at box edges.
+- **Text** — glyph rasterization (shaper version, subpixel positioning,
+  hinting) and line-box metrics (`line-height: normal` ascent/descent)
+  diverge. For non-text fixtures inject `hide-text.css`. For
+  text-subject fixtures, accept a below-100 score and rely on the
+  diff image for review.
+- **Antialiasing on curves** — rounded corners, circles, ellipses,
+  stroke ends. cg's path flattener emits different coverage values
+  than Blink's for the same geometry.
+- **Percentage border-radius** — `border-radius: 50%` and the `H / V`
+  two-value form currently render as square in cg. Fixed-length radii
+  (`12px`, `9999px`) work.
+- **Gradients** — linear, radial, conic, repeating. Color-stop
+  interpolation and color-space handling differ; banding and
+  transition boundaries don't match.
+- **Filters and shadows** — `filter: blur`, `backdrop-filter`,
+  `box-shadow` with large blur radii. Kernel and sampling divergence
+  dominates scores.
+- **`<img>` fallbacks** — our `ImageProvider` renders a placeholder
+  rect; Chromium renders broken-image chrome. Prefer fixtures with
+  real image fills or none.
+- **System-font fallback** — bundle fonts with `@font-face` + local
+  paths when the fixture specifically tests font rendering.
+- **Scrollbar width** — default `full_page: true` captures document
+  height and sidesteps scrollbar chrome; flip only when testing
+  scrollbar geometry.
+- **Dimension drift** — changing a fixture's layout invalidates its
+  `viewport.height` in the suite entry. Re-run `golden_htmlcss` with
+  `--suite`, update the entry's `viewport.height`, re-run refbrowser.
+
 **Oracle type summary:**
 
 | Input format            | Oracle source            | Test type   |
@@ -274,7 +570,134 @@ is the threshold where the renderer needs attention.
 | SVG (arbitrary, no PNG) | resvg-rendered PNG       | Reftest     |
 | SVG (Grida extensions)  | Our own prior output     | Golden test |
 | Figma REST / .fig       | Figma-exported PNG       | Reftest     |
+| HTML / CSS (embed)      | Playwright Chromium PNG  | Reftest     |
 | `.grida` native         | Our own prior output     | Golden test |
+
+---
+
+## Heuristic techniques (future work)
+
+Two techniques that scale reftesting beyond "fixture in, score out."
+Both are format-agnostic — they apply anywhere we control the oracle
+pipeline (refbrowser, refsvg-via-resvg), and both are **unimplemented
+today**. They're documented here so the design is shared before
+anyone starts building.
+
+### Subtree bisection — diff attribution
+
+> Aliases: _diff attribution_, _culprit isolation_. Delta debugging
+> applied to rendering.
+>
+> **TODO — tooling not ready.** Manual application only today.
+
+A reftest gives you a single similarity score and a diff PNG. For a
+minimal fixture that's enough — you eyeball the diff and the culprit
+is obvious. As fixtures scale (multi-element compositions, nested
+layout, overlapping subtrees), you know _that_ there's a divergence
+but not _which_ element owns it.
+
+**The technique** narrows "something in this fixture diverges" to
+"this specific element's rendering is wrong," in two modes:
+
+1. **Region → element (fast path).** Extract the bbox of high-delta
+   regions from the diff PNG (connected-components or simple
+   threshold pass). Match each bbox against element bounds in the
+   fixture — confidently possible when elements are absolutely
+   positioned or when the layout tree has dumped bounds available.
+   One-shot lookup; names the culprit directly.
+
+2. **Isolation bisection (slow path).** When region→element is
+   ambiguous (overlapping elements, pure flow layout), generate
+   temporary scoped-down fixtures by injecting override CSS that
+   hides all siblings / cousins of a candidate subtree
+   (`display: none` on the rest, or `visibility: hidden` if
+   layout must be preserved). Re-run the reftest on each isolated
+   view. Iterate through the element tree to produce per-subtree
+   scores and converge on the offending node.
+
+The two-path split matters because mode (1) is O(1) in reftest runs
+and mode (2) is O(log n) at best — prefer (1) whenever bbox→element
+is unambiguous.
+
+**Applicability.**
+
+| Reftest        | Oracle controllable? | Subtree bisection viable? |
+| -------------- | -------------------- | ------------------------- |
+| refbrowser     | Yes (Playwright)     | ✅ Yes                    |
+| refsvg (resvg) | Yes (local CLI)      | ✅ Yes                    |
+| W3C SVG suite  | No (pre-baked PNG)   | ❌ No                     |
+| refig (Figma)  | No (manual export)   | ❌ No                     |
+
+Figma is explicitly out: isolating a subtree would require
+re-exporting from the Figma app, which is an upstream human step.
+
+**Tooling shape (when built).** A script that:
+
+1. Reads a reftest's diff PNG.
+2. Extracts high-delta bounding boxes.
+3. Attempts region→element match against a parsed fixture tree.
+4. On ambiguity, writes override CSS for each candidate subtree,
+   re-runs the producer + diff, accumulates per-subtree scores.
+5. Outputs a JSON report keyed by element selector, with a score
+   and a small preview diff per subtree.
+
+Not unique to htmlcss — the same pattern works for any tree-structured
+oracle with controllable input (SVG `<g>` subtrees, scene graph nodes
+in .grida, etc.).
+
+### Viewport sweep — width-matrix for layout fixtures
+
+> Aliases: _width sweep_, _responsive sweep_, _width matrix_.
+>
+> **TODO — tooling not ready.** Single-width runs only today.
+
+A single-viewport reftest catches a layout bug at that one width. It
+misses bugs that only manifest at a different width — which for CSS
+layout is most bugs (flex basis resolution, wrap points, grid
+`auto-fill`, `min-content` / `max-content` interaction,
+percentage-sized children against unusual parent widths).
+
+**The technique.** Render the same layout fixture at a list of
+viewport widths and diff each independently. A typical sweep:
+
+```
+widths: [320, 600, 768, 1024, 1280]  // mobile → desktop span
+```
+
+Produces N PNG pairs per fixture and N similarity scores. A fixture
+passes only if _every_ width passes.
+
+**Why width, not height.** CSS content flows vertically as a function
+of the containing block's width; height is mostly an output, not an
+input. Width variance exercises most layout regimes. Height variance
+is relevant only for `min-height`/`max-height`/vh-based cases, which
+are narrower and better covered by dedicated single-width fixtures.
+
+**Applicability.** Layout-category fixtures only. Paint fixtures
+(color, opacity, shadow, gradient, border-radius) render a fixed-size
+subject inside a fixed canvas — sweeping widths adds no signal and
+just multiplies work.
+
+**Tooling shape (when built).** Suite schema grows a `widths` array
+on layout entries:
+
+```json
+{
+  "path": "../L0/box-dimensions.html",
+  "widths": [320, 600, 1024]
+}
+```
+
+Producers loop over `widths`, emitting PNGs named
+`<stem>@<width>.png`. `@grida/reftest` treats each as a separate
+test. No per-width `viewport.height` — let each width produce its
+natural cull height (the measurement _is_ the output).
+
+This technique is also format-agnostic — responsive SVG, responsive
+refbrowser, and responsive .grida scenes all benefit from the same
+width-sweep harness.
+
+---
 
 ### Golden tests — native/proprietary/internal formats
 
@@ -581,6 +1004,37 @@ pnpm --filter @grida/reftest exec reftest \
 
 In a PR: _"refig(refig-standard): auto-layout row spacing fix, average
 similarity 0.81 → 0.94, 612 tests S75→S95."_
+
+### True reftest — HTML/CSS refbrowser against Playwright Chromium
+
+```bash
+# Pre-requisite: Chromium installed for Playwright
+pnpm --filter @grida/reftest exec playwright install chromium
+
+# 1. Render expecteds via Playwright Chromium
+pnpm --filter @grida/reftest exec tsx .agents/skills/cg-reftest/scripts/refbrowser_render.ts \
+  --fixture-dir fixtures/test-html/L0 \
+  --out-dir     target/refbrowser/expected
+
+# 2. Render actuals via our cg pipeline
+cargo run -p cg --example golden_htmlcss -- fixtures/test-html/L0
+mkdir -p target/refbrowser/actual
+cp "$TMPDIR"grida-htmlcss-goldens/*.png target/refbrowser/actual/
+
+# 3. Diff actuals against Chromium oracle, write bucketed report
+pnpm --filter @grida/reftest exec reftest \
+  --actual-dir   target/refbrowser/actual \
+  --expected-dir target/refbrowser/expected \
+  --output-dir   target/reftests/htmlcss \
+  --bg white
+
+# Result: target/reftests/htmlcss/report.json + S99/S95/S90/S75/err/ buckets.
+# A score < 1.0 means our htmlcss renderer diverges from Chromium.
+# This is a genuine reftest — Playwright Chromium is the oracle.
+```
+
+In a PR: _"refbrowser(htmlcss): background-repeat space/round landed,
+average similarity 0.72 → 0.91 across 6 repeat fixtures."_
 
 ### Golden/regression test — custom effect
 

@@ -1,0 +1,23 @@
+{
+  "name": "L0.coverage",
+  "description": "Aspirational L0 coverage. Fixtures here are tracked for progress; they are NOT required to be at 100%. Promote a fixture to L0.exact once it reaches 100.00% byte-exact parity with Chromium.",
+  "defaults": {
+    "viewport": { "width": 600, "height": 800 },
+    "wait_for": ["fonts", "networkidle"],
+    "extra_css": ["../_reftest/hide-text.css"],
+    "full_page": true
+  },
+  "fixtures": [
+    {
+      "path": "../L0/box-dimensions.html",
+      "viewport": { "width": 600, "height": 522 }
+    },
+    {
+      "path": "../L0/box-padding.html",
+      "viewport": { "width": 600, "height": 222 }
+    },
+    { "path": "../L0/paint-background-solid.html" },
+    { "path": "../L0/paint-opacity.html" },
+    { "path": "../L0/paint-border-radius.html" }
+  ]
+}
