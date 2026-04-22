@@ -91,14 +91,14 @@ When the kit changes, walk the grep output and update each file.
 
 `snippets/` is structured as **one overview catalog plus focused per-family files**:
 
-| File             | Role                                                                                                     |
-| ---------------- | -------------------------------------------------------------------------------------------------------- |
-| `template.svg`   | **Starter** — copy this to begin a new figure. Has every CSS class, def, filter, and symbol pre-wired.   |
-| `primitives.svg` | **Index / overview catalog** — every primitive in one tall canvas. Skim here first.                      |
+| File             | Role                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `template.svg`   | **Starter** — copy this to begin a new figure. Has every CSS class, def, filter, and symbol pre-wired.                    |
+| `primitives.svg` | **Index / overview catalog** — every primitive in one tall canvas. Skim here first.                                       |
 | `cursors.svg`    | **Cursors** — pointer, move, grab, grabbing, rotate, h-resize, v-resize, crosshair, text. With sizes and hotspot offsets. |
-| `meters.svg`     | **Meters** — `.badge` (size, blue) and `.badge-distance` (measurement, red) variants side-by-side.       |
-| `handles.svg`    | **Handles & pins** — square `.handle`, `#ft-handle` (circle), `#anchor-pin`.                             |
-| `keycap.svg`     | **Keycap** — modifier-key pill variants (single letter, glyph, multi-char, combos).                      |
+| `meters.svg`     | **Meters** — `.badge` (size, blue) and `.badge-distance` (measurement, red) variants side-by-side.                        |
+| `handles.svg`    | **Handles & pins** — square `.handle`, `#ft-handle` (circle), `#anchor-pin`.                                              |
+| `keycap.svg`     | **Keycap** — modifier-key pill variants (single letter, glyph, multi-char, combos).                                       |
 
 **When to look in which:**
 

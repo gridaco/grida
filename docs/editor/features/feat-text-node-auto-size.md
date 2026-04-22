@@ -27,11 +27,11 @@ stays put. The opposite side moves in.
 
 ![Left-aligned text keeps its left edge fixed; center-aligned text keeps its center; right-aligned text keeps its right edge.](../resources/text-node-auto-size-alignment.svg)
 
-| Text alignment   | What stays fixed     | What moves    |
-| ---------------- | -------------------- | ------------- |
-| Left / top       | Left or top edge     | Opposite edge |
-| Center / middle  | Center of the axis   | Both edges    |
-| Right / bottom   | Right or bottom edge | Opposite edge |
+| Text alignment  | What stays fixed     | What moves    |
+| --------------- | -------------------- | ------------- |
+| Left / top      | Left or top edge     | Opposite edge |
+| Center / middle | Center of the axis   | Both edges    |
+| Right / bottom  | Right or bottom edge | Opposite edge |
 
 This means the text appears to stay in place while the bounding box
 collapses around it, instead of jumping to a new position.
