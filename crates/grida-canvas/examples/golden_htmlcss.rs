@@ -249,9 +249,14 @@ fn parse_args(argv: &[String]) -> (Option<String>, Vec<String>) {
             suite = Some(v.clone());
             i += 2;
         } else if a.starts_with("--") {
-            // Unknown flag; skip. Keeps future-flags additive without
-            // contaminating the positional stream.
-            i += 1;
+            // Unknown long flag. If the next token looks like a value
+            // (doesn't start with `-`) swallow it too, so `--foo bar`
+            // doesn't leak `bar` into the positional stream and get
+            // treated as a file path.
+            match argv.get(i + 1) {
+                Some(next) if !next.starts_with('-') => i += 2,
+                _ => i += 1,
+            }
         } else {
             positional.push(a.clone());
             i += 1;

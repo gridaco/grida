@@ -71,7 +71,7 @@
  */
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 // `@playwright/test` re-exports `chromium` from `playwright-core` and is
 // the package actually installed in this repo (via `editor`). Using it
 // here avoids depending on a separate `playwright` package.
@@ -182,14 +182,21 @@ async function renderOne(
   await page.setViewportSize(config.viewport);
 
   // `file://` URL so relative resources resolve from the fixture's dir.
-  const fileUrl = `file://${path.resolve(htmlPath)}`;
+  // `pathToFileURL` handles Windows drive letters and percent-encodes
+  // spaces/non-ASCII, which plain string concatenation does not.
+  const fileUrl = pathToFileURL(path.resolve(htmlPath)).href;
   await page.goto(fileUrl, { waitUntil: "load" });
 
   if (config.wait_for.includes("networkidle")) {
     await page.waitForLoadState("networkidle");
   }
   if (config.wait_for.includes("fonts")) {
-    await page.evaluate(() => document.fonts.ready);
+    // Await inside the page context; `document.fonts.ready` resolves
+    // to a `FontFaceSet` which Playwright cannot serialize across the
+    // boundary. Return void so the wait is effective and typed.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
   }
 
   let cssCount = 0;

@@ -389,7 +389,7 @@ cargo run -p cg --example golden_htmlcss -- \
   --suite fixtures/test-html/suites/L0.exact.json
 
 mkdir -p target/refbrowser/L0.exact/actual
-cp "$TMPDIR"grida-htmlcss-goldens/*.png target/refbrowser/L0.exact/actual/
+cp "${TMPDIR:-/tmp}/grida-htmlcss-goldens/"*.png target/refbrowser/L0.exact/actual/
 ```
 
 **3. Diff via `@grida/reftest`** — format-agnostic, same bucket layout
@@ -1013,13 +1013,14 @@ pnpm --filter @grida/reftest exec playwright install chromium
 
 # 1. Render expecteds via Playwright Chromium
 pnpm --filter @grida/reftest exec tsx .agents/skills/cg-reftest/scripts/refbrowser_render.ts \
-  --fixture-dir fixtures/test-html/L0 \
-  --out-dir     target/refbrowser/expected
+  --suite   fixtures/test-html/suites/L0.exact.json \
+  --out-dir target/refbrowser/expected
 
 # 2. Render actuals via our cg pipeline
-cargo run -p cg --example golden_htmlcss -- fixtures/test-html/L0
+cargo run -p cg --example golden_htmlcss -- \
+  --suite fixtures/test-html/suites/L0.exact.json
 mkdir -p target/refbrowser/actual
-cp "$TMPDIR"grida-htmlcss-goldens/*.png target/refbrowser/actual/
+cp "${TMPDIR:-/tmp}/grida-htmlcss-goldens/"*.png target/refbrowser/actual/
 
 # 3. Diff actuals against Chromium oracle, write bucketed report
 pnpm --filter @grida/reftest exec reftest \
