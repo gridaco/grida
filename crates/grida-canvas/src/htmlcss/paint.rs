@@ -75,8 +75,10 @@ fn paint_box(
     let w = layout.width;
     let h = layout.height;
 
-    // ── Save state for opacity / filter / clip ──
-    let needs_layer = style.opacity < 1.0 || !style.filter.is_empty();
+    // ── Save state for opacity / filter / mix-blend-mode / clip ──
+    let needs_layer = style.opacity < 1.0
+        || !style.filter.is_empty()
+        || !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal);
     let needs_clip = style.overflow_x != types::Overflow::Visible
         || style.overflow_y != types::Overflow::Visible;
 
@@ -118,6 +120,12 @@ fn paint_box(
     if needs_layer {
         let mut layer_paint = Paint::default();
         layer_paint.set_alpha_f(style.opacity);
+        // CSS `mix-blend-mode` composites this element's stacking context
+        // onto its parent using the given blend mode (CSS Compositing 1
+        // §5). Apply as the layer's Skia blend mode.
+        if !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal) {
+            layer_paint.set_blend_mode(style.blend_mode.into());
+        }
         let has_filter = !style.filter.is_empty();
         if has_filter {
             if let Some(filter) = build_filter_chain(&style.filter) {
