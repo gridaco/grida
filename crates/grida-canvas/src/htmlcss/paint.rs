@@ -524,12 +524,74 @@ fn resolve_bg_position_axis(v: CssLength, area: f32, tile: f32) -> f32 {
     }
 }
 
+/// Map a `background-repeat` keyword to a Skia `TileMode` for the
+/// shader path. `Round` is collapsed to `Repeat` — the round-specific
+/// tile-size adjustment is applied by the caller before constructing
+/// the shader. `Space` is handled via an explicit draw loop (see
+/// [`paint_background_image_layer`]) and should never reach here.
 fn repeat_keyword_to_tile_mode(k: BackgroundRepeatKeyword) -> skia_safe::TileMode {
     match k {
         BackgroundRepeatKeyword::NoRepeat => skia_safe::TileMode::Decal,
-        // Space / Round fall back to plain repeat (P1 follow-up).
-        _ => skia_safe::TileMode::Repeat,
+        BackgroundRepeatKeyword::Repeat | BackgroundRepeatKeyword::Round => {
+            skia_safe::TileMode::Repeat
+        }
+        // Space reaches here only if the caller forgot to branch; use
+        // `Repeat` as a safe fallback rather than panicking.
+        BackgroundRepeatKeyword::Space => skia_safe::TileMode::Repeat,
     }
+}
+
+/// Tile start offsets along one axis relative to the positioning area.
+///
+/// - `NoRepeat` → `[pos]` (single copy at the resolved background-position).
+/// - `Repeat` / `Round` → offsets seeded at `pos`, spanning `[0, area]` after
+///   clipping (caller supplies the already-adjusted tile size for `Round`).
+/// - `Space` → edge-pinned offsets with whitespace distributed evenly
+///   between copies; `pos` is ignored per CSS Backgrounds §3.4.
+fn axis_tile_positions(
+    keyword: BackgroundRepeatKeyword,
+    area: f32,
+    tile: f32,
+    pos: f32,
+) -> Vec<f32> {
+    if tile <= 0.0 {
+        return Vec::new();
+    }
+    match keyword {
+        BackgroundRepeatKeyword::NoRepeat => vec![pos],
+        BackgroundRepeatKeyword::Space => space_axis_positions(area, tile),
+        BackgroundRepeatKeyword::Repeat | BackgroundRepeatKeyword::Round => {
+            repeat_axis_positions(area, tile, pos)
+        }
+    }
+}
+
+/// CSS `background-repeat: space` on one axis. If at least two copies fit,
+/// the first and last are pinned to the edges of the positioning area and
+/// the remaining whitespace is distributed evenly between copies. If fewer
+/// than two fit, revert to a single copy (spec permits arbitrary position;
+/// we pin to the start).
+fn space_axis_positions(area: f32, tile: f32) -> Vec<f32> {
+    let n = (area / tile).floor() as i32;
+    if n < 2 {
+        return vec![0.0];
+    }
+    let gap = (area - n as f32 * tile) / (n - 1) as f32;
+    (0..n).map(|k| k as f32 * (tile + gap)).collect()
+}
+
+/// Tile start offsets for `repeat` on one axis, seeded at `pos`. The first
+/// offset sits in `(-tile, 0]` so the repeating strip fills `[0, area]`
+/// after clipping.
+fn repeat_axis_positions(area: f32, tile: f32, pos: f32) -> Vec<f32> {
+    let first = pos - (pos / tile).ceil() * tile;
+    let mut out = Vec::new();
+    let mut x = first;
+    while x < area {
+        out.push(x);
+        x += tile;
+    }
+    out
 }
 
 fn paint_background_image_layer(
@@ -557,7 +619,7 @@ fn paint_background_image_layer(
         _ => None,
     };
 
-    let (tile_w, tile_h) = resolve_bg_size(
+    let (mut tile_w, mut tile_h) = resolve_bg_size(
         img.size,
         origin_rect.width(),
         origin_rect.height(),
@@ -565,6 +627,17 @@ fn paint_background_image_layer(
     );
     if tile_w <= 0.0 || tile_h <= 0.0 {
         return;
+    }
+
+    // `background-repeat: round` scales the tile so an integer number of
+    // copies fit exactly along the axis (CSS Backgrounds §3.4).
+    if img.repeat.x == BackgroundRepeatKeyword::Round {
+        let n = (origin_rect.width() / tile_w).round().max(1.0);
+        tile_w = origin_rect.width() / n;
+    }
+    if img.repeat.y == BackgroundRepeatKeyword::Round {
+        let n = (origin_rect.height() / tile_h).round().max(1.0);
+        tile_h = origin_rect.height() / n;
     }
 
     // Resolve the source image. For gradients, rasterize at tile size so the
@@ -576,33 +649,6 @@ fn paint_background_image_layer(
     let Some(src_image) = src_image else {
         return;
     };
-
-    let px =
-        resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w) + origin_rect.left;
-    let py =
-        resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h) + origin_rect.top;
-
-    let sx = tile_w / src_image.width() as f32;
-    let sy = tile_h / src_image.height() as f32;
-    let mut local = skia_safe::Matrix::scale((sx, sy));
-    local.post_translate((px, py));
-
-    let tmx = repeat_keyword_to_tile_mode(img.repeat.x);
-    let tmy = repeat_keyword_to_tile_mode(img.repeat.y);
-
-    let shader = src_image.to_shader(
-        Some((tmx, tmy)),
-        sampling_for(style.font.image_rendering),
-        Some(&local),
-    );
-    let Some(shader) = shader else {
-        return;
-    };
-
-    let mut paint = Paint::default();
-    paint.set_style(PaintStyle::Fill);
-    paint.set_anti_alias(true);
-    paint.set_shader(shader);
 
     canvas.save();
     // Clip to the referenced box with radii shrunk to match the box's
@@ -620,7 +666,54 @@ fn paint_background_image_layer(
     } else {
         canvas.clip_rect(clip_rect, ClipOp::Intersect, true);
     }
-    canvas.draw_rect(clip_rect, &paint);
+
+    let needs_space_loop = img.repeat.x == BackgroundRepeatKeyword::Space
+        || img.repeat.y == BackgroundRepeatKeyword::Space;
+
+    if needs_space_loop {
+        // `space` distributes whitespace between copies, which a single
+        // tiled shader can't express. Draw each copy individually.
+        let pos_x = resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w);
+        let pos_y = resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h);
+        let xs = axis_tile_positions(img.repeat.x, origin_rect.width(), tile_w, pos_x);
+        let ys = axis_tile_positions(img.repeat.y, origin_rect.height(), tile_h, pos_y);
+        let sampling = sampling_for(style.font.image_rendering);
+        let paint = Paint::default();
+        for y in &ys {
+            for x in &xs {
+                let dst =
+                    Rect::from_xywh(origin_rect.left + *x, origin_rect.top + *y, tile_w, tile_h);
+                canvas
+                    .draw_image_rect_with_sampling_options(&src_image, None, dst, sampling, &paint);
+            }
+        }
+    } else {
+        let px = resolve_bg_position_axis(img.position.x, origin_rect.width(), tile_w)
+            + origin_rect.left;
+        let py = resolve_bg_position_axis(img.position.y, origin_rect.height(), tile_h)
+            + origin_rect.top;
+
+        let sx = tile_w / src_image.width() as f32;
+        let sy = tile_h / src_image.height() as f32;
+        let mut local = skia_safe::Matrix::scale((sx, sy));
+        local.post_translate((px, py));
+
+        let tmx = repeat_keyword_to_tile_mode(img.repeat.x);
+        let tmy = repeat_keyword_to_tile_mode(img.repeat.y);
+
+        if let Some(shader) = src_image.to_shader(
+            Some((tmx, tmy)),
+            sampling_for(style.font.image_rendering),
+            Some(&local),
+        ) {
+            let mut paint = Paint::default();
+            paint.set_style(PaintStyle::Fill);
+            paint.set_anti_alias(true);
+            paint.set_shader(shader);
+            canvas.draw_rect(clip_rect, &paint);
+        }
+    }
+
     canvas.restore();
 }
 

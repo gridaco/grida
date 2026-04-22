@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: background-repeat — space & round</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+      }
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+      }
+      /* Tile is a sharp red/blue diagonal split so seams are visible.
+         Dimensions chosen so space/round produce non-trivial offsets:
+         180/50 → space n=3, gap=15; round n=4, tile=45.
+         120/50 → space n=2, gap=20; round n=2, tile=60. */
+      .rect {
+        width: 180px;
+        height: 120px;
+        border: 1px solid #000;
+        background-origin: border-box;
+        background-clip: border-box;
+        background-size: 50px 50px;
+        background-image: linear-gradient(
+          135deg,
+          #ff0000 0 50%,
+          #0000ff 50% 100%
+        );
+      }
+      .tall {
+        width: 120px;
+        height: 180px;
+      }
+      .rep-repeat  { background-repeat: repeat; }
+      .rep-space-x { background-repeat: space no-repeat; }
+      .rep-space-y { background-repeat: no-repeat space; }
+      .rep-space   { background-repeat: space; }
+      .rep-round-x { background-repeat: round no-repeat; }
+      .rep-round-y { background-repeat: no-repeat round; }
+      .rep-round   { background-repeat: round; }
+      .rep-space-round { background-repeat: space round; }
+      .rep-one-fits { width: 60px; background-repeat: space; }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">repeat (baseline)</div>
+        <div class="rect rep-repeat"></div>
+      </div>
+      <div class="cell">
+        <div class="label">space x, no-repeat y</div>
+        <div class="rect rep-space-x"></div>
+      </div>
+      <div class="cell">
+        <div class="label">no-repeat x, space y</div>
+        <div class="rect tall rep-space-y"></div>
+      </div>
+      <div class="cell">
+        <div class="label">space (both axes)</div>
+        <div class="rect rep-space"></div>
+      </div>
+      <div class="cell">
+        <div class="label">round x, no-repeat y</div>
+        <div class="rect rep-round-x"></div>
+      </div>
+      <div class="cell">
+        <div class="label">no-repeat x, round y</div>
+        <div class="rect tall rep-round-y"></div>
+      </div>
+      <div class="cell">
+        <div class="label">round (both axes)</div>
+        <div class="rect rep-round"></div>
+      </div>
+      <div class="cell">
+        <div class="label">space x, round y</div>
+        <div class="rect rep-space-round"></div>
+      </div>
+      <div class="cell">
+        <div class="label">space, only 1 fits (60×100, tile 50)</div>
+        <div class="rect rep-one-fits"></div>
+      </div>
+    </div>
+  </body>
+</html>
