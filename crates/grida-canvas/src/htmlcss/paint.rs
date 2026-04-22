@@ -197,7 +197,7 @@ fn paint_box(
             cy,
             cw,
             ch,
-            &style.border_radius,
+            &style.border_radius.resolved(w, h),
             style.font.image_rendering,
             images,
         );
@@ -410,7 +410,8 @@ fn paint_background(
     }
 
     let rect = Rect::from_xywh(0.0, 0.0, w, h);
-    let r = &style.border_radius;
+    let resolved_r = style.border_radius.resolved(w, h);
+    let r = &resolved_r;
 
     for layer in &style.background {
         match layer {
@@ -661,7 +662,7 @@ fn paint_background_image_layer(
     // rounded to match the inner edge").
     if !style.border_radius.is_zero() {
         let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
-        let radii = inset_radii(&style.border_radius, border_rect, clip_rect);
+        let radii = inset_radii(&style.border_radius.resolved(w, h), border_rect, clip_rect);
         let mut rrect = skia_safe::RRect::new();
         rrect.set_rect_radii(clip_rect, &radii);
         canvas.clip_rrect(rrect, ClipOp::Intersect, true);
@@ -1811,7 +1812,7 @@ fn paint_borders(
         && b.top.style != types::BorderStyle::None
         && !style.border_radius.is_zero()
     {
-        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius, w, h);
+        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius.resolved(w, h), w, h);
         return;
     }
 
@@ -2021,7 +2022,8 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
         return;
     }
 
-    let r = &style.border_radius;
+    let resolved_r = style.border_radius.resolved(w, h);
+    let r = &resolved_r;
 
     if outline.style == types::BorderStyle::Double {
         // Two concentric 1/3-width strokes separated by a 1/3-width gap.
@@ -2115,7 +2117,8 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
             h + shadow.spread * 2.0,
         );
 
-        let r = &style.border_radius;
+        let resolved_r = style.border_radius.resolved(w, h);
+        let r = &resolved_r;
         if r.is_zero() {
             canvas.draw_rect(shadow_rect, &paint);
         } else {
@@ -2141,7 +2144,8 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 
         // Clip to the box so shadow cannot bleed outside
         canvas.save();
-        let r = &style.border_radius;
+        let resolved_r = style.border_radius.resolved(w, h);
+        let r = &resolved_r;
         if r.is_zero() {
             canvas.clip_rect(box_rect, ClipOp::Intersect, true);
         } else {

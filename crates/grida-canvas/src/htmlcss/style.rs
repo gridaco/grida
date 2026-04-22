@@ -396,6 +396,13 @@ impl Outline {
 ///
 /// CSS: `border-radius: 10px / 20px` → each corner has (rx=10, ry=20).
 /// Skia: `RRect::set_rect_radii` takes `[Point; 4]` where each Point is (rx, ry).
+///
+/// Percent components (`*_pct`, as fractions in [0, 1+]) stay unresolved
+/// until paint time, when the border-box width/height is known.
+/// Per CSS Backgrounds 3 §5.3: horizontal axis % resolves against box
+/// width, vertical axis % against box height. Call [`Self::resolved`]
+/// to materialize a px-only copy before consuming `*_x` / `*_y` fields
+/// or [`Self::to_skia_radii`].
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CornerRadii {
     pub tl_x: f32,
@@ -406,6 +413,14 @@ pub struct CornerRadii {
     pub br_y: f32,
     pub bl_x: f32,
     pub bl_y: f32,
+    pub tl_x_pct: f32,
+    pub tl_y_pct: f32,
+    pub tr_x_pct: f32,
+    pub tr_y_pct: f32,
+    pub br_x_pct: f32,
+    pub br_y_pct: f32,
+    pub bl_x_pct: f32,
+    pub bl_y_pct: f32,
 }
 
 impl CornerRadii {
@@ -420,6 +435,7 @@ impl CornerRadii {
             br_y: br,
             bl_x: bl,
             bl_y: bl,
+            ..Default::default()
         }
     }
 
@@ -432,9 +448,42 @@ impl CornerRadii {
             && self.br_y == 0.0
             && self.bl_x == 0.0
             && self.bl_y == 0.0
+            && self.tl_x_pct == 0.0
+            && self.tl_y_pct == 0.0
+            && self.tr_x_pct == 0.0
+            && self.tr_y_pct == 0.0
+            && self.br_x_pct == 0.0
+            && self.br_y_pct == 0.0
+            && self.bl_x_pct == 0.0
+            && self.bl_y_pct == 0.0
+    }
+
+    /// Resolve percentage components against a box dimension, returning
+    /// a px-only `CornerRadii`. CSS Backgrounds 3 §5.3 — H axis against
+    /// width, V axis against height.
+    pub fn resolved(&self, w: f32, h: f32) -> Self {
+        Self {
+            tl_x: self.tl_x + self.tl_x_pct * w,
+            tl_y: self.tl_y + self.tl_y_pct * h,
+            tr_x: self.tr_x + self.tr_x_pct * w,
+            tr_y: self.tr_y + self.tr_y_pct * h,
+            br_x: self.br_x + self.br_x_pct * w,
+            br_y: self.br_y + self.br_y_pct * h,
+            bl_x: self.bl_x + self.bl_x_pct * w,
+            bl_y: self.bl_y + self.bl_y_pct * h,
+            tl_x_pct: 0.0,
+            tl_y_pct: 0.0,
+            tr_x_pct: 0.0,
+            tr_y_pct: 0.0,
+            br_x_pct: 0.0,
+            br_y_pct: 0.0,
+            bl_x_pct: 0.0,
+            bl_y_pct: 0.0,
+        }
     }
 
     /// Convert to Skia's `[Point; 4]` format for `RRect::set_rect_radii`.
+    /// Assumes percent fields have been resolved (see [`Self::resolved`]).
     pub fn to_skia_radii(&self) -> [skia_safe::Point; 4] {
         [
             skia_safe::Point::new(self.tl_x, self.tl_y),
@@ -444,7 +493,9 @@ impl CornerRadii {
         ]
     }
 
-    /// Max radius (for simplified single-value contexts like inline decoration).
+    /// Max px-radius (percent components are ignored). Used only for the
+    /// inline-decoration presence check in `collect.rs`, which needs a
+    /// single f32 and predates per-axis plumbing.
     pub fn max_radius(&self) -> f32 {
         self.tl_x
             .max(self.tl_y)
