@@ -392,6 +392,8 @@ fn rasterize_gradient(
     let canvas = surface.canvas();
     let mut paint = Paint::default();
     paint.set_shader(shader);
+    // Match Blink: gradients are always dithered (gradient.cc:359).
+    paint.set_dither(true);
     canvas.draw_rect(Rect::from_wh(w, h), &paint);
     surface.image_snapshot().into()
 }
@@ -1341,7 +1343,10 @@ fn to_skia_interpolation(v: super::style::GradientInterpolation) -> Interpolatio
         HM::Decreasing => HueMethod::Decreasing,
     };
     Interpolation {
-        in_premul: InPremul::No,
+        // Match Blink: legacy CSS gradients premultiply colors before
+        // interpolating (gradient.cc:282-285). For opaque stops this is a
+        // no-op; the difference shows up when stops have alpha.
+        in_premul: InPremul::Yes,
         color_space,
         hue_method,
     }
