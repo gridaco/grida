@@ -17,16 +17,19 @@
 /// ## Suite JSON shape
 ///
 ///   {
-///     "defaults": { "extra_css": ["../_reftest/hide-text.css"] },
+///     "defaults": {
+///       "viewport": { "width": 600, "height": 800 },
+///       "extra_css": ["../_reftest/hide-text.css"]
+///     },
 ///     "fixtures": [
-///       { "path": "../L0/box-dimensions.html" }
+///       { "path": "../L0/box-dimensions.html",
+///         "viewport": { "width": 600, "height": 522 } }
 ///     ]
 ///   }
 ///
 /// Per-fixture entries inherit and override `defaults`. All paths
 /// (`fixtures[].path`, `extra_css[]`) resolve **relative to the suite
-/// file**. `gate` / `viewport` fields are consumed by other tools
-/// (refbrowser, reftest diff) and ignored here.
+/// file**. `gate` and other fields unknown to this tool are ignored.
 use cg::htmlcss;
 use cg::resources::ByteStore;
 use cg::runtime::font_repository::FontRepository;
@@ -42,10 +45,18 @@ fn build_fonts() -> FontRepository {
     repo
 }
 
+#[derive(Debug, Default, Clone, Copy, Deserialize)]
+#[serde(default)]
+struct Viewport {
+    width: Option<f32>,
+    height: Option<f32>,
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 struct FixtureConfig {
     extra_css: Vec<String>,
+    viewport: Viewport,
 }
 
 #[derive(Debug, Deserialize)]
@@ -53,6 +64,8 @@ struct SuiteEntry {
     path: String,
     #[serde(default)]
     extra_css: Option<Vec<String>>,
+    #[serde(default)]
+    viewport: Option<Viewport>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -62,17 +75,30 @@ struct SuiteFile {
     fixtures: Vec<SuiteEntry>,
 }
 
+const DEFAULT_WIDTH: f32 = 600.0;
+const DEFAULT_HEIGHT: f32 = 600.0;
+
 /// Resolve a fixture entry against suite defaults. Suite-relative
-/// paths are anchored at `suite_dir`.
+/// paths are anchored at `suite_dir`. Viewport width/height inherit
+/// from `defaults` and fall back to the built-in defaults.
 fn resolve_entry(
     entry: &SuiteEntry,
     defaults: &FixtureConfig,
     suite_dir: &Path,
-) -> (PathBuf, Vec<PathBuf>) {
+) -> (PathBuf, Vec<PathBuf>, f32, f32) {
     let html = suite_dir.join(&entry.path);
     let css_rel: &[String] = entry.extra_css.as_deref().unwrap_or(&defaults.extra_css);
     let css_abs: Vec<PathBuf> = css_rel.iter().map(|r| suite_dir.join(r)).collect();
-    (html, css_abs)
+    let vp = entry.viewport.unwrap_or(defaults.viewport);
+    let width = vp
+        .width
+        .or(defaults.viewport.width)
+        .unwrap_or(DEFAULT_WIDTH);
+    let height = vp
+        .height
+        .or(defaults.viewport.height)
+        .unwrap_or(DEFAULT_HEIGHT);
+    (html, css_abs, width, height)
 }
 
 /// Populate `cache[abs]` if absent. Missing files warn; absent keys
@@ -89,9 +115,16 @@ fn ensure_css_cached(cache: &mut HashMap<PathBuf, String>, abs: &Path) {
     }
 }
 
-fn render_to_png(html: &str, width: f32, name: &str, out_dir: &Path, fonts: &FontRepository) {
+fn render_to_png(
+    html: &str,
+    width: f32,
+    height: f32,
+    name: &str,
+    out_dir: &Path,
+    fonts: &FontRepository,
+) {
     let picture =
-        htmlcss::render(html, width, 600.0, fonts, &htmlcss::NoImages).expect("render failed");
+        htmlcss::render(html, width, height, fonts, &htmlcss::NoImages).expect("render failed");
     let cull = picture.cull_rect();
     let w = cull.width().max(1.0) as i32;
     let h = cull.height().max(1.0) as i32;
@@ -113,6 +146,8 @@ fn render_to_png(html: &str, width: f32, name: &str, out_dir: &Path, fonts: &Fon
 fn render_with_extras(
     html_path: &Path,
     extras_abs: &[PathBuf],
+    width: f32,
+    height: f32,
     out_dir: &Path,
     fonts: &FontRepository,
     css_cache: &mut HashMap<PathBuf, String>,
@@ -137,7 +172,7 @@ fn render_with_extras(
         htmlcss::with_extra_stylesheets(&html, &extras)
     };
 
-    render_to_png(&html, 600.0, &name, out_dir, fonts);
+    render_to_png(&html, width, height, &name, out_dir, fonts);
 }
 
 fn render_suite(suite_path: &Path, out_dir: &Path, fonts: &FontRepository) {
@@ -154,8 +189,17 @@ fn render_suite(suite_path: &Path, out_dir: &Path, fonts: &FontRepository) {
     );
     let mut css_cache: HashMap<PathBuf, String> = HashMap::new();
     for entry in &suite.fixtures {
-        let (html_path, extras_abs) = resolve_entry(entry, &suite.defaults, suite_dir);
-        render_with_extras(&html_path, &extras_abs, out_dir, fonts, &mut css_cache);
+        let (html_path, extras_abs, width, height) =
+            resolve_entry(entry, &suite.defaults, suite_dir);
+        render_with_extras(
+            &html_path,
+            &extras_abs,
+            width,
+            height,
+            out_dir,
+            fonts,
+            &mut css_cache,
+        );
     }
 }
 
@@ -178,7 +222,15 @@ fn render_directory(dir: &Path, out_dir: &Path, fonts: &FontRepository) {
     );
     let mut css_cache: HashMap<PathBuf, String> = HashMap::new();
     for path in &entries {
-        render_with_extras(path, &[], out_dir, fonts, &mut css_cache);
+        render_with_extras(
+            path,
+            &[],
+            DEFAULT_WIDTH,
+            DEFAULT_HEIGHT,
+            out_dir,
+            fonts,
+            &mut css_cache,
+        );
     }
 }
 
@@ -243,7 +295,15 @@ fn main() {
             if path.is_dir() {
                 render_directory(&path, &out_dir, &fonts);
             } else if path.is_file() {
-                render_with_extras(&path, &[], &out_dir, &fonts, &mut css_cache);
+                render_with_extras(
+                    &path,
+                    &[],
+                    DEFAULT_WIDTH,
+                    DEFAULT_HEIGHT,
+                    &out_dir,
+                    &fonts,
+                    &mut css_cache,
+                );
             } else {
                 eprintln!("Skipping {}: not a file or directory", path.display());
             }

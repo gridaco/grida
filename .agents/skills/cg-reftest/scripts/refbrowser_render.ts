@@ -256,21 +256,24 @@ async function main() {
   console.log(`  out-dir: ${args.outDir}`);
 
   let browser: Browser | null = null;
-  let ctx: BrowserContext | null = null;
   const cssCache = new Map<string, string>();
   try {
     browser = await chromium.launch();
-    ctx = await browser.newContext({
-      // Deterministic: force light color-scheme, standard locale/timezone.
-      colorScheme: "light",
-      locale: "en-US",
-      timezoneId: "UTC",
-      reducedMotion: "reduce",
-    });
 
     for (const r of resolved) {
       const rel = path.relative(process.cwd(), r.htmlPath);
+      // Fresh incognito context per fixture — no cookie/storage/SW
+      // leakage between fixtures, so order can't mask real renderer
+      // changes.
+      let ctx: BrowserContext | null = null;
       try {
+        ctx = await browser.newContext({
+          // Deterministic: force light color-scheme, standard locale/timezone.
+          colorScheme: "light",
+          locale: "en-US",
+          timezoneId: "UTC",
+          reducedMotion: "reduce",
+        });
         const { file, cssCount } = await renderOne(
           ctx,
           r,
@@ -283,10 +286,11 @@ async function main() {
         console.error(`  ${rel}: FAILED`);
         console.error(e);
         process.exitCode = 1;
+      } finally {
+        await ctx?.close();
       }
     }
   } finally {
-    await ctx?.close();
     await browser?.close();
   }
 }
