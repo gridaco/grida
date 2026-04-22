@@ -64,6 +64,7 @@
     { "path": "../L0/layout-grid-gap-asym.html" },
     { "path": "../L0/paint-transform-combined.html" },
     { "path": "../L0/paint-transform-origin.html" },
-    { "path": "../L0/paint-individual-transform-props.html" }
+    { "path": "../L0/paint-individual-transform-props.html" },
+    { "path": "../L0/paint-clip-path-circle.html" }
   ]
 }
