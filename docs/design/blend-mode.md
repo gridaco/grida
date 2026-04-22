@@ -1,4 +1,12 @@
-### Understanding and Working with Blend Modes
+---
+title: Blend modes
+sidebar_label: Blend modes
+description: Understand blend modes, paint stacks, and layer behavior (including Pass Through) in Grida.
+---
+
+# Blend modes
+
+## Understanding and Working with Blend Modes
 
 This guide explains how blend modes work in Grida, how paint stacks are composed, and when to use special layer behavior like Pass Through. It is written for designers who want practical outcomes, with just enough technical detail to reason about results.
 

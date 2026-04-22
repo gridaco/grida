@@ -1,11 +1,16 @@
 ---
+title: Show and hide the right inspector panel
+sidebar_label: Show & hide inspector
+description: Show and hide the right inspector panel in the Grida editor.
 status: "not-started"
 ---
 
-### Hiding the right inspector panel
+# Show and hide the right inspector panel
 
-![Grida: re-ordering properties in inspection panel](../resources/hide-design-inspector-feature-indication.png)
+## Hiding the right inspector panel
+
+![Grida: hide the right inspector panel](../resources/hide-design-inspector-feature-indication.png)
 
 ## Showing the hidden right inspector panel
 
-![BriGridadged: re-ordering properties in inspection panel](../resources/show-design-inspector-button-descriptor.png)
+![Grida: show the right inspector panel](../resources/show-design-inspector-button-descriptor.png)

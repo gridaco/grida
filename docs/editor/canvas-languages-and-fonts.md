@@ -1,3 +1,11 @@
+---
+title: Canvas languages and fonts
+sidebar_label: Languages & fonts
+description: Scripts and default fonts officially supported in the Grida canvas.
+---
+
+# Canvas languages and fonts
+
 ## Officially Supported Languages (Fonts) by Grida
 
 | Script                | Support Level | Default Font       | Tags                   | Note                                                          |

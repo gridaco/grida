@@ -1,3 +1,10 @@
+---
+title: Designing a text-field component
+sidebar_label: Text-field component
+sidebar_position: 10
+description: How to design (structure) a text-field component, with a real-world enterprise design system example.
+---
+
 # How to design (structure) a text-field component - with realworld-enterprise-design-system example
 
 ## Intro
