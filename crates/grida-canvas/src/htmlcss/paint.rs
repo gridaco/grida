@@ -547,7 +547,9 @@ fn repeat_keyword_to_tile_mode(k: BackgroundRepeatKeyword) -> skia_safe::TileMod
 /// - `Repeat` / `Round` → offsets seeded at `pos`, spanning `[0, area]` after
 ///   clipping (caller supplies the already-adjusted tile size for `Round`).
 /// - `Space` → edge-pinned offsets with whitespace distributed evenly
-///   between copies; `pos` is ignored per CSS Backgrounds §3.4.
+///   between copies; `pos` is ignored when two or more copies fit.
+///   When fewer than two fit the spec permits arbitrary positioning —
+///   we apply `pos` so the fallback matches `no-repeat` behavior.
 fn axis_tile_positions(
     keyword: BackgroundRepeatKeyword,
     area: f32,
@@ -559,7 +561,7 @@ fn axis_tile_positions(
     }
     match keyword {
         BackgroundRepeatKeyword::NoRepeat => vec![pos],
-        BackgroundRepeatKeyword::Space => space_axis_positions(area, tile),
+        BackgroundRepeatKeyword::Space => space_axis_positions(area, tile, pos),
         BackgroundRepeatKeyword::Repeat | BackgroundRepeatKeyword::Round => {
             repeat_axis_positions(area, tile, pos)
         }
@@ -569,12 +571,12 @@ fn axis_tile_positions(
 /// CSS `background-repeat: space` on one axis. If at least two copies fit,
 /// the first and last are pinned to the edges of the positioning area and
 /// the remaining whitespace is distributed evenly between copies. If fewer
-/// than two fit, revert to a single copy (spec permits arbitrary position;
-/// we pin to the start).
-fn space_axis_positions(area: f32, tile: f32) -> Vec<f32> {
+/// than two fit, the spec permits arbitrary position — we honor
+/// `background-position` (same as `no-repeat`).
+fn space_axis_positions(area: f32, tile: f32, pos: f32) -> Vec<f32> {
     let n = (area / tile).floor() as i32;
     if n < 2 {
-        return vec![0.0];
+        return vec![pos];
     }
     let gap = (area - n as f32 * tile) / (n - 1) as f32;
     (0..n).map(|k| k as f32 * (tile + gap)).collect()
@@ -2220,8 +2222,13 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 /// Mirrors Chromium's `TextFragmentPainter::PaintSymbol`: filled ellipse
 /// for disc, 1px-stroked ellipse for circle, filled rect for square.
 /// `placeholder` is in canvas-absolute coordinates.
-fn paint_symbol_marker(canvas: &Canvas, marker: &super::style::SymbolMarker, placeholder: Rect) {
-    let bullet = marker.bullet_rect(placeholder);
+fn paint_symbol_marker(
+    canvas: &Canvas,
+    marker: &super::style::SymbolMarker,
+    placeholder: Rect,
+    direction: super::types::Direction,
+) {
+    let bullet = marker.bullet_rect(placeholder, direction);
 
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
@@ -2425,7 +2432,7 @@ fn paint_inline_group(
         let ph_rects = para.get_rects_for_placeholders();
         for (idx, marker) in &marker_placeholders {
             if let Some(tb) = ph_rects.get(*idx) {
-                paint_symbol_marker(canvas, marker, tb.rect.with_offset((x, y)));
+                paint_symbol_marker(canvas, marker, tb.rect.with_offset((x, y)), group.direction);
             }
         }
     }

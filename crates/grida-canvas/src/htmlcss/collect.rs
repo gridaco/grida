@@ -129,11 +129,30 @@ fn generate_marker_output<T: std::fmt::Debug>(lst: &T, ordinal: i32) -> Option<M
 fn marker_output_for_type(ty: types::ListStyleType, ordinal: i32) -> Option<MarkerOutput> {
     use types::ListStyleType as L;
     use types::SymbolMarkerKind as S;
+    // Base-26 alphabetic counter per CSS Counter Styles 3 — after `z`
+    // comes `aa`, `ab`, … so `type="a" start="27"` renders `aa.`.
+    // Non-positive ordinals fall back to decimal (the alphabetic system
+    // has no representation for 0 or negatives).
     let alpha = |base: u8| {
-        if (1..=26).contains(&ordinal) {
-            format!("{}. ", (base + (ordinal - 1) as u8) as char)
+        if ordinal <= 0 {
+            return format!("{}. ", ordinal);
+        }
+        let mut n = ordinal;
+        let mut s = String::new();
+        while n > 0 {
+            n -= 1;
+            s.insert(0, (base + (n % 26) as u8) as char);
+            n /= 26;
+        }
+        format!("{s}. ")
+    };
+    // `decimal-leading-zero` pads to two digits, matching CSS and
+    // browsers (01., 02., … 09., 10., 11., …).
+    let decimal_leading_zero = |n: i32| {
+        if n < 0 {
+            format!("-{:02}. ", (n as i64).unsigned_abs())
         } else {
-            format!("{}. ", ordinal)
+            format!("{:02}. ", n)
         }
     };
     Some(match ty {
@@ -141,7 +160,8 @@ fn marker_output_for_type(ty: types::ListStyleType, ordinal: i32) -> Option<Mark
         L::Disc => MarkerOutput::Symbol(S::Disc),
         L::Circle => MarkerOutput::Symbol(S::Circle),
         L::Square => MarkerOutput::Symbol(S::Square),
-        L::Decimal | L::DecimalLeadingZero => MarkerOutput::Text(format!("{}. ", ordinal)),
+        L::Decimal => MarkerOutput::Text(format!("{}. ", ordinal)),
+        L::DecimalLeadingZero => MarkerOutput::Text(decimal_leading_zero(ordinal)),
         L::LowerAlpha => MarkerOutput::Text(alpha(b'a')),
         L::UpperAlpha => MarkerOutput::Text(alpha(b'A')),
         L::LowerRoman => MarkerOutput::Text(format!("{}. ", to_roman(ordinal).to_lowercase())),
@@ -267,16 +287,16 @@ fn collect_element_with_counter(
             type_override,
         })
     } else if tag == "ul" || tag == "menu" {
-        // Unordered lists: counter exists for symmetry but is not consulted
-        // for numbering. HTML legacy `<ul type="disc|circle|square">` is
-        // obsolete in the spec but widely honored by browsers; we read it
-        // so fixtures relying on the attribute (without CSS) render
-        // the expected bullet shape.
+        // Unordered lists still seed the list-item counter at 1 —
+        // author CSS may set `list-style-type` to a numeric style
+        // (decimal, lower-alpha, …) on a `<ul>`. Legacy HTML
+        // `<ul type="disc|circle|square">` is obsolete but widely
+        // honored; read it so fixtures relying on the attribute render
+        // the expected bullet shape without needing CSS.
         let dom = adapter::dom();
         let node = dom.node(element.node_id());
         let type_override = get_element_attr(node, "type").and_then(|t| {
-            // Match case-insensitively — HTML4 specified the attribute as
-            // case-insensitive.
+            // HTML4 specifies the attribute as case-insensitive.
             match t.to_ascii_lowercase().as_str() {
                 "disc" => Some(types::ListStyleType::Disc),
                 "circle" => Some(types::ListStyleType::Circle),
@@ -285,7 +305,7 @@ fn collect_element_with_counter(
             }
         });
         Some(ListCounter {
-            value: 0,
+            value: 1,
             type_override,
         })
     } else {

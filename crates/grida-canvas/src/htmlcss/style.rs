@@ -274,11 +274,20 @@ impl SymbolMarker {
 
     /// Rect (in the same coordinate space as `placeholder`) where the
     /// bullet geometry should be painted — `bullet_width` square,
-    /// inset 1px from the placeholder's left edge, vertically centered.
-    pub fn bullet_rect(&self, placeholder: skia_safe::Rect) -> skia_safe::Rect {
+    /// inset 1px from the inline-start edge, vertically centered.
+    /// `direction` determines which edge is inline-start so the gap
+    /// sits between the bullet and the text in both LTR and RTL.
+    pub fn bullet_rect(
+        &self,
+        placeholder: skia_safe::Rect,
+        direction: super::types::Direction,
+    ) -> skia_safe::Rect {
         let bullet = self.font_size * 0.25;
         let cy = (placeholder.top + placeholder.bottom) * 0.5;
-        let left = placeholder.left + 1.0;
+        let left = match direction {
+            super::types::Direction::Ltr => placeholder.left + 1.0,
+            super::types::Direction::Rtl => placeholder.right - bullet - 1.0,
+        };
         let top = cy - bullet * 0.5;
         skia_safe::Rect::from_xywh(left, top, bullet, bullet)
     }
