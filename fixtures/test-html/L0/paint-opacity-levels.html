@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Opacity Levels</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 120px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .swatch {
+        width: 120px;
+        height: 100px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .o-100 {
+        opacity: 1;
+      }
+      .o-75 {
+        opacity: 0.75;
+      }
+      .o-50 {
+        opacity: 0.5;
+      }
+      .o-25 {
+        opacity: 0.25;
+      }
+      .o-10 {
+        opacity: 0.1;
+      }
+      .o-0 {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">1.0</div>
+        <div class="swatch o-100"></div>
+      </div>
+      <div>
+        <div class="label">0.75</div>
+        <div class="swatch o-75"></div>
+      </div>
+      <div>
+        <div class="label">0.5</div>
+        <div class="swatch o-50"></div>
+      </div>
+      <div>
+        <div class="label">0.25</div>
+        <div class="swatch o-25"></div>
+      </div>
+      <div>
+        <div class="label">0.1</div>
+        <div class="swatch o-10"></div>
+      </div>
+      <div>
+        <div class="label">0</div>
+        <div class="swatch o-0"></div>
+      </div>
+    </div>
+  </body>
+</html>
