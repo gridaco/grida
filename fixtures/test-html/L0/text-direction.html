@@ -31,8 +31,12 @@
         border: 1px solid #ccc;
         padding: 8px;
       }
-      .ltr { direction: ltr; }
-      .rtl { direction: rtl; }
+      .ltr {
+        direction: ltr;
+      }
+      .rtl {
+        direction: rtl;
+      }
     </style>
   </head>
   <body>
@@ -46,15 +50,21 @@
         <div class="box rtl">Hello, world — this is RTL.</div>
       </div>
       <div class="cell">
-        <div class="label">direction: ltr, Arabic (visual reordering by bidi)</div>
+        <div class="label">
+          direction: ltr, Arabic (visual reordering by bidi)
+        </div>
         <div class="box ltr">English then العربية mixed.</div>
       </div>
       <div class="cell">
-        <div class="label">direction: rtl, Arabic (aligns right, runs reorder)</div>
+        <div class="label">
+          direction: rtl, Arabic (aligns right, runs reorder)
+        </div>
         <div class="box rtl">English then العربية mixed.</div>
       </div>
       <div class="cell">
-        <div class="label">direction: rtl, punctuation in Latin (trailing punctuation moves)</div>
+        <div class="label">
+          direction: rtl, punctuation in Latin (trailing punctuation moves)
+        </div>
         <div class="box rtl">Item 1, Item 2, Item 3.</div>
       </div>
     </div>

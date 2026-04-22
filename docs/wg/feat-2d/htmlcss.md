@@ -336,13 +336,13 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Writing Modes & BiDi
 
-| CSS Property           | Status | Notes |
-| ---------------------- | ------ | ----- |
+| CSS Property           | Status | Notes                                                                                  |
+| ---------------------- | ------ | -------------------------------------------------------------------------------------- |
 | `direction`            | ✅     | ltr/rtl — Skia paragraph base direction; also resolves logical `text-align: start/end` |
-| `writing-mode`         | ❌     |       |
-| `unicode-bidi`         | ❌     |       |
-| `text-orientation`     | ❌     |       |
-| `text-combine-upright` | ❌     |       |
+| `writing-mode`         | ❌     |                                                                                        |
+| `unicode-bidi`         | ❌     |                                                                                        |
+| `text-orientation`     | ❌     |                                                                                        |
+| `text-combine-upright` | ❌     |                                                                                        |
 
 ### Inline Layout & Alignment
 
@@ -364,17 +364,17 @@ Types from `cg::prelude` reused where they 100% align with CSS semantics:
 
 ### Lists
 
-| Feature                        | Status | Notes                                         |
-| ------------------------------ | ------ | --------------------------------------------- |
-| `<ul>` with disc/circle/square | ✅     | Marker text prepended to list item content    |
-| `<ol>` with decimal numbering  | ✅     | Auto-incrementing counter                     |
-| `lower-alpha`, `upper-alpha`   | ✅     |                                               |
+| Feature                        | Status | Notes                                                                           |
+| ------------------------------ | ------ | ------------------------------------------------------------------------------- |
+| `<ul>` with disc/circle/square | ✅     | Marker text prepended to list item content                                      |
+| `<ol>` with decimal numbering  | ✅     | Auto-incrementing counter                                                       |
+| `lower-alpha`, `upper-alpha`   | ✅     |                                                                                 |
 | `lower-roman`, `upper-roman`   | ⚠️     | Via HTML `<ol type="i">`/`"I"` attribute (Stylo servo can't parse the CSS form) |
-| `list-style-type: none`        | ✅     |                                               |
-| `list-style-image`             | ❌     |                                               |
-| `list-style-position`          | ❌     |                                               |
-| `list-style` (shorthand)       | ⚠️     | type only                                     |
-| Nested lists                   | ✅     | Independent counters per list                 |
+| `list-style-type: none`        | ✅     |                                                                                 |
+| `list-style-image`             | ❌     |                                                                                 |
+| `list-style-position`          | ❌     |                                                                                 |
+| `list-style` (shorthand)       | ⚠️     | type only                                                                       |
+| Nested lists                   | ✅     | Independent counters per list                                                   |
 
 ### Visual Effects
 
