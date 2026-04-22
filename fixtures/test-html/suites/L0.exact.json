@@ -24,6 +24,7 @@
     { "path": "../L0/paint-opacity.html" },
     { "path": "../L0/paint-background-solid.html" },
     { "path": "../L0/paint-border-radius.html" },
-    { "path": "../L0/paint-border-solid.html" }
+    { "path": "../L0/paint-border-solid.html" },
+    { "path": "../L0/paint-outline-solid.html" }
   ]
 }
