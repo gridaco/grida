@@ -3281,7 +3281,8 @@ export namespace iofigma {
           case "TABLE_CELL":
           case "WASHI_TAPE":
           case "WIDGET":
-            throw new Error(`Unknown node type: ${node.type}`);
+            // TODO: unsupported figjam/deck node types — skip instead of throwing
+            return undefined;
         }
       }
     }
