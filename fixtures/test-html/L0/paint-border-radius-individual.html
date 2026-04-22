@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Border Radius Individual Corners</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .box {
+        width: 120px;
+        height: 80px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .tl {
+        border-top-left-radius: 24px;
+      }
+      .tr {
+        border-top-right-radius: 24px;
+      }
+      .br {
+        border-bottom-right-radius: 24px;
+      }
+      .bl {
+        border-bottom-left-radius: 24px;
+      }
+      .tl-tr {
+        border-top-left-radius: 16px;
+        border-top-right-radius: 16px;
+      }
+      .diagonal {
+        border-top-left-radius: 20px;
+        border-bottom-right-radius: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="box tl"></div>
+      <div class="box tr"></div>
+      <div class="box br"></div>
+      <div class="box bl"></div>
+      <div class="box tl-tr"></div>
+      <div class="box diagonal"></div>
+    </div>
+  </body>
+</html>

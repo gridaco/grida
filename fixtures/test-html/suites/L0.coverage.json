@@ -53,6 +53,7 @@
     { "path": "../L0/layout-grid-fr.html" },
     { "path": "../L0/layout-grid-span.html" },
     { "path": "../L0/layout-block-flow.html" },
-    { "path": "../L0/paint-outline-double-rect.html" }
+    { "path": "../L0/paint-outline-double-rect.html" },
+    { "path": "../L0/paint-border-radius-individual.html" }
   ]
 }
