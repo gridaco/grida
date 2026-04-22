@@ -22,6 +22,7 @@
     { "path": "../L0/paint-border-solid.html" },
     { "path": "../L0/paint-outline-solid.html" },
     { "path": "../L0/paint-box-shadow-solid.html" },
-    { "path": "../L0/paint-background-gradient-linear-simple.html" }
+    { "path": "../L0/paint-background-gradient-linear-simple.html" },
+    { "path": "../L0/paint-clip-path-inset.html" }
   ]
 }
