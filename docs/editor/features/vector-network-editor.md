@@ -2,6 +2,8 @@
 
 When hovering a straight segment in the vector editor, a preview point appears at the middle of the segment. Pressing and dragging on this preview splits the segment by inserting a new vertex at the midpoint and immediately begins a drag gesture for that vertex.
 
+![Three-panel diagram of midpoint projection: (1) hovering a straight segment shows a hollow midpoint preview ring; (2) pressing inserts a new selected vertex at the midpoint, splitting the segment in two; (3) the same pointer-down continues as a drag, pulling the new vertex away from its original midpoint position.](../resources/vector-network-editor-midpoint-projection.svg)
+
 - Midpoint preview only appears on straight segments.
 - Pointer down on the preview inserts the vertex and selects it.
 - Dragging continues without releasing the pointer.
