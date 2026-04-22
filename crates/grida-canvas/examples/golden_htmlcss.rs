@@ -152,8 +152,13 @@ fn render_with_extras(
     fonts: &FontRepository,
     css_cache: &mut HashMap<PathBuf, String>,
 ) {
-    let html = std::fs::read_to_string(html_path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {e}", html_path.display()));
+    let html = match std::fs::read_to_string(html_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("  warn: failed to read {}: {e}", html_path.display());
+            return;
+        }
+    };
     let name = html_path
         .file_stem()
         .map(|s| s.to_string_lossy().to_string())
