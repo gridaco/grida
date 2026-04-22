@@ -2,12 +2,15 @@
 
 ---
 
-First, clone the repo with git submodules (optional. using Github Desktop will automatically clone the submodules for you)
+First, clone the repo with git submodules (required for canvas/WASM builds; GitHub Desktop clones submodules automatically).
 
 ```bash
 # clone the repo
 git clone --recurse-submodules https://github.com/gridaco/grida
 cd grida
+
+# or, if you already cloned without --recurse-submodules
+git submodule update --init
 
 # setup node & package manager
 nvm use

@@ -78,15 +78,15 @@ export default function Content1() {
       </Carousel>
       {/* body */}
       <div className="min-h-96 h-[300px] sm:h-[400px] md:h-[600px] lg:h-[800px] w-full flex items-start justify-center">
-        <BigImageContainer key={index} {...img} alt={categories[index]} />
+        {img && (
+          <BigImageContainer key={index} src={img} alt={categories[index]} />
+        )}
       </div>
     </div>
   );
 }
 
 function BigImageContainer({
-  width,
-  height,
   alt = "",
   ...props
 }: React.ComponentProps<typeof Image>) {
@@ -97,7 +97,7 @@ function BigImageContainer({
       animate={{ opacity: 1 }}
       transition={{ duration: 1 }}
     >
-      <Image {...props} width={width} height={height} alt={alt} />
+      <Image {...props} alt={alt} />
     </motion.div>
   );
 }
