@@ -197,18 +197,17 @@ export function FullscreenLoadingOverlay({
   errmsg,
 }: FullscreenLoadingOverlayProps) {
   const [showOverlay, setShowOverlay] = useState(true);
-  const [startTime, setStartTime] = useState<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (loading) {
-      setStartTime(Date.now());
+      startTimeRef.current = Date.now();
       setShowOverlay(true);
-    } else if (startTime) {
-      const elapsed = Date.now() - startTime;
+    } else if (startTimeRef.current) {
+      const elapsed = Date.now() - startTimeRef.current;
       const remaining = Math.max(0, minDuration - elapsed);
 
       if (remaining > 0) {
-        // Wait for minimum duration before hiding
         const timer = setTimeout(() => {
           setShowOverlay(false);
         }, remaining);
@@ -218,7 +217,7 @@ export function FullscreenLoadingOverlay({
         setShowOverlay(false);
       }
     }
-  }, [loading, minDuration, startTime]);
+  }, [loading, minDuration]);
 
   return (
     <AnimatePresence mode="wait" onExitComplete={onExitComplete}>

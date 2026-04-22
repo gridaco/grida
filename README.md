@@ -180,7 +180,7 @@ Docs: [@grida/refig](https://grida.co/docs/packages/@grida/refig)
 
 ## Quickstart (monorepo)
 
-**Requirements:** Node.js **22+**, pnpm **10+**
+**Requirements:** Node.js **24+**, pnpm **10+**
 
 ```bash
 pnpm install
