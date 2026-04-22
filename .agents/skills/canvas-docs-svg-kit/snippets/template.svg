@@ -191,6 +191,18 @@
             class="cursor-hand"/>
     </symbol>
 
+    <!-- Crosshair (solid plus, arms meet at centre) — CSS `cursor: crosshair`.
+         Used for vector drawing / point picking. Hot spot is (10, 10). -->
+    <symbol id="cursor-crosshair" viewBox="0 0 20 20" overflow="visible">
+      <path d="M 9 0 H 11 V 9 H 20 V 11 H 11 V 20 H 9 V 11 H 0 V 9 H 9 Z" class="cursor"/>
+    </symbol>
+
+    <!-- Text (I-beam) — CSS `cursor: text`.
+         Hot spot is the centre (4, 10). -->
+    <symbol id="cursor-text" viewBox="0 0 8 20" overflow="visible">
+      <path d="M 0 0 H 8 V 2 H 5 V 18 H 8 V 20 H 0 V 18 H 3 V 2 H 0 Z" class="cursor"/>
+    </symbol>
+
     <!-- Rotation (curved double-arrow).
          Lifted from editor/components/cursor/cursor-data.ts  (template_rotate_svg, angle=0).
          Use with transform="rotate(θ, 13, 12)" on the <use> wrapper to orient it. -->

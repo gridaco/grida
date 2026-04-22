@@ -12,9 +12,9 @@
     editor/components/cursor/cursor-data.ts        (rotate inline SVG)
 -->
 <svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 960 720"
+     viewBox="0 0 960 960"
      width="960"
-     height="720"
+     height="960"
      font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
   <metadata>canvas-docs-svg-kit/v1</metadata>
   <defs>
@@ -64,15 +64,23 @@
     <symbol id="cursor-v" viewBox="0 0 16 28" overflow="visible">
       <path d="M 8 4 L 4 9 L 6.5 9 L 6.5 19 L 4 19 L 8 24 L 12 19 L 9.5 19 L 9.5 9 L 12 9 Z" class="cursor"/>
     </symbol>
+    <symbol id="cursor-crosshair" viewBox="0 0 20 20" overflow="visible">
+      <path d="M 9 0 H 11 V 9 H 20 V 11 H 11 V 20 H 9 V 11 H 0 V 9 H 9 Z" class="cursor"/>
+    </symbol>
+    <symbol id="cursor-text" viewBox="0 0 8 20" overflow="visible">
+      <path d="M 0 0 H 8 V 2 H 5 V 18 H 8 V 20 H 0 V 18 H 3 V 2 H 0 Z" class="cursor"/>
+    </symbol>
   </defs>
 
-  <rect class="canvas-bg" width="960" height="720"/>
+  <rect class="canvas-bg" width="960" height="960"/>
 
   <text x="40" y="50" class="doc-heading">Cursors</text>
   <text x="40" y="74" class="doc-sub">Stylised line-art cursors. For higher-fidelity reference see the macOS PNG set in editor/public/assets/css-cursors-macos/</text>
 
-  <!-- 4 columns × 2 rows = 8 cells, last cell unused -->
-  <!-- cell: 215 × 240, gap 20, starting at x=40, y=110 -->
+  <!-- 4 columns × 3 rows = 12 cells -->
+  <!-- cell: 205 × 240, gap 20. columns x=40, 265, 490, 715. rows y=110, 370, 630 -->
+
+  <!-- ROW 1 -->
 
   <!-- pointer -->
   <g transform="translate(40, 110)">
@@ -114,6 +122,8 @@
     <text x="107" y="210" class="cell-meta" text-anchor="middle">drag in progress (closed)</text>
   </g>
 
+  <!-- ROW 2 -->
+
   <!-- rotate -->
   <g transform="translate(40, 370)">
     <rect width="205" height="240" rx="8" class="cell-bg"/>
@@ -126,12 +136,12 @@
   </g>
 
   <!-- h-resize -->
-  <g transform="translate(275, 370)">
+  <g transform="translate(265, 370)">
     <rect width="205" height="240" rx="8" class="cell-bg"/>
     <text x="16" y="28" class="cell-title">h-resize</text>
     <text x="16" y="46" class="cell-class">use href="#cursor-h"</text>
     <text x="16" y="62" class="cell-meta">28 × 16 · hotspot 14,8</text>
-    <use href="#cursor-h" x="93" y="119" width="28" height="16" filter="url(#cursor-shadow)"/>
+    <use href="#cursor-h" x="88" y="119" width="28" height="16" filter="url(#cursor-shadow)"/>
     <text x="107" y="210" class="cell-meta" text-anchor="middle">edge resize, horizontal</text>
   </g>
 
@@ -141,23 +151,42 @@
     <text x="16" y="28" class="cell-title">v-resize</text>
     <text x="16" y="46" class="cell-class">use href="#cursor-v"</text>
     <text x="16" y="62" class="cell-meta">16 × 28 · hotspot 8,14</text>
-    <use href="#cursor-v" x="99" y="113" width="16" height="28" filter="url(#cursor-shadow)"/>
+    <use href="#cursor-v" x="94" y="113" width="16" height="28" filter="url(#cursor-shadow)"/>
     <text x="107" y="210" class="cell-meta" text-anchor="middle">edge resize, vertical</text>
   </g>
 
-  <!-- empty cell as note -->
+  <!-- crosshair -->
   <g transform="translate(715, 370)">
-    <rect width="205" height="240" rx="8" fill="#fafafa" stroke="#e5e5e5" stroke-dasharray="3 3"/>
-    <text x="107" y="115" class="cell-class" text-anchor="middle">For a higher-fidelity</text>
-    <text x="107" y="135" class="cell-class" text-anchor="middle">cursor, embed the macOS</text>
-    <text x="107" y="155" class="cell-class" text-anchor="middle">PNG via base64 data URI.</text>
-    <text x="107" y="180" class="cell-meta" text-anchor="middle">editor/public/assets/</text>
-    <text x="107" y="195" class="cell-meta" text-anchor="middle">css-cursors-macos/*.png</text>
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">crosshair</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-crosshair"</text>
+    <text x="16" y="62" class="cell-meta">20 × 20 · hotspot 10,10</text>
+    <use href="#cursor-crosshair" x="92" y="117" width="20" height="20" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">point pick · vector draw</text>
+  </g>
+
+  <!-- ROW 3 -->
+
+  <!-- text -->
+  <g transform="translate(40, 630)">
+    <rect width="205" height="240" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">text</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-text"</text>
+    <text x="16" y="62" class="cell-meta">8 × 20 · hotspot 4,10</text>
+    <use href="#cursor-text" x="100" y="117" width="8" height="20" filter="url(#cursor-shadow)"/>
+    <text x="107" y="210" class="cell-meta" text-anchor="middle">I-beam · text insertion</text>
+  </g>
+
+  <!-- note -->
+  <g transform="translate(265, 630)">
+    <rect width="655" height="240" rx="8" fill="#fafafa" stroke="#e5e5e5" stroke-dasharray="3 3"/>
+    <text x="327" y="110" class="cell-class" text-anchor="middle">For a higher-fidelity cursor, embed the macOS PNG via base64 data URI.</text>
+    <text x="327" y="140" class="cell-meta" text-anchor="middle">editor/public/assets/css-cursors-macos/*.png</text>
   </g>
 
   <!-- usage example -->
-  <text x="40" y="660" class="cell-title">Usage</text>
-  <g transform="translate(40, 675)">
-    <text x="0" y="14" class="cell-class">&lt;use href="#cursor-rotate" x="500" y="100" width="26" height="24" filter="url(#cursor-shadow)"/&gt;</text>
+  <text x="40" y="910" class="cell-title">Usage</text>
+  <g transform="translate(40, 925)">
+    <text x="0" y="14" class="cell-class">&lt;use href="#cursor-crosshair" x="100" y="100" width="20" height="20" filter="url(#cursor-shadow)"/&gt;</text>
   </g>
 </svg>
