@@ -1,0 +1,234 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 960 960"
+     width="960"
+     height="960"
+     font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg     { fill: #ECECEC; }
+
+      .doc-heading   { font-size: 26px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .doc-sub       { font-size: 14px; fill: #6b7280; }
+      .col-title     { font-size: 18px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.2px; }
+      .step-label    { font-size: 11px; fill: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; }
+      .caption       { font-size: 13px; fill: #6b7280; }
+      .label-mono    { font-size: 13px; fill: #0a0a0a; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+      /* selection chrome */
+      .sel-outline   { fill: none; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+      .baseline      { stroke: #0D99FF; stroke-width: 0.5; opacity: 0.55; shape-rendering: crispEdges; }
+
+      /* gesture / interaction */
+      .edge-hot      { stroke: #FF3B30; stroke-width: 2; }
+      .ripple        { fill: none; stroke: #FF3B30; stroke-width: 1.25; opacity: 0.6; }
+      .ripple-2      { fill: none; stroke: #FF3B30; stroke-width: 1; opacity: 0.3; }
+      .cursor        { fill: #0a0a0a; stroke: #ffffff; stroke-width: 1.25; stroke-linejoin: round; }
+
+      .ghost         { fill: none; stroke: #b5b5b5; stroke-width: 1; stroke-dasharray: 3 3; shape-rendering: crispEdges; }
+
+      .arrow         { stroke: #9ca3af; stroke-width: 1.25; fill: none; }
+      .arrow-head    { fill: #9ca3af; }
+
+      .legend-box    { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+      .panel-bg      { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; shape-rendering: crispEdges; }
+
+      .step-bg       { fill: #0a0a0a; }
+      .step-num      { font-size: 11px; fill: #ffffff; font-weight: 700; }
+
+      /* ---- INVENTED LOCALLY (not in kit v1) ----
+         Vector-network-specific glyphs: anchor vertices (square handles
+         like Figma/Illustrator), straight segment strokes, midpoint
+         preview indicator, and a committed midpoint vertex. */
+      .vn-segment      { stroke: #0D99FF; stroke-width: 1.5; fill: none; }
+      .vn-segment-soft { stroke: #0D99FF; stroke-width: 1.25; fill: none; opacity: 0.55; }
+      .vn-vertex       { fill: #ffffff; stroke: #0D99FF; stroke-width: 1.25; }
+      .vn-vertex-sel   { fill: #0D99FF; stroke: #ffffff; stroke-width: 1.25; }
+
+      /* midpoint preview: hollow ring on hover */
+      .vn-mid-preview-ring { fill: #ffffff; stroke: #0D99FF; stroke-width: 1.25; opacity: 0.95; }
+      .vn-mid-preview-dot  { fill: #0D99FF; opacity: 0.4; }
+    </style>
+
+    <!-- ARROW MARKERS -->
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"/>
+    </marker>
+
+    <!-- SHADOW FILTERS -->
+    <filter id="cursor-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+      <feOffset dx="0" dy="1" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="vn-vertex-shadow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8"/>
+      <feOffset dx="0" dy="0.5" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- CROSSHAIR CURSOR — matches CSS cursor: crosshair used by the
+         vector editor while drawing/picking points. Hot spot at centre (10,10). -->
+    <symbol id="cursor-crosshair" viewBox="0 0 20 20" overflow="visible">
+      <path d="M 9 0 H 11 V 9 H 20 V 11 H 11 V 20 H 9 V 11 H 0 V 9 H 9 Z"
+            class="cursor"/>
+    </symbol>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="960"/>
+
+  <!-- HEADING -->
+  <text x="480" y="60" class="doc-heading" text-anchor="middle">Midpoint projection on a straight segment</text>
+  <text x="480" y="86" class="doc-sub" text-anchor="middle">Hovering a straight segment previews a midpoint; pressing it inserts a vertex and begins a drag.</text>
+
+  <!-- =========== THREE PANELS =========== -->
+  <!-- Panel layout: 3 columns × 280 wide + 2 × 20 gaps = 880, centred
+       in 960 with 40px margins. Panels at x=40, 340, 640. -->
+
+  <!-- ─── PANEL 1: HOVER (preview) ─── -->
+  <g transform="translate(40, 130)">
+    <rect x="0.5" y="0.5" width="279" height="559" rx="10" class="panel-bg"/>
+
+    <!-- step label + title -->
+    <g transform="translate(20, 32)">
+      <rect x="0" y="-12" width="18" height="18" rx="4" class="step-bg"/>
+      <text x="9" y="1" class="step-num" text-anchor="middle">1</text>
+      <text x="28" y="2" class="step-label">Hover</text>
+    </g>
+    <text x="20" y="68" class="col-title">Preview appears</text>
+    <text x="20" y="90" class="caption">Pointer over a straight segment.</text>
+
+    <g transform="translate(20, 130)">
+      <!-- segment line -->
+      <line x1="40" y1="100" x2="220" y2="250" class="vn-segment"/>
+      <!-- endpoints (circle vertex handles) -->
+      <circle cx="40" cy="100" r="4" class="vn-vertex" filter="url(#vn-vertex-shadow)"/>
+      <circle cx="220" cy="250" r="4" class="vn-vertex" filter="url(#vn-vertex-shadow)"/>
+
+      <!-- midpoint preview (hollow ring, smaller than vertex) -->
+      <!-- midpoint of (40,100)-(220,250) = (130, 175) -->
+      <circle cx="130" cy="175" r="5" class="vn-mid-preview-ring" filter="url(#vn-vertex-shadow)"/>
+
+      <!-- crosshair hovering near midpoint (hotspot offset so the ring stays visible) -->
+      <use href="#cursor-crosshair" x="136" y="175" width="20" height="20" filter="url(#cursor-shadow)"/>
+    </g>
+  </g>
+
+  <!-- ─── PANEL 2: PRESS (insert + select) ─── -->
+  <g transform="translate(340, 130)">
+    <rect x="0.5" y="0.5" width="279" height="559" rx="10" class="panel-bg"/>
+
+    <g transform="translate(20, 32)">
+      <rect x="0" y="-12" width="18" height="18" rx="4" class="step-bg"/>
+      <text x="9" y="1" class="step-num" text-anchor="middle">2</text>
+      <text x="28" y="2" class="step-label">Press</text>
+    </g>
+    <text x="20" y="68" class="col-title">Vertex inserted</text>
+    <text x="20" y="90" class="caption">Pointer-down inserts the vertex.</text>
+
+    <g transform="translate(20, 130)">
+      <!-- segment is now two halves, both straight -->
+      <line x1="40" y1="100" x2="130" y2="175" class="vn-segment"/>
+      <line x1="130" y1="175" x2="220" y2="250" class="vn-segment"/>
+
+      <!-- endpoints -->
+      <circle cx="40" cy="100" r="4" class="vn-vertex" filter="url(#vn-vertex-shadow)"/>
+      <circle cx="220" cy="250" r="4" class="vn-vertex" filter="url(#vn-vertex-shadow)"/>
+
+      <!-- click ripple at the new vertex -->
+      <circle cx="130" cy="175" r="11" class="ripple"/>
+      <circle cx="130" cy="175" r="17" class="ripple-2"/>
+
+      <!-- new midpoint vertex — selected -->
+      <circle cx="130" cy="175" r="4.5" class="vn-vertex-sel" filter="url(#vn-vertex-shadow)"/>
+
+      <!-- crosshair (still down on it) -->
+      <use href="#cursor-crosshair" x="136" y="175" width="20" height="20" filter="url(#cursor-shadow)"/>
+    </g>
+  </g>
+
+  <!-- ─── PANEL 3: DRAG (continue gesture) ─── -->
+  <g transform="translate(640, 130)">
+    <rect x="0.5" y="0.5" width="279" height="559" rx="10" class="panel-bg"/>
+
+    <g transform="translate(20, 32)">
+      <rect x="0" y="-12" width="18" height="18" rx="4" class="step-bg"/>
+      <text x="9" y="1" class="step-num" text-anchor="middle">3</text>
+      <text x="28" y="2" class="step-label">Drag</text>
+    </g>
+    <text x="20" y="68" class="col-title">Translate without release</text>
+    <text x="20" y="90" class="caption">Same pointer-down continues as a drag.</text>
+
+    <g transform="translate(20, 130)">
+      <!-- ghost: original straight segment -->
+      <line x1="40" y1="100" x2="220" y2="250" class="ghost"/>
+
+      <!-- new dragged geometry: both halves follow the moved midpoint -->
+      <!-- moved midpoint: (175, 110) -->
+      <line x1="40" y1="100" x2="175" y2="110" class="vn-segment"/>
+      <line x1="175" y1="110" x2="220" y2="250" class="vn-segment"/>
+
+      <!-- endpoints -->
+      <circle cx="40" cy="100" r="4" class="vn-vertex" filter="url(#vn-vertex-shadow)"/>
+      <circle cx="220" cy="250" r="4" class="vn-vertex" filter="url(#vn-vertex-shadow)"/>
+
+      <!-- moved midpoint vertex (still selected) -->
+      <circle cx="175" cy="110" r="4.5" class="vn-vertex-sel" filter="url(#vn-vertex-shadow)"/>
+
+      <!-- motion arrow from old midpoint to new -->
+      <line x1="135" y1="172" x2="170" y2="115"
+            stroke="#FF3B30" stroke-width="1.5" fill="none"
+            opacity="0.85" stroke-dasharray="3 2"
+            marker-end="url(#ah)"/>
+
+      <!-- crosshair at the dragged position -->
+      <use href="#cursor-crosshair" x="181" y="110" width="20" height="20" filter="url(#cursor-shadow)"/>
+    </g>
+  </g>
+
+  <!-- =========== LEGEND =========== -->
+  <g transform="translate(40, 720)">
+    <rect x="0.5" y="0.5" width="879" height="74" rx="8" class="legend-box"/>
+
+    <!-- vertex -->
+    <g transform="translate(28, 38)">
+      <circle cx="0" cy="0" r="4" class="vn-vertex"/>
+      <text x="16" y="4" class="caption">vertex</text>
+    </g>
+
+    <!-- selected vertex -->
+    <g transform="translate(125, 38)">
+      <circle cx="0" cy="0" r="4.5" class="vn-vertex-sel"/>
+      <text x="16" y="4" class="caption">selected vertex</text>
+    </g>
+
+    <!-- midpoint preview -->
+    <g transform="translate(280, 38)">
+      <circle cx="0" cy="0" r="5" class="vn-mid-preview-ring"/>
+      <text x="14" y="4" class="caption">midpoint preview (hover only)</text>
+    </g>
+
+    <!-- segment -->
+    <g transform="translate(530, 38)">
+      <line x1="0" y1="0" x2="28" y2="0" class="vn-segment"/>
+      <text x="38" y="4" class="caption">segment</text>
+    </g>
+
+    <!-- ghost -->
+    <g transform="translate(640, 38)">
+      <line x1="0" y1="0" x2="28" y2="0" class="ghost"/>
+      <text x="38" y="4" class="caption">previous shape</text>
+    </g>
+
+    <!-- crosshair -->
+    <g transform="translate(790, 38)">
+      <use href="#cursor-crosshair" x="-10" y="-10" width="20" height="20"/>
+      <text x="16" y="4" class="caption">crosshair</text>
+    </g>
+  </g>
+
+</svg>

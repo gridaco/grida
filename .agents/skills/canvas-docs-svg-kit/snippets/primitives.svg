@@ -1,0 +1,350 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<!--
+  canvas-docs-svg-kit  ·  primitives catalog
+
+  Visual reference of every primitive in the kit. Open this file to see
+  what's available before composing a new figure. The CSS classes shown
+  beside each cell are the same names used in template.svg.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 960 1400"
+     width="960"
+     height="1400"
+     font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg     { fill: #ECECEC; }
+      .doc-heading   { font-size: 24px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .doc-sub       { font-size: 13px; fill: #6b7280; }
+      .cell-bg       { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+      .cell-title    { font-size: 13px; fill: #0a0a0a; font-weight: 600; }
+      .cell-class    { font-size: 11px; fill: #6b7280; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+      /* primitives — same as template.svg */
+      .sel-outline   { fill: none; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+      .handle        { fill: #ffffff; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+      .baseline      { stroke: #0D99FF; stroke-width: 0.5; opacity: 0.55; shape-rendering: crispEdges; }
+      .edge-hot      { stroke: #FF3B30; stroke-width: 2; shape-rendering: crispEdges; }
+      .ripple        { fill: none; stroke: #FF3B30; stroke-width: 1.25; opacity: 0.6; }
+      .ripple-2      { fill: none; stroke: #FF3B30; stroke-width: 1; opacity: 0.3; }
+      .cursor        { fill: #0a0a0a; stroke: #ffffff; stroke-width: 1.25; stroke-linejoin: round; }
+      .cursor-hand   { fill: #ffffff; stroke: #0a0a0a; stroke-width: 1.5; stroke-linejoin: round; }
+      .badge          { fill: #0D99FF; }
+      .badge-distance { fill: #f44336; }
+      .badge-text     { font-size: 11px; fill: #ffffff; font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; letter-spacing: 0.3px; }
+      .kbd-bg         { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1; }
+      .kbd-text       { font-size: 11px; fill: #475569; font-weight: 500; letter-spacing: 0.2px; }
+      .handle-circle  { fill: #ffffff; stroke: #0D99FF; stroke-width: 1.5; }
+      .ghost         { fill: none; stroke: #b5b5b5; stroke-width: 1; stroke-dasharray: 3 3; shape-rendering: crispEdges; }
+      .arrow         { stroke: #9ca3af; stroke-width: 1.25; fill: none; }
+      .arrow-head    { fill: #9ca3af; }
+      .arrow-red     { stroke: #FF3B30; stroke-width: 1.25; fill: none; opacity: 0.85; }
+      .arrow-red-head{ fill: #FF3B30; }
+      .step-bg       { fill: #0a0a0a; }
+      .step-num      { font-size: 11px; fill: #ffffff; font-weight: 700; }
+      .node-text     { font-size: 22px; fill: #0a0a0a; letter-spacing: -0.3px; }
+
+      /* token swatches */
+      .swatch        { stroke: #e5e5e5; stroke-width: 1; }
+      .swatch-label  { font-size: 11px; fill: #0a0a0a; }
+      .swatch-hex    { font-size: 10px; fill: #6b7280; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+    </style>
+
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"/>
+    </marker>
+    <marker id="ah-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-red-head"/>
+    </marker>
+
+    <filter id="badge-shadow" x="-20%" y="-20%" width="140%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+      <feOffset dx="0" dy="1"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cursor-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+      <feOffset dx="0" dy="1"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="pin-shadow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1"/>
+      <feOffset dx="0" dy="0.5"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <g id="anchor-pin">
+      <circle cx="0" cy="0" r="9" fill="#FF3B30" opacity="0.18"/>
+      <circle cx="0" cy="0" r="5.5" fill="#FF3B30"/>
+      <circle cx="0" cy="0" r="2" fill="#ffffff"/>
+    </g>
+
+    <symbol id="cursor-h" viewBox="0 0 28 16" overflow="visible">
+      <path d="M 4 8 L 9 4 L 9 6.5 L 19 6.5 L 19 4 L 24 8 L 19 12 L 19 9.5 L 9 9.5 L 9 12 Z" class="cursor"/>
+    </symbol>
+    <symbol id="cursor-v" viewBox="0 0 16 28" overflow="visible">
+      <path d="M 8 4 L 4 9 L 6.5 9 L 6.5 19 L 4 19 L 8 24 L 12 19 L 9.5 19 L 9.5 9 L 12 9 Z" class="cursor"/>
+    </symbol>
+
+    <g id="ft-handle">
+      <circle cx="0" cy="0" r="7" class="handle-circle"/>
+    </g>
+
+    <symbol id="cursor-pointer" viewBox="0 0 14 18" overflow="visible">
+      <path d="M 1 1 L 1 15 L 5 11.5 L 7.5 17 L 9.5 16 L 7 10.8 L 12 10.8 Z" class="cursor"/>
+    </symbol>
+    <symbol id="cursor-move" viewBox="0 0 24 24" overflow="visible">
+      <path d="M 12 2 L 16 6 L 14 6 L 14 10 L 18 10 L 18 8 L 22 12 L 18 16 L 18 14 L 14 14 L 14 18 L 16 18 L 12 22 L 8 18 L 10 18 L 10 14 L 6 14 L 6 16 L 2 12 L 6 8 L 6 10 L 10 10 L 10 6 L 8 6 Z" class="cursor"/>
+    </symbol>
+    <symbol id="cursor-grab" viewBox="0 0 16 18" overflow="visible">
+      <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M8.6 17.5Q7 17.5 6 17q-1.2-.5-2-1.5t-1.6-2.6L.6 8.2v-1q0-.4.7-.6H2q.4.3.6.7l1.6 2.9.2.2h.3V10l-1-7q-.1-.7.1-1a1 1 0 0 1 1-.5 1 1 0 0 1 1.1 1l1.1 5.2v-6q0-.6.4-1 .3-.3.9-.3a1.2 1.2 0 0 1 1.2 1.2v6l1-5.2a1 1 0 0 1 1-1h.3q.5 0 .8.5l.2 1-.9 5.3 1.2-3.5q.2-.5.5-.7a1 1 0 0 1 1.6.3q.3.3.2.9l-1.2 6.5a8 8 0 0 1-1.8 4.2q-1.4 1.5-4 1.5Z"
+            class="cursor-hand"/>
+    </symbol>
+    <symbol id="cursor-grabbing" viewBox="0 0 14 13" overflow="visible">
+      <path d="M6.71.5q.39 0 .73.2l.09.06a1 1 0 0 1 .43.83v.66q.1.05.18.03l.01-.03v-.01l.16-.54.05-.15a1 1 0 0 1 .82-.63q.59-.1 1.06.27.26.18.38.5.1.3.04.6l-.15.88-.01.1q.04.04.13.04h.05l.24-.39V2.9q.3-.4.76-.46.4-.05.74.14l.1.06q.42.32.43.83 0 .84-.13 1.63-.12.77-.35 1.74l-.05.27a8 8 0 0 1-1.05 2.67q-.7 1.11-1.89 1.67-1.18.56-2.8.56-1.85 0-3.28-.92a6 6 0 0 1-1.96-2.16l-.2-.4A8.5 8.5 0 0 1 .5 4.93c0-.51.11-1 .41-1.36a1.5 1.5 0 0 1 1.06-.58q.28-.02.5.04l.15.05.27.1.05.27.25 1.27.02.07v.01h.01l.03.01.02-.01v-.05L2.75 2.3q-.08-.3.03-.61.11-.32.37-.5.48-.36 1.07-.27.31.04.56.26.19.17.27.39l.05.14.15.53v.01l.01.02.05.01q.07 0 .14-.03v-.66a1 1 0 0 1 .42-.83q.38-.27.83-.26Z"
+            class="cursor-hand"/>
+    </symbol>
+    <symbol id="cursor-rotate" viewBox="0 0 26 24" overflow="visible">
+      <path fill="#000000" fill-rule="evenodd" clip-rule="evenodd"
+            d="M23 15.5h-6.43l2.65-2.79A7.72 7.72 0 0 0 13 9.5a7.72 7.72 0 0 0-6.22 3.21l2.65 2.79H3V8.75l1.74 1.83A10.5 10.5 0 0 1 13 6.5c3.32 0 6.3 1.59 8.26 4.08L23 8.75v6.75Z"/>
+      <path fill="none" stroke="#ffffff" stroke-width="0.75"
+            d="M23 15.88h.38V7.8l-.65.68-1.45 1.52A10.85 10.85 0 0 0 13 6.13c-3.3 0-6.25 1.5-8.28 3.88L3.27 8.5l-.64-.68v8.07h7.67l-.6-.64-2.43-2.55A7.32 7.32 0 0 1 13 9.88c2.3 0 4.36 1.08 5.73 2.8l-2.43 2.56-.6.63H23Z"/>
+    </symbol>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="1400"/>
+
+  <text x="40" y="50" class="doc-heading">Primitives catalog</text>
+  <text x="40" y="74" class="doc-sub">Each cell is a standalone primitive. Class names match template.svg.</text>
+
+  <!-- =============== GRID: 3 cols × 3 rows  (cell 280 × 200) =============== -->
+  <!-- column x: 40, 340, 640         row y: 100, 320, 540 -->
+
+  <!-- ─── 1. Selection chrome ─── -->
+  <g transform="translate(40, 100)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Selection chrome</text>
+    <text x="16" y="46" class="cell-class">.sel-outline · .handle · .baseline</text>
+    <g transform="translate(60, 90)">
+      <rect x="0.5" y="0.5" width="159" height="69" class="sel-outline"/>
+      <line x1="0.5" y1="50.5" x2="159.5" y2="50.5" class="baseline"/>
+      <rect x="-3.5" y="-3.5"   width="7" height="7" class="handle"/>
+      <rect x="156.5" y="-3.5"  width="7" height="7" class="handle"/>
+      <rect x="-3.5" y="66.5"   width="7" height="7" class="handle"/>
+      <rect x="156.5" y="66.5"  width="7" height="7" class="handle"/>
+    </g>
+  </g>
+
+  <!-- ─── 2. Size badge ─── -->
+  <g transform="translate(340, 100)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Size badge</text>
+    <text x="16" y="46" class="cell-class">.badge · .badge-text · #badge-shadow</text>
+    <g transform="translate(96, 110)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">280 × 90</text>
+    </g>
+  </g>
+
+  <!-- ─── 3. Anchor pin ─── -->
+  <g transform="translate(640, 100)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Anchor pin</text>
+    <text x="16" y="46" class="cell-class">use href="#anchor-pin" · #pin-shadow</text>
+    <line x1="40" y1="120" x2="240" y2="120" class="ghost"/>
+    <g transform="translate(140, 120)" filter="url(#pin-shadow)">
+      <use href="#anchor-pin"/>
+    </g>
+    <text x="140" y="160" class="cell-class" text-anchor="middle">place via translate(cx, cy)</text>
+  </g>
+
+  <!-- ─── 4. Resize cursor — horizontal ─── -->
+  <g transform="translate(40, 320)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Resize cursor — horizontal</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-h" w=28 h=16</text>
+    <use href="#cursor-h" x="126" y="100" width="28" height="16" filter="url(#cursor-shadow)"/>
+  </g>
+
+  <!-- ─── 5. Resize cursor — vertical ─── -->
+  <g transform="translate(340, 320)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Resize cursor — vertical</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-v" w=16 h=28</text>
+    <use href="#cursor-v" x="132" y="90" width="16" height="28" filter="url(#cursor-shadow)"/>
+  </g>
+
+  <!-- ─── 6. Click ripple ─── -->
+  <g transform="translate(640, 320)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Click ripple</text>
+    <text x="16" y="46" class="cell-class">.ripple · .ripple-2</text>
+    <circle cx="140" cy="115" r="10" class="ripple"/>
+    <circle cx="140" cy="115" r="16" class="ripple-2"/>
+  </g>
+
+  <!-- ─── 7. Hot edge ─── -->
+  <g transform="translate(40, 540)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Hot edge</text>
+    <text x="16" y="46" class="cell-class">.edge-hot</text>
+    <line x1="100" y1="80" x2="100" y2="160" class="edge-hot"/>
+    <line x1="180" y1="80" x2="180" y2="160" class="edge-hot"/>
+    <text x="140" y="180" class="cell-class" text-anchor="middle">target of a gesture</text>
+  </g>
+
+  <!-- ─── 8. Ghost outline ─── -->
+  <g transform="translate(340, 540)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Ghost outline</text>
+    <text x="16" y="46" class="cell-class">.ghost</text>
+    <rect x="60.5" y="80.5" width="159" height="69" class="ghost"/>
+    <text x="140" y="180" class="cell-class" text-anchor="middle">previous bounds</text>
+  </g>
+
+  <!-- ─── 9. Arrows ─── -->
+  <g transform="translate(640, 540)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Arrows</text>
+    <text x="16" y="46" class="cell-class">.arrow · .arrow-red (#ah / #ah-red)</text>
+    <line x1="50" y1="100" x2="220" y2="100" class="arrow" marker-end="url(#ah)"/>
+    <text x="50" y="92" class="cell-class">flow / step</text>
+    <line x1="50" y1="150" x2="220" y2="150" class="arrow-red" marker-end="url(#ah-red)" stroke-dasharray="3 2"/>
+    <text x="50" y="142" class="cell-class">motion / change</text>
+  </g>
+
+  <!-- =============== TOKENS ROW =============== -->
+  <text x="40" y="790" class="cell-title">Color tokens</text>
+  <g transform="translate(40, 810)">
+    <rect width="880" height="130" rx="8" class="cell-bg"/>
+
+    <!-- swatches -->
+    <g transform="translate(20, 24)">
+      <rect width="60" height="44" rx="4" fill="#ECECEC" class="swatch"/>
+      <text x="0" y="64" class="swatch-label">canvas bg</text>
+      <text x="0" y="80" class="swatch-hex">#ECECEC</text>
+    </g>
+    <g transform="translate(120, 24)">
+      <rect width="60" height="44" rx="4" fill="#0D99FF"/>
+      <text x="0" y="64" class="swatch-label">selection</text>
+      <text x="0" y="80" class="swatch-hex">#0D99FF</text>
+    </g>
+    <g transform="translate(220, 24)">
+      <rect width="60" height="44" rx="4" fill="#FF3B30"/>
+      <text x="0" y="64" class="swatch-label">hot</text>
+      <text x="0" y="80" class="swatch-hex">#FF3B30</text>
+    </g>
+    <g transform="translate(320, 24)">
+      <rect width="60" height="44" rx="4" fill="#0a0a0a"/>
+      <text x="0" y="64" class="swatch-label">text</text>
+      <text x="0" y="80" class="swatch-hex">#0a0a0a</text>
+    </g>
+    <g transform="translate(420, 24)">
+      <rect width="60" height="44" rx="4" fill="#6b7280"/>
+      <text x="0" y="64" class="swatch-label">caption</text>
+      <text x="0" y="80" class="swatch-hex">#6b7280</text>
+    </g>
+    <g transform="translate(520, 24)">
+      <rect width="60" height="44" rx="4" fill="#b5b5b5"/>
+      <text x="0" y="64" class="swatch-label">ghost</text>
+      <text x="0" y="80" class="swatch-hex">#b5b5b5</text>
+    </g>
+    <g transform="translate(620, 24)">
+      <rect width="60" height="44" rx="4" fill="#9ca3af"/>
+      <text x="0" y="64" class="swatch-label">arrow</text>
+      <text x="0" y="80" class="swatch-hex">#9ca3af</text>
+    </g>
+    <g transform="translate(720, 24)">
+      <rect width="60" height="44" rx="4" fill="#ffffff" class="swatch"/>
+      <text x="0" y="64" class="swatch-label">handle / panel</text>
+      <text x="0" y="80" class="swatch-hex">#ffffff</text>
+    </g>
+  </g>
+
+  <!-- =============== ROW 4 (new V1 primitives) =============== -->
+  <text x="40" y="990" class="cell-title">More primitives</text>
+
+  <!-- ─── Distance meter (red badge variant) ─── -->
+  <g transform="translate(40, 1010)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Distance meter</text>
+    <text x="16" y="46" class="cell-class">.badge-distance · .badge-text</text>
+    <g transform="translate(96, 110)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge-distance"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">120 px</text>
+    </g>
+    <text x="140" y="172" class="cell-class" text-anchor="middle">measurement / distance variant</text>
+  </g>
+
+  <!-- ─── Keycap ─── -->
+  <g transform="translate(340, 1010)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Keycap</text>
+    <text x="16" y="46" class="cell-class">.kbd-bg · .kbd-text</text>
+    <g transform="translate(124, 100)">
+      <rect x="0" y="0" width="32" height="20" rx="3" class="kbd-bg"/>
+      <text x="16" y="14" class="kbd-text" text-anchor="middle">Alt</text>
+    </g>
+    <g transform="translate(166, 100)">
+      <rect x="0" y="0" width="48" height="20" rx="3" class="kbd-bg"/>
+      <text x="24" y="14" class="kbd-text" text-anchor="middle">Shift</text>
+    </g>
+    <text x="140" y="172" class="cell-class" text-anchor="middle">modifier-key pill (kbd-style)</text>
+  </g>
+
+  <!-- ─── Free-transform handle (circle variant) ─── -->
+  <g transform="translate(640, 1010)">
+    <rect width="280" height="200" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Free-transform handle</text>
+    <text x="16" y="46" class="cell-class">use href="#ft-handle" · .handle-circle</text>
+    <!-- show against a faint selection corner so the role is obvious -->
+    <rect x="80.5" y="80.5" width="120" height="60" class="sel-outline" opacity="0.5"/>
+    <g transform="translate(80, 80)"><use href="#ft-handle"/></g>
+    <g transform="translate(200, 80)"><use href="#ft-handle"/></g>
+    <g transform="translate(80, 140)"><use href="#ft-handle"/></g>
+    <g transform="translate(200, 140)"><use href="#ft-handle"/></g>
+    <text x="140" y="172" class="cell-class" text-anchor="middle">circle variant of .handle</text>
+  </g>
+
+  <!-- =============== ROW 5 (cursor family) =============== -->
+  <g transform="translate(40, 1230)">
+    <rect width="880" height="150" rx="8" class="cell-bg"/>
+    <text x="16" y="28" class="cell-title">Cursors</text>
+    <text x="16" y="46" class="cell-class">use href="#cursor-pointer | move | grab | grabbing | rotate | h | v"</text>
+
+    <!-- 7 cursors in a row, evenly spaced -->
+    <g transform="translate(60, 90)">
+      <use href="#cursor-pointer" x="0" y="-12" width="14" height="18" filter="url(#cursor-shadow)"/>
+      <text x="7" y="36" class="cell-class" text-anchor="middle">pointer</text>
+    </g>
+    <g transform="translate(180, 90)">
+      <use href="#cursor-move" x="-12" y="-12" width="24" height="24" filter="url(#cursor-shadow)"/>
+      <text x="0" y="36" class="cell-class" text-anchor="middle">move</text>
+    </g>
+    <g transform="translate(300, 90)">
+      <use href="#cursor-grab" x="-11" y="-11" width="22" height="22" filter="url(#cursor-shadow)"/>
+      <text x="0" y="36" class="cell-class" text-anchor="middle">grab</text>
+    </g>
+    <g transform="translate(420, 90)">
+      <use href="#cursor-grabbing" x="-11" y="-11" width="22" height="22" filter="url(#cursor-shadow)"/>
+      <text x="0" y="36" class="cell-class" text-anchor="middle">grabbing</text>
+    </g>
+    <g transform="translate(540, 90)">
+      <use href="#cursor-rotate" x="-13" y="-12" width="26" height="24" filter="url(#cursor-shadow)"/>
+      <text x="0" y="36" class="cell-class" text-anchor="middle">rotate</text>
+    </g>
+    <g transform="translate(680, 90)">
+      <use href="#cursor-h" x="-14" y="-8" width="28" height="16" filter="url(#cursor-shadow)"/>
+      <text x="0" y="36" class="cell-class" text-anchor="middle">h-resize</text>
+    </g>
+    <g transform="translate(800, 90)">
+      <use href="#cursor-v" x="-8" y="-14" width="16" height="28" filter="url(#cursor-shadow)"/>
+      <text x="0" y="36" class="cell-class" text-anchor="middle">v-resize</text>
+    </g>
+  </g>
+</svg>

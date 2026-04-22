@@ -1,0 +1,239 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 960" width="960" height="960" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg { fill: #ECECEC; }
+      .panel { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+
+      .doc-heading { font-size: 26px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .col-title { font-size: 18px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.2px; }
+      .caption { font-size: 14px; fill: #6b7280; }
+      .label-mono { font-size: 14px; fill: #0a0a0a; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .step-num { font-size: 11px; fill: #ffffff; font-weight: 700; font-family: 'SF Pro Text', sans-serif; }
+      .step-bg { fill: #0a0a0a; }
+      .step-label { font-size: 12px; fill: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; }
+
+      /* selection chrome — thin, crisp */
+      .sel-outline { fill: none; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+      .handle { fill: #ffffff; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+      .baseline { stroke: #0D99FF; stroke-width: 0.5; opacity: 0.55; shape-rendering: crispEdges; }
+
+      /* hot edge — animated double-click target */
+      .edge-hot { stroke: #FF3B30; stroke-width: 2; shape-rendering: crispEdges; }
+      .ripple { fill: none; stroke: #FF3B30; stroke-width: 1.25; opacity: 0.6; }
+      .ripple-2 { fill: none; stroke: #FF3B30; stroke-width: 1; opacity: 0.3; }
+
+      /* size readout badge */
+      .badge { fill: #0D99FF; }
+      .badge-text { font-size: 11px; fill: #ffffff; font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; letter-spacing: 0.2px; }
+
+      /* cursor icon */
+      .cursor { fill: #0a0a0a; stroke: #ffffff; stroke-width: 1.25; stroke-linejoin: round; }
+
+      .node-text { font-size: 26px; fill: #0a0a0a; letter-spacing: -0.3px; }
+
+      .arrow { stroke: #9ca3af; stroke-width: 1.25; fill: none; }
+      .arrow-head { fill: #9ca3af; }
+
+      .legend-box { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+    </style>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"/>
+    </marker>
+    <filter id="badge-shadow" x="-20%" y="-20%" width="140%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+      <feOffset dx="0" dy="1" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cursor-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+      <feOffset dx="0" dy="1" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- horizontal resize cursor (↔) -->
+    <symbol id="cursor-h" viewBox="0 0 28 16" overflow="visible">
+      <path d="M 4 8 L 9 4 L 9 6.5 L 19 6.5 L 19 4 L 24 8 L 19 12 L 19 9.5 L 9 9.5 L 9 12 Z" class="cursor"/>
+    </symbol>
+    <!-- vertical resize cursor (↕) -->
+    <symbol id="cursor-v" viewBox="0 0 16 28" overflow="visible">
+      <path d="M 8 4 L 4 9 L 6.5 9 L 6.5 19 L 4 19 L 8 24 L 12 19 L 9.5 19 L 9.5 9 L 12 9 Z" class="cursor"/>
+    </symbol>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="960"/>
+
+  <text x="480" y="60" class="doc-heading" text-anchor="middle">Double-click an edge to reset size to auto</text>
+  <text x="480" y="86" class="caption" text-anchor="middle">The axis you click resets. The other axis stays put.</text>
+
+  <!-- ============================================================ -->
+  <!-- LEFT column: width auto                                      -->
+  <!-- ============================================================ -->
+  <g transform="translate(60, 130)">
+    <text x="200" y="20" class="step-label" text-anchor="middle">Left or right edge</text>
+    <text x="200" y="44" class="col-title" text-anchor="middle">resets <tspan class="label-mono">width</tspan> to auto</text>
+  </g>
+
+  <!-- BEFORE: oversized width text node -->
+  <g transform="translate(80, 220)">
+    <!-- selection outline (crisp at .5) -->
+    <rect x="0.5" y="0.5" width="359" height="119" class="sel-outline"/>
+    <!-- text -->
+    <text x="14" y="74" class="node-text">Hello world</text>
+    <!-- baseline guide -->
+    <line x1="0.5" y1="84.5" x2="359.5" y2="84.5" class="baseline"/>
+    <!-- corner handles 8x8 centred on corners -->
+    <rect x="-3.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="356.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="-3.5" y="116.5" width="7" height="7" class="handle"/>
+    <rect x="356.5" y="116.5" width="7" height="7" class="handle"/>
+
+    <!-- hot edges -->
+    <line x1="0.5" y1="0" x2="0.5" y2="120" class="edge-hot"/>
+    <line x1="359.5" y1="0" x2="359.5" y2="120" class="edge-hot"/>
+
+    <!-- click ripple on left edge -->
+    <circle cx="0.5" cy="60" r="10" class="ripple"/>
+    <circle cx="0.5" cy="60" r="16" class="ripple-2"/>
+    <!-- click ripple on right edge -->
+    <circle cx="359.5" cy="60" r="10" class="ripple"/>
+    <circle cx="359.5" cy="60" r="16" class="ripple-2"/>
+
+    <!-- resize cursors at hot edges -->
+    <use href="#cursor-h" x="-32" y="52" width="28" height="16" filter="url(#cursor-shadow)"/>
+    <use href="#cursor-h" x="364" y="52" width="28" height="16" filter="url(#cursor-shadow)"/>
+
+    <!-- size badge centred under selection -->
+    <g transform="translate(136, 132)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">360 × 120</text>
+    </g>
+
+    <!-- step number -->
+    <g transform="translate(-26, -8)">
+      <circle cx="0" cy="0" r="11" class="step-bg"/>
+      <text x="0" y="4" class="step-num" text-anchor="middle">1</text>
+    </g>
+  </g>
+
+  <!-- arrow down -->
+  <line x1="260" y1="394" x2="260" y2="448" class="arrow" marker-end="url(#ah)"/>
+
+  <!-- AFTER: width hugs the text -->
+  <g transform="translate(140, 470)">
+    <rect x="0.5" y="0.5" width="159" height="119" class="sel-outline"/>
+    <text x="14" y="74" class="node-text">Hello world</text>
+    <line x1="0.5" y1="84.5" x2="159.5" y2="84.5" class="baseline"/>
+    <rect x="-3.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="156.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="-3.5" y="116.5" width="7" height="7" class="handle"/>
+    <rect x="156.5" y="116.5" width="7" height="7" class="handle"/>
+
+    <g transform="translate(36, 132)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">auto × 120</text>
+    </g>
+
+    <g transform="translate(-26, -8)">
+      <circle cx="0" cy="0" r="11" class="step-bg"/>
+      <text x="0" y="4" class="step-num" text-anchor="middle">2</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- RIGHT column: height auto                                    -->
+  <!-- ============================================================ -->
+  <g transform="translate(540, 130)">
+    <text x="200" y="20" class="step-label" text-anchor="middle">Top or bottom edge</text>
+    <text x="200" y="44" class="col-title" text-anchor="middle">resets <tspan class="label-mono">height</tspan> to auto</text>
+  </g>
+
+  <!-- BEFORE: oversized height text node -->
+  <g transform="translate(580, 200)">
+    <rect x="0.5" y="0.5" width="259" height="199" class="sel-outline"/>
+    <text x="14" y="74" class="node-text">Hello world</text>
+    <line x1="0.5" y1="84.5" x2="259.5" y2="84.5" class="baseline"/>
+    <rect x="-3.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="256.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="-3.5" y="196.5" width="7" height="7" class="handle"/>
+    <rect x="256.5" y="196.5" width="7" height="7" class="handle"/>
+
+    <!-- hot top & bottom edges -->
+    <line x1="0" y1="0.5" x2="260" y2="0.5" class="edge-hot"/>
+    <line x1="0" y1="199.5" x2="260" y2="199.5" class="edge-hot"/>
+
+    <!-- ripples -->
+    <circle cx="130" cy="0.5" r="10" class="ripple"/>
+    <circle cx="130" cy="0.5" r="16" class="ripple-2"/>
+    <circle cx="130" cy="199.5" r="10" class="ripple"/>
+    <circle cx="130" cy="199.5" r="16" class="ripple-2"/>
+
+    <!-- resize cursors -->
+    <use href="#cursor-v" x="122" y="-32" width="16" height="28" filter="url(#cursor-shadow)"/>
+    <use href="#cursor-v" x="122" y="204" width="16" height="28" filter="url(#cursor-shadow)"/>
+
+    <g transform="translate(86, 212)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">260 × 200</text>
+    </g>
+
+    <g transform="translate(-26, -8)">
+      <circle cx="0" cy="0" r="11" class="step-bg"/>
+      <text x="0" y="4" class="step-num" text-anchor="middle">1</text>
+    </g>
+  </g>
+
+  <line x1="710" y1="478" x2="710" y2="528" class="arrow" marker-end="url(#ah)"/>
+
+  <g transform="translate(580, 550)">
+    <rect x="0.5" y="0.5" width="259" height="49" class="sel-outline"/>
+    <text x="14" y="36" class="node-text">Hello world</text>
+    <line x1="0.5" y1="46.5" x2="259.5" y2="46.5" class="baseline"/>
+    <rect x="-3.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="256.5" y="-3.5" width="7" height="7" class="handle"/>
+    <rect x="-3.5" y="46.5" width="7" height="7" class="handle"/>
+    <rect x="256.5" y="46.5" width="7" height="7" class="handle"/>
+
+    <g transform="translate(86, 62)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="88" height="22" rx="4" class="badge"/>
+      <text x="44" y="15" class="badge-text" text-anchor="middle">260 × auto</text>
+    </g>
+
+    <g transform="translate(-26, -8)">
+      <circle cx="0" cy="0" r="11" class="step-bg"/>
+      <text x="0" y="4" class="step-num" text-anchor="middle">2</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- legend                                                       -->
+  <!-- ============================================================ -->
+  <g transform="translate(140, 800)">
+    <rect x="0" y="0" width="680" height="120" rx="10" class="legend-box"/>
+
+    <g transform="translate(40, 40)">
+      <line x1="0" y1="6" x2="28" y2="6" class="edge-hot"/>
+      <circle cx="14" cy="6" r="6" class="ripple"/>
+      <text x="46" y="11" class="caption">Hot edge — your double-click target</text>
+    </g>
+
+    <g transform="translate(40, 78)">
+      <use href="#cursor-h" x="0" y="-2" width="22" height="14"/>
+      <text x="36" y="11" class="caption">Resize cursor appears on hover</text>
+    </g>
+
+    <g transform="translate(390, 40)">
+      <rect x="0" y="-6" width="64" height="22" rx="4" class="badge"/>
+      <text x="32" y="10" class="badge-text" text-anchor="middle">w × h</text>
+      <text x="76" y="11" class="caption">Live size readout</text>
+    </g>
+
+    <g transform="translate(390, 78)">
+      <rect x="-3.5" y="2.5" width="7" height="7" class="handle"/>
+      <text x="20" y="11" class="caption">Selection corner handle</text>
+    </g>
+  </g>
+</svg>

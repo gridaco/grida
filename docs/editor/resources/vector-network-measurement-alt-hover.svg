@@ -1,0 +1,173 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 960 960"
+     width="960"
+     height="960"
+     font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg     { fill: #ECECEC; }
+
+      .doc-heading   { font-size: 26px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .doc-sub       { font-size: 14px; fill: #6b7280; }
+      .col-title     { font-size: 18px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.2px; }
+      .step-label    { font-size: 11px; fill: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; }
+      .caption       { font-size: 13px; fill: #6b7280; }
+      .label-mono    { font-size: 13px; fill: #0a0a0a; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+      .sel-outline   { fill: none; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+      .handle        { fill: #ffffff; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+
+      .vector-stroke { fill: none; stroke: #0a0a0a; stroke-width: 1.5; }
+      .vertex-dot    { fill: #ffffff; stroke: #0D99FF; stroke-width: 1.5; }
+      .vertex-sel    { fill: #0D99FF; stroke: #ffffff; stroke-width: 1.5; }
+
+      .edge-hot      { stroke: #FF3B30; stroke-width: 2; shape-rendering: crispEdges; }
+      .ripple        { fill: none; stroke: #FF3B30; stroke-width: 1.25; opacity: 0.6; }
+      .ripple-2      { fill: none; stroke: #FF3B30; stroke-width: 1; opacity: 0.3; }
+
+      .badge         { fill: #0D99FF; }
+      .badge-text    { font-size: 11px; fill: #ffffff; font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; letter-spacing: 0.3px; }
+
+      /* INVENTED: measurement-specific tokens (red, distinct from selection blue) */
+      .measure-line  { stroke: #FF3B30; stroke-width: 1.25; shape-rendering: crispEdges; }
+      .measure-aux   { stroke: #FF3B30; stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; shape-rendering: crispEdges; }
+      .measure-badge { fill: #FF3B30; }
+      .measure-text  { font-size: 11px; fill: #ffffff; font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; letter-spacing: 0.3px; }
+
+      /* INVENTED: neutral key-cap pill for the Alt modifier */
+      .keycap-bg     { fill: #ffffff; stroke: #0a0a0a; stroke-width: 1.25; }
+      .keycap-text   { font-size: 12px; fill: #0a0a0a; font-weight: 600; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+      .legend-box    { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+    </style>
+
+    <filter id="badge-shadow" x="-20%" y="-20%" width="140%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+      <feOffset dx="0" dy="1"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cursor-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+      <feOffset dx="0" dy="1"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="960"/>
+
+  <!-- Heading -->
+  <text x="480" y="60" class="doc-heading" text-anchor="middle">Alt-hover on a curve to measure</text>
+  <text x="480" y="86" class="doc-sub" text-anchor="middle">Selected vertex (A) to the parametric point under the cursor on the hovered segment (B).</text>
+
+  <!-- ============================================================
+       Main scene — single panel with the vector network
+       ============================================================ -->
+  <g transform="translate(80, 140)">
+    <rect x="0.5" y="0.5" width="799" height="569" rx="10" class="legend-box"/>
+
+    <!-- step label -->
+    <text x="24" y="36" class="step-label">Gesture</text>
+    <text x="24" y="58" class="col-title">Hold Alt, hover the segment</text>
+
+    <!-- key-cap modifier pill -->
+    <g transform="translate(24, 76)">
+      <rect x="0" y="0" width="56" height="26" rx="6" class="keycap-bg"/>
+      <text x="28" y="18" class="keycap-text" text-anchor="middle">Alt</text>
+      <text x="68" y="18" class="caption">held</text>
+    </g>
+
+    <!-- ============================================================
+         Vector network — a simple open path with three vertices
+         and one Bezier curve segment. Coordinates are panel-local.
+         A: selected vertex at (180, 380)
+         B (parametric): point on curve at roughly (520, 280)
+         ============================================================ -->
+
+    <!-- the vector path: V0 (180,380) -> V1 cubic (520,180) -> V2 (700,420) -->
+    <path d="M 180 380 C 280 180, 460 120, 520 280 S 660 460, 700 420"
+          class="vector-stroke"/>
+
+    <!-- ghost / aux measurement lines (axis-aligned distance from A to parametric point) -->
+    <!-- A is (180, 380); B is (520, 280)
+         dx = 340 (horizontal distance), dy = 100 (vertical distance)
+         Right (dx) line at y of A; Top (dy) line at x of B  -->
+
+    <!-- horizontal aux: from A.x to B.x along A.y -->
+    <line x1="180" y1="380" x2="520" y2="380" class="measure-line"/>
+    <!-- vertical aux: from B.y to A.y along B.x -->
+    <line x1="520" y1="280" x2="520" y2="380" class="measure-line"/>
+
+    <!-- Virtual axis-aligned rect has A (180,380) and B (520,280) at
+         opposite corners. Solid L runs through (520,380). Dashed mirror
+         L runs through (180,280), completing the rectangle's other two
+         sides — matches the editor's measurement-guide rendering. -->
+    <line x1="180" y1="380" x2="180" y2="280" class="measure-aux"/>
+    <line x1="180" y1="280" x2="520" y2="280" class="measure-aux"/>
+
+    <!-- distance badges -->
+    <g transform="translate(310, 392)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="62" height="20" rx="4" class="measure-badge"/>
+      <text x="31" y="14" class="measure-text" text-anchor="middle">340 px</text>
+    </g>
+    <g transform="translate(530, 320)" filter="url(#badge-shadow)">
+      <rect x="0" y="0" width="62" height="20" rx="4" class="measure-badge"/>
+      <text x="31" y="14" class="measure-text" text-anchor="middle">100 px</text>
+    </g>
+
+    <!-- A: the selected vertex -->
+    <circle cx="180" cy="380" r="6" class="vertex-sel"/>
+    <text x="180" y="412" class="label-mono" text-anchor="middle">A · selected vertex</text>
+
+    <!-- other (unselected) vertex on the path for context -->
+    <circle cx="700" cy="420" r="5" class="vertex-dot"/>
+    <text x="700" y="446" class="label-mono" text-anchor="middle">vertex</text>
+
+    <!-- B: parametric point on the curve under the cursor.
+         Dot is coloured with the measurement red so it reads as the
+         measurement target, not a selected vertex. -->
+    <circle cx="520" cy="280" r="10" class="ripple"/>
+    <circle cx="520" cy="280" r="16" class="ripple-2"/>
+    <circle cx="520" cy="280" r="5" fill="#FF3B30" stroke="#ffffff" stroke-width="1.5"/>
+    <text x="520" y="246" class="label-mono" text-anchor="middle">B · parametric point</text>
+
+    <!-- crosshair cursor adjacent to B — offset so the hotspot sits beside
+         the parametric point (hover, not click) and B stays visible. -->
+    <g transform="translate(534, 294)" filter="url(#cursor-shadow)">
+      <path d="M 9 0 H 11 V 9 H 20 V 11 H 11 V 20 H 9 V 11 H 0 V 9 H 9 Z"
+            fill="#0a0a0a" stroke="#ffffff" stroke-width="1.25" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <!-- ============================================================
+       Legend / read-out below
+       ============================================================ -->
+  <g transform="translate(80, 740)">
+    <rect x="0.5" y="0.5" width="799" height="120" rx="10" class="legend-box"/>
+    <text x="24" y="34" class="step-label">Read-out</text>
+
+    <!-- legend: A swatch -->
+    <g transform="translate(24, 60)">
+      <circle cx="8" cy="8" r="6" class="vertex-sel"/>
+      <text x="24" y="12" class="label-mono">A — source (selected vertex, vector2)</text>
+    </g>
+    <!-- legend: B swatch -->
+    <g transform="translate(24, 88)">
+      <circle cx="8" cy="8" r="5" fill="#FF3B30" stroke="#ffffff" stroke-width="1.5"/>
+      <text x="24" y="12" class="label-mono">B — target (parametric point on hovered curve)</text>
+    </g>
+
+    <!-- legend: red line -->
+    <g transform="translate(420, 60)">
+      <line x1="0" y1="8" x2="32" y2="8" class="measure-line"/>
+      <text x="44" y="12" class="label-mono">axis-aligned distance (X / Y independent)</text>
+    </g>
+    <g transform="translate(420, 88)">
+      <line x1="0" y1="8" x2="32" y2="8" class="measure-aux"/>
+      <text x="44" y="12" class="label-mono">auxiliary alignment guide</text>
+    </g>
+  </g>
+</svg>

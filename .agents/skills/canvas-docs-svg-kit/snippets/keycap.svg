@@ -1,0 +1,107 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<!--
+  canvas-docs-svg-kit  ·  keycap
+
+  Modifier-key pill (kbd-style). Use in interaction figures to show which
+  key the user holds during a gesture (Alt-hover, Shift-resize, etc.).
+
+  Source for the canonical look:
+    editor/components/ui/kbd.tsx
+      bg-muted, text-muted-foreground, h-5, min-w-5, px-1, rounded-sm, text-xs
+
+  Sizing recipe (matches kbd.tsx):
+    height = 20            (h-5 ≈ 20px)
+    rx     = 3             (rounded-sm)
+    width  = max(20, glyphs * 8 + 16)
+                           (px-1 each side ≈ 8px padding total, plus glyph room)
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 960 360"
+     width="960"
+     height="360"
+     font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg   { fill: #ECECEC; }
+      .doc-heading { font-size: 24px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .doc-sub     { font-size: 13px; fill: #6b7280; }
+      .cell-bg     { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+      .cell-title  { font-size: 13px; fill: #0a0a0a; font-weight: 600; }
+      .cell-class  { font-size: 11px; fill: #6b7280; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .cell-meta   { font-size: 10px; fill: #9ca3af; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+      .kbd-bg      { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 1; }
+      .kbd-text    { font-size: 11px; fill: #475569; font-weight: 500; letter-spacing: 0.2px; }
+    </style>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="360"/>
+
+  <text x="40" y="50" class="doc-heading">Keycap</text>
+  <text x="40" y="74" class="doc-sub">Modifier-key pill. Width varies with content; height fixed at 20.</text>
+
+  <g transform="translate(40, 110)">
+    <rect width="880" height="220" rx="8" class="cell-bg"/>
+
+    <text x="20" y="32" class="cell-title">Variants</text>
+    <text x="20" y="50" class="cell-class">.kbd-bg · .kbd-text</text>
+
+    <!-- single-letter -->
+    <g transform="translate(60, 110)">
+      <rect x="0" y="0" width="20" height="20" rx="3" class="kbd-bg"/>
+      <text x="10" y="14" class="kbd-text" text-anchor="middle">A</text>
+      <text x="10" y="44" class="cell-meta" text-anchor="middle">A</text>
+    </g>
+
+    <g transform="translate(120, 110)">
+      <rect x="0" y="0" width="20" height="20" rx="3" class="kbd-bg"/>
+      <text x="10" y="14" class="kbd-text" text-anchor="middle">⌘</text>
+      <text x="10" y="44" class="cell-meta" text-anchor="middle">⌘</text>
+    </g>
+
+    <g transform="translate(180, 110)">
+      <rect x="0" y="0" width="20" height="20" rx="3" class="kbd-bg"/>
+      <text x="10" y="14" class="kbd-text" text-anchor="middle">⇧</text>
+      <text x="10" y="44" class="cell-meta" text-anchor="middle">⇧</text>
+    </g>
+
+    <!-- 3-letter -->
+    <g transform="translate(240, 110)">
+      <rect x="0" y="0" width="32" height="20" rx="3" class="kbd-bg"/>
+      <text x="16" y="14" class="kbd-text" text-anchor="middle">Alt</text>
+      <text x="16" y="44" class="cell-meta" text-anchor="middle">Alt (32×20)</text>
+    </g>
+
+    <g transform="translate(312, 110)">
+      <rect x="0" y="0" width="36" height="20" rx="3" class="kbd-bg"/>
+      <text x="18" y="14" class="kbd-text" text-anchor="middle">Esc</text>
+      <text x="18" y="44" class="cell-meta" text-anchor="middle">Esc</text>
+    </g>
+
+    <!-- 5+ -->
+    <g transform="translate(388, 110)">
+      <rect x="0" y="0" width="48" height="20" rx="3" class="kbd-bg"/>
+      <text x="24" y="14" class="kbd-text" text-anchor="middle">Shift</text>
+      <text x="24" y="44" class="cell-meta" text-anchor="middle">Shift (48×20)</text>
+    </g>
+
+    <g transform="translate(476, 110)">
+      <rect x="0" y="0" width="56" height="20" rx="3" class="kbd-bg"/>
+      <text x="28" y="14" class="kbd-text" text-anchor="middle">Enter</text>
+      <text x="28" y="44" class="cell-meta" text-anchor="middle">Enter</text>
+    </g>
+
+    <!-- combo: Cmd + S -->
+    <g transform="translate(572, 110)">
+      <rect x="0" y="0" width="20" height="20" rx="3" class="kbd-bg"/>
+      <text x="10" y="14" class="kbd-text" text-anchor="middle">⌘</text>
+      <text x="34" y="15" font-size="13" fill="#9ca3af" text-anchor="middle">+</text>
+      <rect x="48" y="0" width="20" height="20" rx="3" class="kbd-bg"/>
+      <text x="58" y="14" class="kbd-text" text-anchor="middle">S</text>
+      <text x="34" y="44" class="cell-meta" text-anchor="middle">⌘ + S</text>
+    </g>
+
+    <text x="440" y="200" class="cell-meta" text-anchor="middle">Tip: keep keycaps inline with prose by giving them the same baseline as adjacent text.</text>
+  </g>
+</svg>

@@ -1,0 +1,276 @@
+<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 960 960"
+     width="960"
+     height="960"
+     font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <defs>
+    <style>
+      .canvas-bg     { fill: #ECECEC; }
+
+      .doc-heading   { font-size: 26px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.3px; }
+      .doc-sub       { font-size: 14px; fill: #6b7280; }
+      .col-title     { font-size: 18px; fill: #0a0a0a; font-weight: 600; letter-spacing: -0.2px; }
+      .step-label    { font-size: 11px; fill: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; }
+      .caption       { font-size: 13px; fill: #6b7280; }
+      .label-mono    { font-size: 13px; fill: #0a0a0a; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+      .sel-outline   { fill: none; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+      .handle        { fill: #ffffff; stroke: #0D99FF; stroke-width: 1; shape-rendering: crispEdges; }
+
+      .edge-hot      { stroke: #FF3B30; stroke-width: 2; shape-rendering: crispEdges; }
+      .ripple        { fill: none; stroke: #FF3B30; stroke-width: 1.25; opacity: 0.6; }
+      .ripple-2      { fill: none; stroke: #FF3B30; stroke-width: 1; opacity: 0.3; }
+      .cursor        { fill: #0a0a0a; stroke: #ffffff; stroke-width: 1.25; stroke-linejoin: round; }
+
+      .ghost         { fill: none; stroke: #b5b5b5; stroke-width: 1; stroke-dasharray: 3 3; shape-rendering: crispEdges; }
+      .arrow         { stroke: #9ca3af; stroke-width: 1.25; fill: none; }
+      .arrow-head    { fill: #9ca3af; }
+      .arrow-red     { stroke: #FF3B30; stroke-width: 1.5; fill: none; opacity: 0.9; }
+      .arrow-red-head{ fill: #FF3B30; }
+
+      .legend-box    { fill: #ffffff; stroke: #e5e5e5; stroke-width: 1; }
+
+      /* --- Locally invented for this figure --- */
+
+      /* Node frame: the (non-text) shape that owns the image paint */
+      .node-frame    { fill: #ffffff; stroke: #d4d4d4; stroke-width: 1; }
+
+      /* Image paint stand-in: a soft gray fill with a faint photo grid.
+         A real image isn't available; we evoke "an image" with a gradient. */
+      .img-fill      { fill: url(#imgGradient); }
+
+      /* Image-edit polygon overlay: translucent stroke that traces the
+         transformed image bounds — distinct from selection chrome. */
+      .img-poly      { fill: rgba(13, 153, 255, 0.06); stroke: #0D99FF; stroke-width: 1.25; stroke-dasharray: none; }
+
+      /* Scale rail (one of four invisible-but-hot edges) */
+      .img-rail      { stroke: #FF3B30; stroke-width: 3; opacity: 0.85; stroke-linecap: round; }
+
+      /* Rotation arc + handle ring */
+      .rot-arc       { fill: none; stroke: #FF3B30; stroke-width: 1.25; opacity: 0.85; stroke-dasharray: 3 3; }
+      .rot-handle    { fill: #ffffff; stroke: #FF3B30; stroke-width: 1.5; }
+
+      /* Translate move-cursor marker */
+      .move-glyph    { fill: #0a0a0a; stroke: #ffffff; stroke-width: 1.25; stroke-linejoin: round; }
+
+      /* Callout pill */
+      .callout-bg    { fill: #0a0a0a; }
+      .callout-text  { font-size: 11px; fill: #ffffff; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+    </style>
+
+    <linearGradient id="imgGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"/>
+    </marker>
+    <marker id="ah-red" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-red-head"/>
+    </marker>
+
+    <filter id="badge-shadow" x="-20%" y="-20%" width="140%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+      <feOffset dx="0" dy="1" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cursor-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+      <feOffset dx="0" dy="1" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="pin-shadow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1"/>
+      <feOffset dx="0" dy="0.5" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <symbol id="cursor-h" viewBox="0 0 28 16" overflow="visible">
+      <path d="M 4 8 L 9 4 L 9 6.5 L 19 6.5 L 19 4 L 24 8 L 19 12 L 19 9.5 L 9 9.5 L 9 12 Z" class="cursor"/>
+    </symbol>
+
+    <!-- 4-direction move glyph (locally invented) -->
+    <symbol id="cursor-move" viewBox="-12 -12 24 24" overflow="visible">
+      <path d="M 0 -10 L 4 -6 L 1.5 -6 L 1.5 -1.5 L 6 -1.5 L 6 -4 L 10 0 L 6 4 L 6 1.5 L 1.5 1.5 L 1.5 6 L 4 6 L 0 10 L -4 6 L -1.5 6 L -1.5 1.5 L -6 1.5 L -6 4 L -10 0 L -6 -4 L -6 -1.5 L -1.5 -1.5 L -1.5 -6 L -4 -6 Z" class="move-glyph"/>
+    </symbol>
+  </defs>
+
+  <rect class="canvas-bg" width="960" height="960"/>
+
+  <!-- Heading -->
+  <text x="480" y="60" class="doc-heading" text-anchor="middle">Image-edit overlay</text>
+  <text x="480" y="86" class="doc-sub" text-anchor="middle">Double-click an image-bearing node to enter paint/image mode. Three gestures act on the same overlay.</text>
+
+  <!-- =====================================================
+       MAIN STAGE
+       Node centred at (480, 500), 360 wide × 260 tall, no rotation.
+       Image paint inside it, transformed by rotation+scale: visualised
+       as a parallelogram (the polygon overlay) tilted ~15°.
+       ===================================================== -->
+
+  <!-- The host node (a non-text shape with an image fill) -->
+  <g transform="translate(300, 360)">
+    <rect class="node-frame" x="0.5" y="0.5" width="359" height="259" rx="2"/>
+
+    <!-- Clip the image paint to the node bounds -->
+    <clipPath id="nodeClip">
+      <rect x="0" y="0" width="360" height="260" rx="2"/>
+    </clipPath>
+
+    <!-- Image paint (rotated ~12° about the node centre) -->
+    <g clip-path="url(#nodeClip)">
+      <g transform="rotate(12 180 130)">
+        <rect class="img-fill" x="-40" y="20" width="440" height="220"/>
+        <!-- Subtle grid lines to suggest "an image" -->
+        <g stroke="#ffffff" stroke-width="0.75" opacity="0.35">
+          <line x1="-40" y1="75"  x2="400" y2="75"/>
+          <line x1="-40" y1="130" x2="400" y2="130"/>
+          <line x1="-40" y1="185" x2="400" y2="185"/>
+          <line x1="70"  y1="20"  x2="70"  y2="240"/>
+          <line x1="180" y1="20"  x2="180" y2="240"/>
+          <line x1="290" y1="20"  x2="290" y2="240"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- =====================================================
+         OVERLAY: traces the transformed image bounds.
+         The image rect (-40, 20, 440, 220) rotated 12° clockwise
+         about its centre (180, 130).
+
+         cos(12°)=0.97815, sin(12°)=0.20791
+         SVG rotate(θ) about (cx,cy) applies:
+           X = (x-cx)cos - (y-cy)sin + cx
+           Y = (x-cx)sin + (y-cy)cos + cy
+
+         A = (-40, 20)   -> ( -12.3,  -23.3 )
+         B = ( 400, 20)  -> (  418.1,  68.1 )
+         C = ( 400, 240) -> (  372.3, 283.3 )
+         D = ( -40, 240) -> (  -58.1, 191.9 )
+         ===================================================== -->
+    <polygon class="img-poly"
+             points="-12.3,-23.3 418.1,68.1 372.3,283.3 -58.1,191.9"/>
+
+    <!-- ============= TRANSLATE: hit area inside polygon ============= -->
+    <!-- 4-direction cursor near polygon centre -->
+    <g transform="translate(180, 130)" filter="url(#cursor-shadow)">
+      <use href="#cursor-move" width="24" height="24" x="-12" y="-12"/>
+    </g>
+    <!-- Translation arrow showing direction (starts outside cursor glyph) -->
+    <line x1="195" y1="142" x2="250" y2="180"
+          class="arrow-red" marker-end="url(#ah-red)"/>
+
+    <!-- ============= SCALE: hot rail on right edge ============= -->
+    <!-- Right edge of the polygon = B (418.1, 68.1) → C (372.3, 283.3).
+         Inset 14px from each end so the rail does not run through the
+         corner rotate handles. Direction unit vector ≈ (-0.208, 0.978). -->
+    <line x1="415.2" y1="81.8" x2="375.2" y2="269.6" class="img-rail"/>
+    <!-- Resize cursor centred on rail midpoint, perpendicular to the edge.
+         Edge midpoint: (395.2, 175.7). Edge angle = 102°; perpendicular = 12°. -->
+    <g transform="translate(395.2 175.7) rotate(12)" filter="url(#cursor-shadow)">
+      <use href="#cursor-h" x="-14" y="-8" width="28" height="16"/>
+    </g>
+
+    <!-- ============= ROTATE: corner handle at top-right (B) ============= -->
+    <!-- Dashed arc bulging outside corner B, radius 18 -->
+    <path class="rot-arc"
+          d="M 431.8 54.0 A 18 18 0 0 1 433.7 81.6"/>
+    <!-- Handle ring exactly on corner B -->
+    <g transform="translate(418.1 68.1)" filter="url(#pin-shadow)">
+      <circle r="7" class="rot-handle"/>
+    </g>
+
+    <!-- ============= RESTING CORNER HANDLES ============= -->
+    <g transform="translate(-12.3 -23.3)" filter="url(#pin-shadow)">
+      <circle r="5" class="rot-handle"/>
+    </g>
+    <g transform="translate(372.3 283.3)" filter="url(#pin-shadow)">
+      <circle r="5" class="rot-handle"/>
+    </g>
+    <g transform="translate(-58.1 191.9)" filter="url(#pin-shadow)">
+      <circle r="5" class="rot-handle"/>
+    </g>
+  </g>
+
+  <!-- =====================================================
+       CALLOUTS — three labels pointing at the three gestures.
+       Stage local origin: (300, 360).  World coords below.
+       ===================================================== -->
+
+  <!-- Translate callout (left) -->
+  <g>
+    <line x1="220" y1="490" x2="455" y2="490" class="arrow"/>
+    <g transform="translate(80, 478)">
+      <rect class="callout-bg" width="135" height="22" rx="11"/>
+      <text x="67.5" y="15" class="callout-text" text-anchor="middle">1 · Translate</text>
+    </g>
+    <text x="80" y="520" class="caption">Drag inside the polygon.</text>
+    <text x="80" y="538" class="caption">Offset is resolved in the</text>
+    <text x="80" y="556" class="caption">paint's local axes.</text>
+  </g>
+
+  <!-- Scale callout (right) -->
+  <g>
+    <line x1="780" y1="535" x2="700" y2="535" class="arrow"/>
+    <g transform="translate(782, 524)">
+      <rect class="callout-bg" width="118" height="22" rx="11"/>
+      <text x="59" y="15" class="callout-text" text-anchor="middle">2 · Scale</text>
+    </g>
+    <text x="782" y="566" class="caption">Drag a side rail. The</text>
+    <text x="782" y="584" class="caption">opposite edge stays fixed.</text>
+  </g>
+
+  <!-- Rotate callout (top-right) -->
+  <g>
+    <line x1="755" y1="395" x2="722" y2="425" class="arrow"/>
+    <g transform="translate(755, 365)">
+      <rect class="callout-bg" width="125" height="22" rx="11"/>
+      <text x="62.5" y="15" class="callout-text" text-anchor="middle">3 · Rotate</text>
+    </g>
+    <text x="755" y="409" class="caption">Drag a corner handle.</text>
+    <text x="755" y="427" class="caption">Rotation pivots around</text>
+    <text x="755" y="445" class="caption">the polygon centre.</text>
+  </g>
+
+  <!-- =====================================================
+       LEGEND CARD
+       ===================================================== -->
+  <g transform="translate(80, 760)">
+    <rect class="legend-box" width="800" height="140" rx="8"/>
+
+    <text x="20" y="32" class="col-title">Overlay anatomy</text>
+
+    <!-- Row 1: polygon -->
+    <polygon class="img-poly" points="20,55 110,55 105,85 15,85"/>
+    <text x="125" y="70" class="label-mono">image polygon</text>
+    <text x="125" y="86" class="caption">Traces the transformed image bounds.</text>
+
+    <!-- Row 2: rail -->
+    <line x1="20" y1="108" x2="105" y2="108" class="img-rail"/>
+    <text x="125" y="112" class="label-mono">scale rail</text>
+    <text x="125" y="128" class="caption">Invisible at rest; hot under the pointer.</text>
+
+    <!-- Right column: rotate handle -->
+    <g transform="translate(450, 70)">
+      <circle r="7" class="rot-handle"/>
+    </g>
+    <text x="470" y="75" class="label-mono">rotate handle</text>
+    <text x="470" y="91" class="caption">Corner ring; pivots around polygon centre.</text>
+
+    <!-- Right column: move glyph -->
+    <g transform="translate(450, 115)">
+      <use href="#cursor-move" width="20" height="20" x="-10" y="-10"/>
+    </g>
+    <text x="470" y="112" class="label-mono">translate area</text>
+    <text x="470" y="128" class="caption">Anywhere inside the polygon.</text>
+  </g>
+</svg>
