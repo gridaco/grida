@@ -10,6 +10,8 @@ The surface image editor provides on-canvas controls for repositioning image pai
 
 ## Interaction model
 
+![Image-edit overlay showing the translucent polygon that traces a rotated image paint, with three labelled gestures: drag-to-translate inside the polygon, a hot rail along one side for scaling, and a corner handle for rotation.](../resources/surface-image-editor-overlay.svg)
+
 The overlay exposes three groups of controls:
 
 - **Translate** – dragging anywhere inside the highlighted polygon offsets the paint. Movement is resolved in the paint’s local coordinate system so the image follows the pointer even when rotated.
