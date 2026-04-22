@@ -84,8 +84,8 @@ When the kit changes, walk the grep output and update each file.
 4. **Crib structure from [`examples/`](examples/).** Two finished figures live there:
    - `text-node-auto-size-edges.svg` — two-column before/after with hot edges, ripples, cursors, size badges, and a legend card.
    - `text-node-auto-size-alignment.svg` — three-column comparison with anchor pins and ghost outlines.
-5. **Save to `docs/editor/features/img/`** (or sibling `img/` dir next to the doc). Name: `<feature>-<description>.svg`, kebab-case.
-6. **Embed via Markdown.** `![alt text](img/your-figure.svg)`. The `alt` should describe what the figure shows, not name the file.
+5. **Save to `docs/editor/resources/`.** Name: `<feature>-<description>.svg`, kebab-case.
+6. **Embed via Markdown.** `![alt text](../resources/your-figure.svg)` from a doc under `docs/editor/features/`. The `alt` should describe what the figure shows, not name the file.
 
 ## Snippet files
 
