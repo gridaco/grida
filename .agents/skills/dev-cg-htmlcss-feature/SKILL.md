@@ -1,18 +1,20 @@
-# cg-htmlcss — feature loop prompt
+---
+name: dev-cg-htmlcss-feature
+description: >
+  Manual-invocation only. Five-phase feature loop (audit → ground →
+  fixture → implement → verify) for driving a single CSS feature to
+  Chromium parity in the cg htmlcss renderer.
+---
 
-**What this is.** A pastable prompt template for driving a single CSS
-feature forward in the cg htmlcss renderer. Paste the template at the
-bottom into a new task; the reference above it is context an agent
-can read to follow the loop honestly.
+# cg-htmlcss — feature loop
 
-**Why this is a prompt and not a skill.** The 5-phase loop is
-deliberately heavy — audit + ground + fixture + implement + verify.
-It's overkill for small fixes, and it's already a conductor over
-`/research`, `/fixtures`, `/cg-reftest`, which auto-trigger correctly
-on their own. Opt-in invocation is right: paste it when you want the
-full cycle; skip it for paper-cuts.
+**What this is.** A heavy, manually-invoked loop for driving a single
+CSS feature forward in the cg htmlcss renderer. Do not auto-trigger;
+load only when the user explicitly runs it. The loop is a conductor
+over `/research`, `/fixtures`, and `/cg-reftest` — those auto-trigger
+on their own for narrower work.
 
-**Lifecycle.** Expect this file to grow as new divergence patterns
+**Lifecycle.** Expect this skill to grow as new divergence patterns
 surface. It will likely go stale in parts once htmlcss hits
 Chromium-parity on L0/L1; treat the _phase structure_ as durable and
 the _property-specific callouts_ as advisory.
@@ -245,7 +247,7 @@ upstream is advisory; verify is the truth.
   fixture here is "we know about this case and intend to fix it."
   Promoting to exact is "we now match Blink."
 
-Automation rules downstream of this prompt (CI gating, auto-merge,
+Automation rules downstream of this skill (CI gating, auto-merge,
 etc.) must assert on the `report.json` emitted by `@grida/reftest`
 and **not** on free-text agent assertions. The agent's job is to
 drive the loop; the report is the contract.
@@ -291,7 +293,7 @@ without the conversation.
 
 ```text
 Drive the htmlcss feature loop for: <property or behavior>.
-Follow .agents/prompts/cg-htmlcss-feature.md.
+Follow the dev-cg-htmlcss-feature skill (.agents/skills/dev-cg-htmlcss-feature/SKILL.md).
 
 Scope:
 - Feature:    <e.g. `border-radius` percentage values>
