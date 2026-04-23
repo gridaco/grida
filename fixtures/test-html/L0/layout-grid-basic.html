@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: Grid Basic</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 100px 100px 100px;
+        grid-template-rows: 60px 60px;
+        gap: 8px;
+        width: 400px;
+        background: #eee;
+        padding: 8px;
+        box-sizing: border-box;
+        margin-bottom: 24px;
+      }
+
+      .item {
+        background: #000;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="item"></div>
+      <div class="item" style="background: #c00"></div>
+      <div class="item"></div>
+      <div class="item" style="background: #c00"></div>
+      <div class="item"></div>
+      <div class="item" style="background: #c00"></div>
+    </div>
+  </body>
+</html>

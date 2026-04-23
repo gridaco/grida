@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Solid Border</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #fff;
+        box-sizing: border-box;
+      }
+
+      .uniform-1 {
+        border: 1px solid #000;
+      }
+      .uniform-3 {
+        border: 3px solid #000;
+      }
+      .uniform-8 {
+        border: 8px solid #000;
+      }
+      .top-only {
+        border-top: 4px solid #000;
+      }
+      .asym-width {
+        border-top: 2px solid #000;
+        border-right: 4px solid #000;
+        border-bottom: 6px solid #000;
+        border-left: 8px solid #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">1px solid</div>
+        <div class="box uniform-1"></div>
+      </div>
+      <div>
+        <div class="label">3px solid</div>
+        <div class="box uniform-3"></div>
+      </div>
+      <div>
+        <div class="label">8px solid</div>
+        <div class="box uniform-8"></div>
+      </div>
+      <div>
+        <div class="label">top-only 4px</div>
+        <div class="box top-only"></div>
+      </div>
+      <div>
+        <div class="label">asym-width</div>
+        <div class="box asym-width"></div>
+      </div>
+    </div>
+  </body>
+</html>

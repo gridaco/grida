@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Linear Gradient (axis-aligned, two-stop)</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .swatch {
+        width: 140px;
+        height: 100px;
+        box-sizing: border-box;
+      }
+
+      .to-bottom {
+        background: linear-gradient(to bottom, #000, #fff);
+      }
+      .to-top {
+        background: linear-gradient(to top, #000, #fff);
+      }
+      .to-right {
+        background: linear-gradient(to right, #000, #fff);
+      }
+      .to-left {
+        background: linear-gradient(to left, #000, #fff);
+      }
+      .red-blue {
+        background: linear-gradient(to right, #f00, #00f);
+      }
+      .red-blue-v {
+        background: linear-gradient(to bottom, #f00, #00f);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">to bottom</div>
+        <div class="swatch to-bottom"></div>
+      </div>
+      <div>
+        <div class="label">to top</div>
+        <div class="swatch to-top"></div>
+      </div>
+      <div>
+        <div class="label">to right</div>
+        <div class="swatch to-right"></div>
+      </div>
+      <div>
+        <div class="label">to left</div>
+        <div class="swatch to-left"></div>
+      </div>
+      <div>
+        <div class="label">red→blue (→)</div>
+        <div class="swatch red-blue"></div>
+      </div>
+      <div>
+        <div class="label">red→blue (↓)</div>
+        <div class="swatch red-blue-v"></div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -4,19 +4,16 @@
     <meta charset="utf-8" />
     <title>Paint: Radial Gradient</title>
     <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
-        padding: 24px;
+        padding: 32px;
         background: #fff;
         color: #000;
-        font-family: system-ui, sans-serif;
-        font-size: 14px;
-      }
-
-      .label {
-        font-size: 11px;
-        color: #666;
-        padding-bottom: 4px;
       }
 
       .grid {
@@ -27,16 +24,11 @@
       }
 
       .rect {
-        width: 180px;
-        height: 180px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        color: #fff;
+        width: 100px;
+        height: 100px;
       }
 
-      /* shape */
+      /* <ending-shape> — CSS Images 3 §3.2.2 */
       .circle {
         background: radial-gradient(circle, #f00, #000);
       }
@@ -44,31 +36,16 @@
         background: radial-gradient(ellipse, #f00, #000);
       }
 
-      /* stops */
-      .multi-stop {
-        background: radial-gradient(circle, #f00, #0f0 40%, #00f 80%, #000);
-      }
-
-      /* position */
-      .at-top-left {
-        background: radial-gradient(circle at top left, #f00, #000);
-      }
-      .at-bottom-right {
-        background: radial-gradient(circle at bottom right, #f00, #000);
-      }
-      .at-center {
-        background: radial-gradient(circle at 25% 75%, #f00, #000);
-      }
-      .at-px {
-        background: radial-gradient(circle at 30px 30px, #f00, #000);
-      }
-
-      /* size */
+      /* <extent-keyword> — closest/farthest × side/corner */
       .closest-side {
         background: radial-gradient(circle closest-side, #f00, #000);
       }
-      .farthest-corner {
-        background: radial-gradient(circle farthest-corner, #f00, #000);
+      .farthest-side {
+        background: radial-gradient(
+          circle farthest-side at 30% 30%,
+          #f00,
+          #000
+        );
       }
       .closest-corner {
         background: radial-gradient(
@@ -77,78 +54,69 @@
           #000
         );
       }
-      .explicit-radius {
-        background: radial-gradient(circle 40px, #f00, #000);
+      .farthest-corner {
+        background: radial-gradient(circle farthest-corner, #f00, #000);
       }
-      .ellipse-radii {
-        background: radial-gradient(ellipse 80px 30px at center, #f00, #000);
+      .ellipse-closest-side {
+        background: radial-gradient(
+          ellipse closest-side at 40% 60%,
+          #f00,
+          #000
+        );
+      }
+      .ellipse-farthest-corner {
+        background: radial-gradient(
+          ellipse farthest-corner at 70% 30%,
+          #f00,
+          #000
+        );
       }
 
-      /* stacked */
-      .stacked {
-        background-color: #000;
-        background-image: radial-gradient(
-          circle,
-          rgba(255, 0, 0, 0.8),
-          transparent 70%
-        );
+      /* <length> explicit radii */
+      .explicit-circle {
+        background: radial-gradient(circle 40px, #f00, #000);
+      }
+      .explicit-ellipse {
+        background: radial-gradient(ellipse 60px 30px at center, #f00, #000);
+      }
+
+      /* <position> */
+      .at-top-left {
+        background: radial-gradient(circle at top left, #f00, #000);
+      }
+      .at-bottom-right {
+        background: radial-gradient(circle at bottom right, #f00, #000);
+      }
+      .at-percent {
+        background: radial-gradient(circle at 25% 75%, #f00, #000);
+      }
+      .at-px {
+        background: radial-gradient(circle at 30px 30px, #f00, #000);
+      }
+
+      /* <color-stop-list> */
+      .multi-stop {
+        background: radial-gradient(circle, #f00, #0f0 40%, #00f 80%, #000);
       }
     </style>
   </head>
   <body>
     <div class="grid">
-      <div>
-        <div class="label">circle</div>
-        <div class="rect circle">circle</div>
-      </div>
-      <div>
-        <div class="label">ellipse</div>
-        <div class="rect ellipse">ellipse</div>
-      </div>
-      <div>
-        <div class="label">multi-stop</div>
-        <div class="rect multi-stop">multi-stop</div>
-      </div>
-      <div>
-        <div class="label">at top left</div>
-        <div class="rect at-top-left">at top left</div>
-      </div>
-      <div>
-        <div class="label">at bottom right</div>
-        <div class="rect at-bottom-right">at bottom right</div>
-      </div>
-      <div>
-        <div class="label">at 25% 75%</div>
-        <div class="rect at-center">at 25% 75%</div>
-      </div>
-      <div>
-        <div class="label">at 30px 30px</div>
-        <div class="rect at-px">at 30px</div>
-      </div>
-      <div>
-        <div class="label">closest-side</div>
-        <div class="rect closest-side">closest-side</div>
-      </div>
-      <div>
-        <div class="label">farthest-corner</div>
-        <div class="rect farthest-corner">farthest-corner</div>
-      </div>
-      <div>
-        <div class="label">closest-corner @ 25% 25%</div>
-        <div class="rect closest-corner">closest-corner</div>
-      </div>
-      <div>
-        <div class="label">circle 40px</div>
-        <div class="rect explicit-radius">circle 40px</div>
-      </div>
-      <div>
-        <div class="label">ellipse 80px 30px</div>
-        <div class="rect ellipse-radii">ellipse 80×30</div>
-      </div>
-      <div>
-        <div class="label">stacked on solid bg</div>
-        <div class="rect stacked">stacked</div>
-      </div>
+      <div class="rect circle"></div>
+      <div class="rect ellipse"></div>
+      <div class="rect closest-side"></div>
+      <div class="rect farthest-side"></div>
+      <div class="rect closest-corner"></div>
+      <div class="rect farthest-corner"></div>
+      <div class="rect ellipse-closest-side"></div>
+      <div class="rect ellipse-farthest-corner"></div>
+      <div class="rect explicit-circle"></div>
+      <div class="rect explicit-ellipse"></div>
+      <div class="rect at-top-left"></div>
+      <div class="rect at-bottom-right"></div>
+      <div class="rect at-percent"></div>
+      <div class="rect at-px"></div>
+      <div class="rect multi-stop"></div>
     </div>
   </body>
 </html>

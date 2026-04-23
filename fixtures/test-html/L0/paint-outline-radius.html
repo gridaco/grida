@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Outline + border-radius</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .rect {
+        width: 120px;
+        height: 120px;
+        background: #ddd;
+        box-sizing: border-box;
+      }
+
+      /* solid outline, rounded corners — CSS UI §5.2 + CSS Backgrounds §5.3.
+         Outer corners adopt border-radius + (offset + width); inner corners are
+         the element's border-radius. */
+      .solid-r16 {
+        border-radius: 16px;
+        outline: 4px solid #000;
+      }
+      .solid-r32 {
+        border-radius: 32px;
+        outline: 6px solid #000;
+      }
+
+      /* outline-offset > 0: outer radii = radius + offset + width */
+      .solid-offset {
+        border-radius: 12px;
+        outline: 3px solid #000;
+        outline-offset: 8px;
+      }
+
+      /* thick outline with small radius: outer corners become nearly square */
+      .thick-small-r {
+        border-radius: 6px;
+        outline: 20px solid #000;
+      }
+
+      /* thin outline with large radius */
+      .thin-large-r {
+        border-radius: 40px;
+        outline: 2px solid #000;
+      }
+
+      /* asymmetric per-corner radii — CSS Backgrounds §5.1 */
+      .asym-radii {
+        border-top-left-radius: 30px;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 30px;
+        border-bottom-left-radius: 0;
+        outline: 4px solid #000;
+      }
+
+      /* elliptical corner radii (rx ry syntax) */
+      .ellipse-radii {
+        border-radius: 40px 20px;
+        outline: 3px solid #000;
+      }
+
+      /* double outline + radius */
+      .double-r {
+        border-radius: 16px;
+        outline: 9px double #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="rect solid-r16"></div>
+      <div class="rect solid-r32"></div>
+      <div class="rect solid-offset"></div>
+      <div class="rect thick-small-r"></div>
+      <div class="rect thin-large-r"></div>
+      <div class="rect asym-radii"></div>
+      <div class="rect ellipse-radii"></div>
+      <div class="rect double-r"></div>
+    </div>
+  </body>
+</html>

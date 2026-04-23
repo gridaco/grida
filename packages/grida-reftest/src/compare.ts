@@ -11,7 +11,9 @@ import type {
 } from "./types.js";
 
 const DEFAULT_THRESHOLD = 0.1;
-const DEFAULT_AA = false;
+// Default: ignore anti-aliased edges (pixelmatch `includeAA: false`). Cross-engine
+// AA coverage differences are not a real diff; set `aa: false` for strict mode.
+const DEFAULT_AA = true;
 const DEFAULT_BG: BgColor = "white";
 const DEFAULT_MASK: ScoringMask = "alpha";
 

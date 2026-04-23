@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Z-Index (simple stacking)</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .container {
+        position: relative;
+        width: 400px;
+        height: 300px;
+        background: #eee;
+      }
+
+      .layer {
+        position: absolute;
+        width: 180px;
+        height: 180px;
+        box-sizing: border-box;
+      }
+
+      .a {
+        top: 20px;
+        left: 20px;
+        background: #f00;
+        z-index: 3;
+      }
+      .b {
+        top: 60px;
+        left: 60px;
+        background: #0f0;
+        z-index: 2;
+      }
+      .c {
+        top: 100px;
+        left: 100px;
+        background: #00f;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="layer c"></div>
+      <div class="layer b"></div>
+      <div class="layer a"></div>
+    </div>
+  </body>
+</html>

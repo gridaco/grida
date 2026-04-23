@@ -75,8 +75,10 @@ fn paint_box(
     let w = layout.width;
     let h = layout.height;
 
-    // ── Save state for opacity / filter / clip ──
-    let needs_layer = style.opacity < 1.0 || !style.filter.is_empty();
+    // ── Save state for opacity / filter / mix-blend-mode / clip ──
+    let has_filter = !style.filter.is_empty();
+    let has_blend_mode = !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal);
+    let needs_layer = style.opacity < 1.0 || has_filter || has_blend_mode;
     let needs_clip = style.overflow_x != types::Overflow::Visible
         || style.overflow_y != types::Overflow::Visible;
 
@@ -117,19 +119,27 @@ fn paint_box(
 
     if needs_layer {
         let mut layer_paint = Paint::default();
-        layer_paint.set_alpha((style.opacity * 255.0) as u8);
-        let has_filter = !style.filter.is_empty();
+        layer_paint.set_alpha_f(style.opacity);
+        // CSS `mix-blend-mode` composites this element's stacking context
+        // onto its parent using the given blend mode (CSS Compositing 1
+        // §5). Apply as the layer's Skia blend mode.
+        if has_blend_mode {
+            layer_paint.set_blend_mode(style.blend_mode.into());
+        }
         if has_filter {
             if let Some(filter) = build_filter_chain(&style.filter) {
                 layer_paint.set_image_filter(filter);
             }
         }
-        // Skia clips a layer's output to its `bounds` hint, including any
-        // filter outset. Blur / drop-shadow extend the visible region past
-        // the source box, so when a filter is active we omit `bounds` and
-        // let Skia size the layer from the filter's own fast-bounds.
+        // Skia clips a layer's output to its `bounds` hint. Filters
+        // (blur/drop-shadow) extend past the source box, and
+        // `mix-blend-mode` composites whatever the element paints —
+        // including outer box-shadows, outlines, and overflowing
+        // descendants — onto the parent. In both cases we omit `bounds`
+        // and let Skia size the layer from the actual painted content so
+        // those pixels aren't clipped before compositing.
         let bounds = Rect::from_xywh(0.0, 0.0, w, h);
-        let layer_rec = if has_filter {
+        let layer_rec = if has_filter || has_blend_mode {
             skia_safe::canvas::SaveLayerRec::default().paint(&layer_paint)
         } else {
             skia_safe::canvas::SaveLayerRec::default()
@@ -197,7 +207,7 @@ fn paint_box(
             cy,
             cw,
             ch,
-            &style.border_radius,
+            &style.border_radius.resolved(w, h),
             style.font.image_rendering,
             images,
         );
@@ -392,6 +402,8 @@ fn rasterize_gradient(
     let canvas = surface.canvas();
     let mut paint = Paint::default();
     paint.set_shader(shader);
+    // Match Blink: gradients are always dithered (gradient.cc:359).
+    paint.set_dither(true);
     canvas.draw_rect(Rect::from_wh(w, h), &paint);
     surface.image_snapshot().into()
 }
@@ -409,12 +421,13 @@ fn paint_background(
         return;
     }
 
-    let rect = Rect::from_xywh(0.0, 0.0, w, h);
-    let r = &style.border_radius;
+    let resolved_r = style.border_radius.resolved(w, h);
+    let r = &resolved_r;
+    let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
 
     for layer in &style.background {
         match layer {
-            BackgroundLayer::Solid(c) => {
+            BackgroundLayer::Solid { color: c, clip } => {
                 if c.a == 0 {
                     continue;
                 }
@@ -422,11 +435,13 @@ fn paint_background(
                 paint.set_style(PaintStyle::Fill);
                 paint.set_anti_alias(true);
                 paint.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
+                let fill_rect = box_reference_rect(style, w, h, *clip);
                 if r.is_zero() {
-                    canvas.draw_rect(rect, &paint);
+                    canvas.draw_rect(fill_rect, &paint);
                 } else {
+                    let radii = inset_radii(r, border_rect, fill_rect);
                     let mut rrect = skia_safe::RRect::new();
-                    rrect.set_rect_radii(rect, &r.to_skia_radii());
+                    rrect.set_rect_radii(fill_rect, &radii);
                     canvas.draw_rrect(rrect, &paint);
                 }
             }
@@ -661,7 +676,7 @@ fn paint_background_image_layer(
     // rounded to match the inner edge").
     if !style.border_radius.is_zero() {
         let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
-        let radii = inset_radii(&style.border_radius, border_rect, clip_rect);
+        let radii = inset_radii(&style.border_radius.resolved(w, h), border_rect, clip_rect);
         let mut rrect = skia_safe::RRect::new();
         rrect.set_rect_radii(clip_rect, &radii);
         canvas.clip_rrect(rrect, ClipOp::Intersect, true);
@@ -1340,7 +1355,10 @@ fn to_skia_interpolation(v: super::style::GradientInterpolation) -> Interpolatio
         HM::Decreasing => HueMethod::Decreasing,
     };
     Interpolation {
-        in_premul: InPremul::No,
+        // Match Blink: legacy CSS gradients premultiply colors before
+        // interpolating (gradient.cc:282-285). For opaque stops this is a
+        // no-op; the difference shows up when stops have alpha.
+        in_premul: InPremul::Yes,
         color_space,
         hue_method,
     }
@@ -1461,11 +1479,10 @@ fn build_radial_gradient_shader(
     let (cx, cy) = resolve_center(&grad.center, w, h);
     let (rx_full, ry_full) = radial_radii(grad.shape, grad.size, cx, cy, w, h);
 
-    // Use the larger axis as the gradient line length for px stop
-    // resolution. For circles rx = ry; for ellipses this is a reasonable
-    // convention — CSS defines the ending shape's "gradient line" as
-    // radius-like distance from the center.
-    let line_length = rx_full.max(ry_full);
+    // Use the x-axis radius as the gradient line length for px stop
+    // resolution. Matches Blink: the shader is built at the x radius
+    // and the y axis is stretched via a preScale local matrix.
+    let line_length = rx_full;
 
     let (colors, raw_positions) = build_gradient_data_with_line_length(&grad.stops, line_length);
     if colors.len() < 2 {
@@ -1473,13 +1490,25 @@ fn build_radial_gradient_shader(
     }
 
     let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
-    let (rx, ry) = (rx_full * cycle, ry_full * cycle);
+    let rx = rx_full * cycle;
+    let aspect_ratio = if ry_full > 0.0 {
+        rx_full / ry_full
+    } else {
+        1.0
+    };
 
-    // Unit-radius radial at origin; local matrix maps shader → paint space:
-    // (shader point p) → (cx + rx·p.x, cy + ry·p.y). Works for circles and
-    // ellipses uniformly.
-    let mut matrix = skia_safe::Matrix::scale((rx, ry));
-    matrix.post_translate((cx, cy));
+    // Match Blink (gradient.cc:447-454): build the radial shader at
+    // (cx, cy) with radius = rx, then preScale(1, 1/aspect) at the
+    // center for elliptical gradients. Circles take the identity path,
+    // which avoids the matrix-inverse round-trip and keeps dither phase
+    // aligned with Blink's non-matrix radial draw.
+    let matrix = if (aspect_ratio - 1.0).abs() > 1e-6 {
+        let mut m = skia_safe::Matrix::default();
+        m.pre_scale((1.0, 1.0 / aspect_ratio), Some(Point::new(cx, cy)));
+        Some(m)
+    } else {
+        None
+    };
 
     let gradient = make_gradient(
         &colors,
@@ -1487,7 +1516,7 @@ fn build_radial_gradient_shader(
         tile_mode(grad.repeating),
         grad.interpolation,
     );
-    skia_safe::shaders::radial_gradient((Point::new(0.0, 0.0), 1.0), &gradient, Some(&matrix))
+    skia_safe::shaders::radial_gradient((Point::new(cx, cy), rx), &gradient, matrix.as_ref())
 }
 
 fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<skia_safe::Shader> {
@@ -1806,12 +1835,21 @@ fn paint_borders(
         && b.top.color == b.bottom.color
         && b.top.color == b.left.color
         && b.top.color == b.right.color;
+    // Stroke once as an RRect when sides are uniform *and* the style is
+    // one whose rendering doesn't depend on per-side color adjustments
+    // (inset / outset / groove / ridge darken/lighten per side). The
+    // per-side trapezoid path double-paints corners for translucent colors;
+    // the single-stroke path avoids that.
+    let uniform_stroke_style = matches!(
+        b.top.style,
+        types::BorderStyle::Solid | types::BorderStyle::Double
+    );
     if uniform
+        && uniform_stroke_style
         && b.top.width > 0.0
-        && b.top.style != types::BorderStyle::None
-        && !style.border_radius.is_zero()
+        && (b.top.style != types::BorderStyle::None || !style.border_radius.is_zero())
     {
-        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius, w, h);
+        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius.resolved(w, h), w, h);
         return;
     }
 
@@ -1853,7 +1891,7 @@ fn paint_uniform_rounded_border(
     };
     if side.style == types::BorderStyle::Double {
         let sub_w = side.width / 3.0;
-        let paint = stroke_paint(side.color, sub_w, types::BorderStyle::Solid);
+        let paint = stroke_paint(side.color, sub_w, types::BorderStyle::Solid, None);
         // Outer ring: stroke center near the outside edge.
         let outer_inset = sub_w / 2.0;
         canvas.draw_rrect(stroke_center(outer_inset), &paint);
@@ -1862,7 +1900,7 @@ fn paint_uniform_rounded_border(
         canvas.draw_rrect(stroke_center(inner_inset), &paint);
         return;
     }
-    let paint = stroke_paint(side.color, side.width, side.style);
+    let paint = stroke_paint(side.color, side.width, side.style, None);
     canvas.draw_rrect(stroke_center(side.width / 2.0), &paint);
 }
 
@@ -1900,7 +1938,7 @@ fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h
         let sub_w = side.width / 3.0;
         let (n_dx, n_dy) = side_inward_normal(pos);
         // Outer stroke (toward the element's outer edge).
-        let paint = stroke_paint(side.color, sub_w, BorderStyle::Solid);
+        let paint = stroke_paint(side.color, sub_w, BorderStyle::Solid, None);
         let out_off = -sub_w;
         let outer_p1 = (p1.0 + n_dx * out_off, p1.1 + n_dy * out_off);
         let outer_p2 = (p2.0 + n_dx * out_off, p2.1 + n_dy * out_off);
@@ -1914,8 +1952,33 @@ fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h
     }
 
     let effective_color = shaded_color(side.color, side.style, pos);
-    let paint = stroke_paint(effective_color, side.width, side.style);
+    let side_length = side_length(pos, w, h);
+
+    // For thick dotted (width > 3px), Blink insets the line endpoints
+    // by width/2 so round caps stay inside the box and the gap calc
+    // sees the inner span (box_border_painter.cc:528-537). Thin dotted
+    // (≤ 3px) instead uses `EnforceDotsAtEndpoints` — not yet ported;
+    // those widths land with a small alignment residual.
+    let (p1, p2, dash_len) = if side.style == types::BorderStyle::Dotted && side.width > 3.0 {
+        let half = side.width / 2.0;
+        let (np1, np2) = match pos {
+            SidePos::Top | SidePos::Bottom => ((p1.0 + half, p1.1), (p2.0 - half, p2.1)),
+            SidePos::Left | SidePos::Right => ((p1.0, p1.1 + half), (p2.0, p2.1 - half)),
+        };
+        (np1, np2, side_length - side.width)
+    } else {
+        (p1, p2, side_length)
+    };
+
+    let paint = stroke_paint(effective_color, side.width, side.style, Some(dash_len));
     canvas.draw_line(p1, p2, &paint);
+}
+
+fn side_length(pos: SidePos, w: f32, h: f32) -> f32 {
+    match pos {
+        SidePos::Top | SidePos::Bottom => w,
+        SidePos::Left | SidePos::Right => h,
+    }
 }
 
 fn side_endpoints(pos: SidePos, width: f32, w: f32, h: f32) -> ((f32, f32), (f32, f32)) {
@@ -1978,7 +2041,17 @@ fn shaded_color(c: CGColor, style: types::BorderStyle, pos: SidePos) -> CGColor 
 
 /// Shared stroke paint builder for border sides and outline.
 /// Applies dash/dot path effects for dashed/dotted styles.
-fn stroke_paint(color: CGColor, width: f32, style: types::BorderStyle) -> Paint {
+///
+/// `path_length` (Some) enables Blink-parity gap adjustment so dashes
+/// meet side corners evenly (styled_stroke_data.cc:40-58). None falls
+/// back to nominal intervals — used by paths where the length isn't
+/// known up front (outline RRect perimeter).
+fn stroke_paint(
+    color: CGColor,
+    width: f32,
+    style: types::BorderStyle,
+    path_length: Option<f32>,
+) -> Paint {
     let mut paint = Paint::default();
     paint.set_color(Color::from_argb(color.a, color.r, color.g, color.b));
     paint.set_stroke_width(width);
@@ -1987,13 +2060,42 @@ fn stroke_paint(color: CGColor, width: f32, style: types::BorderStyle) -> Paint 
 
     match style {
         types::BorderStyle::Dashed => {
-            let dash_len = width * 3.0;
-            if let Some(effect) = skia_safe::PathEffect::dash(&[dash_len, dash_len], 0.0) {
+            // Blink (styled_stroke_data.cc:60-74): dash/gap relative to
+            // thickness — thin lines (<3px) use longer dashes/gaps so
+            // they don't read as dots or solid lines.
+            let (dash_ratio, gap_ratio) = if width >= 3.0 {
+                (2.0_f32, 1.0_f32)
+            } else {
+                (3.0_f32, 2.0_f32)
+            };
+            let dash = width * dash_ratio;
+            let nominal_gap = width * gap_ratio;
+            let gap = match path_length {
+                Some(len) if len > dash * 2.0 => {
+                    select_best_dash_gap(len, dash, nominal_gap, false)
+                }
+                _ => nominal_gap,
+            };
+            if let Some(effect) = skia_safe::PathEffect::dash(&[dash, gap], 0.0) {
                 paint.set_path_effect(effect);
             }
         }
         types::BorderStyle::Dotted => {
-            if let Some(effect) = skia_safe::PathEffect::dash(&[width, width], 0.0) {
+            // Blink (styled_stroke_data.cc:115-132): round-cap stroke,
+            // interval `[0, gap + width - ε]`. The zero "on" segment
+            // combined with round-cap produces a dot of diameter=width;
+            // the "off" span sets the center-to-center spacing.
+            // SelectBestDashGap picks a gap that fits an integer count
+            // of dots along the side.
+            let per_dot = width * 2.0;
+            let gap = match path_length {
+                Some(len) if len >= per_dot => select_best_dash_gap(len, width, width, false),
+                _ => per_dot,
+            };
+            // Epsilon keeps the final dot inside the endpoint
+            // (styled_stroke_data.cc:127).
+            let off = (gap + width - 0.01).max(0.01);
+            if let Some(effect) = skia_safe::PathEffect::dash(&[0.0, off], 0.0) {
                 paint.set_path_effect(effect);
             }
             paint.set_stroke_cap(skia_safe::paint::Cap::Round);
@@ -2002,6 +2104,51 @@ fn stroke_paint(color: CGColor, width: f32, style: types::BorderStyle) -> Paint 
     }
 
     paint
+}
+
+/// CSS Backgrounds §7.2 / Blink `ShadowData::BlurRadiusToStdDev`
+/// (shadow_data.h:76-82): blur-radius is twice the Gaussian σ.
+#[inline]
+fn blur_radius_to_sigma(blur_radius: f32) -> f32 {
+    blur_radius * 0.5
+}
+
+/// Pick the gap that minimises deviation from `nominal_gap` while
+/// leaving an integer count of dashes on `stroke_length`. Mirrors
+/// Blink's `SelectBestDashGap` (styled_stroke_data.cc:40-58).
+fn select_best_dash_gap(
+    stroke_length: f32,
+    dash_length: f32,
+    gap_length: f32,
+    closed_path: bool,
+) -> f32 {
+    let available = if closed_path {
+        stroke_length
+    } else {
+        stroke_length + gap_length
+    };
+    let min_num_dashes = (available / (dash_length + gap_length)).floor().max(1.0);
+    let max_num_dashes = min_num_dashes + 1.0;
+    // `.max(1.0)` guards div-by-zero when `min_num_dashes == 1`
+    // on an open path. Blink lets the divide produce +∞ and relies
+    // on the `max_gap <= 0.0` branch below to pick `min_gap` anyway.
+    let min_num_gaps = if closed_path {
+        min_num_dashes
+    } else {
+        (min_num_dashes - 1.0).max(1.0)
+    };
+    let max_num_gaps = if closed_path {
+        max_num_dashes
+    } else {
+        (max_num_dashes - 1.0).max(1.0)
+    };
+    let min_gap = (stroke_length - min_num_dashes * dash_length) / min_num_gaps;
+    let max_gap = (stroke_length - max_num_dashes * dash_length) / max_num_gaps;
+    if max_gap <= 0.0 || (min_gap - gap_length).abs() < (max_gap - gap_length).abs() {
+        min_gap
+    } else {
+        max_gap
+    }
 }
 
 // ─── Outline (Chromium: OutlinePainter::PaintOutlineRects) ─────────────────
@@ -2021,7 +2168,8 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
         return;
     }
 
-    let r = &style.border_radius;
+    let resolved_r = style.border_radius.resolved(w, h);
+    let r = &resolved_r;
 
     if outline.style == types::BorderStyle::Double {
         // Two concentric 1/3-width strokes separated by a 1/3-width gap.
@@ -2029,7 +2177,7 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
         let sub_w = outline.width / 3.0;
         let outer_expand = outline.offset + outline.width - sub_w / 2.0;
         let inner_expand = outline.offset + sub_w / 2.0;
-        let paint = stroke_paint(outline.color, sub_w, types::BorderStyle::Solid);
+        let paint = stroke_paint(outline.color, sub_w, types::BorderStyle::Solid, None);
         draw_outline_ring(canvas, w, h, outer_expand, r, &paint);
         draw_outline_ring(canvas, w, h, inner_expand, r, &paint);
         return;
@@ -2066,7 +2214,7 @@ fn draw_outline_ring(
 }
 
 fn outline_paint(outline: &Outline) -> Paint {
-    stroke_paint(outline.color, outline.width, outline.style)
+    stroke_paint(outline.color, outline.width, outline.style, None)
 }
 
 /// Expand border-radius values outward by `expand` pixels.
@@ -2085,7 +2233,10 @@ fn expand_radii(r: &super::style::CornerRadii, expand: f32) -> [skia_safe::Point
 // ─── Box shadow (Chromium: BoxPainterBase::PaintNormalBoxShadow / PaintInsetBoxShadow) ──
 
 fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
-    for shadow in &style.box_shadow {
+    // CSS Backgrounds §7.2: first shadow listed is on top. Iterate in reverse
+    // so the last-listed shadow paints first (bottom), leaving the first-listed
+    // painted last (on top).
+    for shadow in style.box_shadow.iter().rev() {
         if shadow.inset {
             continue;
         }
@@ -2099,11 +2250,9 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
-            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
-            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur,
+                blur_radius_to_sigma(shadow.blur),
                 false,
             ));
         }
@@ -2115,7 +2264,8 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
             h + shadow.spread * 2.0,
         );
 
-        let r = &style.border_radius;
+        let resolved_r = style.border_radius.resolved(w, h);
+        let r = &resolved_r;
         if r.is_zero() {
             canvas.draw_rect(shadow_rect, &paint);
         } else {
@@ -2132,7 +2282,9 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 /// then drawing a hollow rect (the box outline expanded outward) with a blur
 /// mask so that only the soft inner edge is visible.
 fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
-    for shadow in &style.box_shadow {
+    // CSS Backgrounds §7.2: first shadow listed is on top. Iterate in reverse
+    // so later-listed insets paint first, leaving the first-listed inset on top.
+    for shadow in style.box_shadow.iter().rev() {
         if !shadow.inset {
             continue;
         }
@@ -2141,7 +2293,8 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 
         // Clip to the box so shadow cannot bleed outside
         canvas.save();
-        let r = &style.border_radius;
+        let resolved_r = style.border_radius.resolved(w, h);
+        let r = &resolved_r;
         if r.is_zero() {
             canvas.clip_rect(box_rect, ClipOp::Intersect, true);
         } else {
@@ -2160,33 +2313,34 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
-            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
-            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur,
+                blur_radius_to_sigma(shadow.blur),
                 false,
             ));
         }
 
-        // Draw a large rect with a hole cut out, shifted by offset + spread.
-        // The blur on the outer edge of the hole creates the inset shadow.
+        // Centered frame, translated by `offset` via canvas.translate
+        // so the inner hole and outer edge shift together — matches
+        // Blink's DrawLooper offset semantics (box_painter_base.cc:566)
+        // and keeps the blur gradients symmetric across the box.
         let spread = shadow.spread;
-        let inner_rect = Rect::from_xywh(
-            shadow.offset_x + spread,
-            shadow.offset_y + spread,
-            w - spread * 2.0,
-            h - spread * 2.0,
-        );
+        let inner_rect = Rect::from_xywh(spread, spread, w - spread * 2.0, h - spread * 2.0);
 
-        // Outer rect large enough that its edges are outside the clip region
-        let expansion = shadow.blur * 2.0 + shadow.spread.abs() + 100.0;
-        let outer_rect = Rect::from_xywh(
-            -expansion + shadow.offset_x,
-            -expansion + shadow.offset_y,
-            w + expansion * 2.0,
-            h + expansion * 2.0,
-        );
+        // Outer rect per Blink's `AreaCastingShadowInHole`
+        // (box_painter_base.cc:511-522): outset hole by blur-radius +
+        // |negative_spread|, then union with the pre-offset position so
+        // the frame extends far enough to cover every pixel the shadow
+        // can reach after the translate below. Keeping the thickness at
+        // blur-radius lets inner/outer blur gradients overlap, which is
+        // what produces the soft fall-off toward the box center.
+        let outset = shadow.blur - shadow.spread.min(0.0);
+        let outer_l = (-outset).min(-outset - shadow.offset_x);
+        let outer_t = (-outset).min(-outset - shadow.offset_y);
+        let outer_r = (w + outset).max(w + outset - shadow.offset_x);
+        let outer_b = (h + outset).max(h + outset - shadow.offset_y);
+        let outer_rect = Rect::from_xywh(outer_l, outer_t, outer_r - outer_l, outer_b - outer_t);
+        canvas.translate((shadow.offset_x, shadow.offset_y));
 
         // Build a path: outer rect minus inner rect (creates a frame).
         // EvenOdd fill makes the inner rect a hole.

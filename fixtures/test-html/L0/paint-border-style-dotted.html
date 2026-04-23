@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Border Style Dotted</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+      }
+
+      .rect {
+        width: 140px;
+        height: 100px;
+        box-sizing: border-box;
+        background: #ddd;
+      }
+
+      /* CSS Backgrounds §4.2 border-style: dotted.
+         Blink's dotted stroke: round caps, dots of diameter=width
+         spaced by SelectBestDashGap so an integer number of dots fit
+         the side length. */
+      .w1 {
+        border: 1px dotted #000;
+      }
+      .w2 {
+        border: 2px dotted #000;
+      }
+      .w3 {
+        border: 3px dotted #000;
+      }
+      .w6 {
+        border: 6px dotted #000;
+      }
+      .w10 {
+        border: 10px dotted #000;
+      }
+      .colored {
+        border: 4px dotted #c00;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="rect w1"></div>
+      <div class="rect w2"></div>
+      <div class="rect w3"></div>
+      <div class="rect w6"></div>
+      <div class="rect w10"></div>
+      <div class="rect colored"></div>
+    </div>
+  </body>
+</html>

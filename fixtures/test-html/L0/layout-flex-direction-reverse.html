@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: Flex Direction Reverse</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        width: 400px;
+        height: 60px;
+      }
+
+      .row-reverse {
+        flex-direction: row-reverse;
+      }
+
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 24px;
+        width: 100px;
+        height: 200px;
+      }
+
+      .col-reverse {
+        flex-direction: column-reverse;
+      }
+
+      .item {
+        width: 60px;
+        height: 40px;
+        background: #000;
+        flex-shrink: 0;
+      }
+
+      .col .item {
+        width: 60px;
+        height: 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div class="row row-reverse">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div class="col">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div class="col col-reverse">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+  </body>
+</html>

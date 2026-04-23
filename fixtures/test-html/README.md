@@ -123,6 +123,27 @@ sides should now be at identical dimensions.
 layout changes its natural cull, invalidating `viewport.height` in
 the suite. Re-measure and update.
 
+## Captions and labels
+
+Short captions next to each specimen (`"0.75"`, `"padding: 24px"`,
+etc.) are welcome — they help humans reading the fixture identify what
+each region is testing. Two rules:
+
+- **Keep them short.** The caption is not the subject; if it grows
+  long enough to shape the layout it's in the way.
+- **Don't let captions drive layout.** When captions sit inside flex
+  items, grid cells, or stretched blocks, pin the enclosing element's
+  dimensions (`width`, `height`) so font-advance-width differences
+  between Chromium and cg can't leak into box geometry. Otherwise a
+  1px shaping difference in "padding: 24px (uniform)" propagates to
+  every following sibling.
+
+When text is incidental (labels, glyph placeholders, captions), inject
+`_reftest/hide-text.css` via the suite's `extra_css` — it neutralizes
+color, text-shadow, and line-height while preserving advance widths
+and block flow. The suite defaults already pull it in; see
+`.agents/skills/cg-reftest/SKILL.md` for details.
+
 ## Adding a new fixture
 
 1. **Name** — `<domain>-<property>[-<variant>].html`. The filename is
