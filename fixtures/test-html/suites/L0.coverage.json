@@ -4,7 +4,10 @@
   "defaults": {
     "viewport": { "width": 600, "height": 800 },
     "wait_for": ["fonts", "networkidle"],
-    "extra_css": ["../_reftest/hide-text.css"],
+    "extra_css": [
+      "../_reftest/hide-text.css",
+      "../_reftest/transparent-body.css"
+    ],
     "full_page": true
   },
   "fixtures": [

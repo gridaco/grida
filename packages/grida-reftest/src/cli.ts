@@ -28,8 +28,12 @@ program
   )
   .option(
     "--aa",
-    "ignore anti-aliased edges (pixelmatch includeAA=false)",
-    false
+    "ignore anti-aliased edges (pixelmatch includeAA=false) — default",
+    true
+  )
+  .option(
+    "--no-aa",
+    "strict: count anti-aliased pixels as diffs (pixelmatch includeAA=true)"
   )
   .option(
     "--bg <color>",
@@ -108,7 +112,8 @@ program
   .addOption(
     new Option("--threshold <number>", "pixelmatch YIQ threshold per pixel")
   )
-  .option("--aa", "ignore anti-aliased edges")
+  .option("--aa", "ignore anti-aliased edges (default)")
+  .option("--no-aa", "strict: count AA pixels as diffs")
   .option("--bg <color>", "composite background: white|black")
   .option("--mask <mode>", "scoring denominator: alpha|none")
   .option("--overwrite", "clear output dir on start")
@@ -180,7 +185,7 @@ program
         ? parseNumber(opts.threshold, "--threshold", 0, 1)
         : (config?.diff?.threshold ?? 0.1);
     const aa =
-      opts.aa !== undefined ? Boolean(opts.aa) : (config?.diff?.aa ?? false);
+      opts.aa !== undefined ? Boolean(opts.aa) : (config?.diff?.aa ?? true);
     const bg = opts.bg ? parseBg(opts.bg) : (config?.bg ?? "white");
     const mask = opts.mask
       ? parseMask(opts.mask)

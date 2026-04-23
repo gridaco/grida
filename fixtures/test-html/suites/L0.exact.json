@@ -3,13 +3,16 @@
   "description": "Byte-exact L0 fixtures. Every fixture here MUST stay at 100.00% similarity against the Chromium oracle. Any drop = real regression.",
   "gate": {
     "threshold": 0,
-    "aa": false,
+    "aa": true,
     "floor": 1.0
   },
   "defaults": {
     "viewport": { "width": 600, "height": 800 },
     "wait_for": ["fonts", "networkidle"],
-    "extra_css": ["../_reftest/hide-text.css"],
+    "extra_css": [
+      "../_reftest/hide-text.css",
+      "../_reftest/transparent-body.css"
+    ],
     "full_page": true
   },
   "fixtures": [

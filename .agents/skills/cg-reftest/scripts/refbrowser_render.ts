@@ -216,6 +216,8 @@ async function renderOne(
     fullPage: config.full_page,
     animations: "disabled",
     caret: "hide",
+    // Alpha encodes "CSS drew here" — used as content mask by scoring.
+    omitBackground: true,
   });
 
   await page.close();
