@@ -67,6 +67,7 @@
     { "path": "../L0/paint-individual-transform-props.html" },
     { "path": "../L0/paint-clip-path-circle.html" },
     { "path": "../L0/paint-clip-path-polygon.html" },
-    { "path": "../L0/paint-clip-path-ellipse.html" }
+    { "path": "../L0/paint-clip-path-ellipse.html" },
+    { "path": "../L0/paint-opacity-nested.html" }
   ]
 }
