@@ -70,6 +70,7 @@
     { "path": "../L0/paint-clip-path-ellipse.html" },
     { "path": "../L0/paint-opacity-nested.html" },
     { "path": "../L0/layout-flex-direction-reverse.html" },
-    { "path": "../L0/paint-box-shadow-multiple.html" }
+    { "path": "../L0/paint-box-shadow-multiple.html" },
+    { "path": "../L0/paint-outline-offset.html" }
   ]
 }
