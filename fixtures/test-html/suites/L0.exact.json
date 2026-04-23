@@ -73,6 +73,7 @@
     { "path": "../L0/paint-box-shadow-multiple.html" },
     { "path": "../L0/paint-outline-offset.html" },
     { "path": "../L0/layout-flex-align-self.html" },
-    { "path": "../L0/layout-grid-autoflow.html" }
+    { "path": "../L0/layout-grid-autoflow.html" },
+    { "path": "../L0/layout-flex-basis.html" }
   ]
 }

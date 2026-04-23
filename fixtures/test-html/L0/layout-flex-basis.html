@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: Flex Basis</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+        width: 400px;
+        height: 40px;
+        margin-bottom: 16px;
+      }
+
+      .item {
+        background: #000;
+        height: 40px;
+      }
+
+      .basis-100 {
+        width: 100px;
+        flex-basis: 100px;
+      }
+      .basis-60 {
+        width: 60px;
+        flex-basis: 60px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="item basis-100"></div>
+      <div class="item basis-60"></div>
+      <div class="item basis-100"></div>
+    </div>
+  </body>
+</html>
