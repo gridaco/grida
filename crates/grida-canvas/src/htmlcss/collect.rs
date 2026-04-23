@@ -1185,6 +1185,10 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Flex child
     el.flex_grow = style.clone_flex_grow().0;
     el.flex_shrink = style.clone_flex_shrink().0;
+    el.flex_basis = match &pos.flex_basis {
+        style::values::generics::flex::FlexBasis::Size(s) => extract_size(s),
+        style::values::generics::flex::FlexBasis::Content => CssLength::Auto,
+    };
 
     // Grid container
     if el.display == types::Display::Grid {
