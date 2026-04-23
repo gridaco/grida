@@ -1950,17 +1950,13 @@ fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h
     }
 
     let effective_color = shaded_color(side.color, side.style, pos);
-    let side_length = match pos {
-        SidePos::Top | SidePos::Bottom => w,
-        SidePos::Left | SidePos::Right => h,
-    };
+    let side_length = side_length(pos, w, h);
 
     // For thick dotted (width > 3px), Blink insets the line endpoints
-    // by width/2 so that the round caps stay inside the box and the
-    // gap calc sees the inner span (box_border_painter.cc:528-537).
-    // Thin dotted (width ≤ 3) uses the pixel-aligned dash logic of
-    // `EnforceDotsAtEndpoints`, not yet ported — those variants land
-    // with a small alignment residual at narrow widths.
+    // by width/2 so round caps stay inside the box and the gap calc
+    // sees the inner span (box_border_painter.cc:528-537). Thin dotted
+    // (≤ 3px) instead uses `EnforceDotsAtEndpoints` — not yet ported;
+    // those widths land with a small alignment residual.
     let (p1, p2, dash_len) = if side.style == types::BorderStyle::Dotted && side.width > 3.0 {
         let half = side.width / 2.0;
         let (np1, np2) = match pos {
@@ -1974,6 +1970,13 @@ fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h
 
     let paint = stroke_paint(effective_color, side.width, side.style, Some(dash_len));
     canvas.draw_line(p1, p2, &paint);
+}
+
+fn side_length(pos: SidePos, w: f32, h: f32) -> f32 {
+    match pos {
+        SidePos::Top | SidePos::Bottom => w,
+        SidePos::Left | SidePos::Right => h,
+    }
 }
 
 fn side_endpoints(pos: SidePos, width: f32, w: f32, h: f32) -> ((f32, f32), (f32, f32)) {
@@ -2101,6 +2104,13 @@ fn stroke_paint(
     paint
 }
 
+/// CSS Backgrounds §7.2 / Blink `ShadowData::BlurRadiusToStdDev`
+/// (shadow_data.h:76-82): blur-radius is twice the Gaussian σ.
+#[inline]
+fn blur_radius_to_sigma(blur_radius: f32) -> f32 {
+    blur_radius * 0.5
+}
+
 /// Pick the gap that minimises deviation from `nominal_gap` while
 /// leaving an integer count of dashes on `stroke_length`. Mirrors
 /// Blink's `SelectBestDashGap` (styled_stroke_data.cc:40-58).
@@ -2117,6 +2127,9 @@ fn select_best_dash_gap(
     };
     let min_num_dashes = (available / (dash_length + gap_length)).floor().max(1.0);
     let max_num_dashes = min_num_dashes + 1.0;
+    // `.max(1.0)` guards div-by-zero when `min_num_dashes == 1`
+    // on an open path. Blink lets the divide produce +∞ and relies
+    // on the `max_gap <= 0.0` branch below to pick `min_gap` anyway.
     let min_num_gaps = if closed_path {
         min_num_dashes
     } else {
@@ -2235,12 +2248,9 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
-            // CSS Backgrounds §7.2 blur-radius is twice the Gaussian
-            // standard deviation. Match Blink's ShadowData::BlurRadiusToStdDev
-            // (shadow_data.h:76-82): σ = radius * 0.5.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur * 0.5,
+                blur_radius_to_sigma(shadow.blur),
                 false,
             ));
         }
@@ -2301,23 +2311,17 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
-            // CSS Backgrounds §7.2 blur-radius is twice the Gaussian
-            // standard deviation. Match Blink's ShadowData::BlurRadiusToStdDev
-            // (shadow_data.h:76-82): σ = radius * 0.5.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur * 0.5,
+                blur_radius_to_sigma(shadow.blur),
                 false,
             ));
         }
 
         // Centered frame, translated by `offset` via canvas.translate
-        // so the inner hole and outer edge shift together (matches
-        // Blink's DrawLooper offset semantics, box_painter_base.cc:566).
-        // Shifting only the inner hole (our prior approach) made the
-        // frame asymmetric, so blur gradients from inner and outer
-        // edges did not overlap equally on opposite sides, producing a
-        // shadow that saturated at the box edge on the offset side.
+        // so the inner hole and outer edge shift together — matches
+        // Blink's DrawLooper offset semantics (box_painter_base.cc:566)
+        // and keeps the blur gradients symmetric across the box.
         let spread = shadow.spread;
         let inner_rect = Rect::from_xywh(spread, spread, w - spread * 2.0, h - spread * 2.0);
 
