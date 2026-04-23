@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: transform matrix()</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 40px;
+        background: #fff;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 64px;
+      }
+
+      .box {
+        width: 80px;
+        height: 80px;
+        background: #000;
+      }
+
+      /* CSS Transforms 1 §7.1: matrix(a, b, c, d, tx, ty).
+         The 6 values define a 2D affine:
+         | a c tx |
+         | b d ty |
+         | 0 0  1 |
+
+         Each variant expresses an equivalent of a named function
+         via the matrix primitive. */
+
+      /* identity */
+      .identity {
+        transform: matrix(1, 0, 0, 1, 0, 0);
+      }
+
+      /* pure translate — equivalent to translate(30px, 20px) */
+      .translate-eq {
+        transform: matrix(1, 0, 0, 1, 30, 20);
+      }
+
+      /* uniform scale 0.75 — equivalent to scale(0.75) */
+      .scale-eq {
+        transform: matrix(0.75, 0, 0, 0.75, 0, 0);
+      }
+
+      /* rotation 30deg — cos/−sin/sin/cos, 0, 0 */
+      .rotate-eq {
+        transform: matrix(
+          0.8660254037844387,
+          0.5,
+          -0.5,
+          0.8660254037844387,
+          0,
+          0
+        );
+      }
+
+      /* scale + translate composed */
+      .scale-translate {
+        transform: matrix(0.8, 0, 0, 0.8, 16, 16);
+      }
+
+      /* shear (skewX-style): a=1, b=0, c=tan(15°)≈0.2679, d=1 */
+      .shear-eq {
+        transform: matrix(1, 0, 0.2679491924, 1, 0, 0);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="box identity"></div>
+      <div class="box translate-eq"></div>
+      <div class="box scale-eq"></div>
+      <div class="box rotate-eq"></div>
+      <div class="box scale-translate"></div>
+      <div class="box shear-eq"></div>
+    </div>
+  </body>
+</html>

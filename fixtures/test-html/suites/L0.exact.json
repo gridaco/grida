@@ -78,6 +78,13 @@
     { "path": "../L0/layout-flex-align-self.html" },
     { "path": "../L0/layout-grid-autoflow.html" },
     { "path": "../L0/layout-flex-basis.html" },
-    { "path": "../L0/paint-transform-skew.html" }
+    { "path": "../L0/paint-transform-skew.html" },
+    { "path": "../L0/paint-outline-radius.html" },
+    { "path": "../L0/paint-box-shadow-blur.html" },
+    { "path": "../L0/paint-box-shadow-inset-blur.html" },
+    { "path": "../L0/paint-border-style-dashed.html" },
+    { "path": "../L0/paint-filter-drop-shadow.html" },
+    { "path": "../L0/paint-transform-matrix.html" },
+    { "path": "../L0/paint-filter-blur.html" }
   ]
 }
