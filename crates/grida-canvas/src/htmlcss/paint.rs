@@ -2111,7 +2111,10 @@ fn expand_radii(r: &super::style::CornerRadii, expand: f32) -> [skia_safe::Point
 // ─── Box shadow (Chromium: BoxPainterBase::PaintNormalBoxShadow / PaintInsetBoxShadow) ──
 
 fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
-    for shadow in &style.box_shadow {
+    // CSS Backgrounds §7.2: first shadow listed is on top. Iterate in reverse
+    // so the last-listed shadow paints first (bottom), leaving the first-listed
+    // painted last (on top).
+    for shadow in style.box_shadow.iter().rev() {
         if shadow.inset {
             continue;
         }
@@ -2159,7 +2162,9 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 /// then drawing a hollow rect (the box outline expanded outward) with a blur
 /// mask so that only the soft inner edge is visible.
 fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
-    for shadow in &style.box_shadow {
+    // CSS Backgrounds §7.2: first shadow listed is on top. Iterate in reverse
+    // so later-listed insets paint first, leaving the first-listed inset on top.
+    for shadow in style.box_shadow.iter().rev() {
         if !shadow.inset {
             continue;
         }
