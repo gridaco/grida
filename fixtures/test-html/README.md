@@ -115,7 +115,7 @@ natural cull:
 ```
 
 To find the right height, render the fixture once with
-`golden_htmlcss --suite` and read the reported `WxH`. Update the
+`grida_wpt render --suite` and read the reported `WxH`. Update the
 suite entry's `viewport.height` to match. Re-render refbrowser; both
 sides should now be at identical dimensions.
 
@@ -156,7 +156,7 @@ and block flow. The suite defaults already pull it in; see
    fixtures skill for the full authoring checklist.
 4. **Register it** — add an entry to `suites/L0.coverage.json`:
    - Paint fixtures: `{ "path": "../L0/<your-file>.html" }` (inherits `defaults.viewport`).
-   - Layout fixtures: run `cargo run -p cg --example golden_htmlcss -- --suite …`, read the reported `WxH`, then
+   - Layout fixtures: run `cargo run -p grida_wpt -- render --suite …`, read the reported `WxH`, then
      ```json
      { "path": "../L0/<your-file>.html",
        "viewport": { "width": 600, "height": <natural cull height> } }

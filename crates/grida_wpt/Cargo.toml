@@ -1,0 +1,35 @@
+[package]
+name = "grida_wpt"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+description = "Grida rendering test harness. Houses the golden producer, refbrowser integration, and (future) Web Platform Tests runner plugin."
+
+# A thin umbrella crate for rendering-test tooling. The binary is the
+# primary entry point used by:
+#
+#   * the in-tree refbrowser pipeline (Chromium oracle via Playwright,
+#     diffed against our cg htmlcss renderer)
+#   * the (planned) WPT integration via wptrunner (Python harness calls
+#     this binary as the rendering "product")
+#
+# Kept intentionally lean: no winit/glutin/GL. Headless raster only.
+
+[dependencies]
+cg = { path = "../grida-canvas" }
+skia-safe = { version = "0.93.1", features = ["textlayout"] }
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Blocking HTTP client for `--url` mode (WPT serves tests over localhost).
+# Blocking (not async) to keep the CLI single-threaded and tokio-free.
+ureq = "2"
+url = "2"
+
+[[bin]]
+name = "grida_wpt"
+path = "src/main.rs"
+
+[lints]
+workspace = true
