@@ -1617,15 +1617,7 @@ fn extract_size(
     size: &GenericSize<style::values::computed::NonNegativeLengthPercentage>,
 ) -> CssLength {
     match size {
-        GenericSize::LengthPercentage(lp) => {
-            if let Some(len) = lp.0.to_length() {
-                CssLength::Px(len.px())
-            } else if let Some(pct) = lp.0.to_percentage() {
-                CssLength::Percent(pct.0)
-            } else {
-                CssLength::Auto
-            }
-        }
+        GenericSize::LengthPercentage(lp) => length_percentage_to_css(&lp.0),
         _ => CssLength::Auto,
     }
 }
@@ -1637,15 +1629,7 @@ fn extract_max_size(
 ) -> CssLength {
     use style::values::generics::length::GenericMaxSize;
     match size {
-        GenericMaxSize::LengthPercentage(lp) => {
-            if let Some(len) = lp.0.to_length() {
-                CssLength::Px(len.px())
-            } else if let Some(pct) = lp.0.to_percentage() {
-                CssLength::Percent(pct.0)
-            } else {
-                CssLength::Auto
-            }
-        }
+        GenericMaxSize::LengthPercentage(lp) => length_percentage_to_css(&lp.0),
         _ => CssLength::Auto, // None, MaxContent, MinContent, FitContent, etc.
     }
 }

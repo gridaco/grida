@@ -76,9 +76,9 @@ fn paint_box(
     let h = layout.height;
 
     // ── Save state for opacity / filter / mix-blend-mode / clip ──
-    let needs_layer = style.opacity < 1.0
-        || !style.filter.is_empty()
-        || !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal);
+    let has_filter = !style.filter.is_empty();
+    let has_blend_mode = !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal);
+    let needs_layer = style.opacity < 1.0 || has_filter || has_blend_mode;
     let needs_clip = style.overflow_x != types::Overflow::Visible
         || style.overflow_y != types::Overflow::Visible;
 
@@ -123,21 +123,23 @@ fn paint_box(
         // CSS `mix-blend-mode` composites this element's stacking context
         // onto its parent using the given blend mode (CSS Compositing 1
         // §5). Apply as the layer's Skia blend mode.
-        if !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal) {
+        if has_blend_mode {
             layer_paint.set_blend_mode(style.blend_mode.into());
         }
-        let has_filter = !style.filter.is_empty();
         if has_filter {
             if let Some(filter) = build_filter_chain(&style.filter) {
                 layer_paint.set_image_filter(filter);
             }
         }
-        // Skia clips a layer's output to its `bounds` hint, including any
-        // filter outset. Blur / drop-shadow extend the visible region past
-        // the source box, so when a filter is active we omit `bounds` and
-        // let Skia size the layer from the filter's own fast-bounds.
+        // Skia clips a layer's output to its `bounds` hint. Filters
+        // (blur/drop-shadow) extend past the source box, and
+        // `mix-blend-mode` composites whatever the element paints —
+        // including outer box-shadows, outlines, and overflowing
+        // descendants — onto the parent. In both cases we omit `bounds`
+        // and let Skia size the layer from the actual painted content so
+        // those pixels aren't clipped before compositing.
         let bounds = Rect::from_xywh(0.0, 0.0, w, h);
-        let layer_rec = if has_filter {
+        let layer_rec = if has_filter || has_blend_mode {
             skia_safe::canvas::SaveLayerRec::default().paint(&layer_paint)
         } else {
             skia_safe::canvas::SaveLayerRec::default()
