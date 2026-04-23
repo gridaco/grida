@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Clip-Path Ellipse</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .default {
+        clip-path: ellipse();
+      }
+      .rx-ry {
+        clip-path: ellipse(30px 20px);
+      }
+      .at-center {
+        clip-path: ellipse(30px 20px at 50% 50%);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="box default"></div>
+      <div class="box rx-ry"></div>
+      <div class="box at-center"></div>
+    </div>
+  </body>
+</html>
