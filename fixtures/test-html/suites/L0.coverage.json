@@ -79,6 +79,7 @@
     { "path": "../L0/paint-gradient-radial.html" },
     { "path": "../L0/paint-outline-radius.html" },
     { "path": "../L0/paint-box-shadow-blur.html" },
-    { "path": "../L0/paint-box-shadow-inset-blur.html" }
+    { "path": "../L0/paint-box-shadow-inset-blur.html" },
+    { "path": "../L0/paint-border-style-dashed.html" }
   ]
 }

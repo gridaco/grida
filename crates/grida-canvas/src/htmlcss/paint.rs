@@ -1889,7 +1889,7 @@ fn paint_uniform_rounded_border(
     };
     if side.style == types::BorderStyle::Double {
         let sub_w = side.width / 3.0;
-        let paint = stroke_paint(side.color, sub_w, types::BorderStyle::Solid);
+        let paint = stroke_paint(side.color, sub_w, types::BorderStyle::Solid, None);
         // Outer ring: stroke center near the outside edge.
         let outer_inset = sub_w / 2.0;
         canvas.draw_rrect(stroke_center(outer_inset), &paint);
@@ -1898,7 +1898,7 @@ fn paint_uniform_rounded_border(
         canvas.draw_rrect(stroke_center(inner_inset), &paint);
         return;
     }
-    let paint = stroke_paint(side.color, side.width, side.style);
+    let paint = stroke_paint(side.color, side.width, side.style, None);
     canvas.draw_rrect(stroke_center(side.width / 2.0), &paint);
 }
 
@@ -1936,7 +1936,7 @@ fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h
         let sub_w = side.width / 3.0;
         let (n_dx, n_dy) = side_inward_normal(pos);
         // Outer stroke (toward the element's outer edge).
-        let paint = stroke_paint(side.color, sub_w, BorderStyle::Solid);
+        let paint = stroke_paint(side.color, sub_w, BorderStyle::Solid, None);
         let out_off = -sub_w;
         let outer_p1 = (p1.0 + n_dx * out_off, p1.1 + n_dy * out_off);
         let outer_p2 = (p2.0 + n_dx * out_off, p2.1 + n_dy * out_off);
@@ -1950,7 +1950,11 @@ fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h
     }
 
     let effective_color = shaded_color(side.color, side.style, pos);
-    let paint = stroke_paint(effective_color, side.width, side.style);
+    let side_length = match pos {
+        SidePos::Top | SidePos::Bottom => w,
+        SidePos::Left | SidePos::Right => h,
+    };
+    let paint = stroke_paint(effective_color, side.width, side.style, Some(side_length));
     canvas.draw_line(p1, p2, &paint);
 }
 
@@ -2014,7 +2018,17 @@ fn shaded_color(c: CGColor, style: types::BorderStyle, pos: SidePos) -> CGColor 
 
 /// Shared stroke paint builder for border sides and outline.
 /// Applies dash/dot path effects for dashed/dotted styles.
-fn stroke_paint(color: CGColor, width: f32, style: types::BorderStyle) -> Paint {
+///
+/// `path_length` (Some) enables Blink-parity gap adjustment so dashes
+/// meet side corners evenly (styled_stroke_data.cc:40-58). None falls
+/// back to nominal intervals — used by paths where the length isn't
+/// known up front (outline RRect perimeter).
+fn stroke_paint(
+    color: CGColor,
+    width: f32,
+    style: types::BorderStyle,
+    path_length: Option<f32>,
+) -> Paint {
     let mut paint = Paint::default();
     paint.set_color(Color::from_argb(color.a, color.r, color.g, color.b));
     paint.set_stroke_width(width);
@@ -2023,8 +2037,23 @@ fn stroke_paint(color: CGColor, width: f32, style: types::BorderStyle) -> Paint 
 
     match style {
         types::BorderStyle::Dashed => {
-            let dash_len = width * 3.0;
-            if let Some(effect) = skia_safe::PathEffect::dash(&[dash_len, dash_len], 0.0) {
+            // Blink (styled_stroke_data.cc:60-74): dash/gap relative to
+            // thickness — thin lines (<3px) use longer dashes/gaps so
+            // they don't read as dots or solid lines.
+            let (dash_ratio, gap_ratio) = if width >= 3.0 {
+                (2.0_f32, 1.0_f32)
+            } else {
+                (3.0_f32, 2.0_f32)
+            };
+            let dash = width * dash_ratio;
+            let nominal_gap = width * gap_ratio;
+            let gap = match path_length {
+                Some(len) if len > dash * 2.0 => {
+                    select_best_dash_gap(len, dash, nominal_gap, false)
+                }
+                _ => nominal_gap,
+            };
+            if let Some(effect) = skia_safe::PathEffect::dash(&[dash, gap], 0.0) {
                 paint.set_path_effect(effect);
             }
         }
@@ -2038,6 +2067,41 @@ fn stroke_paint(color: CGColor, width: f32, style: types::BorderStyle) -> Paint 
     }
 
     paint
+}
+
+/// Pick the gap that minimises deviation from `nominal_gap` while
+/// leaving an integer count of dashes on `stroke_length`. Mirrors
+/// Blink's `SelectBestDashGap` (styled_stroke_data.cc:40-58).
+fn select_best_dash_gap(
+    stroke_length: f32,
+    dash_length: f32,
+    gap_length: f32,
+    closed_path: bool,
+) -> f32 {
+    let available = if closed_path {
+        stroke_length
+    } else {
+        stroke_length + gap_length
+    };
+    let min_num_dashes = (available / (dash_length + gap_length)).floor().max(1.0);
+    let max_num_dashes = min_num_dashes + 1.0;
+    let min_num_gaps = if closed_path {
+        min_num_dashes
+    } else {
+        (min_num_dashes - 1.0).max(1.0)
+    };
+    let max_num_gaps = if closed_path {
+        max_num_dashes
+    } else {
+        (max_num_dashes - 1.0).max(1.0)
+    };
+    let min_gap = (stroke_length - min_num_dashes * dash_length) / min_num_gaps;
+    let max_gap = (stroke_length - max_num_dashes * dash_length) / max_num_gaps;
+    if max_gap <= 0.0 || (min_gap - gap_length).abs() < (max_gap - gap_length).abs() {
+        min_gap
+    } else {
+        max_gap
+    }
 }
 
 // ─── Outline (Chromium: OutlinePainter::PaintOutlineRects) ─────────────────
@@ -2066,7 +2130,7 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
         let sub_w = outline.width / 3.0;
         let outer_expand = outline.offset + outline.width - sub_w / 2.0;
         let inner_expand = outline.offset + sub_w / 2.0;
-        let paint = stroke_paint(outline.color, sub_w, types::BorderStyle::Solid);
+        let paint = stroke_paint(outline.color, sub_w, types::BorderStyle::Solid, None);
         draw_outline_ring(canvas, w, h, outer_expand, r, &paint);
         draw_outline_ring(canvas, w, h, inner_expand, r, &paint);
         return;
@@ -2103,7 +2167,7 @@ fn draw_outline_ring(
 }
 
 fn outline_paint(outline: &Outline) -> Paint {
-    stroke_paint(outline.color, outline.width, outline.style)
+    stroke_paint(outline.color, outline.width, outline.style, None)
 }
 
 /// Expand border-radius values outward by `expand` pixels.
