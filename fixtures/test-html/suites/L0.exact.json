@@ -80,6 +80,7 @@
     { "path": "../L0/layout-flex-basis.html" },
     { "path": "../L0/paint-transform-skew.html" },
     { "path": "../L0/paint-outline-radius.html" },
-    { "path": "../L0/paint-box-shadow-blur.html" }
+    { "path": "../L0/paint-box-shadow-blur.html" },
+    { "path": "../L0/paint-box-shadow-inset-blur.html" }
   ]
 }

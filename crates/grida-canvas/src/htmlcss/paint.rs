@@ -2215,24 +2215,30 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
             ));
         }
 
-        // Draw a large rect with a hole cut out, shifted by offset + spread.
-        // The blur on the outer edge of the hole creates the inset shadow.
+        // Centered frame, translated by `offset` via canvas.translate
+        // so the inner hole and outer edge shift together (matches
+        // Blink's DrawLooper offset semantics, box_painter_base.cc:566).
+        // Shifting only the inner hole (our prior approach) made the
+        // frame asymmetric, so blur gradients from inner and outer
+        // edges did not overlap equally on opposite sides, producing a
+        // shadow that saturated at the box edge on the offset side.
         let spread = shadow.spread;
-        let inner_rect = Rect::from_xywh(
-            shadow.offset_x + spread,
-            shadow.offset_y + spread,
-            w - spread * 2.0,
-            h - spread * 2.0,
-        );
+        let inner_rect = Rect::from_xywh(spread, spread, w - spread * 2.0, h - spread * 2.0);
 
-        // Outer rect large enough that its edges are outside the clip region
-        let expansion = shadow.blur * 2.0 + shadow.spread.abs() + 100.0;
-        let outer_rect = Rect::from_xywh(
-            -expansion + shadow.offset_x,
-            -expansion + shadow.offset_y,
-            w + expansion * 2.0,
-            h + expansion * 2.0,
-        );
+        // Outer rect per Blink's `AreaCastingShadowInHole`
+        // (box_painter_base.cc:511-522): outset hole by blur-radius +
+        // |negative_spread|, then union with the pre-offset position so
+        // the frame extends far enough to cover every pixel the shadow
+        // can reach after the translate below. Keeping the thickness at
+        // blur-radius lets inner/outer blur gradients overlap, which is
+        // what produces the soft fall-off toward the box center.
+        let outset = shadow.blur - shadow.spread.min(0.0);
+        let outer_l = (-outset).min(-outset - shadow.offset_x);
+        let outer_t = (-outset).min(-outset - shadow.offset_y);
+        let outer_r = (w + outset).max(w + outset - shadow.offset_x);
+        let outer_b = (h + outset).max(h + outset - shadow.offset_y);
+        let outer_rect = Rect::from_xywh(outer_l, outer_t, outer_r - outer_l, outer_b - outer_t);
+        canvas.translate((shadow.offset_x, shadow.offset_y));
 
         // Build a path: outer rect minus inner rect (creates a frame).
         // EvenOdd fill makes the inner rect a hole.
