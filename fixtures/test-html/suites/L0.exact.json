@@ -68,6 +68,7 @@
     { "path": "../L0/paint-clip-path-circle.html" },
     { "path": "../L0/paint-clip-path-polygon.html" },
     { "path": "../L0/paint-clip-path-ellipse.html" },
-    { "path": "../L0/paint-opacity-nested.html" }
+    { "path": "../L0/paint-opacity-nested.html" },
+    { "path": "../L0/layout-flex-direction-reverse.html" }
   ]
 }
