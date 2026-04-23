@@ -61,7 +61,7 @@ that could be confused with it.
 Prefer `<root>.rs` + `<root>_<qualifier>.rs` over a new subdirectory when
 the group is small:
 
-```
+```text
 painter/
   painter.rs
   painter_debug_node.rs
