@@ -84,6 +84,7 @@
     { "path": "../L0/paint-box-shadow-inset-blur.html" },
     { "path": "../L0/paint-border-style-dashed.html" },
     { "path": "../L0/paint-filter-drop-shadow.html" },
-    { "path": "../L0/paint-transform-matrix.html" }
+    { "path": "../L0/paint-transform-matrix.html" },
+    { "path": "../L0/paint-filter-blur.html" }
   ]
 }
