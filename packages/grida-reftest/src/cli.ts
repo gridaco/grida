@@ -28,8 +28,12 @@ program
   )
   .option(
     "--aa",
-    "ignore anti-aliased edges (pixelmatch includeAA=false)",
-    false
+    "ignore anti-aliased edges (pixelmatch includeAA=false) — default",
+    true
+  )
+  .option(
+    "--no-aa",
+    "strict: count anti-aliased pixels as diffs (pixelmatch includeAA=true)"
   )
   .option(
     "--bg <color>",
@@ -39,7 +43,19 @@ program
   .option("--mask <mode>", "scoring denominator: alpha|none", "alpha")
   .option("--diff-out <path>", "if set, write a diff PNG to this path")
   .option("--json", "emit machine-readable JSON to stdout", false)
-  .action(async (actual: string, expected: string, opts: CompareCmdOpts) => {
+  .action(async function (
+    this: Command,
+    actual: string,
+    expected: string,
+    _opts: CompareCmdOpts
+  ) {
+    // Commander v12 quirk: the root program also declares --threshold / --json /
+    // --aa / --bg / --mask (for the suite runner). When long option names
+    // collide between the root program and a subcommand, CLI values bind to
+    // the root's option store, and the subcommand's action receives its local
+    // defaults. Use optsWithGlobals() so CLI-provided values take precedence
+    // over subcommand defaults.
+    const opts = this.optsWithGlobals() as CompareCmdOpts;
     const threshold = parseNumber(opts.threshold, "--threshold", 0, 1);
     const bg = parseBg(opts.bg);
     const mask = parseMask(opts.mask);
@@ -96,7 +112,8 @@ program
   .addOption(
     new Option("--threshold <number>", "pixelmatch YIQ threshold per pixel")
   )
-  .option("--aa", "ignore anti-aliased edges")
+  .option("--aa", "ignore anti-aliased edges (default)")
+  .option("--no-aa", "strict: count AA pixels as diffs")
   .option("--bg <color>", "composite background: white|black")
   .option("--mask <mode>", "scoring denominator: alpha|none")
   .option("--overwrite", "clear output dir on start")
@@ -168,7 +185,7 @@ program
         ? parseNumber(opts.threshold, "--threshold", 0, 1)
         : (config?.diff?.threshold ?? 0.1);
     const aa =
-      opts.aa !== undefined ? Boolean(opts.aa) : (config?.diff?.aa ?? false);
+      opts.aa !== undefined ? Boolean(opts.aa) : (config?.diff?.aa ?? true);
     const bg = opts.bg ? parseBg(opts.bg) : (config?.bg ?? "white");
     const mask = opts.mask
       ? parseMask(opts.mask)

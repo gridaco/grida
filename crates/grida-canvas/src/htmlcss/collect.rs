@@ -871,7 +871,7 @@ fn collect_inline_items(el: &StyledElement, items: &mut Vec<InlineRunItem>) {
 /// Returns `None` if the element has no visual box decoration.
 fn build_inline_decoration(el: &StyledElement) -> Option<InlineBoxDecoration> {
     let bg = el.background.first().and_then(|l| match l {
-        BackgroundLayer::Solid(c) if c.a > 0 => Some(*c),
+        BackgroundLayer::Solid { color, .. } if color.a > 0 => Some(*color),
         _ => None,
     });
 
@@ -1185,6 +1185,10 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     // Flex child
     el.flex_grow = style.clone_flex_grow().0;
     el.flex_shrink = style.clone_flex_shrink().0;
+    el.flex_basis = match &pos.flex_basis {
+        style::values::generics::flex::FlexBasis::Size(s) => extract_size(s),
+        style::values::generics::flex::FlexBasis::Content => CssLength::Auto,
+    };
 
     // Grid container
     if el.display == types::Display::Grid {
@@ -1571,18 +1575,41 @@ fn extract_gradient_interpolation(
 
 fn extract_border_radius(style: &ComputedValues) -> CornerRadii {
     let b = style.get_border();
-    let lp = |lp: &style::values::computed::NonNegativeLengthPercentage| -> f32 {
-        lp.0.to_length().map(|l| l.px()).unwrap_or(0.0)
+    // Returns (px, percent_fraction). Percent is deferred to paint time,
+    // where the border-box w/h is known (CSS Backgrounds 3 §5.3).
+    let lp = |v: &style::values::computed::NonNegativeLengthPercentage| -> (f32, f32) {
+        match length_percentage_to_css(&v.0) {
+            CssLength::Px(p) => (p, 0.0),
+            CssLength::Percent(p) => (0.0, p),
+            CssLength::Calc { px, percent } => (px, percent),
+            CssLength::Auto => (0.0, 0.0),
+        }
     };
+    let (tl_x, tl_x_pct) = lp(&b.border_top_left_radius.0.width);
+    let (tl_y, tl_y_pct) = lp(&b.border_top_left_radius.0.height);
+    let (tr_x, tr_x_pct) = lp(&b.border_top_right_radius.0.width);
+    let (tr_y, tr_y_pct) = lp(&b.border_top_right_radius.0.height);
+    let (br_x, br_x_pct) = lp(&b.border_bottom_right_radius.0.width);
+    let (br_y, br_y_pct) = lp(&b.border_bottom_right_radius.0.height);
+    let (bl_x, bl_x_pct) = lp(&b.border_bottom_left_radius.0.width);
+    let (bl_y, bl_y_pct) = lp(&b.border_bottom_left_radius.0.height);
     CornerRadii {
-        tl_x: lp(&b.border_top_left_radius.0.width),
-        tl_y: lp(&b.border_top_left_radius.0.height),
-        tr_x: lp(&b.border_top_right_radius.0.width),
-        tr_y: lp(&b.border_top_right_radius.0.height),
-        br_x: lp(&b.border_bottom_right_radius.0.width),
-        br_y: lp(&b.border_bottom_right_radius.0.height),
-        bl_x: lp(&b.border_bottom_left_radius.0.width),
-        bl_y: lp(&b.border_bottom_left_radius.0.height),
+        tl_x,
+        tl_y,
+        tr_x,
+        tr_y,
+        br_x,
+        br_y,
+        bl_x,
+        bl_y,
+        tl_x_pct,
+        tl_y_pct,
+        tr_x_pct,
+        tr_y_pct,
+        br_x_pct,
+        br_y_pct,
+        bl_x_pct,
+        bl_y_pct,
     }
 }
 
@@ -1653,11 +1680,22 @@ fn extract_background(style: &ComputedValues, current_color: CGColor) -> Vec<Bac
     let bg = style.get_background();
     let mut layers: Vec<BackgroundLayer> = Vec::new();
 
-    // 1. Background color (bottom layer)
+    // 1. Background color (bottom layer). Per CSS Backgrounds 3 §2.5 the
+    //    color uses the `background-clip` value from the *final* layer
+    //    entry in the list.
     if let Some(abs) = bg.background_color.as_absolute() {
         let c = abs_color_to_cg(abs);
         if c.a > 0 {
-            layers.push(BackgroundLayer::Solid(c));
+            let color_clip = bg
+                .background_clip
+                .0
+                .last()
+                .map(extract_bg_clip)
+                .unwrap_or(BackgroundBox::BorderBox);
+            layers.push(BackgroundLayer::Solid {
+                color: c,
+                clip: color_clip,
+            });
         }
     }
 
@@ -2771,10 +2809,10 @@ fn map_overflow(ov: style::values::specified::box_::Overflow) -> types::Overflow
 fn abs_color_to_cg(color: &AbsoluteColor) -> CGColor {
     let srgb = color.to_color_space(ColorSpace::Srgb);
     CGColor::from_rgba(
-        (srgb.components.0.clamp(0.0, 1.0) * 255.0) as u8,
-        (srgb.components.1.clamp(0.0, 1.0) * 255.0) as u8,
-        (srgb.components.2.clamp(0.0, 1.0) * 255.0) as u8,
-        (srgb.alpha.clamp(0.0, 1.0) * 255.0) as u8,
+        (srgb.components.0.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.components.1.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.components.2.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
     )
 }
 

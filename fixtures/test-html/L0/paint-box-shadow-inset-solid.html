@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Inset Box Shadow (no blur)</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #ddd;
+        box-sizing: border-box;
+      }
+
+      .inset-spread {
+        box-shadow: inset 0 0 0 6px #000;
+      }
+      .inset-offset {
+        box-shadow: inset 8px 8px 0 0 #000;
+      }
+      .inset-offset-neg {
+        box-shadow: inset -8px -8px 0 0 #000;
+      }
+      .inset-spread-offset {
+        box-shadow: inset 4px 4px 0 2px #000;
+      }
+      .inset-colored {
+        box-shadow: inset 0 0 0 4px #c00;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">inset spread 6</div>
+        <div class="box inset-spread"></div>
+      </div>
+      <div>
+        <div class="label">inset 8/8</div>
+        <div class="box inset-offset"></div>
+      </div>
+      <div>
+        <div class="label">inset -8/-8</div>
+        <div class="box inset-offset-neg"></div>
+      </div>
+      <div>
+        <div class="label">inset 4/4 spread 2</div>
+        <div class="box inset-spread-offset"></div>
+      </div>
+      <div>
+        <div class="label">inset colored</div>
+        <div class="box inset-colored"></div>
+      </div>
+    </div>
+  </body>
+</html>

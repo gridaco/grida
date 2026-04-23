@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Padding (simple)</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .outer {
+        width: 160px;
+        background: #eee;
+        box-sizing: border-box;
+      }
+
+      .inner {
+        width: 100%;
+        height: 40px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .p-0 {
+        padding: 0;
+      }
+      .p-8 {
+        padding: 8px;
+      }
+      .p-asym {
+        padding: 4px 12px 20px 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="outer p-0">
+        <div class="inner"></div>
+      </div>
+      <div class="outer p-8">
+        <div class="inner"></div>
+      </div>
+      <div class="outer p-asym">
+        <div class="inner"></div>
+      </div>
+    </div>
+  </body>
+</html>

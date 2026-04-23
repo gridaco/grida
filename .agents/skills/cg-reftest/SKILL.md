@@ -325,8 +325,8 @@ against the current suite config, move its entry from `coverage` →
 `exact`. Do **not** lower the exact suite's floor to fit new entries;
 the bar exists so regressions are loud.
 
-Per-fixture `.reftest.json` sidecars **do not exist** anymore. All
-config lives in the suite file.
+All per-fixture config lives in the suite file. There are no
+per-fixture `.reftest.json` sidecars.
 
 #### Suite JSON shape
 
@@ -334,25 +334,23 @@ config lives in the suite file.
 {
   "name": "L0.exact",
   "description": "Byte-exact fixtures; any drop = regression.",
-  "gate": { "threshold": 0, "aa": false, "floor": 1.0 },
+  "gate": { "threshold": 0, "aa": true, "floor": 1.0 },
   "defaults": {
     "wait_for": ["fonts", "networkidle"],
-    "extra_css": ["../_reftest/hide-text.css"],
+    "extra_css": [
+      "../_reftest/hide-text.css",
+      "../_reftest/transparent-body.css"
+    ],
     "full_page": true
   },
-  "fixtures": [
-    {
-      "path": "../L0/box-dimensions.html",
-      "viewport": { "width": 600, "height": 522 }
-    }
-  ]
+  "fixtures": [{ "path": "../L0/box-dimensions.html" }]
 }
 ```
 
 - `defaults` — applied to every fixture. Each fixture entry can override any field.
 - `fixtures[].path` and every `extra_css[]` path resolve **relative to the suite file**.
-- `viewport.height` must match cg's cull height for the diff to succeed; render cg once and read `WxH` to calibrate.
 - `gate.threshold` / `gate.aa` are inputs to the pixelmatch diff; `gate.floor` is the aggregate pass bar on similarity.
+- **`aa: true` (default)** → pixelmatch `includeAA: false`. Pixelmatch's AA detector fires and excludes anti-aliased edge pixels from the diff count, separating rasterizer edge noise (Skia vs. Blink) from real divergence. Set `aa: false` for strict byte-exact accounting (e.g. probing an AA-class regression).
 
 #### The three-step pipeline
 
@@ -395,9 +393,13 @@ cp "${TMPDIR:-/tmp}/grida-htmlcss-goldens/"*.png target/refbrowser/L0.exact/actu
 **3. Diff via `@grida/reftest`** — format-agnostic, same bucket layout
 and `report.json` schema as the Rust and refig runners.
 
-Default refbrowser diff: **`--threshold 0`** (pixelmatch strictest,
-AA off). Pass each fixture's similarity against the suite's
-`gate.floor` — for `L0.exact`, that's `1.0` (100.00% byte-exact).
+Default refbrowser diff: **`--threshold 0`** (pixelmatch's tightest
+color-delta) with **AA-ignore mode on by default** (`aa: true` →
+`includeAA: false`; pixelmatch's Vysniauskas AA detector fires and
+excludes edge AA pixels from the diff count). Pass `--no-aa` to flip
+to strict byte-exact accounting. Pass each fixture's similarity
+against the suite's `gate.floor` — for `L0.exact`, that's `1.0`
+(100.00% similarity with AA detection active).
 
 ```sh
 pnpm --filter @grida/reftest exec reftest \
@@ -419,43 +421,46 @@ Pass bar: the suite's `gate.floor`. For `L0.exact`, anything below
 100.00% is a real divergence from Blink (rounding policy, layout
 math, AA emission, etc.) — not noise. See "Reading the score" below.
 
-### Reading the score — do not trust it naively
+### Scoring model — content mask
 
-The similarity score is `1 - diff_pixels / scoring_pixels`, where
-`scoring_pixels ≈ width × height` of the screenshot. **The denominator
-is the whole canvas, not the subject under test.**
+The similarity score is `1 - diff_pixels / scoring_pixels`.
+`scoring_pixels` is the count of pixels where either side has
+`alpha > 0` — the content mask, not the full canvas. Three
+coupled defaults wire this up:
 
-This has two consequences you must internalize before reading any
-report:
+- **Chromium** screenshots with `omitBackground: true` (in
+  `refbrowser_render.ts`). Root canvas default bg is dropped; PNG
+  alpha encodes "did the CSS cascade draw here?"
+- **cg** clears its Skia surface with `Color::TRANSPARENT` and
+  renders at viewport dims (in `examples/golden_htmlcss.rs`).
+- **Both sides** apply `_reftest/transparent-body.css` via
+  `extra_css`. `!important` forces `html, body { background:
+transparent }`, so fixtures with `body { background: #fff }`
+  still produce a content mask without being edited.
 
-1. **Background dominates the score.** A fixture that paints a
-   100×100 subject on a 600×800 canvas has 92% background. A renderer
-   that emits _nothing_ for the subject still scores ~92%. A
-   renderer that paints the subject at 50% accuracy scores ~96%.
-   Neither number means what it naively looks like.
-2. **Small fixtures inflate. Full-bleed fixtures are honest.** A
-   card-in-corner composition will always look "good" on the score
-   even when broken; a composition that fills the viewport gives
-   numeric feedback proportional to real error.
+Chromium and cg produce identical alpha masks on every L0.exact
+fixture. Diffs that appear under `alpha > 0` are genuine pixel
+differences.
 
-**Fixture-authoring rule:** size the fixture so the subject under
-test fills as much of the canvas as practical. Viewport height
-tuned to the subject's bounding box (via the suite entry's
-`viewport.height`) is the usual lever. Padding/margins around the
-subject are scoring dead weight — use them only when the test is
-_about_ spacing.
+**AA-ignore on by default** (`aa: true` → pixelmatch
+`includeAA: false`). The Vysniauskas AA detector excludes
+anti-aliased edge pixels from the diff count. Combined with the
+content mask, this yields:
 
-**Reviewing rule:** never report a similarity number without
-eyeballing the diff PNG. A 96% score on a sparse fixture and a 96%
-score on a full-bleed fixture are _orders of magnitude_ apart in
-severity. The diff image is the source of truth; the score is a
-coarse index.
+| pattern             | strict (`--no-aa`) | default (`--aa`) | meaning                                                                                                      |
+| ------------------- | ------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| **pass**            | 100%               | 100%             | identical — no action.                                                                                       |
+| **AA noise**        | 99.9+%             | 100%             | Skia/Blink rasterizer edge jitter on curves, radii, tilted geometry. Safe to ignore.                         |
+| **real divergence** | <100%              | <100%            | renderer bug or non-AA rasterizer mismatch (dither lattice, multi-color miter wedges). Inspect the diff PNG. |
 
-For a true "fraction of the subject that matches," author a
-probe-friendly fixture (see the probe test section) and assert on
-specific pixels, or mask the background to transparent so
-`mask: alpha` counts only subject pixels. Plain refbrowser scores
-cannot give you that signal.
+**Reviewing rule:** always eyeball the diff PNG. A fixture below
+100% with `aa: true` has mismatched pixels that pixelmatch could
+not explain as edge AA — treat as real.
+
+**Fixture-authoring rule:** the content mask excludes blank bg, so
+there's no need to shrink viewports for scoring density. Focus on
+minimality (one concept per fixture). Probe tests remain the tool
+for vision-free pixel assertions at known coordinates.
 
 **Per-fixture fields inside a suite entry** — all optional,
 defaults shown; any field set on an entry overrides `defaults`.
@@ -484,9 +489,10 @@ defaults shown; any field set on an entry overrides `defaults`.
 
 **Pre-built helper stylesheets** under `fixtures/test-html/_reftest/`:
 
-| File            | Effect                                                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `hide-text.css` | `color: transparent` + `line-height: 1`. Zeros glyph coverage and pins line-box height. Use when a fixture isn't testing text. |
+| File                   | Effect                                                                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hide-text.css`        | `color: transparent` + `line-height: 1`. Zeros glyph coverage and pins line-box height. Use when a fixture isn't testing text.                                                                      |
+| `transparent-body.css` | Forces `html, body { background: transparent !important }`. Enables the content mask (alpha>0 = drawn). Both L0 suites apply this by default; drop from `extra_css` for fixtures testing canvas bg. |
 
 Add more helpers here as divergence patterns emerge. Keep each one
 scoped to a single concern (hide text, normalize scrollbars, force
@@ -558,9 +564,10 @@ PR description; let the score carry the truth.
 - **Scrollbar width** — default `full_page: true` captures document
   height and sidesteps scrollbar chrome; flip only when testing
   scrollbar geometry.
-- **Dimension drift** — changing a fixture's layout invalidates its
-  `viewport.height` in the suite entry. Re-run `golden_htmlcss` with
-  `--suite`, update the entry's `viewport.height`, re-run refbrowser.
+- **Dimensions** — cg renders at viewport dims (`width × height`);
+  Chromium screenshots `fullPage` at the same viewport. Setting an
+  explicit `viewport.height` is optional and only useful to trim
+  scoring area for very tall fixtures.
 
 **Oracle type summary:**
 

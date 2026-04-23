@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Clip-Path Inset</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .all {
+        clip-path: inset(10px);
+      }
+      .asym {
+        clip-path: inset(10px 20px 15px 25px);
+      }
+      .percent {
+        clip-path: inset(10% 20%);
+      }
+      .round {
+        clip-path: inset(10px round 16px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">inset 10px</div>
+        <div class="box all"></div>
+      </div>
+      <div>
+        <div class="label">inset 10/20/15/25</div>
+        <div class="box asym"></div>
+      </div>
+      <div>
+        <div class="label">inset 10%/20%</div>
+        <div class="box percent"></div>
+      </div>
+      <div>
+        <div class="label">inset 10px round 16px</div>
+        <div class="box round"></div>
+      </div>
+    </div>
+  </body>
+</html>

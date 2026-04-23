@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Transform Translate</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 40px;
+      }
+
+      .frame {
+        width: 120px;
+        height: 80px;
+        background: #eee;
+        box-sizing: border-box;
+      }
+
+      .box {
+        width: 120px;
+        height: 80px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .t-xy {
+        transform: translate(16px, 12px);
+      }
+      .t-x {
+        transform: translateX(20px);
+      }
+      .t-y {
+        transform: translateY(-8px);
+      }
+      .t-neg {
+        transform: translate(-12px, -16px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">translate 16/12</div>
+        <div class="frame"><div class="box t-xy"></div></div>
+      </div>
+      <div>
+        <div class="label">translateX 20</div>
+        <div class="frame"><div class="box t-x"></div></div>
+      </div>
+      <div>
+        <div class="label">translateY -8</div>
+        <div class="frame"><div class="box t-y"></div></div>
+      </div>
+      <div>
+        <div class="label">translate -12/-16</div>
+        <div class="frame"><div class="box t-neg"></div></div>
+      </div>
+    </div>
+  </body>
+</html>

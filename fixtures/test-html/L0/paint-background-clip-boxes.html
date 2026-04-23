@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Background-clip (box variants)</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background-color: #000;
+        border: 12px solid rgba(255, 0, 0, 0.5);
+        padding: 12px;
+        box-sizing: border-box;
+      }
+
+      .clip-border {
+        background-clip: border-box;
+      }
+      .clip-padding {
+        background-clip: padding-box;
+      }
+      .clip-content {
+        background-clip: content-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">border-box</div>
+        <div class="box clip-border"></div>
+      </div>
+      <div>
+        <div class="label">padding-box</div>
+        <div class="box clip-padding"></div>
+      </div>
+      <div>
+        <div class="label">content-box</div>
+        <div class="box clip-content"></div>
+      </div>
+    </div>
+  </body>
+</html>

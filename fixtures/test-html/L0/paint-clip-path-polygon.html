@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Clip-Path Polygon</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .triangle-top {
+        clip-path: polygon(0 0, 100% 0, 0 100%);
+      }
+      .axis-hex {
+        clip-path: polygon(0 0, 60px 0, 60px 100px, 0 100px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="box triangle-top"></div>
+      <div class="box axis-hex"></div>
+    </div>
+  </body>
+</html>

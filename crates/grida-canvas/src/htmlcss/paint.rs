@@ -75,8 +75,10 @@ fn paint_box(
     let w = layout.width;
     let h = layout.height;
 
-    // ── Save state for opacity / filter / clip ──
-    let needs_layer = style.opacity < 1.0 || !style.filter.is_empty();
+    // ── Save state for opacity / filter / mix-blend-mode / clip ──
+    let needs_layer = style.opacity < 1.0
+        || !style.filter.is_empty()
+        || !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal);
     let needs_clip = style.overflow_x != types::Overflow::Visible
         || style.overflow_y != types::Overflow::Visible;
 
@@ -118,6 +120,12 @@ fn paint_box(
     if needs_layer {
         let mut layer_paint = Paint::default();
         layer_paint.set_alpha_f(style.opacity);
+        // CSS `mix-blend-mode` composites this element's stacking context
+        // onto its parent using the given blend mode (CSS Compositing 1
+        // §5). Apply as the layer's Skia blend mode.
+        if !matches!(style.blend_mode, crate::cg::prelude::BlendMode::Normal) {
+            layer_paint.set_blend_mode(style.blend_mode.into());
+        }
         let has_filter = !style.filter.is_empty();
         if has_filter {
             if let Some(filter) = build_filter_chain(&style.filter) {
@@ -197,7 +205,7 @@ fn paint_box(
             cy,
             cw,
             ch,
-            &style.border_radius,
+            &style.border_radius.resolved(w, h),
             style.font.image_rendering,
             images,
         );
@@ -392,6 +400,8 @@ fn rasterize_gradient(
     let canvas = surface.canvas();
     let mut paint = Paint::default();
     paint.set_shader(shader);
+    // Match Blink: gradients are always dithered (gradient.cc:359).
+    paint.set_dither(true);
     canvas.draw_rect(Rect::from_wh(w, h), &paint);
     surface.image_snapshot().into()
 }
@@ -409,12 +419,13 @@ fn paint_background(
         return;
     }
 
-    let rect = Rect::from_xywh(0.0, 0.0, w, h);
-    let r = &style.border_radius;
+    let resolved_r = style.border_radius.resolved(w, h);
+    let r = &resolved_r;
+    let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
 
     for layer in &style.background {
         match layer {
-            BackgroundLayer::Solid(c) => {
+            BackgroundLayer::Solid { color: c, clip } => {
                 if c.a == 0 {
                     continue;
                 }
@@ -422,11 +433,13 @@ fn paint_background(
                 paint.set_style(PaintStyle::Fill);
                 paint.set_anti_alias(true);
                 paint.set_color(Color::from_argb(c.a, c.r, c.g, c.b));
+                let fill_rect = box_reference_rect(style, w, h, *clip);
                 if r.is_zero() {
-                    canvas.draw_rect(rect, &paint);
+                    canvas.draw_rect(fill_rect, &paint);
                 } else {
+                    let radii = inset_radii(r, border_rect, fill_rect);
                     let mut rrect = skia_safe::RRect::new();
-                    rrect.set_rect_radii(rect, &r.to_skia_radii());
+                    rrect.set_rect_radii(fill_rect, &radii);
                     canvas.draw_rrect(rrect, &paint);
                 }
             }
@@ -661,7 +674,7 @@ fn paint_background_image_layer(
     // rounded to match the inner edge").
     if !style.border_radius.is_zero() {
         let border_rect = Rect::from_xywh(0.0, 0.0, w, h);
-        let radii = inset_radii(&style.border_radius, border_rect, clip_rect);
+        let radii = inset_radii(&style.border_radius.resolved(w, h), border_rect, clip_rect);
         let mut rrect = skia_safe::RRect::new();
         rrect.set_rect_radii(clip_rect, &radii);
         canvas.clip_rrect(rrect, ClipOp::Intersect, true);
@@ -1340,7 +1353,10 @@ fn to_skia_interpolation(v: super::style::GradientInterpolation) -> Interpolatio
         HM::Decreasing => HueMethod::Decreasing,
     };
     Interpolation {
-        in_premul: InPremul::No,
+        // Match Blink: legacy CSS gradients premultiply colors before
+        // interpolating (gradient.cc:282-285). For opaque stops this is a
+        // no-op; the difference shows up when stops have alpha.
+        in_premul: InPremul::Yes,
         color_space,
         hue_method,
     }
@@ -1806,12 +1822,21 @@ fn paint_borders(
         && b.top.color == b.bottom.color
         && b.top.color == b.left.color
         && b.top.color == b.right.color;
+    // Stroke once as an RRect when sides are uniform *and* the style is
+    // one whose rendering doesn't depend on per-side color adjustments
+    // (inset / outset / groove / ridge darken/lighten per side). The
+    // per-side trapezoid path double-paints corners for translucent colors;
+    // the single-stroke path avoids that.
+    let uniform_stroke_style = matches!(
+        b.top.style,
+        types::BorderStyle::Solid | types::BorderStyle::Double
+    );
     if uniform
+        && uniform_stroke_style
         && b.top.width > 0.0
-        && b.top.style != types::BorderStyle::None
-        && !style.border_radius.is_zero()
+        && (b.top.style != types::BorderStyle::None || !style.border_radius.is_zero())
     {
-        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius, w, h);
+        paint_uniform_rounded_border(canvas, &b.top, &style.border_radius.resolved(w, h), w, h);
         return;
     }
 
@@ -2021,7 +2046,8 @@ fn paint_outline(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
         return;
     }
 
-    let r = &style.border_radius;
+    let resolved_r = style.border_radius.resolved(w, h);
+    let r = &resolved_r;
 
     if outline.style == types::BorderStyle::Double {
         // Two concentric 1/3-width strokes separated by a 1/3-width gap.
@@ -2085,7 +2111,10 @@ fn expand_radii(r: &super::style::CornerRadii, expand: f32) -> [skia_safe::Point
 // ─── Box shadow (Chromium: BoxPainterBase::PaintNormalBoxShadow / PaintInsetBoxShadow) ──
 
 fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
-    for shadow in &style.box_shadow {
+    // CSS Backgrounds §7.2: first shadow listed is on top. Iterate in reverse
+    // so the last-listed shadow paints first (bottom), leaving the first-listed
+    // painted last (on top).
+    for shadow in style.box_shadow.iter().rev() {
         if shadow.inset {
             continue;
         }
@@ -2115,7 +2144,8 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
             h + shadow.spread * 2.0,
         );
 
-        let r = &style.border_radius;
+        let resolved_r = style.border_radius.resolved(w, h);
+        let r = &resolved_r;
         if r.is_zero() {
             canvas.draw_rect(shadow_rect, &paint);
         } else {
@@ -2132,7 +2162,9 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 /// then drawing a hollow rect (the box outline expanded outward) with a blur
 /// mask so that only the soft inner edge is visible.
 fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32) {
-    for shadow in &style.box_shadow {
+    // CSS Backgrounds §7.2: first shadow listed is on top. Iterate in reverse
+    // so later-listed insets paint first, leaving the first-listed inset on top.
+    for shadow in style.box_shadow.iter().rev() {
         if !shadow.inset {
             continue;
         }
@@ -2141,7 +2173,8 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
 
         // Clip to the box so shadow cannot bleed outside
         canvas.save();
-        let r = &style.border_radius;
+        let resolved_r = style.border_radius.resolved(w, h);
+        let r = &resolved_r;
         if r.is_zero() {
             canvas.clip_rect(box_rect, ClipOp::Intersect, true);
         } else {

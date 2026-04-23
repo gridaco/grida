@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Translucent Border</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+        padding-bottom: 4px;
+        width: 140px;
+        height: 16px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .box {
+        width: 140px;
+        height: 100px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .b-thin {
+        border: 4px solid rgba(255, 0, 0, 0.5);
+      }
+      .b-thick {
+        border: 12px solid rgba(0, 0, 255, 0.5);
+      }
+      .b-green {
+        border: 8px solid rgba(0, 128, 0, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">4px red@0.5</div>
+        <div class="box b-thin"></div>
+      </div>
+      <div>
+        <div class="label">12px blue@0.5</div>
+        <div class="box b-thick"></div>
+      </div>
+      <div>
+        <div class="label">8px green@0.5</div>
+        <div class="box b-green"></div>
+      </div>
+    </div>
+  </body>
+</html>

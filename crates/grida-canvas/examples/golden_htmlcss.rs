@@ -125,13 +125,14 @@ fn render_to_png(
 ) {
     let picture =
         htmlcss::render(html, width, height, fonts, &htmlcss::NoImages).expect("render failed");
-    let cull = picture.cull_rect();
-    let w = cull.width().max(1.0) as i32;
-    let h = cull.height().max(1.0) as i32;
+    // Full-viewport dims match Chromium's fullPage footprint; transparent clear
+    // lets PNG alpha double as the reftest content mask.
+    let w = width.max(1.0) as i32;
+    let h = height.max(1.0) as i32;
 
     let mut surface = surfaces::raster_n32_premul((w, h)).expect("surface");
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
+    canvas.clear(Color::TRANSPARENT);
     canvas.draw_picture(&picture, None, None);
 
     let image = surface.image_snapshot();

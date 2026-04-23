@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Visibility</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .box {
+        width: 120px;
+        height: 100px;
+        background: #000;
+        box-sizing: border-box;
+      }
+
+      .v-visible {
+        visibility: visible;
+      }
+      .v-hidden {
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="box v-visible"></div>
+      <div class="box v-hidden"></div>
+      <div class="box v-visible"></div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Hex/Alpha Color Forms</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .swatch {
+        width: 100px;
+        height: 100px;
+        box-sizing: border-box;
+      }
+
+      .hex6 {
+        background-color: #3366cc;
+      }
+      .hex8 {
+        background-color: #3366cc80;
+      }
+      .hex3 {
+        background-color: #39c;
+      }
+      .hex4 {
+        background-color: #39c8;
+      }
+      .rgb-space {
+        background-color: rgb(51 102 204);
+      }
+      .rgb-slash {
+        background-color: rgb(51 102 204 / 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="swatch hex6"></div>
+      <div class="swatch hex8"></div>
+      <div class="swatch hex3"></div>
+      <div class="swatch hex4"></div>
+      <div class="swatch rgb-space"></div>
+      <div class="swatch rgb-slash"></div>
+    </div>
+  </body>
+</html>

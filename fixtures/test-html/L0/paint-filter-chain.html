@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paint: Filter chain</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fff;
+        color: #000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .swatch {
+        width: 100px;
+        height: 100px;
+        background: #c00;
+        box-sizing: border-box;
+      }
+
+      .invert-grayscale {
+        filter: invert(1) grayscale(1);
+      }
+      .opacity-brightness {
+        filter: opacity(0.7) brightness(1.5);
+      }
+      .sepia-saturate {
+        filter: sepia(1) saturate(2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="swatch invert-grayscale"></div>
+      <div class="swatch opacity-brightness"></div>
+      <div class="swatch sepia-saturate"></div>
+    </div>
+  </body>
+</html>
