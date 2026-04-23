@@ -2139,11 +2139,12 @@ fn paint_box_shadow_outer(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
-            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
-            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
+            // CSS Backgrounds §7.2 blur-radius is twice the Gaussian
+            // standard deviation. Match Blink's ShadowData::BlurRadiusToStdDev
+            // (shadow_data.h:76-82): σ = radius * 0.5.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur,
+                shadow.blur * 0.5,
                 false,
             ));
         }
@@ -2204,11 +2205,12 @@ fn paint_box_shadow_inset(canvas: &Canvas, style: &StyledElement, w: f32, h: f32
         paint.set_anti_alias(true);
         paint.set_style(PaintStyle::Fill);
         if shadow.blur > 0.0 {
-            // CSS `box-shadow` blur length is a Gaussian sigma per CSS
-            // Backgrounds §7.2; Skia's mask-filter takes sigma directly.
+            // CSS Backgrounds §7.2 blur-radius is twice the Gaussian
+            // standard deviation. Match Blink's ShadowData::BlurRadiusToStdDev
+            // (shadow_data.h:76-82): σ = radius * 0.5.
             paint.set_mask_filter(skia_safe::MaskFilter::blur(
                 skia_safe::BlurStyle::Normal,
-                shadow.blur,
+                shadow.blur * 0.5,
                 false,
             ));
         }
