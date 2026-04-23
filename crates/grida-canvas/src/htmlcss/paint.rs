@@ -1477,11 +1477,10 @@ fn build_radial_gradient_shader(
     let (cx, cy) = resolve_center(&grad.center, w, h);
     let (rx_full, ry_full) = radial_radii(grad.shape, grad.size, cx, cy, w, h);
 
-    // Use the larger axis as the gradient line length for px stop
-    // resolution. For circles rx = ry; for ellipses this is a reasonable
-    // convention — CSS defines the ending shape's "gradient line" as
-    // radius-like distance from the center.
-    let line_length = rx_full.max(ry_full);
+    // Use the x-axis radius as the gradient line length for px stop
+    // resolution. Matches Blink: the shader is built at the x radius
+    // and the y axis is stretched via a preScale local matrix.
+    let line_length = rx_full;
 
     let (colors, raw_positions) = build_gradient_data_with_line_length(&grad.stops, line_length);
     if colors.len() < 2 {
@@ -1489,13 +1488,25 @@ fn build_radial_gradient_shader(
     }
 
     let (positions, cycle) = repeat_scale(raw_positions, grad.repeating);
-    let (rx, ry) = (rx_full * cycle, ry_full * cycle);
+    let rx = rx_full * cycle;
+    let aspect_ratio = if ry_full > 0.0 {
+        rx_full / ry_full
+    } else {
+        1.0
+    };
 
-    // Unit-radius radial at origin; local matrix maps shader → paint space:
-    // (shader point p) → (cx + rx·p.x, cy + ry·p.y). Works for circles and
-    // ellipses uniformly.
-    let mut matrix = skia_safe::Matrix::scale((rx, ry));
-    matrix.post_translate((cx, cy));
+    // Match Blink (gradient.cc:447-454): build the radial shader at
+    // (cx, cy) with radius = rx, then preScale(1, 1/aspect) at the
+    // center for elliptical gradients. Circles take the identity path,
+    // which avoids the matrix-inverse round-trip and keeps dither phase
+    // aligned with Blink's non-matrix radial draw.
+    let matrix = if (aspect_ratio - 1.0).abs() > 1e-6 {
+        let mut m = skia_safe::Matrix::default();
+        m.pre_scale((1.0, 1.0 / aspect_ratio), Some(Point::new(cx, cy)));
+        Some(m)
+    } else {
+        None
+    };
 
     let gradient = make_gradient(
         &colors,
@@ -1503,7 +1514,7 @@ fn build_radial_gradient_shader(
         tile_mode(grad.repeating),
         grad.interpolation,
     );
-    skia_safe::shaders::radial_gradient((Point::new(0.0, 0.0), 1.0), &gradient, Some(&matrix))
+    skia_safe::shaders::radial_gradient((Point::new(cx, cy), rx), &gradient, matrix.as_ref())
 }
 
 fn build_conic_gradient_shader(grad: &ConicGradient, w: f32, h: f32) -> Option<skia_safe::Shader> {
