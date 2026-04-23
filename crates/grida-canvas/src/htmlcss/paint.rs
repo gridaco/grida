@@ -1954,7 +1954,25 @@ fn paint_border_side(canvas: &Canvas, pos: SidePos, side: &BorderSide, w: f32, h
         SidePos::Top | SidePos::Bottom => w,
         SidePos::Left | SidePos::Right => h,
     };
-    let paint = stroke_paint(effective_color, side.width, side.style, Some(side_length));
+
+    // For thick dotted (width > 3px), Blink insets the line endpoints
+    // by width/2 so that the round caps stay inside the box and the
+    // gap calc sees the inner span (box_border_painter.cc:528-537).
+    // Thin dotted (width ≤ 3) uses the pixel-aligned dash logic of
+    // `EnforceDotsAtEndpoints`, not yet ported — those variants land
+    // with a small alignment residual at narrow widths.
+    let (p1, p2, dash_len) = if side.style == types::BorderStyle::Dotted && side.width > 3.0 {
+        let half = side.width / 2.0;
+        let (np1, np2) = match pos {
+            SidePos::Top | SidePos::Bottom => ((p1.0 + half, p1.1), (p2.0 - half, p2.1)),
+            SidePos::Left | SidePos::Right => ((p1.0, p1.1 + half), (p2.0, p2.1 - half)),
+        };
+        (np1, np2, side_length - side.width)
+    } else {
+        (p1, p2, side_length)
+    };
+
+    let paint = stroke_paint(effective_color, side.width, side.style, Some(dash_len));
     canvas.draw_line(p1, p2, &paint);
 }
 
@@ -2058,7 +2076,21 @@ fn stroke_paint(
             }
         }
         types::BorderStyle::Dotted => {
-            if let Some(effect) = skia_safe::PathEffect::dash(&[width, width], 0.0) {
+            // Blink (styled_stroke_data.cc:115-132): round-cap stroke,
+            // interval `[0, gap + width - ε]`. The zero "on" segment
+            // combined with round-cap produces a dot of diameter=width;
+            // the "off" span sets the center-to-center spacing.
+            // SelectBestDashGap picks a gap that fits an integer count
+            // of dots along the side.
+            let per_dot = width * 2.0;
+            let gap = match path_length {
+                Some(len) if len >= per_dot => select_best_dash_gap(len, width, width, false),
+                _ => per_dot,
+            };
+            // Epsilon keeps the final dot inside the endpoint
+            // (styled_stroke_data.cc:127).
+            let off = (gap + width - 0.01).max(0.01);
+            if let Some(effect) = skia_safe::PathEffect::dash(&[0.0, off], 0.0) {
                 paint.set_path_effect(effect);
             }
             paint.set_stroke_cap(skia_safe::paint::Cap::Round);
