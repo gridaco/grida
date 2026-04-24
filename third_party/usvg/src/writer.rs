@@ -153,9 +153,10 @@ pub(crate) fn convert(tree: &Tree, opt: &WriteOptions) -> String {
         xml.write_attribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
     }
 
-    xml.start_svg_element(EId::Defs);
-    write_defs(tree, opt, &mut xml);
-    xml.end_element();
+    let has_text_paths = has_text_paths(&tree.root);
+    if tree.has_defs_nodes() || has_text_paths {
+        write_defs(tree, opt, &mut xml, has_text_paths);
+    }
 
     write_elements(&tree.root, false, opt, &mut xml);
 
@@ -227,27 +228,7 @@ fn write_filters(tree: &Tree, opt: &WriteOptions, xml: &mut XmlWriter) {
                     xml.write_filter_primitive_attrs(filter.rect(), fe);
                     xml.write_filter_input(AId::In, &blend.input1);
                     xml.write_filter_input(AId::In2, &blend.input2);
-                    xml.write_svg_attribute(
-                        AId::Mode,
-                        match blend.mode {
-                            BlendMode::Normal => "normal",
-                            BlendMode::Multiply => "multiply",
-                            BlendMode::Screen => "screen",
-                            BlendMode::Overlay => "overlay",
-                            BlendMode::Darken => "darken",
-                            BlendMode::Lighten => "lighten",
-                            BlendMode::ColorDodge => "color-dodge",
-                            BlendMode::ColorBurn => "color-burn",
-                            BlendMode::HardLight => "hard-light",
-                            BlendMode::SoftLight => "soft-light",
-                            BlendMode::Difference => "difference",
-                            BlendMode::Exclusion => "exclusion",
-                            BlendMode::Hue => "hue",
-                            BlendMode::Saturation => "saturation",
-                            BlendMode::Color => "color",
-                            BlendMode::Luminosity => "luminosity",
-                        },
-                    );
+                    xml.write_svg_attribute(AId::Mode, &blend.mode.to_string());
                     xml.write_svg_attribute(AId::Result, &fe.result);
                     xml.end_element();
                 }
@@ -507,7 +488,8 @@ fn write_filters(tree: &Tree, opt: &WriteOptions, xml: &mut XmlWriter) {
     }
 }
 
-fn write_defs(tree: &Tree, opt: &WriteOptions, xml: &mut XmlWriter) {
+fn write_defs(tree: &Tree, opt: &WriteOptions, xml: &mut XmlWriter, write_text_paths: bool) {
+    xml.start_svg_element(EId::Defs);
     for lg in tree.linear_gradients() {
         xml.start_svg_element(EId::LinearGradient);
         xml.write_id_attribute(lg.id(), opt);
@@ -548,7 +530,7 @@ fn write_defs(tree: &Tree, opt: &WriteOptions, xml: &mut XmlWriter) {
         xml.end_element();
     }
 
-    if tree.has_text_nodes() {
+    if write_text_paths {
         write_text_path_paths(&tree.root, opt, xml);
     }
 
@@ -589,8 +571,48 @@ fn write_defs(tree: &Tree, opt: &WriteOptions, xml: &mut XmlWriter) {
 
         xml.end_element();
     }
+    xml.end_element(); // end EId::Defs
 }
 
+fn has_text_paths(parent: &Group) -> bool {
+    for node in &parent.children {
+        if let Node::Group(ref group) = node {
+            if has_text_paths(group) {
+                return true;
+            }
+        } else if let Node::Text(ref text) = node {
+            for chunk in &text.chunks {
+                if let TextFlow::Path(ref text_path) = chunk.text_flow {
+                    let path = Path::new(
+                        text_path.id().to_string(),
+                        true,
+                        None,
+                        None,
+                        PaintOrder::default(),
+                        ShapeRendering::default(),
+                        text_path.path.clone(),
+                        Transform::default(),
+                    );
+                    if path.is_some() {
+                        return true;
+                    }
+                }
+            }
+        }
+        let mut need_path = false;
+        node.subroots(|subroot| {
+            if !need_path && has_text_paths(subroot) {
+                need_path = true;
+            }
+        });
+        if need_path {
+            return true;
+        }
+    }
+    false
+}
+
+/// Write the `path` elements for text paths.
 fn write_text_path_paths(parent: &Group, opt: &WriteOptions, xml: &mut XmlWriter) {
     for node in &parent.children {
         if let Node::Group(ref group) = node {
@@ -809,16 +831,22 @@ fn write_group_element(g: &Group, is_clip_path: bool, opt: &WriteOptions, xml: &
         // Same with text. Text elements will be converted into groups,
         // but only the group's children should be written.
         for child in &g.children {
-            if let Node::Path(ref path) = child {
-                let clip_id = g.clip_path.as_ref().map(|cp| cp.id().to_string());
-                write_path(
-                    path,
-                    is_clip_path,
-                    g.transform,
-                    clip_id.as_deref(),
-                    opt,
-                    xml,
-                );
+            match child {
+                Node::Group(child_group) => {
+                    write_group_element(child_group, is_clip_path, opt, xml);
+                }
+                Node::Path(child_path) => {
+                    let clip_id = g.clip_path.as_ref().map(|cp| cp.id().to_string());
+                    write_path(
+                        child_path,
+                        is_clip_path,
+                        g.transform,
+                        clip_id.as_deref(),
+                        opt,
+                        xml,
+                    );
+                }
+                _ => {}
             }
         }
         return;
@@ -854,31 +882,12 @@ fn write_group_element(g: &Group, is_clip_path: bool, opt: &WriteOptions, xml: &
     xml.write_transform(AId::Transform, g.transform, opt);
 
     if g.blend_mode != BlendMode::Normal || g.isolate {
-        let blend_mode = match g.blend_mode {
-            BlendMode::Normal => "normal",
-            BlendMode::Multiply => "multiply",
-            BlendMode::Screen => "screen",
-            BlendMode::Overlay => "overlay",
-            BlendMode::Darken => "darken",
-            BlendMode::Lighten => "lighten",
-            BlendMode::ColorDodge => "color-dodge",
-            BlendMode::ColorBurn => "color-burn",
-            BlendMode::HardLight => "hard-light",
-            BlendMode::SoftLight => "soft-light",
-            BlendMode::Difference => "difference",
-            BlendMode::Exclusion => "exclusion",
-            BlendMode::Hue => "hue",
-            BlendMode::Saturation => "saturation",
-            BlendMode::Color => "color",
-            BlendMode::Luminosity => "luminosity",
-        };
-
         // For reasons unknown, `mix-blend-mode` and `isolation` must be written
         // as `style` attribute.
         let isolation = if g.isolate { "isolate" } else { "auto" };
         xml.write_attribute_fmt(
             AId::Style.to_str(),
-            format_args!("mix-blend-mode:{};isolation:{}", blend_mode, isolation),
+            format_args!("mix-blend-mode:{};isolation:{}", g.blend_mode, isolation),
         );
     }
 

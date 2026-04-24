@@ -51,6 +51,10 @@ This is a fork of the original [usvg](https://github.com/linebender/resvg) libra
 - **Crates.io:** [usvg](https://crates.io/crates/usvg)
 - **Documentation:** [docs.rs/usvg](https://docs.rs/usvg)
 
+### Sync State
+
+See [PATCHES.md](PATCHES.md) for the fork base, last-synced upstream commit, and the list of adopted patches.
+
 ### Why This Fork?
 
 This fork includes planned modifications to align with Grida's architecture, including dependency unification, bundle downsizing, and enhanced tree processing. See [TODO.md](TODO.md) for details on planned changes and development roadmap.
