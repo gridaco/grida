@@ -37,44 +37,52 @@ Apps/grida/
 Do not use a random upstream WPT checkout — it lacks the `grida`
 product registration.
 
-### 2. Build `grida_wpt` (release mode)
+That's it — `just wpt` handles build + binary path + report output.
+
+## Run
+
+From this repo:
 
 ```sh
-cargo build -p grida_wpt --release
+just wpt css/css-transforms/2d-rotate-001.html  # one file (pilot test)
+just wpt css/css-transforms/                    # one subsuite
+just wpt                                        # all of css/ (default)
 ```
 
-## Run a test
-
-From the `wpt/` sibling:
-
-```sh
-cd ../wpt
-
-./wpt run \
-  --binary=../grida/target/release/grida_wpt \
-  grida \
-  css/css-transforms/2d-rotate-001.html
-```
-
-Expected output: `SUITE_START` → `TEST_START` → `TEST_END: FAIL,
-expected PASS`. The FAIL is not a setup error — it means the pipeline
-ran end-to-end and cg's rendering of the pair did not match within
-fuzzy tolerance. See the [primitives inventory][inventory] for what
-feature gaps cause most of the fails.
+Expected output on the pilot: `SUITE_START` → `TEST_START` →
+`TEST_END: FAIL, expected PASS`. The FAIL is not a setup error — it
+means the pipeline ran end-to-end and cg's rendering of the pair did
+not match within fuzzy tolerance. See the [primitives inventory][inventory]
+for what feature gaps cause most of the fails.
 
 [inventory]: https://github.com/gridaco/grida/issues <!-- TODO: link once checked in -->
 
-### Wider runs
+Wide runs write a structured report to `target/wpt-report.json`. Mine
+it with `jq`:
 
 ```sh
-./wpt run \
-  --binary=../grida/target/release/grida_wpt \
-  grida \
-  css/css-transforms/
+jq '.results | group_by(.status) | map({status: .[0].status, count: length})' \
+   target/wpt-report.json
 ```
 
 The plugin is reftest-only; `testharness`, `crashtest`, `wdspec`, and
 `print-reftest` types warn "Unsupported test type" and are skipped.
+
+### Under the hood
+
+`just wpt` runs:
+
+```sh
+cargo build -p grida_wpt --release
+cd ../wpt && ./wpt run \
+    --binary=<repo>/target/release/grida_wpt \
+    --log-wptreport=<repo>/target/wpt-report.json \
+    --log-mach-level=info \
+    grida <target>
+```
+
+Skip the recipe and call `./wpt run` directly if you need custom
+flags (`--include-file`, `--repeat`, etc.).
 
 ## What the plugin does
 
