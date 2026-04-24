@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout: display: inline-block</title>
+    <style>
+      html,
+      body {
+        min-height: 800px;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+      }
+
+      .row {
+        font-size: 0;
+      }
+
+      .box {
+        display: inline-block;
+        width: 80px;
+        height: 80px;
+        vertical-align: top;
+      }
+
+      .a {
+        background: #c00;
+      }
+      .b {
+        background: #0a0;
+      }
+      .c {
+        background: #05f;
+      }
+      .d {
+        background: #fa0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="box a"></div>
+      <div class="box b"></div>
+      <div class="box c"></div>
+      <div class="box d"></div>
+    </div>
+  </body>
+</html>
