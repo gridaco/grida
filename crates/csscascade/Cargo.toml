@@ -19,12 +19,11 @@ crate-type = ["rlib"]
 [dependencies]
 # css parsing
 # (+2.5mb wasm32-unknown-emscripten)
-# https://github.com/servo/stylo/issues/272 / The issue has been fixed upstream, yet not released. sticking to fork until the next release
-stylo = { git = "https://github.com/gridaco/stylo" }
-selectors = { git = "https://github.com/gridaco/stylo", package = "selectors" }
-stylo_dom = { git = "https://github.com/gridaco/stylo", package = "stylo_dom" }
-stylo_atoms = { git = "https://github.com/gridaco/stylo", package = "stylo_atoms" }
-style_traits = { git = "https://github.com/gridaco/stylo", package = "stylo_traits" }
+stylo = "0.16"
+selectors = "0.37"
+stylo_dom = "0.16"
+stylo_atoms = "0.16"
+style_traits = { package = "stylo_traits", version = "0.16" }
 url = "2.5"
 euclid = "0.22.11"
 

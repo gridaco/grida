@@ -283,7 +283,7 @@ fixtures/test-html/
     └── L0.coverage.json           ── aspirational scope; tracks progress
 
         │
-        ├── cargo run -p cg --example golden_htmlcss -- --suite <suite>
+        ├── cargo run -p grida_wpt -- render --suite <suite>
         │       └─► $TMPDIR/grida-htmlcss-goldens/<name>.png   (cg actual)
         │
         └── refbrowser_render.ts --suite <suite>
@@ -376,18 +376,16 @@ pnpm --filter @grida/reftest exec tsx \
   --out-dir /tmp/refbrowser-verify
 ```
 
-**2. Render actuals (our pipeline)** — the `golden_htmlcss` example
-reads the same suite JSON, resolves `extra_css` relative to the suite
-file, and applies each stylesheet via
+**2. Render actuals (our pipeline)** — the `grida_wpt render`
+CLI reads the same suite JSON, resolves `extra_css` relative to the
+suite file, and applies each stylesheet via
 `htmlcss::with_extra_stylesheets` before rendering, so the cascade is
 symmetric with Chromium.
 
 ```sh
-cargo run -p cg --example golden_htmlcss -- \
-  --suite fixtures/test-html/suites/L0.exact.json
-
-mkdir -p target/refbrowser/L0.exact/actual
-cp "${TMPDIR:-/tmp}/grida-htmlcss-goldens/"*.png target/refbrowser/L0.exact/actual/
+cargo run -p grida_wpt -- render \
+  --suite   fixtures/test-html/suites/L0.exact.json \
+  --out-dir target/refbrowser/L0.exact/actual
 ```
 
 **3. Diff via `@grida/reftest`** — format-agnostic, same bucket layout
@@ -432,7 +430,7 @@ coupled defaults wire this up:
   `refbrowser_render.ts`). Root canvas default bg is dropped; PNG
   alpha encodes "did the CSS cascade draw here?"
 - **cg** clears its Skia surface with `Color::TRANSPARENT` and
-  renders at viewport dims (in `examples/golden_htmlcss.rs`).
+  renders at viewport dims (in `crates/grida_wpt/src/render.rs`).
 - **Both sides** apply `_reftest/transparent-body.css` via
   `extra_css`. `!important` forces `html, body { background:
 transparent }`, so fixtures with `body { background: #fff }`
@@ -1024,10 +1022,9 @@ pnpm --filter @grida/reftest exec tsx .agents/skills/cg-reftest/scripts/refbrows
   --out-dir target/refbrowser/expected
 
 # 2. Render actuals via our cg pipeline
-cargo run -p cg --example golden_htmlcss -- \
-  --suite fixtures/test-html/suites/L0.exact.json
-mkdir -p target/refbrowser/actual
-cp "${TMPDIR:-/tmp}/grida-htmlcss-goldens/"*.png target/refbrowser/actual/
+cargo run -p grida_wpt -- render \
+  --suite   fixtures/test-html/suites/L0.exact.json \
+  --out-dir target/refbrowser/actual
 
 # 3. Diff actuals against Chromium oracle, write bucketed report
 pnpm --filter @grida/reftest exec reftest \

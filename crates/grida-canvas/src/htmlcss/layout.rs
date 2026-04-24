@@ -126,6 +126,19 @@ fn build_taffy_node(
         apply_replaced_intrinsic_size(&mut style, replaced, images);
     }
 
+    // Emulate inline-block sibling flow via Taffy flex-wrap. Taffy has no
+    // inline formatting context, so a block container holding only
+    // inline-block siblings would otherwise stack them vertically. Only
+    // apply when ≥2 inline-block element children exist and no text or
+    // non-inline-block elements would be misrouted through flex.
+    if style.display == taffy::Display::Block && should_emulate_inline_block_container(el) {
+        style.display = taffy::Display::Flex;
+        style.flex_wrap = taffy::FlexWrap::Wrap;
+        // Override default `stretch` so inline-blocks keep their
+        // own block-size instead of filling the container's line height.
+        style.align_items = Some(taffy::AlignItems::Start);
+    }
+
     // Build child nodes
     let mut child_ids: Vec<TaffyNodeId> = Vec::new();
 
@@ -174,6 +187,26 @@ fn build_taffy_node(
     }
 
     taffy.new_with_children(style, &child_ids).unwrap()
+}
+
+/// Returns true when `el` should lay out its children as a horizontal
+/// flex-wrap row to emulate inline-block flow. Only safe when the
+/// container holds ≥2 inline-block element siblings and no text or
+/// non-inline-block element children (those would require a real inline
+/// formatting context to mix with inline-blocks correctly).
+fn should_emulate_inline_block_container(el: &StyledElement) -> bool {
+    let mut inline_block_count = 0usize;
+    for child in &el.children {
+        match child {
+            StyledNode::Element(child_el) => match child_el.display {
+                types::Display::InlineBlock => inline_block_count += 1,
+                types::Display::None => {}
+                _ => return false,
+            },
+            StyledNode::Text(_) | StyledNode::InlineGroup(_) => return false,
+        }
+    }
+    inline_block_count >= 2
 }
 
 /// Taffy context for text/inline leaf nodes. Stores inline items so the

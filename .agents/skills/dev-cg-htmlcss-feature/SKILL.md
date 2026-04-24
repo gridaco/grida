@@ -167,7 +167,7 @@ the suite config is wrong and the score will be zero.
   terms.
 
 **Exit when.** `cargo check -p cg` is clean, existing tests pass,
-and the fixture renders through `golden_htmlcss --suite` without
+and the fixture renders through `grida_wpt render --suite` without
 error. Similarity score is measured in phase 5 — do not gate on
 it here.
 
@@ -181,8 +181,8 @@ in the change:
 
 1. Render expecteds (Playwright Chromium) into
    `target/refbrowser/<suite>/expected`.
-2. Render actuals (`cargo run -p cg --example golden_htmlcss --
---suite …`).
+2. Render actuals (`cargo run -p grida_wpt -- render --suite …
+--out-dir target/refbrowser/<suite>/actual`).
 3. Diff with `@grida/reftest`, threshold 0 (the strict default).
 4. Read similarity against the suite's `gate.floor`.
 

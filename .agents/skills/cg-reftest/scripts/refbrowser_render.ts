@@ -11,7 +11,7 @@
  *  │ + helper CSS   │   │ (full-page screen)  │   │                  │
  *  └────────────────┘   └─────────────────────┘   └──────────────────┘
  *
- * Pair with `cargo run -p cg --example golden_htmlcss --suite` on the
+ * Pair with `cargo run -p grida_wpt -- render --suite` on the
  * actual side, then diff via `@grida/reftest`.
  *
  * ## Usage
@@ -149,7 +149,7 @@ async function resolveSuite(suitePath: string): Promise<Resolved[]> {
     const extra_css = merged.extra_css.map((rel) =>
       path.resolve(suiteDir, rel)
     );
-    const stem = path.basename(entry.path).replace(/\.html?$/i, "");
+    const stem = path.basename(entry.path).replace(/\.(html?|xht|xhtml)$/i, "");
     return { htmlPath, stem, config: { ...merged, extra_css } };
   });
 }
@@ -258,7 +258,7 @@ async function main() {
     );
   } else {
     const htmlPath = path.resolve(args.fixture!);
-    const stem = path.basename(htmlPath).replace(/\.html?$/i, "");
+    const stem = path.basename(htmlPath).replace(/\.(html?|xht|xhtml)$/i, "");
     resolved = [{ htmlPath, stem, config: DEFAULTS }];
     console.log(`refbrowser: rendering 1 fixture (ad-hoc, defaults only)`);
   }
