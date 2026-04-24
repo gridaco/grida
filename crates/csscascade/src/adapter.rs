@@ -15,7 +15,6 @@ use std::borrow::Borrow;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-use atomic_refcell::{AtomicRef, AtomicRefMut};
 use euclid::default::Size2D;
 use markup5ever::{Attribute, Namespace as HtmlNamespace, ns};
 use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
@@ -26,8 +25,8 @@ use selectors::{OpaqueElement, sink::Push};
 use style::Namespace as StyleNamespace;
 use style::applicable_declarations::ApplicableDeclarationBlock;
 use style::context::SharedStyleContext;
-use style::data::ElementData;
-use style::dom::{LayoutIterator, OpaqueNode, TElement, TNode};
+use style::data::{ElementDataMut, ElementDataRef, ElementDataWrapper};
+use style::dom::{AttributeProvider, LayoutIterator, OpaqueNode, TElement, TNode};
 use style::properties::PropertyDeclarationBlock;
 use style::selector_parser::{AttrValue as SelectorAttrValue, Lang, PseudoElement, SelectorImpl};
 use style::servo_arc::{Arc, ArcBorrow};
@@ -173,7 +172,7 @@ impl HtmlElement {
         HtmlNode(self.0)
     }
 
-    fn data_slot(&self) -> &'static atomic_refcell::AtomicRefCell<Option<ElementData>> {
+    fn data_slot(&self) -> &'static OnceLock<ElementDataWrapper> {
         dom().element_data_slot(self.0)
     }
 
@@ -528,42 +527,28 @@ impl ::style::dom::TElement for HtmlElement {
         0
     }
 
-    unsafe fn ensure_data(&self) -> AtomicRefMut<'_, style::data::ElementData> {
+    unsafe fn ensure_data(&self) -> ElementDataMut<'_> {
         let slot = self.data_slot();
-        let mut cell = slot.borrow_mut();
-        if cell.is_none() {
-            *cell = Some(ElementData::default());
-        }
-        AtomicRefMut::map(cell, |opt| opt.as_mut().unwrap())
+        slot.get_or_init(ElementDataWrapper::default).borrow_mut()
     }
 
     unsafe fn clear_data(&self) {
-        let slot = self.data_slot();
-        *slot.borrow_mut() = None;
+        // OnceLock-backed storage: we cannot reset the slot safely, and
+        // callers in the cascade driver never rely on clearing data between
+        // passes. Leaving the entry in place matches Stylo's Gecko backend,
+        // which also reuses the allocation.
     }
 
     fn has_data(&self) -> bool {
-        self.data_slot().borrow().is_some()
+        self.data_slot().get().is_some()
     }
 
-    fn borrow_data(&self) -> Option<AtomicRef<'_, style::data::ElementData>> {
-        let slot = self.data_slot();
-        let cell = slot.borrow();
-        if cell.is_some() {
-            Some(AtomicRef::map(cell, |opt| opt.as_ref().unwrap()))
-        } else {
-            None
-        }
+    fn borrow_data(&self) -> Option<ElementDataRef<'_>> {
+        self.data_slot().get().map(|w| w.borrow())
     }
 
-    fn mutate_data(&self) -> Option<AtomicRefMut<'_, style::data::ElementData>> {
-        let slot = self.data_slot();
-        let cell = slot.borrow_mut();
-        if cell.is_some() {
-            Some(AtomicRefMut::map(cell, |opt| opt.as_mut().unwrap()))
-        } else {
-            None
-        }
+    fn mutate_data(&self) -> Option<ElementDataMut<'_>> {
+        self.data_slot().get().map(|w| w.borrow_mut())
     }
 
     fn skip_item_display_fixup(&self) -> bool {
@@ -651,6 +636,23 @@ impl ::style::dom::TElement for HtmlElement {
 
     fn relative_selector_search_direction(&self) -> ElementSelectorFlags {
         ElementSelectorFlags::empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// style::dom::AttributeProvider
+// ---------------------------------------------------------------------------
+
+impl AttributeProvider for HtmlElement {
+    fn get_attr(&self, attr: &style::LocalName, namespace: &StyleNamespace) -> Option<String> {
+        self.attr_iter()
+            .filter(|(a, _)| {
+                let dom_ns: &str = &a.name.ns;
+                let sel_ns: &str = namespace.as_ref();
+                dom_ns == sel_ns
+            })
+            .find(|(_, stored)| *stored == attr)
+            .map(|(a, _)| a.value.to_string())
     }
 }
 

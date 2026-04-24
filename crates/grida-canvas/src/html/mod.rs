@@ -1116,10 +1116,19 @@ fn line_direction_to_alignment(
 fn css_border_to_cg(style: &ComputedValues) -> (Paints, StrokeWidth, StrokeStyle) {
     let border = style.get_border();
 
-    let top_w = border.border_top_width.to_f32_px();
-    let right_w = border.border_right_width.to_f32_px();
-    let bottom_w = border.border_bottom_width.to_f32_px();
-    let left_w = border.border_left_width.to_f32_px();
+    // Stylo stores the unresolved `medium` default (3px) in `BorderSideWidth`
+    // even when `border-style` is `none`/`hidden`. Treat those as zero-width.
+    use style::values::specified::border::BorderStyle as BS;
+    let width_for = |w: &style::values::computed::BorderSideWidth, s: BS| -> f32 {
+        match s {
+            BS::None | BS::Hidden => 0.0,
+            _ => w.0.to_f32_px(),
+        }
+    };
+    let top_w = width_for(&border.border_top_width, border.border_top_style);
+    let right_w = width_for(&border.border_right_width, border.border_right_style);
+    let bottom_w = width_for(&border.border_bottom_width, border.border_bottom_style);
+    let left_w = width_for(&border.border_left_width, border.border_left_style);
 
     let has_border = top_w > 0.0 || right_w > 0.0 || bottom_w > 0.0 || left_w > 0.0;
     if !has_border {
