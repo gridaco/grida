@@ -5,6 +5,7 @@ pub mod filter;
 mod geom;
 mod text;
 
+use std::fmt::Display;
 use std::sync::Arc;
 
 pub use strict_num::{self, ApproxEqUlps, NonZeroPositiveF32, NormalizedF32, PositiveF32};
@@ -225,6 +226,30 @@ pub enum BlendMode {
 impl Default for BlendMode {
     fn default() -> Self {
         Self::Normal
+    }
+}
+
+impl Display for BlendMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let blend_mode = match self {
+            BlendMode::Normal => "normal",
+            BlendMode::Multiply => "multiply",
+            BlendMode::Screen => "screen",
+            BlendMode::Overlay => "overlay",
+            BlendMode::Darken => "darken",
+            BlendMode::Lighten => "lighten",
+            BlendMode::ColorDodge => "color-dodge",
+            BlendMode::ColorBurn => "color-burn",
+            BlendMode::HardLight => "hard-light",
+            BlendMode::SoftLight => "soft-light",
+            BlendMode::Difference => "difference",
+            BlendMode::Exclusion => "exclusion",
+            BlendMode::Hue => "hue",
+            BlendMode::Saturation => "saturation",
+            BlendMode::Color => "color",
+            BlendMode::Luminosity => "luminosity",
+        };
+        write!(f, "{blend_mode}")
     }
 }
 
@@ -1592,6 +1617,16 @@ impl Tree {
     /// Checks if the current tree has any text nodes.
     pub fn has_text_nodes(&self) -> bool {
         has_text_nodes(&self.root)
+    }
+
+    /// Checks if the current tree has any `defs` nodes.
+    pub fn has_defs_nodes(&self) -> bool {
+        !self.linear_gradients().is_empty()
+            || !self.radial_gradients().is_empty()
+            || !self.patterns().is_empty()
+            || !self.filters().is_empty()
+            || !self.clip_paths().is_empty()
+            || !self.masks().is_empty()
     }
 
     /// Returns a list of all unique [`LinearGradient`]s in the tree.
