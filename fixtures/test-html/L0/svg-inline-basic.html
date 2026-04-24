@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SVG: inline basic shapes</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        font-family: system-ui, sans-serif;
+      }
+
+      .grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .cell {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: #666;
+      }
+
+      .frame {
+        background: #f3f3f3;
+        border-radius: 6px;
+        padding: 8px;
+        width: 120px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      svg {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <div class="label">rect + fill</div>
+        <div class="frame">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <rect x="10" y="10" width="80" height="80" fill="#ef4444" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">circle + stroke</div>
+        <div class="frame">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle
+              cx="50"
+              cy="50"
+              r="36"
+              fill="#fde68a"
+              stroke="#78350f"
+              stroke-width="4"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">path</div>
+        <div class="frame">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <path
+              d="M 10 80 L 50 10 L 90 80 Z"
+              fill="#22c55e"
+              stroke="#14532d"
+              stroke-width="3"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">grouped transform</div>
+        <div class="frame">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <g transform="translate(50 50) rotate(30)">
+              <rect x="-30" y="-30" width="60" height="60" fill="#3b82f6" />
+              <rect
+                x="-30"
+                y="-30"
+                width="60"
+                height="60"
+                fill="none"
+                stroke="#1e3a8a"
+                stroke-width="3"
+              />
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">linear gradient</div>
+        <div class="frame">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <defs>
+              <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#06b6d4" />
+                <stop offset="100%" stop-color="#7c3aed" />
+              </linearGradient>
+            </defs>
+            <rect width="100" height="100" fill="url(#lg)" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div class="label">polyline</div>
+        <div class="frame">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <polyline
+              points="10,90 30,40 50,70 70,20 90,60"
+              fill="none"
+              stroke="#db2777"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

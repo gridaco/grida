@@ -3,7 +3,7 @@ use crate::reftest::compare::{compare_images, ScoringMask};
 use crate::reftest::config::ReftestToml;
 use crate::reftest::render::{
     find_test_pairs_from_glob, find_test_pairs_in_dirs, render_svg_to_png,
-    render_svg_to_png_via_htmlcss, TestPair,
+    render_svg_to_png_via_htmlcss, render_svg_to_png_via_sksvg, TestPair,
 };
 use crate::reftest::report::{generate_json_report, ReftestReport, TestResult};
 use anyhow::{Context, Result};
@@ -69,6 +69,7 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
             let suffix = match args.renderer {
                 SvgRenderer::Iosvg => String::new(),
                 SvgRenderer::Htmlcss => ".htmlcss".to_string(),
+                SvgRenderer::Sksvg => ".sksvg".to_string(),
             };
             output_dir = output_dir.join(format!("{}{}", sanitize_dir_name(&name), suffix));
         }
@@ -220,6 +221,9 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
             SvgRenderer::Iosvg => render_svg_to_png(&pair.svg_path, &temp_output_png, target_size),
             SvgRenderer::Htmlcss => {
                 render_svg_to_png_via_htmlcss(&pair.svg_path, &temp_output_png, target_size)
+            }
+            SvgRenderer::Sksvg => {
+                render_svg_to_png_via_sksvg(&pair.svg_path, &temp_output_png, target_size)
             }
         }));
 

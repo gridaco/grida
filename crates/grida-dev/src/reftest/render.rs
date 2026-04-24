@@ -241,6 +241,67 @@ fn sniff_svg_dimensions(svg: &str) -> Option<(u32, u32)> {
     Some((w.max(1), h.max(1)))
 }
 
+/// Render an SVG file through **Skia's native SVG module** with the
+/// thinnest possible wrapper.
+///
+/// Pipeline: `fs::read` → `Data::new_copy` → `svg::Dom::from_bytes` →
+/// `surface.canvas()` → `dom.render()` → PNG. No htmlcss module, no
+/// `PictureRecorder`, no Grida tree surgery.
+///
+/// Purpose: attribute reftest failures correctly. A test that fails
+/// here is a limitation of Skia's own `svg::Dom` implementation, not
+/// of Grida's wiring. If the same test fails identically under
+/// `--renderer htmlcss`, then our htmlcss wrapping adds zero
+/// divergence; any delta between the two backends attributes to the
+/// `PictureRecorder` round-trip we add in htmlcss.
+pub(crate) fn render_svg_to_png_via_sksvg(
+    svg_path: &Path,
+    output_path: &Path,
+    target_size: Option<(u32, u32)>,
+) -> Result<()> {
+    use skia_safe::{surfaces, svg, Color as SkColor, Data, EncodedImageFormat, FontMgr, Size};
+
+    let svg_bytes = fs::read(svg_path)
+        .with_context(|| format!("failed to read SVG file {}", svg_path.display()))?;
+
+    let (width, height) = match target_size {
+        Some((w, h)) => (w.max(1) as i32, h.max(1) as i32),
+        None => {
+            let svg_source = std::str::from_utf8(&svg_bytes)
+                .with_context(|| format!("SVG file {} is not UTF-8", svg_path.display()))?;
+            let (w, h) = sniff_svg_dimensions(svg_source).unwrap_or((512, 512));
+            (w as i32, h as i32)
+        }
+    };
+
+    let data = Data::new_copy(&svg_bytes);
+    let mut dom = svg::Dom::from_bytes(&data, FontMgr::default())
+        .map_err(|e| anyhow!("skia svg::Dom::from_bytes failed: {e}"))?;
+    dom.set_container_size(Size::new(width as f32, height as f32));
+
+    let mut surface = surfaces::raster_n32_premul((width, height))
+        .ok_or_else(|| anyhow!("failed to create raster surface {}x{}", width, height))?;
+    {
+        let canvas = surface.canvas();
+        canvas.clear(SkColor::TRANSPARENT);
+        dom.render(canvas);
+    }
+
+    let image = surface.image_snapshot();
+    let encoded = image
+        .encode(None, EncodedImageFormat::PNG, None)
+        .ok_or_else(|| anyhow!("Failed to encode PNG"))?;
+
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create output directory {}", parent.display()))?;
+    }
+    fs::write(output_path, encoded.as_bytes())
+        .with_context(|| format!("failed to write PNG to {}", output_path.display()))?;
+
+    Ok(())
+}
+
 pub(crate) fn render_svg_to_png(
     svg_path: &Path,
     output_path: &Path,
