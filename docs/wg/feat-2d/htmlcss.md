@@ -15,6 +15,44 @@ Renders HTML+CSS to a Skia Picture for opaque embedding on the canvas
 
 **Source:** `crates/grida-canvas/src/htmlcss/`
 
+## Inputs
+
+Two public entry points, both returning a `skia_safe::Picture`:
+
+| Entry point  | Input                                              | Pipeline                                                      |
+| ------------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| `render`     | HTML source                                        | Stylo cascade → Taffy layout → Skia paint                     |
+| `render_svg` | Standalone SVG source                              | Skia's built-in `svg::Dom::from_bytes` → `dom.render(canvas)` |
+| `render_any` | HTML or SVG (sniffed from `<?xml` / `<svg` prefix) | Dispatches to the right path                                  |
+
+Inline `<svg>` inside HTML is also supported via the same Skia `svg::Dom`
+path — see [Inline SVG](#inline-svg) below.
+
+### Why accept raw SVG
+
+Mirrors Servo's "SVG as a replaced element + serialized subtree" design
+(`servo/components/script/dom/svg/svgsvgelement.rs` +
+`servo/components/net/image_cache.rs`) but swaps the resvg/tiny-skia CPU
+rasterizer for Skia's built-in SVG DOM — GPU-capable and paints straight
+to an `SkCanvas`. Unblocks WPT-style SVG reftests without writing a
+native Grida SVG renderer.
+
+Baseline against `fixtures/local/resvg-test-suite` (1,679 tests, `grida-dev
+reftest --renderer htmlcss`):
+
+| Bucket    | Count | % of suite |
+| --------- | ----: | ---------: |
+| S99 (≥99) |   482 |      28.7% |
+| S95 (≥95) |    59 |       3.5% |
+| S90 (≥90) |    73 |       4.3% |
+| S75 (≥75) |   225 |      13.4% |
+| <S75      |   833 |      49.6% |
+| 0%        |     7 |       0.4% |
+| errors    |     6 |       0.4% |
+
+Average similarity: **66.24%**. Comparable iosvg-backend run on the same
+suite averages 64.12%.
+
 ---
 
 ## Architecture

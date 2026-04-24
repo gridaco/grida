@@ -18,6 +18,33 @@ impl std::str::FromStr for BgColor {
     }
 }
 
+/// Choice of SVG renderer backend.
+///
+/// - `Iosvg` (default): current path — parse SVG via vendored usvg,
+///   convert to the Grida scene graph through `cg::svg::pack`, render
+///   via the canvas runtime. Lossy (editor-oriented tree surgery), but
+///   GPU-native and consistent with the in-editor experience.
+/// - `Htmlcss`: new path — hand raw SVG bytes to
+///   `cg::htmlcss::render_svg`, which delegates to Skia's built-in
+///   `svg::Dom`. Targets as-is rendering fidelity (Chromium-style),
+///   used for WPT-style reftests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SvgRenderer {
+    Iosvg,
+    Htmlcss,
+}
+
+impl std::str::FromStr for SvgRenderer {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "iosvg" | "grida" | "pack" => Ok(SvgRenderer::Iosvg),
+            "htmlcss" | "skia" | "skia-svg" | "skiasvg" => Ok(SvgRenderer::Htmlcss),
+            other => Err(format!("invalid renderer: {} (use iosvg|htmlcss)", other)),
+        }
+    }
+}
+
 #[derive(Args, Debug)]
 pub(crate) struct ReftestArgs {
     /// Path to W3C_SVG_11_TestSuite directory
@@ -52,4 +79,9 @@ pub(crate) struct ReftestArgs {
     #[arg(long = "overwrite", action = clap::ArgAction::SetTrue)]
     #[arg(long = "no-overwrite", action = clap::ArgAction::SetFalse, overrides_with = "overwrite")]
     pub overwrite: Option<bool>,
+
+    /// SVG renderer backend: `iosvg` (default — cg scene graph) or
+    /// `htmlcss` (Skia's built-in svg::Dom, used for WPT-style reftests).
+    #[arg(long = "renderer", default_value = "iosvg")]
+    pub renderer: SvgRenderer,
 }

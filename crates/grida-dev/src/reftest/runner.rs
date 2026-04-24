@@ -1,8 +1,9 @@
-use crate::reftest::args::{BgColor, ReftestArgs};
+use crate::reftest::args::{BgColor, ReftestArgs, SvgRenderer};
 use crate::reftest::compare::{compare_images, ScoringMask};
 use crate::reftest::config::ReftestToml;
 use crate::reftest::render::{
-    find_test_pairs_from_glob, find_test_pairs_in_dirs, render_svg_to_png, TestPair,
+    find_test_pairs_from_glob, find_test_pairs_in_dirs, render_svg_to_png,
+    render_svg_to_png_via_htmlcss, TestPair,
 };
 use crate::reftest::report::{generate_json_report, ReftestReport, TestResult};
 use anyhow::{Context, Result};
@@ -62,7 +63,14 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                 .map(|s| s.to_string())
         });
         if let Some(name) = suite_name {
-            output_dir = output_dir.join(sanitize_dir_name(&name));
+            // Keep iosvg (legacy default) at the historical path so
+            // existing CI / bookmarks don't break; qualify alt backends
+            // with their label.
+            let suffix = match args.renderer {
+                SvgRenderer::Iosvg => String::new(),
+                SvgRenderer::Htmlcss => ".htmlcss".to_string(),
+            };
+            output_dir = output_dir.join(format!("{}{}", sanitize_dir_name(&name), suffix));
         }
     }
 
@@ -203,11 +211,16 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
         // Render SVG to PNG (temporary location first)
         let temp_output_png = output_dir.join(format!("{}-temp-output.png", pair.test_name));
 
-        // Render SVG to PNG, scaling to match reference size
-        // Wrap in catch_unwind to handle panics from usvg library
+        // Render SVG to PNG, scaling to match reference size.
+        // Wrap in catch_unwind to handle panics from underlying
+        // rendering code (usvg for `iosvg`, Skia for `htmlcss`).
         let svg_path_for_panic = pair.svg_path.clone();
-        let render_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            render_svg_to_png(&pair.svg_path, &temp_output_png, target_size)
+        let renderer = args.renderer;
+        let render_result = panic::catch_unwind(panic::AssertUnwindSafe(|| match renderer {
+            SvgRenderer::Iosvg => render_svg_to_png(&pair.svg_path, &temp_output_png, target_size),
+            SvgRenderer::Htmlcss => {
+                render_svg_to_png_via_htmlcss(&pair.svg_path, &temp_output_png, target_size)
+            }
         }));
 
         let render_result = match render_result {

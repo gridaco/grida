@@ -789,7 +789,29 @@ fn paint_replaced(
         canvas.clip_rect(dest_rect, ClipOp::Intersect, true);
     }
 
-    if let Some(image) = images.get(&content.src) {
+    // Inline <svg>: delegate to Skia's built-in SVG DOM. Mirrors
+    // Servo's "<svg> as replaced element with serialized subtree" pattern
+    // (components/script/dom/svg/svgsvgelement.rs +
+    // components/net/image_cache.rs) but swaps resvg + tiny-skia for
+    // skia_safe::svg::Dom, which paints straight onto the SkCanvas.
+    let svg_handled = if let Some(ref xml) = content.svg_xml {
+        paint_inline_svg(canvas, xml.as_bytes(), w, h)
+    } else {
+        false
+    };
+
+    if svg_handled {
+        canvas.restore();
+        return;
+    }
+
+    // Image path: only applies to <img>-style replaced elements (not SVG).
+    let image_opt = if content.svg_xml.is_none() {
+        images.get(&content.src)
+    } else {
+        None
+    };
+    if let Some(image) = image_opt {
         let img_w = image.width() as f32;
         let img_h = image.height() as f32;
 
@@ -846,6 +868,27 @@ fn paint_replaced(
     }
 
     canvas.restore();
+}
+
+/// Render a serialized inline SVG subtree via Skia's built-in SVG DOM.
+///
+/// The caller has already translated the canvas to the replaced
+/// element's top-left and clipped to its content box. Returns `true` on
+/// successful render, `false` if the XML fails to parse.
+///
+/// Container-size semantics match Chromium's `SVGImageForContainer`:
+/// the `<svg>` is rendered at the replaced element's box size, and
+/// `viewBox` + `preserveAspectRatio` (interpreted internally by Skia)
+/// determine how SVG user units map into that box.
+fn paint_inline_svg(canvas: &Canvas, xml: &[u8], w: f32, h: f32) -> bool {
+    use skia_safe::{svg, FontMgr, Size};
+    let data = skia_safe::Data::new_copy(xml);
+    let Ok(mut dom) = svg::Dom::from_bytes(&data, FontMgr::default()) else {
+        return false;
+    };
+    dom.set_container_size(Size::new(w, h));
+    dom.render(canvas);
+    true
 }
 
 /// Map CSS `image-rendering` to Skia `SamplingOptions`.
