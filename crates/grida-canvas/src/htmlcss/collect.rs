@@ -37,7 +37,9 @@ pub(crate) fn collect_styled_tree(html: &str) -> Result<Option<StyledElement>, S
     // Without this, `display: grid` is not parsed (gated behind a pref).
     use std::sync::Once;
     static GRID_PREF: Once = Once::new();
-    GRID_PREF.call_once(|| style_config::set_bool("layout.grid.enabled", true));
+    GRID_PREF.call_once(|| {
+        stylo_static_prefs::set_pref!("layout.grid.enabled", true);
+    });
 
     let dom =
         DemoDom::parse_from_bytes(html.as_bytes()).map_err(|e| format!("HTML parse error: {e}"))?;
@@ -1019,7 +1021,7 @@ fn extract_style(tag: &str, style: &ComputedValues) -> StyledElement {
     let bx = style.get_box();
     el.overflow_x = map_overflow(bx.overflow_x);
     el.overflow_y = map_overflow(bx.overflow_y);
-    el.overflow_clip_margin = style.get_margin().clone_overflow_clip_margin().px();
+    el.overflow_clip_margin = style.get_margin().clone_overflow_clip_margin().offset.px();
 
     // Position
     {
@@ -1289,25 +1291,39 @@ fn extract_border(style: &ComputedValues, current_color: CGColor) -> BorderBox {
 
     BorderBox {
         top: BorderSide {
-            width: b.border_top_width.to_f32_px(),
+            width: side_width(&b.border_top_width, b.border_top_style),
             color: extract_color(&style.clone_border_top_color()),
             style: map_border_style(b.border_top_style),
         },
         right: BorderSide {
-            width: b.border_right_width.to_f32_px(),
+            width: side_width(&b.border_right_width, b.border_right_style),
             color: extract_color(&style.clone_border_right_color()),
             style: map_border_style(b.border_right_style),
         },
         bottom: BorderSide {
-            width: b.border_bottom_width.to_f32_px(),
+            width: side_width(&b.border_bottom_width, b.border_bottom_style),
             color: extract_color(&style.clone_border_bottom_color()),
             style: map_border_style(b.border_bottom_style),
         },
         left: BorderSide {
-            width: b.border_left_width.to_f32_px(),
+            width: side_width(&b.border_left_width, b.border_left_style),
             color: extract_color(&style.clone_border_left_color()),
             style: map_border_style(b.border_left_style),
         },
+    }
+}
+
+/// Stylo stores the unresolved `medium` default (3px) in `BorderSideWidth`
+/// even when `border-style` is `none`/`hidden`. CSS resolves the used width
+/// to zero in that case, so apply the same adjustment locally.
+fn side_width(
+    w: &style::values::computed::BorderSideWidth,
+    s: style::values::specified::border::BorderStyle,
+) -> f32 {
+    use style::values::specified::border::BorderStyle as BS;
+    match s {
+        BS::None | BS::Hidden => 0.0,
+        _ => w.0.to_f32_px(),
     }
 }
 
@@ -1372,10 +1388,10 @@ fn extract_border_image(style: &ComputedValues, current_color: CGColor) -> Optio
     // LengthPercentage is an absolute value. Auto = use slice value.
     let biw = &b.border_image_width;
     let border_widths = [
-        b.border_top_width.to_f32_px(),
-        b.border_right_width.to_f32_px(),
-        b.border_bottom_width.to_f32_px(),
-        b.border_left_width.to_f32_px(),
+        side_width(&b.border_top_width, b.border_top_style),
+        side_width(&b.border_right_width, b.border_right_style),
+        side_width(&b.border_bottom_width, b.border_bottom_style),
+        side_width(&b.border_left_width, b.border_left_style),
     ];
     let resolve_bisw =
         |v: &style::values::computed::BorderImageSideWidth, border_w: f32| -> Option<f32> {
@@ -1421,10 +1437,6 @@ fn extract_border_image(style: &ComputedValues, current_color: CGColor) -> Optio
 fn extract_outline(style: &ComputedValues) -> Outline {
     let o = style.get_outline();
 
-    if !o.outline_has_nonzero_width() {
-        return Outline::default();
-    }
-
     // outline-style: Auto | BorderStyle(bs)
     let outline_style = {
         use style::values::computed::OutlineStyle;
@@ -1438,6 +1450,11 @@ fn extract_outline(style: &ComputedValues) -> Outline {
         return Outline::default();
     }
 
+    let width = o.outline_width.0.to_f32_px();
+    if width <= 0.0 {
+        return Outline::default();
+    }
+
     // outline-color defaults to currentcolor per CSS spec
     let color = o
         .outline_color
@@ -1446,7 +1463,7 @@ fn extract_outline(style: &ComputedValues) -> Outline {
         .unwrap_or_else(|| abs_color_to_cg(&style.get_inherited_text().color));
 
     Outline {
-        width: o.outline_width.to_f32_px(),
+        width,
         color,
         style: outline_style,
         offset: o.outline_offset.to_f32_px(),
@@ -2182,7 +2199,7 @@ fn extract_clip_path(style: &ComputedValues) -> ClipPath {
                 }
             };
             let resolve_radius = |r: &GenericShapeRadius<
-                style::values::computed::NonNegativeLengthPercentage,
+                style::values::computed::LengthPercentage,
             >|
              -> ShapeRadius {
                 match r {

@@ -21,19 +21,19 @@ use std::mem;
 use std::rc::Rc;
 use std::sync::{Arc, OnceLock};
 use style::context::QuirksMode;
+use style::device::Device;
+use style::device::servo::FontMetricsProvider;
 use style::font_metrics::FontMetrics;
 use style::media_queries::MediaType;
 use style::properties::style_structs::Font;
 use style::properties::{self, LonghandId};
 use style::queries::values::PrefersColorScheme;
-use style::servo::media_queries::{Device, FontMetricsProvider};
 use style::servo_arc::Arc as ServoArc;
 use style::shared_lock::SharedRwLock;
 use style::stylist::Stylist;
 use style::values::computed::CSSPixelLength;
 use style::values::computed::Length;
-use style::values::computed::font::GenericFontFamily;
-use style::values::specified::font::QueryFontMetricsFlags;
+use style::values::computed::font::{GenericFontFamily, QueryFontMetricsFlags};
 use tendril::StrTendril;
 
 /// Options that control how a [`Tree`] is serialized back to HTML.

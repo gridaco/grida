@@ -11,20 +11,21 @@ use std::{
     io::{self, Cursor},
 };
 
-use atomic_refcell::AtomicRefCell;
 use html5ever::tendril::TendrilSink;
 use html5ever::{driver::ParseOpts, parse_document};
 use markup5ever::interface::tree_builder::{
     ElemName as ElemNameTrait, ElementFlags, NodeOrText, QuirksMode, TreeSink,
 };
 use markup5ever::{Attribute, LocalName, Namespace, QualName};
+use std::sync::OnceLock;
 use style::context::QuirksMode as StyleQuirksMode;
+use style::data::ElementDataWrapper;
 use style::properties::parse_style_attribute;
 use style::servo_arc::Arc;
 use style::stylesheets::{CssRuleType, UrlExtraData};
 use style::{
-    LocalName as StyleLocalName, Namespace as StyleNamespace, data::ElementData,
-    properties::PropertyDeclarationBlock, shared_lock::Locked, values::AtomIdent,
+    LocalName as StyleLocalName, Namespace as StyleNamespace, properties::PropertyDeclarationBlock,
+    shared_lock::Locked, values::AtomIdent,
 };
 use stylo_atoms::Atom as WeakAtom;
 use tendril::StrTendril;
@@ -96,8 +97,10 @@ pub struct DemoDom {
     document: NodeId,
     quirks_mode: QuirksMode,
     pub errors: Vec<String>,
-    /// Per-node slot for Stylo [`ElementData`] (only meaningful for elements).
-    pub(crate) element_data: Vec<AtomicRefCell<Option<ElementData>>>,
+    /// Per-node slot for Stylo [`ElementDataWrapper`] (only meaningful for
+    /// elements). Populated lazily the first time Stylo's traversal calls
+    /// `ensure_data` on the element.
+    pub(crate) element_data: Vec<OnceLock<ElementDataWrapper>>,
 }
 
 // SAFETY: The DOM is frozen after parsing; no mutable aliasing across threads.
@@ -130,7 +133,7 @@ impl DemoDom {
         &self.nodes[id.idx()]
     }
 
-    pub(crate) fn element_data_slot(&self, id: NodeId) -> &AtomicRefCell<Option<ElementData>> {
+    pub(crate) fn element_data_slot(&self, id: NodeId) -> &OnceLock<ElementDataWrapper> {
         &self.element_data[id.idx()]
     }
 
@@ -409,7 +412,7 @@ impl TreeSink for DemoDomBuilder {
             })
             .collect();
 
-        let element_data = nodes.iter().map(|_| AtomicRefCell::new(None)).collect();
+        let element_data = nodes.iter().map(|_| OnceLock::new()).collect();
 
         DemoDom {
             nodes,

@@ -52,6 +52,8 @@ mod cascade {
         StyleContext, StyleSystemOptions, ThreadLocalStyleContext,
     };
     use style::data::ElementStyles;
+    use style::device::Device;
+    use style::device::servo::FontMetricsProvider;
     use style::dom::TElement;
     use style::font_metrics::FontMetrics;
     use style::media_queries::{MediaList, MediaType};
@@ -59,7 +61,6 @@ mod cascade {
     use style::properties::style_structs::Font;
     use style::queries::values::PrefersColorScheme;
     use style::servo::animation::DocumentAnimationSet;
-    use style::servo::media_queries::{Device, FontMetricsProvider};
     use style::servo::selector_parser::SnapshotMap;
     use style::servo_arc::Arc as ServoArc;
     use style::shared_lock::{SharedRwLock, SharedRwLockReadGuard, StylesheetGuards};
@@ -69,9 +70,8 @@ mod cascade {
     use style::stylist::{RuleInclusion, Stylist};
     use style::traversal::resolve_style;
     use style::traversal_flags::TraversalFlags;
-    use style::values::computed::font::GenericFontFamily;
+    use style::values::computed::font::{GenericFontFamily, QueryFontMetricsFlags};
     use style::values::computed::{CSSPixelLength, Length};
-    use style::values::specified::font::QueryFontMetricsFlags;
     use style_traits::{CSSPixel, DevicePixel};
     use stylo_atoms::Atom;
     use url::Url;
@@ -127,15 +127,11 @@ body {
             }
         }
 
-        pub(crate) fn flush(&mut self, document: HtmlDocument) {
+        pub(crate) fn flush(&mut self, _document: HtmlDocument) {
             let guard = self.stylesheet_lock.read();
             let guards = StylesheetGuards::same(&guard);
             trace_dom!("cascade: flushing stylist");
-            let _ = self.stylist.flush::<HtmlElement>(
-                &guards,
-                document.root_element(),
-                Some(&self.snapshot_map),
-            );
+            let _ = self.stylist.flush(&guards);
         }
 
         pub(crate) fn style_document(&mut self, document: HtmlDocument) -> usize {
@@ -360,17 +356,15 @@ mod demo_dom {
         io::{self, Cursor},
     };
 
-    use atomic_refcell::AtomicRefCell;
     use html5ever::tendril::TendrilSink;
     use html5ever::{driver::ParseOpts, parse_document};
     use markup5ever::interface::tree_builder::{
         ElemName as ElemNameTrait, ElementFlags, NodeOrText, QuirksMode, TreeSink,
     };
     use markup5ever::{Attribute, LocalName, Namespace, QualName};
-    use style::{
-        LocalName as StyleLocalName, Namespace as StyleNamespace, data::ElementData,
-        values::AtomIdent,
-    };
+    use std::sync::OnceLock as StdOnceLock;
+    use style::data::ElementDataWrapper;
+    use style::{LocalName as StyleLocalName, Namespace as StyleNamespace, values::AtomIdent};
     use stylo_atoms::Atom as WeakAtom;
     use tendril::StrTendril;
 
@@ -426,7 +420,7 @@ mod demo_dom {
         document: NodeId,
         quirks_mode: QuirksMode,
         pub errors: Vec<String>,
-        element_data: Vec<AtomicRefCell<Option<ElementData>>>,
+        element_data: Vec<StdOnceLock<ElementDataWrapper>>,
     }
 
     unsafe impl Sync for DemoDom {}
@@ -461,7 +455,7 @@ mod demo_dom {
             &self.nodes[id.idx()]
         }
 
-        pub(crate) fn element_data_slot(&self, id: NodeId) -> &AtomicRefCell<Option<ElementData>> {
+        pub(crate) fn element_data_slot(&self, id: NodeId) -> &StdOnceLock<ElementDataWrapper> {
             &self.element_data[id.idx()]
         }
 
@@ -735,7 +729,7 @@ mod demo_dom {
                 })
                 .collect();
 
-            let element_data = nodes.iter().map(|_| AtomicRefCell::new(None)).collect();
+            let element_data = nodes.iter().map(|_| StdOnceLock::new()).collect();
 
             DemoDom {
                 nodes,
@@ -988,7 +982,6 @@ mod demo_dom {
 mod stylo_dom {
     use std::{borrow::Borrow, sync::OnceLock};
 
-    use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
     use euclid::default::Size2D;
     use markup5ever::{Attribute, Namespace as HtmlNamespace, ns};
     use selectors::attr::{AttrSelectorOperation, CaseSensitivity, NamespaceConstraint};
@@ -999,8 +992,8 @@ mod stylo_dom {
     use style::Namespace as StyleNamespace;
     use style::applicable_declarations::ApplicableDeclarationBlock;
     use style::context::SharedStyleContext;
-    use style::data::ElementData;
-    use style::dom::{LayoutIterator, OpaqueNode, TElement, TNode};
+    use style::data::{ElementDataMut, ElementDataRef, ElementDataWrapper};
+    use style::dom::{AttributeProvider, LayoutIterator, OpaqueNode, TElement, TNode};
     use style::properties::PropertyDeclarationBlock;
     use style::selector_parser::{
         AttrValue as SelectorAttrValue, Lang, PseudoElement, SelectorImpl,
@@ -1114,7 +1107,7 @@ mod stylo_dom {
             HtmlNode(self.0)
         }
 
-        fn data_slot(&self) -> &'static AtomicRefCell<Option<ElementData>> {
+        fn data_slot(&self) -> &'static std::sync::OnceLock<ElementDataWrapper> {
             dom().element_data_slot(self.0)
         }
 
@@ -1480,47 +1473,33 @@ mod stylo_dom {
             0
         }
 
-        unsafe fn ensure_data(&self) -> AtomicRefMut<'_, style::data::ElementData> {
+        unsafe fn ensure_data(&self) -> ElementDataMut<'_> {
             trace_dom!("TElement::ensure_data {:?}", self);
             let slot = self.data_slot();
-            let mut cell = slot.borrow_mut();
-            if cell.is_none() {
-                *cell = Some(ElementData::default());
-            }
-            AtomicRefMut::map(cell, |opt| opt.as_mut().unwrap())
+            slot.get_or_init(ElementDataWrapper::default).borrow_mut()
         }
 
         unsafe fn clear_data(&self) {
             trace_dom!("TElement::clear_data {:?}", self);
-            let slot = self.data_slot();
-            *slot.borrow_mut() = None;
+            // OnceLock-backed storage: we cannot reset the slot safely, and
+            // callers in the cascade driver never rely on clearing data between
+            // passes. Leaving the entry in place matches Stylo's Gecko backend,
+            // which also reuses the allocation.
         }
 
         fn has_data(&self) -> bool {
             trace_dom!("TElement::has_data {:?}", self);
-            self.data_slot().borrow().is_some()
+            self.data_slot().get().is_some()
         }
 
-        fn borrow_data(&self) -> Option<AtomicRef<'_, style::data::ElementData>> {
+        fn borrow_data(&self) -> Option<ElementDataRef<'_>> {
             trace_dom!("TElement::borrow_data {:?}", self);
-            let slot = self.data_slot();
-            let cell = slot.borrow();
-            if cell.is_some() {
-                Some(AtomicRef::map(cell, |opt| opt.as_ref().unwrap()))
-            } else {
-                None
-            }
+            self.data_slot().get().map(|w| w.borrow())
         }
 
-        fn mutate_data(&self) -> Option<AtomicRefMut<'_, style::data::ElementData>> {
+        fn mutate_data(&self) -> Option<ElementDataMut<'_>> {
             trace_dom!("TElement::mutate_data {:?}", self);
-            let slot = self.data_slot();
-            let cell = slot.borrow_mut();
-            if cell.is_some() {
-                Some(AtomicRefMut::map(cell, |opt| opt.as_mut().unwrap()))
-            } else {
-                None
-            }
+            self.data_slot().get().map(|w| w.borrow_mut())
         }
 
         fn skip_item_display_fixup(&self) -> bool {
@@ -1623,6 +1602,19 @@ mod stylo_dom {
         fn relative_selector_search_direction(&self) -> ElementSelectorFlags {
             trace_dom!("TElement::relative_selector_search_direction {:?}", self);
             ElementSelectorFlags::empty()
+        }
+    }
+
+    impl AttributeProvider for HtmlElement {
+        fn get_attr(&self, attr: &style::LocalName, namespace: &StyleNamespace) -> Option<String> {
+            self.attr_iter()
+                .filter(|(a, _)| {
+                    let dom_ns: &str = &a.name.ns;
+                    let sel_ns: &str = namespace.as_ref();
+                    dom_ns == sel_ns
+                })
+                .find(|(_, stored)| *stored == attr)
+                .map(|(a, _)| a.value.to_string())
         }
     }
 

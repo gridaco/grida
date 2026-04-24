@@ -687,7 +687,7 @@ dependencies = [
  "serde_json",
  "skia-safe",
  "stylo",
- "stylo_config",
+ "stylo_static_prefs",
  "taffy",
  "tokio",
  "unicode-segmentation",
@@ -2543,12 +2543,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "matches"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
-
-[[package]]
 name = "math2"
 version = "0.0.2"
 dependencies = [
@@ -4079,8 +4073,9 @@ dependencies = [
 
 [[package]]
 name = "selectors"
-version = "0.33.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cfaaa6035167f0e604e42723c7650d59ee269ef220d7bbe0565602c8a0173b9"
 dependencies = [
  "bitflags 2.9.1",
  "cssparser",
@@ -4189,7 +4184,8 @@ dependencies = [
 [[package]]
 name = "servo_arc"
 version = "0.4.3"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "170fb83ab34de17dc69aa7c67482b22218ddb85da56546f9bd6b929e32a05930"
 dependencies = [
  "serde",
  "stable_deref_trait",
@@ -4409,9 +4405,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
+
+[[package]]
+name = "strum_macros"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
+
+[[package]]
 name = "stylo"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf16d4d7f37038ec5d0eb0289045a5d797b1b85d3366d6d2bfaf1f9a55471739"
 dependencies = [
  "app_units",
  "arrayvec",
@@ -4426,10 +4441,8 @@ dependencies = [
  "indexmap",
  "itertools 0.14.0",
  "itoa",
- "lazy_static",
  "log",
  "malloc_size_of_derive",
- "matches",
  "mime",
  "new_debug_unreachable",
  "num-derive",
@@ -4448,8 +4461,9 @@ dependencies = [
  "smallvec",
  "static_assertions",
  "string_cache",
+ "strum",
+ "strum_macros",
  "stylo_atoms",
- "stylo_config",
  "stylo_derive",
  "stylo_dom",
  "stylo_malloc_size_of",
@@ -4467,22 +4481,19 @@ dependencies = [
 
 [[package]]
 name = "stylo_atoms"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0ccc231ff982eb5e89a9670275046b1283f1218537e1e498e4fafd41ee78c7e"
 dependencies = [
  "string_cache",
  "string_cache_codegen",
 ]
 
 [[package]]
-name = "stylo_config"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
-
-[[package]]
 name = "stylo_derive"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e23de306a4574a16fabcdac5d711af99a458a96a7a1d5d6aeb6c312c1a18c22a"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -4493,8 +4504,9 @@ dependencies = [
 
 [[package]]
 name = "stylo_dom"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b09f4863058955f38d5fee5ae04baa60b2f71735ef406ad35cb01911dfc811d"
 dependencies = [
  "bitflags 2.9.1",
  "stylo_malloc_size_of",
@@ -4502,8 +4514,9 @@ dependencies = [
 
 [[package]]
 name = "stylo_malloc_size_of"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bcb103ab4c0ec6fe0cdd71d092d6bd82a5a012489ccf4c4bd1874a659423316"
 dependencies = [
  "app_units",
  "cssparser",
@@ -4519,13 +4532,15 @@ dependencies = [
 
 [[package]]
 name = "stylo_static_prefs"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fe8c72f25bcf5b076b1ad183eaaaf1f2e30cb244d77a74e2b4631c41254f768"
 
 [[package]]
 name = "stylo_traits"
-version = "0.9.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "765956b903dbc474540399789062c4a4fcdf3a55d41c4e7919f5e78fc234e30c"
 dependencies = [
  "app_units",
  "bitflags 2.9.1",
@@ -4811,7 +4826,8 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "to_shmem"
 version = "0.3.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eab187810ca1e6aaa4c97a06492aac9ade2ffae6a301fd2aac103656f5a69edb"
 dependencies = [
  "cssparser",
  "servo_arc",
@@ -4824,7 +4840,8 @@ dependencies = [
 [[package]]
 name = "to_shmem_derive"
 version = "0.1.0"
-source = "git+https://github.com/gridaco/stylo#ae78004b3056c90b66dbba4d92edc0edbc24bc49"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ba1f5563024b63bb6acb4558452d9ba737518c1d11fcc1861febe98d1e31cf4"
 dependencies = [
  "darling",
  "proc-macro2",

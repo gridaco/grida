@@ -16,6 +16,8 @@ use style::context::{
     RegisteredSpeculativePainter, RegisteredSpeculativePainters, SharedStyleContext, StyleContext,
     StyleSystemOptions, ThreadLocalStyleContext,
 };
+use style::device::Device;
+use style::device::servo::FontMetricsProvider;
 use style::dom::TElement;
 use style::font_metrics::FontMetrics;
 use style::media_queries::{MediaList, MediaType};
@@ -23,7 +25,6 @@ use style::properties::ComputedValues;
 use style::properties::style_structs::Font;
 use style::queries::values::PrefersColorScheme;
 use style::servo::animation::DocumentAnimationSet;
-use style::servo::media_queries::{Device, FontMetricsProvider};
 use style::servo::selector_parser::SnapshotMap;
 use style::servo_arc::Arc as ServoArc;
 use style::shared_lock::{SharedRwLock, SharedRwLockReadGuard, StylesheetGuards};
@@ -31,9 +32,8 @@ use style::stylesheets::{AllowImportRules, DocumentStyleSheet, Origin, Styleshee
 use style::stylist::{RuleInclusion, Stylist};
 use style::traversal::resolve_style;
 use style::traversal_flags::TraversalFlags;
-use style::values::computed::font::GenericFontFamily;
+use style::values::computed::font::{GenericFontFamily, QueryFontMetricsFlags};
 use style::values::computed::{CSSPixelLength, Length};
-use style::values::specified::font::QueryFontMetricsFlags;
 use style_traits::{CSSPixel, DevicePixel};
 use stylo_atoms::Atom;
 use url::Url;
@@ -199,14 +199,10 @@ impl CascadeDriver {
     }
 
     /// Flush the stylist so it picks up all appended sheets.
-    pub fn flush(&mut self, document: HtmlDocument) {
+    pub fn flush(&mut self, _document: HtmlDocument) {
         let guard = self.stylesheet_lock.read();
         let guards = StylesheetGuards::same(&guard);
-        let _ = self.stylist.flush::<HtmlElement>(
-            &guards,
-            document.root_element(),
-            Some(&self.snapshot_map),
-        );
+        let _ = self.stylist.flush(&guards);
     }
 
     /// Resolve styles for every element under `document`.
