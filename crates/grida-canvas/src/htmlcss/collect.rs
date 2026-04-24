@@ -432,8 +432,16 @@ fn collect_element_with_counter(
 
                     // Widgets with intrinsic sizes need their own Taffy node
                     // for sizing to work — don't flatten them into inline groups.
-                    let is_inline = child.display == types::Display::Inline
-                        || child.display == types::Display::InlineBlock;
+                    // Same for inline-block with explicit sizing: its width/height
+                    // would be lost inside the inline path. Layout later emulates
+                    // inline-block flow by mapping the parent to Taffy flex-wrap
+                    // when all of its element children are inline-block.
+                    let inline_block_with_size = child.display == types::Display::InlineBlock
+                        && (child.width != types::CssLength::Auto
+                            || child.height != types::CssLength::Auto);
+                    let is_inline = (child.display == types::Display::Inline
+                        || child.display == types::Display::InlineBlock)
+                        && !inline_block_with_size;
                     if is_inline && !child.widget.is_widget() && child.replaced.is_none() {
                         collect_inline_items(&child, &mut pending_inline);
                     } else {
