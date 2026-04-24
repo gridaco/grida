@@ -8,7 +8,9 @@ on:
     paths:
       - ".github/workflows/**"
       - "Cargo.lock"
+      - "Cargo.toml"
       - "crates/**"
+      - "third_party/**"
       - "rust-toolchain.toml"
 
 concurrency:
