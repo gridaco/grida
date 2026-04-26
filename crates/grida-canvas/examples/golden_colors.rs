@@ -1,12 +1,12 @@
 use cg::cg::prelude::*;
-use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Rect};
+use skia_safe::{Color, Font, Paint, Rect};
+
+mod dev_kit;
 
 fn main() {
-    // Create a surface to draw on
     let (width, height) = (1000, 1000);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Tailwind color palettes
     let tailwind_colors = [
@@ -132,10 +132,7 @@ fn main() {
     let start_y = 100.0;
     let corner_radius = 8.0;
 
-    // Load Geist font
-    let font_data = cg::embedded_fonts::geist::BYTES;
-    let font_mgr = FontMgr::new();
-    let typeface = font_mgr.new_from_data(font_data, None).unwrap();
+    let typeface = dev_kit::geist_typeface();
 
     // Draw column headers (shade labels)
     let mut header_paint = Paint::default();
@@ -225,14 +222,5 @@ fn main() {
         &title_paint,
     );
 
-    // Save the result to a PNG file
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/colors.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "colors");
 }
