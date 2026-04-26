@@ -1,12 +1,12 @@
 use skia_safe::{color_filters, image_filters, ColorMatrix};
-use skia_safe::{surfaces, BlendMode, Color, Paint, Rect};
+use skia_safe::{BlendMode, Color, Paint, Rect};
+
+mod dev_kit;
 
 fn main() {
     // Output size
-    let size = (200, 200);
-    let mut surface = surfaces::raster_n32_premul(size).expect("surface");
+    let mut surface = dev_kit::raster_surface(200, 200, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Draw base rectangle
     let rect = Rect::from_xywh(40.0, 40.0, 120.0, 120.0);
@@ -55,13 +55,5 @@ fn main() {
     canvas.restore();
 
     // Save result
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/inner_shadow.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "inner_shadow");
 }

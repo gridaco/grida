@@ -1,5 +1,7 @@
 use cg::shape::*;
-use skia_safe::{surfaces, Color, Paint};
+use skia_safe::{Color, Paint};
+
+mod dev_kit;
 
 fn main() {
     let shape = EllipticalRingSectorShape {
@@ -12,9 +14,8 @@ fn main() {
     };
 
     let mut surface =
-        surfaces::raster_n32_premul((shape.width as i32, shape.height as i32)).expect("surface");
+        dev_kit::raster_surface(shape.width as i32, shape.height as i32, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let path = build_ring_sector_path(&shape);
 
@@ -23,13 +24,5 @@ fn main() {
     paint.set_color(Color::BLUE);
     canvas.draw_path(&path, &paint);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/arc.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "arc");
 }

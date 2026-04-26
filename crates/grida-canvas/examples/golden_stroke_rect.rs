@@ -8,28 +8,21 @@
 use cg::cg::prelude::*;
 use cg::painter::paint::shader_from_paint;
 use cg::shape::stroke_rect::stroke_geometry_rectangular;
-use skia_safe::{surfaces, Canvas, Color, EncodedImageFormat, Paint, PaintStyle, Rect};
+use skia_safe::{Canvas, Color, Paint, PaintStyle, Rect};
+
+mod dev_kit;
 
 fn main() {
     // Canvas setup - larger to fit all 3 alignment demos
     let width = 1400;
     let height = 600;
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
-
-    // Clear background
-    surface.canvas().clear(Color::WHITE);
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
 
     // Draw stroke alignment comparison demos
     draw_stroke_alignment_demos(surface.canvas());
 
     // Save output
-    let image = surface.image_snapshot();
-    let data = image.encode(None, EncodedImageFormat::PNG, None).unwrap();
-    std::fs::write(
-        "crates/grida-canvas/goldens/stroke_rect.png",
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "stroke_rect");
     println!("Saved crates/grida-canvas/goldens/stroke_rect.png");
 }
 

@@ -18,18 +18,17 @@
 //! This is the solution to the pyramid blur optimization problem!
 
 use skia_safe::{
-    self as sk, image_filters,
+    image_filters,
     runtime_effect::{ChildPtr, RuntimeEffect},
     surfaces, Color, Data, Image, Paint, Rect, Shader, TileMode,
 };
 
+mod dev_kit;
+
 fn main() {
     let (width, height) = (400, 400);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::BLACK);
     let canvas = surface.canvas();
-
-    // Draw background
-    canvas.clear(Color::BLACK);
 
     // Create a simple test image (blue rectangle)
     let mut test_surface = surfaces::raster_n32_premul((width, height)).expect("test surface");
@@ -150,18 +149,7 @@ fn main() {
     );
 
     // Save result
-    let image_snapshot = surface.image_snapshot();
-    let data = image_snapshot
-        .encode(None, sk::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/progressive_blur_pyramid.png"
-        ),
-        data.as_bytes(),
-    )
-    .expect("write file");
+    dev_kit::save_golden(&mut surface, "progressive_blur_pyramid");
 }
 
 /// Helper: Create a blurred shader from an image

@@ -2,7 +2,9 @@ use skia_safe::textlayout::{
     FontCollection, ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TextStyle,
     TypefaceFontProvider,
 };
-use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Point};
+use skia_safe::{Color, Font, FontMgr, Paint, Point};
+
+mod dev_kit;
 
 const NOTO_SANS: &[u8] =
     include_bytes!("../../../fixtures/fonts/Noto_Sans/NotoSans-VariableFont_wdth,wght.ttf");
@@ -74,9 +76,8 @@ fn draw_paragraph(
 }
 
 fn main() {
-    let mut surface = surfaces::raster_n32_premul((1200, 1400)).unwrap();
+    let mut surface = dev_kit::raster_surface(1200, 1400, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
@@ -267,18 +268,7 @@ fn main() {
         &paint,
     );
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/golden_type_font_fallback_script.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "golden_type_font_fallback_script");
 
     println!("Generated golden_type_font_fallback_script.png");
     println!("This demo shows how to disable system fonts in Skia by not calling set_default_font_manager()");

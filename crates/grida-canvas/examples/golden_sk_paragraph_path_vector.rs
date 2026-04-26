@@ -17,7 +17,6 @@ use cg::vectornetwork::{StrokeOptions, VNPainter, VectorNetwork};
 use skia_safe::{
     self as sk,
     font_style::{Slant, Weight, Width},
-    surfaces,
     textlayout::{
         FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, TextAlign, TextStyle,
         TypefaceFontProvider,
@@ -25,9 +24,11 @@ use skia_safe::{
     Color, Data, FontMgr, Matrix, Path, PathBuilder, Point,
 };
 
+mod dev_kit;
+
 fn main() {
     let (width, height) = (1440, 1600);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::TRANSPARENT);
     let canvas = surface.canvas();
 
     // Create a subtle gradient background
@@ -47,18 +48,7 @@ fn main() {
     let y_offset = scenario_multiscript(canvas, y_offset);
     let _y_offset = scenario_variable_fonts(canvas, y_offset);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, sk::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/sk_paragraph_path_vector.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_paragraph_path_vector");
 }
 
 fn draw_title_and_description(canvas: &sk::Canvas) {

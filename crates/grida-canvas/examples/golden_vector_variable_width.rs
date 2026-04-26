@@ -1,7 +1,9 @@
 use cg::cg::prelude::*;
 use cg::vectornetwork::vn::{PiecewiseVectorNetworkGeometry, VectorNetworkSegment};
 use cg::vectornetwork::vn_painter::VNPainter;
-use skia_safe::{surfaces, Color};
+use skia_safe::Color;
+
+mod dev_kit;
 
 fn main() {
     // Define the variable width profile
@@ -151,9 +153,8 @@ fn main() {
     .expect("Valid geometry");
 
     // Render using VNPainter with direct variable width stroke
-    let mut surface = surfaces::raster_n32_premul((2550, 3300)).expect("surface");
+    let mut surface = dev_kit::raster_surface(2550, 3300, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let painter = VNPainter::new(canvas);
     painter.draw_stroke_variable_width(&curve_1, &[Paint::from(CGColor::BLACK)], &width_profile_1);
@@ -162,16 +163,5 @@ fn main() {
     painter.draw_stroke_variable_width(&curve_4, &[Paint::from(CGColor::BLACK)], &curve_4_profile);
     painter.draw_stroke_variable_width(&curve_5, &[Paint::from(CGColor::BLACK)], &curve_5_profile);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/vector_variable_width.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "vector_variable_width");
 }

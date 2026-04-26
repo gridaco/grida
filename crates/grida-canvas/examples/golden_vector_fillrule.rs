@@ -1,6 +1,8 @@
 use cg::cg::prelude::*;
 use cg::vectornetwork::*;
-use skia_safe::{surfaces, Color, Paint, PaintStyle};
+use skia_safe::{Color, Paint, PaintStyle};
+
+mod dev_kit;
 
 fn main() {
     // Helper to create a segment without tangents
@@ -56,9 +58,8 @@ fn main() {
     let mut network_evenodd = network.clone();
     network_evenodd.regions[0].fill_rule = FillRule::EvenOdd;
 
-    let mut surface = surfaces::raster_n32_premul((400, 200)).expect("surface");
+    let mut surface = dev_kit::raster_surface(400, 200, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let mut fill_paint = Paint::default();
     fill_paint.set_anti_alias(true);
@@ -76,13 +77,5 @@ fn main() {
         canvas.draw_path(&path, &fill_paint);
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_fillrule.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "vector_fillrule");
 }

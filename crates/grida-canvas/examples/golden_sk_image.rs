@@ -37,8 +37,10 @@ use skia_safe::{
     SamplingOptions, TileMode,
 };
 
+mod dev_kit;
+
 thread_local! {
-    static FONT: Font = Font::new(cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES), 12.0);
+    static FONT: Font = Font::new(dev_kit::geistmono_typeface(), 12.0);
 }
 
 fn main() {
@@ -50,9 +52,8 @@ fn main() {
     let total_width = (padding * 2.0 + tile * 2.0 + column_gap) as i32;
     let total_height = (padding * 2.0 + tile + label_height + label_gap) as i32;
 
-    let mut surface = surfaces::raster_n32_premul((total_width, total_height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(total_width, total_height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Calculate center positions for both images
     let center_y = padding + tile / 2.0;
@@ -99,15 +100,7 @@ fn main() {
     draw_centered_label(canvas, right_center_x, label_y, "Shader");
 
     // save png
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/sk_image.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_image");
 }
 
 fn draw_centered_label(canvas: &sk::Canvas, center_x: f32, y: f32, text: &str) {

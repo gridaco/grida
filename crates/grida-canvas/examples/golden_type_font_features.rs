@@ -4,13 +4,14 @@ use skia_safe::textlayout::{
     FontCollection, ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection,
     TypefaceFontProvider,
 };
-use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
+use skia_safe::{Color, FontMgr, Paint, Point};
+
+mod dev_kit;
 
 fn main() {
     // Create a larger surface to accommodate all the font feature demonstrations
-    let mut surface = surfaces::raster_n32_premul((1400, 2000)).unwrap();
+    let mut surface = dev_kit::raster_surface(1400, 2000, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
@@ -18,9 +19,7 @@ fn main() {
 
     // Load the Geist variable font which has excellent OpenType feature support
     let font_mgr = FontMgr::new();
-    let geist_typeface = font_mgr
-        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
-        .unwrap();
+    let geist_typeface = dev_kit::geist_typeface();
 
     let mut paragraph_style = ParagraphStyle::new();
     paragraph_style.set_text_direction(TextDirection::LTR);
@@ -426,16 +425,5 @@ fn main() {
     paragraph.layout(1360.0);
     paragraph.paint(canvas, Point::new(20.0, 40.0));
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/type_font_features.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "type_font_features");
 }

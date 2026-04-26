@@ -1,6 +1,8 @@
 use cg::cg::prelude::*;
 use cg::vectornetwork::*;
-use skia_safe::{surfaces, Color};
+use skia_safe::Color;
+
+mod dev_kit;
 
 fn main() {
     // Create a vector network with four separate rectangles forming a Microsoft logo,
@@ -97,23 +99,11 @@ fn main() {
         ],
     };
 
-    let mut surface = surfaces::raster_n32_premul((500, 500)).expect("surface");
+    let mut surface = dev_kit::raster_surface(500, 500, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let painter = VNPainter::new(canvas);
     painter.draw(&network, &[], None, 0.0);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/vector_regions_fills.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "vector_regions_fills");
 }

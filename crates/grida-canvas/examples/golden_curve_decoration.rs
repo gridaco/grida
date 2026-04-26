@@ -20,10 +20,11 @@
 //! Intentionally **not** modularized — raw Skia exploration code.
 
 use skia_safe::{
-    surfaces, Canvas, Color, EncodedImageFormat, Paint, PaintCap, PaintStyle, Path, PathBuilder,
-    PathMeasure, Point,
+    Canvas, Color, Paint, PaintCap, PaintStyle, Path, PathBuilder, PathMeasure, Point,
 };
 use std::f32::consts::PI;
+
+mod dev_kit;
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -38,14 +39,10 @@ const STROKE_W: f32 = 2.5;
 const M: f32 = 12.0; // marker base size
 
 fn main() {
-    let mut surface = surfaces::raster_n32_premul((W, H)).expect("surface");
+    let mut surface = dev_kit::raster_surface(W, H, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
-    let font = skia_safe::Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        12.0,
-    );
+    let font = skia_safe::Font::new(dev_kit::geistmono_typeface(), 12.0);
     let lp = text_paint();
 
     // Column headers
@@ -92,15 +89,7 @@ fn main() {
     }
 
     // Save
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/curve_decoration.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "curve_decoration");
     println!("Saved goldens/curve_decoration.png");
 }
 

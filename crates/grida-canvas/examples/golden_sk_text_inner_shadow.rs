@@ -20,18 +20,19 @@
 //! - Multiple inner shadows
 
 use cg::cg::prelude::*;
-use skia_safe::{self as sk, surfaces, Color, Font, Paint as SkPaint, Point};
+use skia_safe::{self as sk, Color, Font, Paint as SkPaint, Point};
+
+mod dev_kit;
 
 thread_local! {
-    static FONT: Font = Font::new(cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES), 48.0);
+    static FONT: Font = Font::new(dev_kit::geistmono_typeface(), 48.0);
 }
 
 fn main() {
     let width = 800;
     let height = 400;
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Example 1: Simple inner shadow
     let shadow1 = FeShadow {
@@ -74,18 +75,7 @@ fn main() {
     ); // Orange text
 
     // save png
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/sk_text_inner_shadow.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_text_inner_shadow");
 }
 
 fn draw_text_with_inner_shadow(

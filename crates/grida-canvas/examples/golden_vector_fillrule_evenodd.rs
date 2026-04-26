@@ -1,5 +1,7 @@
 use cg::vectornetwork::*;
-use skia_safe::{surfaces, Color, Paint};
+use skia_safe::{Color, Paint};
+
+mod dev_kit;
 
 fn main() {
     // Create a VectorNetwork with 4 overlapping rectangles forming a "+" shape
@@ -38,9 +40,8 @@ fn main() {
         VectorNetworkSegment::ab(a, b)
     }
 
-    let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
+    let mut surface = dev_kit::raster_surface(400, 400, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Convert VectorNetwork to a single Skia Path and apply even-odd fill rule
     let mut path = network.to_appended_path();
@@ -52,16 +53,5 @@ fn main() {
     fill_paint.set_style(skia_safe::PaintStyle::Fill);
     canvas.draw_path(&path, &fill_paint);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/vector_fillrule_evenodd.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "vector_fillrule_evenodd");
 }

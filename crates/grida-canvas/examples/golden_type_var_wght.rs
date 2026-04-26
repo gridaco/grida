@@ -1,29 +1,19 @@
 use cg::cg::prelude::*;
 use cg::text::text_style::textstyle;
-use skia_safe::textlayout::FontCollection;
-use skia_safe::textlayout::{
-    ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TypefaceFontProvider,
-};
-use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
+use skia_safe::textlayout::{ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection};
+use skia_safe::{Color, Paint, Point};
+
+mod dev_kit;
 
 fn main() {
     // Create a surface to accommodate all the weight rows
-    let mut surface = surfaces::raster_n32_premul((1200, 2000)).unwrap();
+    let mut surface = dev_kit::raster_surface(1200, 2000, Color::WHITE);
     let canvas = surface.canvas();
-
-    // Clear the canvas with white background
-    canvas.clear(Color::WHITE);
 
     // Create a paint for text
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
     paint.set_color(Color::BLACK);
-
-    // Load the Geist variable font
-    let font_mgr = FontMgr::new();
-    let base_typeface = font_mgr
-        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
-        .unwrap();
 
     // Define the weights we want to demonstrate (100 to 1000 in 25-step increments)
     let weights = vec![
@@ -38,11 +28,7 @@ fn main() {
     paragraph_style.set_text_align(TextAlign::Left);
 
     // Create a font collection and add the variable font
-    let mut font_collection = FontCollection::new();
-    let mut provider = TypefaceFontProvider::new();
-    provider.register_typeface(base_typeface.clone(), Some("Geist"));
-    font_collection.set_asset_font_manager(Some(provider.into()));
-    font_collection.set_default_font_manager(font_mgr.clone(), None);
+    let font_collection = dev_kit::default_font_collection();
 
     // Simple row layout parameters
     let start_x = 80.0;
@@ -126,16 +112,7 @@ fn main() {
     }
 
     // Save the result to a PNG file
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    let bytes = data.as_bytes();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/type_var_wght.png"),
-        bytes,
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "type_var_wght");
 
     println!("Variable font weight demo saved to goldens/type_var_wght.png");
 }

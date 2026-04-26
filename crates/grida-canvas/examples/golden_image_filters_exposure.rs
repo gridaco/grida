@@ -21,14 +21,15 @@ use cg::cg::types::ImageFilters;
 use cg::painter::image_filters;
 use skia_safe::{self as sk, surfaces, Color, Data, Font, Image, Paint as SkPaint, Point, Rect};
 
+mod dev_kit;
+
 thread_local! {
-    static FONT: Font = Font::new(cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES), 12.0);
+    static FONT: Font = Font::new(dev_kit::geistmono_typeface(), 12.0);
 }
 
 fn main() {
-    let mut surface = surfaces::raster_n32_premul((2000, 1200)).expect("Failed to create surface");
+    let mut surface = dev_kit::raster_surface(2000, 1200, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Test images for each row
     let images = [
@@ -99,18 +100,7 @@ fn main() {
     }
 
     // Save PNG
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/image_filters_exposure.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "image_filters_exposure");
 }
 
 fn draw_centered_label(canvas: &sk::Canvas, center_x: f32, y: f32, text: &str) {

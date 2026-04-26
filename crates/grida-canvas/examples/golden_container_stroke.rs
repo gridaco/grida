@@ -6,6 +6,8 @@ use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer};
 use math2::{rect::Rectangle, transform::AffineTransform};
 
+mod dev_kit;
+
 async fn scene() -> Scene {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
@@ -62,15 +64,7 @@ async fn main() {
     let canvas = surface.canvas();
     renderer.render_to_canvas(canvas, width, height);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/container_stroke.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(surface, "container_stroke");
 
     renderer.free();
 }

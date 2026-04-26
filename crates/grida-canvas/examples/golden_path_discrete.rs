@@ -1,13 +1,14 @@
-use skia_safe::{path_effect::PathEffect, surfaces, Color, Paint, PaintStyle, Path};
+use skia_safe::{path_effect::PathEffect, Color, Paint, PaintStyle, Path};
+
+mod dev_kit;
 
 fn main() {
     // Create a circle path
     let path = Path::circle((200.0, 200.0), 100.0, None);
 
     // Prepare a surface and clear with white background
-    let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
+    let mut surface = dev_kit::raster_surface(400, 400, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Paint with stroke style and apply discrete path effect
     let mut paint = Paint::default();
@@ -21,14 +22,5 @@ fn main() {
     canvas.draw_path(&path, &paint);
 
     // Write to golden file
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::create_dir_all("goldens").unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/path_discrete.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "path_discrete");
 }

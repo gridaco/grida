@@ -16,10 +16,11 @@
 use cg::cg::StrokeMarkerPreset;
 use cg::shape::marker::{self, BuiltinMarker, MarkerAnchor};
 use skia_safe::{
-    surfaces, Canvas, Color, EncodedImageFormat, Paint, PaintCap, PaintStyle, Path, PathBuilder,
-    PathMeasure, Point,
+    Canvas, Color, Paint, PaintCap, PaintStyle, Path, PathBuilder, PathMeasure, Point,
 };
 use std::f32::consts::PI;
+
+mod dev_kit;
 
 const W: i32 = 1100;
 const H: i32 = 1600;
@@ -31,18 +32,11 @@ const TOP: f32 = 70.0;
 const ROW_H: f32 = 90.0;
 
 fn main() {
-    let mut surface = surfaces::raster_n32_premul((W, H)).expect("surface");
+    let mut surface = dev_kit::raster_surface(W, H, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
-    let font = skia_safe::Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        12.0,
-    );
-    let small_font = skia_safe::Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        11.0,
-    );
+    let font = skia_safe::Font::new(dev_kit::geistmono_typeface(), 12.0);
+    let small_font = skia_safe::Font::new(dev_kit::geistmono_typeface(), 11.0);
     let lp = label_paint();
     let sp = section_paint();
     let gp = guide_paint();
@@ -341,13 +335,8 @@ fn main() {
     }
 
     // Save
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, EncodedImageFormat::PNG, None)
-        .expect("encode");
-    let out = concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/stroke_decoration.png");
-    std::fs::write(out, data.as_bytes()).unwrap();
-    println!("Saved {}", out);
+    dev_kit::save_golden(&mut surface, "stroke_decoration");
+    println!("Saved goldens/stroke_decoration.png");
 }
 
 // ===========================================================================

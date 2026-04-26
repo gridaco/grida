@@ -1,13 +1,14 @@
 use cg::cg::prelude::*;
 use cg::painter::gradient::*;
 use math2::transform::AffineTransform;
-use skia_safe::{surfaces, Color, Rect};
+use skia_safe::{Color, Rect};
+
+mod dev_kit;
 
 fn main() {
     let (width, height) = (400, 400);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let gradient = SweepGradientPaint {
         stops: vec![
@@ -37,13 +38,5 @@ fn main() {
         &paint,
     );
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/gradient_sweep.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "gradient_sweep");
 }

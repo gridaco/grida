@@ -4,7 +4,8 @@ use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer, RendererOptions};
 use cg::svg::pack;
 use math2::rect::Rectangle;
-use skia_safe::EncodedImageFormat;
+
+mod dev_kit;
 
 const LINEAR_SVG_BYTES: &[u8] =
     include_bytes!("../../../fixtures/test-svg/L0/paint-linear-gradient-01.svg");
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         200.0,
         200.0,
-        "goldens/svg_linear_gradient.png",
+        "svg_linear_gradient",
     )?;
     render_scene(
         scene_from_svg(
@@ -30,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         200.0,
         200.0,
-        "goldens/svg_radial_gradient.png",
+        "svg_radial_gradient",
     )?;
     println!("✅ Wrote svg gradient goldens");
     Ok(())
@@ -50,7 +51,7 @@ fn render_scene(
     scene: Scene,
     width: f32,
     height: f32,
-    output: &str,
+    name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut renderer = Renderer::new_with_options(
         Backend::new_from_raster(width as i32, height as i32),
@@ -67,14 +68,7 @@ fn render_scene(
     let canvas = surface.canvas();
     renderer.render_to_canvas(canvas, width, height);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, EncodedImageFormat::PNG, None)
-        .ok_or_else(|| "failed to encode png".to_string())?;
-    std::fs::write(
-        format!("{}/{}", env!("CARGO_MANIFEST_DIR"), output),
-        data.as_bytes(),
-    )?;
+    dev_kit::save_golden(surface, name);
 
     renderer.free();
     Ok(())

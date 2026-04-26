@@ -17,7 +17,9 @@ use cg::runtime::{
     render_policy::RenderPolicy,
     scene::{Backend, FrameFlushResult, Renderer, RendererOptions},
 };
-use skia_safe::{surfaces, Color, Font, Paint as SkPaint, Rect};
+use skia_safe::{Color, Font, Paint as SkPaint, Rect};
+
+mod dev_kit;
 
 fn build_scene() -> Scene {
     let nf = NodeFactory::new();
@@ -127,9 +129,8 @@ fn main() {
     let out_w = (normal.width() as f32 * 2.0 + padding * 3.0) as i32;
     let out_h = (normal.height() as f32 + padding * 2.0 + label_h) as i32;
 
-    let mut surface = surfaces::raster_n32_premul((out_w, out_h)).expect("surface");
+    let mut surface = dev_kit::raster_surface(out_w, out_h, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let left_x = padding;
     let top_y = padding + label_h;
@@ -140,10 +141,7 @@ fn main() {
     canvas.draw_image(&outline, (right_x, top_y), None);
 
     // Labels
-    let font = Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        12.0,
-    );
+    let font = Font::new(dev_kit::geistmono_typeface(), 12.0);
     let mut paint = SkPaint::default();
     paint.set_color(Color::BLACK);
     paint.set_anti_alias(true);
@@ -169,13 +167,5 @@ fn main() {
         &border,
     );
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/outline_mode.png"),
-        data.as_bytes(),
-    )
-    .expect("write png");
+    dev_kit::save_golden(&mut surface, "outline_mode");
 }

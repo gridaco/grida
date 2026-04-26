@@ -1,7 +1,9 @@
 use cg::cg::prelude::*;
 use cg::painter::effects_noise;
 use cg::painter::geometry::PainterShape;
-use skia_safe::{self as sk, surfaces, Color, Paint, Rect};
+use skia_safe::{self as sk, Color, Paint, Rect};
+
+mod dev_kit;
 
 fn main() {
     let (width, height) = (400, 400);
@@ -53,10 +55,9 @@ fn main() {
     ];
 
     for (effect, name) in effects.iter() {
-        let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+        let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
         {
             let canvas = surface.canvas();
-            canvas.clear(Color::WHITE);
 
             // light bg
             let mut bg = Paint::default();
@@ -80,16 +81,8 @@ fn main() {
         }
 
         // save PNG
-        let image = surface.image_snapshot();
-        let data = image
-            .encode(None, sk::EncodedImageFormat::PNG, None)
-            .expect("encode png");
-        let png_path = format!(
-            "{}/goldens/fe_noise_{}.png",
-            env!("CARGO_MANIFEST_DIR"),
-            name
-        );
-        std::fs::write(&png_path, data.as_bytes()).unwrap();
+        let golden_name = format!("fe_noise_{}", name);
+        dev_kit::save_golden(&mut surface, &golden_name);
         println!("✓ Saved PNG: goldens/fe_noise_{}.png", name);
     }
 }

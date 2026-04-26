@@ -1,6 +1,8 @@
 use cg::cg::*;
 use cg::shape::*;
-use skia_safe::{surfaces, Color, Paint};
+use skia_safe::{Color, Paint};
+
+mod dev_kit;
 
 fn main() {
     // Create a regular pentagon
@@ -22,9 +24,8 @@ fn main() {
         corner_radius: 32.0,
     };
 
-    let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
+    let mut surface = dev_kit::raster_surface(400, 400, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let path = build_simple_polygon_path(&shape);
 
@@ -33,13 +34,5 @@ fn main() {
     paint.set_color(Color::BLUE);
     canvas.draw_path(&path, &paint);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/polygon.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "polygon");
 }

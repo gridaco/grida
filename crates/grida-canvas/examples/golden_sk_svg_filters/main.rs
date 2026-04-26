@@ -27,11 +27,11 @@ use skia_safe::{
 use usvg::tiny_skia_path::{Path as TinyPath, PathSegment};
 use usvg::{Node, Options, Tree};
 
+#[path = "../dev_kit/mod.rs"]
+mod dev_kit;
+
 thread_local! {
-    static FONT: Font = Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        12.0
-    );
+    static FONT: Font = Font::new(dev_kit::geistmono_typeface(), 12.0);
 }
 
 // ----------------------------------------------------------------------------
@@ -2017,9 +2017,8 @@ fn process_svg_file(svg_path: &std::path::Path) -> Result<(), Box<dyn std::error
     // Create output surface
     let size = tree.size();
     let (w, h) = (size.width().ceil() as i32, size.height().ceil() as i32);
-    let mut surface = surfaces::raster_n32_premul((w, h)).expect("create surface");
+    let mut surface = dev_kit::raster_surface(w, h, Color::TRANSPARENT);
     let canvas = surface.canvas();
-    canvas.clear(Color::TRANSPARENT);
 
     // Render the SVG tree
     // Filters are treated as a layer property - the rendering function
@@ -2034,21 +2033,10 @@ fn process_svg_file(svg_path: &std::path::Path) -> Result<(), Box<dyn std::error
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("output");
-    let output_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("goldens")
-        .join(format!("sk_svg_{}.png", file_stem));
+    let golden_name = format!("sk_svg_{}", file_stem);
+    dev_kit::save_golden(&mut surface, &golden_name);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, sk::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(&output_path, data.as_bytes())?;
-
-    println!(
-        "  → Rendered to: {} ({} bytes)",
-        output_path.display(),
-        data.as_bytes().len()
-    );
+    println!("  → Rendered to: goldens/{}.png", golden_name);
     Ok(())
 }
 

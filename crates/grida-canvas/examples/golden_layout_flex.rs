@@ -6,7 +6,9 @@ use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::{
     ContainerNodeRec, LayoutContainerStyle, LayoutDimensionStyle, Node, Scene, Size, StrokeStyle,
 };
-use skia_safe::{surfaces, Color, Font, FontMgr, Paint, Rect};
+use skia_safe::{Color, Font, Paint, Rect};
+
+mod dev_kit;
 
 fn create_container(id: &str, width: f32, height: f32) -> ContainerNodeRec {
     create_container_with_gap(id, width, height, 10.0)
@@ -65,14 +67,11 @@ fn create_container_with_gap(id: &str, width: f32, height: f32, gap: f32) -> Con
 fn main() {
     // Create a surface to draw on
     let (width, height) = (1200, 1800);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Load font for labels
-    let font_data = cg::embedded_fonts::geist::BYTES;
-    let font_mgr = FontMgr::new();
-    let typeface = font_mgr.new_from_data(font_data, None).unwrap();
+    let typeface = dev_kit::geist_typeface();
     let label_font = Font::new(typeface.clone(), 16.0);
     let title_font = Font::new(typeface.clone(), 24.0);
 
@@ -349,16 +348,8 @@ fn main() {
     }
 
     // Save the result to a PNG file
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    // Use cargo env to get the correct output directory
-    let output_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let output_path = format!("{}/goldens/layout_flex.png", output_dir);
-    std::fs::write(&output_path, data.as_bytes()).unwrap();
-
-    println!("✓ Generated {}", output_path);
+    dev_kit::save_golden(&mut surface, "layout_flex");
+    println!("✓ Generated goldens/layout_flex.png");
 }
 
 /// Render a single layout scenario and return the total height used

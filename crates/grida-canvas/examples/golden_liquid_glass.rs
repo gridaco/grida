@@ -9,7 +9,9 @@
 
 use cg::cg::prelude::*;
 use cg::painter::effects;
-use skia_safe::{canvas::SaveLayerRec, surfaces, Data, EncodedImageFormat, Image, Paint, Rect};
+use skia_safe::{canvas::SaveLayerRec, Color, Data, Image, Paint, Rect};
+
+mod dev_kit;
 
 const BACKGROUND_IMAGE: &[u8] = include_bytes!("../../../fixtures/images/stripes.png");
 
@@ -38,7 +40,7 @@ fn main() {
     };
 
     // Create surface for final composition
-    let mut surface = surfaces::raster_n32_premul(canvas_size).expect("surface");
+    let mut surface = dev_kit::raster_surface(canvas_size.0, canvas_size.1, Color::TRANSPARENT);
     let canvas = surface.canvas();
 
     // Load and draw background image
@@ -81,13 +83,5 @@ fn main() {
     canvas.restore();
 
     // Save to PNG
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/liquid_glass.png"),
-        data.as_bytes(),
-    )
-    .expect("write png");
+    dev_kit::save_golden(&mut surface, "liquid_glass");
 }

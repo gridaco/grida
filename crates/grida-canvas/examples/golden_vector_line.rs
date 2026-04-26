@@ -1,13 +1,14 @@
 use cg::cg::prelude::*;
 use cg::vectornetwork::vn_painter::*;
 use cg::vectornetwork::*;
-use skia_safe::{surfaces, Color};
+use skia_safe::Color;
 use std::f32::consts::PI;
 
+mod dev_kit;
+
 fn main() {
-    let mut surface = surfaces::raster_n32_premul((600, 600)).expect("surface");
+    let mut surface = dev_kit::raster_surface(600, 600, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Create multiple lines with different angles
     let num_lines = 10;
@@ -64,14 +65,6 @@ fn main() {
         painter.draw(&line, &[], Some(&stroke_options), 0.0);
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_line.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "vector_line");
     println!("Image saved with {} lines and a test rectangle", num_lines);
 }

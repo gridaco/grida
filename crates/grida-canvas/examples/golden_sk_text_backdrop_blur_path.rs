@@ -19,7 +19,6 @@
 use skia_safe::{
     self as sk,
     canvas::SaveLayerRec,
-    surfaces,
     textlayout::{FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle},
     Color, Data, FontMgr, Image, Matrix, Paint as SkPaint, Path, PathBuilder, Point, Rect,
 };
@@ -27,12 +26,13 @@ use skia_safe::{
 use cg::cg::prelude::*;
 use cg::text::text_style::textstyle;
 
+mod dev_kit;
+
 fn main() {
     let width = 800;
     let height = 600;
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Draw background image
     draw_background_image(canvas, width, height);
@@ -48,18 +48,7 @@ fn main() {
     );
 
     // Save as golden image
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/sk_text_backdrop_blur_path.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_text_backdrop_blur_path");
 }
 
 fn draw_background_image(canvas: &sk::Canvas, width: i32, height: i32) {
@@ -162,9 +151,7 @@ fn create_paragraph(text: &str, text_color: Color) -> Paragraph {
     // Set up font collection with embedded Geist font
     let mut font_collection = FontCollection::new();
     let font_mgr = FontMgr::new();
-    let _typeface = font_mgr
-        .new_from_data(&Data::new_copy(cg::embedded_fonts::geist::BYTES), None)
-        .expect("Failed to create typeface");
+    let _typeface = dev_kit::geist_typeface();
     font_collection.set_default_font_manager(font_mgr, None);
 
     // Build paragraph

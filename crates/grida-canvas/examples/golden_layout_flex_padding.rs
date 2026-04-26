@@ -6,13 +6,12 @@ use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use skia_safe::{Color, Paint, Rect};
 
+mod dev_kit;
+
 fn main() {
     // Create a surface for rendering
-    let mut surface = skia_safe::surfaces::raster_n32_premul((800, 600)).unwrap();
+    let mut surface = dev_kit::raster_surface(800, 600, Color::from_argb(255, 255, 255, 255));
     let canvas = surface.canvas();
-
-    // Clear background
-    canvas.clear(Color::from_argb(255, 255, 255, 255));
 
     // Build scene graph with production pipeline
     let nf = NodeFactory::new();
@@ -95,17 +94,8 @@ fn main() {
     }
 
     // Save the result
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-
-    // Use cargo env to get the correct output directory
-    let output_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let output_path = format!("{}/goldens/layout_flex_padding.png", output_dir);
-    std::fs::write(&output_path, data.as_bytes()).unwrap();
-
-    println!("✓ Generated {}", output_path);
+    dev_kit::save_golden(&mut surface, "layout_flex_padding");
+    println!("✓ Generated goldens/layout_flex_padding.png");
 }
 
 fn create_child_container(id: &str, width: f32, height: f32) -> ContainerNodeRec {

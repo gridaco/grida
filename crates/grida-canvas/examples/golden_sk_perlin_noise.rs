@@ -1,4 +1,6 @@
-use skia_safe::{surfaces, Color, Paint, Rect, Shader};
+use skia_safe::{Color, Paint, Rect, Shader};
+
+mod dev_kit;
 
 /// Demonstrates the use of SkPerlinNoiseShader with different parameters
 ///
@@ -8,9 +10,8 @@ use skia_safe::{surfaces, Color, Paint, Rect, Shader};
 /// - Different tile sizes for seamless tiling
 fn main() {
     let (width, height) = (800, 400);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Example 1: Fractal Perlin Noise - Basic
     draw_fractal_perlin_noise(canvas, 0.0, 0.0, 200.0, 200.0);
@@ -36,15 +37,7 @@ fn main() {
     // Example 8: Low Frequency Turbulence
     draw_low_freq_turbulence(canvas, 600.0, 200.0, 200.0, 200.0);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/sk_perlin_noise.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_perlin_noise");
 }
 
 fn draw_fractal_perlin_noise(canvas: &skia_safe::Canvas, x: f32, y: f32, width: f32, height: f32) {

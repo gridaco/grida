@@ -9,10 +9,11 @@ use skia_safe::textlayout::{
 use skia_safe::{surfaces, Color, FontMgr, Paint as SkPaint, Point};
 use std::sync::{Arc, Mutex};
 
+mod dev_kit;
+
 fn main() {
-    let mut surface = surfaces::raster_n32_premul((1200, 2800)).unwrap();
+    let mut surface = dev_kit::raster_surface(1200, 2800, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // -- Font setup --
     let font_mgr = FontMgr::new();
@@ -994,14 +995,6 @@ fn main() {
     }
 
     // -- Save --
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/type_attributed.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "type_attributed");
     println!("Generated goldens/type_attributed.png ({y:.0}px used of 2800px)");
 }

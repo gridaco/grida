@@ -14,7 +14,9 @@
 
 use cg::cg::types::RectangularCornerRadius;
 use cg::shape::*;
-use skia_safe::{surfaces, Color, Color4f, ColorSpace, Paint};
+use skia_safe::{Color, Color4f, ColorSpace, Paint};
+
+mod dev_kit;
 
 fn main() {
     let radii = [40.0_f32, 80.0_f32];
@@ -27,9 +29,8 @@ fn main() {
     let canvas_w = (col_w * 3.0 + pad) as i32;
     let canvas_h = (row_h * radii.len() as f32 + pad) as i32;
 
-    let mut surface = surfaces::raster_n32_premul((canvas_w, canvas_h)).expect("surface");
+    let mut surface = dev_kit::raster_surface(canvas_w, canvas_h, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Paints
     let mut paint_rrect = Paint::new(Color4f::new(0.84, 0.36, 0.36, 1.0), &ColorSpace::new_srgb());
@@ -81,14 +82,6 @@ fn main() {
         canvas.restore();
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    let out_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/goldens/corner_radius_backends.png"
-    );
-    std::fs::write(out_path, data.as_bytes()).unwrap();
-    println!("Written to {out_path}");
+    dev_kit::save_golden(&mut surface, "corner_radius_backends");
+    println!("Written to goldens/corner_radius_backends.png");
 }

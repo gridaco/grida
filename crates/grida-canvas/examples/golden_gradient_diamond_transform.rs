@@ -1,7 +1,9 @@
 use cg::cg::prelude::*;
 use cg::painter::gradient::*;
 use math2::transform::AffineTransform;
-use skia_safe::{surfaces, Color, Rect};
+use skia_safe::{Color, Rect};
+
+mod dev_kit;
 
 /// Draw a rectangle filled with a diamond gradient at the specified position and size.
 ///
@@ -36,9 +38,8 @@ fn draw_rect(
 
 fn main() {
     let (width, height) = (1400, 600);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Create a base diamond gradient
     let diamond_gradient = DiamondGradientPaint {
@@ -137,16 +138,5 @@ fn main() {
         current_x += rect_width + spacing;
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/gradient_diamond_transform.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "gradient_diamond_transform");
 }

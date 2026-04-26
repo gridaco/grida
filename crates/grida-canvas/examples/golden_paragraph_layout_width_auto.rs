@@ -41,7 +41,9 @@
 use skia_safe::textlayout::{
     FontCollection, Paragraph, ParagraphBuilder, ParagraphStyle, TextStyle,
 };
-use skia_safe::{surfaces, Color, Color4f, FontMgr, Paint, PaintStyle, Point, Rect};
+use skia_safe::{Color, Color4f, FontMgr, Paint, PaintStyle, Point, Rect};
+
+mod dev_kit;
 
 fn main() {
     // Demonstrate the correct width: auto implementation
@@ -187,11 +189,8 @@ fn generate_golden_image() {
     println!("\n=== Generating Golden Image ===");
 
     // Create a surface for rendering
-    let mut surface = surfaces::raster_n32_premul((800, 600)).expect("surface");
+    let mut surface = dev_kit::raster_surface(800, 600, Color::WHITE);
     let canvas = surface.canvas();
-
-    // Clear background
-    canvas.clear(Color::WHITE);
 
     // Create font manager and collection
     let font_mgr = FontMgr::new();
@@ -292,18 +291,7 @@ fn generate_golden_image() {
     title_paragraph.paint(canvas, Point::new(50.0, 20.0));
 
     // Save the image
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/paragraph_layout_width_auto.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "paragraph_layout_width_auto");
 
     println!("✅ Golden image saved to: goldens/paragraph_layout_width_auto.png");
     println!("   Red boxes show the intrinsic width boundaries");

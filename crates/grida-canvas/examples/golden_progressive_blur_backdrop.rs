@@ -1,8 +1,8 @@
 use cg::cg::prelude::*;
 use cg::painter::effects::create_progressive_blur_image_filter;
-use skia_safe::{
-    self as sk, canvas::SaveLayerRec, surfaces, Color, Data, ImageFilter, Paint, Rect,
-};
+use skia_safe::{self as sk, canvas::SaveLayerRec, Color, Data, ImageFilter, Paint, Rect};
+
+mod dev_kit;
 
 // Include 8K background image
 const BACKGROUND_IMAGE: &[u8] = include_bytes!("../../../fixtures/images/8k.jpg");
@@ -71,7 +71,7 @@ fn draw_glass_panel_with_progressive_backdrop_blur(
 
 fn main() {
     let (width, height) = (400, 400);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::TRANSPARENT);
     let canvas = surface.canvas();
 
     // Load and draw the 4K background image
@@ -102,18 +102,6 @@ fn main() {
     );
 
     // Save the result to a file
-    let image_snapshot = surface.image_snapshot();
-    let data = image_snapshot
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("Failed to encode image");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/progressive_blur_backdrop.png"
-        ),
-        data.as_bytes(),
-    )
-    .expect("Failed to write output file");
-
+    dev_kit::save_golden(&mut surface, "progressive_blur_backdrop");
     println!("Progressive backdrop blur example saved to goldens/progressive_blur_backdrop.png");
 }

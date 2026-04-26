@@ -19,6 +19,8 @@ use cg::runtime::scene::{Backend, Renderer};
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 
+mod dev_kit;
+
 const LINE_LENGTH: f32 = 400.0;
 const STROKE_W: f32 = 10.0;
 const LEFT: f32 = 80.0;
@@ -87,10 +89,7 @@ async fn main() {
     renderer.render_to_canvas(canvas, width, height);
 
     // Overlay: red guidelines + labels (drawn after renderer, on top)
-    let font = skia_safe::Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        12.0,
-    );
+    let font = skia_safe::Font::new(dev_kit::geistmono_typeface(), 12.0);
     let label_paint = {
         let mut p = skia_safe::Paint::default();
         p.set_anti_alias(true);
@@ -111,10 +110,7 @@ async fn main() {
         p.set_color(skia_safe::Color::from_rgb(160, 160, 160));
         p
     };
-    let title_font = skia_safe::Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        11.0,
-    );
+    let title_font = skia_safe::Font::new(dev_kit::geistmono_typeface(), 11.0);
 
     canvas.draw_str(
         &format!("Built-in presets  |  sw={STROKE_W}  |  red = logical endpoint"),
@@ -157,16 +153,8 @@ async fn main() {
         );
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    let out = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/goldens/stroke_decoration_presets.png"
-    );
-    std::fs::write(out, data.as_bytes()).unwrap();
-    println!("Saved {}", out);
+    dev_kit::save_golden(surface, "stroke_decoration_presets");
+    println!("Saved goldens/stroke_decoration_presets.png");
 
     renderer.free();
 }

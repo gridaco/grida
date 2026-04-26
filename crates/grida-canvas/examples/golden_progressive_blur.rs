@@ -1,6 +1,8 @@
 use cg::cg::prelude::*;
 use cg::painter::effects::create_progressive_blur_image_filter;
-use skia_safe::{self as sk, canvas::SaveLayerRec, surfaces, Color, ImageFilter, Paint, Rect};
+use skia_safe::{self as sk, canvas::SaveLayerRec, Color, ImageFilter, Paint, Rect};
+
+mod dev_kit;
 
 static BLUR_EFFECT: FeProgressiveBlur = FeProgressiveBlur {
     start: Alignment(0.0, -1.0), // Top edge center (node-local)
@@ -47,11 +49,8 @@ fn draw_rect_with_progressive_blur(
 
 fn main() {
     let (width, height) = (400, 400);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::BLACK);
     let canvas = surface.canvas();
-
-    // Draw solid black background
-    canvas.clear(Color::BLACK);
 
     // Define the rectangle bounds (1:2 ratio - width:height)
     // With 50px margin on top and bottom
@@ -68,15 +67,7 @@ fn main() {
     );
 
     // Save the result to a file
-    let image_snapshot = surface.image_snapshot();
-    let data = image_snapshot
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("Failed to encode image");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/progressive_blur.png"),
-        data.as_bytes(),
-    )
-    .expect("Failed to write output file");
+    dev_kit::save_golden(&mut surface, "progressive_blur");
 
     println!("Progressive blur example saved to goldens/progressive_blur.png");
 }

@@ -1,6 +1,8 @@
 use cg::cg::prelude::*;
 use cg::vectornetwork::*;
-use skia_safe::{surfaces, Color};
+use skia_safe::Color;
+
+mod dev_kit;
 
 fn main() {
     // Define two overlapping squares in a 400x400 space
@@ -45,9 +47,8 @@ fn main() {
         ],
     };
 
-    let mut surface = surfaces::raster_n32_premul((400, 1200)).expect("surface");
+    let mut surface = dev_kit::raster_surface(400, 1200, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let painter = VNPainter::new(canvas);
 
@@ -76,16 +77,5 @@ fn main() {
         canvas.restore();
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/vector_regions_strokes.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "vector_regions_strokes");
 }

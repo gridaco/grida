@@ -11,10 +11,9 @@
 
 use cg::cg::prelude::*;
 use cg::painter::effects;
-use skia_safe::{
-    canvas::SaveLayerRec, surfaces, Color, Data, EncodedImageFormat, Font, FontMgr, Image, Paint,
-    Rect, Surface,
-};
+use skia_safe::{canvas::SaveLayerRec, Color, Data, Font, Image, Paint, Rect, Surface};
+
+mod dev_kit;
 
 const BACKGROUND_IMAGE: &[u8] = include_bytes!("../../../fixtures/images/stripes.png");
 
@@ -26,7 +25,7 @@ fn main() {
     let cell_height = canvas_size.1 as f32 / grid_rows as f32;
 
     // Create surface
-    let mut surface = surfaces::raster_n32_premul(canvas_size).expect("surface");
+    let mut surface = dev_kit::raster_surface(canvas_size.0, canvas_size.1, Color::TRANSPARENT);
 
     // Load and draw background image (tiled if needed)
     let background_image =
@@ -39,10 +38,7 @@ fn main() {
     );
 
     // Load font for labels
-    let font_data = cg::embedded_fonts::geist::BYTES;
-    let font_mgr = FontMgr::new();
-    let typeface = font_mgr.new_from_data(font_data, None).unwrap();
-    let font = Font::new(typeface, 32.0);
+    let font = Font::new(dev_kit::geist_typeface(), 32.0);
 
     // Glass effect parameters
     let effect = FeLiquidGlass::default();
@@ -106,18 +102,7 @@ fn main() {
     draw_grid_lines(canvas, canvas_size, grid_cols, grid_rows);
 
     // Save to PNG
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/liquid_glass_transform.png"
-        ),
-        data.as_bytes(),
-    )
-    .expect("write png");
+    dev_kit::save_golden(&mut surface, "liquid_glass_transform");
 }
 
 /// Draw a single grid cell with liquid glass effect

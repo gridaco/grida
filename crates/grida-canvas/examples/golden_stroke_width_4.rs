@@ -6,6 +6,8 @@ use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer};
 use math2::{rect::Rectangle, transform::AffineTransform};
 
+mod dev_kit;
+
 /// Golden test example demonstrating per-side stroke widths on rectangles.
 ///
 /// This example creates a 4x3 grid (4 rows, 3 columns) showcasing different per-side
@@ -36,15 +38,7 @@ async fn main() {
     let canvas = surface.canvas();
     renderer.render_to_canvas(canvas, width, height);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/stroke_width_4.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(surface, "stroke_width_4");
 
     println!("Saved goldens/stroke_width_4.png");
 

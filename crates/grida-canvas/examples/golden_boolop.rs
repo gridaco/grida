@@ -1,10 +1,11 @@
-use skia_safe::{surfaces, Color, Paint, Path, PathBuilder, PathOp, Rect};
+use skia_safe::{Color, Paint, Path, PathBuilder, PathOp, Rect};
+
+mod dev_kit;
 
 fn main() {
     let (w, h) = (600, 120);
-    let mut surface = surfaces::raster_n32_premul((w, h)).expect("surface");
+    let mut surface = dev_kit::raster_surface(w, h, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
@@ -70,14 +71,5 @@ fn main() {
         }
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::create_dir_all("goldens").unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/boolop.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "boolop");
 }

@@ -15,7 +15,9 @@ use cg::runtime::{
     camera::Camera2D,
     scene::{Backend, FrameFlushResult, Renderer, RendererOptions},
 };
-use skia_safe::{surfaces, Color, Font, Paint as SkPaint, Rect};
+use skia_safe::{Color, Font, Paint as SkPaint, Rect};
+
+mod dev_kit;
 
 fn build_scene() -> Scene {
     let nf = NodeFactory::new();
@@ -112,14 +114,10 @@ fn main() {
     let out_w = (padding + cols * (cell_w + padding)) as i32;
     let out_h = (padding + rows * (cell_h + label_h + padding)) as i32;
 
-    let mut surface = surfaces::raster_n32_premul((out_w, out_h)).expect("surface");
+    let mut surface = dev_kit::raster_surface(out_w, out_h, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
-    let font = Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        10.0,
-    );
+    let font = Font::new(dev_kit::geistmono_typeface(), 10.0);
     let mut text_paint = SkPaint::default();
     text_paint.set_color(Color::BLACK);
     text_paint.set_anti_alias(true);
@@ -140,16 +138,5 @@ fn main() {
         canvas.draw_rect(Rect::from_xywh(x, y + label_h, cell_w, cell_h), &border);
     }
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/pixel_preview_stability.png"
-        ),
-        data.as_bytes(),
-    )
-    .expect("write png");
+    dev_kit::save_golden(&mut surface, "pixel_preview_stability");
 }

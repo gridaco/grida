@@ -4,18 +4,17 @@ use skia_safe::textlayout::FontCollection;
 use skia_safe::textlayout::{
     ParagraphBuilder, ParagraphStyle, TextAlign, TextDirection, TypefaceFontProvider,
 };
-use skia_safe::{surfaces, Color, FontMgr, Paint, Point};
+use skia_safe::{Color, FontMgr, Paint, Point};
 
 #[path = "../tests/fonts.rs"]
 mod fonts;
 
+mod dev_kit;
+
 fn main() {
     // Create a surface to accommodate all the optical sizing examples
-    let mut surface = surfaces::raster_n32_premul((1200, 1800)).unwrap();
+    let mut surface = dev_kit::raster_surface(1200, 1800, Color::WHITE);
     let canvas = surface.canvas();
-
-    // Clear the canvas with white background
-    canvas.clear(Color::WHITE);
 
     // Create a paint for text
     let mut paint = Paint::default();
@@ -264,16 +263,7 @@ fn main() {
     }
 
     // Save the result to a PNG file
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    let bytes = data.as_bytes();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/type_var_opsz.png"),
-        bytes,
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "type_var_opsz");
 
     println!("Optical sizing demo saved to goldens/type_var_opsz.png");
 }

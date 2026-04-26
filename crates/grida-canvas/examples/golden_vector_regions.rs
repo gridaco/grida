@@ -1,5 +1,7 @@
 use cg::vectornetwork::*;
-use skia_safe::{surfaces, Color, Paint};
+use skia_safe::{Color, Paint};
+
+mod dev_kit;
 
 fn main() {
     // Create a VectorNetwork with 4 isolated rectangles
@@ -54,9 +56,8 @@ fn main() {
         regions: vec![],
     };
 
-    let mut surface = surfaces::raster_n32_premul((400, 400)).expect("surface");
+    let mut surface = dev_kit::raster_surface(400, 400, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Convert VectorNetwork to Skia Path using the Into trait
     // The implementation automatically handles multiple disconnected shapes
@@ -68,13 +69,5 @@ fn main() {
     fill_paint.set_style(skia_safe::PaintStyle::Fill);
     canvas.draw_path(&path, &fill_paint);
 
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/vector_regions.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "vector_regions");
 }

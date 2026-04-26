@@ -1,5 +1,7 @@
 use skia_safe::textlayout::*;
-use skia_safe::{surfaces, Color, FontMgr, Paint, PaintStyle, Point};
+use skia_safe::{Color, FontMgr, Paint, PaintStyle, Point};
+
+mod dev_kit;
 
 /// Configuration for paragraph styling
 #[derive(Debug, Clone)]
@@ -148,20 +150,14 @@ pub fn paint_paragraph_with_linemetrics(
 
 fn main() {
     let (width, height) = (600, 800);
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
-
-    // Create font manager and load the Geist font
-    let font_mgr = FontMgr::new();
-    let typeface = font_mgr
-        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
-        .unwrap();
 
     // Create font collection and add the Geist font
+    let font_mgr = FontMgr::new();
     let mut font_collection = FontCollection::new();
     let mut provider = TypefaceFontProvider::new();
-    provider.register_typeface(typeface, Some("Geist"));
+    provider.register_typeface(dev_kit::geist_typeface(), Some("Geist"));
     font_collection.set_asset_font_manager(Some(provider.into()));
     font_collection.set_default_font_manager(font_mgr.clone(), None);
 
@@ -227,18 +223,7 @@ fn main() {
     );
 
     // Save the result
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode png");
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/sk_paragraph_linemetrics.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_paragraph_linemetrics");
 
     println!("Test completed! Check goldens/sk_paragraph_linemetrics.png for the result.");
     println!("The demo shows how the function works with different font sizes and line heights:");

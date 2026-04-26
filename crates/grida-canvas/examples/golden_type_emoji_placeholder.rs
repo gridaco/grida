@@ -5,7 +5,9 @@ use skia_safe::textlayout::{
     FontCollection, ParagraphBuilder, ParagraphStyle, PlaceholderAlignment, PlaceholderStyle,
     TextAlign, TextBaseline, TextDirection, TypefaceFontProvider,
 };
-use skia_safe::{surfaces, Color, Data, FontMgr, Image, Paint, Point, Rect};
+use skia_safe::{Color, Data, Image, Paint, Point, Rect};
+
+mod dev_kit;
 
 // Layout constants - easy to customize
 static MARGIN: f32 = 40.0;
@@ -77,20 +79,13 @@ enum TextRun {
 
 fn main() {
     // Create surface and canvas
-    let mut surface = surfaces::raster_n32_premul((600, 800)).unwrap();
+    let mut surface = dev_kit::raster_surface(600, 800, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     // Prepare paint
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
     paint.set_color(Color::BLACK);
-
-    // Load font
-    let font_mgr = FontMgr::new();
-    let geist = font_mgr
-        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
-        .unwrap();
 
     let mut paragraph_style = ParagraphStyle::new();
     paragraph_style.set_text_direction(TextDirection::LTR);
@@ -98,7 +93,7 @@ fn main() {
 
     let mut font_collection = FontCollection::new();
     let mut provider = TypefaceFontProvider::new();
-    provider.register_typeface(geist, Some("Geist"));
+    provider.register_typeface(dev_kit::geist_typeface(), Some("Geist"));
     font_collection.set_asset_font_manager(Some(provider.into()));
 
     let mut builder = ParagraphBuilder::new(&paragraph_style, &font_collection);
@@ -233,16 +228,5 @@ fn main() {
     }
 
     // Save result
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    std::fs::write(
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/goldens/type_emoji_placeholder.png"
-        ),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "type_emoji_placeholder");
 }

@@ -38,17 +38,16 @@
 use cg::resources::ByteStore;
 use cg::{cg::types::*, cg::*, painter::paint, runtime::image_repository::ImageRepository};
 use math2::{box_fit::BoxFit, transform::AffineTransform};
-use skia_safe::{surfaces, Color, Point, Rect};
+use skia_safe::{Color, Point, Rect};
 use std::{
     hash::Hash,
     sync::{Arc, Mutex},
 };
 
+mod dev_kit;
+
 thread_local! {
-    static FONT: skia_safe::Font = skia_safe::Font::new(
-        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
-        8.0,
-    );
+    static FONT: skia_safe::Font = skia_safe::Font::new(dev_kit::geistmono_typeface(), 8.0);
 }
 
 fn main() {
@@ -65,9 +64,8 @@ fn main() {
         + row_gap * (rows - 1) as f32
         + label_height * rows as f32) as i32;
 
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("surface");
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-    canvas.clear(Color::WHITE);
 
     let (image_repository, checker_image_ref) = load_checker_image();
 
@@ -338,15 +336,7 @@ fn main() {
     }
 
     // save png
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .expect("encode");
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/sk_paints.png"),
-        data.as_bytes(),
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_paints");
 }
 
 fn draw_stacked(

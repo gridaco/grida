@@ -1,8 +1,10 @@
 use cg::cg::prelude::*;
 use skia_safe::{
-    gradient_shader, luma_color_filter, surfaces, BlendMode, Color, Paint, Path, PathBuilder,
-    Point, Rect, TileMode,
+    gradient_shader, luma_color_filter, BlendMode, Color, Paint, Path, PathBuilder, Point, Rect,
+    TileMode,
 };
+
+mod dev_kit;
 
 fn draw_demo_content(canvas: &skia_safe::Canvas, area: Rect) {
     // Draw colorful content to visualize masking results
@@ -182,11 +184,8 @@ fn main() {
     // Create a surface
     let width = 1400;
     let height = 400;
-    let mut surface = surfaces::raster_n32_premul((width, height)).unwrap();
+    let mut surface = dev_kit::raster_surface(width, height, Color::WHITE);
     let canvas = surface.canvas();
-
-    // Clear background
-    canvas.clear(Color::WHITE);
 
     // Layout four panels side-by-side
     let panel_w = (width as f32 - 5.0 * 20.0) / 4.0; // margins between panels
@@ -207,15 +206,6 @@ fn main() {
     }
 
     // Save PNG to goldens
-    let image = surface.image_snapshot();
-    let data = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, None)
-        .unwrap();
-    let bytes = data.as_bytes();
-    std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/goldens/sk_mask.png"),
-        bytes,
-    )
-    .unwrap();
+    dev_kit::save_golden(&mut surface, "sk_mask");
     println!("Generated sk_mask.png");
 }
