@@ -4,7 +4,7 @@ import React, { useContext, useEffect, useMemo } from "react";
 import { useCurrentSceneState, useTransformState } from "./provider";
 import { useCurrentEditor, useEditorState } from "./use-editor";
 import { NodeElement } from "@/grida-canvas-react-renderer-dom/nodes/node";
-import { domapi } from "../grida/backends/dom";
+import { domapi } from "../grida-canvas/backends/dom";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 import { useMeasure } from "@uidotdev/usehooks";
 import kolor from "@grida/color";
