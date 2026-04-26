@@ -197,7 +197,7 @@ impl SurfaceUI {
         dpr: f32,
     ) {
         let view = camera.view_matrix();
-        let view_sk = crate::sk::sk_matrix(view.matrix);
+        let view_sk = crate::backends::skia::sk_matrix(view.matrix);
 
         let handles = if surface.selection.len() == 1 {
             // Single selection: use oriented bounding box.
@@ -274,7 +274,7 @@ impl SurfaceUI {
         dpr: f32,
     ) {
         let view = camera.view_matrix();
-        let view_sk = crate::sk::sk_matrix(view.matrix);
+        let view_sk = crate::backends::skia::sk_matrix(view.matrix);
 
         let (w, h, bottom_center, angle_deg, outward) = if surface.selection.len() == 1 {
             let id = surface.selection.iter().next().unwrap();

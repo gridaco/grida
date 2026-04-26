@@ -1,8 +1,8 @@
+use crate::backends::skia as sk;
 use crate::cache::compositor::LayerImageCache;
 use crate::node::schema::{NodeId, Scene};
 use crate::runtime::effect_tree::EffectTree;
 use crate::runtime::font_repository::FontRepository;
-use crate::sk;
 use crate::{
     cache::{
         geometry::GeometryCache,

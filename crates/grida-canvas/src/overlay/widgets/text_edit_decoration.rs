@@ -12,11 +12,11 @@
 //! using the node's world transform and the camera view matrix, following
 //! the same pattern as [`super::stroke_overlay::StrokeOverlay`].
 
+use crate::backends::skia as sk;
 use crate::cache::scene::SceneCache;
 use crate::node::schema::NodeId;
 use crate::painter::layer::Layer;
 use crate::runtime::camera::Camera2D;
-use crate::sk;
 use crate::text_edit::{CaretRect, SelectionRect, DEFAULT_CARET_WIDTH};
 use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, Rect};
 

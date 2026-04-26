@@ -1,3 +1,4 @@
+use crate::backends::skia as sk;
 use crate::cache::scene::SceneCache;
 use crate::overlay::gesture::SurfaceGesture;
 use crate::overlay::state::SurfaceState;
@@ -5,7 +6,6 @@ use crate::overlay::widgets::text;
 use crate::painter::layer::{Layer, PainterPictureLayer};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::font_repository::FontRepository;
-use crate::sk;
 use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, PathBuilder, PathEffect};
 
 /// Selection overlay color (blue).

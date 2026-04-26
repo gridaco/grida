@@ -1,12 +1,12 @@
 use super::geometry::{
     boolean_operation_path, boolean_operation_shape, build_shape, merge_shapes, PainterShape,
 };
+use crate::backends::skia as sk;
 use crate::cache::scene::SceneCache;
 use crate::cg::prelude::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::shape::*;
-use crate::sk;
 use crate::vectornetwork::VectorNetwork;
 use math2::{rect::Rectangle, transform::AffineTransform};
 use skia_safe::Path;

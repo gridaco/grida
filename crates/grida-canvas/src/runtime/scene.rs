@@ -1,3 +1,4 @@
+use crate::backends::skia as sk;
 use crate::cg::prelude::*;
 use crate::node::{scene_graph::SceneGraph, schema::*};
 use crate::painter::Painter;
@@ -6,7 +7,6 @@ use crate::runtime::counter::FrameCounter;
 use crate::runtime::frame_strategy::FrameRenderStrategy;
 use crate::runtime::invalidation::GlobalFlag;
 use crate::runtime::render_policy::RenderPolicy;
-use crate::sk;
 use crate::{
     cache,
     resources::{self, ByteStore, Resources},

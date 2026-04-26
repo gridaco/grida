@@ -1,6 +1,6 @@
+use crate::backends::usvg::tsk_path_to_sk_path;
 use crate::cg::prelude::*;
 use crate::embedded_fonts::geist;
-use crate::sk_tiny::tsk_path_to_sk_path;
 use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
 use skia_safe::Path as SkPath;

@@ -1,3 +1,4 @@
+pub mod backends;
 pub mod cache;
 pub mod cg;
 pub mod embedded_fonts;
@@ -16,8 +17,6 @@ pub mod query;
 pub mod resources;
 pub mod runtime;
 pub mod shape;
-pub mod sk;
-pub mod sk_tiny;
 pub mod svg;
 pub mod sys;
 pub mod text;

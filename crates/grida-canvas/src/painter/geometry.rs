@@ -12,7 +12,7 @@ use crate::cg::prelude::*;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::*;
 use crate::shape::*;
-use crate::{cache::geometry::GeometryCache, sk};
+use crate::{backends::skia as sk, cache::geometry::GeometryCache};
 use math2::rect::Rectangle;
 use math2::transform::AffineTransform;
 use skia_safe::{Path, RRect, Rect};
