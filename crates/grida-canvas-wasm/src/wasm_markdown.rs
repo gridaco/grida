@@ -8,7 +8,7 @@ use super::_internal::*;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use cg::io::io_markdown::markdown_to_html;
+use cg::formats::markdown::markdown_to_html;
 
 // ====================================================================================================
 // #region: WASM Response Structs
@@ -29,7 +29,7 @@ pub(crate) struct WasmMarkdownToHtmlResult {
 /// Converts markdown text to HTML.
 ///
 /// Parses markdown content and converts it to HTML using the pulldown-cmark library.
-/// See `cg::io::io_markdown::markdown_to_html` for detailed documentation.
+/// See `cg::formats::markdown::markdown_to_html` for detailed documentation.
 ///
 /// # Arguments
 /// * `markdown` - Input markdown string (null-terminated C string)

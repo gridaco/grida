@@ -16,13 +16,13 @@ use cg::{
     export::{
         export_as_image::export_node_as_image, ExportAsImage, ExportAsPNG, ExportSize, Exported,
     },
+    import::svg::pack,
     node::{
         scene_graph::SceneGraph,
         schema::{Node, NodeId, Scene},
     },
     resources::ByteStore,
     runtime::{font_repository::FontRepository, image_repository::ImageRepository},
-    svg::pack,
 };
 
 #[derive(Parser, Debug)]

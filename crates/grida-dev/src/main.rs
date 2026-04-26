@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
+use cg::import::svg::pack;
 use cg::node::schema::Scene;
 use cg::resources::{load_scene_images, ImageMessage};
-use cg::svg::pack;
 use cg::window::application::{HostEvent, HostEventCallback};
 use clap::{Parser, Subcommand};
 use futures::channel::mpsc;
@@ -110,7 +110,7 @@ struct SvgToGridaArgs {
 }
 
 fn run_svg_to_grida(args: SvgToGridaArgs) {
-    use cg::io::io_svg::svg_to_grida_bytes;
+    use cg::import::svg::grida::svg_to_grida_bytes;
 
     let input_dir = PathBuf::from(args.path.as_deref().unwrap_or("fixtures/test-svg/L0"));
     let output_dir = PathBuf::from(
@@ -341,7 +341,7 @@ fn scene_from_html_path(path: &Path) -> Result<Scene> {
     use cg::cg::prelude::CGColor;
     let html_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
-    let graph = cg::html::from_html_str(&html_source)
+    let graph = cg::import::html::from_html_str(&html_source)
         .map_err(|err| anyhow::anyhow!("failed to convert HTML {}: {err}", path.display()))?;
 
     Ok(Scene {

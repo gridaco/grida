@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use cg::cache::geometry::GeometryCache;
+use cg::import::svg::pack;
 use cg::runtime::{
     camera::Camera2D,
     font_repository::FontRepository,
     image_repository::ImageRepository,
     scene::{Backend, Renderer, RendererOptions},
 };
-use cg::svg::pack;
 use glob::{glob_with, MatchOptions};
 use math2::rect::Rectangle;
 use skia_safe::EncodedImageFormat;
@@ -154,7 +154,7 @@ pub(crate) fn find_test_pairs_in_dirs(svg_dir: &Path, png_dir: &Path) -> Result<
 /// path and write a PNG.
 ///
 /// Unlike [`render_svg_to_png`], which round-trips through the Grida
-/// scene graph via `cg::svg::pack`, this path delegates directly to
+/// scene graph via `cg::import::svg::pack`, this path delegates directly to
 /// Skia's SVG module — matching Chromium's rendering for WPT-style
 /// reftests. Target size is the reference PNG's pixel dimensions;
 /// `viewBox` + `preserveAspectRatio` inside the SVG map user units to

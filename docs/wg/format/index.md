@@ -32,5 +32,5 @@ Tracking docs for the Grida IR schema and how external formats map into it.
 - **FlatBuffers schema:** `format/grida.fbs` — the canonical on-disk file format
 - **Rust runtime model:** `crates/grida-canvas/src/node/schema.rs`
 - **TypeScript model:** `packages/grida-canvas-schema/grida.ts`
-- **HTML import pipeline:** `crates/grida-canvas/src/html/`
-- **SVG import pipeline:** `crates/grida-canvas/src/svg/`
+- **HTML import pipeline:** `crates/grida-canvas/src/import/html/`
+- **SVG import pipeline:** `crates/grida-canvas/src/import/svg/`

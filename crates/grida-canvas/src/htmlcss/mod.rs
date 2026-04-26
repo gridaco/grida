@@ -363,7 +363,7 @@ fn collect_urls_from_element(el: &style::StyledElement, urls: &mut Vec<String>) 
 /// The output is a complete `<html>` document with an embedded `<style>` block
 /// that can be passed directly to [`render()`].
 pub fn markdown_to_styled_html(markdown: &str) -> String {
-    let html_body = crate::io::io_markdown::markdown_to_html(markdown);
+    let html_body = crate::formats::markdown::markdown_to_html(markdown);
     format!(
         "<html><head><style>{}</style></head><body class=\"markdown-body\">{}</body></html>",
         GITHUB_MARKDOWN_CSS, html_body

@@ -13,10 +13,10 @@ use crate::cg::svg::{
     IRSVGAttributedTextChunk, IRSVGChildNode, IRSVGGroupNode, IRSVGPathNode, IRSVGTextChunk,
     IRSVGTextNode, SVGFillAttributes, SVGFontStyle, SVGStrokeAttributes,
 };
+use crate::import::svg::packed_scene::SVGPackedScene;
 use crate::node::factory::NodeFactory;
 use crate::node::scene_graph::{Parent, SceneGraph};
 use crate::node::schema::*;
-use crate::svg::from_usvg_tree::SVGPackedScene;
 use math2::transform::AffineTransform;
 
 pub fn from_svg_str(svg: &str) -> Result<SceneGraph, String> {

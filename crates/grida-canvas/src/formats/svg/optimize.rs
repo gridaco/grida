@@ -1,65 +1,14 @@
-use crate::io::io_grida_fbs;
-use crate::node::schema::*;
-use crate::svg::into_tree;
-use crate::svg::pack;
-use crate::svg::sanitize::sanitize_svg;
-use std::collections::HashMap;
+//! SVG → SVG optimization (CSS resolution + normalization).
+//!
+//! Pure format-internal transform: takes an SVG string, produces a flatter,
+//! self-contained SVG string. No Grida types involved — that's why this lives
+//! under `formats/` rather than `import/`.
+
+use crate::formats::svg::parse::into_tree;
+use crate::formats::svg::sanitize::sanitize_svg;
 
 type ErrorMessageString = String;
 type SvgString = String;
-
-/// Parse SVG and return a `.grida` FlatBuffers binary.
-/// with a single Rust function that produces the final `.grida` document
-/// directly, using the same FBS codec the editor already understands.
-pub fn svg_to_grida_bytes(svg_source: &str) -> Result<Vec<u8>, ErrorMessageString> {
-    let sanitized = sanitize_svg(svg_source);
-    let graph = pack::from_svg_str(&sanitized)?;
-
-    let scene = Scene {
-        name: "svg".to_string(),
-        graph,
-        background_color: None,
-    };
-
-    // Build string ID map (NodeId u64 → string) and position map.
-    // Position strings must follow the tree's depth-first order so the
-    // FBS decoder reconstructs correct sibling z-order. Iterating
-    // `nodes_iter()` would give HashMap order which is arbitrary.
-    let mut id_map: HashMap<NodeId, String> = HashMap::new();
-    let mut position_map: HashMap<NodeId, String> = HashMap::new();
-    let mut counter: u64 = 0;
-
-    fn walk_tree_order(
-        graph: &crate::node::scene_graph::SceneGraph,
-        node_id: &NodeId,
-        id_map: &mut HashMap<NodeId, String>,
-        position_map: &mut HashMap<NodeId, String>,
-        counter: &mut u64,
-    ) {
-        id_map.insert(*node_id, format!("svg_{}", node_id));
-        position_map.insert(*node_id, format!("a{:06}", counter));
-        *counter += 1;
-
-        if let Some(children) = graph.get_children(node_id) {
-            for child_id in children {
-                walk_tree_order(graph, child_id, id_map, position_map, counter);
-            }
-        }
-    }
-
-    for root_id in scene.graph.roots() {
-        walk_tree_order(
-            &scene.graph,
-            root_id,
-            &mut id_map,
-            &mut position_map,
-            &mut counter,
-        );
-    }
-
-    let bytes = io_grida_fbs::encode(&scene, "svg_scene", &id_map, &position_map);
-    Ok(bytes)
-}
 
 /// Optimizes and resolves an SVG, producing a flat, self-contained SVG output.
 ///
@@ -90,7 +39,7 @@ pub fn svg_to_grida_bytes(svg_source: &str) -> Result<Vec<u8>, ErrorMessageStrin
 /// # Example
 ///
 /// ```rust
-/// use cg::io::io_svg::svg_optimize;
+/// use cg::formats::svg::optimize::svg_optimize;
 ///
 /// # fn main() -> Result<(), String> {
 /// let input = r#"
@@ -114,7 +63,6 @@ pub fn svg_to_grida_bytes(svg_source: &str) -> Result<Vec<u8>, ErrorMessageStrin
 /// # Errors
 ///
 /// Returns an error if the input SVG cannot be parsed or is invalid.
-///
 pub fn svg_optimize(svg_source: &str) -> Result<SvgString, ErrorMessageString> {
     let sanitized = sanitize_svg(svg_source);
     let tree = into_tree(&sanitized).map_err(|err| err.to_string())?;

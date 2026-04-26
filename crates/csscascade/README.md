@@ -67,7 +67,7 @@ Replace stubs with real providers so computed values reflect the runtime environ
 
 ### Phase 3 — IR Conversion ✅
 
-HTML → Grida IR pipeline implemented in `crates/grida-canvas/src/html/mod.rs`.
+HTML → Grida IR pipeline implemented in `crates/grida-canvas/src/import/html/mod.rs`.
 
 - [x] Map block/flex containers → Container IR nodes
 - [x] Map text nodes → TextSpan IR nodes with font/color properties

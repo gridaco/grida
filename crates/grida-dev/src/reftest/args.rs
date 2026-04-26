@@ -21,7 +21,7 @@ impl std::str::FromStr for BgColor {
 /// Choice of SVG renderer backend.
 ///
 /// - `Iosvg` (default): current path — parse SVG via vendored usvg,
-///   convert to the Grida scene graph through `cg::svg::pack`, render
+///   convert to the Grida scene graph through `cg::import::svg::pack`, render
 ///   via the canvas runtime. Lossy (editor-oriented tree surgery), but
 ///   GPU-native and consistent with the in-editor experience.
 /// - `Htmlcss`: goes through `cg::htmlcss::render_svg`, which records

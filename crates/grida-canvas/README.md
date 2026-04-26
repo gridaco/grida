@@ -53,11 +53,12 @@ Grida Canvas is a **safe, high-performance 2D real-time rendering engine** for t
 
 ## I/O
 
-| Module                          | Description                                                                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `io::io_grida_fbs`              | Encode/decode `.grida` FlatBuffers binaries. Bindings are generated from `format/grida.fbs` via `flatc --rust` (see repo root and `format/README.md`). |
-| `io::io_grida_file`             | Unified loader that auto-detects raw FlatBuffers vs ZIP-wrapped `.grida` files.                                                                        |
-| `io::io_svg`, `io::io_markdown` | Additional import/parsing helpers.                                                                                                                     |
+| Module                              | Description                                                                                                                                              |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `io::io_grida_fbs`                  | Encode/decode `.grida` FlatBuffers binaries. Bindings are generated from `format/grida.fbs` via `flatc --rust` (see repo root and `format/README.md`).   |
+| `io::io_grida_file`                 | Unified loader that auto-detects raw FlatBuffers vs ZIP-wrapped `.grida` files.                                                                          |
+| `import::svg`, `import::html`       | External-format importers (SVG, HTML) that produce a Grida `SceneGraph` or `.grida` bytes.                                                               |
+| `formats::svg`, `formats::markdown` | Format-internal utilities (sanitize, optimize, parse, markdown→HTML) — no Grida types in or out. See [`src/formats/README.md`](./src/formats/README.md). |
 
 ### Test fixtures
 

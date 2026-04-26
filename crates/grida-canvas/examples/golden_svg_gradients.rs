@@ -1,8 +1,8 @@
 use cg::cg::prelude::*;
+use cg::import::svg::pack;
 use cg::node::schema::Scene;
 use cg::runtime::camera::Camera2D;
 use cg::runtime::scene::{Backend, Renderer, RendererOptions};
-use cg::svg::pack;
 use math2::rect::Rectangle;
 
 mod dev_kit;

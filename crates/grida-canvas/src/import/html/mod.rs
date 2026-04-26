@@ -31,7 +31,7 @@ use style::values::specified::text::TextDecorationLine as StyloTextDecorationLin
 
 /// Parse an HTML string and convert it into a Grida [`SceneGraph`].
 ///
-/// This is the main entry point, analogous to [`crate::svg::pack::from_svg_str`].
+/// This is the main entry point, analogous to [`crate::import::svg::pack::from_svg_str`].
 ///
 /// # Thread Safety
 ///

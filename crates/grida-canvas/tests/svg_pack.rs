@@ -5,9 +5,9 @@
 //! For bulk-testing large external SVG corpora, use the `tool_svg_batch` example instead:
 //!   cargo run --example tool_svg_batch -- /path/to/svgs
 
-use cg::io::io_svg::svg_optimize;
-use cg::svg::sanitize::sanitize_svg;
-use cg::svg::SVGPackedScene;
+use cg::formats::svg::optimize::svg_optimize;
+use cg::formats::svg::sanitize::sanitize_svg;
+use cg::import::svg::SVGPackedScene;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -588,10 +588,10 @@ fn optimize_then_pack() {
 #[test]
 fn pack_nested_transforms_world_positions() {
     use cg::cache::geometry::GeometryCache;
+    use cg::import::svg::pack;
     use cg::layout::engine::LayoutEngine;
     use cg::node::schema::{Node, Scene};
     use cg::runtime::font_repository::FontRepository;
-    use cg::svg::pack;
     use math2::transform::AffineTransform;
     use std::sync::{Arc, Mutex};
 
@@ -716,10 +716,10 @@ fn pack_nested_transforms_world_positions() {
 #[test]
 fn pack_nested_translate_positions() {
     use cg::cache::geometry::GeometryCache;
+    use cg::import::svg::pack;
     use cg::layout::engine::LayoutEngine;
     use cg::node::schema::Scene;
     use cg::runtime::font_repository::FontRepository;
-    use cg::svg::pack;
     use std::sync::{Arc, Mutex};
 
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500">
@@ -812,10 +812,10 @@ fn pack_nested_translate_positions() {
 #[test]
 fn pack_text_in_transformed_group_world_positions() {
     use cg::cache::geometry::GeometryCache;
+    use cg::import::svg::pack;
     use cg::layout::engine::LayoutEngine;
     use cg::node::schema::{Node, Scene};
     use cg::runtime::font_repository::FontRepository;
-    use cg::svg::pack;
     use math2::transform::AffineTransform;
     use std::sync::{Arc, Mutex};
 
@@ -919,8 +919,8 @@ fn pack_text_in_transformed_group_world_positions() {
 #[test]
 fn pack_gradient_transform_rotation_preserved() {
     use cg::cg::types::Paint;
+    use cg::import::svg::pack;
     use cg::node::schema::Node;
-    use cg::svg::pack;
     use math2::transform::AffineTransform;
 
     // Non-square rect at a non-zero position. The gradient is rotated 45°.
@@ -1036,8 +1036,8 @@ fn pack_gradient_transform_rotation_preserved() {
 /// further down the page).
 #[test]
 fn pack_text_multiline_tspan_produces_group_with_ordered_y() {
+    use cg::import::svg::pack;
     use cg::node::schema::Node;
-    use cg::svg::pack;
 
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
       <text x="10" y="30" font-size="20" fill="black">
@@ -1101,8 +1101,8 @@ fn pack_text_multiline_tspan_produces_group_with_ordered_y() {
 /// repositioning). The text content should be the full concatenated string.
 #[test]
 fn pack_text_inline_tspans_single_chunk() {
+    use cg::import::svg::pack;
     use cg::node::schema::Node;
-    use cg::svg::pack;
 
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
       <text x="10" y="30" font-size="20" fill="black">
@@ -1161,8 +1161,8 @@ fn pack_text_inline_tspans_single_chunk() {
 /// TextSpan children, not bare TextSpan siblings.
 #[test]
 fn pack_text_multichunk_creates_group_parent() {
+    use cg::import::svg::pack;
     use cg::node::schema::Node;
-    use cg::svg::pack;
 
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
       <text x="10" y="30" font-size="20" fill="black">
@@ -1225,8 +1225,8 @@ fn pack_text_multichunk_creates_group_parent() {
 /// matrix (including scale/skew) must be preserved, not just rotation.
 #[test]
 fn svg_to_grida_fbs_group_transform_roundtrip() {
+    use cg::import::svg::grida::svg_to_grida_bytes;
     use cg::io::io_grida_fbs;
-    use cg::io::io_svg::svg_to_grida_bytes;
     use cg::node::schema::Node;
 
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
@@ -1281,8 +1281,8 @@ fn svg_to_grida_fbs_group_transform_roundtrip() {
 /// gradient transforms faithfully (full 2x3 matrix, not just rotation).
 #[test]
 fn svg_to_grida_fbs_gradient_transform_roundtrip() {
+    use cg::import::svg::grida::svg_to_grida_bytes;
     use cg::io::io_grida_fbs;
-    use cg::io::io_svg::svg_to_grida_bytes;
     use cg::node::schema::Node;
 
     // Rect at non-zero position with a 45° rotated gradient
@@ -1339,8 +1339,8 @@ fn svg_to_grida_fbs_gradient_transform_roundtrip() {
 /// decoded back into a Scene with the expected structure.
 #[test]
 fn svg_to_grida_fbs_roundtrip() {
+    use cg::import::svg::grida::svg_to_grida_bytes;
     use cg::io::io_grida_fbs;
-    use cg::io::io_svg::svg_to_grida_bytes;
     use cg::node::schema::Node;
 
     let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
@@ -1408,8 +1408,8 @@ fn svg_to_grida_fbs_roundtrip() {
 /// Minimal SVG — the kind a browser drag-drop would produce.
 #[test]
 fn svg_to_grida_fbs_minimal() {
+    use cg::import::svg::grida::svg_to_grida_bytes;
     use cg::io::io_grida_fbs;
-    use cg::io::io_svg::svg_to_grida_bytes;
 
     let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z" fill="black"/></svg>"#;
 
@@ -1422,8 +1422,8 @@ fn svg_to_grida_fbs_minimal() {
 /// SVG with only groups (no paths/text) — should still produce valid FBS.
 #[test]
 fn svg_to_grida_fbs_groups_only() {
+    use cg::import::svg::grida::svg_to_grida_bytes;
     use cg::io::io_grida_fbs;
-    use cg::io::io_svg::svg_to_grida_bytes;
 
     let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><g transform="translate(10,20)"><g transform="rotate(45)"/></g></svg>"#;
 
@@ -1435,8 +1435,8 @@ fn svg_to_grida_fbs_groups_only() {
 /// Empty SVG — should still produce valid FBS (just a container).
 #[test]
 fn svg_to_grida_fbs_empty() {
+    use cg::import::svg::grida::svg_to_grida_bytes;
     use cg::io::io_grida_fbs;
-    use cg::io::io_svg::svg_to_grida_bytes;
 
     let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>"#;
 
@@ -1451,8 +1451,8 @@ fn svg_to_grida_fbs_empty() {
 
 #[test]
 fn pack_attributed_text_multi_tspan_diagnostic() {
+    use cg::import::svg::pack;
     use cg::node::schema::Node;
-    use cg::svg::pack;
 
     let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">
   <text x="10" y="40">
@@ -1537,10 +1537,10 @@ fn pack_attributed_text_multi_tspan_diagnostic() {
 #[test]
 fn pack_attributed_text_full_pipeline() {
     use cg::cache::geometry::GeometryCache;
+    use cg::import::svg::pack;
     use cg::layout::engine::LayoutEngine;
     use cg::node::schema::{Node, Scene};
     use cg::runtime::font_repository::FontRepository;
-    use cg::svg::pack;
     use std::sync::{Arc, Mutex};
 
     let fixture_path = concat!(

@@ -217,7 +217,7 @@ This is closest to how both Chromium (`pattern_map_` per client) and usvg
 | File                                                     | Change                                                       |
 | -------------------------------------------------------- | ------------------------------------------------------------ |
 | `crates/grida-canvas/src/cg/svg.rs`                      | Add `SVGPatternPaint` struct and `SVGPaint::Pattern` variant |
-| `crates/grida-canvas/src/svg/from_usvg.rs`               | Convert `usvg::Paint::Pattern` instead of discarding         |
+| `crates/grida-canvas/src/import/svg/from_usvg.rs`        | Convert `usvg::Paint::Pattern` instead of discarding         |
 | `crates/grida-canvas/src/cg/types.rs`                    | Possibly add `Paint::Pattern(...)` variant                   |
 | `crates/grida-canvas/src/painter/paint.rs`               | Handle pattern shader creation                               |
 | `crates/grida-canvas-wasm/lib/modules/svg-bindings.d.ts` | Update `SVGPaint` type                                       |

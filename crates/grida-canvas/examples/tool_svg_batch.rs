@@ -27,9 +27,9 @@ use std::{
 
 use clap::Parser;
 
-use cg::io::io_svg::svg_optimize;
-use cg::svg::sanitize::sanitize_svg;
-use cg::svg::SVGPackedScene;
+use cg::formats::svg::optimize::svg_optimize;
+use cg::formats::svg::sanitize::sanitize_svg;
+use cg::import::svg::SVGPackedScene;
 
 #[derive(Parser, Debug)]
 #[command(
