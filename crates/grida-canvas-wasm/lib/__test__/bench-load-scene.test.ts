@@ -91,34 +91,6 @@ describe("bench: load_scene (WASM-on-Node)", () => {
     scene.dispose();
   });
 
-  it("synthetic 100x100 grid (10k nodes)", async () => {
-    const scene = createRasterScene();
-
-    const t0 = performance.now();
-    scene.loadBenchmarkScene(100, 100);
-    const elapsed = performance.now() - t0;
-
-    console.log(
-      `[wasm-bench] synthetic 100x100: ${elapsed.toFixed(0)}ms (10k nodes)`
-    );
-    expect(elapsed).toBeLessThan(30_000);
-    scene.dispose();
-  }, 60_000);
-
-  it("synthetic 200x200 grid (40k nodes)", async () => {
-    const scene = createRasterScene();
-
-    const t0 = performance.now();
-    scene.loadBenchmarkScene(200, 200);
-    const elapsed = performance.now() - t0;
-
-    console.log(
-      `[wasm-bench] synthetic 200x200: ${elapsed.toFixed(0)}ms (40k nodes)`
-    );
-    expect(elapsed).toBeLessThan(60_000);
-    scene.dispose();
-  }, 120_000);
-
   // Auto-discovered .grida fixtures from fixtures/local/
   const fixtures = discoverGridaFixtures();
 

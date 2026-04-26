@@ -72,12 +72,6 @@ declare namespace canvas {
       children_ptr: number,
       children_len: number
     ): boolean;
-    _load_dummy_scene(state: GridaCanvasApplicationPtr): void;
-    _load_benchmark_scene(
-      state: GridaCanvasApplicationPtr,
-      cols: number,
-      rows: number
-    ): void;
     _pointer_move(state: GridaCanvasApplicationPtr, x: number, y: number): void;
     _add_font(
       state: GridaCanvasApplicationPtr,

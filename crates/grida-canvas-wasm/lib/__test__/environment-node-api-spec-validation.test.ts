@@ -51,8 +51,6 @@ const EXPECTED_FUNCTIONS = [
   { name: "_switch_scene", paramCount: 3 },
   { name: "_replace_node_grida", paramCount: 3 },
   { name: "_delete_node", paramCount: 3 },
-  { name: "_load_dummy_scene", paramCount: 1 },
-  { name: "_load_benchmark_scene", paramCount: 3 },
 
   // images (lazy loading)
   { name: "_drain_missing_images", paramCount: 1 },

@@ -24,8 +24,9 @@ const factory = await init({
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const scene = factory.createWebGLCanvasSurface(canvas);
 
-// ready to draw
-scene.loadDummyScene();
+// load a .grida document
+const bytes = new Uint8Array(await (await fetch("scene.grida")).arrayBuffer());
+scene.loadSceneGrida(bytes);
 ```
 
 ### Node (raster export)

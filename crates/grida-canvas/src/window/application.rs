@@ -1,7 +1,6 @@
 use crate::cg::color::CGColor;
 use crate::cg::types::{Paint, TextAlignVertical};
 use crate::devtools::{fps_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay};
-use crate::dummy;
 use crate::export::{
     export_node_as, export_pdf_document, ExportAs, ExportPdfDocumentOptions, Exported,
 };
@@ -203,12 +202,6 @@ pub trait ApplicationApi {
         let _ = children_user_ids;
         false
     }
-
-    // static demo scenes
-    /// Load a simple demo scene with a few colored rectangles.
-    fn load_dummy_scene(&mut self);
-    /// Load a heavy scene useful for performance benchmarking.
-    fn load_benchmark_scene(&mut self, cols: u32, rows: u32);
 }
 
 /// Host events
@@ -979,16 +972,6 @@ impl ApplicationApi for UnknownTargetApplication {
         }
         self.queue();
         true
-    }
-
-    fn load_dummy_scene(&mut self) {
-        let scene = dummy::create_dummy_scene();
-        self.renderer.load_scene(scene);
-    }
-
-    fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
-        let scene = dummy::create_benchmark_scene(cols, rows);
-        self.renderer.load_scene(scene);
     }
 }
 

@@ -1374,29 +1374,3 @@ pub(crate) unsafe extern "C" fn highlight_strokes(
 }
 
 // #endregion: surface api
-
-// ====================================================================================================
-// #region: testing / mock / dummy
-// ====================================================================================================
-
-#[no_mangle]
-/// js::_load_dummy_scene
-pub(crate) unsafe extern "C" fn load_dummy_scene(app: *mut UnknownTargetApplication) {
-    if let Some(app) = app.as_mut() {
-        app.load_dummy_scene();
-    }
-}
-
-#[no_mangle]
-/// js::_load_benchmark_scene
-pub(crate) unsafe extern "C" fn load_benchmark_scene(
-    app: *mut UnknownTargetApplication,
-    cols: u32,
-    rows: u32,
-) {
-    if let Some(app) = app.as_mut() {
-        app.load_benchmark_scene(cols, rows);
-    }
-}
-
-// #endregion

@@ -319,15 +319,6 @@ impl ApplicationApi for EmscriptenApplication {
     fn loaded_scene_ids(&self) -> Vec<String> {
         self.base.loaded_scene_ids()
     }
-
-    fn load_dummy_scene(&mut self) {
-        self.base.load_dummy_scene();
-    }
-
-    /// Load a heavy scene useful for performance benchmarking.
-    fn load_benchmark_scene(&mut self, cols: u32, rows: u32) {
-        self.base.load_benchmark_scene(cols, rows);
-    }
 }
 
 impl EmscriptenApplication {
