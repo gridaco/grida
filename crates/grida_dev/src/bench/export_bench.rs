@@ -5,22 +5,22 @@
 //!
 //! ```sh
 //! # List nodes in a scene to pick a target
-//! cargo run -p grida-dev --release -- export-bench file.grida --list-nodes
+//! cargo run -p grida_dev --release -- export-bench file.grida --list-nodes
 //!
 //! # Benchmark exporting node 42 as PNG (default: 5 iterations)
-//! cargo run -p grida-dev --release -- export-bench file.grida --node 42
+//! cargo run -p grida_dev --release -- export-bench file.grida --node 42
 //!
 //! # Export with scale constraint, JPEG format
-//! cargo run -p grida-dev --release -- export-bench file.grida --node 42 --format jpeg --scale 2.0
+//! cargo run -p grida_dev --release -- export-bench file.grida --node 42 --format jpeg --scale 2.0
 //!
 //! # Export all root nodes
-//! cargo run -p grida-dev --release -- export-bench file.grida --all-roots
+//! cargo run -p grida_dev --release -- export-bench file.grida --all-roots
 //!
 //! # Save the exported image to inspect visually
-//! cargo run -p grida-dev --release -- export-bench file.grida --node 42 --save
+//! cargo run -p grida_dev --release -- export-bench file.grida --node 42 --save
 //!
 //! # Compare two strategies pixel-for-pixel (future: baseline vs optimized)
-//! cargo run -p grida-dev --release -- export-bench file.grida --node 42 --compare
+//! cargo run -p grida_dev --release -- export-bench file.grida --node 42 --compare
 //! ```
 
 use anyhow::{anyhow, bail, Context, Result};

@@ -4,7 +4,7 @@ members = [
   "crates/grida-canvas",
   "crates/grida-canvas-wasm",
   "crates/fonts",
-  "crates/grida-dev",
+  "crates/grida_dev",
   "crates/grida_wpt",
   "crates/csscascade",
   "crates/math2",

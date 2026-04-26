@@ -6,7 +6,7 @@ import type { BgColor, ScoringMask, SuiteConfig } from "./types.js";
 /**
  * Load and parse a `reftest.toml` or `reftest.json` from a suite directory.
  *
- * The schema mirrors `crates/grida-dev/src/reftest/config.rs`, minus the
+ * The schema mirrors `crates/grida_dev/src/reftest/config.rs`, minus the
  * `type` field (which Rust kept but never used). The new nested shape is
  * preferred:
  *

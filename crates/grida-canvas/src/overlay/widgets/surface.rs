@@ -34,7 +34,7 @@ pub struct SurfaceOverlayConfig {
     /// Show selection handles (resize knobs, rotation zones) and per-node
     /// bounding rects on selected shapes. Defaults to `false`.
     ///
-    /// Enabled by the native host (`grida-dev`). The web side keeps this
+    /// Enabled by the native host (`grida_dev`). The web side keeps this
     /// off because the JS editor renders its own overlay handles.
     pub show_selection_handles: bool,
 }

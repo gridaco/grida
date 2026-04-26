@@ -108,7 +108,7 @@ A practical approach treats benchmarking as three separate layers:
 
 Measures the implementation ceiling and isolates core algorithmic cost.
 
-Tools: `cargo run -p grida-dev --release -- load-bench`, Criterion benches
+Tools: `cargo run -p grida_dev --release -- load-bench`, Criterion benches
 in `crates/grida-canvas/benches/`.
 
 Best for: Algorithmic comparisons, regression detection, profiling with

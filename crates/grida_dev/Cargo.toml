@@ -1,5 +1,5 @@
 [package]
-name = "grida-dev"
+name = "grida_dev"
 version = "0.0.0"
 edition = "2021"
 publish = false

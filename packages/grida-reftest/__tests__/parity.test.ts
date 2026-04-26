@@ -1,11 +1,11 @@
 // Parity gate: a single fixture pair must score within ±0.005 of the
-// Rust `grida-dev reftest` tool (and land in the same bucket).
+// Rust `grida_dev reftest` tool (and land in the same bucket).
 //
 // Strategy
 // --------
 // 1. Copy the committed parity fixture (svg/halfdiff.svg + png/halfdiff.png)
-//    into a scratch suite-dir that grida-dev reftest can consume.
-// 2. Invoke the pre-built `target/debug/grida-dev` binary with the same
+//    into a scratch suite-dir that grida_dev reftest can consume.
+// 2. Invoke the pre-built `target/debug/grida_dev` binary with the same
 //    defaults this package uses under the hood (bg=white, threshold=0, no AA).
 //    We keep mask=none to match Rust's default for non-SVG-kind configs.
 // 3. Read the Rust-produced `report.json` and the bucketed `*.current.png`.
@@ -21,7 +21,7 @@
 //
 // Skips (does not fail) when the Rust binary isn't available — CI without
 // a cargo build has no way to run this. Devs who run `cargo build -p
-// grida-dev` will see it enforced locally.
+// grida_dev` will see it enforced locally.
 
 import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
@@ -34,7 +34,7 @@ import { deserializeReport } from "../src/report.js";
 import { makeSolidPng, writeFixture } from "./fixtures.js";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-const RUST_BIN = path.join(REPO_ROOT, "target", "debug", "grida-dev");
+const RUST_BIN = path.join(REPO_ROOT, "target", "debug", "grida_dev");
 const FIXTURES = path.resolve(__dirname, "fixtures", "parity");
 const SVG_DIR = path.join(FIXTURES, "svg");
 const PNG_DIR = path.join(FIXTURES, "png");
@@ -58,7 +58,7 @@ interface RustRunResult {
 }
 
 function runRustReftest(testName: string): RustRunResult {
-  // grida-dev reftest requires a suite-dir with svg/ and png/ subdirs and
+  // grida_dev reftest requires a suite-dir with svg/ and png/ subdirs and
   // writes the bucketed output + report.json to --output-dir. We isolate
   // a single fixture by copying just the one pair into a scratch dir.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "grida-reftest-parity-"));
@@ -112,7 +112,7 @@ function runRustReftest(testName: string): RustRunResult {
   };
 }
 
-describe.runIf(rustBinAvailable())("parity with grida-dev reftest", () => {
+describe.runIf(rustBinAvailable())("parity with grida_dev reftest", () => {
   it("halfdiff fixture: TS score within ±0.005 of Rust score, same bucket", async () => {
     const rust = runRustReftest("halfdiff");
 
@@ -199,10 +199,10 @@ describe.runIf(rustBinAvailable())("parity with grida-dev reftest", () => {
 });
 
 describe.skipIf(rustBinAvailable())(
-  "parity with grida-dev reftest (SKIPPED)",
+  "parity with grida_dev reftest (SKIPPED)",
   () => {
     it.todo(
-      `rust binary not found at ${RUST_BIN}; run 'cargo build -p grida-dev' to enable`
+      `rust binary not found at ${RUST_BIN}; run 'cargo build -p grida_dev' to enable`
     );
   }
 );

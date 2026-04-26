@@ -82,6 +82,6 @@ We use pixel-by-pixel comparison to measure rendering accuracy against reference
 
 ## Internal Tools: Reftest
 
-The `reftest` command in `grida-dev` is the primary testing tool for SVG rendering evaluation. It renders SVG files to PNG, compares them against reference images using pixel diffing, and generates similarity scores and visual diff images. Results are organized into score-based categories (S99, S95, S90, S75, err) with comprehensive JSON reports.
+The `reftest` command in `grida_dev` is the primary testing tool for SVG rendering evaluation. It renders SVG files to PNG, compares them against reference images using pixel diffing, and generates similarity scores and visual diff images. Results are organized into score-based categories (S99, S95, S90, S75, err) with comprehensive JSON reports.
 
-See `crates/grida-dev/TESTING.md` for detailed usage instructions, configuration options, and command-line reference.
+See `crates/grida_dev/TESTING.md` for detailed usage instructions, configuration options, and command-line reference.

@@ -132,7 +132,7 @@ npx vitest run __test__/bench-load-scene.test.ts
 Native benchmarks:
 
 ```sh
-cargo run -p grida-dev --release -- load-bench fixtures/local/perf/local/<your-fixture>.grida --iterations 3
+cargo run -p grida_dev --release -- load-bench fixtures/local/perf/local/<your-fixture>.grida --iterations 3
 ```
 
 Build WASM (from repo root):
@@ -153,7 +153,7 @@ just --justfile crates/grida-canvas-wasm/justfile build
 ## Validation
 
 1. `cargo test -p cg` — all 330 tests must pass
-2. `cargo check -p cg -p grida-canvas-wasm -p grida-dev` — all crates compile
+2. `cargo check -p cg -p grida-canvas-wasm -p grida_dev` — all crates compile
 3. Native benchmark: should not regress (target: `<800ms`)
 4. WASM-on-Node benchmark: geometry stage should drop from ~4s to `<1s`
 5. Visual: load the fixture in browser debug embed, verify text renders correctly and pan/zoom/settle work

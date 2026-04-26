@@ -1,4 +1,4 @@
-# `grida-dev`
+# `grida_dev`
 
 Rust-native dev runtime for `cg` that bundles the winit/Skia host, CLI devtools, and (eventually) micro editor surfaces—ideal for iterating without rebuilding the WASM/editor stack.
 
@@ -13,17 +13,17 @@ Rust-native dev runtime for `cg` that bundles the winit/Skia host, CLI devtools,
 
 ```bash
 # Interactive window — drop files to load, or pass a file/URL directly
-cargo run -p grida-dev
-cargo run -p grida-dev -- path/to/scene.grida
-cargo run -p grida-dev -- icon.svg
+cargo run -p grida_dev
+cargo run -p grida_dev -- path/to/scene.grida
+cargo run -p grida_dev -- icon.svg
 
 # Headless GPU benchmark (no window, prints per-frame stats)
-cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
-cargo run -p grida-dev --release -- bench --size 100
+cargo run -p grida_dev --release -- bench ./fixtures/test-grida/bench.grida
+cargo run -p grida_dev --release -- bench --size 100
 
 # Resize benchmark — measures resize() + redraw() cost per cycle
-cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida --resize
-cargo run -p grida-dev --release -- bench --size 100 --resize --frames 50
+cargo run -p grida_dev --release -- bench ./fixtures/test-grida/bench.grida --resize
+cargo run -p grida_dev --release -- bench --size 100 --resize --frames 50
 ```
 
 ## Performance measurement

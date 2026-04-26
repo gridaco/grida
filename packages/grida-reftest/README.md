@@ -2,7 +2,7 @@
 
 General-purpose, language-agnostic reference-test CLI and library for
 image-based visual comparison. Canonical diff/score/report implementation
-for the Grida project; peer of `grida-dev reftest` (Rust, SVG-specific).
+for the Grida project; peer of `grida_dev reftest` (Rust, SVG-specific).
 
 Non-goals: rendering, format parsing, watch mode, JUnit/TAP output,
 multi-suite orchestration.
@@ -41,9 +41,9 @@ in shell pipes.
 └── report.json
 ```
 
-`report.json` matches the schema produced by the Rust `grida-dev reftest`
+`report.json` matches the schema produced by the Rust `grida_dev reftest`
 tool exactly (snake_case field names). See
-`crates/grida-dev/src/reftest/report.rs`.
+`crates/grida_dev/src/reftest/report.rs`.
 
 ## Programmatic API
 
@@ -122,7 +122,7 @@ mask = "alpha"
 
 ## Scoring
 
-Mirrors `crates/grida-dev/src/reftest/compare.rs` exactly:
+Mirrors `crates/grida_dev/src/reftest/compare.rs` exactly:
 
 ```
 scoring_pixels = mask === "alpha"
@@ -158,5 +158,5 @@ pnpm --filter @grida/reftest build       # emits ./dist via tsc
 ```
 
 The M4 parity test (`__tests__/parity.test.ts`) needs the Rust binary at
-`<repo>/target/debug/grida-dev`. Run `cargo build -p grida-dev` once to
+`<repo>/target/debug/grida_dev`. Run `cargo build -p grida_dev` once to
 enable it; it skips cleanly if the binary is missing.

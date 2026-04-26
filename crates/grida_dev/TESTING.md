@@ -1,6 +1,6 @@
 # SVG Reftest Testing
 
-The `reftest` command in `grida-dev` provides a testing framework for evaluating SVG rendering accuracy by comparing rendered outputs against reference images.
+The `reftest` command in `grida_dev` provides a testing framework for evaluating SVG rendering accuracy by comparing rendered outputs against reference images.
 
 ## Overview
 
@@ -28,7 +28,7 @@ This is a **scoring system**, not a pass/fail assertion framework. It provides m
 ### Basic Usage
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite
 ```
 
@@ -53,7 +53,7 @@ The suite name is determined by:
 Override with `--output-dir`:
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --output-dir custom-output
 ```
@@ -65,7 +65,7 @@ The output directory is cleared on each run by default. Use `--no-overwrite` to 
 Run only specific test categories:
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --filter "shapes-*"
 ```
@@ -117,7 +117,7 @@ The diff comparer composites images over a solid background before pixel diffing
 Example:
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --bg white
 ```
@@ -249,14 +249,14 @@ Example: If `inputs = "scalable/**/*.svg"` and `expects = "256x256"`, then `scal
 ### Run All Tests
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite
 ```
 
 ### Test Only Shape Rendering
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --filter "shapes-*"
 ```
@@ -264,7 +264,7 @@ cargo run -p grida-dev -- reftest \
 ### Test with White Background
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --bg white \
   --threshold 0
@@ -273,7 +273,7 @@ cargo run -p grida-dev -- reftest \
 ### Custom Output Directory
 
 ```bash
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --output-dir my-results \
   --no-overwrite
@@ -319,7 +319,7 @@ The reftest command can be integrated into CI/CD pipelines:
 
 ```bash
 # Run tests
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --output-dir ci-results
 
@@ -337,5 +337,5 @@ Since this is a scoring system, you may want to:
 
 ## See Also
 
-- `crates/grida-dev/reftest.example.toml` for a configuration template
+- `crates/grida_dev/reftest.example.toml` for a configuration template
 - Test suite configurations in `fixtures/local/*/reftest.toml`

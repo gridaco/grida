@@ -37,7 +37,7 @@ rasterizer for Skia's built-in SVG DOM — GPU-capable and paints straight
 to an `SkCanvas`. Unblocks WPT-style SVG reftests without writing a
 native Grida SVG renderer.
 
-Baseline against `fixtures/local/resvg-test-suite` (1,679 tests, `grida-dev
+Baseline against `fixtures/local/resvg-test-suite` (1,679 tests, `grida_dev
 reftest --renderer htmlcss`):
 
 | Bucket    | Count | % of suite |

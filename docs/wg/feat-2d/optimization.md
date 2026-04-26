@@ -1007,7 +1007,7 @@ and single-thread overhead.
     ~5x layout speedup on small scenes; orders of magnitude on
     100K+ node scenes where Taffy + text measurement dominate.
 
-    CLI: `cargo run -p grida-dev --release -- load-bench file.grida --skip-layout`
+    CLI: `cargo run -p grida_dev --release -- load-bench file.grida --skip-layout`
 
 35. **Pre-Allocate Layout Data Structures** ✅ IMPLEMENTED
 
@@ -1035,7 +1035,7 @@ and single-thread overhead.
     that returns measurements directly, skipping Skia entirely for
     repeated queries with the same width.
 
-**Diagnostic tooling:** `load-bench` CLI (`grida-dev load-bench`)
+**Diagnostic tooling:** `load-bench` CLI (`grida_dev load-bench`)
 for per-stage timing; `cargo bench -p cg --bench bench_load_scene`
 for Criterion benchmarks at synthetic scale.
 

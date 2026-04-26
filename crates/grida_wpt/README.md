@@ -19,7 +19,7 @@ the binary without pulling a GUI toolchain.
 The crate is named for its strategic anchor (WPT) but is expected to
 grow to host adjacent test infra — the existing SVG reftest runner,
 refig suites, and future paint reftests — as they are promoted out of
-`grida-dev`.
+`grida_dev`.
 
 ## Usage
 

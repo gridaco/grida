@@ -1,7 +1,7 @@
 //! Dev-only editor — owns document state, handles gestures, flushes
 //! scenes to the `cg` renderer.
 //!
-//! This module is the **grida-dev counterpart** to the web editor's
+//! This module is the **grida_dev counterpart** to the web editor's
 //! React/Redux layer. It:
 //! - Owns a mutable copy of the `Scene` (the editor document).
 //! - Reads gesture/selection state from the `cg` surface.

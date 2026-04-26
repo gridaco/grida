@@ -463,7 +463,7 @@ fn selection_rect_hit_test_accuracy() {
 // ── Schema accessor tests ────────────────────────────────────────────────
 // Test Node::transform_mut(), Node::size_mut(), refresh_node_geo_data()
 // via direct scene graph manipulation + full geometry rebuild.
-// (Mutation e2e tests live in grida-dev/src/editor/.)
+// (Mutation e2e tests live in grida_dev/src/editor/.)
 
 #[test]
 fn translate_node_moves_bounds() {

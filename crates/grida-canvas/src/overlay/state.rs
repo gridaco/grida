@@ -66,7 +66,7 @@ pub struct SurfaceState {
     /// click-to-select.  Translate gestures, deferred selection, the
     /// move cursor, and selection-rect hit testing are all disabled.
     ///
-    /// Set to `false` by the native host (`grida-dev`) to enable the
+    /// Set to `false` by the native host (`grida_dev`) to enable the
     /// full editing surface.  The web side keeps the default so these
     /// features don't interfere with the JS-driven editor.
     pub readonly: bool,

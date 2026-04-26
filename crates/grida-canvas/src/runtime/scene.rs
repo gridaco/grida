@@ -93,7 +93,7 @@ pub struct RendererOptions {
     ///
     /// **Default: `false`** — matches the WASM/web environment where only
     /// explicitly provided fonts are available. Set to `true` in native-only
-    /// dev tools (grida-dev `--system-fonts`) for convenient local previewing.
+    /// dev tools (grida_dev `--system-fonts`) for convenient local previewing.
     pub use_system_fonts: bool,
     /// Initial renderer configuration. Applied at construction; individual
     /// fields remain mutable via `Renderer::set_*` / `ApplicationApi` setters.

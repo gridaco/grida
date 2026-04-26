@@ -50,7 +50,7 @@ export interface ProgressEvent {
 
 /**
  * Produce actuals-vs-expected bucketed output + report.json for a single suite.
- * Output layout mirrors `crates/grida-dev/src/reftest/runner.rs`:
+ * Output layout mirrors `crates/grida_dev/src/reftest/runner.rs`:
  * `<outputDir>/{S99,S95,S90,S75,err}/<name>.{current,expected,diff}.png` + `report.json`.
  *
  * Scoring is reported, not asserted: the returned report may contain failing

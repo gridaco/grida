@@ -38,10 +38,10 @@ Use these terms precisely. Misusing them erodes trust in test results.
 | **Pixel diff**                     | Byte-level comparison of two raster images. A single differing channel value is a failure (at zero tolerance).                                                                                                                                                            |
 | **Perceptual diff**                | Comparison in a perceptual color space (e.g. YIQ via the `dify` crate). Weights differences by human visual sensitivity. More forgiving than raw pixel diff but still quantifiable.                                                                                       |
 | **rendiff**                        | Rust crate (`rendiff` v0.2) for histogram-based pixel diffing. Computes a per-channel difference histogram; thresholds are expressed as `[(max_diff, max_count), ...]` pairs. Used in `flatten_rendiff.rs` for equivalence tests. Dep in `crates/grida-canvas/`.          |
-| **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida-dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                           |
+| **dify**                           | Rust crate for perceptual image comparison in YIQ color space. Used by `grida_dev reftest` for SVG reftests. Supports `--threshold` and `--aa` (anti-aliasing detection) flags.                                                                                           |
 | **pixelmatch**                     | Pure-JS perceptual image comparison library. YIQ-based, AA-aware. Used by `@grida/reftest`. Zero native deps; same conceptual model as dify, slightly different threshold semantics — see parity notes below.                                                             |
-| **`@grida/reftest`**               | General-purpose, language-agnostic TS reftest CLI + library at `packages/grida-reftest/`. Takes two directories of PNGs, diffs, scores, writes the same bucket layout and JSON report as the Rust `grida-dev reftest`. Does NOT render anything — producers upstream.     |
-| **`grida-dev reftest`**            | Rust reftest runner at `crates/grida-dev/src/reftest/`. SVG-specific: renders SVG via our own cg pipeline, then diffs against a reference PNG. Canonical for SVG. For non-SVG formats, use `@grida/reftest` with an upstream renderer.                                    |
+| **`@grida/reftest`**               | General-purpose, language-agnostic TS reftest CLI + library at `packages/grida-reftest/`. Takes two directories of PNGs, diffs, scores, writes the same bucket layout and JSON report as the Rust `grida_dev reftest`. Does NOT render anything — producers upstream.     |
+| **`grida_dev reftest`**            | Rust reftest runner at `crates/grida_dev/src/reftest/`. SVG-specific: renders SVG via our own cg pipeline, then diffs against a reference PNG. Canonical for SVG. For non-SVG formats, use `@grida/reftest` with an upstream renderer.                                    |
 | **refig**                          | Short for "Figma reftest." Fixture suites under `fixtures/local/refig/` containing `.fig` + `document.json` + `images/` + `exports/` (oracle PNGs from Figma's Images API). Consumed by a TS render step + `@grida/reftest`. See `fixtures/local/refig/README.md`.        |
 | **refbrowser**                     | Short for "headless-browser reftest." HTML/CSS fixtures under `fixtures/test-html/L0/` rendered by Playwright Chromium as the oracle vs. our `cg` htmlcss renderer. Producer script: `.agents/skills/cg-reftest/scripts/refbrowser_render.ts`; diff via `@grida/reftest`. |
 | **Tolerance / fuzz**               | A configured threshold below which pixel differences are ignored. Expressed as a histogram threshold (rendiff) or a YIQ distance (dify / pixelmatch). Required when rasterization is non-deterministic across platforms.                                                  |
@@ -91,8 +91,8 @@ instant, deterministic, and platform-independent.
 Use when a **trusted external reference** exists:
 
 - **SVG rendering** — W3C SVG 1.1 Test Suite provides reference PNGs.
-  Our `grida-dev reftest` runner compares against these.
-  See `docs/wg/feat-svg/testing.md` and `crates/grida-dev/TESTING.md`.
+  Our `grida_dev reftest` runner compares against these.
+  See `docs/wg/feat-svg/testing.md` and `crates/grida_dev/TESTING.md`.
 - **resvg test suite** — feature-focused SVG tests with author-provided
   reference PNGs.
 - **Figma files (refig)** — Figma's own Images API renders every node
@@ -111,7 +111,7 @@ producer:
 
 | Runner              | Language | Render path                      | Diff engine | Use when                                                            |
 | ------------------- | -------- | -------------------------------- | ----------- | ------------------------------------------------------------------- |
-| `grida-dev reftest` | Rust     | SVG → cg → PNG (built-in)        | dify        | SVG suites (W3C, resvg); renderer runs in-process                   |
+| `grida_dev reftest` | Rust     | SVG → cg → PNG (built-in)        | dify        | SVG suites (W3C, resvg); renderer runs in-process                   |
 | `@grida/reftest`    | TS       | None — you produce PNGs upstream | pixelmatch  | Figma refig, any cross-language producer, re-diff without re-render |
 
 Both write the **same bucket layout** (`S99/S95/S90/S75/err`) and the
@@ -136,11 +136,11 @@ Two strategies, depending on whether a reference image already exists:
 
 Use if the SVG comes from a test suite that ships reference PNGs alongside it
 (W3C SVG 1.1, resvg-test-suite, Oxygen Icons). The oracle is the co-located
-PNG; `grida-dev reftest` picks it up automatically via `reftest.toml`.
+PNG; `grida_dev reftest` picks it up automatically via `reftest.toml`.
 
 ```sh
 # W3C suite — reference PNGs are in png/ next to svg/
-cargo run -p grida-dev --release -- reftest \
+cargo run -p grida_dev --release -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite --bg white
 ```
 
@@ -905,7 +905,7 @@ individually justified. If you regenerate, review each changed file.
 
 ### Reserve "reftest" for true reference-backed correctness checks
 
-The SVG test suite comparisons via `grida-dev reftest` are genuine
+The SVG test suite comparisons via `grida_dev reftest` are genuine
 reftests — they compare against W3C-provided reference images.
 
 The `flatten_rendiff.rs` tests are **self-consistency tests** — they
@@ -964,7 +964,7 @@ chore: regenerate snapshots    ← (why? what changed?)
 
 ```bash
 # Run SVG reftests against W3C suite
-cargo run -p grida-dev -- reftest \
+cargo run -p grida_dev -- reftest \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite \
   --bg white
 

@@ -33,7 +33,7 @@ Before touching any code, build context by reading these sources in order:
    read whichever documents match the problem at hand.
 4. **Read existing benchmarks** — look in `crates/grida-canvas/benches/`
    to understand what is already measured and how.
-5. **Read `crates/grida-dev/src/main.rs`** — the `bench` and `bench-report`
+5. **Read `crates/grida_dev/src/main.rs`** — the `bench` and `bench-report`
    subcommands show how GPU benchmarks work with real `.grida` scene files.
    `bench-report` is the bulk mode that outputs JSON across all fixtures.
 
@@ -50,14 +50,14 @@ relying on hardcoded paths. File locations shift as the engine evolves.
 | Promotion heuristics                      | `grep "fn should_promote" --include="*.rs"`                                                         |
 | Where zoom invalidation happens           | `grep "zoom_changed\|mark_all_stale\|invalidate_all" --include="*.rs"` in `src/runtime/`            |
 | Frame pipeline flow                       | Search for `fn queue\|fn flush\|fn draw\|fn frame` in the renderer file                             |
-| Benchmark fixture scenes                  | `--list-scenes` flag on `grida-dev bench`, or run `bench-report` on a directory                     |
+| Benchmark fixture scenes                  | `--list-scenes` flag on `grida_dev bench`, or run `bench-report` on a directory                     |
 | Config toggles (compositing, atlas, etc.) | `grep "set_layer_compositing\|set_compositor_atlas\|set_interaction_render_scale" --include="*.rs"` |
 | Existing `.plan.md` proposals             | `glob "docs/wg/feat-2d/*.plan.md"`                                                                  |
 | Scene loading pipeline                    | `grep "fn load_scene" --include="*.rs"` in `src/runtime/scene.rs`                                   |
 | Layout engine entry point                 | `grep "fn compute\b" --include="*.rs"` in `src/layout/engine.rs`                                    |
 | Text measurement stats                    | `grep "ParagraphMeasureStats" --include="*.rs"`                                                     |
 | Skip-layout config                        | `grep "skip_layout" --include="*.rs"` in `src/runtime/`                                             |
-| Load-bench CLI tool                       | Read `crates/grida-dev/src/bench/load_bench.rs`                                                     |
+| Load-bench CLI tool                       | Read `crates/grida_dev/src/bench/load_bench.rs`                                                     |
 
 ---
 
@@ -70,12 +70,12 @@ bench and Criterion provide deeper investigation when needed.
 
 | Class           | What moves between frames          | Tool                            | Measures                                       |
 | --------------- | ---------------------------------- | ------------------------------- | ---------------------------------------------- |
-| Camera motion   | `Camera2D` (pan/zoom)              | `grida-dev bench` scenarios     | draw + compositor + caches on stable scene     |
-| Node mutation   | Scene graph (translate / replace)  | `grida-dev bench --translate`   | `apply_changes` (invalidation pipeline) + draw |
-| Bulk regression | All scenes, camera motion          | `grida-dev bench-report` (JSON) | per-scene PassStats across the fixture set     |
+| Camera motion   | `Camera2D` (pan/zoom)              | `grida_dev bench` scenarios     | draw + compositor + caches on stable scene     |
+| Node mutation   | Scene graph (translate / replace)  | `grida_dev bench --translate`   | `apply_changes` (invalidation pipeline) + draw |
+| Bulk regression | All scenes, camera motion          | `grida_dev bench-report` (JSON) | per-scene PassStats across the fixture set     |
 | Algorithmic     | Synthetic grid, various operations | `cargo bench -p cg` (Criterion) | CPU-only cost with statistical CI              |
 
-### 1. Bulk benchmark report (`grida-dev bench-report`)
+### 1. Bulk benchmark report (`grida_dev bench-report`)
 
 Runs all scenes in all `.grida` files and outputs a compact **JSON
 report**. Use this to establish baselines, detect regressions across
@@ -83,13 +83,13 @@ the full fixture set, and identify which scenes/stages are slowest.
 
 ```sh
 # All fixtures — recommended first step
-cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --output baseline.json
+cargo run -p grida_dev --release -- bench-report ./fixtures/ --frames 100 --output baseline.json
 
 # Single file
-cargo run -p grida-dev --release -- bench-report ./fixtures/test-grida/bench.grida --frames 200
+cargo run -p grida_dev --release -- bench-report ./fixtures/test-grida/bench.grida --frames 200
 
 # Local fixtures for broader coverage
-cargo run -p grida-dev --release -- bench-report ./fixtures/local/ --frames 100 --output baseline-local.json
+cargo run -p grida_dev --release -- bench-report ./fixtures/local/ --frames 100 --output baseline-local.json
 ```
 
 The JSON report contains per-scene results with:
@@ -109,17 +109,17 @@ Each `PassStats` contains:
 Progress goes to stderr, JSON to stdout (or `--output path`). This
 keeps the JSON clean for programmatic consumption.
 
-### 2. Single-scene GPU benchmark (`grida-dev bench`)
+### 2. Single-scene GPU benchmark (`grida_dev bench`)
 
 Runs real scene data on the actual GPU backend (Metal/GL). This is the
 ground truth for "does the user experience improve?"
 
 ```sh
 # List scenes to pick the right one
-cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida --list-scenes
+cargo run -p grida_dev --release -- bench ./fixtures/test-grida/bench.grida --list-scenes
 
 # Run a specific scene
-cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida --scene <N> --frames 200
+cargo run -p grida_dev --release -- bench ./fixtures/test-grida/bench.grida --scene <N> --frames 200
 ```
 
 **Always use `--release`.** Debug builds are 20-30x slower and produce
@@ -155,11 +155,11 @@ matching the real `Application::frame()` pipeline where
 
 ```sh
 # A/B test: content only vs content + overlay (MUST be sequential, never parallel)
-cargo run -p grida-dev --release -- bench ./fixtures/test-grida/L0.grida --scene 22 --frames 200 && \
-cargo run -p grida-dev --release -- bench ./fixtures/test-grida/L0.grida --scene 22 --frames 200 --overlay
+cargo run -p grida_dev --release -- bench ./fixtures/test-grida/L0.grida --scene 22 --frames 200 && \
+cargo run -p grida_dev --release -- bench ./fixtures/test-grida/L0.grida --scene 22 --frames 200 --overlay
 
 # Bulk report with overlay
-cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --overlay --output overlay.json
+cargo run -p grida_dev --release -- bench-report ./fixtures/ --frames 100 --overlay --output overlay.json
 ```
 
 The overlay cost is opt-in because it is a devtools feature, not user
@@ -195,7 +195,7 @@ scenes that stress the subsystem you're optimizing. For effects/caching
 work, look for scenes with high promoted-node counts. For culling work,
 look for scenes with many visible nodes but few effects.
 
-### 3. Node mutation benchmark (`grida-dev bench --translate`)
+### 3. Node mutation benchmark (`grida_dev bench --translate`)
 
 Measures the **invalidation pipeline cost** — not camera motion.
 Every frame mutates the scene graph (translates a target node), then
@@ -206,13 +206,13 @@ the demo.
 
 ```sh
 # List scenes, pick a target
-cargo run -p grida-dev --release -- bench <path.grida> --list-scenes
+cargo run -p grida_dev --release -- bench <path.grida> --list-scenes
 
 # Translate the first suitable root node for 200 frames
-cargo run -p grida-dev --release -- bench <path.grida> --translate first --frames 200
+cargo run -p grida_dev --release -- bench <path.grida> --translate first --frames 200
 
 # Translate a specific node by id
-cargo run -p grida-dev --release -- bench <path.grida> --translate 42 --frames 200
+cargo run -p grida_dev --release -- bench <path.grida> --translate 42 --frames 200
 ```
 
 Output includes a separate line for **`apply_changes` timing** — this
@@ -231,7 +231,7 @@ stderr log showing which flush branch fires each frame, with phase
 timings:
 
 ```sh
-GRIDA_INVALIDATION_LOG=1 cargo run -p grida-dev --release -- \
+GRIDA_INVALIDATION_LOG=1 cargo run -p grida_dev --release -- \
     bench <path.grida> --translate first --frames 20
 ```
 
@@ -314,7 +314,7 @@ Run the bulk benchmark report BEFORE any changes. Save the JSON output
 so you can compare against it after the change.
 
 ```sh
-cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --output baseline.json
+cargo run -p grida_dev --release -- bench-report ./fixtures/ --frames 100 --output baseline.json
 ```
 
 For algorithmic changes, also run Criterion to get statistical baselines.
@@ -338,7 +338,7 @@ Run the same benchmarks AFTER the change. Compare the numbers.
 Re-run the bulk benchmark report and compare against `baseline.json`.
 
 ```sh
-cargo run -p grida-dev --release -- bench-report ./fixtures/ --frames 100 --output after.json
+cargo run -p grida_dev --release -- bench-report ./fixtures/ --frames 100 --output after.json
 ```
 
 A zoom optimization must not regress pan. An effects optimization must
@@ -494,7 +494,7 @@ scene switch, not per frame.
 | `crates/grida-canvas/src/runtime/scene.rs` (`load_scene`) | Orchestrates the load pipeline             |
 | `crates/grida-canvas/src/layout/engine.rs`                | Layout engine (Taffy tree build + compute) |
 | `crates/grida-canvas/src/runtime/config.rs`               | `skip_layout` flag                         |
-| `crates/grida-dev/src/bench/load_bench.rs`                | `load-bench` CLI for per-stage timing      |
+| `crates/grida_dev/src/bench/load_bench.rs`                | `load-bench` CLI for per-stage timing      |
 | `crates/grida-canvas/benches/bench_load_scene.rs`         | Criterion benchmarks for layout at scale   |
 
 ### The load-bench tool
@@ -502,10 +502,10 @@ scene switch, not per frame.
 Primary diagnostic for scene loading. Reports per-stage timings.
 
 ```sh
-cargo run -p grida-dev --release -- load-bench file.grida --iterations 5
-cargo run -p grida-dev --release -- load-bench file.grida --list-scenes
-cargo run -p grida-dev --release -- load-bench file.grida --skip-text    # isolate tree + flexbox cost
-cargo run -p grida-dev --release -- load-bench file.grida --skip-layout  # schema-only fast path
+cargo run -p grida_dev --release -- load-bench file.grida --iterations 5
+cargo run -p grida_dev --release -- load-bench file.grida --list-scenes
+cargo run -p grida_dev --release -- load-bench file.grida --skip-text    # isolate tree + flexbox cost
+cargo run -p grida_dev --release -- load-bench file.grida --skip-layout  # schema-only fast path
 ```
 
 ### Cost breakdown
@@ -543,8 +543,8 @@ the runs with `&&`:
 
 ```sh
 # CORRECT — sequential
-cargo run -p grida-dev --release -- bench file.grida --scene 0 --frames 100 && \
-cargo run -p grida-dev --release -- bench file.grida --scene 0 --frames 100 --overlay
+cargo run -p grida_dev --release -- bench file.grida --scene 0 --frames 100 && \
+cargo run -p grida_dev --release -- bench file.grida --scene 0 --frames 100 --overlay
 
 # WRONG — parallel (results are unreliable)
 cargo run ... --frames 100 &

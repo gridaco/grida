@@ -95,7 +95,7 @@ By inlining as a `cg` module, the editor can reference canvas types directly. No
 ## Demo
 
 ```sh
-cargo run -p grida-dev --example wd_text_editor
+cargo run -p grida_dev --example wd_text_editor
 ```
 
 ## Testing

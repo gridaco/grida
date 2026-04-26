@@ -27,7 +27,7 @@ export interface DecodedPng {
 /**
  * Compare two PNG files on disk and return similarity/diff metrics.
  *
- * Mirrors the scoring formula in `crates/grida-dev/src/reftest/compare.rs`:
+ * Mirrors the scoring formula in `crates/grida_dev/src/reftest/compare.rs`:
  *
  *   scoring_pixels = mask === "alpha"
  *     ? count(actual.a > 0 OR expected.a > 0)

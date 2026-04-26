@@ -2,7 +2,7 @@
 name: io-svg
 description: >
   Guides work on SVG import into the Grida Canvas Rust engine (cg crate).
-  Covers crates/grida-canvas/src/import/svg/, the grida-dev svg-to-grida CLI, cross-boundary
+  Covers crates/grida-canvas/src/import/svg/, the grida_dev svg-to-grida CLI, cross-boundary
   FBS codec tests (Rust encode → TS decode), SVG fixture authoring, and known SVG
   import limitations (text model, filters, transforms).
   Use when adding SVG feature support, fixing import bugs, authoring SVG test fixtures,
@@ -49,7 +49,7 @@ The TypeScript cross-boundary test (`fbs-svg-cross-boundary.test.ts`) decodes `.
 | `crates/grida-canvas/src/import/svg/pack.rs`                        | Packs converted nodes into scene document |
 | `crates/grida-canvas/src/import/svg/from_usvg.rs`                   | High-level entry: bytes → scene           |
 | `crates/grida-canvas/src/formats/svg/sanitize.rs`                   | Pre-processing / sanitization             |
-| `crates/grida-dev/src/main.rs`                                      | `svg-to-grida` subcommand                 |
+| `crates/grida_dev/src/main.rs`                                      | `svg-to-grida` subcommand                 |
 | `fixtures/test-svg/L0/`                                             | Committed SVG fixtures                    |
 | `fixtures/test-svg/.generated/`                                     | Gitignored, generated `.grida` outputs    |
 | `packages/grida-canvas-io/__tests__/fbs-svg-cross-boundary.test.ts` | TS-side codec test                        |
@@ -75,7 +75,7 @@ The TypeScript cross-boundary test (`fbs-svg-cross-boundary.test.ts`) decodes `.
 
 ```sh
 # Step 1: Rust encodes all L0 SVG fixtures → .grida files
-cargo run -p grida-dev -- svg-to-grida fixtures/test-svg/L0
+cargo run -p grida_dev -- svg-to-grida fixtures/test-svg/L0
 
 # Step 2: TS decodes the .grida files and runs assertions
 pnpm vitest run fbs-svg-cross-boundary --reporter=verbose
@@ -86,20 +86,20 @@ Outputs land in `fixtures/test-svg/.generated/` (gitignored).
 For custom SVG files:
 
 ```sh
-cargo run -p grida-dev -- svg-to-grida path/to/svgs -r
+cargo run -p grida_dev -- svg-to-grida path/to/svgs -r
 ```
 
 ### Run SVG reftests
 
 ```sh
 # W3C SVG test suite (requires separate download — see docs/wg/feat-svg/testing.md)
-cargo run -p grida-dev --release -- reftest path/to/w3c-suite/
+cargo run -p grida_dev --release -- reftest path/to/w3c-suite/
 
 # resvg test suite
-cargo run -p grida-dev --release -- reftest path/to/resvg-test-suite/
+cargo run -p grida_dev --release -- reftest path/to/resvg-test-suite/
 ```
 
-See `crates/grida-dev/TESTING.md` for full reftest flags.
+See `crates/grida_dev/TESTING.md` for full reftest flags.
 
 ### Rust tests for SVG
 
@@ -169,6 +169,6 @@ cargo check -p cg --all-targets
 cargo test -p cg
 
 # Cross-boundary cycle
-cargo run -p grida-dev -- svg-to-grida fixtures/test-svg/L0
+cargo run -p grida_dev -- svg-to-grida fixtures/test-svg/L0
 pnpm vitest run fbs-svg-cross-boundary
 ```

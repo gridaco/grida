@@ -13,10 +13,10 @@
 //! # Usage
 //!
 //! ```sh
-//! cargo run -p grida-dev --release -- load-bench path/to/file.grida
-//! cargo run -p grida-dev --release -- load-bench path/to/file.grida --scene 0
-//! cargo run -p grida-dev --release -- load-bench path/to/file.grida --list-scenes
-//! cargo run -p grida-dev --release -- load-bench path/to/file.grida --iterations 5
+//! cargo run -p grida_dev --release -- load-bench path/to/file.grida
+//! cargo run -p grida_dev --release -- load-bench path/to/file.grida --scene 0
+//! cargo run -p grida_dev --release -- load-bench path/to/file.grida --list-scenes
+//! cargo run -p grida_dev --release -- load-bench path/to/file.grida --iterations 5
 //! ```
 
 use super::runner::AsyncSceneLoader;

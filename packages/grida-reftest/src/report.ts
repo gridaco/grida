@@ -4,7 +4,7 @@ import type { ReftestReport, TestResult } from "./types.js";
 /**
  * Construct a ReftestReport from a list of test results.
  *
- * Mirrors `crates/grida-dev/src/reftest/report.rs::ReftestReport::new`:
+ * Mirrors `crates/grida_dev/src/reftest/report.rs::ReftestReport::new`:
  * similarity stats are computed over non-error rows only; empty sets
  * degrade to 0.0 averages.
  */

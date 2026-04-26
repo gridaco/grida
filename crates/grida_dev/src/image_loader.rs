@@ -1,4 +1,4 @@
-//! Image loader for the grida-dev runtime.
+//! Image loader for the grida_dev runtime.
 //!
 //! Resolves image URLs (local paths and remote HTTP) into decoded bytes
 //! and a [`PreloadedImages`] provider for the htmlcss rendering pipeline.

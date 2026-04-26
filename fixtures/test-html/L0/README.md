@@ -225,7 +225,7 @@ machine-verifiable without vision models.
 2. Name the file `<domain>-<property>[-<descriptor>].html`.
 3. Copy the template — fill in specimens that exercise distinct values.
 4. Verify: `cargo test -p cg --lib -- htmlcss::tests --test-threads=1`
-5. Visual-check: `cargo run -p grida-dev -- fixtures/test-html/L0/<file>.html`
+5. Visual-check: `cargo run -p grida_dev -- fixtures/test-html/L0/<file>.html`
 6. Fixtures may test unsupported properties — L0 is a reference corpus, not a
    passing-test gate. Implementation status lives in
    [`docs/wg/feat-2d/htmlcss.md`](../../../docs/wg/feat-2d/htmlcss.md).
@@ -236,6 +236,6 @@ machine-verifiable without vision models.
 # all fixtures parse without error
 cargo test -p cg --lib -- htmlcss::tests --test-threads=1
 
-# visual check via grida-dev
-cargo run -p grida-dev -- fixtures/test-html/L0/mixed-card.html
+# visual check via grida_dev
+cargo run -p grida_dev -- fixtures/test-html/L0/mixed-card.html
 ```

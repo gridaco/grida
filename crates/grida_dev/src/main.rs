@@ -18,7 +18,7 @@ use winit::event_loop::EventLoopProxy;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "grida-dev",
+    name = "grida_dev",
     version,
     about = "Rust-native dev runtime for previewing grida-canvas scenes with winit.\n\n\
              Opens an interactive window. Optionally pass a file path or URL to load it\n\

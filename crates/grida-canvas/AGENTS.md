@@ -54,8 +54,8 @@ cargo run --example <example-name>
 > and produce meaningless performance data.
 
 ```sh
-# headless GPU benchmark (via grida-dev)
-cargo run -p grida-dev --release -- bench ./fixtures/test-grida/bench.grida
+# headless GPU benchmark (via grida_dev)
+cargo run -p grida_dev --release -- bench ./fixtures/test-grida/bench.grida
 
 # headless GPU example (cg only, requires native-gl-context feature)
 cargo run -p cg --example headless_gpu --features native-gl-context --release
