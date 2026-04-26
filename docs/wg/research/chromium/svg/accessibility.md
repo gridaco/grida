@@ -52,19 +52,19 @@ on the element type and the layout object's `IsSVG*()` predicates.
 
 ## Default role mapping
 
-| SVG element | Default role | Notes |
-| ----------- | ------------ | ----- |
-| `<svg>` (root) | `kSvgRoot` | Maps to `graphics-document` per SVG-AAM |
-| `<svg>` (nested) | `kGroup` | Author opt-in to `kRegion` via `role="group"` etc. |
-| `<symbol>` | `kGroup` (when `LayoutSVGViewportContainer`) | Otherwise hidden |
-| `<g>` | (generic — usually filtered) | Inherits role from children unless author sets one |
-| `<path>`, `<circle>`, `<rect>`, `<ellipse>`, `<line>`, `<polygon>`, `<polyline>` | `kGraphicsSymbol` | Per SVG-AAM |
-| `<image>` | `kImage` | |
-| `<foreignObject>` | `kGroup` | Children fall back to HTML AX mapping |
-| `<text>`, `<tspan>` | (text content) | Exposed via accessible name |
-| `<title>` | (consumed) | Becomes the parent's accessible name |
-| `<desc>` | (consumed) | Becomes the parent's accessible description |
-| Resource elements (`<defs>`, `<clipPath>`, `<mask>`, `<filter>`, `<marker>`, `<linearGradient>`, ...) | hidden | Not in the AX tree |
+| SVG element                                                                                           | Default role                                 | Notes                                              |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| `<svg>` (root)                                                                                        | `kSvgRoot`                                   | Maps to `graphics-document` per SVG-AAM            |
+| `<svg>` (nested)                                                                                      | `kGroup`                                     | Author opt-in to `kRegion` via `role="group"` etc. |
+| `<symbol>`                                                                                            | `kGroup` (when `LayoutSVGViewportContainer`) | Otherwise hidden                                   |
+| `<g>`                                                                                                 | (generic — usually filtered)                 | Inherits role from children unless author sets one |
+| `<path>`, `<circle>`, `<rect>`, `<ellipse>`, `<line>`, `<polygon>`, `<polyline>`                      | `kGraphicsSymbol`                            | Per SVG-AAM                                        |
+| `<image>`                                                                                             | `kImage`                                     |                                                    |
+| `<foreignObject>`                                                                                     | `kGroup`                                     | Children fall back to HTML AX mapping              |
+| `<text>`, `<tspan>`                                                                                   | (text content)                               | Exposed via accessible name                        |
+| `<title>`                                                                                             | (consumed)                                   | Becomes the parent's accessible name               |
+| `<desc>`                                                                                              | (consumed)                                   | Becomes the parent's accessible description        |
+| Resource elements (`<defs>`, `<clipPath>`, `<mask>`, `<filter>`, `<marker>`, `<linearGradient>`, ...) | hidden                                       | Not in the AX tree                                 |
 
 The `kSvgRoot` mapping for root `<svg>` is technically a Chromium extension
 beyond the SVG-AAM spec (which currently maps all `<svg>` to
@@ -91,14 +91,14 @@ author wants for an icon.
 
 ## Author opt-ins
 
-| Author markup | Effect |
-| ------------- | ------ |
-| `<svg role="img" aria-label="...">` | Treated as a single image with the given name |
-| `<svg role="img" aria-labelledby="t" aria-describedby="d">` | Same, with linked title/desc |
-| `<svg role="presentation">` or `<svg role="none">` | Removed from AX tree (decorative) |
-| `<svg aria-hidden="true">` | Removed from AX tree |
-| `<g role="group" aria-label="...">` | Group is exposed with name |
-| `<path role="graphics-symbol" aria-label="...">` | Per-shape labeling |
+| Author markup                                               | Effect                                        |
+| ----------------------------------------------------------- | --------------------------------------------- |
+| `<svg role="img" aria-label="...">`                         | Treated as a single image with the given name |
+| `<svg role="img" aria-labelledby="t" aria-describedby="d">` | Same, with linked title/desc                  |
+| `<svg role="presentation">` or `<svg role="none">`          | Removed from AX tree (decorative)             |
+| `<svg aria-hidden="true">`                                  | Removed from AX tree                          |
+| `<g role="group" aria-label="...">`                         | Group is exposed with name                    |
+| `<path role="graphics-symbol" aria-label="...">`            | Per-shape labeling                            |
 
 Per the WAI-ARIA Graphics Module, additional roles are available:
 `graphics-document`, `graphics-object`, `graphics-symbol`. Blink honors
@@ -138,12 +138,12 @@ walking the DOM.
 
 ## Files
 
-| File | Role |
-| ---- | ---- |
-| `modules/accessibility/ax_node_object.cc` | SVG role mapping, accessible-name extraction (no separate AXSVG class) |
-| `modules/accessibility/ax_object.cc` | Common predicates (`IsA<SVGElement>`-aware) |
-| `modules/accessibility/ax_object_cache.cc` | Element → AXObject mapping |
-| `modules/accessibility/ax_enums.h` | `Role` enum (incl. `kSvgRoot`, `kGraphicsSymbol`, ...) |
+| File                                       | Role                                                                   |
+| ------------------------------------------ | ---------------------------------------------------------------------- |
+| `modules/accessibility/ax_node_object.cc`  | SVG role mapping, accessible-name extraction (no separate AXSVG class) |
+| `modules/accessibility/ax_object.cc`       | Common predicates (`IsA<SVGElement>`-aware)                            |
+| `modules/accessibility/ax_object_cache.cc` | Element → AXObject mapping                                             |
+| `modules/accessibility/ax_enums.h`         | `Role` enum (incl. `kSvgRoot`, `kGraphicsSymbol`, ...)                 |
 
 ## See also
 

@@ -81,12 +81,12 @@ is running, `current_value_ == base_value_` (pointer equality, not deep copy).
 
 ## Read paths
 
-| Reader | Reads |
-| ------ | ----- |
-| Layout, paint, hit-test (rendering) | `CurrentValue()` (i.e., always animVal) |
-| JS via `.baseVal` | `BaseValue()` |
-| JS via `.animVal` | `CurrentValue()` (same as rendering reads) |
-| `Element.getAttribute('r')` | declared value as a string (lazy-synced from base) |
+| Reader                              | Reads                                              |
+| ----------------------------------- | -------------------------------------------------- |
+| Layout, paint, hit-test (rendering) | `CurrentValue()` (i.e., always animVal)            |
+| JS via `.baseVal`                   | `BaseValue()`                                      |
+| JS via `.animVal`                   | `CurrentValue()` (same as rendering reads)         |
+| `Element.getAttribute('r')`         | declared value as a string (lazy-synced from base) |
 
 The renderer never reads baseVal directly. Animations update the animVal
 slot and rendering picks it up on the next style recalc / layout / paint
@@ -125,7 +125,7 @@ through the content attribute.
 
 ### JS `.baseVal.value = ...` (tear-off mutation)
 
-JS holds a *tear-off* (`SVGLengthTearOff`, `SVGTransformTearOff`, ...) that
+JS holds a _tear-off_ (`SVGLengthTearOff`, `SVGTransformTearOff`, ...) that
 back-references the owning element. Mutating through the tear-off:
 
 1. Updates the underlying `Property` in place.
@@ -214,14 +214,14 @@ ComputedStyle is bypassed.
 
 ## Files
 
-| File | Role |
-| ---- | ---- |
-| `core/svg/properties/svg_animated_property.h` | `SVGAnimatedPropertyBase` + `SVGAnimatedPropertyCommon<T>` |
-| `core/svg/properties/svg_property.h` | `SVGPropertyBase` value types |
-| `core/svg/properties/svg_property_tear_off.h` | JS-exposed tear-off wrappers |
-| `core/svg/properties/svg_list_property_tear_off_helper.h` | List tear-offs (transforms, points, ...) |
-| `core/svg/svg_animated_length.h` | Concrete instance — `SVGLength` with CSS bridge |
-| `core/svg/svg_element.h` | `BaseValueChanged`, `SetAnimatedAttribute`, `AddAnimatedPropertyToPresentationAttributeStyle` |
+| File                                                      | Role                                                                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `core/svg/properties/svg_animated_property.h`             | `SVGAnimatedPropertyBase` + `SVGAnimatedPropertyCommon<T>`                                    |
+| `core/svg/properties/svg_property.h`                      | `SVGPropertyBase` value types                                                                 |
+| `core/svg/properties/svg_property_tear_off.h`             | JS-exposed tear-off wrappers                                                                  |
+| `core/svg/properties/svg_list_property_tear_off_helper.h` | List tear-offs (transforms, points, ...)                                                      |
+| `core/svg/svg_animated_length.h`                          | Concrete instance — `SVGLength` with CSS bridge                                               |
+| `core/svg/svg_element.h`                                  | `BaseValueChanged`, `SetAnimatedAttribute`, `AddAnimatedPropertyToPresentationAttributeStyle` |
 
 ## See also
 

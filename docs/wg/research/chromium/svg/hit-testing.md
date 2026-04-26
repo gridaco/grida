@@ -125,18 +125,18 @@ class PointerEventsHitRules {
 
 Mapping (for `kSvgGeometryHitTesting`):
 
-| `pointer-events` | require visible | can hit fill | can hit stroke | require fill | require stroke | bbox |
-| ---------------- | --------------- | ------------ | -------------- | ------------ | -------------- | ---- |
-| `visiblePainted` (default) | ✓ | ✓ | ✓ | ✓ (paint must exist) | ✓ (paint must exist) | – |
-| `visibleFill` | ✓ | ✓ | – | – | – | – |
-| `visibleStroke` | ✓ | – | ✓ | – | – | – |
-| `visible` | ✓ | ✓ | ✓ | – | – | – |
-| `painted` | – | ✓ | ✓ | ✓ | ✓ | – |
-| `fill` | – | ✓ | – | – | – | – |
-| `stroke` | – | – | ✓ | – | – | – |
-| `all` | – | ✓ | ✓ | – | – | – |
-| `bounding-box` | – | – | – | – | – | ✓ |
-| `none` | – | – | – | – | – | – |
+| `pointer-events`           | require visible | can hit fill | can hit stroke | require fill         | require stroke       | bbox |
+| -------------------------- | --------------- | ------------ | -------------- | -------------------- | -------------------- | ---- |
+| `visiblePainted` (default) | ✓               | ✓            | ✓              | ✓ (paint must exist) | ✓ (paint must exist) | –    |
+| `visibleFill`              | ✓               | ✓            | –              | –                    | –                    | –    |
+| `visibleStroke`            | ✓               | –            | ✓              | –                    | –                    | –    |
+| `visible`                  | ✓               | ✓            | ✓              | –                    | –                    | –    |
+| `painted`                  | –               | ✓            | ✓              | ✓                    | ✓                    | –    |
+| `fill`                     | –               | ✓            | –              | –                    | –                    | –    |
+| `stroke`                   | –               | –            | ✓              | –                    | –                    | –    |
+| `all`                      | –               | ✓            | ✓              | –                    | –                    | –    |
+| `bounding-box`             | –               | –            | –              | –                    | –                    | ✓    |
+| `none`                     | –               | –            | –              | –                    | –                    | –    |
 
 The CSS values `auto`, `inherit`, `unset` resolve to one of the above per the
 spec (`auto` → `visiblePainted` for SVG content).
@@ -203,14 +203,14 @@ same value is honored at the box-fragment level.
 
 ## Files
 
-| File | Role |
-| ---- | ---- |
-| `core/layout/svg/layout_svg_shape.cc` | Shape hit entry, `HitTestShape`, fill/stroke containment |
-| `core/layout/svg/layout_svg_image.cc` | Image hit entry |
-| `core/layout/pointer_events_hit_rules.h` | `pointer-events` → bit flags lookup |
-| `core/paint/clip_path_clipper.cc` | `ClipPathClipper::HitTest` for clip-path |
-| `core/paint/box_fragment_painter.cc` | `kSvgTextHitTesting` text path entry |
-| `platform/graphics/path.cc` | `Contains` and `StrokeContains` (Skia bridge) |
+| File                                     | Role                                                     |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `core/layout/svg/layout_svg_shape.cc`    | Shape hit entry, `HitTestShape`, fill/stroke containment |
+| `core/layout/svg/layout_svg_image.cc`    | Image hit entry                                          |
+| `core/layout/pointer_events_hit_rules.h` | `pointer-events` → bit flags lookup                      |
+| `core/paint/clip_path_clipper.cc`        | `ClipPathClipper::HitTest` for clip-path                 |
+| `core/paint/box_fragment_painter.cc`     | `kSvgTextHitTesting` text path entry                     |
+| `platform/graphics/path.cc`              | `Contains` and `StrokeContains` (Skia bridge)            |
 
 ## See also
 

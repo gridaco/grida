@@ -16,15 +16,15 @@ on the main Chromium branch.
 
 ## Layout: LayoutNG migration
 
-| Subsystem | Status | Notes |
-| --------- | ------ | ----- |
-| HTML legacy box layout | **Removed** (~2022) | All HTML on LayoutNG. The "legacy box tree" no longer exists. |
-| SVG `<text>`, `<tspan>`, `<textPath>` | **LayoutNG** | `LayoutSVGText` extends `LayoutSVGBlock` extends `LayoutBlockFlow`. Header at `core/layout/svg/layout_svg_text.h:13` literally says "the LayoutNG representation of SVG `<text>`." See [text.md](./text.md). |
-| SVG `<foreignObject>` | **LayoutNG** | `LayoutSVGForeignObject` extends `LayoutSVGBlock` extends `LayoutBlockFlow`. HTML descendants get full LayoutNG. See [use-and-foreign-object.md](./use-and-foreign-object.md). |
-| SVG shapes (`<path>`, `<circle>`, `<rect>`, ...) | **SVG-specific** (`UpdateSVGLayout`) | No public roadmap to migrate. |
-| SVG containers (`<g>`, viewport containers) | **SVG-specific** | No public roadmap to migrate. |
-| SVG resources (`<defs>`, `<linearGradient>`, `<pattern>`, ...) | **SVG-specific** | No public roadmap to migrate. |
-| SVG `<image>` | **SVG-specific** (extends `LayoutSVGModelObject`) | No public roadmap to migrate. |
+| Subsystem                                                      | Status                                            | Notes                                                                                                                                                                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| HTML legacy box layout                                         | **Removed** (~2022)                               | All HTML on LayoutNG. The "legacy box tree" no longer exists.                                                                                                                                                |
+| SVG `<text>`, `<tspan>`, `<textPath>`                          | **LayoutNG**                                      | `LayoutSVGText` extends `LayoutSVGBlock` extends `LayoutBlockFlow`. Header at `core/layout/svg/layout_svg_text.h:13` literally says "the LayoutNG representation of SVG `<text>`." See [text.md](./text.md). |
+| SVG `<foreignObject>`                                          | **LayoutNG**                                      | `LayoutSVGForeignObject` extends `LayoutSVGBlock` extends `LayoutBlockFlow`. HTML descendants get full LayoutNG. See [use-and-foreign-object.md](./use-and-foreign-object.md).                               |
+| SVG shapes (`<path>`, `<circle>`, `<rect>`, ...)               | **SVG-specific** (`UpdateSVGLayout`)              | No public roadmap to migrate.                                                                                                                                                                                |
+| SVG containers (`<g>`, viewport containers)                    | **SVG-specific**                                  | No public roadmap to migrate.                                                                                                                                                                                |
+| SVG resources (`<defs>`, `<linearGradient>`, `<pattern>`, ...) | **SVG-specific**                                  | No public roadmap to migrate.                                                                                                                                                                                |
+| SVG `<image>`                                                  | **SVG-specific** (extends `LayoutSVGModelObject`) | No public roadmap to migrate.                                                                                                                                                                                |
 
 The position is that LayoutNG's constraint-space algorithm is designed for
 CSS box layout, and SVG's attribute-driven, transform-baked-in geometry
@@ -33,13 +33,13 @@ they reuse complex inline / block-flow logic that's hard to duplicate.
 
 ## Paint: BlinkGenPropertyTrees / CompositeAfterPaint
 
-| Subsystem | Status |
-| --------- | ------ |
-| Property trees built by Blink (PrePaint) | **Complete** (~2020) |
-| SVG transforms participate in `TransformPaintPropertyNode` | ✓ |
-| SVG `clip-path` participates in `ClipPaintPropertyNode` | ✓ |
-| SVG `mask`, `filter`, `opacity` participate in `EffectPaintPropertyNode` | ✓ |
-| `viewBox` → viewport mapping on `LayoutSVGRoot` becomes a `TransformPaintPropertyNode` | ✓ |
+| Subsystem                                                                              | Status               |
+| -------------------------------------------------------------------------------------- | -------------------- |
+| Property trees built by Blink (PrePaint)                                               | **Complete** (~2020) |
+| SVG transforms participate in `TransformPaintPropertyNode`                             | ✓                    |
+| SVG `clip-path` participates in `ClipPaintPropertyNode`                                | ✓                    |
+| SVG `mask`, `filter`, `opacity` participate in `EffectPaintPropertyNode`               | ✓                    |
+| `viewBox` → viewport mapping on `LayoutSVGRoot` becomes a `TransformPaintPropertyNode` | ✓                    |
 
 The "CompositeAfterPaint" architecture is fully on for SVG. SVG paint
 records and property trees flow through the same commit path as HTML.
@@ -47,12 +47,12 @@ See [`../property-trees.md`](../property-trees.md).
 
 ## Animations
 
-| Subsystem | Status |
-| --------- | ------ |
-| CSS animations on SVG | **Stable** — uses standard `core/animation/` |
-| Web Animations API on SVG | **Stable** — same engine |
-| SMIL deprecation | **Reverted** (~2016) |
-| SMIL maintenance | **Active** — `core/svg/animation/` receives ongoing fixes |
+| Subsystem                                            | Status                                                                  |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- |
+| CSS animations on SVG                                | **Stable** — uses standard `core/animation/`                            |
+| Web Animations API on SVG                            | **Stable** — same engine                                                |
+| SMIL deprecation                                     | **Reverted** (~2016)                                                    |
+| SMIL maintenance                                     | **Active** — `core/svg/animation/` receives ongoing fixes               |
 | Compositor-thread animation on SVG transform/opacity | **Supported** but uncommon (most SVG content lacks its own `cc::Layer`) |
 
 In 2015 Google announced an intent to remove SMIL in favor of CSS / Web
@@ -63,12 +63,12 @@ indefinitely. See [animation-and-smil.md](./animation-and-smil.md).
 
 ## Skia integration
 
-| Subsystem | Status |
-| --------- | ------ |
-| Path rasterization via Skia | **Stable** — `cc::PaintRecord` → `SkCanvas` → Skia GPU/CPU backend |
-| Skia GPU backend | **Mixed** — Ganesh (legacy GL/Vk/Metal) and Graphite (newer Vk/Metal/Dawn) coexist; Graphite is opt-in per platform |
-| Skia's own `modules/svg/` (SkSVGDOM) | **Unused** by Blink — Blink has its own complete SVG implementation |
-| Skia's `modules/skottie/` (Lottie player) | **Used** by `cc::PaintSkottie` for browser UI animations only — *not* for web SVG content |
+| Subsystem                                 | Status                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Path rasterization via Skia               | **Stable** — `cc::PaintRecord` → `SkCanvas` → Skia GPU/CPU backend                                                  |
+| Skia GPU backend                          | **Mixed** — Ganesh (legacy GL/Vk/Metal) and Graphite (newer Vk/Metal/Dawn) coexist; Graphite is opt-in per platform |
+| Skia's own `modules/svg/` (SkSVGDOM)      | **Unused** by Blink — Blink has its own complete SVG implementation                                                 |
+| Skia's `modules/skottie/` (Lottie player) | **Used** by `cc::PaintSkottie` for browser UI animations only — _not_ for web SVG content                           |
 
 Blink does not consume Skia's SVG module. SkSVG is a standalone renderer
 designed for embedders who need to display an SVG without browser
@@ -77,20 +77,23 @@ bindings, accessibility, or hit-testing.
 
 ## DOM and bindings
 
-| Subsystem | Status |
-| --------- | ------ |
-| `SVGAnimatedProperty<T>` (`baseVal`/`animVal`) | **Stable** | See [animated-properties-idl.md](./animated-properties-idl.md). |
-| Tear-off types (`SVGLengthTearOff`, etc.) | **Stable** |
-| Shadow DOM for `<use>` | **Stable** (closed shadow root, UA-managed) |
-| `<foreignObject>` HTML descendants | **Stable** — use full Blink HTML pipeline |
+| Subsystem                                      | Status                                      |
+| ---------------------------------------------- | ------------------------------------------- |
+| `SVGAnimatedProperty<T>` (`baseVal`/`animVal`) | **Stable**                                  |
+| Tear-off types (`SVGLengthTearOff`, etc.)      | **Stable**                                  |
+| Shadow DOM for `<use>`                         | **Stable** (closed shadow root, UA-managed) |
+| `<foreignObject>` HTML descendants             | **Stable** — use full Blink HTML pipeline   |
+
+See [animated-properties-idl.md](./animated-properties-idl.md) for the
+`SVGAnimatedProperty` and tear-off mechanisms in detail.
 
 ## Hit-testing and accessibility
 
-| Subsystem | Status |
-| --------- | ------ |
-| SVG hit-test (path-based) | **Stable** — see [hit-testing.md](./hit-testing.md) |
-| `pointer-events` SVG-specific values (`bounding-box`, `visiblePainted`, ...) | **Stable** |
-| AX tree integration | **Stable** — uses standard `AXNodeObject` with SVG branches; no dedicated `AXSVG*` classes — see [accessibility.md](./accessibility.md) |
+| Subsystem                                                                    | Status                                                                                                                                  |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| SVG hit-test (path-based)                                                    | **Stable** — see [hit-testing.md](./hit-testing.md)                                                                                     |
+| `pointer-events` SVG-specific values (`bounding-box`, `visiblePainted`, ...) | **Stable**                                                                                                                              |
+| AX tree integration                                                          | **Stable** — uses standard `AXNodeObject` with SVG branches; no dedicated `AXSVG*` classes — see [accessibility.md](./accessibility.md) |
 
 ## In-flight work
 

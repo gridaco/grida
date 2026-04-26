@@ -16,10 +16,10 @@ machinery. Both can target the same element; SMIL takes precedence per spec.
 
 ## Two engines, one element
 
-| Engine | Targets | Output destination |
-| ------ | ------- | ------------------ |
-| SMIL | SVG attributes (CSS properties or non-CSS like `points`, `d`, `viewBox`) | `animVal` slot (see [animated-properties-idl.md](./animated-properties-idl.md)), then folded into `ComputedStyle` for presentation attributes |
-| CSS animations / Web Animations | CSS properties | `ComputedStyle` directly via the standard `core/animation/` engine |
+| Engine                          | Targets                                                                  | Output destination                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| SMIL                            | SVG attributes (CSS properties or non-CSS like `points`, `d`, `viewBox`) | `animVal` slot (see [animated-properties-idl.md](./animated-properties-idl.md)), then folded into `ComputedStyle` for presentation attributes |
+| CSS animations / Web Animations | CSS properties                                                           | `ComputedStyle` directly via the standard `core/animation/` engine                                                                            |
 
 When both engines target the same property, **SMIL's `animVal` wins** and the
 CSS animation effect is suppressed for that property. Implemented by sampling
@@ -82,7 +82,7 @@ class ElementSMILAnimations : public GarbageCollected<ElementSMILAnimations> {
 ## The sandwich model
 
 Per SMIL: when multiple animation elements target the same `(element,
-attribute)` pair, they form a *sandwich* — a priority-ordered stack where
+attribute)` pair, they form a _sandwich_ — a priority-ordered stack where
 later-started intervals have higher priority. At any given `presentation_time`,
 the sandwich's active subset is composed top-down per the additive/accumulate
 semantics, and the result is written to `animVal`.
@@ -233,15 +233,15 @@ The host triggers SMIL service inside the image via
 
 ## Files
 
-| File | Role |
-| ---- | ---- |
-| `core/svg/animation/svg_smil_element.h` | Base class for `<animate>`, `<set>`, etc. — interval timing model |
-| `core/svg/animation/element_smil_animations.h` | Per-target sandwich registry |
-| `core/svg/animation/smil_animation_sandwich.h` | The sandwich composition algorithm |
-| `core/svg/animation/smil_time_container.h` | Per-`<svg>` timeline; `ServiceAnimations` entry |
-| `core/svg/svg_document_extensions.h` | `ServiceSmilOnAnimationFrame` — entry from `LocalFrameView` |
-| `core/page/page_animator.cc` | `ServiceScriptedAnimations` — top-of-frame dispatch |
-| `core/animation/` | Standard CSS / Web Animations engine (shared with HTML) |
+| File                                           | Role                                                              |
+| ---------------------------------------------- | ----------------------------------------------------------------- |
+| `core/svg/animation/svg_smil_element.h`        | Base class for `<animate>`, `<set>`, etc. — interval timing model |
+| `core/svg/animation/element_smil_animations.h` | Per-target sandwich registry                                      |
+| `core/svg/animation/smil_animation_sandwich.h` | The sandwich composition algorithm                                |
+| `core/svg/animation/smil_time_container.h`     | Per-`<svg>` timeline; `ServiceAnimations` entry                   |
+| `core/svg/svg_document_extensions.h`           | `ServiceSmilOnAnimationFrame` — entry from `LocalFrameView`       |
+| `core/page/page_animator.cc`                   | `ServiceScriptedAnimations` — top-of-frame dispatch               |
+| `core/animation/`                              | Standard CSS / Web Animations engine (shared with HTML)           |
 
 ## See also
 
