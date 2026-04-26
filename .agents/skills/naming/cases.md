@@ -5,13 +5,13 @@ mappings, the short-name charter, or the unresolved questions.
 
 ## Crate directory vs. Cargo `name`
 
-| Directory                   | `name`              | Rationale                                         |
-| --------------------------- | ------------------- | ------------------------------------------------- |
-| `crates/grida-canvas`       | `cg`                | Heavily imported; short name pays off everywhere. |
-| `crates/grida-canvas-fonts` | `fonts`             | Scoped under `grida-canvas`; `fonts` is clear.    |
-| `crates/grida-canvas-wasm`  | `grida-canvas-wasm` | Published artifact; full name is its API.         |
-| `crates/math2`              | `math2`             | No browse-breadcrumb to leverage — align.         |
-| `crates/csscascade`         | `csscascade`        | Same.                                             |
+| Directory                  | `name`              | Rationale                                         |
+| -------------------------- | ------------------- | ------------------------------------------------- |
+| `crates/grida-canvas`      | `cg`                | Heavily imported; short name pays off everywhere. |
+| `crates/fonts`             | `fonts`             | Standalone; agnostic of canvas.                   |
+| `crates/grida-canvas-wasm` | `grida-canvas-wasm` | Published artifact; full name is its API.         |
+| `crates/math2`             | `math2`             | No browse-breadcrumb to leverage — align.         |
+| `crates/csscascade`        | `csscascade`        | Same.                                             |
 
 ## Package directory vs. `package.json` `name`
 
