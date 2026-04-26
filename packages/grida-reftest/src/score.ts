@@ -3,7 +3,7 @@ import type { Bucket } from "./types.js";
 /**
  * Map a similarity score in [0, 1] to a bucket directory name.
  *
- * Mirrors `crates/grida-dev/src/reftest/runner.rs::get_score_category`
+ * Mirrors `crates/grida_dev/src/reftest/runner.rs::get_score_category`
  * exactly (percentage * 100, ≥99/95/90 → S99/S95/S90, else S75). Errors
  * are routed to the `err` bucket by the runner, not by this function.
  */

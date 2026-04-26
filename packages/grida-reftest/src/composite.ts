@@ -5,7 +5,7 @@ import type { BgColor } from "./types.js";
  * opaque RGBA buffer (alpha set to 255 everywhere).
  *
  * Mirrors the Rust implementation in
- * `crates/grida-dev/src/reftest/compare.rs::composite_to_opaque`:
+ * `crates/grida_dev/src/reftest/compare.rs::composite_to_opaque`:
  *
  *   out_rgb = rgb * a + bg * (1 - a); out_a = 255
  *

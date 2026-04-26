@@ -6,7 +6,7 @@
 //   1. loadSceneGrida — FBS decode + SceneGraph construction
 //   2. switchScene    — layout + geometry + effects + layers
 //
-// When `perf` feature is enabled on the cg crate, the Rust side emits
+// When `perf` feature is enabled on the grida crate, the Rust side emits
 // per-stage timing via eprintln! ([load_scene] line).
 // This test measures JS-side wall time for comparison.
 //
@@ -90,34 +90,6 @@ describe("bench: load_scene (WASM-on-Node)", () => {
     expect(elapsed).toBeLessThan(5_000);
     scene.dispose();
   });
-
-  it("synthetic 100x100 grid (10k nodes)", async () => {
-    const scene = createRasterScene();
-
-    const t0 = performance.now();
-    scene.loadBenchmarkScene(100, 100);
-    const elapsed = performance.now() - t0;
-
-    console.log(
-      `[wasm-bench] synthetic 100x100: ${elapsed.toFixed(0)}ms (10k nodes)`
-    );
-    expect(elapsed).toBeLessThan(30_000);
-    scene.dispose();
-  }, 60_000);
-
-  it("synthetic 200x200 grid (40k nodes)", async () => {
-    const scene = createRasterScene();
-
-    const t0 = performance.now();
-    scene.loadBenchmarkScene(200, 200);
-    const elapsed = performance.now() - t0;
-
-    console.log(
-      `[wasm-bench] synthetic 200x200: ${elapsed.toFixed(0)}ms (40k nodes)`
-    );
-    expect(elapsed).toBeLessThan(60_000);
-    scene.dispose();
-  }, 120_000);
 
   // Auto-discovered .grida fixtures from fixtures/local/
   const fixtures = discoverGridaFixtures();

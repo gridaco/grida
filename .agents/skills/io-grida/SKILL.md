@@ -24,15 +24,15 @@ Two on-disk variants:
 
 ## Key Locations
 
-| Path                                            | Role                                                        |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| `format/grida.fbs`                              | **Source of truth** — FlatBuffers schema                    |
-| `format/AGENTS.md`                              | Schema evolution rules (append-only, never reuse field IDs) |
-| `packages/grida-canvas-schema/grida.ts`         | TS runtime types (`grida` namespace)                        |
-| `packages/grida-canvas-io/`                     | TS file loading, archive pack/unpack, clipboard protocol    |
-| `crates/grida-canvas/src/io/`                   | Rust decoder (FBS/ZIP/JSON → `Scene`)                       |
-| `crates/grida-canvas/src/io/generated/grida.rs` | Auto-generated Rust FlatBuffers bindings                    |
-| `crates/grida-canvas/src/node/schema.rs`        | Rust runtime node schema (aligned with TS)                  |
+| Path                                     | Role                                                        |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| `format/grida.fbs`                       | **Source of truth** — FlatBuffers schema                    |
+| `format/AGENTS.md`                       | Schema evolution rules (append-only, never reuse field IDs) |
+| `packages/grida-canvas-schema/grida.ts`  | TS runtime types (`grida` namespace)                        |
+| `packages/grida-canvas-io/`              | TS file loading, archive pack/unpack, clipboard protocol    |
+| `crates/grida/src/io/`                   | Rust decoder (FBS/ZIP/JSON → `Scene`)                       |
+| `crates/grida/src/io/generated/grida.rs` | Auto-generated Rust FlatBuffers bindings                    |
+| `crates/grida/src/node/schema.rs`        | Rust runtime node schema (aligned with TS)                  |
 
 ## TS Side — `packages/grida-canvas-io/`
 
@@ -41,7 +41,7 @@ Two on-disk variants:
 - **`io.archive.pack/unpack`** — ZIP with `manifest.json`
 - **`io.clipboard.encode/decode`** — Grida clipboard protocol
 
-## Rust Side — `crates/grida-canvas/src/io/`
+## Rust Side — `crates/grida/src/io/`
 
 | File               | Role                                                           |
 | ------------------ | -------------------------------------------------------------- |
@@ -66,7 +66,7 @@ Uses pinned `flatc` v25.12.19 via `bin/activate-flatc`.
 
 ```sh
 # Rust round-trip
-cargo test -p cg --test fbs_roundtrip
+cargo test -p grida --test fbs_roundtrip
 
 # TS I/O tests
 pnpm turbo test --filter='@grida/io'
@@ -91,7 +91,7 @@ When you need to invalidate old files (field renumbering, semantic changes, remo
 
 1. **Bump MINOR** (while MAJOR=0) in both places:
    - TS: `grida.program.document.SCHEMA_VERSION` in `packages/grida-canvas-schema/grida.ts`
-   - Rust: `SCHEMA_VERSION` in `crates/grida-canvas/src/io/io_grida_fbs.rs`
+   - Rust: `SCHEMA_VERSION` in `crates/grida/src/io/io_grida_fbs.rs`
 2. Keep them **exactly in sync** — both writers must emit the same version string.
 3. Old files will be **rejected** by the TS reader (`format.ts` calls `isSchemaCompatible()` and throws on mismatch).
 
@@ -111,7 +111,7 @@ See `format/AGENTS.md` for the full review checklist.
 Use `flatbuffers::root::<fbs::GridaFile>(&bytes)` (not `root_unchecked`) in a Rust test to run the FlatBuffers verifier. It reports the exact field chain with the bad offset.
 
 ```rust
-use cg::io::generated::grida::grida as fbs;
+use grida::io::generated::grida::grida as fbs;
 let result = flatbuffers::root::<fbs::GridaFile>(&bytes);
 ```
 

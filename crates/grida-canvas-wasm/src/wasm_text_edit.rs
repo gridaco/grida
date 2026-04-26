@@ -6,8 +6,8 @@
 //! boundary.
 
 use crate::_internal::*;
-use cg::text_edit_session::DEFAULT_CARET_WIDTH;
-use cg::window::application::UnknownTargetApplication;
+use grida::text_edit_session::DEFAULT_CARET_WIDTH;
+use grida::window::application::UnknownTargetApplication;
 use serde::Deserialize;
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ fn f32_slice_to_le_bytes(floats: &[f32]) -> Vec<u8> {
     bytes
 }
 
-use cg::text_edit_session::EditCommand;
+use grida::text_edit_session::EditCommand;
 
 /// JSON-serializable editing command from TS.
 #[derive(Deserialize)]

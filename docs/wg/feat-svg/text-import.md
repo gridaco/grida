@@ -135,6 +135,6 @@ lists and text-on-path would still require dedicated support.
 ## References
 
 - usvg text model: `third_party/usvg/src/tree/text.rs`
-- Text import code: `crates/grida-canvas/src/svg/from_usvg_tree.rs` (`convert_text`)
-- Text pack code: `crates/grida-canvas/src/svg/pack.rs` (`append_text`)
+- Text import code: `crates/grida/src/import/svg/packed_scene.rs` (`convert_text`)
+- Text pack code: `crates/grida/src/import/svg/pack.rs` (`append_text`)
 - SVG text spec: https://www.w3.org/TR/SVG11/text.html

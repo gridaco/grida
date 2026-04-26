@@ -13,7 +13,7 @@ tags:
 Renders HTML+CSS to a Skia Picture for opaque embedding on the canvas
 (HTMLEmbedNode).
 
-**Source:** `crates/grida-canvas/src/htmlcss/`
+**Source:** `crates/grida/src/htmlcss/`
 
 ## Inputs
 
@@ -37,7 +37,7 @@ rasterizer for Skia's built-in SVG DOM — GPU-capable and paints straight
 to an `SkCanvas`. Unblocks WPT-style SVG reftests without writing a
 native Grida SVG renderer.
 
-Baseline against `fixtures/local/resvg-test-suite` (1,679 tests, `grida-dev
+Baseline against `fixtures/local/resvg-test-suite` (1,679 tests, `grida_dev
 reftest --renderer htmlcss`):
 
 | Bucket    | Count | % of suite |
@@ -86,7 +86,7 @@ Phase 1: Collect (collect.rs)     Phase 2: Layout (layout.rs)     Phase 3: Paint
 
 ## CG type reuse
 
-Types from `cg::prelude` reused where they 100% align with CSS semantics:
+Types from `grida::cg::prelude` reused where they 100% align with CSS semantics:
 
 | cg type               | CSS property                          |
 | --------------------- | ------------------------------------- |

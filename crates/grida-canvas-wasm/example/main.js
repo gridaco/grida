@@ -40,10 +40,7 @@ init({
   grida.devtools_rendering_set_show_hit_testing(true);
   grida.devtools_rendering_set_show_ruler(true);
 
-  grida.loadDummyScene();
   requestAnimationFrame(render);
-
-  // grida.loadBenchmarkScene(50, 50);
 
   canvasel.addEventListener("pointermove", (event) => {
     const dpr = window.devicePixelRatio || 1;

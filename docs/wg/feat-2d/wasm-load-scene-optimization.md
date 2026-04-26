@@ -132,7 +132,7 @@ npx vitest run __test__/bench-load-scene.test.ts
 Native benchmarks:
 
 ```sh
-cargo run -p grida-dev --release -- load-bench fixtures/local/perf/local/<your-fixture>.grida --iterations 3
+cargo run -p grida_dev --release -- load-bench fixtures/local/perf/local/<your-fixture>.grida --iterations 3
 ```
 
 Build WASM (from repo root):
@@ -143,17 +143,17 @@ just --justfile crates/grida-canvas-wasm/justfile build
 
 ## Files to Modify
 
-| File                                         | Change                                                 |
-| -------------------------------------------- | ------------------------------------------------------ |
-| `crates/grida-canvas/src/cache/geometry.rs`  | Add `GeoInput`, extraction pass, rewrite DFS           |
-| `crates/grida-canvas/src/cache/paragraph.rs` | No change (already optimized with measurement caching) |
-| `crates/grida-canvas/src/cache/scene.rs`     | No change                                              |
-| `crates/grida-canvas/src/layout/tree.rs`     | No change                                              |
+| File                                  | Change                                                 |
+| ------------------------------------- | ------------------------------------------------------ |
+| `crates/grida/src/cache/geometry.rs`  | Add `GeoInput`, extraction pass, rewrite DFS           |
+| `crates/grida/src/cache/paragraph.rs` | No change (already optimized with measurement caching) |
+| `crates/grida/src/cache/scene.rs`     | No change                                              |
+| `crates/grida/src/layout/tree.rs`     | No change                                              |
 
 ## Validation
 
-1. `cargo test -p cg` — all 330 tests must pass
-2. `cargo check -p cg -p grida-canvas-wasm -p grida-dev` — all crates compile
+1. `cargo test -p grida` — all 330 tests must pass
+2. `cargo check -p grida -p grida-canvas-wasm -p grida_dev` — all crates compile
 3. Native benchmark: should not regress (target: `<800ms`)
 4. WASM-on-Node benchmark: geometry stage should drop from ~4s to `<1s`
 5. Visual: load the fixture in browser debug embed, verify text renders correctly and pan/zoom/settle work

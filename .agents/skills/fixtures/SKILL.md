@@ -53,7 +53,7 @@ edge case** that the codebase supports or intends to support. This includes:
 - **Match the fixture's subject to the viewport policy.** For refbrowser
   fixtures under `fixtures/test-html/`, **paint / visual-property**
   fixtures should size their root to a preset viewport (via `min-height`)
-  so cg's cull and Chromium's screenshot have identical dimensions.
+  so grida's cull and Chromium's screenshot have identical dimensions.
   **Layout** fixtures (box-model, flex, grid, intrinsic sizing) must
   NOT force a body size — the output dimensions _are_ what the test
   measures; a `min-height` hack contaminates the result. See

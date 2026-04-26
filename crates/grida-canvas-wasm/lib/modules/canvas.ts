@@ -314,22 +314,6 @@ export class Scene {
   }
 
   /**
-   * @deprecated - test use only
-   */
-  loadDummyScene() {
-    this._assertAlive();
-    this.module._load_dummy_scene(this.appptr);
-  }
-
-  /**
-   * @deprecated - test use only
-   */
-  loadBenchmarkScene(cols: number, rows: number) {
-    this._assertAlive();
-    this.module._load_benchmark_scene(this.appptr, cols, rows);
-  }
-
-  /**
    * Register a font with the renderer.
    *
    * The wasm module cannot fetch font files directly from the network, so the

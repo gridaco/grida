@@ -117,7 +117,7 @@ export class CanvasSurfaceUI {
       return;
     }
 
-    // Node navigation shortcuts (matches grida-dev native bindings)
+    // Node navigation shortcuts (matches grida_dev native bindings)
     // Tab → next sibling, Shift+Tab → previous sibling
     if (e.key === "Tab") {
       e.preventDefault();

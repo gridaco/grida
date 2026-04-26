@@ -8,7 +8,8 @@ use super::_internal::*;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use cg::io::io_svg::{svg_optimize, svg_to_grida_bytes};
+use grida::formats::svg::optimize::svg_optimize;
+use grida::import::svg::grida::svg_to_grida_bytes;
 
 // ====================================================================================================
 // #region: WASM Response Structs
@@ -29,7 +30,7 @@ pub(crate) struct WasmSvgOptimizeResult {
 /// Optimizes and resolves an SVG, producing a flat, self-contained SVG output.
 ///
 /// Resolves CSS styles from `<style>` tags and inlines them as element attributes.
-/// See `cg::io::io_svg::svg_optimize` for detailed documentation.
+/// See `grida::formats::svg::optimize::svg_optimize` for detailed documentation.
 ///
 /// # Arguments
 /// * `svg` - Input SVG string (null-terminated C string)

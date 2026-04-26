@@ -1,7 +1,7 @@
 // Shared TypeScript types for @grida/reftest.
 //
 // IMPORTANT: JSON report field names use snake_case (compat with Rust
-// serde output from `crates/grida-dev/src/reftest/report.rs`). TS types
+// serde output from `crates/grida_dev/src/reftest/report.rs`). TS types
 // use camelCase. Conversion happens at the IO boundary in src/report.ts.
 
 export type BgColor = "white" | "black";

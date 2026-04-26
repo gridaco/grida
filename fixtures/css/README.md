@@ -17,4 +17,4 @@ GitHub's default light mode markdown stylesheet. (by [sindresorhus](https://gith
 
 Grida's own markdown stylesheet for the `htmlcss` render pipeline. Targets bare HTML elements produced by `pulldown-cmark` (GFM mode) under a `.markdown-body` wrapper. Uses element selectors only (no GitHub-specific classes), explicit px/rgb values (no CSS custom properties), and Grida's embedded font stack (Geist).
 
-Embedded into the `cg` crate via symlink at `crates/grida-canvas/assets/css/grida-markdown.css`.
+Embedded into the `grida` crate via symlink at `crates/grida/assets/css/grida-markdown.css`.

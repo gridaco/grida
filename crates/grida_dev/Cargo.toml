@@ -1,0 +1,56 @@
+[package]
+name = "grida_dev"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+description = "Native winit playground for grida scenes."
+
+[dependencies]
+grida = { path = "../grida", features = [
+  "web",
+  "perf",
+  "native-clock-tick",
+  "native-gl-context",
+] }
+fonts = { path = "../fonts", features = ["webfonts"] }
+math2 = { path = "../math2" }
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs"] }
+futures = "0.3"
+gl = "0.14.0"
+glutin = "0.32.0"
+glutin-winit = "0.5.0"
+raw-window-handle = "0.6.0"
+winit = "0.30.0"
+skia-safe = { version = "0.93.1", features = [
+  "gpu",
+  "gl",
+  "textlayout",
+  "pdf",
+  "svg",
+  "webp",
+] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "jpeg",
+  "webp",
+] }
+dify = "0.7"
+indicatif = "0.17"
+toml = "0.9.8"
+glob = "0.3.3"
+arboard = "3"
+rfd = "0.15"
+zip = { version = "8.2.0", default-features = false, features = [
+  "deflate-flate2",
+] }
+
+[lints]
+workspace = true

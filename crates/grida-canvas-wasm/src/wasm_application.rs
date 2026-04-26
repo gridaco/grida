@@ -1,6 +1,6 @@
 use crate::_internal::*;
-use cg::window::application::ApplicationApi;
-use cg::window::application::UnknownTargetApplication;
+use grida::window::application::ApplicationApi;
+use grida::window::application::UnknownTargetApplication;
 use serde::Serialize;
 use std::boxed::Box;
 
@@ -35,8 +35,8 @@ const BACKEND_RASTER: u32 = 1;
 /// get the default behaviour.
 const CONFIG_FLAG_SKIP_LAYOUT: u32 = 1 << 0;
 
-fn config_from_flags(flags: u32) -> cg::runtime::config::RuntimeRendererConfig {
-    let mut config = cg::runtime::config::RuntimeRendererConfig::default();
+fn config_from_flags(flags: u32) -> grida::runtime::config::RuntimeRendererConfig {
+    let mut config = grida::runtime::config::RuntimeRendererConfig::default();
     if flags & CONFIG_FLAG_SKIP_LAYOUT != 0 {
         config.skip_layout = true;
     }
@@ -76,14 +76,14 @@ pub(crate) extern "C" fn init_with_backend(
     use_embedded_fonts: bool,
     config_flags: u32,
 ) -> Box<UnknownTargetApplication> {
-    let options = cg::runtime::scene::RendererOptions {
+    let options = grida::runtime::scene::RendererOptions {
         use_embedded_fonts,
         use_system_fonts: false, // WASM has no system font manager
         config: config_from_flags(config_flags),
     };
     match backend_id {
         BACKEND_RASTER => UnknownTargetApplication::new_raster(width, height, options),
-        _ => cg::window::application_emscripten::new_webgl_app(width, height, options),
+        _ => grida::window::application_emscripten::new_webgl_app(width, height, options),
     }
 }
 
@@ -322,7 +322,7 @@ pub(crate) unsafe extern "C" fn pointer_move(app: *mut UnknownTargetApplication,
 /// bit 1 = cursor_changed
 /// bit 2 = selection_changed
 /// bit 3 = hover_changed
-fn pack_surface_response(r: &cg::surface::SurfaceResponse) -> u32 {
+fn pack_surface_response(r: &grida::overlay::SurfaceResponse) -> u32 {
     (r.needs_redraw as u32)
         | ((r.cursor_changed as u32) << 1)
         | ((r.selection_changed as u32) << 2)
@@ -332,8 +332,8 @@ fn pack_surface_response(r: &cg::surface::SurfaceResponse) -> u32 {
 /// Decode a modifiers bitmask from JS.
 ///
 /// bit 0 = shift, bit 1 = alt, bit 2 = ctrl_or_cmd
-fn decode_modifiers(bits: u32) -> cg::surface::Modifiers {
-    cg::surface::Modifiers {
+fn decode_modifiers(bits: u32) -> grida::overlay::Modifiers {
+    grida::overlay::Modifiers {
         shift: bits & 1 != 0,
         alt: bits & 2 != 0,
         ctrl_or_cmd: bits & 4 != 0,
@@ -343,11 +343,11 @@ fn decode_modifiers(bits: u32) -> cg::surface::Modifiers {
 /// Decode a pointer button from JS.
 ///
 /// 0 = Primary, 1 = Secondary, 2 = Middle
-fn decode_button(id: u32) -> cg::surface::PointerButton {
+fn decode_button(id: u32) -> grida::overlay::PointerButton {
     match id {
-        1 => cg::surface::PointerButton::Secondary,
-        2 => cg::surface::PointerButton::Middle,
-        _ => cg::surface::PointerButton::Primary,
+        1 => grida::overlay::PointerButton::Secondary,
+        2 => grida::overlay::PointerButton::Middle,
+        _ => grida::overlay::PointerButton::Primary,
     }
 }
 
@@ -423,15 +423,15 @@ pub(crate) unsafe extern "C" fn surface_pointer_up(
 pub(crate) unsafe extern "C" fn surface_get_cursor(app: *const UnknownTargetApplication) -> u32 {
     match app.as_ref() {
         Some(app) => match app.surface_cursor() {
-            cg::surface::CursorIcon::Default => 0,
-            cg::surface::CursorIcon::Pointer => 1,
-            cg::surface::CursorIcon::Grab => 2,
-            cg::surface::CursorIcon::Grabbing => 3,
-            cg::surface::CursorIcon::Crosshair => 4,
-            cg::surface::CursorIcon::Move => 5,
+            grida::overlay::CursorIcon::Default => 0,
+            grida::overlay::CursorIcon::Pointer => 1,
+            grida::overlay::CursorIcon::Grab => 2,
+            grida::overlay::CursorIcon::Grabbing => 3,
+            grida::overlay::CursorIcon::Crosshair => 4,
+            grida::overlay::CursorIcon::Move => 5,
             // Resize/Rotate cursors are handled by the native editor surface.
             // The web editor manages its own CSS cursors — map to default.
-            cg::surface::CursorIcon::Resize(_) | cg::surface::CursorIcon::Rotate(_) => 0,
+            grida::overlay::CursorIcon::Resize(_) | grida::overlay::CursorIcon::Rotate(_) => 0,
         },
         None => 0,
     }
@@ -493,7 +493,7 @@ pub(crate) unsafe extern "C" fn surface_set_selection(
     let slice = std::slice::from_raw_parts(json_ptr, json_len as usize);
     // JS sends user-facing string IDs — convert to internal NodeId
     if let Ok(user_ids) = serde_json::from_slice::<Vec<String>>(slice) {
-        let internal_ids: Vec<cg::node::schema::NodeId> = user_ids
+        let internal_ids: Vec<grida::node::schema::NodeId> = user_ids
             .iter()
             .filter_map(|uid| app.user_id_to_internal(uid))
             .collect();
@@ -532,7 +532,7 @@ pub(crate) unsafe extern "C" fn query_paint_groups(
         return alloc_len_prefixed(b"[]");
     };
 
-    let internal_ids: Vec<cg::node::schema::NodeId> = user_ids
+    let internal_ids: Vec<grida::node::schema::NodeId> = user_ids
         .iter()
         .filter_map(|uid| app.user_id_to_internal(uid))
         .collect();
@@ -542,8 +542,8 @@ pub(crate) unsafe extern "C" fn query_paint_groups(
     }
 
     let paint_target = match target {
-        1 => cg::query::paint::PaintTarget::Stroke,
-        _ => cg::query::paint::PaintTarget::Fill,
+        1 => grida::query::paint::PaintTarget::Stroke,
+        _ => grida::query::paint::PaintTarget::Fill,
     };
     let limit = if limit == 0 {
         None
@@ -551,7 +551,7 @@ pub(crate) unsafe extern "C" fn query_paint_groups(
         Some(limit as usize)
     };
 
-    let groups = cg::query::paint::query_paint_groups(
+    let groups = grida::query::paint::query_paint_groups(
         &scene.graph,
         &scene.graph,
         &internal_ids,
@@ -563,7 +563,7 @@ pub(crate) unsafe extern "C" fn query_paint_groups(
     // Serialize with user-facing string IDs
     #[derive(Serialize)]
     struct PaintGroupOut {
-        paint: cg::cg::types::Paint,
+        paint: grida::cg::types::Paint,
         node_ids: Vec<String>,
     }
 
@@ -614,7 +614,7 @@ pub(crate) unsafe extern "C" fn set_surface_overlay_config(
     }
 
     if let Ok(cfg) = serde_json::from_slice::<Config>(slice) {
-        app.surface_overlay_config = cg::devtools::surface_overlay::SurfaceOverlayConfig {
+        app.surface_overlay_config = grida::overlay::widgets::surface::SurfaceOverlayConfig {
             dpr: cfg.dpr,
             text_baseline_decoration: cfg.text_baseline_decoration,
             show_size_meter: cfg.show_size_meter,
@@ -634,7 +634,7 @@ pub(crate) unsafe extern "C" fn command(
     a: f32,
     b: f32,
 ) {
-    use cg::window::command::ApplicationCommand;
+    use grida::window::command::ApplicationCommand;
     if let Some(app) = app.as_mut() {
         let cmd = match id {
             1 => ApplicationCommand::ZoomIn,
@@ -643,12 +643,12 @@ pub(crate) unsafe extern "C" fn command(
             4 => ApplicationCommand::Pan { tx: a, ty: b },
             5 => ApplicationCommand::SelectAll,
             6 => ApplicationCommand::DeselectAll,
-            7 => ApplicationCommand::Select(cg::query::Selector::Children),
-            8 => ApplicationCommand::Select(cg::query::Selector::Parent),
-            9 => ApplicationCommand::Select(cg::query::Selector::NextSibling),
-            10 => ApplicationCommand::Select(cg::query::Selector::PreviousSibling),
-            11 => ApplicationCommand::Select(cg::query::Selector::Siblings),
-            12 => ApplicationCommand::Select(cg::query::Selector::All),
+            7 => ApplicationCommand::Select(grida::query::Selector::Children),
+            8 => ApplicationCommand::Select(grida::query::Selector::Parent),
+            9 => ApplicationCommand::Select(grida::query::Selector::NextSibling),
+            10 => ApplicationCommand::Select(grida::query::Selector::PreviousSibling),
+            11 => ApplicationCommand::Select(grida::query::Selector::Siblings),
+            12 => ApplicationCommand::Select(grida::query::Selector::All),
             13 => ApplicationCommand::ZoomToFit,
             14 => ApplicationCommand::ZoomToSelection,
             15 => ApplicationCommand::ZoomTo100,
@@ -973,7 +973,7 @@ pub(crate) unsafe extern "C" fn get_node_absolute_bounding_box(
     if let Some(app) = app.as_mut() {
         let id = __str_from_ptr_len(ptr, len);
         if let Some(id) = id {
-            let target = cg::window::application::BoundsTarget::from_str(&id);
+            let target = grida::window::application::BoundsTarget::from_str(&id);
             if let Some(rect) = app.get_node_absolute_bounding_box(target) {
                 let vec4 = rect.to_vec4(); // [f32; 4]
                 let out = allocate(std::mem::size_of::<f32>() * 4) as *mut f32;
@@ -1025,7 +1025,7 @@ pub(crate) unsafe extern "C" fn export_node_as(
     fmt_ptr: *const u8,
     fmt_len: usize,
 ) -> *const u8 {
-    use cg::export::ExportAs;
+    use grida::export::ExportAs;
 
     let (Some(app), Some(id), Some(fmt_str)) = (
         app.as_mut(),
@@ -1072,7 +1072,7 @@ pub(crate) unsafe extern "C" fn export_pdf_document(
     json_ptr: *const u8,
     json_len: usize,
 ) -> *const u8 {
-    use cg::export::ExportPdfDocumentOptions;
+    use grida::export::ExportPdfDocumentOptions;
 
     let (Some(app), Some(json_str)) = (app.as_mut(), __str_from_ptr_len(json_ptr, json_len)) else {
         return std::ptr::null();
@@ -1274,7 +1274,7 @@ pub(crate) unsafe extern "C" fn runtime_renderer_set_outline_mode(
     app: *mut UnknownTargetApplication,
     enable: bool,
 ) {
-    use cg::runtime::render_policy::{
+    use grida::runtime::render_policy::{
         RenderPolicy, RenderPolicyFlags, FLAG_RENDER_OUTLINES_ALWAYS,
     };
     if let Some(app) = app.as_mut() {
@@ -1352,13 +1352,13 @@ pub(crate) unsafe extern "C" fn highlight_strokes(
         if let Some(json) = __str_from_ptr_len(ptr, len) {
             if let Ok(args) = serde_json::from_str::<JsArgs>(&json) {
                 let style = args.style.map(|s| {
-                    let mut st = cg::devtools::stroke_overlay::StrokeOverlayStyle::default();
+                    let mut st = grida::overlay::widgets::stroke::StrokeOverlayStyle::default();
                     if let Some(w) = s.stroke_width {
                         st.stroke_width = w;
                     }
                     if let Some(color) = s.stroke {
                         let rgba = math2::hex_to_rgba8888(&color);
-                        st.stroke = cg::cg::CGColor::from_rgba(
+                        st.stroke = grida::cg::CGColor::from_rgba(
                             rgba.r,
                             rgba.g,
                             rgba.b,
@@ -1374,29 +1374,3 @@ pub(crate) unsafe extern "C" fn highlight_strokes(
 }
 
 // #endregion: surface api
-
-// ====================================================================================================
-// #region: testing / mock / dummy
-// ====================================================================================================
-
-#[no_mangle]
-/// js::_load_dummy_scene
-pub(crate) unsafe extern "C" fn load_dummy_scene(app: *mut UnknownTargetApplication) {
-    if let Some(app) = app.as_mut() {
-        app.load_dummy_scene();
-    }
-}
-
-#[no_mangle]
-/// js::_load_benchmark_scene
-pub(crate) unsafe extern "C" fn load_benchmark_scene(
-    app: *mut UnknownTargetApplication,
-    cols: u32,
-    rows: u32,
-) {
-    if let Some(app) = app.as_mut() {
-        app.load_benchmark_scene(cols, rows);
-    }
-}
-
-// #endregion

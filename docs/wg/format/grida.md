@@ -13,7 +13,7 @@ The Grida IR is the in-memory scene graph used by all Grida rendering, layout, a
 
 **Canonical sources:**
 
-- Rust runtime model: `crates/grida-canvas/src/node/schema.rs`
+- Rust runtime model: `crates/grida/src/node/schema.rs`
 - FlatBuffers schema: `format/grida.fbs`
 - TypeScript model: `packages/grida-canvas-schema/grida.ts`
 

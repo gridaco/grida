@@ -1,10 +1,10 @@
 //! HTTP fetch helper for `--url` mode.
 //!
 //! WPT tests are served from a local `wpt serve` (or equivalent). We
-//! fetch the HTML as a string and render it with the `cg::htmlcss`
+//! fetch the HTML as a string and render it with the `grida::htmlcss`
 //! pipeline exactly as if it had been read from disk. External
 //! asset URLs (`<link href>`, `<img src>`) are *not* resolved here —
-//! the cg htmlcss renderer does not yet support a base URL. When
+//! the grida htmlcss renderer does not yet support a base URL. When
 //! external-stylesheet support lands (plan P4) this module should
 //! grow to thread a base URL through to the renderer.
 

@@ -119,7 +119,7 @@ arrays in capability tables, and validate aggressively.
 
 -- This is a draft schema file. It is expected to evolve.
 -- The obvious parts here are aligned to the current Rust runtime model:
--- `crates/grida-canvas/src/node/schema.rs`
+-- `crates/grida/src/node/schema.rs`
 
 create schema if not exists grida_canvas;
 
@@ -129,7 +129,7 @@ create domain grida_canvas.object_id as bigint
   check (value >= 0 and value <= 4294967295);
 
 -- -----------------------------
--- enums (aligned to Rust `cg::types` serde rename strings)
+-- enums (aligned to Rust `grida::cg::types` serde rename strings)
 -- -----------------------------
 
 create type grida_canvas.canvas_node_type as enum (

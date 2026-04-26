@@ -14,7 +14,7 @@ CSS → Grida IR property mapping table and TODO tracker.
 
 **Status key:** ✅ mapped | ⚠️ partial | 🔧 IR exists, not wired | ❌ IR missing | 🚫 out of scope
 
-**Import pipelines:** HTML import (`crates/grida-canvas/src/html/`), SVG import (via usvg, `crates/grida-canvas/src/svg/`).
+**Import pipelines:** HTML import (`crates/grida/src/import/html/`), SVG import (via usvg, `crates/grida/src/import/svg/`).
 
 ---
 
@@ -243,7 +243,7 @@ CSS allows negative margins to pull elements closer or create overlapping layout
 
 ## Tree Surgery Reference
 
-CSS properties that lack direct IR representation are converted via structural tree transforms during HTML import (`crates/grida-canvas/src/html/mod.rs`).
+CSS properties that lack direct IR representation are converted via structural tree transforms during HTML import (`crates/grida/src/import/html/mod.rs`).
 
 ### Margin → wrapper + padding
 

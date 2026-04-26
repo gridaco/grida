@@ -14,7 +14,7 @@ export interface DiscoverOptions {
   /**
    * Optional filter on generated test names. If the pattern ends with `*`
    * it's treated as a prefix; otherwise it's a substring match. Mirrors
-   * `crates/grida-dev/src/reftest/runner.rs` filter semantics.
+   * `crates/grida_dev/src/reftest/runner.rs` filter semantics.
    */
   filter?: string;
 }

@@ -144,7 +144,7 @@ fn blur_pass_estimate(sigma: f32) -> u32 {
 
 ### `reduce_blur()` — Interactive Quality Reduction
 
-> **FACT** — From `crates/grida-canvas/src/painter/painter.rs`.
+> **FACT** — From `crates/grida/src/painter/painter.rs`.
 
 The painter implements `reduce_blur()` which divides sigma by 4×
 during interactive frames (`RenderPolicy::EffectQuality::Reduced`).
@@ -340,4 +340,4 @@ noted otherwise.
 | `skia_bench_cache_blit`  | Cache hit/miss ratio, blit constancy across effect types                           |
 | `skia_bench_scene_scale` | Full Renderer pipeline at 1K–136K nodes with culling and caching                   |
 
-Source: `crates/grida-canvas/examples/skia_bench/`
+Source: `crates/grida/examples/skia_bench/`

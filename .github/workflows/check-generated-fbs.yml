@@ -4,7 +4,7 @@
 #
 # Why this exists
 # ---------------
-# The Rust FlatBuffers bindings (`crates/grida-canvas/src/io/generated/grida.rs`)
+# The Rust FlatBuffers bindings (`crates/grida/src/io/generated/grida.rs`)
 # are committed to git so that `cargo build` works from a clean checkout without
 # requiring `flatc`. However, because the file is generated from `format/grida.fbs`,
 # it can become stale if someone edits the schema but forgets to regenerate.
@@ -20,8 +20,8 @@
 #
 # How to fix a failure
 # --------------------
-#   pnpm --filter @crates/grida-canvas generate
-#   git add crates/grida-canvas/src/io/generated/grida.rs
+#   pnpm --filter @crates/grida generate
+#   git add crates/grida/src/io/generated/grida.rs
 #   git commit
 # -----------------------------------------------------------------
 
@@ -34,7 +34,7 @@ on:
   pull_request:
     paths:
       - "format/grida.fbs"
-      - "crates/grida-canvas/src/io/generated/**"
+      - "crates/grida/src/io/generated/**"
       - "packages/grida-format/src/**"
       - "bin/activate-flatc"
 
@@ -49,14 +49,14 @@ jobs:
       - name: Regenerate Rust FlatBuffers bindings
         run: |
           python3 bin/activate-flatc -- --rust \
-            -o crates/grida-canvas/src/io/generated \
+            -o crates/grida/src/io/generated \
             format/grida.fbs
-          mv crates/grida-canvas/src/io/generated/grida_generated.rs \
-             crates/grida-canvas/src/io/generated/grida.rs
+          mv crates/grida/src/io/generated/grida_generated.rs \
+             crates/grida/src/io/generated/grida.rs
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --exit-code crates/grida-canvas/src/io/generated/grida.rs; then
-            echo "::error::Generated Rust FlatBuffers bindings are stale. Run 'pnpm --filter @crates/grida-canvas generate' and commit the result."
+          if ! git diff --exit-code crates/grida/src/io/generated/grida.rs; then
+            echo "::error::Generated Rust FlatBuffers bindings are stale. Run 'pnpm --filter @crates/grida generate' and commit the result."
             exit 1
           fi

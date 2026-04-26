@@ -1,12 +1,12 @@
 # grida_wpt
 
-Rendering-test harness for the Grida Canvas (`cg`) crate.
+Rendering-test harness for the Grida Canvas (`grida`) crate.
 
 **Two consumers:**
 
 - the in-tree **refbrowser pipeline** — Chromium-parity checks on L0
   fixtures. Invoked via `grida_wpt render --suite …`. See
-  [cg-reftest skill](../../.agents/skills/cg-reftest/SKILL.md).
+  [render-reftest skill](../../.agents/skills/render-reftest/SKILL.md).
 - the upstream **Web Platform Tests** — spec-conformance checks
   driven by `wptrunner` calling `grida_wpt render --url …`. Plugin
   lives in the [`gridaco/wpt`](https://github.com/gridaco/wpt) fork;
@@ -19,7 +19,7 @@ the binary without pulling a GUI toolchain.
 The crate is named for its strategic anchor (WPT) but is expected to
 grow to host adjacent test infra — the existing SVG reftest runner,
 refig suites, and future paint reftests — as they are promoted out of
-`grida-dev`.
+`grida_dev`.
 
 ## Usage
 
@@ -59,7 +59,7 @@ Default output directory: `${TMPDIR}/grida-htmlcss-goldens/`. Pass
 ## Suite JSON schema
 
 Shared with the TypeScript oracle
-(`.agents/skills/cg-reftest/scripts/refbrowser_render.ts`) and
+(`.agents/skills/render-reftest/scripts/refbrowser_render.ts`) and
 existing suite files at `fixtures/test-html/suites/*.json`.
 
 ```json

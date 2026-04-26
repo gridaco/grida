@@ -10,7 +10,7 @@
 - **`CanvasDocument` field IDs reindexed**: `nodes` → `id:1`, `scenes` → `id:2`
   (previously `id:2` / `id:3`). Any document serialized with `0.90.x` is **not
   readable** by a `0.91.x` decoder without migration.
-- **Rust decoder added**: `crates/grida-canvas/src/io/io_grida_fbs.rs` decodes
+- **Rust decoder added**: `crates/grida/src/io/io_grida_fbs.rs` decodes
   raw `.grida` FlatBuffers binaries into the internal `Scene` representation.
 
 ## `0.90.0-beta+20260108`

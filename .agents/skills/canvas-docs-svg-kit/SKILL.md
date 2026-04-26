@@ -199,7 +199,7 @@ Rule of thumb: if you find yourself inventing a primitive that maps to a real pr
 
 **Tier 1: render with `resvg`, then look.** (Always do this.)
 
-Editing an SVG without rendering it is editing blind. The geometry-by-arithmetic bugs in this kit (anchor pin offset, badge padding, container overflow) repeatedly slip through when you reason about coordinates without seeing the result. `resvg` is the standard SVG rasteriser used elsewhere in the project — already installed and what `cg-reftest` uses for golden comparisons. It's the right tool here too.
+Editing an SVG without rendering it is editing blind. The geometry-by-arithmetic bugs in this kit (anchor pin offset, badge padding, container overflow) repeatedly slip through when you reason about coordinates without seeing the result. `resvg` is the standard SVG rasteriser used elsewhere in the project — already installed and what `render-reftest` uses for golden comparisons. It's the right tool here too.
 
 ```sh
 resvg path/to/figure.svg /tmp/check.png

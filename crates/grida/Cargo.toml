@@ -1,0 +1,189 @@
+[package]
+name = "grida"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# skia
+skia-safe = { version = "0.93.1", features = [
+  "gpu",
+  "gl",
+  "textlayout",
+  "pdf",
+  "svg",
+  "webp",
+] }
+gl = "0.14.0"
+
+# io
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+json-patch = "4.1.0"
+flatbuffers = "25.12.19"
+
+# text editing
+unicode-segmentation = "1"
+
+# geo
+math2 = { path = "../math2", features = ["serde"] }
+rstar = "0.12"
+
+# core resource hashing
+seahash = "4.1.0"
+# fast non-cryptographic hasher for hot-path HashMaps
+rustc-hash = "2"
+# layout engine
+taffy = "0.9.2"
+# svg parsing
+# (+2mb wasm32-unknown-emscripten@opt-level=3)
+usvg = { path = "../../third_party/usvg" }
+# html/css cascade (Stylo-based style resolution)
+csscascade = { path = "../csscascade" }
+stylo = "0.16"
+stylo_static_prefs = "0.16"
+# markdown parsing
+# (+0.25mb wasm32-unknown-emscripten@opt-level=3)
+pulldown-cmark = "0.13.0"
+
+# .grida ZIP file support
+# "deflate" enables both read (flate2) and write (zopfli) paths; there is no
+# read-only feature in zip v2.  Adds ~3 small crates (zopfli, bumpalo,
+# simd-adler32) — all pure Rust, wasm-safe, and eliminated by LTO if unused.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+# toolings
+async-trait = "0.1"
+futures = "0.3.31"
+
+# native GL context creation (headless GPU rendering, CLI, SDK)
+glutin = { version = "0.32.0", optional = true }
+raw-window-handle = { version = "0.6.0", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+reqwest = "0.12.19"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+
+[features]
+default = []
+web = []
+perf = []
+native-clock-tick = []
+native-gl-context = ["dep:glutin", "dep:raw-window-handle"]
+
+[dev-dependencies]
+criterion = "0.5"
+clap = { version = "4.5.39", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+rendiff = "0.2"
+imgref = "1.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[[bench]]
+name = "bench_rectangles"
+harness = false
+
+[[bench]]
+name = "bench_mipmap"
+harness = false
+
+[[bench]]
+name = "bench_viewport_culling"
+harness = false
+
+[[bench]]
+name = "bench_camera"
+harness = false
+
+[[bench]]
+name = "bench_load_scene"
+harness = false
+
+[[bench]]
+name = "bench_export"
+harness = false
+
+[[example]]
+name = "headless_gpu"
+required-features = ["native-gl-context"]
+
+# ── Skia GPU microbenchmarks (examples/skia_bench/) ──────────────
+# Raw Skia measurements, no engine involvement.
+# Run: cargo run -p grida --example skia_bench_<name> --features native-gl-context --release
+
+[[example]]
+name = "skia_bench_subpixel"
+path = "examples/skia_bench/skia_bench_subpixel.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_primitives"
+path = "examples/skia_bench/skia_bench_primitives.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_rrect_vs_rect"
+path = "examples/skia_bench/skia_bench_rrect_vs_rect.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_text_lod"
+path = "examples/skia_bench/skia_bench_text_lod.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_effects"
+path = "examples/skia_bench/skia_bench_effects.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_opacity"
+path = "examples/skia_bench/skia_bench_opacity.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_downscale"
+path = "examples/skia_bench/skia_bench_downscale.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_atlas"
+path = "examples/skia_bench/skia_bench_atlas.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_tiling"
+path = "examples/skia_bench/skia_bench_tiling.rs"
+
+[[example]]
+name = "skia_bench_srcset"
+path = "examples/skia_bench/skia_bench_srcset.rs"
+
+[[example]]
+name = "skia_bench_cache_image"
+path = "examples/skia_bench/skia_bench_cache_image.rs"
+
+[[example]]
+name = "skia_bench_cache_text"
+path = "examples/skia_bench/skia_bench_cache_text.rs"
+
+[[example]]
+name = "skia_bench_cost_model"
+path = "examples/skia_bench/skia_bench_cost_model.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_cache_blit"
+path = "examples/skia_bench/skia_bench_cache_blit.rs"
+required-features = ["native-gl-context"]
+
+[[example]]
+name = "skia_bench_scene_scale"
+path = "examples/skia_bench/skia_bench_scene_scale.rs"
+required-features = ["native-gl-context"]
+
+[lints]
+workspace = true
+

@@ -16,11 +16,11 @@ rendering (target: 60+ fps with large design documents including effects).
 
 Related:
 
-- Skia GPU Primitives Benchmark — see `crates/grida-canvas/examples/skia_bench/BENCHMARK.md`
+- Skia GPU Primitives Benchmark — see `crates/grida/examples/skia_bench/BENCHMARK.md`
 - [Chromium Compositor Research](../research/chromium/index.md) — reference architecture
-- Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_effects.rs` — effect cost ranking
-- Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_opacity.rs` — opacity proof
-- Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_atlas.rs` — texture atlas compositor
+- Benchmark source: `crates/grida/examples/skia_bench/skia_bench_effects.rs` — effect cost ranking
+- Benchmark source: `crates/grida/examples/skia_bench/skia_bench_opacity.rs` — opacity proof
+- Benchmark source: `crates/grida/examples/skia_bench/skia_bench_atlas.rs` — texture atlas compositor
 
 ---
 
@@ -125,7 +125,7 @@ Related:
     pressure (~57 µs at 100 nodes → ~135 µs at 5000 nodes), while
     per-paint stays flat.
 
-    Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_opacity.rs`
+    Benchmark source: `crates/grida/examples/skia_bench/skia_bench_opacity.rs`
 
     ### Correctness caveats
 
@@ -263,7 +263,7 @@ Related:
     Falls back to individual texture capture when atlas allocation fails
     (node too large for a page).
 
-    Benchmark source: `crates/grida-canvas/examples/skia_bench/skia_bench_atlas.rs`
+    Benchmark source: `crates/grida/examples/skia_bench/skia_bench_atlas.rs`
 
 7c. **Compositor Early-Exit for Non-Promotable Nodes**
 
@@ -1007,7 +1007,7 @@ and single-thread overhead.
     ~5x layout speedup on small scenes; orders of magnitude on
     100K+ node scenes where Taffy + text measurement dominate.
 
-    CLI: `cargo run -p grida-dev --release -- load-bench file.grida --skip-layout`
+    CLI: `cargo run -p grida_dev --release -- load-bench file.grida --skip-layout`
 
 35. **Pre-Allocate Layout Data Structures** ✅ IMPLEMENTED
 
@@ -1035,8 +1035,8 @@ and single-thread overhead.
     that returns measurements directly, skipping Skia entirely for
     repeated queries with the same width.
 
-**Diagnostic tooling:** `load-bench` CLI (`grida-dev load-bench`)
-for per-stage timing; `cargo bench -p cg --bench bench_load_scene`
+**Diagnostic tooling:** `load-bench` CLI (`grida_dev load-bench`)
+for per-stage timing; `cargo bench -p grida --bench bench_load_scene`
 for Criterion benchmarks at synthetic scale.
 
 ---

@@ -1,8 +1,8 @@
 ---
 name: io-svg
 description: >
-  Guides work on SVG import into the Grida Canvas Rust engine (cg crate).
-  Covers crates/grida-canvas/src/svg/, the grida-dev svg-to-grida CLI, cross-boundary
+  Guides work on SVG import into the Grida Canvas Rust engine (grida crate).
+  Covers crates/grida/src/import/svg/, the grida_dev svg-to-grida CLI, cross-boundary
   FBS codec tests (Rust encode → TS decode), SVG fixture authoring, and known SVG
   import limitations (text model, filters, transforms).
   Use when adding SVG feature support, fixing import bugs, authoring SVG test fixtures,
@@ -12,7 +12,7 @@ description: >
 
 # SVG I/O — Rust SVG Import Pipeline
 
-Crate: `crates/grida-canvas/src/svg/`
+Crate: `crates/grida/src/import/svg/`
 
 ## When to Use This Skill
 
@@ -30,7 +30,7 @@ Crate: `crates/grida-canvas/src/svg/`
 ```
 .svg bytes
   → usvg::Tree::from_data()   — parse + resolve (third_party/usvg/)
-  → from_usvg_tree::*         — usvg::Tree → Grida scene graph
+  → packed_scene::*           — usvg::Tree → Grida scene graph
   → pack::*                   — pack nodes into IPackedSceneDocument
   → io::archive::pack()       — produce .grida ZIP
 ```
@@ -45,11 +45,11 @@ The TypeScript cross-boundary test (`fbs-svg-cross-boundary.test.ts`) decodes `.
 
 | Path                                                                | Role                                      |
 | ------------------------------------------------------------------- | ----------------------------------------- |
-| `crates/grida-canvas/src/svg/from_usvg_tree.rs`                     | Core conversion: usvg nodes → Grida nodes |
-| `crates/grida-canvas/src/svg/pack.rs`                               | Packs converted nodes into scene document |
-| `crates/grida-canvas/src/svg/from_usvg.rs`                          | High-level entry: bytes → scene           |
-| `crates/grida-canvas/src/svg/sanitize.rs`                           | Pre-processing / sanitization             |
-| `crates/grida-dev/src/main.rs`                                      | `svg-to-grida` subcommand                 |
+| `crates/grida/src/import/svg/packed_scene.rs`                       | Core conversion: usvg nodes → Grida nodes |
+| `crates/grida/src/import/svg/pack.rs`                               | Packs converted nodes into scene document |
+| `crates/grida/src/import/svg/from_usvg.rs`                          | High-level entry: bytes → scene           |
+| `crates/grida/src/formats/svg/sanitize.rs`                          | Pre-processing / sanitization             |
+| `crates/grida_dev/src/main.rs`                                      | `svg-to-grida` subcommand                 |
 | `fixtures/test-svg/L0/`                                             | Committed SVG fixtures                    |
 | `fixtures/test-svg/.generated/`                                     | Gitignored, generated `.grida` outputs    |
 | `packages/grida-canvas-io/__tests__/fbs-svg-cross-boundary.test.ts` | TS-side codec test                        |
@@ -60,14 +60,14 @@ The TypeScript cross-boundary test (`fbs-svg-cross-boundary.test.ts`) decodes `.
 
 ### Orient before touching code
 
-1. Read `crates/grida-canvas/AGENTS.md` for crate conventions and commands.
+1. Read `crates/grida/AGENTS.md` for crate conventions and commands.
 2. Read `docs/wg/feat-svg/text-import.md` before touching text conversion — the text model is intentionally limited and the design is documented there.
-3. Grep for the relevant element in `from_usvg_tree.rs`.
+3. Grep for the relevant element in `packed_scene.rs`.
 
 ### Add support for a new SVG element or attribute
 
 1. Find where usvg exposes the element in `third_party/usvg/src/`.
-2. Add the mapping in `from_usvg_tree.rs` (the main `convert_*` functions).
+2. Add the mapping in `packed_scene.rs` (the main `convert_*` functions).
 3. Add a minimal SVG fixture to `fixtures/test-svg/L0/` that exercises the feature.
 4. Run the cross-boundary cycle (see below) to verify Rust→TS round-trip.
 
@@ -75,7 +75,7 @@ The TypeScript cross-boundary test (`fbs-svg-cross-boundary.test.ts`) decodes `.
 
 ```sh
 # Step 1: Rust encodes all L0 SVG fixtures → .grida files
-cargo run -p grida-dev -- svg-to-grida fixtures/test-svg/L0
+cargo run -p grida_dev -- svg-to-grida fixtures/test-svg/L0
 
 # Step 2: TS decodes the .grida files and runs assertions
 pnpm vitest run fbs-svg-cross-boundary --reporter=verbose
@@ -86,26 +86,26 @@ Outputs land in `fixtures/test-svg/.generated/` (gitignored).
 For custom SVG files:
 
 ```sh
-cargo run -p grida-dev -- svg-to-grida path/to/svgs -r
+cargo run -p grida_dev -- svg-to-grida path/to/svgs -r
 ```
 
 ### Run SVG reftests
 
 ```sh
 # W3C SVG test suite (requires separate download — see docs/wg/feat-svg/testing.md)
-cargo run -p grida-dev --release -- reftest path/to/w3c-suite/
+cargo run -p grida_dev --release -- reftest path/to/w3c-suite/
 
 # resvg test suite
-cargo run -p grida-dev --release -- reftest path/to/resvg-test-suite/
+cargo run -p grida_dev --release -- reftest path/to/resvg-test-suite/
 ```
 
-See `crates/grida-dev/TESTING.md` for full reftest flags.
+See `crates/grida_dev/TESTING.md` for full reftest flags.
 
 ### Rust tests for SVG
 
 ```sh
-cargo test -p cg
-cargo test -p cg svg        # filter to SVG tests only
+cargo test -p grida
+cargo test -p grida svg        # filter to SVG tests only
 ```
 
 ---
@@ -165,10 +165,10 @@ When fixing a codec bug found via the cross-boundary test:
 
 ```sh
 # Rust check + tests
-cargo check -p cg --all-targets
-cargo test -p cg
+cargo check -p grida --all-targets
+cargo test -p grida
 
 # Cross-boundary cycle
-cargo run -p grida-dev -- svg-to-grida fixtures/test-svg/L0
+cargo run -p grida_dev -- svg-to-grida fixtures/test-svg/L0
 pnpm vitest run fbs-svg-cross-boundary
 ```

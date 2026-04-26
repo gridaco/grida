@@ -1,0 +1,171 @@
+use super::native_application::NativeApplication;
+use futures::channel::mpsc;
+use grida::node::schema::Scene;
+use grida::resources::{load_scene_images, FontMessage, ImageMessage};
+use grida::runtime::scene::{Backend, Renderer};
+use grida::window::application::{ApplicationApi, HostEvent, HostEventCallback};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Instant;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+
+#[allow(dead_code)]
+pub async fn run_demo_window(scene: Scene) {
+    run_demo_window_with(scene, |_, _, _, _| {}).await;
+}
+
+/// Run a demo window with multiple scenes (PageUp/PageDown to switch).
+#[allow(dead_code)]
+pub async fn run_demo_window_multi(scenes: Vec<Scene>) {
+    let first = scenes
+        .first()
+        .cloned()
+        .expect("run_demo_window_multi requires at least one scene");
+    let options = grida::runtime::scene::RendererOptions {
+        use_embedded_fonts: true,
+        ..Default::default()
+    };
+    run_demo_window_core_multi(first, scenes, |_, _, _, _| {}, None, None, options).await;
+}
+
+pub async fn run_demo_window_with<F>(scene: Scene, init: F)
+where
+    F: FnOnce(
+        &mut Renderer,
+        mpsc::UnboundedSender<ImageMessage>,
+        mpsc::UnboundedSender<FontMessage>,
+        winit::event_loop::EventLoopProxy<HostEvent>,
+    ),
+{
+    let options = grida::runtime::scene::RendererOptions {
+        use_embedded_fonts: true,
+        ..Default::default()
+    };
+    run_demo_window_core_multi(scene.clone(), vec![scene], init, None, None, options).await;
+}
+
+pub async fn run_demo_window_with_drop<F>(
+    scene: Scene,
+    init: F,
+    drop_tx: UnboundedSender<PathBuf>,
+    scenes_rx: UnboundedReceiver<Vec<Scene>>,
+    options: grida::runtime::scene::RendererOptions,
+) where
+    F: FnOnce(
+        &mut Renderer,
+        mpsc::UnboundedSender<ImageMessage>,
+        mpsc::UnboundedSender<FontMessage>,
+        winit::event_loop::EventLoopProxy<HostEvent>,
+    ),
+{
+    run_demo_window_core_multi(
+        scene.clone(),
+        vec![scene],
+        init,
+        Some(drop_tx),
+        Some(scenes_rx),
+        options,
+    )
+    .await;
+}
+
+async fn run_demo_window_core_multi<F>(
+    scene: Scene,
+    all_scenes: Vec<Scene>,
+    init: F,
+    file_drop_tx: Option<UnboundedSender<PathBuf>>,
+    scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
+    options: grida::runtime::scene::RendererOptions,
+) where
+    F: FnOnce(
+        &mut Renderer,
+        mpsc::UnboundedSender<ImageMessage>,
+        mpsc::UnboundedSender<FontMessage>,
+        winit::event_loop::EventLoopProxy<HostEvent>,
+    ),
+{
+    let width = 1080;
+    let height = 1080;
+    let startup_started_at = Instant::now();
+
+    println!("[demo] starting demo window");
+    let (tx, rx) = mpsc::unbounded();
+    let (font_tx, font_rx) = mpsc::unbounded();
+
+    let (mut app, el) = NativeApplication::new_with_options(
+        width,
+        height,
+        rx,
+        font_rx,
+        options,
+        file_drop_tx.clone(),
+        file_drop_tx.is_some(),
+        scenes_rx,
+    );
+    println!(
+        "[demo] native application initialized in {:?}",
+        startup_started_at.elapsed()
+    );
+    let proxy = el.create_proxy();
+
+    let surface_ptr = app.app.surface_mut_ptr();
+    app.app.set_renderer_backend(Backend::GL(surface_ptr));
+
+    println!(
+        "[demo] initializing image loader at {:?}",
+        startup_started_at.elapsed()
+    );
+    println!("[demo] loading scene images in background");
+    let scene_clone = scene.clone();
+    let tx_clone = tx.clone();
+    let image_load_started_at = Instant::now();
+    let event_cb: HostEventCallback = {
+        let proxy_clone = proxy.clone();
+        Arc::new(move |event: HostEvent| {
+            let _ = proxy_clone.send_event(event);
+        })
+    };
+    // Store image_tx and event_cb for scene-switch image loading.
+    app.image_tx = Some(tx.clone());
+    app.event_cb = Some(event_cb.clone());
+
+    std::thread::spawn(move || {
+        let event_cb = event_cb.clone();
+        futures::executor::block_on(async move {
+            load_scene_images(&scene_clone, tx_clone, event_cb).await;
+            println!(
+                "[demo] scene images loaded in {:?}",
+                image_load_started_at.elapsed()
+            );
+        });
+    });
+
+    {
+        let renderer = app.app.renderer_mut();
+        init(renderer, tx, font_tx, proxy);
+    }
+
+    {
+        let renderer = app.app.renderer_mut();
+        renderer.load_scene(scene.clone());
+    }
+    app.scenes = all_scenes;
+    app.scene_index = 0;
+    if app.scenes.len() > 1 {
+        let title = format!("[1/{}] {}", app.scenes.len(), scene.name);
+        app.window.set_title(&title);
+    }
+    app.app.devtools_rendering_set_show_fps_meter(true);
+    app.app.devtools_rendering_set_show_stats(true);
+    app.app.devtools_rendering_set_show_hit_testing(true);
+    app.app.devtools_rendering_set_show_ruler(true);
+    app.app.devtools_rendering_set_show_tiles(false);
+
+    println!(
+        "[demo] entering event loop after {:?}",
+        startup_started_at.elapsed()
+    );
+    if let Err(e) = el.run_app(&mut app) {
+        eprintln!("Event loop error: {:?}", e);
+    }
+}

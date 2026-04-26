@@ -1,6 +1,6 @@
 # `fixtures/test-html/`
 
-HTML+CSS fixtures for the `cg` htmlcss renderer and the refbrowser
+HTML+CSS fixtures for the `grida` htmlcss renderer and the refbrowser
 reftest pipeline.
 
 ## Layout
@@ -14,7 +14,7 @@ fixtures/test-html/
     └── L0.coverage.json   # aspirational scope; tracks progress
 ```
 
-See [`.agents/skills/cg-reftest/SKILL.md`](../../.agents/skills/cg-reftest/SKILL.md)
+See [`.agents/skills/render-reftest/SKILL.md`](../../.agents/skills/render-reftest/SKILL.md)
 for the reftest pipeline and suite schema. See
 [`.agents/skills/fixtures/SKILL.md`](../../.agents/skills/fixtures/SKILL.md)
 for general fixture authoring guidance (naming, one-concept-per-file,
@@ -25,10 +25,10 @@ viewport convention specific to refbrowser.
 
 Fixtures should target a **well-known viewport size** so the PNG
 output of both producers is at a predictable dimension. This
-eliminates the brittle "tune `viewport.height` per fixture to cg's
+eliminates the brittle "tune `viewport.height` per fixture to grida's
 cull" dance and makes diffs cleaner (subject fills the canvas,
 background doesn't inflate the score — see "Reading the score" in
-the cg-reftest skill).
+the render-reftest skill).
 
 Recommended presets, ordered by typical use:
 
@@ -67,11 +67,11 @@ body {
 }
 ```
 
-cg then culls to exactly the preset height and Chromium produces the
+grida then culls to exactly the preset height and Chromium produces the
 same size under `full_page: true`. Both sides match without
 per-fixture `viewport` in the suite.
 
-**Why not `100vh`?** — cg's htmlcss engine currently resolves `vh`
+**Why not `100vh`?** — grida's htmlcss engine currently resolves `vh`
 against an internal viewport that may not match your target (observed:
 100vh → 720px cull). Explicit pixel heights are deterministic across
 both producers.
@@ -104,7 +104,7 @@ body {
 }
 ```
 
-The suite entry then carries an explicit `viewport` matching cg's
+The suite entry then carries an explicit `viewport` matching grida's
 natural cull:
 
 ```json
@@ -134,7 +134,7 @@ each region is testing. Two rules:
 - **Don't let captions drive layout.** When captions sit inside flex
   items, grid cells, or stretched blocks, pin the enclosing element's
   dimensions (`width`, `height`) so font-advance-width differences
-  between Chromium and cg can't leak into box geometry. Otherwise a
+  between Chromium and grida can't leak into box geometry. Otherwise a
   1px shaping difference in "padding: 24px (uniform)" propagates to
   every following sibling.
 
@@ -142,7 +142,7 @@ When text is incidental (labels, glyph placeholders, captions), inject
 `_reftest/hide-text.css` via the suite's `extra_css` — it neutralizes
 color, text-shadow, and line-height while preserving advance widths
 and block flow. The suite defaults already pull it in; see
-`.agents/skills/cg-reftest/SKILL.md` for details.
+`.agents/skills/render-reftest/SKILL.md` for details.
 
 ## Adding a new fixture
 
@@ -150,7 +150,7 @@ and block flow. The suite defaults already pull it in; see
    the test id.
 2. **Classify** — is this a **paint** fixture (color/border/shadow/
    opacity/etc.) or a **layout** fixture (sizing/padding/flex/grid)?
-   - **Paint:** add `html, body { min-height: <preset>; box-sizing: border-box; }` so cg cull = preset height.
+   - **Paint:** add `html, body { min-height: <preset>; box-sizing: border-box; }` so grida cull = preset height.
    - **Layout:** do **not** set any body `min-height`; let content size itself.
 3. **Keep it minimal** — one property or behavior per file. See the
    fixtures skill for the full authoring checklist.
@@ -161,7 +161,7 @@ and block flow. The suite defaults already pull it in; see
      { "path": "../L0/<your-file>.html",
        "viewport": { "width": 600, "height": <natural cull height> } }
      ```
-5. **Verify** — run both producers against the suite. The cg cull
+5. **Verify** — run both producers against the suite. The grida cull
    should equal the viewport in the suite, and the refbrowser
    screenshot should match pixel-for-pixel (or land somewhere in the
    coverage spectrum, with the diff image showing the real
@@ -174,8 +174,8 @@ and block flow. The suite defaults already pull it in; see
 
 - Per-fixture `.reftest.json` sidecars are **gone**. All per-fixture
   config lives in the suite manifest.
-- cg htmlcss does not currently resolve `vh` against the refbrowser
+- grida htmlcss does not currently resolve `vh` against the refbrowser
   viewport. Use explicit pixel heights.
 - The refbrowser diff default is `--threshold 0` (pixelmatch
-  strictest). See the cg-reftest skill for rationale and for the list
+  strictest). See the render-reftest skill for rationale and for the list
   of known Blink-vs-Skia divergence surfaces.

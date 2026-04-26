@@ -2,7 +2,7 @@
 //!
 //! Subcommands:
 //!
-//! * `render` — HTML+CSS fixtures → PNG via `cg::htmlcss` (the
+//! * `render` — HTML+CSS fixtures → PNG via `grida::htmlcss` (the
 //!   "actual" side of the reftest pair).
 //!
 //! Future: a `wpt` subcommand for the `wptrunner` product glue.
@@ -30,7 +30,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// Render HTML/CSS fixtures to PNG via the cg htmlcss renderer.
+    /// Render HTML/CSS fixtures to PNG via the grida htmlcss renderer.
     Render(RenderArgs),
 }
 
@@ -114,7 +114,7 @@ fn cmd_render(args: RenderArgs) {
 fn render_from_url(
     url: &str,
     args: &RenderArgs,
-    fonts: &cg::runtime::font_repository::FontRepository,
+    fonts: &grida::runtime::font_repository::FontRepository,
 ) {
     eprintln!("Fetching {url}");
     let html = fetch::fetch_text(url);
@@ -129,7 +129,7 @@ fn render_from_url(
 fn render_one(
     html_path: &Path,
     out_dir: &Path,
-    fonts: &cg::runtime::font_repository::FontRepository,
+    fonts: &grida::runtime::font_repository::FontRepository,
     args: &RenderArgs,
 ) {
     let mut cache = std::collections::HashMap::new();

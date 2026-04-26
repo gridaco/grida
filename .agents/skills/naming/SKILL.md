@@ -102,13 +102,16 @@ set by where the name is visible, and the difference is severe:
   break.
 
 This asymmetry is why the directory name and the published name
-**should often diverge**. `packages/grida-canvas-cg` publishes as
-`@grida/cg`; `crates/grida-canvas` publishes as `cg`. The long
-form pays for browsability where rename is cheap; the short form
-pays for ergonomics where rename is expensive. Two different
-decisions — treat them so. Invest heavily in a name **before** it
-escapes its file; once it's a public surface, the name is a
-commitment.
+**can diverge**. `packages/grida-canvas-cg` publishes as
+`@grida/cg`: the long directory pays for browsability (the
+canvas family clusters in the file tree) where rename is cheap;
+the short scope pays for ergonomics where rename is expensive.
+The Rust side, by contrast, currently aligns — `crates/grida`
+publishes as `grida` because the core crate is also the
+project's public namespace, and keeping the two in lockstep
+removes a name to remember. Two different trade-offs; pick per
+surface. Invest heavily in a name **before** it escapes its
+file; once it's a public surface, the name is a commitment.
 
 ## A name is a diagnostic
 
@@ -134,7 +137,7 @@ it resists.
 
 ## Terseness is a claim of uniqueness
 
-Two-letter names (`cg`, `fe`, `sk`, `k/`, `q/`) are not
+Two-letter names (`cg`, `fe`, `k/`, `q/`) are not
 abbreviations — they are assertions that nothing else in this
 parent competes for the slot. The assertion is load-bearing;
 reviewers rely on it to mean "this is _the_ canvas-graphics

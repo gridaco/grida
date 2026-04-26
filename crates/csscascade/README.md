@@ -21,7 +21,7 @@ csscascade ── cascade ─► StyledTree (computed styles per node)
 taffy ─────── layout ──► positioned boxes
     │
     ▼
-grida-canvas ─ convert ► IR nodes (rectangles, text, etc.)
+grida ─ convert ► IR nodes (rectangles, text, etc.)
 ```
 
 This mirrors the SVG import path (`usvg` → `from_usvg` → IR), but for HTML/CSS each stage is a separate crate because no single library (like `usvg` for SVG) handles the full pipeline.
@@ -67,13 +67,13 @@ Replace stubs with real providers so computed values reflect the runtime environ
 
 ### Phase 3 — IR Conversion ✅
 
-HTML → Grida IR pipeline implemented in `crates/grida-canvas/src/html/mod.rs`.
+HTML → Grida IR pipeline implemented in `crates/grida/src/import/html/mod.rs`.
 
 - [x] Map block/flex containers → Container IR nodes
 - [x] Map text nodes → TextSpan IR nodes with font/color properties
 - [x] Map background, border, opacity, gradients, shadows, effects, blend modes
 - [x] Handle `display: none` (exclusion)
-- [x] Layout pass via `taffy` (integrated into grida-canvas layout engine)
+- [x] Layout pass via `taffy` (integrated into grida layout engine)
 - [ ] `visibility: hidden` — needs dedicated IR field (not opacity:0)
 
 ### Phase 4 — Completeness
