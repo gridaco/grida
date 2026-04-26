@@ -22,17 +22,22 @@ lives under `LayoutSVGRoot`.
 
 ## Documents
 
-| Document                                                 | Scope                                                                            |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| [pipeline.md](./pipeline.md)                             | End-to-end pipeline: DOM → LayoutSVG\* → paint → composite                       |
-| [coordinate-systems.md](./coordinate-systems.md)         | viewBox, preserveAspectRatio, CTM, local-to-parent transforms                    |
-| [paint-servers.md](./paint-servers.md)                   | Gradients and patterns as shader-producing resources                             |
-| [resources-and-effects.md](./resources-and-effects.md)   | `<clipPath>`, `<mask>`, `<filter>`, `<marker>` resolution                        |
-| [path-geometry.md](./path-geometry.md)                   | `d=` parsing, `SVGPath` → `SkPath`, stroke properties → Skia                     |
-| [text.md](./text.md)                                     | SVG text: two-phase layout, text-on-path, `SvgTextLayoutAlgorithm`               |
-| [use-and-foreign-object.md](./use-and-foreign-object.md) | `<use>` shadow instance tree, `<foreignObject>` HTML-in-SVG bridging             |
-| [svg-as-image.md](./svg-as-image.md)                     | Inline vs standalone vs `<img>`-embedded SVG; `SVGImage`, `SVGImageForContainer` |
-| [comparison.md](./comparison.md)                         | Cross-engine comparison: Chromium vs Servo vs resvg                              |
+| Document                                                       | Scope                                                                            |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [pipeline.md](./pipeline.md)                                   | End-to-end pipeline: DOM → LayoutSVG\* → paint → composite                       |
+| [coordinate-systems.md](./coordinate-systems.md)               | viewBox, preserveAspectRatio, CTM, local-to-parent transforms                    |
+| [paint-servers.md](./paint-servers.md)                         | Gradients and patterns as shader-producing resources                             |
+| [resources-and-effects.md](./resources-and-effects.md)         | `<clipPath>`, `<mask>`, `<filter>`, `<marker>` resolution                        |
+| [path-geometry.md](./path-geometry.md)                         | `d=` parsing, `SVGPath` → `SkPath`, stroke properties → Skia                     |
+| [text.md](./text.md)                                           | SVG text: two-phase layout, text-on-path, `SvgTextLayoutAlgorithm`               |
+| [use-and-foreign-object.md](./use-and-foreign-object.md)       | `<use>` shadow instance tree, `<foreignObject>` HTML-in-SVG bridging             |
+| [svg-as-image.md](./svg-as-image.md)                           | Inline vs standalone vs `<img>`-embedded SVG; `SVGImage`, `SVGImageForContainer` |
+| [animation-and-smil.md](./animation-and-smil.md)               | SMIL pipeline (sandwich model, sync-base/event timing) and CSS / Web Animations on SVG |
+| [animated-properties-idl.md](./animated-properties-idl.md)     | `SVGAnimatedProperty<T>`, `baseVal`/`animVal` slots, tear-offs, lazy attribute sync |
+| [hit-testing.md](./hit-testing.md)                             | Path-based hit-testing, `pointer-events` value table, stroke widening, `<use>` retargeting |
+| [accessibility.md](./accessibility.md)                         | SVG in the AX tree: role mapping, `<title>`/`<desc>`, ARIA opt-ins                |
+| [migration-status.md](./migration-status.md)                   | LayoutNG / CompositeAfterPaint / SMIL status snapshot; what's stable vs in-flight |
+| [comparison.md](./comparison.md)                               | Cross-engine comparison: Chromium vs Servo vs resvg                              |
 
 ## Pre-existing companion docs
 
