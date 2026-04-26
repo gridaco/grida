@@ -6,10 +6,10 @@ import {
   CanvasWasmFontManagerAgentInterfaceProvider,
   CanvasWasmFontParserInterfaceProvider,
   CanvasWasmDefaultExportInterfaceProvider,
-} from "../grida-canvas/backends/wasm";
+} from "../grida/backends/wasm";
 import init, { type ApplicationFactory, Scene } from "@grida/canvas-wasm";
 import assert from "assert";
-import { editor } from "../grida-canvas/editor.i";
+import { editor } from "../grida/editor.i";
 
 type ResourceLoaderFn<T> = () => Promise<T> | T;
 type ResourceLoader<T> = ResourceLoaderFn<T> | Promise<T> | T;

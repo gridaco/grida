@@ -1,4 +1,3 @@
-use cg::window::{application::HostEvent, state::SurfaceState};
 use gl::types::*;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
@@ -8,6 +7,7 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+use grida::window::{application::HostEvent, state::SurfaceState};
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;
 use skia_safe::gpu;
@@ -34,7 +34,7 @@ pub(crate) fn winit_window(width: i32, height: i32) -> WinitResult {
     let el = EventLoop::<HostEvent>::with_user_event().build().unwrap();
 
     let window_attributes = WindowAttributes::default()
-        .with_title("Grida - grida-canvas / glutin / skia-safe::gpu::gl")
+        .with_title("Grida - grida / glutin / skia-safe::gpu::gl")
         .with_inner_size(LogicalSize::new(width, height));
 
     let template = ConfigTemplateBuilder::new()

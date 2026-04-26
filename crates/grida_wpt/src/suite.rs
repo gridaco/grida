@@ -1,7 +1,7 @@
 //! Suite config parsing for HTML/CSS golden runs.
 //!
 //! The JSON schema is shared between this Rust crate and the
-//! TypeScript refbrowser oracle (`.agents/skills/cg-reftest/scripts/
+//! TypeScript refbrowser oracle (`.agents/skills/render-reftest/scripts/
 //! refbrowser_render.ts`). Unknown fields (`gate`, `wait_for`,
 //! `full_page`, `name`, `description`) are consumed by other tools
 //! and deliberately ignored here.

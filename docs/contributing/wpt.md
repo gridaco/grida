@@ -1,17 +1,17 @@
 # Contributing to Grida | Web Platform Tests
 
 This guide covers how to run the upstream [web-platform-tests][wpt]
-suite against Grida's `cg::htmlcss` renderer. It is relevant only if
+suite against Grida's `grida::htmlcss` renderer. It is relevant only if
 you are working on the htmlcss renderer and want to validate against
 the CSS spec; for day-to-day Chromium-parity work use the in-tree
-refbrowser pipeline (see [cg-reftest skill][cg-reftest]).
+refbrowser pipeline (see [render-reftest skill][render-reftest]).
 
 Status: **PoC**. Reftest pair-matching works end-to-end. Testharness
 and crashtest executors are not yet wired. Most tests fail — the goal
 right now is to make the plumbing reliable, not to ship a pass rate.
 
 [wpt]: https://web-platform-tests.org/
-[cg-reftest]: ../../.agents/skills/cg-reftest/SKILL.md
+[render-reftest]: ../../.agents/skills/render-reftest/SKILL.md
 
 ## One-time setup
 
@@ -51,7 +51,7 @@ just wpt                                        # all of css/ (default)
 
 Expected output on the pilot: `SUITE_START` → `TEST_START` →
 `TEST_END: FAIL, expected PASS`. The FAIL is not a setup error — it
-means the pipeline ran end-to-end and cg's rendering of the pair did
+means the pipeline ran end-to-end and grida's rendering of the pair did
 not match within fuzzy tolerance. See the [primitives inventory][inventory]
 for what feature gaps cause most of the fails.
 
@@ -88,7 +88,7 @@ flags (`--include-file`, `--repeat`, etc.).
 
 Pipeline: `wptrunner` invokes `grida_wpt render --url <test_url> --out
 <tmp>` once per reftest screenshot. Both `test.html` and `ref.html`
-render through `cg::htmlcss`. Wptrunner's built-in
+render through `grida::htmlcss`. Wptrunner's built-in
 `RefTestImplementation` compares the two PNGs, honoring `<meta
 name="fuzzy">` tolerances.
 

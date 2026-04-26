@@ -63,7 +63,7 @@ size gets rasterized with reduced quality during pinch-zoom.
 ### Where AA is set
 
 All `set_anti_alias(true)` calls go through a few central functions in
-`crates/grida-canvas/src/painter/`:
+`crates/grida/src/painter/`:
 
 - `paint.rs` — `sk_solid_paint()`, `sk_paint_stack()`, `sk_paint_stack_without_images()`
 - `gradient.rs` — gradient paint creation
@@ -111,6 +111,6 @@ regardless of AA state.
 
 ## Related
 
-- `crates/grida-canvas/examples/skia_bench/skia_bench_subpixel.rs` — isolated benchmark
+- `crates/grida/examples/skia_bench/skia_bench_subpixel.rs` — isolated benchmark
 - `docs/wg/feat-2d/optimization.md` — master optimization catalog
 - Chromium pinch-zoom: reduced rasterization quality during interaction

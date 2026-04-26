@@ -1,16 +1,16 @@
 use super::args::{BenchArgs, BenchReportArgs};
 use super::report::*;
 use anyhow::{anyhow, Result};
-use cg::cg::prelude::*;
-use cg::node::factory::NodeFactory;
-use cg::node::scene_graph::{Parent, SceneGraph};
-use cg::node::schema::{Node, Scene, Size};
-use cg::overlay::state::SurfaceState;
-use cg::overlay::ui::{HitRegions, SurfaceUI};
-use cg::overlay::widgets::surface::SurfaceOverlayConfig;
-use cg::runtime::frame_loop::{FrameLoop, FrameQuality};
-use cg::runtime::scene::FrameFlushResult;
-use cg::window::headless::HeadlessGpu;
+use grida::cg::prelude::*;
+use grida::node::factory::NodeFactory;
+use grida::node::scene_graph::{Parent, SceneGraph};
+use grida::node::schema::{Node, Scene, Size};
+use grida::overlay::state::SurfaceState;
+use grida::overlay::ui::{HitRegions, SurfaceUI};
+use grida::overlay::widgets::surface::SurfaceOverlayConfig;
+use grida::runtime::frame_loop::{FrameLoop, FrameQuality};
+use grida::runtime::scene::FrameFlushResult;
+use grida::window::headless::HeadlessGpu;
 use math2::transform::AffineTransform;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -43,7 +43,7 @@ impl OverlayBenchState {
     }
 
     /// Draw `SurfaceUI` onto the renderer's canvas and flush the GPU.
-    fn draw(&mut self, renderer: &mut cg::runtime::scene::Renderer) {
+    fn draw(&mut self, renderer: &mut grida::runtime::scene::Renderer) {
         let graph = renderer.scene.as_ref().map(|s| &s.graph);
         let cache = renderer.get_cache();
         let camera = &renderer.camera;
@@ -63,7 +63,7 @@ impl OverlayBenchState {
     }
 }
 
-fn count_effects_nodes(renderer: &cg::runtime::scene::Renderer) -> usize {
+fn count_effects_nodes(renderer: &grida::runtime::scene::Renderer) -> usize {
     renderer
         .scene
         .as_ref()
@@ -80,7 +80,7 @@ fn count_effects_nodes(renderer: &cg::runtime::scene::Renderer) -> usize {
         .unwrap_or(0)
 }
 
-fn warmup(renderer: &mut cg::runtime::scene::Renderer) {
+fn warmup(renderer: &mut grida::runtime::scene::Renderer) {
     renderer.queue_stable();
     let _ = renderer.flush();
     for _ in 0..10 {
@@ -98,7 +98,7 @@ fn warmup(renderer: &mut cg::runtime::scene::Renderer) {
 /// is included in `total_us` but not in the per-stage breakdown, mirroring how
 /// the native viewer accounts for it.
 fn measure_frame(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     stable: bool,
     overlay: Option<&mut OverlayBenchState>,
 ) -> Option<(u64, u64, u64, u64, u64, u64)> {
@@ -136,7 +136,7 @@ fn measure_frame(
 /// and expose frame drop outliers during area discovery/culling.
 /// Measures queue + flush per frame. Ends with a settle (stable) frame.
 fn run_pan_pass_at(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     dx: f32,
     mut overlay: Option<OverlayBenchState>,
@@ -185,7 +185,7 @@ fn run_pan_pass_at(
 
 /// Legacy: pan at dx=5.0 (default).
 fn run_pan_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     overlay: Option<OverlayBenchState>,
 ) -> PassStats {
@@ -196,8 +196,8 @@ fn run_pan_pass(
 ///
 /// Prefers the first root node that supports translation. Skips
 /// `InitialContainer` which has no movable transform.
-fn pick_translate_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
-    use cg::node::schema::Node;
+fn pick_translate_target(scene: &Scene) -> Option<grida::node::schema::NodeId> {
+    use grida::node::schema::Node;
     for &root_id in scene.graph.roots() {
         match scene.graph.get_node(&root_id) {
             Ok(Node::InitialContainer(_)) => continue,
@@ -211,8 +211,11 @@ fn pick_translate_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
 /// Find the first deep leaf starting from `root_id` (a node with no
 /// children, or the deepest child along the first branch). Skips
 /// `InitialContainer`.
-fn find_leaf_from(scene: &Scene, id: cg::node::schema::NodeId) -> Option<cg::node::schema::NodeId> {
-    use cg::node::schema::Node;
+fn find_leaf_from(
+    scene: &Scene,
+    id: grida::node::schema::NodeId,
+) -> Option<grida::node::schema::NodeId> {
+    use grida::node::schema::Node;
     if matches!(scene.graph.get_node(&id), Ok(Node::InitialContainer(_))) {
         return None;
     }
@@ -231,7 +234,7 @@ fn find_leaf_from(scene: &Scene, id: cg::node::schema::NodeId) -> Option<cg::nod
 }
 
 /// Pick a leaf (childless) node for realistic per-node mutation benches.
-fn pick_leaf_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
+fn pick_leaf_target(scene: &Scene) -> Option<grida::node::schema::NodeId> {
     for &root_id in scene.graph.roots() {
         if let Some(leaf) = find_leaf_from(scene, root_id) {
             return Some(leaf);
@@ -241,10 +244,10 @@ fn pick_leaf_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
 }
 
 /// Pick a leaf that supports paint (fills) via `MutationCommand::SetFill`.
-fn pick_paint_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
-    use cg::node::schema::Node;
+fn pick_paint_target(scene: &Scene) -> Option<grida::node::schema::NodeId> {
+    use grida::node::schema::Node;
     // DFS iteratively, pick the first leaf with fills.
-    let mut stack: Vec<cg::node::schema::NodeId> = scene.graph.roots().to_vec();
+    let mut stack: Vec<grida::node::schema::NodeId> = scene.graph.roots().to_vec();
     while let Some(id) = stack.pop() {
         match scene.graph.get_node(&id) {
             Ok(Node::InitialContainer(_)) => {}
@@ -268,9 +271,9 @@ fn pick_paint_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
 }
 
 /// Pick a leaf that supports resize via `MutationCommand::Resize`.
-fn pick_resize_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
+fn pick_resize_target(scene: &Scene) -> Option<grida::node::schema::NodeId> {
     use grida_dev::editor::mutation::node_supports_resize;
-    let mut stack: Vec<cg::node::schema::NodeId> = scene.graph.roots().to_vec();
+    let mut stack: Vec<grida::node::schema::NodeId> = scene.graph.roots().to_vec();
     // Prefer a leaf (childless) resizable node.
     let mut fallback = None;
     while let Some(id) = stack.pop() {
@@ -295,10 +298,10 @@ fn pick_resize_target(scene: &Scene) -> Option<cg::node::schema::NodeId> {
 
 /// Collect up to `n` leaves for delete-bench N cycles. Skips
 /// `InitialContainer`. Iterative DFS; returns ids in DFS order.
-fn collect_leaves(scene: &Scene, n: usize) -> Vec<cg::node::schema::NodeId> {
-    use cg::node::schema::Node;
+fn collect_leaves(scene: &Scene, n: usize) -> Vec<grida::node::schema::NodeId> {
+    use grida::node::schema::Node;
     let mut out = Vec::with_capacity(n);
-    let mut stack: Vec<cg::node::schema::NodeId> = scene.graph.roots().to_vec();
+    let mut stack: Vec<grida::node::schema::NodeId> = scene.graph.roots().to_vec();
     stack.reverse();
     while let Some(id) = stack.pop() {
         if matches!(scene.graph.get_node(&id), Ok(Node::InitialContainer(_))) {
@@ -331,9 +334,9 @@ fn collect_leaves(scene: &Scene, n: usize) -> Vec<cg::node::schema::NodeId> {
 ///      in `EditorDocument::apply_and_mark`).
 ///   3. Measure queue+flush as a regular frame.
 fn run_translate_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
-    target_id: cg::node::schema::NodeId,
+    target_id: grida::node::schema::NodeId,
     dx: f32,
     mut overlay: Option<OverlayBenchState>,
 ) -> PassStats {
@@ -379,7 +382,7 @@ fn run_translate_pass(
         // the invalidation pipeline actually runs.
         let t_total = Instant::now();
         let t_ac = Instant::now();
-        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let _ = renderer.apply_changes(grida::runtime::camera::CameraChangeKind::None, false);
         let apply_us = t_ac.elapsed().as_micros() as u64;
 
         if let Some((queue_flush_total, q, d_us, mf, c, f)) =
@@ -484,11 +487,11 @@ fn print_mutation_stats(pass: &PassStats) {
 /// color between two values on the target node, exercising the
 /// paint-only invalidation fast path.
 fn run_paint_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
-    target_id: cg::node::schema::NodeId,
+    target_id: grida::node::schema::NodeId,
 ) -> PassStats {
-    use cg::cg::prelude::*;
+    use grida::cg::prelude::*;
     use grida_dev::editor::mutation::{self, MutationCommand};
 
     let wall_start = Instant::now();
@@ -535,7 +538,7 @@ fn run_paint_pass(
 
         let t_total = Instant::now();
         let t_ac = Instant::now();
-        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let _ = renderer.apply_changes(grida::runtime::camera::CameraChangeKind::None, false);
         let apply_us = t_ac.elapsed().as_micros() as u64;
 
         if let Some((_, q, d, mf, c, f)) = measure_frame(renderer, false, None) {
@@ -567,9 +570,9 @@ fn run_paint_pass(
 /// Run a resize-node pass. Each frame alternates width/height between
 /// two values, exercising the `ChangeKind::Full` invalidation path.
 fn run_resize_node_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
-    target_id: cg::node::schema::NodeId,
+    target_id: grida::node::schema::NodeId,
 ) -> PassStats {
     use grida_dev::editor::mutation::{self, MutationCommand};
 
@@ -617,7 +620,7 @@ fn run_resize_node_pass(
 
         let t_total = Instant::now();
         let t_ac = Instant::now();
-        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let _ = renderer.apply_changes(grida::runtime::camera::CameraChangeKind::None, false);
         let apply_us = t_ac.elapsed().as_micros() as u64;
 
         if let Some((_, q, d, mf, c, f)) = measure_frame(renderer, false, None) {
@@ -650,7 +653,7 @@ fn run_resize_node_pass(
 /// from the scene. Unlike translate/paint/resize, this cannot
 /// meaningfully repeat on the same target; we pre-collect `frames`
 /// leaves and delete one per frame.
-fn run_delete_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> PassStats {
+fn run_delete_pass(renderer: &mut grida::runtime::scene::Renderer, frames: u32) -> PassStats {
     use grida_dev::editor::mutation::{self, MutationCommand};
 
     let targets = renderer
@@ -686,7 +689,7 @@ fn run_delete_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> 
 
         let t_total = Instant::now();
         let t_ac = Instant::now();
-        let _ = renderer.apply_changes(cg::runtime::camera::CameraChangeKind::None, false);
+        let _ = renderer.apply_changes(grida::runtime::camera::CameraChangeKind::None, false);
         let apply_us = t_ac.elapsed().as_micros() as u64;
 
         if let Some((_, q, d, mf, c, f)) = measure_frame(renderer, false, None) {
@@ -719,12 +722,12 @@ fn run_delete_pass(renderer: &mut cg::runtime::scene::Renderer, frames: u32) -> 
 /// pass that prints its own header and stats. `all` runs every kind
 /// sequentially against the same loaded scene.
 fn run_mutation_kind(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     spec: &str,
 ) -> Result<()> {
     let kind = spec.trim().to_ascii_lowercase();
-    let run_one = |which: &str, r: &mut cg::runtime::scene::Renderer| -> Result<()> {
+    let run_one = |which: &str, r: &mut grida::runtime::scene::Renderer| -> Result<()> {
         match which {
             "translate-root" => {
                 let Some(id) = r.scene.as_ref().and_then(pick_translate_target) else {
@@ -803,7 +806,7 @@ fn run_mutation_kind(
 /// Run a zoom pass with configurable step and range.
 /// Measures queue + flush per frame. Ends with a settle (stable) frame.
 fn run_zoom_pass_at(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     step: f32,
     z_min: f32,
@@ -870,7 +873,7 @@ fn run_zoom_pass_at(
 
 /// Legacy: zoom with step=0.02, range 0.5-2.0.
 fn run_zoom_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     overlay: Option<OverlayBenchState>,
 ) -> PassStats {
@@ -878,7 +881,7 @@ fn run_zoom_pass(
 }
 
 /// Measure a single stable (settle) frame including queue + flush.
-fn measure_settle(renderer: &mut cg::runtime::scene::Renderer) -> u64 {
+fn measure_settle(renderer: &mut grida::runtime::scene::Renderer) -> u64 {
     let t = Instant::now();
     renderer.queue_stable();
     let _ = renderer.flush();
@@ -894,12 +897,12 @@ fn measure_settle(renderer: &mut cg::runtime::scene::Renderer) -> u64 {
 ///   3. apply_changes  (central dispatch — selective invalidation)
 ///   4. queue_unstable + flush (scene repaint with surviving caches)
 fn measure_resize(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     width: i32,
     height: i32,
 ) -> Option<(u64, u64, u64, u64)> {
-    use cg::runtime::camera::CameraChangeKind;
-    use cg::runtime::invalidation::GlobalFlag;
+    use grida::runtime::camera::CameraChangeKind;
+    use grida::runtime::invalidation::GlobalFlag;
 
     let t0 = Instant::now();
 
@@ -935,7 +938,7 @@ fn measure_resize(
 /// Simulates what happens on every ResizeObserver callback in the browser:
 /// the full resize() + redraw() path fires per frame during a window drag.
 fn run_resize_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     size_a: (i32, i32),
     size_b: (i32, i32),
@@ -1075,7 +1078,7 @@ fn compute_pass_stats(
 /// settle countdown), then the next zig/zag begins cold (no cache from the
 /// previous direction).
 fn run_zigzag_pan_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     mut overlay: Option<OverlayBenchState>,
     frames: u32,
     dx: f32,
@@ -1159,7 +1162,7 @@ fn run_zigzag_pan_pass(
 ///
 /// `radius` is in world-space units. The circle completes over `frames` frames.
 fn run_circle_pan_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     mut overlay: Option<OverlayBenchState>,
     frames: u32,
     radius: f32,
@@ -1224,7 +1227,7 @@ fn run_circle_pan_pass(
 /// This produces frame timings that match what the user actually sees in the
 /// native viewer, including settle-induced frame drops at their natural frequency.
 fn run_realtime_pan_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     mut overlay: Option<OverlayBenchState>,
     scroll_interval_ms: f64,
     dx: f32,
@@ -1337,7 +1340,7 @@ fn run_realtime_pan_pass(
 /// distribution reflects the real interaction — including jank spikes
 /// from stable frames.
 fn run_frameloop_pan_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     scroll_interval_ms: f64,
     dx: f32,
     duration_ms: f64,
@@ -1460,7 +1463,7 @@ fn run_frameloop_pan_pass(
 /// Diagnostic: realtime event loop with per-frame printing.
 #[allow(dead_code)]
 fn run_realtime_diagnostic(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     mut overlay: Option<OverlayBenchState>,
     scroll_interval_ms: f64,
     dx: f32,
@@ -1528,7 +1531,7 @@ fn run_realtime_diagnostic(
 }
 
 fn run_pan_with_settle_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     mut overlay: Option<OverlayBenchState>,
     frames: u32,
     dx: f32,
@@ -1610,7 +1613,7 @@ fn run_pan_with_settle_pass(
 /// `settle_interval` = number of zoom frames between each settle frame.
 /// settle_interval=12 matches the native viewer's 12-tick countdown at 240Hz (~50ms).
 fn run_zoom_with_settle_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     mut overlay: Option<OverlayBenchState>,
     frames: u32,
     step: f32,
@@ -1717,7 +1720,7 @@ fn run_zoom_with_settle_pass(
 /// nuke the zoom image cache, forcing the next unstable frame into a full
 /// draw — this is the spike users feel as "3 FPS during zoom".
 fn run_frameloop_zoom_pass(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     event_interval_ms: f64,
     step: f32,
     z_min: f32,
@@ -1854,7 +1857,7 @@ fn run_frameloop_zoom_pass(
 /// Compare against `run_zoom_pass_at` (which uses stable=false) to see the
 /// performance impact of the bug.
 fn run_zoom_pass_forced_stable(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     step: f32,
     z_min: f32,
@@ -1917,7 +1920,7 @@ fn run_zoom_pass_forced_stable(
 /// AFTER settle should be fast if the cache was recaptured).
 #[allow(dead_code)]
 fn run_pan_settle_diagnostic(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     mut overlay: Option<OverlayBenchState>,
     frames: u32,
     dx: f32,
@@ -1963,7 +1966,7 @@ fn run_pan_settle_diagnostic(
 /// Shows exactly where frame drops occur during the transition from
 /// "all nodes visible" to "some nodes culled".
 #[allow(dead_code)]
-fn run_pan_diagnostic(renderer: &mut cg::runtime::scene::Renderer, frames: u32, dx: f32) {
+fn run_pan_diagnostic(renderer: &mut grida::runtime::scene::Renderer, frames: u32, dx: f32) {
     eprintln!("\n=== PAN DIAGNOSTIC: dx={dx}, {} frames ===", frames);
     eprintln!(
         "{:>5} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
@@ -2085,7 +2088,7 @@ fn standard_scenarios(fit_zoom: f32) -> (Vec<PanScenario>, Vec<ZoomScenario>) {
 }
 
 fn run_scenarios(
-    renderer: &mut cg::runtime::scene::Renderer,
+    renderer: &mut grida::runtime::scene::Renderer,
     frames: u32,
     fit_zoom: f32,
     overlay: bool,
@@ -2850,7 +2853,7 @@ pub(crate) async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoade
 
     let mut renderer = gpu.create_renderer();
     if args.no_aa {
-        let mut policy = cg::runtime::render_policy::RenderPolicy::STANDARD;
+        let mut policy = grida::runtime::render_policy::RenderPolicy::STANDARD;
         policy.force_no_aa = true;
         renderer.set_render_policy(policy);
     }
@@ -2895,7 +2898,7 @@ pub(crate) async fn run_bench(args: BenchArgs, load_scenes: impl AsyncSceneLoade
 
     // --- Node-translate mutation benchmark (--translate) ---
     if let Some(ref spec) = args.translate {
-        use cg::node::schema::NodeId;
+        use grida::node::schema::NodeId;
         let target_id: Option<NodeId> = match spec.as_str() {
             "" | "first" => renderer.scene.as_ref().and_then(pick_translate_target),
             s => s.parse::<NodeId>().ok(),

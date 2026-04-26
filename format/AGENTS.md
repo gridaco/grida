@@ -14,7 +14,7 @@ You are editing Grida’s **canonical on-disk contract** (the `.grida` file form
 
 The `grida.fbs` header calls out the main alignment targets:
 
-- **Rust runtime model**: `crates/grida-canvas/src/node/schema.rs`
+- **Rust runtime model**: `crates/grida/src/node/schema.rs`
 - **TS document model**: `packages/grida-canvas-schema/grida.ts`
 
 If you change the schema shape, **assume you must update both** the Rust and TS sides (and any serializers/deserializers that map between runtime models and FlatBuffers).
@@ -84,7 +84,7 @@ The short version you must internalize:
 
 Schema changes require round-trip tests in both Rust and TS. New union members must be **appended** (never inserted mid-list).
 
-- **Rust:** `crates/grida-canvas/tests/fbs_roundtrip.rs` — `cargo test -p cg --test fbs_roundtrip`
+- **Rust:** `crates/grida/tests/fbs_roundtrip.rs` — `cargo test -p grida --test fbs_roundtrip`
 - **TS:** `packages/grida-canvas-io/__tests__/format-roundtrip.test.ts` — `pnpm turbo test --filter='@grida/io'`
 
 ## Review checklist (before you consider the work “done”)

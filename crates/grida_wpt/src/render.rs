@@ -1,15 +1,15 @@
-//! Golden producer: HTML+CSS → PNG via the `cg::htmlcss` renderer.
+//! Golden producer: HTML+CSS → PNG via the `grida::htmlcss` renderer.
 //!
 //! This is the "actual" side of the reftest pair. The "expected" side
-//! is produced by Playwright Chromium (see `.agents/skills/cg-reftest/
+//! is produced by Playwright Chromium (see `.agents/skills/render-reftest/
 //! scripts/refbrowser_render.ts`). Both sides write PNGs with
 //! transparent backgrounds so pixel alpha doubles as the content
 //! mask during diffing.
 
 use crate::suite::{self, ResolvedFixture, SuiteFile};
-use cg::htmlcss;
-use cg::resources::ByteStore;
-use cg::runtime::font_repository::FontRepository;
+use grida::htmlcss;
+use grida::resources::ByteStore;
+use grida::runtime::font_repository::FontRepository;
 use skia_safe::{surfaces, Color};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;

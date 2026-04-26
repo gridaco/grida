@@ -91,7 +91,7 @@ Rust-side, `IsolationMode` lives on `RenderFilter` (owned by `Renderer`).
 `ChangeFlags::RENDER_FILTER` ensures a frame is queued when isolation
 changes — no cache invalidation needed.
 
-See `crates/grida-canvas/src/runtime/filter.rs` for the full type
+See `crates/grida/src/runtime/filter.rs` for the full type
 definitions.
 
 ---

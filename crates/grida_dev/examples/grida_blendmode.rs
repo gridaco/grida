@@ -1,9 +1,9 @@
 // FIXME: broken demo - make this golden_ not grida_
 
-use cg::cg::prelude::*;
-use cg::node::factory::NodeFactory;
-use cg::node::scene_graph::{Parent, SceneGraph};
-use cg::node::schema::*;
+use grida::cg::prelude::*;
+use grida::node::factory::NodeFactory;
+use grida::node::scene_graph::{Parent, SceneGraph};
+use grida::node::schema::*;
 use grida_dev::platform::native_demo;
 use math2::transform::AffineTransform;
 

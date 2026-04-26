@@ -11,10 +11,10 @@
 //! - Re-plot: scale all vertices/tangents (lossy under repetition).
 //! - Render scale: add `render_scale: [f32; 2]` to `VectorNodeRec`.
 
-use cg::cg::prelude::*;
-use cg::node::scene_graph::SceneGraph;
-use cg::node::schema::*;
-use cg::runtime::invalidation::ChangeKind;
+use grida::cg::prelude::*;
+use grida::node::scene_graph::SceneGraph;
+use grida::node::schema::*;
+use grida::runtime::invalidation::ChangeKind;
 
 /// A scene-graph mutation command.
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ pub enum MutationCommand {
 ///
 /// Returns the list of `(NodeId, ChangeKind)` pairs describing what
 /// changed. The caller forwards these to
-/// [`cg::runtime::scene::Renderer::mark_node_change_kind`] so the
+/// [`grida::runtime::scene::Renderer::mark_node_change_kind`] so the
 /// invalidation module can pick the narrowest cache-rebuild path.
 ///
 /// An empty return means the command was a no-op (delta below
@@ -82,7 +82,7 @@ pub fn apply(scene: &mut Scene, cmd: &MutationCommand) -> Vec<(NodeId, ChangeKin
         }
         MutationCommand::Delete { id } => {
             // Report the parent (or `*id` for a root) with `Full`
-            // so the renderer full-rebuilds. The cg crate currently
+            // so the renderer full-rebuilds. The grida crate currently
             // has no structural-remove fast path.
             let parent = scene.graph.get_parent(id).unwrap_or(*id);
             match scene.graph.remove_subtree(*id) {
@@ -120,7 +120,7 @@ pub fn node_supports_resize(node: &Node) -> bool {
 
 // ── Node accessors ───────────────────────────────────────────────────────
 // These are editor-only helpers for reaching into Node variant fields.
-// They live here (not on `impl Node` in cg) because cg is a renderer
+// They live here (not on `impl Node` in grida) because grida is a renderer
 // and should not expose mutable setters on its data model.
 
 /// Mutable reference to a node's `AffineTransform`, if it has one.
@@ -330,8 +330,8 @@ fn set_fill_solid(graph: &mut SceneGraph, id: &NodeId, color: CGColor) -> bool {
 // ── Resize geometry helpers (pure math) ──────────────────────────────────
 
 /// Which axes a resize direction affects: `(width, height)`.
-pub fn resize_affected_axes(direction: cg::overlay::ResizeDirection) -> (bool, bool) {
-    use cg::overlay::ResizeDirection;
+pub fn resize_affected_axes(direction: grida::overlay::ResizeDirection) -> (bool, bool) {
+    use grida::overlay::ResizeDirection;
     let w = matches!(
         direction,
         ResizeDirection::E
@@ -356,13 +356,13 @@ pub fn resize_affected_axes(direction: cg::overlay::ResizeDirection) -> (bool, b
 /// Compute new size + origin shift from a drag delta and current bounds.
 /// Returns `(new_w, new_h, translate_x, translate_y)`.
 pub fn compute_resize_geometry(
-    direction: cg::overlay::ResizeDirection,
+    direction: grida::overlay::ResizeDirection,
     dx: f32,
     dy: f32,
     old_w: f32,
     old_h: f32,
 ) -> (f32, f32, f32, f32) {
-    use cg::overlay::ResizeDirection;
+    use grida::overlay::ResizeDirection;
     match direction {
         ResizeDirection::SE => (old_w + dx, old_h + dy, 0.0, 0.0),
         ResizeDirection::NW => (old_w - dx, old_h - dy, dx, dy),

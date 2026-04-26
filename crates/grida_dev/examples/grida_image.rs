@@ -1,8 +1,8 @@
-use cg::cg::{types::*, *};
-use cg::node::factory::NodeFactory;
-use cg::node::scene_graph::{Parent, SceneGraph};
-use cg::node::schema::*;
-use cg::resources::{hash_bytes, load_image};
+use grida::cg::{types::*, *};
+use grida::node::factory::NodeFactory;
+use grida::node::scene_graph::{Parent, SceneGraph};
+use grida::node::schema::*;
+use grida::resources::{hash_bytes, load_image};
 use grida_dev::platform::native_demo;
 use math2::{box_fit::BoxFit, transform::AffineTransform};
 

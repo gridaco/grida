@@ -1,9 +1,9 @@
 //! `.grida` file format detection and decoding — thin wrapper around
-//! [`cg::io::io_grida_file`] with `anyhow::Result` ergonomics.
+//! [`grida::io::io_grida_file`] with `anyhow::Result` ergonomics.
 
 use anyhow::{anyhow, Result};
-use cg::io::{io_grida_fbs, io_grida_file};
-use cg::node::schema::Scene;
+use grida::io::{io_grida_fbs, io_grida_file};
+use grida::node::schema::Scene;
 
 /// Re-export the format enum for callers that need it.
 #[allow(unused_imports)]

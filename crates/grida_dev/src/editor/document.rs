@@ -9,10 +9,10 @@
 //! Performance is not a concern — this is dev-only. A full `load_scene`
 //! rebuilds all caches from scratch.
 
-use cg::node::schema::{Node, NodeId, Scene};
-use cg::overlay::gesture::SurfaceGesture;
-use cg::runtime::invalidation::ChangeKind;
-use cg::window::application::UnknownTargetApplication;
+use grida::node::schema::{Node, NodeId, Scene};
+use grida::overlay::gesture::SurfaceGesture;
+use grida::runtime::invalidation::ChangeKind;
+use grida::window::application::UnknownTargetApplication;
 
 use super::mutation::{
     self, compute_resize_geometry, node_supports_resize, resize_affected_axes, MutationCommand,
@@ -56,7 +56,7 @@ impl EditorDocument {
     ///
     /// This is the fast path for interactive mutations (drag, resize).
     /// It avoids `load_scene`'s full cache rebuild — the renderer's
-    /// [`apply_changes`](cg::runtime::scene::Renderer::apply_changes)
+    /// [`apply_changes`](grida::runtime::scene::Renderer::apply_changes)
     /// picks the narrowest invalidation based on the reported
     /// `ChangeKind`s.
     ///
@@ -140,7 +140,7 @@ impl EditorDocument {
     fn handle_incremental_resize(
         &mut self,
         app: &mut UnknownTargetApplication,
-        direction: cg::overlay::ResizeDirection,
+        direction: grida::overlay::ResizeDirection,
         old_screen: [f32; 2],
         new_screen: [f32; 2],
     ) -> bool {
@@ -240,20 +240,20 @@ impl EditorDocument {
                     let actual_w = new_width.unwrap_or(*w);
                     let measured = match node {
                         Node::MarkdownEmbed(n) => {
-                            let html = cg::htmlcss::markdown_to_styled_html(&n.markdown);
-                            cg::htmlcss::measure_content_height(
+                            let html = grida::htmlcss::markdown_to_styled_html(&n.markdown);
+                            grida::htmlcss::measure_content_height(
                                 &html,
                                 actual_w,
                                 &app.renderer().fonts,
-                                &cg::htmlcss::NoImages,
+                                &grida::htmlcss::NoImages,
                             )
                             .ok()
                         }
-                        Node::HTMLEmbed(n) => cg::htmlcss::measure_content_height(
+                        Node::HTMLEmbed(n) => grida::htmlcss::measure_content_height(
                             &n.html,
                             actual_w,
                             &app.renderer().fonts,
-                            &cg::htmlcss::NoImages,
+                            &grida::htmlcss::NoImages,
                         )
                         .ok(),
                         _ => None,

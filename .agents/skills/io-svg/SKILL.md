@@ -1,8 +1,8 @@
 ---
 name: io-svg
 description: >
-  Guides work on SVG import into the Grida Canvas Rust engine (cg crate).
-  Covers crates/grida-canvas/src/import/svg/, the grida_dev svg-to-grida CLI, cross-boundary
+  Guides work on SVG import into the Grida Canvas Rust engine (grida crate).
+  Covers crates/grida/src/import/svg/, the grida_dev svg-to-grida CLI, cross-boundary
   FBS codec tests (Rust encode → TS decode), SVG fixture authoring, and known SVG
   import limitations (text model, filters, transforms).
   Use when adding SVG feature support, fixing import bugs, authoring SVG test fixtures,
@@ -12,7 +12,7 @@ description: >
 
 # SVG I/O — Rust SVG Import Pipeline
 
-Crate: `crates/grida-canvas/src/import/svg/`
+Crate: `crates/grida/src/import/svg/`
 
 ## When to Use This Skill
 
@@ -45,10 +45,10 @@ The TypeScript cross-boundary test (`fbs-svg-cross-boundary.test.ts`) decodes `.
 
 | Path                                                                | Role                                      |
 | ------------------------------------------------------------------- | ----------------------------------------- |
-| `crates/grida-canvas/src/import/svg/packed_scene.rs`                | Core conversion: usvg nodes → Grida nodes |
-| `crates/grida-canvas/src/import/svg/pack.rs`                        | Packs converted nodes into scene document |
-| `crates/grida-canvas/src/import/svg/from_usvg.rs`                   | High-level entry: bytes → scene           |
-| `crates/grida-canvas/src/formats/svg/sanitize.rs`                   | Pre-processing / sanitization             |
+| `crates/grida/src/import/svg/packed_scene.rs`                       | Core conversion: usvg nodes → Grida nodes |
+| `crates/grida/src/import/svg/pack.rs`                               | Packs converted nodes into scene document |
+| `crates/grida/src/import/svg/from_usvg.rs`                          | High-level entry: bytes → scene           |
+| `crates/grida/src/formats/svg/sanitize.rs`                          | Pre-processing / sanitization             |
 | `crates/grida_dev/src/main.rs`                                      | `svg-to-grida` subcommand                 |
 | `fixtures/test-svg/L0/`                                             | Committed SVG fixtures                    |
 | `fixtures/test-svg/.generated/`                                     | Gitignored, generated `.grida` outputs    |
@@ -60,7 +60,7 @@ The TypeScript cross-boundary test (`fbs-svg-cross-boundary.test.ts`) decodes `.
 
 ### Orient before touching code
 
-1. Read `crates/grida-canvas/AGENTS.md` for crate conventions and commands.
+1. Read `crates/grida/AGENTS.md` for crate conventions and commands.
 2. Read `docs/wg/feat-svg/text-import.md` before touching text conversion — the text model is intentionally limited and the design is documented there.
 3. Grep for the relevant element in `packed_scene.rs`.
 
@@ -104,8 +104,8 @@ See `crates/grida_dev/TESTING.md` for full reftest flags.
 ### Rust tests for SVG
 
 ```sh
-cargo test -p cg
-cargo test -p cg svg        # filter to SVG tests only
+cargo test -p grida
+cargo test -p grida svg        # filter to SVG tests only
 ```
 
 ---
@@ -165,8 +165,8 @@ When fixing a codec bug found via the cross-boundary test:
 
 ```sh
 # Rust check + tests
-cargo check -p cg --all-targets
-cargo test -p cg
+cargo check -p grida --all-targets
+cargo test -p grida
 
 # Cross-boundary cycle
 cargo run -p grida_dev -- svg-to-grida fixtures/test-svg/L0

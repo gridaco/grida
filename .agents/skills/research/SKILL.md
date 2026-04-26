@@ -6,7 +6,7 @@ description: >
   Taffy, or peer canvas editors solve a problem before writing code. Covers
   source-code exploration, research document authoring, and the
   study-adapt-differ pattern used in .plan.md files. Relevant dirs:
-  docs/wg/research/, docs/wg/feat-2d/, crates/grida-canvas/.
+  docs/wg/research/, docs/wg/feat-2d/, crates/grida/.
 ---
 
 # Code Research Skill
@@ -59,7 +59,7 @@ grep "chromium\|servo\|adapted from\|ported from\|based on" --include="*.rs"
 
 Known citations:
 
-- `crates/grida-canvas/src/runtime/effect_tree.rs` — Chromium EffectTree/EffectNode
+- `crates/grida/src/runtime/effect_tree.rs` — Chromium EffectTree/EffectNode
 - `crates/csscascade/src/rcdom/mod.rs` — Servo html5ever rcdom
 - `crates/csscascade/` — Servo style system (`style::servo::*`)
 - `third_party/usvg/src/text/layout.rs` — Chromium font metrics

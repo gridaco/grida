@@ -29,14 +29,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use cg::cache::geometry::GeometryCache;
-use cg::export::{ExportAs, ExportConstraints, ExportSize};
-use cg::node::schema::{Node, NodeId, Scene, Size};
-use cg::resources::ByteStore;
-use cg::runtime::camera::Camera2D;
-use cg::runtime::font_repository::FontRepository;
-use cg::runtime::image_repository::ImageRepository;
-use cg::runtime::scene::{Backend, Renderer, RendererOptions};
+use grida::cache::geometry::GeometryCache;
+use grida::export::{ExportAs, ExportConstraints, ExportSize};
+use grida::node::schema::{Node, NodeId, Scene, Size};
+use grida::resources::ByteStore;
+use grida::runtime::camera::Camera2D;
+use grida::runtime::font_repository::FontRepository;
+use grida::runtime::image_repository::ImageRepository;
+use grida::runtime::scene::{Backend, Renderer, RendererOptions};
 
 use super::runner::AsyncSceneLoader;
 
@@ -490,7 +490,7 @@ fn print_node_tree(scene: &Scene, geometry: &GeometryCache) {
     let graph = &scene.graph;
 
     fn walk(
-        graph: &cg::node::scene_graph::SceneGraph,
+        graph: &grida::node::scene_graph::SceneGraph,
         geometry: &GeometryCache,
         id: &NodeId,
         depth: usize,
@@ -749,7 +749,7 @@ pub(crate) async fn run_export_bench<L: AsyncSceneLoader>(
     eprintln!("Scene: {} nodes total", node_count);
     eprintln!(
         "Tip: For statistical analysis, run the Criterion benchmark:\n  \
-         cargo bench -p cg --bench bench_export"
+         cargo bench -p grida --bench bench_export"
     );
 
     Ok(())

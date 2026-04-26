@@ -21,14 +21,14 @@
 
 use super::runner::AsyncSceneLoader;
 use anyhow::{anyhow, Result};
-use cg::cache;
-use cg::layout::engine::LayoutEngine;
-use cg::node::schema::{Scene, Size};
-use cg::resources::ByteStore;
-use cg::runtime::camera::Camera2D;
-use cg::runtime::font_repository::FontRepository;
-use cg::runtime::scene::{Backend, Renderer};
 use clap::Args;
+use grida::cache;
+use grida::layout::engine::LayoutEngine;
+use grida::node::schema::{Scene, Size};
+use grida::resources::ByteStore;
+use grida::runtime::camera::Camera2D;
+use grida::runtime::font_repository::FontRepository;
+use grida::runtime::scene::{Backend, Renderer};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -76,7 +76,7 @@ struct StageTimings {
     layers_us: u64,
     total_us: u64,
     /// Paragraph measurement stats from the layout phase.
-    para_stats: cg::cache::paragraph::ParagraphMeasureStats,
+    para_stats: grida::cache::paragraph::ParagraphMeasureStats,
 }
 
 /// Measure load_scene by running each stage independently with timing.
@@ -99,7 +99,7 @@ fn measure_load_scene(
     // Stage 0: Collect font families
     let t0 = Instant::now();
     {
-        let requested = cg::runtime::scene::collect_scene_font_families(scene);
+        let requested = grida::runtime::scene::collect_scene_font_families(scene);
         // Simulate set_requested_families cost (just drop the result)
         std::hint::black_box(requested);
     }
@@ -116,7 +116,7 @@ fn measure_load_scene(
         engine.compute(
             scene,
             viewport_size,
-            Some(cg::layout::tree::TextMeasureProvider {
+            Some(grida::layout::tree::TextMeasureProvider {
                 paragraph_cache: &mut paragraph_cache,
                 fonts: &fonts,
             }),
@@ -171,7 +171,7 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
     engine_full.compute(
         scene,
         viewport_size,
-        Some(cg::layout::tree::TextMeasureProvider {
+        Some(grida::layout::tree::TextMeasureProvider {
             paragraph_cache: &mut paragraph_cache,
             fonts: &fonts,
         }),
@@ -204,25 +204,25 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
                     .graph
                     .get_node(&id)
                     .map(|n| match n {
-                        cg::node::schema::Node::Container(_) => "Container",
-                        cg::node::schema::Node::Rectangle(_) => "Rectangle",
-                        cg::node::schema::Node::Ellipse(_) => "Ellipse",
-                        cg::node::schema::Node::Image(_) => "Image",
-                        cg::node::schema::Node::Line(_) => "Line",
-                        cg::node::schema::Node::Polygon(_) => "Polygon",
-                        cg::node::schema::Node::RegularPolygon(_) => "RegularPolygon",
-                        cg::node::schema::Node::RegularStarPolygon(_) => "RegularStarPolygon",
-                        cg::node::schema::Node::TextSpan(_) => "TextSpan",
-                        cg::node::schema::Node::Vector(_) => "Vector",
-                        cg::node::schema::Node::Path(_) => "Path",
-                        cg::node::schema::Node::Group(_) => "Group",
-                        cg::node::schema::Node::BooleanOperation(_) => "BoolOp",
-                        cg::node::schema::Node::InitialContainer(_) => "ICB",
-                        cg::node::schema::Node::AttributedText(_) => "AttributedText",
-                        cg::node::schema::Node::Tray(_) => "Tray",
-                        cg::node::schema::Node::Error(_) => "Error",
-                        cg::node::schema::Node::MarkdownEmbed(_) => "MarkdownEmbed",
-                        cg::node::schema::Node::HTMLEmbed(_) => "HTMLEmbed",
+                        grida::node::schema::Node::Container(_) => "Container",
+                        grida::node::schema::Node::Rectangle(_) => "Rectangle",
+                        grida::node::schema::Node::Ellipse(_) => "Ellipse",
+                        grida::node::schema::Node::Image(_) => "Image",
+                        grida::node::schema::Node::Line(_) => "Line",
+                        grida::node::schema::Node::Polygon(_) => "Polygon",
+                        grida::node::schema::Node::RegularPolygon(_) => "RegularPolygon",
+                        grida::node::schema::Node::RegularStarPolygon(_) => "RegularStarPolygon",
+                        grida::node::schema::Node::TextSpan(_) => "TextSpan",
+                        grida::node::schema::Node::Vector(_) => "Vector",
+                        grida::node::schema::Node::Path(_) => "Path",
+                        grida::node::schema::Node::Group(_) => "Group",
+                        grida::node::schema::Node::BooleanOperation(_) => "BoolOp",
+                        grida::node::schema::Node::InitialContainer(_) => "ICB",
+                        grida::node::schema::Node::AttributedText(_) => "AttributedText",
+                        grida::node::schema::Node::Tray(_) => "Tray",
+                        grida::node::schema::Node::Error(_) => "Error",
+                        grida::node::schema::Node::MarkdownEmbed(_) => "MarkdownEmbed",
+                        grida::node::schema::Node::HTMLEmbed(_) => "HTMLEmbed",
                     })
                     .unwrap_or("?");
                 let _ = node_type; // suppress unused
@@ -233,10 +233,10 @@ fn layout_diff(scene: &Scene, width: i32, height: i32, threshold: f32) {
                     .get_parent(&id)
                     .and_then(|pid| {
                         scene.graph.get_node(&pid).ok().map(|p| match p {
-                            cg::node::schema::Node::Container(_) => "Container",
-                            cg::node::schema::Node::Group(_) => "Group",
-                            cg::node::schema::Node::BooleanOperation(_) => "BoolOp",
-                            cg::node::schema::Node::InitialContainer(_) => "ICB",
+                            grida::node::schema::Node::Container(_) => "Container",
+                            grida::node::schema::Node::Group(_) => "Group",
+                            grida::node::schema::Node::BooleanOperation(_) => "BoolOp",
+                            grida::node::schema::Node::InitialContainer(_) => "ICB",
                             _ => "Leaf",
                         })
                     })
@@ -472,12 +472,12 @@ pub(crate) async fn run_load_bench(
         let text_count = scene
             .graph
             .nodes_iter()
-            .filter(|(_, n)| matches!(n, cg::node::schema::Node::TextSpan(_)))
+            .filter(|(_, n)| matches!(n, grida::node::schema::Node::TextSpan(_)))
             .count();
         let container_count = scene
             .graph
             .nodes_iter()
-            .filter(|(_, n)| matches!(n, cg::node::schema::Node::Container(_)))
+            .filter(|(_, n)| matches!(n, grida::node::schema::Node::Container(_)))
             .count();
 
         println!(
@@ -509,7 +509,7 @@ pub(crate) async fn run_load_bench(
                 effects_us: all_timings.iter().map(|t| t.effects_us).sum::<u64>() / n,
                 layers_us: all_timings.iter().map(|t| t.layers_us).sum::<u64>() / n,
                 total_us: all_timings.iter().map(|t| t.total_us).sum::<u64>() / n,
-                para_stats: cg::cache::paragraph::ParagraphMeasureStats {
+                para_stats: grida::cache::paragraph::ParagraphMeasureStats {
                     calls: all_timings.iter().map(|t| t.para_stats.calls).sum::<u64>() / n,
                     cache_hits: all_timings
                         .iter()

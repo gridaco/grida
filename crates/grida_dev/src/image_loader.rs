@@ -9,8 +9,8 @@
 
 use std::path::Path;
 
-use cg::htmlcss::PreloadedImages;
-use cg::resources::ImageMessage;
+use grida::htmlcss::PreloadedImages;
+use grida::resources::ImageMessage;
 
 /// Pre-loaded images: `(url_key, raw_bytes)`.
 ///

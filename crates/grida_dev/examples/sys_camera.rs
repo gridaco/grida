@@ -1,11 +1,3 @@
-use cg::cg::prelude::*;
-use cg::node::factory::NodeFactory;
-use cg::{
-    node::scene_graph::{Parent, SceneGraph},
-    node::schema::*,
-    runtime::camera::Camera2D,
-    runtime::scene::{Backend, Renderer, RendererOptions},
-};
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext},
@@ -14,6 +6,14 @@ use glutin::{
     surface::{Surface as GlutinSurface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+use grida::cg::prelude::*;
+use grida::node::factory::NodeFactory;
+use grida::{
+    node::scene_graph::{Parent, SceneGraph},
+    node::schema::*,
+    runtime::camera::Camera2D,
+    runtime::scene::{Backend, Renderer, RendererOptions},
+};
 use math2::transform::AffineTransform;
 #[allow(deprecated)]
 use raw_window_handle::HasRawWindowHandle;

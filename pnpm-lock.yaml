@@ -274,7 +274,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  crates/grida-canvas: {}
+  crates/grida: {}
 
   crates/grida-canvas-wasm:
     devDependencies:

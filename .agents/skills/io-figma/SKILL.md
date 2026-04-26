@@ -137,7 +137,7 @@ For end-to-end correctness of the Figma import pipeline (does our Grida
 render of a Figma file match Figma's own render?), use the **refig**
 flow: oracle PNGs from Figma's Images API + `@grida/reftest` for the
 diff/score/report. Suites live at `fixtures/local/refig/<name>.<filekey>/`
-(gitignored). See `fixtures/local/refig/README.md` and the `cg-reftest`
+(gitignored). See `fixtures/local/refig/README.md` and the `render-reftest`
 skill's "Figma — the refig reftest pipeline" section for the full flow.
 
 When debugging a conversion bug with a visible visual symptom, run the

@@ -13,7 +13,7 @@ tags:
 Renders HTML+CSS to a Skia Picture for opaque embedding on the canvas
 (HTMLEmbedNode).
 
-**Source:** `crates/grida-canvas/src/htmlcss/`
+**Source:** `crates/grida/src/htmlcss/`
 
 ## Inputs
 
@@ -86,7 +86,7 @@ Phase 1: Collect (collect.rs)     Phase 2: Layout (layout.rs)     Phase 3: Paint
 
 ## CG type reuse
 
-Types from `cg::prelude` reused where they 100% align with CSS semantics:
+Types from `grida::cg::prelude` reused where they 100% align with CSS semantics:
 
 | cg type               | CSS property                          |
 | --------------------- | ------------------------------------- |

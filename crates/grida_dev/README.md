@@ -1,6 +1,6 @@
 # grida_dev
 
-Rust-native dev runtime for [`cg`](../grida-canvas). It bundles the desktop winit host, CLI entrypoints, and an expanding toolbox of dev-only utilities so you can iterate entirely in Rust (no WASM build or full editor boot required).
+Rust-native dev runtime for [`grida`](../grida). It bundles the desktop winit host, CLI entrypoints, and an expanding toolbox of dev-only utilities so you can iterate entirely in Rust (no WASM build or full editor boot required).
 
 ## Why
 
@@ -51,7 +51,7 @@ Output includes avg/p50/p95/p99 frame times, display list size, live draw count,
 
 ### Native Examples
 
-All legacy `cargo run --example ...` entrypoints from `grida-canvas` now live here. Run them directly:
+All legacy `cargo run --example ...` entrypoints from `grida` now live here. Run them directly:
 
 ```bash
 cargo run -p grida_dev --example grida_basic
@@ -63,7 +63,7 @@ Examples live under `crates/grida_dev/examples/*` (with the CLI now covering the
 ## Notes
 
 - Remote scenes use `reqwest`; stay online or stick to local files.
-- Image/font assets referenced with `http(s)://` URLs are loaded asynchronously inside `cg`.
-- `run_demo_window` currently opens a fixed 1080×1080 window; customize it in `cg` if needed.
+- Image/font assets referenced with `http(s)://` URLs are loaded asynchronously inside `grida`.
+- `run_demo_window` currently opens a fixed 1080×1080 window; customize it in `grida` if needed.
 - The interactive window accepts file drops at any time; multi-scene files support PageUp/PageDown pagination.
 - This crate is intentionally `publish = false`—it will gain CLI subcommands/devtools over time (inspector GUIs, perf capture, etc.).

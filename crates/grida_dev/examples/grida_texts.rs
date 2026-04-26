@@ -1,9 +1,9 @@
-use cg::cg::prelude::*;
-use cg::node::factory::NodeFactory;
-use cg::node::scene_graph::{Parent, SceneGraph};
-use cg::node::schema::*;
-use cg::resources::{load_font, FontMessage};
-use cg::window::application::HostEvent;
+use grida::cg::prelude::*;
+use grida::node::factory::NodeFactory;
+use grida::node::scene_graph::{Parent, SceneGraph};
+use grida::node::schema::*;
+use grida::resources::{load_font, FontMessage};
+use grida::window::application::HostEvent;
 use grida_dev::platform::native_demo;
 use math2::transform::AffineTransform;
 

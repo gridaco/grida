@@ -1,9 +1,9 @@
 use super::native_application::NativeApplication;
-use cg::node::schema::Scene;
-use cg::resources::{load_scene_images, FontMessage, ImageMessage};
-use cg::runtime::scene::{Backend, Renderer};
-use cg::window::application::{ApplicationApi, HostEvent, HostEventCallback};
 use futures::channel::mpsc;
+use grida::node::schema::Scene;
+use grida::resources::{load_scene_images, FontMessage, ImageMessage};
+use grida::runtime::scene::{Backend, Renderer};
+use grida::window::application::{ApplicationApi, HostEvent, HostEventCallback};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -21,7 +21,7 @@ pub async fn run_demo_window_multi(scenes: Vec<Scene>) {
         .first()
         .cloned()
         .expect("run_demo_window_multi requires at least one scene");
-    let options = cg::runtime::scene::RendererOptions {
+    let options = grida::runtime::scene::RendererOptions {
         use_embedded_fonts: true,
         ..Default::default()
     };
@@ -37,7 +37,7 @@ where
         winit::event_loop::EventLoopProxy<HostEvent>,
     ),
 {
-    let options = cg::runtime::scene::RendererOptions {
+    let options = grida::runtime::scene::RendererOptions {
         use_embedded_fonts: true,
         ..Default::default()
     };
@@ -49,7 +49,7 @@ pub async fn run_demo_window_with_drop<F>(
     init: F,
     drop_tx: UnboundedSender<PathBuf>,
     scenes_rx: UnboundedReceiver<Vec<Scene>>,
-    options: cg::runtime::scene::RendererOptions,
+    options: grida::runtime::scene::RendererOptions,
 ) where
     F: FnOnce(
         &mut Renderer,
@@ -75,7 +75,7 @@ async fn run_demo_window_core_multi<F>(
     init: F,
     file_drop_tx: Option<UnboundedSender<PathBuf>>,
     scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
-    options: cg::runtime::scene::RendererOptions,
+    options: grida::runtime::scene::RendererOptions,
 ) where
     F: FnOnce(
         &mut Renderer,

@@ -1,18 +1,18 @@
 use super::winit::{winit_window, WinitResult};
-use cg::node::schema::{Scene, Size};
-use cg::resources::{load_scene_images, FontMessage, ImageMessage};
-use cg::runtime::camera::Camera2D;
-use cg::window::application::{
-    ApplicationApi, HostEvent, HostEventCallback, UnknownTargetApplication,
-};
-use cg::window::command::ApplicationCommand;
-use cg::window::state::AnySurfaceState;
 use futures::channel::mpsc;
 use glutin::{
     context::PossiblyCurrentContext,
     prelude::GlSurface,
     surface::{Surface as GlutinSurface, WindowSurface},
 };
+use grida::node::schema::{Scene, Size};
+use grida::resources::{load_scene_images, FontMessage, ImageMessage};
+use grida::runtime::camera::Camera2D;
+use grida::window::application::{
+    ApplicationApi, HostEvent, HostEventCallback, UnknownTargetApplication,
+};
+use grida::window::command::ApplicationCommand;
+use grida::window::state::AnySurfaceState;
 
 use std::num::NonZeroU32;
 use std::path::PathBuf;
@@ -25,17 +25,17 @@ use winit::{
     window::Window,
 };
 
-/// Map a cg `CursorIcon` to a winit `CursorIcon`.
-fn map_cursor_icon(icon: cg::overlay::CursorIcon) -> winit::window::CursorIcon {
-    use cg::overlay::ResizeDirection;
+/// Map a grida `CursorIcon` to a winit `CursorIcon`.
+fn map_cursor_icon(icon: grida::overlay::CursorIcon) -> winit::window::CursorIcon {
+    use grida::overlay::ResizeDirection;
     match icon {
-        cg::overlay::CursorIcon::Default => winit::window::CursorIcon::Default,
-        cg::overlay::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
-        cg::overlay::CursorIcon::Grab => winit::window::CursorIcon::Grab,
-        cg::overlay::CursorIcon::Grabbing => winit::window::CursorIcon::Grabbing,
-        cg::overlay::CursorIcon::Crosshair => winit::window::CursorIcon::Crosshair,
-        cg::overlay::CursorIcon::Move => winit::window::CursorIcon::Move,
-        cg::overlay::CursorIcon::Resize(dir) => match dir {
+        grida::overlay::CursorIcon::Default => winit::window::CursorIcon::Default,
+        grida::overlay::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
+        grida::overlay::CursorIcon::Grab => winit::window::CursorIcon::Grab,
+        grida::overlay::CursorIcon::Grabbing => winit::window::CursorIcon::Grabbing,
+        grida::overlay::CursorIcon::Crosshair => winit::window::CursorIcon::Crosshair,
+        grida::overlay::CursorIcon::Move => winit::window::CursorIcon::Move,
+        grida::overlay::CursorIcon::Resize(dir) => match dir {
             ResizeDirection::N | ResizeDirection::S => winit::window::CursorIcon::NsResize,
             ResizeDirection::E | ResizeDirection::W => winit::window::CursorIcon::EwResize,
             ResizeDirection::NW | ResizeDirection::SE => winit::window::CursorIcon::NwseResize,
@@ -43,7 +43,7 @@ fn map_cursor_icon(icon: cg::overlay::CursorIcon) -> winit::window::CursorIcon {
         },
         // Rotation uses a custom cursor in the web editor; for native dev
         // we fall back to a crosshair which is the closest standard cursor.
-        cg::overlay::CursorIcon::Rotate(_) => winit::window::CursorIcon::Alias,
+        grida::overlay::CursorIcon::Rotate(_) => winit::window::CursorIcon::Alias,
     }
 }
 
@@ -51,8 +51,8 @@ fn map_cursor_icon(icon: cg::overlay::CursorIcon) -> winit::window::CursorIcon {
 fn winit_key_to_surface_key_down(
     event: &KeyEvent,
     modifiers: &winit::keyboard::ModifiersState,
-) -> Option<cg::overlay::SurfaceEvent> {
-    use cg::text_edit::session::KeyName;
+) -> Option<grida::overlay::SurfaceEvent> {
+    use grida::text_edit::session::KeyName;
 
     let key = match &event.logical_key {
         Key::Named(winit::keyboard::NamedKey::ArrowLeft) => KeyName::ArrowLeft,
@@ -99,7 +99,7 @@ fn winit_key_to_surface_key_down(
         _ => return None,
     };
 
-    let mods = cg::overlay::Modifiers {
+    let mods = grida::overlay::Modifiers {
         shift: modifiers.shift_key(),
         alt: modifiers.alt_key(),
         ctrl_or_cmd: if cfg!(target_os = "macos") {
@@ -109,7 +109,7 @@ fn winit_key_to_surface_key_down(
         },
     };
 
-    Some(cg::overlay::SurfaceEvent::KeyDown {
+    Some(grida::overlay::SurfaceEvent::KeyDown {
         key,
         modifiers: mods,
     })
@@ -231,7 +231,7 @@ impl NativeApplication {
             height,
             image_rx,
             font_rx,
-            cg::runtime::scene::RendererOptions::default(),
+            grida::runtime::scene::RendererOptions::default(),
             None,
             false,
             None,
@@ -243,7 +243,7 @@ impl NativeApplication {
         height: i32,
         image_rx: mpsc::UnboundedReceiver<ImageMessage>,
         font_rx: mpsc::UnboundedReceiver<FontMessage>,
-        options: cg::runtime::scene::RendererOptions,
+        options: grida::runtime::scene::RendererOptions,
         file_drop_tx: Option<UnboundedSender<PathBuf>>,
         fit_scene_on_load: bool,
         scenes_rx: Option<UnboundedReceiver<Vec<Scene>>>,
@@ -316,8 +316,8 @@ impl NativeApplication {
         (app, el)
     }
 
-    fn build_modifiers(&self) -> cg::overlay::Modifiers {
-        cg::overlay::Modifiers {
+    fn build_modifiers(&self) -> grida::overlay::Modifiers {
+        grida::overlay::Modifiers {
             shift: self.modifiers.shift_key(),
             alt: self.modifiers.alt_key(),
             ctrl_or_cmd: if cfg!(target_os = "macos") {
@@ -351,7 +351,7 @@ impl NativeApplication {
             PhysicalKey::Code(KeyCode::KeyX) if !self.modifiers.shift_key() => {
                 self.text_edit_copy_selection();
                 self.app
-                    .text_edit_command(cg::text_edit_session::EditCommand::DeleteByCut);
+                    .text_edit_command(grida::text_edit_session::EditCommand::DeleteByCut);
                 self.window.request_redraw();
                 true
             }
@@ -430,7 +430,7 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 .screen_to_canvas_point([position.x as f32, position.y as f32]);
             let screen_point = [position.x as f32, position.y as f32];
 
-            let surface_event = cg::overlay::SurfaceEvent::PointerMove {
+            let surface_event = grida::overlay::SurfaceEvent::PointerMove {
                 canvas_point,
                 screen_point,
             };
@@ -454,23 +454,23 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             let was_editing = self.app.text_edit_is_active();
             let modifiers = self.build_modifiers();
             let pointer_button = match button {
-                MouseButton::Left => cg::overlay::PointerButton::Primary,
-                MouseButton::Right => cg::overlay::PointerButton::Secondary,
-                MouseButton::Middle => cg::overlay::PointerButton::Middle,
-                _ => cg::overlay::PointerButton::Primary,
+                MouseButton::Left => grida::overlay::PointerButton::Primary,
+                MouseButton::Right => grida::overlay::PointerButton::Secondary,
+                MouseButton::Middle => grida::overlay::PointerButton::Middle,
+                _ => grida::overlay::PointerButton::Primary,
             };
             let [sx, sy] = self.app.input_cursor();
             let canvas_point = self.app.renderer().camera.screen_to_canvas_point([sx, sy]);
             let screen_point = [sx, sy];
 
             let surface_event = match state {
-                ElementState::Pressed => cg::overlay::SurfaceEvent::PointerDown {
+                ElementState::Pressed => grida::overlay::SurfaceEvent::PointerDown {
                     canvas_point,
                     screen_point,
                     button: pointer_button,
                     modifiers,
                 },
-                ElementState::Released => cg::overlay::SurfaceEvent::PointerUp {
+                ElementState::Released => grida::overlay::SurfaceEvent::PointerUp {
                     canvas_point,
                     screen_point,
                     button: pointer_button,
@@ -497,8 +497,8 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 use winit::event::Ime;
                 match ime {
                     Ime::Preedit(text, _cursor_range) => {
-                        let surface_event = cg::overlay::SurfaceEvent::Ime(
-                            cg::overlay::ImeEvent::Preedit(text.clone()),
+                        let surface_event = grida::overlay::SurfaceEvent::Ime(
+                            grida::overlay::ImeEvent::Preedit(text.clone()),
                         );
                         let response = self.app.handle_surface_event(surface_event);
                         if response.needs_redraw {
@@ -506,8 +506,8 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                         }
                     }
                     Ime::Commit(text) => {
-                        let surface_event = cg::overlay::SurfaceEvent::Ime(
-                            cg::overlay::ImeEvent::Commit(text.clone()),
+                        let surface_event = grida::overlay::SurfaceEvent::Ime(
+                            grida::overlay::ImeEvent::Commit(text.clone()),
                         );
                         let response = self.app.handle_surface_event(surface_event);
                         if response.needs_redraw {
@@ -571,7 +571,7 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                             // Filter out control characters (Enter, Tab, etc.
                             // are already handled as KeyDown actions).
                             if !s.is_empty() && s.chars().all(|c| !c.is_control()) {
-                                let surface_event = cg::overlay::SurfaceEvent::TextInput {
+                                let surface_event = grida::overlay::SurfaceEvent::TextInput {
                                     text: s.to_string(),
                                 };
                                 let response = self.app.handle_surface_event(surface_event);
@@ -760,6 +760,6 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
     }
 }
 
-fn fit_camera_to_scene(renderer: &mut cg::runtime::scene::Renderer) {
+fn fit_camera_to_scene(renderer: &mut grida::runtime::scene::Renderer) {
     renderer.fit_camera_to_scene();
 }

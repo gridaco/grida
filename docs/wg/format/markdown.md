@@ -13,8 +13,8 @@ tags:
 The `MarkdownNode` renders GFM (GitHub Flavored Markdown) directly to a Skia Picture using pulldown-cmark's event stream and Skia's `textlayout::Paragraph` API. No HTML/CSS pipeline is involved — the markdown source is walked and drawn in a single pass.
 
 - **Parser**: `pulldown-cmark` 0.13 with `ENABLE_STRIKETHROUGH | ENABLE_TABLES | ENABLE_TASKLISTS | ENABLE_MATH`
-- **Renderer**: `crates/grida-canvas/src/painter/markdown.rs`
-- **Node schema**: `MarkdownNodeRec` in `crates/grida-canvas/src/node/schema.rs`
+- **Renderer**: `crates/grida/src/painter/markdown.rs`
+- **Node schema**: `MarkdownNodeRec` in `crates/grida/src/node/schema.rs`
 - **Theme**: GitHub markdown light (hardcoded colors from `fixtures/css/github-markdown-light.css`)
 
 ## Block Elements

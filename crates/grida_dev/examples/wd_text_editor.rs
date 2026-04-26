@@ -18,7 +18,7 @@ use std::fs;
 use std::num::NonZeroU32;
 use std::time::Duration;
 
-use cg::text_edit::time::Instant;
+use grida::text_edit::time::Instant;
 
 use arboard::Clipboard;
 use gl::types::GLint;
@@ -47,8 +47,8 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
-use cg::cg::color::CGColor;
-use cg::text_edit::{
+use grida::cg::color::CGColor;
+use grida::text_edit::{
     attributed_text::{AttributedText, TextStyle as AttrTextStyle},
     selection_rects::EmptyLineSelectionPolicy,
     session::{ClickTracker, KeyAction, KeyName, TextEditSession},

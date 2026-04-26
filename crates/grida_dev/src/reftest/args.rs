@@ -21,10 +21,10 @@ impl std::str::FromStr for BgColor {
 /// Choice of SVG renderer backend.
 ///
 /// - `Iosvg` (default): current path — parse SVG via vendored usvg,
-///   convert to the Grida scene graph through `cg::import::svg::pack`, render
+///   convert to the Grida scene graph through `grida::import::svg::pack`, render
 ///   via the canvas runtime. Lossy (editor-oriented tree surgery), but
 ///   GPU-native and consistent with the in-editor experience.
-/// - `Htmlcss`: goes through `cg::htmlcss::render_svg`, which records
+/// - `Htmlcss`: goes through `grida::htmlcss::render_svg`, which records
 ///   into a Skia `Picture` via `PictureRecorder` before rasterizing.
 ///   Exercises the exact code path that inline `<svg>` inside HTML
 ///   takes.
@@ -91,8 +91,8 @@ pub(crate) struct ReftestArgs {
     pub overwrite: Option<bool>,
 
     /// SVG renderer backend:
-    ///  - `iosvg` (default): cg scene graph via usvg → pack.
-    ///  - `htmlcss`: cg::htmlcss::render_svg → PictureRecorder → surface.
+    ///  - `iosvg` (default): grida scene graph via usvg → pack.
+    ///  - `htmlcss`: grida::htmlcss::render_svg → PictureRecorder → surface.
     ///  - `sksvg`: direct Skia svg::Dom → surface (no htmlcss wrapping).
     ///    Use this to prove a failure is Skia's own SVG module, not our
     ///    plumbing. Aliases: `skia-svg`, `skia_svg`, `skia`.

@@ -662,40 +662,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "cg"
-version = "0.0.0"
-dependencies = [
- "async-trait",
- "clap",
- "criterion",
- "csscascade",
- "flatbuffers",
- "futures",
- "gl",
- "glutin",
- "imgref",
- "json-patch",
- "math2",
- "pulldown-cmark",
- "raw-window-handle",
- "rendiff",
- "reqwest",
- "rstar",
- "rustc-hash",
- "seahash",
- "serde",
- "serde_json",
- "skia-safe",
- "stylo",
- "stylo_static_prefs",
- "taffy",
- "tokio",
- "unicode-segmentation",
- "usvg",
- "zip 2.4.2",
-]
-
-[[package]]
 name = "cgl"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1764,11 +1730,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9e2d4c0a8296178d8802098410ca05d86b17a10bb5ab559b3fb404c1f948220"
 
 [[package]]
+name = "grida"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "criterion",
+ "csscascade",
+ "flatbuffers",
+ "futures",
+ "gl",
+ "glutin",
+ "imgref",
+ "json-patch",
+ "math2",
+ "pulldown-cmark",
+ "raw-window-handle",
+ "rendiff",
+ "reqwest",
+ "rstar",
+ "rustc-hash",
+ "seahash",
+ "serde",
+ "serde_json",
+ "skia-safe",
+ "stylo",
+ "stylo_static_prefs",
+ "taffy",
+ "tokio",
+ "unicode-segmentation",
+ "usvg",
+ "zip 2.4.2",
+]
+
+[[package]]
 name = "grida-canvas-wasm"
 version = "0.0.0"
 dependencies = [
- "cg",
  "fonts",
+ "grida",
  "math2",
  "serde",
  "serde_json",
@@ -1780,7 +1780,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "arboard",
- "cg",
  "clap",
  "dify",
  "fonts",
@@ -1789,6 +1788,7 @@ dependencies = [
  "glob",
  "glutin",
  "glutin-winit",
+ "grida",
  "image",
  "indicatif",
  "math2",
@@ -1808,8 +1808,8 @@ dependencies = [
 name = "grida_wpt"
 version = "0.0.0"
 dependencies = [
- "cg",
  "clap",
+ "grida",
  "serde",
  "serde_json",
  "skia-safe",

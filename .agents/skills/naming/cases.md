@@ -5,13 +5,21 @@ mappings, the short-name charter, or the unresolved questions.
 
 ## Crate directory vs. Cargo `name`
 
-| Directory                  | `name`              | Rationale                                         |
-| -------------------------- | ------------------- | ------------------------------------------------- |
-| `crates/grida-canvas`      | `cg`                | Heavily imported; short name pays off everywhere. |
-| `crates/fonts`             | `fonts`             | Standalone; agnostic of canvas.                   |
-| `crates/grida-canvas-wasm` | `grida-canvas-wasm` | Published artifact; full name is its API.         |
-| `crates/math2`             | `math2`             | No browse-breadcrumb to leverage — align.         |
-| `crates/csscascade`        | `csscascade`        | Same.                                             |
+The Rust crates currently align directory and `name` — the project's
+core Rust surface ships as `grida` from `crates/grida`, and the
+supporting crates use the same name on both sides.
+
+| Directory                  | `name`              | Rationale                                                |
+| -------------------------- | ------------------- | -------------------------------------------------------- |
+| `crates/grida`             | `grida`             | Core engine; aligns with the project's public namespace. |
+| `crates/grida-canvas-wasm` | `grida-canvas-wasm` | Published artifact; full name is its API.                |
+| `crates/grida_dev`         | `grida_dev`         | Internal binary; underscore matches Rust ident.          |
+| `crates/fonts`             | `fonts`             | Standalone; agnostic of canvas.                          |
+| `crates/math2`             | `math2`             | No browse-breadcrumb to leverage — align.                |
+| `crates/csscascade`        | `csscascade`        | Same.                                                    |
+
+The TS-package side keeps the long-directory / short-published-name
+pattern — see the next table.
 
 ## Package directory vs. `package.json` `name`
 
@@ -49,7 +57,7 @@ new feature exists.
 Accept without prefix, because each is the sole occupant of its concept
 slot in its parent:
 
-- Rust modules: `cg`, `fe`, `sk`, `sk_tiny`, `sys`, `os`, `k`
+- Rust modules: `cg`, `fe`, `sys`, `os`, `k`
 - TS dirs: `k/` (constants), `q/` (query), `lib/`, `utils/`, `hooks/`,
   `types/`, `theme/`
 

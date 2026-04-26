@@ -6,7 +6,7 @@ description = "Grida Canvas WASM"
 edition = "2021"
 
 [dependencies]
-cg = { path = "../grida-canvas", features = ["web"] }
+grida = { path = "../grida", features = ["web"] }
 math2 = { path = "../math2" }
 fonts = { path = "../fonts", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }

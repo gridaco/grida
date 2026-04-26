@@ -10,8 +10,8 @@ Workflow and reasoning framework for performance work on the
 React subscription layer, and headless benchmarks.
 
 > **Scope boundary:** This skill covers the **JS/TS editor** pipeline
-> (`editor/grida-canvas/`). For the **Rust rendering engine** (cg
-> crate), use the `cg-perf` skill instead. The two pipelines are
+> (`editor/grida-canvas/`). For the **Rust rendering engine** (the
+> `grida` crate), use the `render-perf` skill instead. The two pipelines are
 > connected — a dispatch in JS may trigger a WASM re-render — but they
 > are profiled with different tools.
 

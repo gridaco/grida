@@ -1426,7 +1426,7 @@ export namespace cg {
    *
    * only struct, widely aknowledged, de-facto standard defaults will be set.
    *
-   * this is aligned in cg crate's default values.
+   * this is aligned in grida crate's default values.
    */
   export namespace def {
     export const LAYER_BLENDMODE: cg.LayerBlendMode = "pass-through";

@@ -5,7 +5,7 @@
 // Goal:
 // - A single, universal, evolvable, binary document format for large documents.
 // - Aligned to:
-//   - Rust runtime model: `crates/grida-canvas/src/node/schema.rs`
+//   - Rust runtime model: `crates/grida/src/node/schema.rs`
 //   - TS document model: `packages/grida-canvas-schema/grida.ts`
 //
 // Key decisions (draft):
@@ -126,7 +126,7 @@ table None {}
 table Auto {}
 
 // -----------------------------------------------------------------------------
-// Core primitives (Rust `crates/grida-canvas/src/cg/**` aligned)
+// Core primitives (Rust `crates/grida/src/cg/**` aligned)
 // -----------------------------------------------------------------------------
 
 /// Node identifier (temporary: string-based for compatibility with current editor).
@@ -186,7 +186,7 @@ struct UV {
   v:float;
 }
 
-/// Rust: (no dedicated cg struct) used throughout as (w,h). Keep for schema convenience.
+/// Rust: (no dedicated grida struct) used throughout as (w,h). Keep for schema convenience.
 struct CGSize {
   width:float;
   height:float;
@@ -498,7 +498,7 @@ union LayerMaskType {
 }
 
 // -----------------------------------------------------------------------------
-// Text style (Rust `cg::types::TextStyleRec` aligned)
+// Text style (Rust `grida::cg::types::TextStyleRec` aligned)
 // -----------------------------------------------------------------------------
 
 /// Rust: `TextTransform`
@@ -633,7 +633,7 @@ table TextStyleRec {
 }
 
 // -----------------------------------------------------------------------------
-// Paints (Rust `cg::types` aligned)
+// Paints (Rust `grida::cg::types` aligned)
 // -----------------------------------------------------------------------------
 
 struct GradientStop {
@@ -849,7 +849,7 @@ table VectorNetworkData {
 }
 
 // -----------------------------------------------------------------------------
-// Effects (Rust `cg::fe` + `node::schema::LayerEffects` aligned)
+// Effects (Rust `grida::cg::fe` + `node::schema::LayerEffects` aligned)
 // -----------------------------------------------------------------------------
 
 /// Rust: `FeGaussianBlur { radius: f32 }`
@@ -980,7 +980,7 @@ table VariableWidthStop {
 /// Variable-width stroke profile.
 ///
 /// Notes:
-/// - This matches TS `cg.VariableWidthProfile` and Rust `cg::varwidth::{WidthStop, VarWidthProfile}` at the wire level.
+/// - This matches TS `cg.VariableWidthProfile` and Rust `grida::cg::varwidth::{WidthStop, VarWidthProfile}` at the wire level.
 /// - `base` is intentionally not stored here; renderers should derive a base half-width from the node's `stroke_width`
 ///   when `stops` is empty (see Rust `VarWidthSampler` behavior).
 table VariableWidthProfile {

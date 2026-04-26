@@ -1,7 +1,7 @@
-use cg::cg::prelude::*; // import style per repo convention [[memory:8559399]]
-use cg::node::factory::NodeFactory;
-use cg::node::scene_graph::{Parent, SceneGraph};
-use cg::node::schema::*;
+use grida::cg::prelude::*; // import style per repo convention [[memory:8559399]]
+use grida::node::factory::NodeFactory;
+use grida::node::scene_graph::{Parent, SceneGraph};
+use grida::node::schema::*;
 use grida_dev::platform::native_demo;
 use math2::transform::AffineTransform;
 

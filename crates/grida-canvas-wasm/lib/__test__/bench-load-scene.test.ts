@@ -6,7 +6,7 @@
 //   1. loadSceneGrida — FBS decode + SceneGraph construction
 //   2. switchScene    — layout + geometry + effects + layers
 //
-// When `perf` feature is enabled on the cg crate, the Rust side emits
+// When `perf` feature is enabled on the grida crate, the Rust side emits
 // per-stage timing via eprintln! ([load_scene] line).
 // This test measures JS-side wall time for comparison.
 //

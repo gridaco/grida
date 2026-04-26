@@ -12,7 +12,7 @@ tags:
 
 SVG → Grida IR property mapping and TODO tracker.
 
-**Implementation:** `crates/grida-canvas/src/import/svg/` (uses [usvg](https://github.com/nicbeuc/resvg) for pre-processing).
+**Implementation:** `crates/grida/src/import/svg/` (uses [usvg](https://github.com/nicbeuc/resvg) for pre-processing).
 
 usvg simplifies the SVG DOM before we see it: `<use>` is resolved, CSS is computed, `<defs>` are inlined, transforms are flattened. Our mapping is from the usvg simplified tree, not raw SVG.
 

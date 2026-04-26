@@ -4,10 +4,10 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 license = "Apache-2.0"
-description = "Native winit playground for grida-canvas scenes."
+description = "Native winit playground for grida scenes."
 
 [dependencies]
-cg = { path = "../grida-canvas", features = [
+grida = { path = "../grida", features = [
   "web",
   "perf",
   "native-clock-tick",

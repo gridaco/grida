@@ -113,7 +113,7 @@ When writing or updating **user-facing docs**, prefer **universal routing** link
 - **Never link outside `/docs`** from docs markdown files. Links like
   `../../../crates/...` or `../../packages/...` break when docs are
   hosted on Docusaurus (only `/docs/**` is deployed). Instead, reference
-  external paths as inline code: `` `crates/grida-canvas/examples/foo.rs` ``.
+  external paths as inline code: `` `crates/grida/examples/foo.rs` ``.
 - Links **within `/docs`** (relative paths between docs pages) are fine.
 - Links to **external URLs** (`https://...`) are fine.
 

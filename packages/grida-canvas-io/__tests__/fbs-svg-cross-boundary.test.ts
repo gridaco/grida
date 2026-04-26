@@ -5,7 +5,7 @@
  *   cargo run -p grida_dev -- svg-to-grida
  *
  * The Rust side asserts the same expectations on the same files
- * (crates/grida-canvas/tests/fbs_golden.rs).
+ * (crates/grida/tests/fbs_golden.rs).
  *
  * To test with custom SVGs:
  *   cargo run -p grida_dev -- svg-to-grida path/to/svgs -r

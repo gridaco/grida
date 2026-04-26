@@ -1,6 +1,6 @@
 ## `fixtures/test-html/L0`
 
-Baseline HTML fixtures for the HTML+CSS embed renderer (`crates/grida-canvas/src/htmlcss/`).
+Baseline HTML fixtures for the HTML+CSS embed renderer (`crates/grida/src/htmlcss/`).
 Each file exercises a narrow slice of CSS so regressions trace to a specific
 rendering subsystem.
 
@@ -224,7 +224,7 @@ machine-verifiable without vision models.
 1. Pick the correct **domain** from the table.
 2. Name the file `<domain>-<property>[-<descriptor>].html`.
 3. Copy the template — fill in specimens that exercise distinct values.
-4. Verify: `cargo test -p cg --lib -- htmlcss::tests --test-threads=1`
+4. Verify: `cargo test -p grida --lib -- htmlcss::tests --test-threads=1`
 5. Visual-check: `cargo run -p grida_dev -- fixtures/test-html/L0/<file>.html`
 6. Fixtures may test unsupported properties — L0 is a reference corpus, not a
    passing-test gate. Implementation status lives in
@@ -234,7 +234,7 @@ machine-verifiable without vision models.
 
 ```sh
 # all fixtures parse without error
-cargo test -p cg --lib -- htmlcss::tests --test-threads=1
+cargo test -p grida --lib -- htmlcss::tests --test-threads=1
 
 # visual check via grida_dev
 cargo run -p grida_dev -- fixtures/test-html/L0/mixed-card.html

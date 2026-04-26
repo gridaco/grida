@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Context, Result};
-use cg::cache::geometry::GeometryCache;
-use cg::import::svg::pack;
-use cg::runtime::{
+use glob::{glob_with, MatchOptions};
+use grida::cache::geometry::GeometryCache;
+use grida::import::svg::pack;
+use grida::runtime::{
     camera::Camera2D,
     font_repository::FontRepository,
     image_repository::ImageRepository,
     scene::{Backend, Renderer, RendererOptions},
 };
-use glob::{glob_with, MatchOptions};
 use math2::rect::Rectangle;
 use skia_safe::EncodedImageFormat;
 use std::fs;
@@ -154,7 +154,7 @@ pub(crate) fn find_test_pairs_in_dirs(svg_dir: &Path, png_dir: &Path) -> Result<
 /// path and write a PNG.
 ///
 /// Unlike [`render_svg_to_png`], which round-trips through the Grida
-/// scene graph via `cg::import::svg::pack`, this path delegates directly to
+/// scene graph via `grida::import::svg::pack`, this path delegates directly to
 /// Skia's SVG module — matching Chromium's rendering for WPT-style
 /// reftests. Target size is the reference PNG's pixel dimensions;
 /// `viewBox` + `preserveAspectRatio` inside the SVG map user units to
@@ -182,7 +182,7 @@ pub(crate) fn render_svg_to_png_via_htmlcss(
 
     // Record the SVG into a Skia Picture via the htmlcss module's public
     // entry point.
-    let picture = cg::htmlcss::render_svg(&svg_source, width as f32, height as f32)
+    let picture = grida::htmlcss::render_svg(&svg_source, width as f32, height as f32)
         .map_err(|e| anyhow!("htmlcss::render_svg failed: {e}"))?;
 
     // Rasterize the Picture onto a CPU-backed surface. Transparent clear
@@ -313,16 +313,16 @@ pub(crate) fn render_svg_to_png(
     let graph =
         pack::from_svg_str(&svg_source).map_err(|err| anyhow!("failed to convert SVG: {err}"))?;
 
-    let scene = cg::node::schema::Scene {
+    let scene = grida::node::schema::Scene {
         name: svg_path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "SVG".to_string()),
         graph,
-        background_color: Some(cg::cg::prelude::CGColor::from_u32(0xFFFFFFFF)),
+        background_color: Some(grida::cg::prelude::CGColor::from_u32(0xFFFFFFFF)),
     };
 
-    let store = Arc::new(Mutex::new(cg::resources::ByteStore::new()));
+    let store = Arc::new(Mutex::new(grida::resources::ByteStore::new()));
     let mut fonts = FontRepository::new(store.clone());
     fonts.register_embedded_fonts();
     let images = ImageRepository::new(store.clone());
@@ -351,7 +351,7 @@ pub(crate) fn render_svg_to_png(
     // Create camera with target viewport size
     let camera = if let Some((target_w, target_h)) = target_size {
         // Create camera with target size as viewport, then scale to fit bounds
-        let mut cam = Camera2D::new(cg::node::schema::Size {
+        let mut cam = Camera2D::new(grida::node::schema::Size {
             width: target_w as f32,
             height: target_h as f32,
         });

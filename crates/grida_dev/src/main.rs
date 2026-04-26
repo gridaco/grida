@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use cg::import::svg::pack;
-use cg::node::schema::Scene;
-use cg::resources::{load_scene_images, ImageMessage};
-use cg::window::application::{HostEvent, HostEventCallback};
 use clap::{Parser, Subcommand};
 use futures::channel::mpsc;
+use grida::import::svg::pack;
+use grida::node::schema::Scene;
+use grida::resources::{load_scene_images, ImageMessage};
+use grida::window::application::{HostEvent, HostEventCallback};
 use grida_dev::platform::native_demo::run_demo_window_with_drop;
 mod bench;
 mod grida_file;
@@ -20,7 +20,7 @@ use winit::event_loop::EventLoopProxy;
 #[command(
     name = "grida_dev",
     version,
-    about = "Rust-native dev runtime for previewing grida-canvas scenes with winit.\n\n\
+    about = "Rust-native dev runtime for previewing grida scenes with winit.\n\n\
              Opens an interactive window. Optionally pass a file path or URL to load it\n\
              immediately. Drop files onto the window at any time to replace the scene.\n\n\
              Supported formats: .grida, .grida1, .svg, .html, .md, .png, .jpg, .jpeg, .webp"
@@ -110,7 +110,7 @@ struct SvgToGridaArgs {
 }
 
 fn run_svg_to_grida(args: SvgToGridaArgs) {
-    use cg::import::svg::grida::svg_to_grida_bytes;
+    use grida::import::svg::grida::svg_to_grida_bytes;
 
     let input_dir = PathBuf::from(args.path.as_deref().unwrap_or("fixtures/test-svg/L0"));
     let output_dir = PathBuf::from(
@@ -233,8 +233,8 @@ fn is_url(path: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 fn build_empty_scene() -> Scene {
-    use cg::cg::prelude::CGColor;
-    use cg::node::scene_graph::SceneGraph;
+    use grida::cg::prelude::CGColor;
+    use grida::node::scene_graph::SceneGraph;
     Scene {
         name: "Drop a file to begin".to_string(),
         graph: SceneGraph::new(),
@@ -286,7 +286,7 @@ async fn run_interactive(file: Option<String>, system_fonts: bool) -> Result<()>
         let _ = scenes_tx.send(initial_scenes);
     }
 
-    let options = cg::runtime::scene::RendererOptions {
+    let options = grida::runtime::scene::RendererOptions {
         use_embedded_fonts: true,
         use_system_fonts: system_fonts,
         ..Default::default()
@@ -321,7 +321,7 @@ async fn run_interactive(file: Option<String>, system_fonts: bool) -> Result<()>
 }
 
 fn scene_from_svg_path(path: &Path) -> Result<Scene> {
-    use cg::cg::prelude::CGColor;
+    use grida::cg::prelude::CGColor;
     let svg_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
     let graph = pack::from_svg_str(&svg_source)
@@ -338,10 +338,10 @@ fn scene_from_svg_path(path: &Path) -> Result<Scene> {
 }
 
 fn scene_from_html_path(path: &Path) -> Result<Scene> {
-    use cg::cg::prelude::CGColor;
+    use grida::cg::prelude::CGColor;
     let html_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
-    let graph = cg::import::html::from_html_str(&html_source)
+    let graph = grida::import::html::from_html_str(&html_source)
         .map_err(|err| anyhow::anyhow!("failed to convert HTML {}: {err}", path.display()))?;
 
     Ok(Scene {
@@ -361,16 +361,16 @@ struct HtmlEmbedScene {
 }
 
 async fn scene_from_html_embed_path(path: &Path) -> Result<HtmlEmbedScene> {
-    use cg::cg::prelude::CGColor;
-    use cg::node::factory::NodeFactory;
-    use cg::node::scene_graph::{Parent, SceneGraph};
-    use cg::node::schema::Node;
+    use grida::cg::prelude::CGColor;
+    use grida::node::factory::NodeFactory;
+    use grida::node::scene_graph::{Parent, SceneGraph};
+    use grida::node::schema::Node;
 
     let html_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
 
     // 1. Extract image URLs from the HTML content
-    let urls = cg::htmlcss::collect_image_urls(&html_source).unwrap_or_default();
+    let urls = grida::htmlcss::collect_image_urls(&html_source).unwrap_or_default();
 
     // 2. Resolve and load images (local + remote)
     let base_dir = path.parent().unwrap_or(Path::new("."));
@@ -379,20 +379,21 @@ async fn scene_from_html_embed_path(path: &Path) -> Result<HtmlEmbedScene> {
     // 3. Measure content height with images available for intrinsic sizing
     let width = 800.0f32;
     let temp_fonts = {
-        use cg::resources::ByteStore;
-        use cg::runtime::font_repository::FontRepository;
+        use grida::resources::ByteStore;
+        use grida::runtime::font_repository::FontRepository;
         let mut repo =
             FontRepository::new(std::sync::Arc::new(std::sync::Mutex::new(ByteStore::new())));
         repo.enable_system_fallback();
         repo
     };
-    let height = cg::htmlcss::measure_content_height(&html_source, width, &temp_fonts, &preloaded)
-        .unwrap_or(600.0);
+    let height =
+        grida::htmlcss::measure_content_height(&html_source, width, &temp_fonts, &preloaded)
+            .unwrap_or(600.0);
 
     let nf = NodeFactory::new();
     let mut node = nf.create_html_embed_node();
     node.html = html_source;
-    node.size = cg::node::schema::Size { width, height };
+    node.size = grida::node::schema::Size { width, height };
 
     let mut graph = SceneGraph::new();
     graph.append_child(Node::HTMLEmbed(node), Parent::Root);
@@ -431,10 +432,10 @@ fn ask_html_import_mode() -> bool {
 }
 
 fn scene_from_markdown_embed_path(path: &Path) -> Result<Scene> {
-    use cg::cg::prelude::CGColor;
-    use cg::node::factory::NodeFactory;
-    use cg::node::scene_graph::{Parent, SceneGraph};
-    use cg::node::schema::Node;
+    use grida::cg::prelude::CGColor;
+    use grida::node::factory::NodeFactory;
+    use grida::node::scene_graph::{Parent, SceneGraph};
+    use grida::node::schema::Node;
 
     let md_source = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
@@ -469,12 +470,12 @@ struct RasterScene {
 }
 
 fn load_raster(path: &Path) -> Result<RasterScene> {
-    use cg::cg::prelude::CGColor;
-    use cg::cg::types::{Paints, ResourceRef};
-    use cg::node::factory::NodeFactory;
-    use cg::node::scene_graph::{Parent, SceneGraph};
-    use cg::node::schema::{Node, Size};
-    use cg::resources::hash_bytes;
+    use grida::cg::prelude::CGColor;
+    use grida::cg::types::{Paints, ResourceRef};
+    use grida::node::factory::NodeFactory;
+    use grida::node::scene_graph::{Parent, SceneGraph};
+    use grida::node::schema::{Node, Size};
+    use grida::resources::hash_bytes;
 
     let bytes = std::fs::read(path)
         .with_context(|| format!("failed to read image file {}", path.display()))?;

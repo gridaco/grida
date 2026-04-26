@@ -114,7 +114,7 @@ Tray is implemented as a first-class node type with visual rendering across all 
 - `TrayNode` table with SystemNodeTrait, LayerTrait, stroke_geometry, corner_radius, fill_paints, stroke_paints
 - `TrayNode` in the `Node` union
 
-**Rust** (`crates/grida-canvas/`):
+**Rust** (`crates/grida/`):
 
 - `NodeTypeTag::Tray`, `Node::Tray(TrayNodeRec)` in `node/schema.rs`
 - `TrayNodeRec` struct: active, opacity, blend_mode, mask, rotation, position, layout_dimensions, corner_radius, corner_smoothing, fills, strokes, stroke_style, stroke_width
