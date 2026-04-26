@@ -53,11 +53,11 @@ Grida Canvas is a **safe, high-performance 2D real-time rendering engine** for t
 
 ## I/O
 
-| Module                                        | Description                                                                                                                                            |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `io::io_grida_fbs`                            | Encode/decode `.grida` FlatBuffers binaries. Bindings are generated from `format/grida.fbs` via `flatc --rust` (see repo root and `format/README.md`). |
-| `io::io_grida_file`                           | Unified loader that auto-detects raw FlatBuffers vs ZIP-wrapped `.grida` files.                                                                        |
-| `io::io_svg`, `io::io_css`, `io::io_markdown` | Additional import/parsing helpers.                                                                                                                     |
+| Module                          | Description                                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `io::io_grida_fbs`              | Encode/decode `.grida` FlatBuffers binaries. Bindings are generated from `format/grida.fbs` via `flatc --rust` (see repo root and `format/README.md`). |
+| `io::io_grida_file`             | Unified loader that auto-detects raw FlatBuffers vs ZIP-wrapped `.grida` files.                                                                        |
+| `io::io_svg`, `io::io_markdown` | Additional import/parsing helpers.                                                                                                                     |
 
 ### Test fixtures
 
