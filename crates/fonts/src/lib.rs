@@ -14,6 +14,13 @@ pub mod selection_italic;
 #[cfg(feature = "serde")]
 pub mod serde;
 
+/// Grida Webfonts service client (https://fonts.grida.co).
+///
+/// Optional, gated behind the `webfonts` feature. Adds `reqwest` and
+/// `serde_json` deps; not pulled in by default consumers.
+#[cfg(feature = "webfonts")]
+pub mod webfonts;
+
 // Re-export core types and functionality
 pub use parse::{
     FontFeature, FvarAxis, FvarData, FvarInstance, Parser, StatAxis, StatAxisValue,

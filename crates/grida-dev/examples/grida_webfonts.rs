@@ -1,10 +1,10 @@
 use cg::cg::prelude::*;
-use cg::helpers::webfont_helper::{find_font_files_by_family, load_webfonts_metadata};
 use cg::node::factory::NodeFactory;
 use cg::node::scene_graph::{Parent, SceneGraph};
 use cg::node::schema::*;
 use cg::resources::{load_font, FontMessage};
 use cg::window::application::HostEvent;
+use fonts::webfonts::{find_font_files_by_family, load_webfonts_metadata};
 use futures::future::join_all;
 use grida_dev::platform::native_demo;
 use math2::transform::AffineTransform;

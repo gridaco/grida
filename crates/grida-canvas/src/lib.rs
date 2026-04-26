@@ -3,7 +3,6 @@ pub mod cache;
 pub mod cg;
 pub mod embedded_fonts;
 pub mod export;
-pub mod helpers;
 pub mod hittest;
 pub mod html;
 pub mod htmlcss;

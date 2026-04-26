@@ -13,6 +13,7 @@ cg = { path = "../grida-canvas", features = [
   "native-clock-tick",
   "native-gl-context",
 ] }
+fonts = { path = "../fonts", features = ["webfonts"] }
 math2 = { path = "../math2" }
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }

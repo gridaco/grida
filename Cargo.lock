@@ -1434,6 +1434,7 @@ name = "fonts"
 version = "0.2.0"
 dependencies = [
  "fixed",
+ "reqwest",
  "serde",
  "serde_json",
  "ttf-parser",
@@ -1782,6 +1783,7 @@ dependencies = [
  "cg",
  "clap",
  "dify",
+ "fonts",
  "futures",
  "gl",
  "glob",

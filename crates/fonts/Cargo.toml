@@ -25,12 +25,23 @@ optional = true
 version = "1.0"
 optional = true
 
+[dependencies.reqwest]
+version = "0.12"
+default-features = false
+features = ["rustls-tls"]
+optional = true
+
 [dev-dependencies]
 serde_json = "1.0"
 
 [features]
 default = []
 serde = ["dep:serde"]
+# Optional Grida Webfonts service client (https://fonts.grida.co).
+# Pulls in reqwest + serde_json. Native-only; on wasm32 the network calls
+# return errors but the module still compiles so downstream crates aren't
+# forced to feature-gate.
+webfonts = ["dep:reqwest", "dep:serde_json"]
 
 [lints]
 workspace = true
