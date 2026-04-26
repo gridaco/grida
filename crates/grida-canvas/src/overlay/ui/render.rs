@@ -1,13 +1,13 @@
 use crate::cache::scene::SceneCache;
 use crate::cg::types::Paint as CGPaint;
-use crate::devtools::surface_overlay::SurfaceOverlayConfig;
 use crate::node::scene_graph::SceneGraph;
 use crate::node::schema::{Node, NodeId};
+use crate::overlay::state::SurfaceState;
+use crate::overlay::ui::handles::{HandleHit, SelectionHandles};
+use crate::overlay::ui::hit_region::{HitRegion, HitRegions, OverlayAction};
+use crate::overlay::widgets::surface::SurfaceOverlayConfig;
 use crate::runtime::camera::Camera2D;
 use crate::runtime::font_repository::FontRepository;
-use crate::surface::state::SurfaceState;
-use crate::surface::ui::handles::{HandleHit, SelectionHandles};
-use crate::surface::ui::hit_region::{HitRegion, HitRegions, OverlayAction};
 use skia_safe::textlayout;
 use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, Point, RRect, Rect};
 

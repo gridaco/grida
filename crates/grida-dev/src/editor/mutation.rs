@@ -330,8 +330,8 @@ fn set_fill_solid(graph: &mut SceneGraph, id: &NodeId, color: CGColor) -> bool {
 // ── Resize geometry helpers (pure math) ──────────────────────────────────
 
 /// Which axes a resize direction affects: `(width, height)`.
-pub fn resize_affected_axes(direction: cg::surface::ResizeDirection) -> (bool, bool) {
-    use cg::surface::ResizeDirection;
+pub fn resize_affected_axes(direction: cg::overlay::ResizeDirection) -> (bool, bool) {
+    use cg::overlay::ResizeDirection;
     let w = matches!(
         direction,
         ResizeDirection::E
@@ -356,13 +356,13 @@ pub fn resize_affected_axes(direction: cg::surface::ResizeDirection) -> (bool, b
 /// Compute new size + origin shift from a drag delta and current bounds.
 /// Returns `(new_w, new_h, translate_x, translate_y)`.
 pub fn compute_resize_geometry(
-    direction: cg::surface::ResizeDirection,
+    direction: cg::overlay::ResizeDirection,
     dx: f32,
     dy: f32,
     old_w: f32,
     old_h: f32,
 ) -> (f32, f32, f32, f32) {
-    use cg::surface::ResizeDirection;
+    use cg::overlay::ResizeDirection;
     match direction {
         ResizeDirection::SE => (old_w + dx, old_h + dy, 0.0, 0.0),
         ResizeDirection::NW => (old_w - dx, old_h - dy, dx, dy),

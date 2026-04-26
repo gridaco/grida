@@ -1,5 +1,5 @@
 use crate::cache::scene::SceneCache;
-use crate::devtools::text_overlay;
+use crate::overlay::widgets::text;
 
 use crate::node::schema::NodeId;
 use crate::painter::layer::{Layer, PainterPictureLayer};
@@ -65,9 +65,7 @@ impl StrokeOverlay {
                             }
                             PainterPictureLayer::Text(text_layer) => {
                                 if let Some(text_path) =
-                                    text_overlay::TextOverlay::text_layer_baseline(
-                                        cache, text_layer, fonts,
-                                    )
+                                    text::TextOverlay::text_layer_baseline(cache, text_layer, fonts)
                                 {
                                     text_path
                                 } else {

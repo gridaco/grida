@@ -26,16 +26,16 @@ use winit::{
 };
 
 /// Map a cg `CursorIcon` to a winit `CursorIcon`.
-fn map_cursor_icon(icon: cg::surface::CursorIcon) -> winit::window::CursorIcon {
-    use cg::surface::ResizeDirection;
+fn map_cursor_icon(icon: cg::overlay::CursorIcon) -> winit::window::CursorIcon {
+    use cg::overlay::ResizeDirection;
     match icon {
-        cg::surface::CursorIcon::Default => winit::window::CursorIcon::Default,
-        cg::surface::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
-        cg::surface::CursorIcon::Grab => winit::window::CursorIcon::Grab,
-        cg::surface::CursorIcon::Grabbing => winit::window::CursorIcon::Grabbing,
-        cg::surface::CursorIcon::Crosshair => winit::window::CursorIcon::Crosshair,
-        cg::surface::CursorIcon::Move => winit::window::CursorIcon::Move,
-        cg::surface::CursorIcon::Resize(dir) => match dir {
+        cg::overlay::CursorIcon::Default => winit::window::CursorIcon::Default,
+        cg::overlay::CursorIcon::Pointer => winit::window::CursorIcon::Pointer,
+        cg::overlay::CursorIcon::Grab => winit::window::CursorIcon::Grab,
+        cg::overlay::CursorIcon::Grabbing => winit::window::CursorIcon::Grabbing,
+        cg::overlay::CursorIcon::Crosshair => winit::window::CursorIcon::Crosshair,
+        cg::overlay::CursorIcon::Move => winit::window::CursorIcon::Move,
+        cg::overlay::CursorIcon::Resize(dir) => match dir {
             ResizeDirection::N | ResizeDirection::S => winit::window::CursorIcon::NsResize,
             ResizeDirection::E | ResizeDirection::W => winit::window::CursorIcon::EwResize,
             ResizeDirection::NW | ResizeDirection::SE => winit::window::CursorIcon::NwseResize,
@@ -43,7 +43,7 @@ fn map_cursor_icon(icon: cg::surface::CursorIcon) -> winit::window::CursorIcon {
         },
         // Rotation uses a custom cursor in the web editor; for native dev
         // we fall back to a crosshair which is the closest standard cursor.
-        cg::surface::CursorIcon::Rotate(_) => winit::window::CursorIcon::Alias,
+        cg::overlay::CursorIcon::Rotate(_) => winit::window::CursorIcon::Alias,
     }
 }
 
@@ -51,7 +51,7 @@ fn map_cursor_icon(icon: cg::surface::CursorIcon) -> winit::window::CursorIcon {
 fn winit_key_to_surface_key_down(
     event: &KeyEvent,
     modifiers: &winit::keyboard::ModifiersState,
-) -> Option<cg::surface::SurfaceEvent> {
+) -> Option<cg::overlay::SurfaceEvent> {
     use cg::text_edit::session::KeyName;
 
     let key = match &event.logical_key {
@@ -99,7 +99,7 @@ fn winit_key_to_surface_key_down(
         _ => return None,
     };
 
-    let mods = cg::surface::Modifiers {
+    let mods = cg::overlay::Modifiers {
         shift: modifiers.shift_key(),
         alt: modifiers.alt_key(),
         ctrl_or_cmd: if cfg!(target_os = "macos") {
@@ -109,7 +109,7 @@ fn winit_key_to_surface_key_down(
         },
     };
 
-    Some(cg::surface::SurfaceEvent::KeyDown {
+    Some(cg::overlay::SurfaceEvent::KeyDown {
         key,
         modifiers: mods,
     })
@@ -316,8 +316,8 @@ impl NativeApplication {
         (app, el)
     }
 
-    fn build_modifiers(&self) -> cg::surface::Modifiers {
-        cg::surface::Modifiers {
+    fn build_modifiers(&self) -> cg::overlay::Modifiers {
+        cg::overlay::Modifiers {
             shift: self.modifiers.shift_key(),
             alt: self.modifiers.alt_key(),
             ctrl_or_cmd: if cfg!(target_os = "macos") {
@@ -430,7 +430,7 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 .screen_to_canvas_point([position.x as f32, position.y as f32]);
             let screen_point = [position.x as f32, position.y as f32];
 
-            let surface_event = cg::surface::SurfaceEvent::PointerMove {
+            let surface_event = cg::overlay::SurfaceEvent::PointerMove {
                 canvas_point,
                 screen_point,
             };
@@ -454,23 +454,23 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
             let was_editing = self.app.text_edit_is_active();
             let modifiers = self.build_modifiers();
             let pointer_button = match button {
-                MouseButton::Left => cg::surface::PointerButton::Primary,
-                MouseButton::Right => cg::surface::PointerButton::Secondary,
-                MouseButton::Middle => cg::surface::PointerButton::Middle,
-                _ => cg::surface::PointerButton::Primary,
+                MouseButton::Left => cg::overlay::PointerButton::Primary,
+                MouseButton::Right => cg::overlay::PointerButton::Secondary,
+                MouseButton::Middle => cg::overlay::PointerButton::Middle,
+                _ => cg::overlay::PointerButton::Primary,
             };
             let [sx, sy] = self.app.input_cursor();
             let canvas_point = self.app.renderer().camera.screen_to_canvas_point([sx, sy]);
             let screen_point = [sx, sy];
 
             let surface_event = match state {
-                ElementState::Pressed => cg::surface::SurfaceEvent::PointerDown {
+                ElementState::Pressed => cg::overlay::SurfaceEvent::PointerDown {
                     canvas_point,
                     screen_point,
                     button: pointer_button,
                     modifiers,
                 },
-                ElementState::Released => cg::surface::SurfaceEvent::PointerUp {
+                ElementState::Released => cg::overlay::SurfaceEvent::PointerUp {
                     canvas_point,
                     screen_point,
                     button: pointer_button,
@@ -497,8 +497,8 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                 use winit::event::Ime;
                 match ime {
                     Ime::Preedit(text, _cursor_range) => {
-                        let surface_event = cg::surface::SurfaceEvent::Ime(
-                            cg::surface::ImeEvent::Preedit(text.clone()),
+                        let surface_event = cg::overlay::SurfaceEvent::Ime(
+                            cg::overlay::ImeEvent::Preedit(text.clone()),
                         );
                         let response = self.app.handle_surface_event(surface_event);
                         if response.needs_redraw {
@@ -506,8 +506,8 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                         }
                     }
                     Ime::Commit(text) => {
-                        let surface_event = cg::surface::SurfaceEvent::Ime(
-                            cg::surface::ImeEvent::Commit(text.clone()),
+                        let surface_event = cg::overlay::SurfaceEvent::Ime(
+                            cg::overlay::ImeEvent::Commit(text.clone()),
                         );
                         let response = self.app.handle_surface_event(surface_event);
                         if response.needs_redraw {
@@ -571,7 +571,7 @@ impl NativeApplicationHandler<HostEvent> for NativeApplication {
                             // Filter out control characters (Enter, Tab, etc.
                             // are already handled as KeyDown actions).
                             if !s.is_empty() && s.chars().all(|c| !c.is_control()) {
-                                let surface_event = cg::surface::SurfaceEvent::TextInput {
+                                let surface_event = cg::overlay::SurfaceEvent::TextInput {
                                     text: s.to_string(),
                                 };
                                 let response = self.app.handle_surface_event(surface_event);

@@ -303,7 +303,7 @@ impl ApplicationApi for EmscriptenApplication {
     fn highlight_strokes(
         &mut self,
         ids: Vec<String>,
-        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+        style: Option<crate::overlay::widgets::stroke::StrokeOverlayStyle>,
     ) {
         self.base.highlight_strokes(ids, style);
     }

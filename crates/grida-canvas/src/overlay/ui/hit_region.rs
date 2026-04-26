@@ -1,5 +1,5 @@
 use crate::node::schema::NodeId;
-use crate::surface::cursor::{ResizeDirection, RotationCorner};
+use crate::overlay::cursor::{ResizeDirection, RotationCorner};
 use skia_safe::{Contains, Rect};
 
 /// Action to perform when an overlay hit region is activated.

@@ -6,6 +6,7 @@ pub mod response;
 pub mod selection;
 pub mod state;
 pub mod ui;
+pub mod widgets;
 
 pub use cursor::{CursorIcon, ResizeDirection, RotationCorner};
 pub use event::{ImeEvent, Modifiers, PointerButton, SurfaceEvent};

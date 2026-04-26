@@ -1,13 +1,13 @@
 use crate::hittest::HitTester;
 use crate::node::schema::NodeId;
+use crate::overlay::cursor::CursorIcon;
+use crate::overlay::event::{Modifiers, PointerButton, SurfaceEvent};
+use crate::overlay::gesture::SurfaceGesture;
+use crate::overlay::hover::{HoverSource, HoverState};
+use crate::overlay::response::SurfaceResponse;
+use crate::overlay::selection::SelectionState;
+use crate::overlay::ui::hit_region::{HitRegions, OverlayAction};
 use crate::query::{self, Hierarchy};
-use crate::surface::cursor::CursorIcon;
-use crate::surface::event::{Modifiers, PointerButton, SurfaceEvent};
-use crate::surface::gesture::SurfaceGesture;
-use crate::surface::hover::{HoverSource, HoverState};
-use crate::surface::response::SurfaceResponse;
-use crate::surface::selection::SelectionState;
-use crate::surface::ui::hit_region::{HitRegions, OverlayAction};
 use crate::text_edit::session::ClickTracker;
 use math2::vector2::Vector2;
 

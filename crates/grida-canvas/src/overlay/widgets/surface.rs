@@ -1,11 +1,11 @@
 use crate::cache::scene::SceneCache;
-use crate::devtools::text_overlay;
+use crate::overlay::gesture::SurfaceGesture;
+use crate::overlay::state::SurfaceState;
+use crate::overlay::widgets::text;
 use crate::painter::layer::{Layer, PainterPictureLayer};
 use crate::runtime::camera::Camera2D;
 use crate::runtime::font_repository::FontRepository;
 use crate::sk;
-use crate::surface::gesture::SurfaceGesture;
-use crate::surface::state::SurfaceState;
 use skia_safe::{Canvas, Color, Matrix, Paint, PaintStyle, PathBuilder, PathEffect};
 
 /// Selection overlay color (blue).
@@ -169,7 +169,7 @@ impl SurfaceOverlay {
         } else if use_text_baseline {
             match &layer_entry.layer {
                 PainterPictureLayer::Text(text_layer) => {
-                    match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer, fonts) {
+                    match text::TextOverlay::text_layer_baseline(cache, text_layer, fonts) {
                         Some(text_path) => text_path,
                         None => return,
                     }
@@ -248,11 +248,10 @@ impl SurfaceOverlay {
             _ => return,
         };
 
-        let baseline_path =
-            match text_overlay::TextOverlay::text_layer_baseline(cache, text_layer, fonts) {
-                Some(p) => p,
-                None => return,
-            };
+        let baseline_path = match text::TextOverlay::text_layer_baseline(cache, text_layer, fonts) {
+            Some(p) => p,
+            None => return,
+        };
 
         let transform = layer_entry.layer.transform();
         let mut path = baseline_path;

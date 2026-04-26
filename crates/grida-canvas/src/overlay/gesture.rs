@@ -1,4 +1,4 @@
-use crate::surface::cursor::{ResizeDirection, RotationCorner};
+use crate::overlay::cursor::{ResizeDirection, RotationCorner};
 use math2::vector2::Vector2;
 
 /// Active gesture on the surface.

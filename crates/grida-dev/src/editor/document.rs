@@ -10,8 +10,8 @@
 //! rebuilds all caches from scratch.
 
 use cg::node::schema::{Node, NodeId, Scene};
+use cg::overlay::gesture::SurfaceGesture;
 use cg::runtime::invalidation::ChangeKind;
-use cg::surface::gesture::SurfaceGesture;
 use cg::window::application::UnknownTargetApplication;
 
 use super::mutation::{
@@ -140,7 +140,7 @@ impl EditorDocument {
     fn handle_incremental_resize(
         &mut self,
         app: &mut UnknownTargetApplication,
-        direction: cg::surface::ResizeDirection,
+        direction: cg::overlay::ResizeDirection,
         old_screen: [f32; 2],
         new_screen: [f32; 2],
     ) -> bool {

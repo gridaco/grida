@@ -322,7 +322,7 @@ pub(crate) unsafe extern "C" fn pointer_move(app: *mut UnknownTargetApplication,
 /// bit 1 = cursor_changed
 /// bit 2 = selection_changed
 /// bit 3 = hover_changed
-fn pack_surface_response(r: &cg::surface::SurfaceResponse) -> u32 {
+fn pack_surface_response(r: &cg::overlay::SurfaceResponse) -> u32 {
     (r.needs_redraw as u32)
         | ((r.cursor_changed as u32) << 1)
         | ((r.selection_changed as u32) << 2)
@@ -332,8 +332,8 @@ fn pack_surface_response(r: &cg::surface::SurfaceResponse) -> u32 {
 /// Decode a modifiers bitmask from JS.
 ///
 /// bit 0 = shift, bit 1 = alt, bit 2 = ctrl_or_cmd
-fn decode_modifiers(bits: u32) -> cg::surface::Modifiers {
-    cg::surface::Modifiers {
+fn decode_modifiers(bits: u32) -> cg::overlay::Modifiers {
+    cg::overlay::Modifiers {
         shift: bits & 1 != 0,
         alt: bits & 2 != 0,
         ctrl_or_cmd: bits & 4 != 0,
@@ -343,11 +343,11 @@ fn decode_modifiers(bits: u32) -> cg::surface::Modifiers {
 /// Decode a pointer button from JS.
 ///
 /// 0 = Primary, 1 = Secondary, 2 = Middle
-fn decode_button(id: u32) -> cg::surface::PointerButton {
+fn decode_button(id: u32) -> cg::overlay::PointerButton {
     match id {
-        1 => cg::surface::PointerButton::Secondary,
-        2 => cg::surface::PointerButton::Middle,
-        _ => cg::surface::PointerButton::Primary,
+        1 => cg::overlay::PointerButton::Secondary,
+        2 => cg::overlay::PointerButton::Middle,
+        _ => cg::overlay::PointerButton::Primary,
     }
 }
 
@@ -423,15 +423,15 @@ pub(crate) unsafe extern "C" fn surface_pointer_up(
 pub(crate) unsafe extern "C" fn surface_get_cursor(app: *const UnknownTargetApplication) -> u32 {
     match app.as_ref() {
         Some(app) => match app.surface_cursor() {
-            cg::surface::CursorIcon::Default => 0,
-            cg::surface::CursorIcon::Pointer => 1,
-            cg::surface::CursorIcon::Grab => 2,
-            cg::surface::CursorIcon::Grabbing => 3,
-            cg::surface::CursorIcon::Crosshair => 4,
-            cg::surface::CursorIcon::Move => 5,
+            cg::overlay::CursorIcon::Default => 0,
+            cg::overlay::CursorIcon::Pointer => 1,
+            cg::overlay::CursorIcon::Grab => 2,
+            cg::overlay::CursorIcon::Grabbing => 3,
+            cg::overlay::CursorIcon::Crosshair => 4,
+            cg::overlay::CursorIcon::Move => 5,
             // Resize/Rotate cursors are handled by the native editor surface.
             // The web editor manages its own CSS cursors — map to default.
-            cg::surface::CursorIcon::Resize(_) | cg::surface::CursorIcon::Rotate(_) => 0,
+            cg::overlay::CursorIcon::Resize(_) | cg::overlay::CursorIcon::Rotate(_) => 0,
         },
         None => 0,
     }
@@ -614,7 +614,7 @@ pub(crate) unsafe extern "C" fn set_surface_overlay_config(
     }
 
     if let Ok(cfg) = serde_json::from_slice::<Config>(slice) {
-        app.surface_overlay_config = cg::devtools::surface_overlay::SurfaceOverlayConfig {
+        app.surface_overlay_config = cg::overlay::widgets::surface::SurfaceOverlayConfig {
             dpr: cfg.dpr,
             text_baseline_decoration: cfg.text_baseline_decoration,
             show_size_meter: cfg.show_size_meter,
@@ -1352,7 +1352,7 @@ pub(crate) unsafe extern "C" fn highlight_strokes(
         if let Some(json) = __str_from_ptr_len(ptr, len) {
             if let Ok(args) = serde_json::from_str::<JsArgs>(&json) {
                 let style = args.style.map(|s| {
-                    let mut st = cg::devtools::stroke_overlay::StrokeOverlayStyle::default();
+                    let mut st = cg::overlay::widgets::stroke::StrokeOverlayStyle::default();
                     if let Some(w) = s.stroke_width {
                         st.stroke_width = w;
                     }

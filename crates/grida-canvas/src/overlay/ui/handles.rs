@@ -13,7 +13,7 @@
 //! reports *which* handle was hit and what cursor to show. The host (or a
 //! future gesture layer) decides what to do with that information.
 
-use crate::surface::cursor::{ResizeDirection, RotationCorner};
+use crate::overlay::cursor::{ResizeDirection, RotationCorner};
 use skia_safe::{Canvas, Color, Contains, Paint, PaintStyle, Point, Rect};
 
 // ── Layout constants (logical pixels, scaled by `dpr` at draw time) ──────────

@@ -11,13 +11,13 @@ use cg::node::{
     scene_graph::{Parent, SceneGraph},
     schema::*,
 };
+use cg::overlay::event::{Modifiers, PointerButton, SurfaceEvent};
+use cg::overlay::gesture::SurfaceGesture;
+use cg::overlay::state::SurfaceState;
+use cg::overlay::ui::hit_region::HitRegions;
+use cg::overlay::CursorIcon;
 use cg::resources::ByteStore;
 use cg::runtime::font_repository::FontRepository;
-use cg::surface::event::{Modifiers, PointerButton, SurfaceEvent};
-use cg::surface::gesture::SurfaceGesture;
-use cg::surface::state::SurfaceState;
-use cg::surface::ui::hit_region::HitRegions;
-use cg::surface::CursorIcon;
 use math2::transform::AffineTransform;
 use std::sync::{Arc, Mutex};
 

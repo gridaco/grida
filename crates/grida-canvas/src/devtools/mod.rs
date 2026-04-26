@@ -1,7 +1,0 @@
-pub mod fps_overlay;
-pub mod ruler_overlay;
-pub mod stats_overlay;
-pub mod stroke_overlay;
-pub mod surface_overlay;
-pub mod text_edit_decoration_overlay;
-pub mod text_overlay;

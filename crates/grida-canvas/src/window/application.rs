@@ -1,11 +1,11 @@
 use crate::cg::color::CGColor;
 use crate::cg::types::{Paint, TextAlignVertical};
-use crate::devtools::{fps_overlay, ruler_overlay, stats_overlay, stroke_overlay, surface_overlay};
 use crate::export::{
     export_node_as, export_pdf_document, ExportAs, ExportPdfDocumentOptions, Exported,
 };
 use crate::io::vn_json::JSONFlattenResult;
 use crate::node::schema::*;
+use crate::overlay::widgets::{fps, ruler, stats, stroke, surface};
 use crate::query::Hierarchy;
 use crate::resources::{FontMessage, ImageMessage};
 use crate::runtime::camera::Camera2D;
@@ -155,7 +155,7 @@ pub trait ApplicationApi {
     fn highlight_strokes(
         &mut self,
         ids: Vec<String>,
-        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+        style: Option<crate::overlay::widgets::stroke::StrokeOverlayStyle>,
     );
 
     /// Load a scene from `.grida` FlatBuffers binary bytes.
@@ -258,7 +258,7 @@ pub struct UnknownTargetApplication {
     pub(crate) last_stats: Option<String>,
 
     pub(crate) highlight_strokes: Vec<crate::node::schema::NodeId>,
-    pub(crate) highlight_stroke_style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+    pub(crate) highlight_stroke_style: Option<crate::overlay::widgets::stroke::StrokeOverlayStyle>,
     pub(crate) devtools_rendering_show_fps: bool,
     pub(crate) devtools_rendering_show_tiles: bool,
     pub(crate) devtools_rendering_show_stats: bool,
@@ -291,16 +291,16 @@ pub struct UnknownTargetApplication {
     /// Text editing decorations (caret + selection) for the overlay pass.
     /// `None` when no text editing session is active.
     text_edit_decorations:
-        Option<crate::devtools::text_edit_decoration_overlay::TextEditingDecorations>,
+        Option<crate::overlay::widgets::text_edit_decoration::TextEditingDecorations>,
 
     /// Canvas surface interaction state (hover, selection, gesture, cursor).
-    pub(crate) surface: crate::surface::SurfaceState,
+    pub(crate) surface: crate::overlay::SurfaceState,
 
     /// Surface overlay rendering configuration.
-    pub surface_overlay_config: crate::devtools::surface_overlay::SurfaceOverlayConfig,
+    pub surface_overlay_config: crate::overlay::widgets::surface::SurfaceOverlayConfig,
 
     /// Overlay UI hit regions, rebuilt each frame during drawing.
-    pub(crate) ui_hit_regions: crate::surface::ui::HitRegions,
+    pub(crate) ui_hit_regions: crate::overlay::ui::HitRegions,
 }
 
 impl ApplicationApi for UnknownTargetApplication {
@@ -787,7 +787,7 @@ impl ApplicationApi for UnknownTargetApplication {
     fn highlight_strokes(
         &mut self,
         ids: Vec<String>,
-        style: Option<crate::devtools::stroke_overlay::StrokeOverlayStyle>,
+        style: Option<crate::overlay::widgets::stroke::StrokeOverlayStyle>,
     ) {
         // Convert user string IDs to internal u64 IDs
         self.highlight_strokes = ids
@@ -1078,8 +1078,8 @@ impl UnknownTargetApplication {
     /// camera transform and hit-tester construction internally.
     pub fn surface_dispatch(
         &mut self,
-        event: crate::surface::SurfaceEvent,
-    ) -> crate::surface::SurfaceResponse {
+        event: crate::overlay::SurfaceEvent,
+    ) -> crate::overlay::SurfaceResponse {
         let iso_set = self.renderer.isolation_set();
         let (_hit_tester, response) = if let Some(scene) = self.renderer.scene.as_ref() {
             let ht = crate::hittest::HitTester::with_graph(self.renderer.get_cache(), &scene.graph)
@@ -1178,15 +1178,15 @@ impl UnknownTargetApplication {
     }
 
     /// Read-only access to the surface state.
-    pub fn surface(&self) -> &crate::surface::SurfaceState {
+    pub fn surface(&self) -> &crate::overlay::SurfaceState {
         &self.surface
     }
 
     /// Mutable access to the surface state.
     ///
     /// Used by the host to configure flags like
-    /// [`readonly`](crate::surface::SurfaceState::readonly) at startup.
-    pub fn surface_mut(&mut self) -> &mut crate::surface::SurfaceState {
+    /// [`readonly`](crate::overlay::SurfaceState::readonly) at startup.
+    pub fn surface_mut(&mut self) -> &mut crate::overlay::SurfaceState {
         &mut self.surface
     }
 
@@ -1202,13 +1202,13 @@ impl UnknownTargetApplication {
         &mut self,
         screen_x: f32,
         screen_y: f32,
-    ) -> crate::surface::SurfaceResponse {
+    ) -> crate::overlay::SurfaceResponse {
         self.set_cursor_position([screen_x, screen_y]);
         let canvas_point = self
             .renderer
             .camera
             .screen_to_canvas_point([screen_x, screen_y]);
-        let event = crate::surface::SurfaceEvent::PointerMove {
+        let event = crate::overlay::SurfaceEvent::PointerMove {
             canvas_point,
             screen_point: [screen_x, screen_y],
         };
@@ -1220,12 +1220,12 @@ impl UnknownTargetApplication {
         &mut self,
         screen_x: f32,
         screen_y: f32,
-        button: crate::surface::PointerButton,
-        modifiers: crate::surface::Modifiers,
-    ) -> crate::surface::SurfaceResponse {
+        button: crate::overlay::PointerButton,
+        modifiers: crate::overlay::Modifiers,
+    ) -> crate::overlay::SurfaceResponse {
         let screen_point = [screen_x, screen_y];
         let canvas_point = self.renderer.camera.screen_to_canvas_point(screen_point);
-        let event = crate::surface::SurfaceEvent::PointerDown {
+        let event = crate::overlay::SurfaceEvent::PointerDown {
             canvas_point,
             screen_point,
             button,
@@ -1239,12 +1239,12 @@ impl UnknownTargetApplication {
         &mut self,
         screen_x: f32,
         screen_y: f32,
-        button: crate::surface::PointerButton,
-        modifiers: crate::surface::Modifiers,
-    ) -> crate::surface::SurfaceResponse {
+        button: crate::overlay::PointerButton,
+        modifiers: crate::overlay::Modifiers,
+    ) -> crate::overlay::SurfaceResponse {
         let screen_point = [screen_x, screen_y];
         let canvas_point = self.renderer.camera.screen_to_canvas_point(screen_point);
-        let event = crate::surface::SurfaceEvent::PointerUp {
+        let event = crate::overlay::SurfaceEvent::PointerUp {
             canvas_point,
             screen_point,
             button,
@@ -1266,7 +1266,7 @@ impl UnknownTargetApplication {
     }
 
     /// Current cursor icon.
-    pub fn surface_cursor(&self) -> crate::surface::CursorIcon {
+    pub fn surface_cursor(&self) -> crate::overlay::CursorIcon {
         self.surface.cursor
     }
 
@@ -1356,10 +1356,10 @@ impl UnknownTargetApplication {
             auto_tick: false,
             text_edit: None,
             text_edit_decorations: None,
-            surface: crate::surface::SurfaceState::new(),
-            surface_overlay_config: crate::devtools::surface_overlay::SurfaceOverlayConfig::default(
+            surface: crate::overlay::SurfaceState::new(),
+            surface_overlay_config: crate::overlay::widgets::surface::SurfaceOverlayConfig::default(
             ),
-            ui_hit_regions: crate::surface::ui::HitRegions::new(),
+            ui_hit_regions: crate::overlay::ui::HitRegions::new(),
         }
     }
 
@@ -1821,16 +1821,16 @@ impl UnknownTargetApplication {
             let surface = self.state.surface_mut();
             let canvas = surface.canvas();
             if self.devtools_rendering_show_fps {
-                fps_overlay::FpsMeter::draw(canvas, self.clock.hz() as f32);
+                fps::FpsMeter::draw(canvas, self.clock.hz() as f32);
             }
             if self.devtools_rendering_show_stats {
                 if let Some(s) = self.last_stats.as_deref() {
-                    stats_overlay::StatsOverlay::draw(canvas, s, &self.clock);
+                    stats::StatsOverlay::draw(canvas, s, &self.clock);
                 }
             }
 
             if !self.highlight_strokes.is_empty() {
-                stroke_overlay::StrokeOverlay::draw(
+                stroke::StrokeOverlay::draw(
                     canvas,
                     &self.highlight_strokes,
                     &self.renderer.camera,
@@ -1843,7 +1843,7 @@ impl UnknownTargetApplication {
             // an overlay — unclipped by parent containers and with a
             // zoom-independent caret width.
             if let Some(ref deco) = self.text_edit_decorations {
-                crate::devtools::text_edit_decoration_overlay::TextEditDecorationOverlay::draw(
+                crate::overlay::widgets::text_edit_decoration::TextEditDecorationOverlay::draw(
                     canvas,
                     deco,
                     &self.renderer.camera,
@@ -1851,7 +1851,7 @@ impl UnknownTargetApplication {
                 );
             }
             // Surface interaction overlays (hover, selection, marquee)
-            surface_overlay::SurfaceOverlay::draw(
+            surface::SurfaceOverlay::draw(
                 canvas,
                 &self.surface,
                 &self.renderer.camera,
@@ -1860,7 +1860,7 @@ impl UnknownTargetApplication {
                 &self.renderer.fonts,
             );
             // Surface UI elements (size meter, frame titles, hit regions)
-            crate::surface::ui::SurfaceUI::draw(
+            crate::overlay::ui::SurfaceUI::draw(
                 canvas,
                 &self.surface,
                 &self.renderer.camera,
@@ -1871,7 +1871,7 @@ impl UnknownTargetApplication {
                 &self.renderer.fonts,
             );
             if self.devtools_rendering_show_ruler {
-                ruler_overlay::Ruler::draw(canvas, &self.renderer.camera);
+                ruler::Ruler::draw(canvas, &self.renderer.camera);
             }
             if let Some(mut ctx) = surface.recording_context() {
                 if let Some(mut direct) = ctx.as_direct_context() {
@@ -2356,9 +2356,9 @@ impl UnknownTargetApplication {
     /// other flags (cursor, selection) for platform-specific actions.
     pub fn handle_surface_event(
         &mut self,
-        event: crate::surface::SurfaceEvent,
-    ) -> crate::surface::SurfaceResponse {
-        use crate::surface::SurfaceEvent;
+        event: crate::overlay::SurfaceEvent,
+    ) -> crate::overlay::SurfaceResponse {
+        use crate::overlay::SurfaceEvent;
 
         match &event {
             // --- Pointer events ---
@@ -2385,7 +2385,7 @@ impl UnknownTargetApplication {
             SurfaceEvent::PointerUp { .. } => {
                 if self.text_edit.is_some() {
                     self.text_edit_pointer_up();
-                    crate::surface::SurfaceResponse::redraw()
+                    crate::overlay::SurfaceResponse::redraw()
                 } else {
                     self.surface_dispatch(event)
                 }
@@ -2430,11 +2430,11 @@ impl UnknownTargetApplication {
     fn handle_key_down(
         &mut self,
         key: &crate::text_edit::session::KeyName,
-        modifiers: &crate::surface::Modifiers,
-    ) -> crate::surface::SurfaceResponse {
+        modifiers: &crate::overlay::Modifiers,
+    ) -> crate::overlay::SurfaceResponse {
         use crate::text_edit::session::{KeyAction, KeyName};
 
-        let mut response = crate::surface::SurfaceResponse::none();
+        let mut response = crate::overlay::SurfaceResponse::none();
 
         if self.text_edit.is_some() {
             // Escape → exit edit mode (commit changes).
@@ -2503,34 +2503,34 @@ impl UnknownTargetApplication {
     }
 
     /// Handle committed text input (post-IME, post-dead-key).
-    fn handle_text_input(&mut self, text: &str) -> crate::surface::SurfaceResponse {
+    fn handle_text_input(&mut self, text: &str) -> crate::overlay::SurfaceResponse {
         if let Some(te) = self.text_edit.as_mut() {
             te.session
                 .apply(crate::text_edit::EditingCommand::Insert(text.to_owned()));
             self.text_edit_refresh_decorations();
-            crate::surface::SurfaceResponse {
+            crate::overlay::SurfaceResponse {
                 needs_redraw: true,
                 ..Default::default()
             }
         } else {
-            crate::surface::SurfaceResponse::none()
+            crate::overlay::SurfaceResponse::none()
         }
     }
 
     /// Handle an IME composition event.
-    fn handle_ime(&mut self, ime: &crate::surface::ImeEvent) -> crate::surface::SurfaceResponse {
+    fn handle_ime(&mut self, ime: &crate::overlay::ImeEvent) -> crate::overlay::SurfaceResponse {
         match ime {
-            crate::surface::ImeEvent::Preedit(text) => {
+            crate::overlay::ImeEvent::Preedit(text) => {
                 self.text_edit_ime_set_preedit(text.clone());
             }
-            crate::surface::ImeEvent::Commit(text) => {
+            crate::overlay::ImeEvent::Commit(text) => {
                 self.text_edit_ime_commit(text);
             }
-            crate::surface::ImeEvent::Cancel => {
+            crate::overlay::ImeEvent::Cancel => {
                 self.text_edit_ime_cancel();
             }
         }
-        crate::surface::SurfaceResponse {
+        crate::overlay::SurfaceResponse {
             needs_redraw: self.text_edit.is_some(),
             ..Default::default()
         }
@@ -2543,15 +2543,15 @@ impl UnknownTargetApplication {
     /// (committing changes) and process the click normally.
     fn handle_pointer_down_during_edit(
         &mut self,
-        event: crate::surface::SurfaceEvent,
-    ) -> crate::surface::SurfaceResponse {
+        event: crate::overlay::SurfaceEvent,
+    ) -> crate::overlay::SurfaceResponse {
         let (canvas_point, modifiers) = match &event {
-            crate::surface::SurfaceEvent::PointerDown {
+            crate::overlay::SurfaceEvent::PointerDown {
                 canvas_point,
                 modifiers,
                 ..
             } => (*canvas_point, *modifiers),
-            _ => return crate::surface::SurfaceResponse::none(),
+            _ => return crate::overlay::SurfaceResponse::none(),
         };
 
         let node_id = match self.text_edit.as_ref() {
@@ -2564,7 +2564,7 @@ impl UnknownTargetApplication {
         if let Some(local) = self.canvas_to_text_local(canvas_point, node_id) {
             let click_count = self.surface.click_tracker.register(local[0], local[1]);
             self.text_edit_pointer_down(local[0], local[1], modifiers.shift, click_count);
-            crate::surface::SurfaceResponse {
+            crate::overlay::SurfaceResponse {
                 needs_redraw: true,
                 ..Default::default()
             }
@@ -2579,10 +2579,10 @@ impl UnknownTargetApplication {
     fn handle_pointer_move_during_edit(
         &mut self,
         canvas_point: math2::vector2::Vector2,
-    ) -> crate::surface::SurfaceResponse {
+    ) -> crate::overlay::SurfaceResponse {
         let node_id = match self.text_edit.as_ref() {
             Some(te) => te.node_id(),
-            None => return crate::surface::SurfaceResponse::none(),
+            None => return crate::overlay::SurfaceResponse::none(),
         };
 
         if let Some(local) = self.canvas_to_text_local(canvas_point, node_id) {
@@ -2593,14 +2593,14 @@ impl UnknownTargetApplication {
             // text content. This avoids clearing the pan_image_cache on every
             // mouse move which causes flickering.
             self.text_edit_refresh_decorations_overlay_only();
-            return crate::surface::SurfaceResponse {
+            return crate::overlay::SurfaceResponse {
                 needs_redraw: true,
                 ..Default::default()
             };
         }
 
         // Mouse is outside the text node — no text edit update needed.
-        crate::surface::SurfaceResponse::none()
+        crate::overlay::SurfaceResponse::none()
     }
 
     /// Convert a canvas-space point to layout-local coordinates for the
@@ -2739,7 +2739,7 @@ impl UnknownTargetApplication {
     /// geometry changed — this avoids clearing the pan cache and causing
     /// flicker.
     fn text_edit_refresh_decorations_inner(&mut self, sync_content: bool) {
-        use crate::devtools::text_edit_decoration_overlay::{
+        use crate::overlay::widgets::text_edit_decoration::{
             CaretDecoration, TextEditingDecorations,
         };
 
