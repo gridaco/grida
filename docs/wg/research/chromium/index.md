@@ -37,6 +37,7 @@ material when designing rendering systems that face similar problems.
 | [effect-optimizations.md](./effect-optimizations.md)                                   | Effect optimization: filter demotion, render pass bypass, damage tracking                           |
 | [node-data-layout.md](./node-data-layout.md)                                           | Node data layout: DOM RareData, compositor property trees, ECS comparison                           |
 | [svg-pattern.md](./svg-pattern.md)                                                     | SVG `<pattern>` paint server semantics, Chromium/resvg/Skia comparison                              |
+| [svg/index.md](./svg/index.md)                                                         | **SVG rendering subdirectory** — full pipeline, coordinate systems, paint servers, effects, text    |
 | [blink-rendering-pipeline.md](./blink-rendering-pipeline.md)                           | Blink Style → Layout → Paint pipeline, ComputedStyle groups, LayoutNG, inline layout, list markers  |
 | [external-resource-loading.md](./external-resource-loading.md)                         | Resource fetch lifecycle, ImageResource observer pattern, CSS background-image/img loading pipeline |
 | [dirty-flag-management.md](./dirty-flag-management.md)                                 | Dirty-flag families across Blink + cc, categorized by type and by invalidation shape/granularity    |

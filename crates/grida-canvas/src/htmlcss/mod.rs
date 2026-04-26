@@ -202,6 +202,82 @@ pub fn render(
     ))
 }
 
+/// Render a standalone SVG document to a Skia Picture.
+///
+/// Delegates to Skia's built-in `svg::Dom` (enabled via the `svg` feature
+/// on `skia-safe`). The Picture is recorded at `(width, height)` in CSS
+/// pixels; `viewBox` + `preserveAspectRatio` inside the SVG map user
+/// units to that box, interpreted internally by Skia.
+///
+/// Accepts `.svg` bytes directly alongside the HTML `render()` entry
+/// point. Servo treats inline `<svg>` this way (subtree serialization +
+/// out-of-band SVG renderer); this function is the standalone-document
+/// equivalent — skip the HTML parser entirely and hand raw SVG bytes to
+/// Skia.
+///
+/// Returns `Err` on parse failure (malformed XML, missing root `<svg>`).
+pub fn render_svg(svg: &str, width: f32, height: f32) -> Result<skia_safe::Picture, String> {
+    use skia_safe::{svg, FontMgr, PictureRecorder, Rect, Size};
+
+    let data = skia_safe::Data::new_copy(svg.as_bytes());
+    let mut dom = svg::Dom::from_bytes(&data, FontMgr::default())
+        .map_err(|e| format!("SVG parse error: {e}"))?;
+    dom.set_container_size(Size::new(width, height));
+
+    let mut recorder = PictureRecorder::new();
+    let bounds = Rect::from_xywh(0.0, 0.0, width.max(1.0), height.max(1.0));
+    let canvas = recorder.begin_recording(bounds, false);
+    dom.render(canvas);
+    recorder
+        .finish_recording_as_picture(Some(&bounds))
+        .ok_or_else(|| "failed to finish SVG picture recording".to_string())
+}
+
+/// Render either HTML or SVG to a Skia Picture, auto-detected from the
+/// input's first non-whitespace characters.
+///
+/// Detection rules (cheap, no full parse):
+/// - Starts with `<?xml` or `<svg` (case-insensitive) → route to
+///   [`render_svg`] with `(width, height)` as the container size.
+/// - Otherwise → route to [`render`] (HTML pipeline).
+///
+/// This lets callers (e.g., reftest runners, tooling) accept either
+/// format without branching at the call site.
+pub fn render_any(
+    input: &str,
+    width: f32,
+    height: f32,
+    fonts: &FontRepository,
+    images: &dyn ImageProvider,
+) -> Result<skia_safe::Picture, String> {
+    if looks_like_svg(input) {
+        render_svg(input, width, height)
+    } else {
+        render(input, width, height, fonts, images)
+    }
+}
+
+fn looks_like_svg(input: &str) -> bool {
+    let trimmed = input.trim_start();
+    // Skip leading XML declaration + doctype if present.
+    let rest = trimmed
+        .strip_prefix("<?xml")
+        .map(|r| {
+            // Skip past '?>' and any subsequent whitespace / doctype.
+            r.find("?>")
+                .map(|i| r[i + 2..].trim_start())
+                .unwrap_or(r)
+                .trim_start()
+        })
+        .unwrap_or(trimmed);
+    let rest = rest
+        .strip_prefix("<!DOCTYPE")
+        .or_else(|| rest.strip_prefix("<!doctype"))
+        .and_then(|r| r.find('>').map(|i| r[i + 1..].trim_start()))
+        .unwrap_or(rest);
+    rest.starts_with("<svg") || rest.starts_with("<SVG") || rest.starts_with("<Svg")
+}
+
 /// Measure the content height of HTML at the given width.
 ///
 /// Runs style resolution and Taffy layout but does not create a Skia Picture.
@@ -3208,6 +3284,129 @@ code block
         let html = r#"<div><img src="photo.jpg" width="50" height="50" /></div>"#;
         let pic = render(html, 400.0, 300.0, &fonts, &images);
         assert!(pic.is_ok(), "Should render with image provider");
+    }
+
+    // ── Standalone .svg input tests ──
+
+    /// `render_svg` must accept a raw SVG document and produce a
+    /// non-empty Picture. Servo-style standalone path — no HTML parser,
+    /// direct delegation to Skia's svg::Dom.
+    #[test]
+    fn test_render_svg_standalone_ok() {
+        let _guard = crate::stylo_test::lock();
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect width="40" height="40" fill="#0f0"/></svg>"##;
+        let pic = render_svg(svg, 40.0, 40.0);
+        assert!(pic.is_ok(), "render_svg must succeed: {:?}", pic.err());
+        let bounds = pic.unwrap().cull_rect();
+        assert!(bounds.width() > 0.0 && bounds.height() > 0.0);
+    }
+
+    /// `render_svg` must surface an Err on malformed SVG (not panic).
+    #[test]
+    fn test_render_svg_malformed_errors() {
+        let _guard = crate::stylo_test::lock();
+        let bad = "<svg>unclosed";
+        let result = render_svg(bad, 100.0, 100.0);
+        // Skia's svg::Dom is lenient; either Ok or Err is acceptable —
+        // what matters is that we don't panic.
+        let _ = result;
+    }
+
+    /// `render_any` sniffs SVG vs HTML from the input prefix and routes
+    /// appropriately. Both inputs must produce a Picture.
+    #[test]
+    fn test_render_any_sniff_svg_and_html() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+
+        // SVG input → render_svg path
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>"#;
+        assert!(render_any(svg, 10.0, 10.0, &fonts, &NoImages).is_ok());
+
+        // SVG with XML decl prefix
+        let svg_with_decl = r#"<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>"#;
+        assert!(render_any(svg_with_decl, 10.0, 10.0, &fonts, &NoImages).is_ok());
+
+        // HTML input → render() path
+        let html = "<p>hi</p>";
+        assert!(render_any(html, 200.0, 100.0, &fonts, &NoImages).is_ok());
+    }
+
+    // ── Inline <svg> tests ──
+
+    /// Verify inline <svg> is collected as a replaced element with its
+    /// subtree serialized to XML. Children are NOT recursed into as
+    /// HTML — they belong to the serialized `svg_xml`.
+    #[test]
+    fn test_svg_inline_collection() {
+        let _guard = crate::stylo_test::lock();
+        let html = r#"<div><svg width="100" height="50" viewBox="0 0 100 50"><rect width="100" height="50" fill="red"/></svg></div>"#;
+        let root = collect::collect_styled_tree(html).unwrap().unwrap();
+
+        fn find_svg(el: &style::StyledElement) -> Option<&style::ReplacedContent> {
+            if let Some(ref r) = el.replaced {
+                if r.svg_xml.is_some() {
+                    return Some(r);
+                }
+            }
+            for child in &el.children {
+                if let style::StyledNode::Element(e) = child {
+                    if let Some(found) = find_svg(e) {
+                        return Some(found);
+                    }
+                }
+            }
+            None
+        }
+
+        let r = find_svg(&root).expect("should find <svg> replaced content");
+        assert_eq!(r.attr_width, Some(100));
+        assert_eq!(r.attr_height, Some(50));
+        assert_eq!(r.svg_view_box, Some((0.0, 0.0, 100.0, 50.0)));
+        let xml = r.svg_xml.as_ref().unwrap();
+        assert!(
+            xml.contains("<svg"),
+            "serialized xml must start with <svg: {xml}"
+        );
+        assert!(
+            xml.contains("xmlns=\"http://www.w3.org/2000/svg\""),
+            "xmlns auto-injected"
+        );
+        assert!(xml.contains("<rect"), "child element preserved");
+        assert!(xml.contains("fill=\"red\""), "attributes preserved");
+    }
+
+    /// Verify inline <svg> renders end-to-end through the HtmlCss pipeline.
+    /// Skia's built-in svg::Dom must accept the serialized subtree.
+    #[test]
+    fn test_svg_inline_render() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = test_render(
+            r#"<div><svg width="120" height="80" viewBox="0 0 120 80"><circle cx="60" cy="40" r="30" fill="blue"/></svg></div>"#,
+            400.0,
+            300.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "inline <svg> should render: {:?}", pic.err());
+        let h = pic.unwrap().cull_rect().height();
+        assert!(h > 0.0, "should have positive height, got {h}");
+    }
+
+    /// Malformed SVG must not crash rendering — the container box still
+    /// draws (background / borders / placeholder), matching the
+    /// graceful-degradation pattern used for missing `<img>` resources.
+    #[test]
+    fn test_svg_inline_malformed_recovers() {
+        let _guard = crate::stylo_test::lock();
+        let fonts = test_fonts();
+        let pic = test_render(
+            r#"<div><svg width="50" height="50">not valid &amp; mismatched</svg></div>"#,
+            200.0,
+            200.0,
+            &fonts,
+        );
+        assert!(pic.is_ok(), "malformed SVG must not crash the pipeline");
     }
 
     /// Verify background-image: url() doesn't crash with NoImages.

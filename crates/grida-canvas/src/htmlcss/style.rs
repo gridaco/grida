@@ -197,6 +197,19 @@ pub struct ReplacedContent {
     /// `BackgroundPosition::center()` so the image is centered by
     /// default rather than pinned to the top-left.
     pub object_position: BackgroundPosition,
+    /// Inline SVG subtree captured at collect time.
+    ///
+    /// When `Some`, the replaced element is an `<svg>` whose content has
+    /// been XML-serialized (with `xmlns="http://www.w3.org/2000/svg"`
+    /// injected if missing). Paint time parses this via
+    /// `skia_safe::svg::Dom::from_bytes` and renders it onto the canvas.
+    /// Follows the Servo-style architectural pattern of treating inline
+    /// SVG as a replaced element, but uses Skia's built-in SVG module
+    /// (GPU-capable) instead of resvg + tiny-skia.
+    pub svg_xml: Option<String>,
+    /// Parsed `viewBox="min-x min-y width height"` for SVG intrinsic
+    /// aspect-ratio resolution. Only populated when `svg_xml` is set.
+    pub svg_view_box: Option<(f32, f32, f32, f32)>,
 }
 
 /// Consecutive inline items merged into a single paragraph.

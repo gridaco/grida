@@ -176,6 +176,16 @@ chromium:
   permalink: /chromium
   description: Chromium / Blink / cc compositor source research notes.
 
+servo:
+  label: Servo
+  permalink: /servo
+  description: Servo browser engine source research notes.
+
+resvg:
+  label: resvg
+  permalink: /resvg
+  description: resvg / usvg SVG renderer source research notes.
+
 compositing:
   label: Compositing
   permalink: /compositing

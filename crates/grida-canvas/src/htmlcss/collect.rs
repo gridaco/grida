@@ -505,7 +505,174 @@ fn detect_img_element(node: &DemoNode) -> ReplacedContent {
         attr_height,
         object_fit: types::ObjectFit::Fill, // HTML spec default for <img>
         object_position: BackgroundPosition::center(),
+        svg_xml: None,
+        svg_view_box: None,
     }
+}
+
+// ─── Inline <svg> detection ────────────────────────────────────────
+
+/// XML-serialize an SVG subtree into a self-contained `<svg>…</svg>` string.
+///
+/// Inspired by Servo's `SVGSVGElement::serialize_and_cache_subtree`
+/// (components/script/dom/svg/svgsvgelement.rs): the `<svg>` subtree is
+/// flattened to a standalone XML string so it can be parsed by an
+/// out-of-band SVG renderer. Unlike Servo, Grida hands the string to
+/// Skia's built-in `svg::Dom` (GPU-capable) rather than resvg's
+/// tiny-skia rasterizer.
+fn serialize_svg_subtree(dom: &DemoDom, svg_node: &DemoNode) -> String {
+    let mut out = String::new();
+    write_svg_element(dom, svg_node, &mut out, /*inject_xmlns=*/ true);
+    out
+}
+
+fn write_svg_node(dom: &DemoDom, node: &DemoNode, out: &mut String) {
+    match &node.data {
+        DemoNodeData::Element(_) => write_svg_element(dom, node, out, false),
+        DemoNodeData::Text(t) => escape_xml_text(t.as_ref(), out),
+        // Comments, doctypes, PIs, the document node — skip entirely.
+        _ => {}
+    }
+}
+
+fn write_svg_element(dom: &DemoDom, node: &DemoNode, out: &mut String, inject_xmlns: bool) {
+    let DemoNodeData::Element(ref data) = node.data else {
+        return;
+    };
+    let tag: &str = &data.name.local;
+
+    out.push('<');
+    out.push_str(tag);
+
+    // Emit attributes.
+    let mut has_xmlns = false;
+    for attr in &data.attrs {
+        let name: &str = &attr.name.local;
+        if name == "xmlns" {
+            has_xmlns = true;
+        }
+        out.push(' ');
+        out.push_str(name);
+        out.push_str("=\"");
+        escape_xml_attr(&attr.value, out);
+        out.push('"');
+    }
+
+    // Skia's parser requires the SVG namespace on the root element.
+    if inject_xmlns && !has_xmlns {
+        out.push_str(" xmlns=\"http://www.w3.org/2000/svg\"");
+    }
+
+    if node.children.is_empty() {
+        out.push_str("/>");
+        return;
+    }
+
+    out.push('>');
+    for child_id in &node.children {
+        let child = dom.node(*child_id);
+        write_svg_node(dom, child, out);
+    }
+    out.push_str("</");
+    out.push_str(tag);
+    out.push('>');
+}
+
+fn escape_xml_text(s: &str, out: &mut String) {
+    for ch in s.chars() {
+        match ch {
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '&' => out.push_str("&amp;"),
+            c => out.push(c),
+        }
+    }
+}
+
+fn escape_xml_attr(s: &str, out: &mut String) {
+    for ch in s.chars() {
+        match ch {
+            '<' => out.push_str("&lt;"),
+            '&' => out.push_str("&amp;"),
+            '"' => out.push_str("&quot;"),
+            c => out.push(c),
+        }
+    }
+}
+
+fn parse_view_box(s: &str) -> Option<(f32, f32, f32, f32)> {
+    let parts: Vec<f32> = s
+        .split(|c: char| c.is_whitespace() || c == ',')
+        .filter(|t| !t.is_empty())
+        .filter_map(|t| t.parse::<f32>().ok())
+        .collect();
+    if parts.len() == 4 {
+        Some((parts[0], parts[1], parts[2], parts[3]))
+    } else {
+        None
+    }
+}
+
+/// Capture an inline `<svg>` as a replaced element.
+///
+/// Walks the subtree to produce a standalone XML document, reads
+/// `width` / `height` / `viewBox` attributes for intrinsic sizing, and
+/// stashes the serialized source on `ReplacedContent` for paint-time
+/// delegation to `skia_safe::svg::Dom`.
+fn detect_svg_element(dom: &DemoDom, node: &DemoNode) -> ReplacedContent {
+    let xml = serialize_svg_subtree(dom, node);
+
+    // Intrinsic dimensions. Prefer explicit pixel width/height attrs;
+    // fall back to viewBox (paint / layout derive aspect ratio from it).
+    let attr_width = get_element_attr(node, "width")
+        .as_deref()
+        .and_then(parse_svg_length_as_px);
+    let attr_height = get_element_attr(node, "height")
+        .as_deref()
+        .and_then(parse_svg_length_as_px);
+    let svg_view_box = get_element_attr(node, "viewBox")
+        .as_deref()
+        .and_then(parse_view_box);
+
+    ReplacedContent {
+        src: String::new(),
+        alt: None,
+        attr_width,
+        attr_height,
+        object_fit: types::ObjectFit::Fill,
+        object_position: BackgroundPosition::center(),
+        svg_xml: Some(xml),
+        svg_view_box,
+    }
+}
+
+/// Parse an SVG length attribute as pixels.
+///
+/// SVG `width` / `height` accept lengths with unit suffixes (`px`,
+/// `pt`, `em`, …) and bare numbers (treated as user units == px). For
+/// intrinsic-size resolution we only need integer-ish px values; other
+/// units fall through to `None` and the caller uses `viewBox` or the
+/// 300×150 default.
+fn parse_svg_length_as_px(s: &str) -> Option<u32> {
+    let trimmed = s.trim();
+    // Strip a trailing "px" if present (case-insensitive).
+    let numeric = if let Some(stripped) = trimmed
+        .strip_suffix("px")
+        .or_else(|| trimmed.strip_suffix("PX"))
+    {
+        stripped.trim()
+    } else if trimmed
+        .chars()
+        .last()
+        .map(|c| c.is_alphabetic() || c == '%')
+        .unwrap_or(false)
+    {
+        // em, pt, %, etc. — leave to viewBox.
+        return None;
+    } else {
+        trimmed
+    };
+    numeric.parse::<f32>().ok().map(|v| v.max(0.0) as u32)
 }
 
 // ─── Widget (form control) detection ────────────────────────────────
@@ -522,6 +689,19 @@ fn detect_widget(tag: &str, node_data: &DemoNode, dom: &DemoDom, el: &mut Styled
                 el.display = types::Display::InlineBlock;
             }
             true // <img> is a void element
+        }
+        "svg" => {
+            // Treat inline <svg> as a replaced element whose content is
+            // an XML-serialized subtree. Paint time delegates to
+            // skia_safe::svg::Dom (see htmlcss/paint.rs). Children are
+            // captured in the serialized XML — the normal DOM walker
+            // must not descend into them (they'd be painted twice and
+            // misinterpreted as HTML text nodes).
+            el.replaced = Some(detect_svg_element(dom, node_data));
+            if el.display == types::Display::Inline {
+                el.display = types::Display::InlineBlock;
+            }
+            true // children are captured in svg_xml
         }
         "input" => {
             detect_input_widget(node_data, el);
