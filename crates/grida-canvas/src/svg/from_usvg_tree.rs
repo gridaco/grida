@@ -1,5 +1,5 @@
 use crate::cg::prelude::*;
-use crate::fonts::embedded::geist;
+use crate::embedded_fonts::geist;
 use crate::sk_tiny::tsk_path_to_sk_path;
 use math2::transform::AffineTransform;
 use serde::{Deserialize, Serialize};
@@ -314,7 +314,7 @@ fn resolve_font_family(font: &usvg::Font) -> String {
             usvg::FontFamily::Named(name) => Some(name.clone()),
             _ => None,
         })
-        .unwrap_or_else(|| crate::fonts::embedded::geist::FAMILY.to_string())
+        .unwrap_or_else(|| crate::embedded_fonts::geist::FAMILY.to_string())
 }
 
 fn extract_relative_transform(

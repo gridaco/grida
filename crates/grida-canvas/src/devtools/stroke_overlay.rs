@@ -24,7 +24,7 @@ impl Default for StrokeOverlayStyle {
 }
 
 thread_local! {
-    static FONT: Font = Font::new(crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES), 20.0);
+    static FONT: Font = Font::new(crate::embedded_fonts::typeface(crate::embedded_fonts::geistmono::BYTES), 20.0);
 }
 
 pub struct StrokeOverlay;

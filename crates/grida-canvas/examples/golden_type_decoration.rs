@@ -22,7 +22,7 @@ fn main() {
     // Load the Geist variable font
     let font_mgr = FontMgr::new();
     let base_typeface = font_mgr
-        .new_from_data(cg::fonts::embedded::geist::BYTES, None)
+        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
         .unwrap();
 
     // Create a paragraph style

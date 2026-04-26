@@ -63,7 +63,7 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     // Load font for labels
-    let font_data = cg::fonts::embedded::geist::BYTES;
+    let font_data = cg::embedded_fonts::geist::BYTES;
     let font_mgr = FontMgr::new();
     let typeface = font_mgr.new_from_data(font_data, None).unwrap();
     let label_font = Font::new(typeface.clone(), 14.0);

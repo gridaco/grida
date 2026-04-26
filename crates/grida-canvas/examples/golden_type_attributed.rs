@@ -17,10 +17,10 @@ fn main() {
     // -- Font setup --
     let font_mgr = FontMgr::new();
     let geist_tf = font_mgr
-        .new_from_data(cg::fonts::embedded::geist::BYTES, None)
+        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
         .unwrap();
     let geist_mono_tf = font_mgr
-        .new_from_data(cg::fonts::embedded::geistmono::BYTES, None)
+        .new_from_data(cg::embedded_fonts::geistmono::BYTES, None)
         .unwrap();
 
     let mut font_collection = FontCollection::new();

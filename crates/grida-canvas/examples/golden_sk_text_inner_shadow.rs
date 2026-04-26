@@ -23,7 +23,7 @@ use cg::cg::prelude::*;
 use skia_safe::{self as sk, surfaces, Color, Font, Paint as SkPaint, Point};
 
 thread_local! {
-    static FONT: Font = Font::new(cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES), 48.0);
+    static FONT: Font = Font::new(cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES), 48.0);
 }
 
 fn main() {

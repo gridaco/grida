@@ -62,10 +62,10 @@ fn main() {
     // --- Fonts ----------------------------------------------------------------
     let font_mgr = FontMgr::new();
     let typeface = font_mgr
-        .new_from_data(cg::fonts::embedded::geist::BYTES, None)
+        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
         .expect("failed to load embedded Geist font");
     let typeface_mono = font_mgr
-        .new_from_data(cg::fonts::embedded::geistmono::BYTES, None)
+        .new_from_data(cg::embedded_fonts::geistmono::BYTES, None)
         .expect("failed to load embedded Geist Mono font");
 
     let font_title = Font::from_typeface(&typeface, 64.0);

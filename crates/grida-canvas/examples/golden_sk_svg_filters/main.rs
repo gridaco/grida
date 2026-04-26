@@ -29,7 +29,7 @@ use usvg::{Node, Options, Tree};
 
 thread_local! {
     static FONT: Font = Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         12.0
     );
 }

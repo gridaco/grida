@@ -163,7 +163,7 @@ fn create_paragraph(text: &str, text_color: Color) -> Paragraph {
     let mut font_collection = FontCollection::new();
     let font_mgr = FontMgr::new();
     let _typeface = font_mgr
-        .new_from_data(&Data::new_copy(cg::fonts::embedded::geist::BYTES), None)
+        .new_from_data(&Data::new_copy(cg::embedded_fonts::geist::BYTES), None)
         .expect("Failed to create typeface");
     font_collection.set_default_font_manager(font_mgr, None);
 

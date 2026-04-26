@@ -46,7 +46,7 @@ use std::{
 
 thread_local! {
     static FONT: skia_safe::Font = skia_safe::Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         8.0,
     );
 }

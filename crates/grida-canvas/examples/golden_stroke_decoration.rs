@@ -36,11 +36,11 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     let font = skia_safe::Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         12.0,
     );
     let small_font = skia_safe::Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         11.0,
     );
     let lp = label_paint();

@@ -38,7 +38,7 @@ use skia_safe::{
 };
 
 thread_local! {
-    static FONT: Font = Font::new(cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES), 12.0);
+    static FONT: Font = Font::new(cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES), 12.0);
 }
 
 fn main() {

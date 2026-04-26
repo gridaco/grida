@@ -88,7 +88,7 @@ async fn main() {
 
     // Overlay: red guidelines + labels (drawn after renderer, on top)
     let font = skia_safe::Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         12.0,
     );
     let label_paint = {
@@ -112,7 +112,7 @@ async fn main() {
         p
     };
     let title_font = skia_safe::Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         11.0,
     );
 

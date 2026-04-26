@@ -155,7 +155,7 @@ fn main() {
     // Create font manager and load the Geist font
     let font_mgr = FontMgr::new();
     let typeface = font_mgr
-        .new_from_data(cg::fonts::embedded::geist::BYTES, None)
+        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
         .unwrap();
 
     // Create font collection and add the Geist font

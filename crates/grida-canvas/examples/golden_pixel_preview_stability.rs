@@ -117,7 +117,7 @@ fn main() {
     canvas.clear(Color::WHITE);
 
     let font = Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         10.0,
     );
     let mut text_paint = SkPaint::default();

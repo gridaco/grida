@@ -124,7 +124,7 @@ fn main() {
 
     // Labels
     let font = Font::new(
-        cg::fonts::embedded::typeface(cg::fonts::embedded::geistmono::BYTES),
+        cg::embedded_fonts::typeface(cg::embedded_fonts::geistmono::BYTES),
         12.0,
     );
     let mut paint = SkPaint::default();

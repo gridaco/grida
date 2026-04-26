@@ -111,12 +111,12 @@ impl FontRepository {
     /// Register the built-in embedded fonts bundled with the renderer.
     pub fn register_embedded_fonts(&mut self) {
         self.register_embedded_font(
-            crate::fonts::embedded::geist::BYTES,
-            crate::fonts::embedded::geist::FAMILY,
+            crate::embedded_fonts::geist::BYTES,
+            crate::embedded_fonts::geist::FAMILY,
         );
         self.register_embedded_font(
-            crate::fonts::embedded::geistmono::BYTES,
-            crate::fonts::embedded::geistmono::FAMILY,
+            crate::embedded_fonts::geistmono::BYTES,
+            crate::embedded_fonts::geistmono::FAMILY,
         );
     }
 

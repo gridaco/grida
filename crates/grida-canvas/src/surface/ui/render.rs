@@ -54,7 +54,7 @@ const BADGE_STROKE_WIDTH: f32 = 1.0;
 
 thread_local! {
     static FONT_SIZE_METER: Font = Font::new(
-        crate::fonts::embedded::typeface(crate::fonts::embedded::geistmono::BYTES),
+        crate::embedded_fonts::typeface(crate::embedded_fonts::geistmono::BYTES),
         SIZE_METER_FONT_SIZE,
     );
 
@@ -458,7 +458,7 @@ impl SurfaceUI {
         // Build font families list: primary + user fallback fonts
         let fallbacks = fonts.user_fallback_families();
         let mut families: Vec<&str> = Vec::with_capacity(1 + fallbacks.len());
-        families.push(crate::fonts::embedded::geist::FAMILY);
+        families.push(crate::embedded_fonts::geist::FAMILY);
         for f in &fallbacks {
             families.push(f.as_str());
         }

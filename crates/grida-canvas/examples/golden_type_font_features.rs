@@ -19,7 +19,7 @@ fn main() {
     // Load the Geist variable font which has excellent OpenType feature support
     let font_mgr = FontMgr::new();
     let geist_typeface = font_mgr
-        .new_from_data(cg::fonts::embedded::geist::BYTES, None)
+        .new_from_data(cg::embedded_fonts::geist::BYTES, None)
         .unwrap();
 
     let mut paragraph_style = ParagraphStyle::new();
