@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>htmlcss reftest dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @theme {
+        --font-sans:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      body {
+        font-feature-settings: "ss01", "cv11";
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100 antialiased"
+  >
+    <header
+      class="sticky top-0 z-10 backdrop-blur bg-stone-50/85 dark:bg-stone-950/85 border-b border-stone-200 dark:border-stone-800"
+    >
+      <div
+        class="max-w-[1400px] mx-auto px-6 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5"
+      >
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span class="font-semibold text-sm">htmlcss reftest</span>
+          <span class="text-stone-400 dark:text-stone-600">·</span>
+          <code
+            class="font-mono text-[11px] px-1 py-0.5 rounded bg-stone-200/70 dark:bg-stone-800 text-stone-700 dark:text-stone-300"
+            >resvg-test-suite</code
+          >
+        </div>
+        <div
+          id="summary"
+          class="num text-xs text-stone-600 dark:text-stone-400 flex flex-wrap items-center gap-x-3 gap-y-1"
+        ></div>
+        <details class="relative ml-auto">
+          <summary
+            class="text-xs text-stone-500 dark:text-stone-400 cursor-pointer hover:text-stone-700 dark:hover:text-stone-200 select-none list-none px-2 py-1 rounded hover:bg-stone-200/60 dark:hover:bg-stone-800"
+          >
+            categories ▾
+          </summary>
+          <div
+            id="categories"
+            class="absolute right-0 top-full mt-1 w-[420px] max-h-[60vh] overflow-auto p-2 grid grid-cols-1 gap-1 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg shadow-lg z-20"
+          ></div>
+        </details>
+      </div>
+      <div class="border-t border-stone-200/60 dark:border-stone-800/60">
+        <div
+          class="max-w-[1400px] mx-auto px-6 py-2 flex flex-wrap items-center gap-2"
+        >
+          <input
+            type="search"
+            id="q"
+            placeholder="filter by test name…"
+            autocomplete="off"
+            class="text-sm px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 min-w-[220px]"
+          />
+          <select
+            id="cat"
+            class="text-sm px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900"
+          >
+            <option value="">all categories</option>
+          </select>
+          <div
+            class="flex items-center rounded-md border border-stone-300 dark:border-stone-700 overflow-hidden text-xs num"
+            id="buckets"
+          >
+            <button
+              data-bucket="all"
+              class="px-2 py-1 bg-stone-900 text-white dark:bg-white dark:text-stone-900"
+            >
+              all
+            </button>
+            <button
+              data-bucket="S99"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S99
+            </button>
+            <button
+              data-bucket="S95"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S95
+            </button>
+            <button
+              data-bucket="S90"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S90
+            </button>
+            <button
+              data-bucket="S75"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S75
+            </button>
+            <button
+              data-bucket="err"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              err
+            </button>
+          </div>
+          <select
+            id="sort"
+            class="text-sm px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900"
+          >
+            <option value="score-asc">worst score first</option>
+            <option value="score-desc">best score first</option>
+            <option value="name-asc">name A–Z</option>
+            <option value="name-desc">name Z–A</option>
+          </select>
+          <span
+            class="num text-xs text-stone-500 dark:text-stone-400 ml-auto"
+            id="count"
+            >—</span
+          >
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-[1400px] mx-auto px-6 py-6 pb-20">
+      <div
+        id="grid"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+      ></div>
+    </main>
+
+    <div
+      id="lightbox"
+      class="fixed inset-0 z-50 bg-black/85 hidden items-center justify-center"
+      onclick="
+        this.classList.add('hidden');
+        this.classList.remove('flex');
+      "
+    >
+      <button
+        class="absolute top-4 right-5 text-white/70 hover:text-white text-2xl leading-none"
+      >
+        ×
+      </button>
+      <img
+        id="lightbox-img"
+        class="max-w-[92vw] max-h-[92vh] [image-rendering:pixelated] bg-white ring-1 ring-stone-700"
+        src=""
+        alt=""
+      />
+    </div>
+
+    <script>
+      // __REPORT_INLINE_PLACEHOLDER__
+    </script>
+
+    <script>
+      (async function () {
+        let report = window.__REPORT__;
+        if (!report) {
+          try {
+            const res = await fetch("report.json", { cache: "no-store" });
+            report = await res.json();
+          } catch (e) {
+            document.getElementById("grid").innerHTML =
+              `<div class="col-span-full text-center text-stone-500 py-16 text-sm">no report data — serve a result dir over HTTP, or inline via <code class="font-mono">build_reftest_dashboard.py</code></div>`;
+            return;
+          }
+        }
+
+        function bucketFor(score, err) {
+          if (err) return "err";
+          const p = score * 100;
+          if (p >= 99) return "S99";
+          if (p >= 95) return "S95";
+          if (p >= 90) return "S90";
+          return "S75";
+        }
+
+        const tests = (report.tests || []).map((t) => ({
+          name: t.test_name,
+          score: t.similarity_score,
+          diff_pct: t.diff_percentage,
+          error: t.error || null,
+          bucket: bucketFor(t.similarity_score, t.error),
+          category: t.test_name.split("_")[0],
+        }));
+
+        const total = report.total ?? tests.length;
+        const avg = (report.average_similarity ?? 0) * 100;
+        const counts = { S99: 0, S95: 0, S90: 0, S75: 0, err: 0 };
+        for (const t of tests) counts[t.bucket]++;
+        const passing = counts.S99 + counts.S95;
+
+        const chip = (label, value, color) => `
+    <span class="inline-flex items-center gap-1">
+      <span class="text-stone-400 dark:text-stone-500 text-[10px] uppercase tracking-wider">${label}</span>
+      <span class="font-semibold ${color || "text-stone-800 dark:text-stone-200"}">${value}</span>
+    </span>`;
+        const dot = (color) =>
+          `<span class="inline-block w-1.5 h-1.5 rounded-full ${color}"></span>`;
+        const bucketChip = (label, n, dotColor, textColor) => `
+    <span class="inline-flex items-center gap-1">
+      ${dot(dotColor)}
+      <span class="text-stone-400 dark:text-stone-500 text-[10px] uppercase tracking-wider">${label}</span>
+      <span class="font-semibold ${textColor}">${n.toLocaleString()}</span>
+    </span>`;
+
+        document.getElementById("summary").innerHTML = [
+          chip("total", total.toLocaleString()),
+          chip("avg", `${avg.toFixed(2)}%`),
+          chip(
+            "≥95%",
+            passing.toLocaleString(),
+            "text-emerald-600 dark:text-emerald-400"
+          ),
+          `<span class="w-px h-3 bg-stone-300 dark:bg-stone-700 mx-1"></span>`,
+          bucketChip(
+            "S99",
+            counts.S99,
+            "bg-emerald-500",
+            "text-emerald-600 dark:text-emerald-400"
+          ),
+          bucketChip(
+            "S95",
+            counts.S95,
+            "bg-lime-500",
+            "text-lime-600 dark:text-lime-400"
+          ),
+          bucketChip(
+            "S90",
+            counts.S90,
+            "bg-amber-500",
+            "text-amber-600 dark:text-amber-400"
+          ),
+          bucketChip(
+            "S75",
+            counts.S75,
+            "bg-red-500",
+            "text-red-600 dark:text-red-400"
+          ),
+          counts.err
+            ? bucketChip("err", counts.err, "bg-stone-400", "text-stone-500")
+            : "",
+        ].join("");
+
+        // Per-category breakdown
+        const byCat = new Map();
+        for (const t of tests) {
+          const c = byCat.get(t.category) ?? { n: 0, sum: 0 };
+          c.n++;
+          c.sum += t.score;
+          byCat.set(t.category, c);
+        }
+        const catRows = [...byCat.entries()].sort((a, b) =>
+          a[0].localeCompare(b[0])
+        );
+        document.getElementById("categories").innerHTML = catRows
+          .map(([cat, c]) => {
+            const pct = (c.sum / c.n) * 100;
+            const barColor =
+              pct >= 90
+                ? "bg-emerald-500"
+                : pct >= 75
+                  ? "bg-lime-500"
+                  : pct >= 60
+                    ? "bg-amber-500"
+                    : "bg-red-500";
+            return `<div class="grid grid-cols-[110px_1fr_55px_36px] gap-2.5 items-center bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded px-2.5 py-1.5 text-xs">
+      <span class="font-medium truncate">${cat}</span>
+      <div class="h-1.5 bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden"><div class="h-full ${barColor}" style="width:${pct.toFixed(1)}%"></div></div>
+      <span class="num text-right text-stone-500">${pct.toFixed(1)}%</span>
+      <span class="num text-right text-stone-400 text-[10px]">${c.n}</span>
+    </div>`;
+          })
+          .join("");
+
+        // Populate category select
+        const catSel = document.getElementById("cat");
+        for (const [cat, c] of catRows) {
+          const o = document.createElement("option");
+          o.value = cat;
+          o.textContent = `${cat} (${c.n})`;
+          catSel.appendChild(o);
+        }
+
+        const grid = document.getElementById("grid");
+        const countEl = document.getElementById("count");
+        let bucketFilter = "all";
+
+        function pathFor(t) {
+          const dir = t.bucket;
+          return {
+            current: `${dir}/${t.name}.current.png`,
+            expected: `${dir}/${t.name}.expected.png`,
+            diff: `${dir}/${t.name}.diff.png`,
+            chrome: svgPathFor(t.name),
+          };
+        }
+
+        // resvg test names map: <cat>_<group>_<rest> -> tests/<cat>/<group>/<rest>.svg
+        function svgPathFor(name) {
+          const i1 = name.indexOf("_");
+          if (i1 < 0) return null;
+          const i2 = name.indexOf("_", i1 + 1);
+          if (i2 < 0) return null;
+          const cat = name.slice(0, i1);
+          const group = name.slice(i1 + 1, i2);
+          const file = name.slice(i2 + 1);
+          return `tests/${cat}/${group}/${file}.svg`;
+        }
+
+        const badgeColor = (b) =>
+          ({
+            S99: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
+            S95: "bg-lime-100 text-lime-900 dark:bg-lime-950 dark:text-lime-300",
+            S90: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
+            S75: "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300",
+            err: "bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
+          })[b];
+
+        function render() {
+          const q = document.getElementById("q").value.trim().toLowerCase();
+          const cat = catSel.value;
+          const sort = document.getElementById("sort").value;
+          let rows = tests.filter((t) => {
+            if (bucketFilter !== "all" && t.bucket !== bucketFilter)
+              return false;
+            if (cat && t.category !== cat) return false;
+            if (q && !t.name.toLowerCase().includes(q)) return false;
+            return true;
+          });
+          switch (sort) {
+            case "score-asc":
+              rows.sort((a, b) => a.score - b.score);
+              break;
+            case "score-desc":
+              rows.sort((a, b) => b.score - a.score);
+              break;
+            case "name-asc":
+              rows.sort((a, b) => a.name.localeCompare(b.name));
+              break;
+            case "name-desc":
+              rows.sort((a, b) => b.name.localeCompare(a.name));
+              break;
+          }
+          countEl.textContent = `${rows.length.toLocaleString()} of ${tests.length.toLocaleString()}`;
+          if (rows.length === 0) {
+            grid.innerHTML = `<div class="col-span-full text-center text-stone-500 py-16 text-sm">no tests match the current filters</div>`;
+            return;
+          }
+          const capped = rows.slice(0, 500);
+          grid.innerHTML = capped
+            .map((t) => {
+              const p = pathFor(t);
+              const pct = (t.score * 100).toFixed(2);
+              const cat = t.name.split("_")[0];
+              const tail = t.name.slice(cat.length + 1);
+              const badge = `<span class="num shrink-0 px-2 py-0.5 rounded text-[11px] font-semibold ${badgeColor(t.bucket)}">${t.bucket === "err" ? "ERR" : pct + "%"}</span>`;
+              return `<article class="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden hover:border-stone-300 dark:hover:border-stone-700 transition">
+        <header class="px-3 py-2.5 flex items-center gap-2.5 border-b border-stone-100 dark:border-stone-800">
+          ${badge}
+          <div class="font-mono text-[11px] leading-tight break-all min-w-0 flex-1"><span class="text-stone-400">${cat}/</span>${tail}</div>
+        </header>
+        <div class="grid grid-cols-4 gap-px bg-stone-200 dark:bg-stone-800">
+          ${["chrome", "expected", "current", "diff"]
+            .map((k) =>
+              p[k]
+                ? `
+            <figure class="m-0 relative aspect-square bg-white overflow-hidden">
+              <figcaption class="absolute top-1 left-1 text-[9px] uppercase tracking-wider px-1 py-0.5 rounded ${k === "chrome" ? "bg-sky-600/80" : "bg-black/60"} text-white pointer-events-none z-[1]">${k}</figcaption>
+              <img loading="lazy" class="w-full h-full object-contain cursor-zoom-in" src="${p[k]}" onerror="this.replaceWith(noImg('${k}'))" />
+            </figure>`
+                : `
+            <figure class="m-0 relative aspect-square bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-[10px] text-stone-400">
+              <figcaption class="absolute top-1 left-1 text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-black/40 text-white pointer-events-none z-[1]">${k}</figcaption>
+              no ${k}
+            </figure>`
+            )
+            .join("")}
+        </div>
+      </article>`;
+            })
+            .join("");
+          if (rows.length > 500) {
+            grid.insertAdjacentHTML(
+              "beforeend",
+              `<div class="col-span-full text-center text-stone-500 py-6 text-sm">${rows.length - 500} more hidden — narrow the filter to see them</div>`
+            );
+          }
+        }
+
+        window.noImg = function (label) {
+          const f = document.createElement("figure");
+          f.className =
+            "m-0 relative aspect-square bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-[11px] text-stone-400";
+          f.textContent = `no ${label}`;
+          return f;
+        };
+
+        document.addEventListener("click", (e) => {
+          if (e.target.tagName === "IMG" && e.target.closest("article")) {
+            const lb = document.getElementById("lightbox");
+            const img = document.getElementById("lightbox-img");
+            img.src = e.target.src;
+            lb.classList.remove("hidden");
+            lb.classList.add("flex");
+            e.stopPropagation();
+          }
+        });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            const lb = document.getElementById("lightbox");
+            lb.classList.add("hidden");
+            lb.classList.remove("flex");
+          }
+        });
+
+        document.getElementById("q").addEventListener("input", render);
+        catSel.addEventListener("change", render);
+        document.getElementById("sort").addEventListener("change", render);
+        document.querySelectorAll("#buckets button").forEach((b) => {
+          b.addEventListener("click", () => {
+            bucketFilter = b.dataset.bucket;
+            document.querySelectorAll("#buckets button").forEach((x) => {
+              const active = x === b;
+              x.classList.toggle("bg-stone-900", active);
+              x.classList.toggle("text-white", active);
+              x.classList.toggle("dark:bg-white", active);
+              x.classList.toggle("dark:text-stone-900", active);
+            });
+            render();
+          });
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>

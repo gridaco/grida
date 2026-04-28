@@ -15,6 +15,7 @@ mod github_markdown;
 mod layout;
 mod paint;
 pub mod style;
+pub mod svg;
 pub mod types;
 
 use crate::runtime::font_repository::FontRepository;
@@ -204,33 +205,21 @@ pub fn render(
 
 /// Render a standalone SVG document to a Skia Picture.
 ///
-/// Delegates to Skia's built-in `svg::Dom` (enabled via the `svg` feature
-/// on `skia-safe`). The Picture is recorded at `(width, height)` in CSS
-/// pixels; `viewBox` + `preserveAspectRatio` inside the SVG map user
-/// units to that box, interpreted internally by Skia.
+/// Routes through the in-tree `htmlcss::svg` pipeline (DemoDom + Stylo +
+/// Blink-shaped layout/paint). The pipeline does its own work — there is
+/// no fallback to Skia's built-in `svg::Dom`. Features still under
+/// construction (e.g. text, filters) render as best-effort: unsupported
+/// elements are skipped rather than passed to a different renderer, so
+/// missing pixels surface as obvious gaps in the output and we feel the
+/// motivation to implement them.
 ///
-/// Accepts `.svg` bytes directly alongside the HTML `render()` entry
-/// point. Servo treats inline `<svg>` this way (subtree serialization +
-/// out-of-band SVG renderer); this function is the standalone-document
-/// equivalent — skip the HTML parser entirely and hand raw SVG bytes to
-/// Skia.
+/// `width` / `height` are CSS pixels; `viewBox` + `preserveAspectRatio`
+/// inside the SVG map user units to that box.
 ///
-/// Returns `Err` on parse failure (malformed XML, missing root `<svg>`).
+/// Returns `Err` only when the input is malformed XML.
 pub fn render_svg(svg: &str, width: f32, height: f32) -> Result<skia_safe::Picture, String> {
-    use skia_safe::{svg, FontMgr, PictureRecorder, Rect, Size};
-
-    let data = skia_safe::Data::new_copy(svg.as_bytes());
-    let mut dom = svg::Dom::from_bytes(&data, FontMgr::default())
-        .map_err(|e| format!("SVG parse error: {e}"))?;
-    dom.set_container_size(Size::new(width, height));
-
-    let mut recorder = PictureRecorder::new();
-    let bounds = Rect::from_xywh(0.0, 0.0, width.max(1.0), height.max(1.0));
-    let canvas = recorder.begin_recording(bounds, false);
-    dom.render(canvas);
-    recorder
-        .finish_recording_as_picture(Some(&bounds))
-        .ok_or_else(|| "failed to finish SVG picture recording".to_string())
+    crate::htmlcss::svg::render_to_picture(svg, width, height)
+        .map_err(|e| format!("htmlcss::svg::render_to_picture: {e}"))
 }
 
 /// Render either HTML or SVG to a Skia Picture, auto-detected from the
@@ -3290,7 +3279,7 @@ code block
 
     /// `render_svg` must accept a raw SVG document and produce a
     /// non-empty Picture. Servo-style standalone path — no HTML parser,
-    /// direct delegation to Skia's svg::Dom.
+    /// direct routing through `htmlcss::svg::render_to_picture`.
     #[test]
     fn test_render_svg_standalone_ok() {
         let _guard = crate::stylo_test::lock();
@@ -3307,8 +3296,9 @@ code block
         let _guard = crate::stylo_test::lock();
         let bad = "<svg>unclosed";
         let result = render_svg(bad, 100.0, 100.0);
-        // Skia's svg::Dom is lenient; either Ok or Err is acceptable —
-        // what matters is that we don't panic.
+        // The htmlcss::svg parser is permissive on minor malformations;
+        // either Ok or Err is acceptable — what matters is that we
+        // don't panic.
         let _ = result;
     }
 
@@ -3377,7 +3367,7 @@ code block
     }
 
     /// Verify inline <svg> renders end-to-end through the HtmlCss pipeline.
-    /// Skia's built-in svg::Dom must accept the serialized subtree.
+    /// The in-tree htmlcss::svg renderer must accept the serialized subtree.
     #[test]
     fn test_svg_inline_render() {
         let _guard = crate::stylo_test::lock();

@@ -27,17 +27,12 @@ impl std::str::FromStr for BgColor {
 /// - `Htmlcss`: goes through `grida::htmlcss::render_svg`, which records
 ///   into a Skia `Picture` via `PictureRecorder` before rasterizing.
 ///   Exercises the exact code path that inline `<svg>` inside HTML
-///   takes.
-/// - `Sksvg`: **minimal** direct path — `skia_safe::svg::Dom::from_bytes`
-///   → `surface.canvas()` → `dom.render()`. No htmlcss module, no
-///   Picture recording, no Grida tree surgery. Used to isolate Skia's
-///   native SVG module so that any failure is attributable to Skia
-///   itself, not our wrapping / plumbing.
+///   takes, end-to-end through the in-tree htmlcss::svg renderer (no
+///   fallback to Skia's built-in `svg::Dom`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SvgRenderer {
     Iosvg,
     Htmlcss,
-    Sksvg,
 }
 
 impl std::str::FromStr for SvgRenderer {
@@ -46,11 +41,7 @@ impl std::str::FromStr for SvgRenderer {
         match s.to_ascii_lowercase().as_str() {
             "iosvg" | "grida" | "pack" => Ok(SvgRenderer::Iosvg),
             "htmlcss" => Ok(SvgRenderer::Htmlcss),
-            "sksvg" | "skia-svg" | "skia_svg" | "skiasvg" | "skia" => Ok(SvgRenderer::Sksvg),
-            other => Err(format!(
-                "invalid renderer: {} (use iosvg|htmlcss|sksvg)",
-                other
-            )),
+            other => Err(format!("invalid renderer: {} (use iosvg|htmlcss)", other)),
         }
     }
 }
@@ -92,10 +83,9 @@ pub(crate) struct ReftestArgs {
 
     /// SVG renderer backend:
     ///  - `iosvg` (default): grida scene graph via usvg → pack.
-    ///  - `htmlcss`: grida::htmlcss::render_svg → PictureRecorder → surface.
-    ///  - `sksvg`: direct Skia svg::Dom → surface (no htmlcss wrapping).
-    ///    Use this to prove a failure is Skia's own SVG module, not our
-    ///    plumbing. Aliases: `skia-svg`, `skia_svg`, `skia`.
+    ///  - `htmlcss`: grida::htmlcss::render_svg → PictureRecorder →
+    ///    surface. End-to-end through the in-tree htmlcss::svg
+    ///    renderer; no fallback to Skia's built-in `svg::Dom`.
     #[arg(long = "renderer", default_value = "iosvg")]
     pub renderer: SvgRenderer,
 }
