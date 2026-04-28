@@ -25,11 +25,16 @@ lives under `LayoutSVGRoot`.
 | Document                                                   | Scope                                                                                      |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | [pipeline.md](./pipeline.md)                               | End-to-end pipeline: DOM → LayoutSVG\* → paint → composite                                 |
+| [module-structure.md](./module-structure.md)               | Directory organization in `third_party/blink/renderer/`: where the code lives and why      |
 | [coordinate-systems.md](./coordinate-systems.md)           | viewBox, preserveAspectRatio, CTM, local-to-parent transforms                              |
 | [paint-servers.md](./paint-servers.md)                     | Gradients and patterns as shader-producing resources                                       |
 | [resources-and-effects.md](./resources-and-effects.md)     | `<clipPath>`, `<mask>`, `<filter>`, `<marker>` resolution                                  |
+| [clip-path.md](./clip-path.md)                             | `<clipPath>` element + CSS `clip-path` (basic shapes, references, recursion, chaining)     |
+| [fe-tile.md](./fe-tile.md)                                 | `<feTile>`: source-tile selection, target rect, §15.7 default-subregion chaining           |
+| [fe-image.md](./fe-image.md)                               | `<feImage>` internal element refs: PaintResourceSubtree, PictureRecorder, cycle protection |
 | [path-geometry.md](./path-geometry.md)                     | `d=` parsing, `SVGPath` → `SkPath`, stroke properties → Skia                               |
 | [text.md](./text.md)                                       | SVG text: two-phase layout, text-on-path, `SvgTextLayoutAlgorithm`                         |
+| [text-on-path.md](./text-on-path.md)                       | `<textPath>`: arc-length mapping, per-glyph rotation, side/startOffset, drawing            |
 | [use-and-foreign-object.md](./use-and-foreign-object.md)   | `<use>` shadow instance tree, `<foreignObject>` HTML-in-SVG bridging                       |
 | [svg-as-image.md](./svg-as-image.md)                       | Inline vs standalone vs `<img>`-embedded SVG; `SVGImage`, `SVGImageForContainer`           |
 | [animation-and-smil.md](./animation-and-smil.md)           | SMIL pipeline (sandwich model, sync-base/event timing) and CSS / Web Animations on SVG     |
