@@ -455,6 +455,6 @@ arrays (acceptable simplicity; revisit if profiling demands).
 - Reftest runner: `crates/grida_dev/src/reftest/`
 - Feature loop: `.agents/skills/dev-render-htmlcss-feature/SKILL.md`
 - Reftest gate: `.agents/skills/render-reftest/SKILL.md`
-- resvg upstream: <https://github.com/linebender/resvg>
-- usvg upstream: <https://github.com/linebender/resvg/tree/main/crates/usvg>
+- resvg upstream: [github.com/linebender/resvg](https://github.com/linebender/resvg)
+- usvg upstream: [github.com/linebender/resvg/tree/main/crates/usvg](https://github.com/linebender/resvg/tree/main/crates/usvg)
 - Skia SVG module (reference only): `modules/svg/` in `google/skia`
