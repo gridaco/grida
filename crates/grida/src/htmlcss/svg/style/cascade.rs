@@ -63,7 +63,7 @@ fn get_inline_style(node: &DemoNode, name: &str) -> Option<String> {
             continue;
         };
         if k.trim().eq_ignore_ascii_case(name) {
-            return Some(v.trim().to_string());
+            return Some(strip_priority(v.trim()).to_string());
         }
     }
     None
@@ -81,11 +81,31 @@ pub fn get_attr_or_style(node: &DemoNode, name: &str) -> Option<String> {
                 continue;
             };
             if k.trim().eq_ignore_ascii_case(name) {
-                return Some(v.trim().to_string());
+                return Some(strip_priority(v.trim()).to_string());
             }
         }
     }
     get_attr(node, name).map(|s| s.to_string())
+}
+
+/// Strip a trailing `!important` priority marker from a declaration
+/// value. CSS Cascading 5 §6.2: `!important` is part of the priority
+/// (used by the cascade-order layer), not the value. Downstream parsers
+/// expect `red`, not `red !important`.
+fn strip_priority(value: &str) -> &str {
+    let lower = value.trim_end();
+    // Case-insensitive trim of `!important` plus any whitespace that
+    // separates it from the value. We do the comparison on the lower
+    // 10 bytes ASCII; `!important` is ASCII-only.
+    let bytes = lower.as_bytes();
+    if bytes.len() < 10 {
+        return lower;
+    }
+    let tail = &lower[lower.len() - 10..];
+    if tail.eq_ignore_ascii_case("!important") {
+        return lower[..lower.len() - 10].trim_end();
+    }
+    lower
 }
 
 /// Strip `/* ... */` C-style comments from a CSS declaration block.

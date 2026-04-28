@@ -28,7 +28,7 @@ use super::svg_image_painter;
 use super::svg_shape_painter;
 use super::svg_text_painter;
 use super::svg_use_painter::paint_use;
-use super::visibility::{has_display_none, is_painted, is_visible_inherited};
+use super::visibility::{has_display_none, is_visible_inherited};
 
 /// Paint each SVG-namespace child of `parent_id`.
 pub fn paint_children(canvas: &Canvas, ctx: &PaintCtx<'_>, parent_id: NodeId) {
@@ -68,9 +68,15 @@ fn paint_switch_child(canvas: &Canvas, ctx: &PaintCtx<'_>, parent_id: NodeId) {
         if !system_language_match(n) {
             continue;
         }
-        // `display:none`/`visibility:hidden` skip the candidate (still
+        // `display:none` / `visibility:hidden` skip the candidate (still
         // counts as visited — the next sibling becomes eligible).
-        if !is_painted(n) {
+        // Visibility check uses the *inherited* result so a
+        // `<switch visibility="hidden">` (or any ancestor `hidden`)
+        // doesn't pin the first child as winner just because it lacks
+        // its own `visibility` declaration. Without this, a hidden
+        // ancestor would let the first eligible child swallow the
+        // selection while painting nothing.
+        if has_display_none(n) || !is_visible_inherited(ctx.dom, id) {
             continue;
         }
         paint_node(canvas, ctx, id);

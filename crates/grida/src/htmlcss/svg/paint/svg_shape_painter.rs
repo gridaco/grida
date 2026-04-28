@@ -692,9 +692,11 @@ fn inherited_paint(
         current = n.parent;
     }
     // `<use>` instance shadow tree — Blink's `SVGUseElement::CreateInstanceTree`
-    // makes the `<use>` element act as an additional ancestor for
-    // inheritance purposes.
-    if let Some(use_id) = ctx.use_inherit {
+    // makes each `<use>` element along the recursion chain act as an
+    // additional ancestor for inheritance purposes. Innermost `<use>`
+    // wins; if it doesn't supply the property, walk outward.
+    for use_id in crate::htmlcss::svg::paint::scoped_svg_paint_state::use_chain_iter(ctx.use_chain)
+    {
         let mut current = Some(use_id);
         while let Some(id) = current {
             let n = ctx.dom.node(id);
@@ -775,7 +777,8 @@ fn resolve_current_color(ctx: &PaintCtx<'_>, node: &DemoNode) -> Color {
         }
         current = n.parent;
     }
-    if let Some(use_id) = ctx.use_inherit {
+    for use_id in crate::htmlcss::svg::paint::scoped_svg_paint_state::use_chain_iter(ctx.use_chain)
+    {
         let mut current = Some(use_id);
         while let Some(id) = current {
             let n = ctx.dom.node(id);
@@ -827,7 +830,8 @@ fn opacity_property(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Option<f
         }
         current = n.parent;
     }
-    if let Some(use_id) = ctx.use_inherit {
+    for use_id in crate::htmlcss::svg::paint::scoped_svg_paint_state::use_chain_iter(ctx.use_chain)
+    {
         let mut current = Some(use_id);
         while let Some(id) = current {
             let n = ctx.dom.node(id);

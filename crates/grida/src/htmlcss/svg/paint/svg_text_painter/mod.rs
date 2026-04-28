@@ -1881,7 +1881,8 @@ fn read_local(node: &DemoNode, name: &str) -> Option<String> {
 /// When painting a `<use>` instance, the use's own attributes also
 /// participate in inheritance (Blink's "use shadow tree"), even though
 /// the cloned subtree's DOM parent is wherever it lives in `<defs>`.
-/// `ctx.use_inherit` is the use element to consult.
+/// `ctx.use_chain` is the stack of `<use>` elements to consult,
+/// innermost first.
 fn read_inherited(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Option<String> {
     /// CSS-wide keywords that don't carry information at this level —
     /// the cascade should continue walking. `inherit` explicitly asks
@@ -1912,7 +1913,8 @@ fn read_inherited(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Option<Str
         }
         current = n.parent;
     }
-    if let Some(use_id) = ctx.use_inherit {
+    for use_id in crate::htmlcss::svg::paint::scoped_svg_paint_state::use_chain_iter(ctx.use_chain)
+    {
         let mut current = Some(use_id);
         while let Some(id) = current {
             let n = ctx.dom.node(id);
@@ -1946,7 +1948,8 @@ fn resolve_font_size_at(ctx: &PaintCtx<'_>, node: &DemoNode) -> f32 {
         }
         cur = n.parent;
     }
-    if let Some(use_id) = ctx.use_inherit {
+    for use_id in crate::htmlcss::svg::paint::scoped_svg_paint_state::use_chain_iter(ctx.use_chain)
+    {
         let mut cur = Some(use_id);
         while let Some(id) = cur {
             let n = ctx.dom.node(id);
@@ -2247,16 +2250,21 @@ mod tests {
     #[test]
     fn font_weight_named_and_numeric() {
         // CSS Fonts 4 §3.2.4: named keywords and the 1..=1000 numeric
-        // range. `inherited` is irrelevant for absolute values.
+        // range. In-range absolute values resolve to themselves.
         assert_eq!(resolve_font_weight_token("normal", 400), 400);
         assert_eq!(resolve_font_weight_token("bold", 400), 700);
         assert_eq!(resolve_font_weight_token("100", 400), 100);
         assert_eq!(resolve_font_weight_token("700", 400), 700);
-        // Out-of-range numeric values clamp to 1..=1000.
-        assert_eq!(resolve_font_weight_token("0", 400), 1);
-        assert_eq!(resolve_font_weight_token("1500", 400), 1000);
-        // Non-numeric, non-keyword falls back to 400 (the initial
-        // value per §3.2.4).
+        // Out-of-range numeric values are invalid declarations per
+        // CSS Fonts 4 §3.2.4 (Blink:
+        // `ConsumeFontWeightNumber` returns nullptr → cascade falls
+        // back to the inherited value). We mirror that — `inherited`
+        // is returned, not a clamp to 1/1000.
+        assert_eq!(resolve_font_weight_token("0", 400), 400);
+        assert_eq!(resolve_font_weight_token("1500", 400), 400);
+        assert_eq!(resolve_font_weight_token("0", 700), 700);
+        // Non-numeric, non-keyword falls back to the inherited value
+        // for the same reason.
         assert_eq!(resolve_font_weight_token("heavy", 400), 400);
         // Case-insensitive named keywords.
         assert_eq!(resolve_font_weight_token("BOLD", 400), 700);

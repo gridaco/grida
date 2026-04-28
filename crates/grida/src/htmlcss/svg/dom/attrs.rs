@@ -669,7 +669,16 @@ mod tests {
         assert_eq!(parse_length_px("10"), Some(10.0));
         assert_eq!(parse_length_px("10px"), Some(10.0));
         assert_eq!(parse_length_px("  10.5  "), Some(10.5));
-        assert_eq!(parse_length_px("10em"), None);
+        // Relative units (`em`, `rem`, `ex`, `ch`) use the
+        // default-context approximation documented on
+        // `parse_length_px`: em/rem = 16px, ex/ch = 8px. We
+        // intentionally return a value rather than `None` so callers
+        // without a cascade context still produce visible geometry.
+        assert_eq!(parse_length_px("10em"), Some(160.0));
+        assert_eq!(parse_length_px("1rem"), Some(16.0));
+        assert_eq!(parse_length_px("1ex"), Some(8.0));
+        // Percentages still fail — they need the containing viewport.
+        assert_eq!(parse_length_px("50%"), None);
     }
 
     #[test]

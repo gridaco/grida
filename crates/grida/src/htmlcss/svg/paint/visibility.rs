@@ -38,32 +38,31 @@ pub fn is_painted(node: &DemoNode) -> bool {
 /// but each level only needs to check its own value because the early
 /// return at the ancestor stops descent).
 pub fn has_display_none(node: &DemoNode) -> bool {
-    if matches_attr(node, "display", "none") {
-        return true;
-    }
+    // CSS specificity: inline `style="..."` beats the presentation
+    // attribute. Look up `style` first; if it sets `display`, that
+    // value wins and we ignore the attribute. Only fall through to
+    // the attribute when `style` doesn't mention `display`.
     if let Some(style) = get_attr(node, "style") {
-        if style_contains_pair(style, "display", "none") {
-            return true;
+        if let Some(v) = read_style_pair(style, "display") {
+            return v.eq_ignore_ascii_case("none");
         }
     }
-    false
+    matches_attr(node, "display", "none")
 }
 
 /// `visibility: hidden`/`collapse` on this element only — no
 /// inheritance walk. Use [`is_visible_inherited`] when you need the
 /// effective value with parent-cascade applied.
 pub fn is_visible_self(node: &DemoNode) -> bool {
-    if matches_attr(node, "visibility", "hidden") || matches_attr(node, "visibility", "collapse") {
-        return false;
-    }
+    // Inline `style="..."` overrides the presentation attribute. Look
+    // up `style` first; only consult the attribute when `style`
+    // doesn't mention `visibility`.
     if let Some(style) = get_attr(node, "style") {
-        if style_contains_pair(style, "visibility", "hidden")
-            || style_contains_pair(style, "visibility", "collapse")
-        {
-            return false;
+        if let Some(v) = read_style_pair(style, "visibility") {
+            return !(v.eq_ignore_ascii_case("hidden") || v.eq_ignore_ascii_case("collapse"));
         }
     }
-    true
+    !(matches_attr(node, "visibility", "hidden") || matches_attr(node, "visibility", "collapse"))
 }
 
 /// Effective `visibility` for a leaf element — walks the ancestor
@@ -111,17 +110,26 @@ fn matches_attr(node: &DemoNode, name: &str, value: &str) -> bool {
     get_attr(node, name).map(str::trim) == Some(value)
 }
 
-/// Crude `key: value` lookup inside a `style="..."` blob. Good enough for
-/// `display:none` / `visibility:hidden` checks — proper CSS resolution
-/// will go through Stylo once the SVG cascade hook is wired.
-fn style_contains_pair(style: &str, key: &str, value: &str) -> bool {
+/// Crude `key: value` lookup inside a `style="..."` blob. Returns the
+/// declared value (without `!important`) or `None` if the key is
+/// absent. Good enough for `display` / `visibility` checks — proper CSS
+/// resolution will go through Stylo once the SVG cascade hook is wired.
+fn read_style_pair(style: &str, key: &str) -> Option<String> {
     for decl in style.split(';') {
         let Some((k, v)) = decl.split_once(':') else {
             continue;
         };
-        if k.trim().eq_ignore_ascii_case(key) && v.trim().eq_ignore_ascii_case(value) {
-            return true;
+        if k.trim().eq_ignore_ascii_case(key) {
+            // Strip an `!important` priority marker before returning;
+            // gating helpers compare against keyword values like `none`
+            // or `hidden`, not against priority annotations.
+            let v = v
+                .trim()
+                .trim_end_matches(|c: char| c.is_ascii_whitespace())
+                .trim_end_matches("!important")
+                .trim();
+            return Some(v.to_string());
         }
     }
-    false
+    None
 }

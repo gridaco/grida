@@ -216,7 +216,11 @@ pub fn render(
 /// `width` / `height` are CSS pixels; `viewBox` + `preserveAspectRatio`
 /// inside the SVG map user units to that box.
 ///
-/// Returns `Err` only when the input is malformed XML.
+/// Returns `Err` only when SVG structure is unrecoverable (e.g. no
+/// `<svg>` element, picture-recording failure). The XML parser is
+/// permissive — best-effort recoverable input may render as `Ok`
+/// even if it isn't strictly well-formed. Use this as a render
+/// entry point, not as an XML validator.
 pub fn render_svg(svg: &str, width: f32, height: f32) -> Result<skia_safe::Picture, String> {
     crate::htmlcss::svg::render_to_picture(svg, width, height)
         .map_err(|e| format!("htmlcss::svg::render_to_picture: {e}"))

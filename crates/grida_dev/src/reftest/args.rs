@@ -24,11 +24,13 @@ impl std::str::FromStr for BgColor {
 ///   convert to the Grida scene graph through `grida::import::svg::pack`, render
 ///   via the canvas runtime. Lossy (editor-oriented tree surgery), but
 ///   GPU-native and consistent with the in-editor experience.
-/// - `Htmlcss`: goes through `grida::htmlcss::render_svg`, which records
-///   into a Skia `Picture` via `PictureRecorder` before rasterizing.
-///   Exercises the exact code path that inline `<svg>` inside HTML
-///   takes, end-to-end through the in-tree htmlcss::svg renderer (no
-///   fallback to Skia's built-in `svg::Dom`).
+/// - `Htmlcss`: goes through `grida::htmlcss::svg::render_to_picture*`
+///   (or its `_with_context` variant when host hooks are needed),
+///   which records into a Skia `Picture` via `PictureRecorder` before
+///   rasterizing. Exercises the exact code path that inline `<svg>`
+///   inside HTML takes, end-to-end through the in-tree
+///   `htmlcss::svg` renderer (no fallback to Skia's built-in
+///   `svg::Dom`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SvgRenderer {
     Iosvg,
@@ -83,9 +85,10 @@ pub(crate) struct ReftestArgs {
 
     /// SVG renderer backend:
     ///  - `iosvg` (default): grida scene graph via usvg → pack.
-    ///  - `htmlcss`: grida::htmlcss::render_svg → PictureRecorder →
-    ///    surface. End-to-end through the in-tree htmlcss::svg
-    ///    renderer; no fallback to Skia's built-in `svg::Dom`.
+    ///  - `htmlcss`: `grida::htmlcss::svg::render_to_picture*` →
+    ///    PictureRecorder → surface. End-to-end through the in-tree
+    ///    `htmlcss::svg` renderer; no fallback to Skia's built-in
+    ///    `svg::Dom`.
     #[arg(long = "renderer", default_value = "iosvg")]
     pub renderer: SvgRenderer,
 }

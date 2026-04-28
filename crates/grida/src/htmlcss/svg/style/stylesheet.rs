@@ -457,11 +457,16 @@ fn parse_at_import(s: &str) -> Option<(String, usize)> {
 /// portion after the keyword + whitespace). Returns `(url, bytes
 /// consumed)`. Shared between [`parse_at_import`] (which needs the
 /// length to advance) and the public [`scan_imports`] helper.
+///
+/// `url(` is matched case-insensitively per CSS Syntax §4.3 (token
+/// keywords are ASCII-case-insensitive).
 fn parse_import_url(body: &str) -> Option<(String, usize)> {
-    if let Some(rest) = body.strip_prefix("url(") {
+    let starts_with_url = body.len() >= 4 && body[..4].eq_ignore_ascii_case("url(");
+    if starts_with_url {
+        let rest = &body[4..];
         let close = rest.find(')')?;
         let raw = rest[..close].trim().trim_matches(|c| c == '\'' || c == '"');
-        Some((raw.to_string(), "url(".len() + close + 1))
+        Some((raw.to_string(), 4 + close + 1))
     } else if let Some(rest) = body.strip_prefix('"') {
         let close = rest.find('"')?;
         Some((rest[..close].to_string(), 1 + close + 1))
@@ -481,12 +486,15 @@ fn parse_import_url(body: &str) -> Option<(String, usize)> {
 pub fn scan_imports(text: &str) -> Vec<String> {
     let stripped = strip_css_comments(text);
     let mut out = Vec::new();
-    let mut rest = stripped.as_str();
-    while let Some(idx) = rest.find("@import") {
-        let after = &rest[idx + "@import".len()..];
-        // Same keyword-boundary check as `parse_at_import`: the byte
-        // after `@import` must be whitespace; otherwise this is a
-        // longer ident like `@importurl` and we move past it.
+    // `@import` matches case-insensitively per CSS Syntax §4.3. We
+    // scan a lowercase copy for keyword positions and slice the
+    // original-case `stripped` for the URL (positions match because
+    // ASCII case-folding preserves byte indices).
+    let lower = stripped.to_ascii_lowercase();
+    let mut cursor = 0usize;
+    while let Some(rel) = lower[cursor..].find("@import") {
+        let idx = cursor + rel;
+        let after = &stripped[idx + "@import".len()..];
         let boundary_ok = after
             .as_bytes()
             .first()
@@ -497,7 +505,7 @@ pub fn scan_imports(text: &str) -> Vec<String> {
                 out.push(url);
             }
         }
-        rest = after;
+        cursor = idx + "@import".len();
     }
     out
 }

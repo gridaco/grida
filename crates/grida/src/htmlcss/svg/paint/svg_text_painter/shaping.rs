@@ -154,7 +154,11 @@ pub(super) fn compute_kerned_advances(
         // shaped glyph at or after end_byte (or end of shaped list);
         // its origin marks the next character's start, so the advance
         // for this character is the difference.
-        let start_glyph = shaped.iter().position(|g| g.cluster >= start_byte);
+        // Use `==` (not `>=`) for `start_byte` so a character with no
+        // shaped glyph (combining mark, mark cluster) gets advance 0
+        // instead of borrowing the next character's advance — preserving
+        // the zero-advance contract documented above.
+        let start_glyph = shaped.iter().position(|g| g.cluster == start_byte);
         let end_glyph = shaped.iter().position(|g| g.cluster >= end_byte);
         let advance = match start_glyph {
             None => 0.0,

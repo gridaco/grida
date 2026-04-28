@@ -79,13 +79,58 @@ pub struct PaintCtx<'a> {
     /// `vmin` / `vmax` (CSS Values 4 §8). For a standalone SVG
     /// rendered to a 500×500 PNG, this is `(500.0, 500.0)`.
     pub initial_viewport: (f32, f32),
-    /// `<use>` element whose subtree we're currently painting, if any.
-    /// Inheritable property resolution (fill, stroke, font-size, …)
-    /// consults attributes here in addition to the DOM ancestor chain
-    /// so an SVG like `<use fill="green" href="#g"/>` propagates the
-    /// green fill into the cloned subtree. Mirrors Blink's "use shadow
-    /// tree" composition (`SVGUseElement::CreateInstanceTree`).
-    pub use_inherit: Option<NodeId>,
+    /// Stack of nested `<use>` elements whose subtree we're currently
+    /// painting, innermost last. Inheritable property resolution
+    /// (fill, stroke, font-size, …) consults attributes here in
+    /// addition to the DOM ancestor chain so an SVG like
+    /// `<use fill="green" href="#g"/>` propagates the green fill into
+    /// the cloned subtree. Mirrors Blink's "use shadow tree"
+    /// composition (`SVGUseElement::CreateInstanceTree`).
+    ///
+    /// Modeled as a stack of references so multiple levels of `<use>`
+    /// each contribute (innermost wins, then outer). Implemented as a
+    /// linked list of stack frames so `PaintCtx` stays `Copy` — each
+    /// recursion adds one frame on the caller's stack and points
+    /// `use_chain` at it.
+    pub use_chain: Option<&'a UseFrame<'a>>,
+}
+
+/// One link in the `<use>` recursion stack. Carries the `<use>`
+/// element id (for inheritance lookup) and the resolved target id
+/// (for cycle detection — non-ancestor cycles like `#a → #b → #a`
+/// are caught by walking this chain).
+#[derive(Clone, Copy)]
+pub struct UseFrame<'a> {
+    pub use_id: NodeId,
+    pub target_id: NodeId,
+    pub parent: Option<&'a UseFrame<'a>>,
+}
+
+impl<'a> UseFrame<'a> {
+    /// Returns true if `target` already appears in the chain — used
+    /// by `paint_use` to abort recursion before painting a cyclic
+    /// reference.
+    pub fn contains_target(&self, target: NodeId) -> bool {
+        if self.target_id == target {
+            return true;
+        }
+        match self.parent {
+            Some(p) => p.contains_target(target),
+            None => false,
+        }
+    }
+}
+
+/// Walk the `<use>` chain innermost-first. Each `use_id` is yielded
+/// in turn so callers can read inheritable attributes from the
+/// closest `<use>` first.
+pub fn use_chain_iter<'a>(chain: Option<&'a UseFrame<'a>>) -> impl Iterator<Item = NodeId> + 'a {
+    let mut cursor = chain;
+    std::iter::from_fn(move || {
+        let frame = cursor?;
+        cursor = frame.parent;
+        Some(frame.use_id)
+    })
 }
 
 impl<'a> PaintCtx<'a> {
@@ -107,13 +152,13 @@ impl<'a> PaintCtx<'a> {
             pattern_depth: 0,
             marker_depth: 0,
             initial_viewport,
-            use_inherit: None,
+            use_chain: None,
         }
     }
 
-    pub fn with_use_inherit(self, use_node: NodeId) -> Self {
+    pub fn with_use_chain(self, frame: &'a UseFrame<'a>) -> Self {
         Self {
-            use_inherit: Some(use_node),
+            use_chain: Some(frame),
             ..self
         }
     }

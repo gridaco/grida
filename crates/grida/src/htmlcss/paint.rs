@@ -797,23 +797,23 @@ fn paint_replaced(
     // than resvg+tiny-skia or Skia's built-in svg::Dom. There is no
     // fallback — features still under construction render as best-effort
     // gaps so we feel the motivation to implement them.
-    let svg_handled = if let Some(ref xml) = content.svg_xml {
-        paint_inline_svg(canvas, xml.as_bytes(), w, h, images)
-    } else {
-        false
-    };
-
-    if svg_handled {
+    // Inline SVG: routes through the in-tree htmlcss::svg renderer.
+    // Per the "no fallback" intent, an inline-SVG element terminates
+    // here whether the render succeeded or not — we do NOT fall back
+    // to the gray placeholder. The placeholder is for missing `<img>`
+    // resources only. (Reviewer note: see PR #698 / coderabbit
+    // finding "Inline `<svg>` failure still falls back to placeholder
+    // rendering"; the previous flow let `paint_inline_svg`-returned-
+    // false fall through to the placeholder draw at the bottom of
+    // this function.)
+    if let Some(ref xml) = content.svg_xml {
+        let _ = paint_inline_svg(canvas, xml.as_bytes(), w, h, images);
         canvas.restore();
         return;
     }
 
-    // Image path: only applies to <img>-style replaced elements (not SVG).
-    let image_opt = if content.svg_xml.is_none() {
-        images.get(&content.src)
-    } else {
-        None
-    };
+    // Image path: only applies to <img>-style replaced elements.
+    let image_opt = images.get(&content.src);
     if let Some(image) = image_opt {
         let img_w = image.width() as f32;
         let img_h = image.height() as f32;

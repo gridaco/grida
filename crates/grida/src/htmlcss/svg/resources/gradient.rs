@@ -320,6 +320,21 @@ fn resolve_common(dom: &DemoDom, chain: &[NodeId]) -> Option<GradientCommon> {
         return None;
     }
 
+    // Per SVG 1.1 §13.2.4 and SVG 2 §13.2.4: each stop's offset must be
+    // greater than or equal to the previous stop's. If not, the user
+    // agent must "use the previous offset value." Without this pass an
+    // out-of-order list like `0.8, 0.2, 1` would feed Skia a malformed
+    // distribution and produce the wrong gradient. Sorting would change
+    // the color order; spec says clamp upward instead.
+    let mut max_so_far = 0.0_f32;
+    for stop in stops.iter_mut() {
+        if stop.offset < max_so_far {
+            stop.offset = max_so_far;
+        } else {
+            max_so_far = stop.offset;
+        }
+    }
+
     Some(GradientCommon {
         units,
         transform,

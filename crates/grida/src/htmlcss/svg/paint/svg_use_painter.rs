@@ -16,7 +16,7 @@ use crate::htmlcss::svg::dom::element::{get_attr, ElementKind};
 use crate::htmlcss::svg::dom::href::{href_attr, same_document_fragment};
 use crate::htmlcss::svg::layout::viewport::{ancestor_svg_viewport, compute_viewbox_matrix};
 use crate::htmlcss::svg::paint::effects::group_opacity;
-use crate::htmlcss::svg::paint::scoped_svg_paint_state::{PaintCtx, MAX_USE_DEPTH};
+use crate::htmlcss::svg::paint::scoped_svg_paint_state::{PaintCtx, UseFrame, MAX_USE_DEPTH};
 use crate::htmlcss::svg::paint::svg_container_painter::{paint_children, paint_node};
 
 pub(crate) fn paint_use(canvas: &Canvas, ctx: &PaintCtx<'_>, use_id: NodeId) {
@@ -33,12 +33,23 @@ pub(crate) fn paint_use(canvas: &Canvas, ctx: &PaintCtx<'_>, use_id: NodeId) {
     if target_id == use_id {
         return;
     }
+    // Ancestor-chain cycle: target is a DOM ancestor of this `<use>`.
     let mut anc = node.parent;
     while let Some(id) = anc {
         if id == target_id {
             return;
         }
         anc = ctx.dom.node(id).parent;
+    }
+    // Recursion-chain cycle: target was already painted as a `<use>`
+    // host higher in the recursion stack (e.g. mutual references like
+    // `#a → #b → #a` that don't share a DOM ancestor). Without this
+    // check we'd recurse to MAX_USE_DEPTH painting intermediate
+    // content multiple times before the depth cap kicked in.
+    if let Some(chain) = ctx.use_chain {
+        if chain.contains_target(target_id) {
+            return;
+        }
     }
 
     let restore = canvas.save();
@@ -48,7 +59,12 @@ pub(crate) fn paint_use(canvas: &Canvas, ctx: &PaintCtx<'_>, use_id: NodeId) {
         canvas.translate((x, y));
     }
 
-    let deeper = ctx.with_deeper_use().with_use_inherit(use_id);
+    let frame = UseFrame {
+        use_id,
+        target_id,
+        parent: ctx.use_chain,
+    };
+    let deeper = ctx.with_deeper_use().with_use_chain(&frame);
     let target = ctx.dom.node(target_id);
     if let DemoNodeData::Element(d) = &target.data {
         let kind = ElementKind::from_local_name(d.name.local.as_ref());
