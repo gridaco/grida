@@ -104,7 +104,7 @@ The SVG static-rendering surface, modeled on Blink's coverage:
 - **Paint servers**: `<linearGradient>`, `<radialGradient>`, `<pattern>`.
 - **Effects**: `<clipPath>`, `<mask>`, `<filter>`, `<marker>`.
 - **Filter primitives**: full set mapped to `skia_safe::ImageFilter` —
-  see the table in `resources/filter_effect.rs`.
+  see the table in `resources/svg_filter_builder.rs`.
 - **Coordinate systems**: `viewBox`, `preserveAspectRatio`, nested `<svg>`,
   `transform=` attribute.
 - **Style**: temporary SVG CSS subset. Full Stylo integration remains
@@ -174,44 +174,47 @@ Chromium as the oracle).
 
 ## Module map (Grida ↔ Blink)
 
-| Grida file (`crates/grida/src/htmlcss/svg/`) | Blink anchor (`third_party/blink/renderer/`)                                    |
-| -------------------------------------------- | ------------------------------------------------------------------------------- |
-| `error.rs`                                   | (Grida-only) renderer error type                                                |
-| `context.rs`                                 | host hooks (image / font / css providers)                                       |
-| `dom/element.rs`                             | `core/svg/svg_*_element.{h,cc}` (one per tag)                                   |
-| `dom/attrs.rs`                               | `core/svg/svg_animated_*.{h,cc}` (typed; static, no animVal)                    |
-| `dom/path_d.rs`                              | `core/svg/svg_path_*` parser family                                             |
-| `dom/parser.rs`                              | `core/svg/svg_parser_utilities.cc` + Blink XML parser frontend                  |
-| `dom/href.rs`                                | `core/svg/svg_uri_reference.{h,cc}`                                             |
-| `style/stylesheet.rs`                        | `core/css/parser/css_parser_impl.cc` (a tiny in-tree subset; see note above)    |
-| `style/stylo_bridge.rs`                      | (placeholder) future Stylo cascade entry point                                  |
-| `geometry/basic_shape.rs`                    | `core/css/basic_shape_functions.{h,cc}` + `core/style/basic_shapes.{h,cc}`      |
-| `layout/bbox.rs`                             | scattered `core/layout/svg/*::ObjectBoundingBox` overrides                      |
-| `layout/transform.rs`                        | `core/layout/svg/transform_helper.{h,cc}`                                       |
-| `layout/viewport.rs`                         | `core/layout/svg/layout_svg_viewport_container.{h,cc}` + viewBox math           |
-| `layout/layout_svg_element.rs`               | (bridge type) thin wrapper paint/resources see for "an SVG element"             |
-| `paint/svg_painter.rs`                       | (trait) uniform painter contract (Blink: `*Painter::Paint(PaintInfo)`)          |
-| `paint/scoped_svg_paint_state.rs`            | `core/paint/scoped_svg_paint_state.{h,cc}`                                      |
-| `paint/svg_object_painter.rs`                | `core/paint/svg_object_painter.{h,cc}`                                          |
-| `paint/svg_root_painter.rs`                  | `core/paint/svg_root_painter.{h,cc}`                                            |
-| `paint/svg_container_painter.rs`             | `core/paint/svg_container_painter.{h,cc}`                                       |
-| `paint/svg_shape_painter.rs`                 | `core/paint/svg_shape_painter.{h,cc}`                                           |
-| `paint/svg_text_painter.rs`                  | `core/layout/svg/svg_text_layout_algorithm.{h,cc}` + HTML inline-text painter   |
-| `paint/svg_image_painter.rs`                 | `core/paint/svg_image_painter.{h,cc}`                                           |
-| `paint/svg_use_painter.rs`                   | `core/svg/svg_use_element.{h,cc}` shadow-tree expansion                         |
-| `paint/svg_marker_painter.rs`                | `core/paint/marker_range_mapping_context.{h,cc}` + svg_shape_painter:256–323    |
-| `paint/clip_path_clipper.rs`                 | `core/paint/clip_path_clipper.{h,cc}`                                           |
-| `paint/effects.rs`                           | (helpers) opacity, filter resolution, font-size resolution                      |
-| `resources/svg_resources.rs`                 | `core/layout/svg/svg_resources.{h,cc}` + `layout_svg_resource_container.{h,cc}` |
-| `resources/svg_resource_container.rs`        | (trait) uniform resource-container contract                                     |
-| `resources/cache.rs`                         | (placeholder) per-client cache, mirrors `SVGElementResourceClient`              |
-| `resources/paint_server.rs`                  | `core/layout/svg/layout_svg_resource_paint_server.{h,cc}`                       |
-| `resources/gradient.rs`                      | `core/layout/svg/layout_svg_resource_gradient.{h,cc}` (+ linear/radial)         |
-| `resources/pattern.rs`                       | `core/layout/svg/layout_svg_resource_pattern.{h,cc}`                            |
-| `resources/clipper.rs`                       | `core/layout/svg/layout_svg_resource_clipper.{h,cc}`                            |
-| `resources/masker.rs`                        | `core/layout/svg/layout_svg_resource_masker.{h,cc}`                             |
-| `resources/filter.rs`                        | `core/layout/svg/layout_svg_resource_filter.{h,cc}`                             |
-| `resources/svg_filter_builder.rs`            | `core/svg/graphics/filters/svg_filter_builder.{h,cc}` + `FilterEffect` family   |
+| Grida file (`crates/grida/src/htmlcss/svg/`) | Blink anchor (`third_party/blink/renderer/`)                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `error.rs`                                   | (Grida-only) renderer error type                                                      |
+| `context.rs`                                 | host hooks (image / font / css providers)                                             |
+| `dom/element.rs`                             | `core/svg/svg_*_element.{h,cc}` (one per tag)                                         |
+| `dom/attrs.rs`                               | `core/svg/svg_animated_*.{h,cc}` (typed; static, no animVal)                          |
+| `dom/path_d.rs`                              | `core/svg/svg_path_*` parser family                                                   |
+| `dom/parser.rs`                              | `core/svg/svg_parser_utilities.cc` + Blink XML parser frontend                        |
+| `dom/href.rs`                                | `core/svg/svg_uri_reference.{h,cc}`                                                   |
+| `style/cascade.rs`                           | `core/css/resolver/style_resolver.cc` (single funnel for property resolution)         |
+| `style/stylesheet.rs`                        | `core/css/parser/css_parser_impl.cc` (a tiny in-tree subset; see note above)          |
+| `style/stylo_bridge.rs`                      | (placeholder) future Stylo cascade entry point                                        |
+| `geometry/basic_shape.rs`                    | `core/css/basic_shape_functions.{h,cc}` + `core/style/basic_shapes.{h,cc}`            |
+| `layout/bbox.rs`                             | scattered `core/layout/svg/*::ObjectBoundingBox` overrides                            |
+| `layout/transform.rs`                        | `core/layout/svg/transform_helper.{h,cc}`                                             |
+| `layout/viewport.rs`                         | `core/layout/svg/layout_svg_viewport_container.{h,cc}` + viewBox math                 |
+| `layout/layout_svg_element.rs`               | (bridge type) thin wrapper paint/resources see for "an SVG element"                   |
+| `paint/svg_painter.rs`                       | (trait) uniform painter contract (Blink: `*Painter::Paint(PaintInfo)`)                |
+| `paint/scoped_svg_paint_state.rs`            | `core/paint/scoped_svg_paint_state.{h,cc}`                                            |
+| `paint/svg_object_painter.rs`                | `core/paint/svg_object_painter.{h,cc}`                                                |
+| `paint/svg_root_painter.rs`                  | `core/paint/svg_root_painter.{h,cc}`                                                  |
+| `paint/svg_container_painter.rs`             | `core/paint/svg_container_painter.{h,cc}`                                             |
+| `paint/svg_shape_painter.rs`                 | `core/paint/svg_shape_painter.{h,cc}`                                                 |
+| `paint/svg_text_painter/mod.rs`              | `core/paint/svg_text_painter.{h,cc}` + `core/layout/svg/svg_text_layout_algorithm.cc` |
+| `paint/svg_text_painter/shaping.rs`          | `platform/fonts/shaping/harfbuzz_shaper.{h,cc}` (the SkShaper bridge)                 |
+| `paint/visibility.rs`                        | (paint helper) `display:none` / `visibility:hidden` predicates                        |
+| `paint/svg_image_painter.rs`                 | `core/paint/svg_image_painter.{h,cc}`                                                 |
+| `paint/svg_use_painter.rs`                   | `core/svg/svg_use_element.{h,cc}` shadow-tree expansion                               |
+| `paint/svg_marker_painter.rs`                | `core/paint/marker_range_mapping_context.{h,cc}` + svg_shape_painter:256–323          |
+| `paint/clip_path_clipper.rs`                 | `core/paint/clip_path_clipper.{h,cc}`                                                 |
+| `paint/effects.rs`                           | (helpers) opacity, filter resolution, font-size resolution                            |
+| `resources/svg_resources.rs`                 | `core/layout/svg/svg_resources.{h,cc}` + `layout_svg_resource_container.{h,cc}`       |
+| `resources/svg_resource_container.rs`        | (trait) uniform resource-container contract                                           |
+| `resources/cache.rs`                         | (placeholder) per-client cache, mirrors `SVGElementResourceClient`                    |
+| `resources/paint_server.rs`                  | `core/layout/svg/layout_svg_resource_paint_server.{h,cc}`                             |
+| `resources/gradient.rs`                      | `core/layout/svg/layout_svg_resource_gradient.{h,cc}` (+ linear/radial)               |
+| `resources/pattern.rs`                       | `core/layout/svg/layout_svg_resource_pattern.{h,cc}`                                  |
+| `resources/clipper.rs`                       | `core/layout/svg/layout_svg_resource_clipper.{h,cc}`                                  |
+| `resources/masker.rs`                        | `core/layout/svg/layout_svg_resource_masker.{h,cc}`                                   |
+| `resources/filter.rs`                        | `core/layout/svg/layout_svg_resource_filter.{h,cc}`                                   |
+| `resources/svg_filter_builder.rs`            | `core/svg/graphics/filters/svg_filter_builder.{h,cc}` + `FilterEffect` family         |
 
 ## Cross-references
 

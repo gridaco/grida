@@ -19,8 +19,6 @@ use fixture_helpers::*;
 use grida::cg::color::CGColor;
 use grida::cg::fe::*;
 use grida::cg::stroke_width::StrokeWidth;
-use grida::cg::types::*;
-use grida::node::schema::*;
 use std::collections::HashMap;
 
 /// 100×100 grid of rectangles (10 000 nodes).

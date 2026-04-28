@@ -1,9 +1,10 @@
 //! `LayoutSvgResourceFilter` — `<filter>` resource.
 //!
 //! Compiles the child `fe*` primitives (parsed in
-//! [`super::filter_effect`]) into a single `skia_safe::ImageFilter`, then
-//! returns a [`FilterInvocation`] the painter can apply via a
-//! `save_layer` whose paint carries the `ImageFilter`.
+//! [`super::svg_filter_builder`]) into a single
+//! `skia_safe::ImageFilter`, then returns a [`FilterInvocation`] the
+//! painter can apply via a `save_layer` whose paint carries the
+//! `ImageFilter`.
 //!
 //! Honours: `filterUnits` (`objectBoundingBox` default), `primitiveUnits`
 //! (`userSpaceOnUse` default), `x` / `y` / `width` / `height` (the filter
@@ -34,8 +35,7 @@
 use csscascade::dom::{DemoDom, DemoNodeData, NodeId};
 use rustc_hash::FxHashMap;
 use skia_safe::{
-    color_filters, image_filters, paint::Paint as SkPaint, BlendMode, ColorFilter, ColorMatrix,
-    ImageFilter, Rect,
+    color_filters, image_filters, BlendMode, ColorFilter, ColorMatrix, ImageFilter, Rect,
 };
 
 use super::svg_filter_builder::{
@@ -1756,19 +1756,9 @@ fn parse_drop_shadow_args(
     Some((dx, dy, blur, color.unwrap_or(current_color)))
 }
 
-/// Apply the resolved [`FilterInvocation`] around `paint_inner`. Mirrors
-/// Blink's effect-tree composition: open a layer with the image filter
-/// set on the layer paint, run the inner draw, restore.
-pub fn apply<F>(canvas: &skia_safe::Canvas, inv: &FilterInvocation, paint_inner: F)
-where
-    F: FnOnce(&skia_safe::Canvas),
-{
-    let mut paint = SkPaint::default();
-    paint.set_image_filter(Some(inv.image_filter.clone()));
-    let rec = skia_safe::canvas::SaveLayerRec::default()
-        .bounds(&inv.region_user_space)
-        .paint(&paint);
-    canvas.save_layer(&rec);
-    paint_inner(canvas);
-    canvas.restore();
-}
+// Filter application happens inline at the call site — see
+// `paint/svg_container_painter.rs` where the painter sets
+// `inv.image_filter` on a `SkPaint` and opens a `save_layer` directly.
+// Keeping that inline (rather than a helper here) preserves the
+// "resources/ produces, paint/ applies" boundary enforced by
+// `tests/htmlcss_svg_architecture.rs`.

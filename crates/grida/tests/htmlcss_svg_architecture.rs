@@ -74,14 +74,6 @@ fn read(path: &Path) -> String {
 /// fixed. Each entry should reference an issue/comment that explains
 /// why it's deferred. Keep this list **shrinking, not growing**.
 const ALLOWLIST: &[(&str, &str)] = &[
-    // resources/filter.rs::apply opens a saveLayer on the caller's
-    // canvas, which is genuinely paint-time work. The right fix is
-    // to split the file: keep FilterInvocation construction here and
-    // move `apply` to paint/. Tracked as a follow-up to the initial
-    // refactor (commit message: "next: split filter realization
-    // from filter application").
-    ("resources/filter.rs", "skia_safe::Canvas"),
-    ("resources/filter.rs", "skia_safe::canvas::"),
     // geometry/basic_shape.rs needs the SVG `d=` path parser to
     // implement CSS `path(...)`. The right long-term home for that
     // parser is geometry/, but moving it requires updating dom/'s

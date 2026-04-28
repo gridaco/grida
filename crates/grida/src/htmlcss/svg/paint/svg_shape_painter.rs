@@ -18,9 +18,10 @@ use skia_safe::{
 };
 
 use super::super::dom::attrs::{parse_length_px, parse_paint, parse_points, parse_viewbox, Paint};
-use super::super::dom::element::{cascade_property, get_attr, ElementKind};
+use super::super::dom::element::{get_attr, ElementKind};
 use super::super::dom::path_d::parse_path;
 use super::super::resources::paint_server::{self, Resolved};
+use super::super::style::cascade::cascade_property;
 use super::scoped_svg_paint_state::PaintCtx;
 use csscascade::dom::DemoNodeData;
 

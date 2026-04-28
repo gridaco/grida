@@ -23,3 +23,4 @@ pub mod svg_root_painter;
 pub mod svg_shape_painter;
 pub mod svg_text_painter;
 pub mod svg_use_painter;
+pub mod visibility;

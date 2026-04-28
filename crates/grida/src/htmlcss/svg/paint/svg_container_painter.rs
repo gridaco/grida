@@ -13,16 +13,14 @@ use csscascade::dom::{DemoNode, DemoNodeData, NodeId};
 use skia_safe::{Canvas, Paint as SkPaint};
 
 use super::super::dom::attrs::parse_transform;
-use super::super::dom::element::{
-    cascade_property, element_kind, get_attr, has_display_none, is_painted, is_visible_inherited,
-    ElementKind,
-};
+use super::super::dom::element::{element_kind, get_attr, ElementKind};
 use super::super::dom::parser::svg_element_children;
 use super::super::layout::bbox::element_object_bbox;
 use super::super::layout::transform::transform_origin_for;
 use super::super::layout::viewport::paint_nested_svg;
 use super::super::resources::masker;
 use super::super::resources::svg_resources::parse_url_ref;
+use super::super::style::cascade::cascade_property;
 use super::clip_path_clipper::apply_clip_path;
 use super::effects::{group_opacity, resolve_filter_chain};
 use super::scoped_svg_paint_state::{PaintCtx, MAX_FILTER_DEPTH, MAX_MASK_DEPTH};
@@ -30,6 +28,7 @@ use super::svg_image_painter;
 use super::svg_shape_painter;
 use super::svg_text_painter;
 use super::svg_use_painter::paint_use;
+use super::visibility::{has_display_none, is_painted, is_visible_inherited};
 
 /// Paint each SVG-namespace child of `parent_id`.
 pub fn paint_children(canvas: &Canvas, ctx: &PaintCtx<'_>, parent_id: NodeId) {

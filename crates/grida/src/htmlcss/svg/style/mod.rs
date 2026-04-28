@@ -29,5 +29,6 @@
 //! - No pseudo-classes (`:hover`, `:focus`), pseudo-elements,
 //!   `@media`, `@supports`, custom properties, or layered cascade.
 
+pub mod cascade;
 pub mod stylesheet;
 pub mod stylo_bridge;

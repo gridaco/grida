@@ -236,7 +236,7 @@ fn build_child_path(
 
     // `display="none"` / `visibility="hidden"` on a clipper child means
     // the shape contributes nothing.
-    if !crate::htmlcss::svg::dom::element::is_painted(node) {
+    if !crate::htmlcss::svg::paint::visibility::is_painted(node) {
         return Some(None);
     }
     // `fill="none"` on a clipper child does NOT remove it — clipping

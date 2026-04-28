@@ -16,7 +16,7 @@ use skia_safe::{Canvas, Matrix, Paint as SkPaint, Rect};
 use super::super::dom::attrs::{
     parse_length_px, parse_preserve_aspect_ratio, parse_viewbox, AlignX, AlignY, Fit,
 };
-use super::super::dom::element::{get_attr, is_painted};
+use super::super::dom::element::get_attr;
 use super::super::dom::parser::find_svg_root;
 use super::super::resources::filter as svg_filter;
 use super::super::resources::svg_resources::{parse_url_ref, Resources};
@@ -24,6 +24,7 @@ use super::super::SvgError;
 use super::clip_path_clipper::apply_clip_path;
 use super::scoped_svg_paint_state::PaintCtx;
 use super::svg_container_painter::paint_children;
+use super::visibility::is_painted;
 use crate::htmlcss::svg::layout::bbox::element_object_bbox;
 use crate::htmlcss::svg::RenderContext;
 
