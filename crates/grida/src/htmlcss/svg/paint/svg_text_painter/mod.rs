@@ -2291,6 +2291,145 @@ fn draw_glyphs(canvas: &Canvas, glyphs: &[ResolvedGlyph], font: &Font, paint: &S
     }
 }
 
+/// Build a unioned glyph-outline `Path` for a `<text>` element used as
+/// a `<clipPath>` child. Walks the text's descendants, shapes their
+/// concatenated content with the text root's font, then unions each
+/// glyph's outline (translated to its shaped position + the text's
+/// `(x, y)` origin) into a single path. Per SVG 2 §14.3.5 a `<text>`
+/// inside `<clipPath>` contributes its rendered glyph geometry to the
+/// clip region; this is a coarse mirror that handles single-font
+/// runs (the most common shape — variable-weight tspans within one
+/// `<clipPath>` would need per-tspan shaping to be exact).
+///
+/// Returns `None` when the font can't be resolved or the text yields
+/// no glyphs.
+pub(crate) fn build_text_clip_path(ctx: &PaintCtx<'_>, node: &DemoNode) -> Option<Path> {
+    let root_size = resolve_font_size_at(ctx, node).max(0.0);
+    if root_size <= 0.0 {
+        return None;
+    }
+    let x0 = get_attr(node, "x").and_then(parse_length_px).unwrap_or(0.0);
+    let y0 = get_attr(node, "y").and_then(parse_length_px).unwrap_or(0.0);
+
+    let mut state = ClipPathBuildState {
+        cursor_x: x0,
+        cursor_y: y0,
+        last_was_space: true,
+        acc: None,
+    };
+    walk_text_clip_runs(ctx, node, node, &mut state);
+    state.acc
+}
+
+/// Per-run shaping state for `build_text_clip_path`. Tracks the running
+/// pen position so successive tspan / text-data runs concatenate
+/// horizontally, and remembers the last-emitted whitespace status so
+/// the XML-default whitespace collapse is honored across run
+/// boundaries (matches the painter's collapse rule on flat tspan
+/// children).
+struct ClipPathBuildState {
+    cursor_x: f32,
+    cursor_y: f32,
+    last_was_space: bool,
+    acc: Option<Path>,
+}
+
+/// Walk the children of a text root for the clip-path glyph builder.
+/// `current_source` is the element whose font / position attrs apply to
+/// the current text run — for direct text under `<text>` it's the text
+/// root, for text under a tspan it's that tspan. Each tspan with
+/// explicit `x` or `y` resets the pen.
+fn walk_text_clip_runs(
+    ctx: &PaintCtx<'_>,
+    text_root: &DemoNode,
+    current_source: &DemoNode,
+    state: &mut ClipPathBuildState,
+) {
+    for &cid in &current_source.children {
+        let child = ctx.dom.node(cid);
+        match &child.data {
+            DemoNodeData::Text(s) => {
+                emit_clip_run(ctx, text_root, current_source, s, state);
+            }
+            DemoNodeData::Element(_) => {
+                if let Some(x) = get_attr(child, "x").and_then(parse_length_px) {
+                    state.cursor_x = x;
+                    state.last_was_space = true;
+                }
+                if let Some(y) = get_attr(child, "y").and_then(parse_length_px) {
+                    state.cursor_y = y;
+                }
+                walk_text_clip_runs(ctx, text_root, child, state);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Shape one text-data run with the source element's resolved font,
+/// emit each glyph's outline path translated to the running pen
+/// position, then advance the pen by the run's total advance.
+fn emit_clip_run(
+    ctx: &PaintCtx<'_>,
+    _text_root: &DemoNode,
+    source: &DemoNode,
+    raw: &str,
+    state: &mut ClipPathBuildState,
+) {
+    // Whitespace collapse: identical to `collect_text_content`'s
+    // logic, but threaded so consecutive runs share state.
+    let mut text = String::new();
+    for ch in raw.chars() {
+        if ch.is_whitespace() {
+            if !state.last_was_space {
+                text.push(' ');
+                state.last_was_space = true;
+            }
+        } else {
+            text.push(ch);
+            state.last_was_space = false;
+        }
+    }
+    if text.is_empty() {
+        return;
+    }
+    let font_size = resolve_font_size_at(ctx, source).max(0.0);
+    if font_size <= 0.0 {
+        return;
+    }
+    let family = read_inherited(ctx, source, "font-family");
+    let style = read_font_style(ctx, source);
+    let Some(typeface) = pick_typeface(ctx.fonts, family.as_deref(), style) else {
+        return;
+    };
+    let font = Font::from_typeface(typeface, font_size);
+    let (shaped, total) = shaping::shape_text(&text, &font);
+    if shaped.is_empty() {
+        return;
+    }
+    for g in &shaped {
+        let Some(mut glyph_path) = font.get_path(g.id) else {
+            continue;
+        };
+        if glyph_path.is_empty() {
+            continue;
+        }
+        let m = skia_safe::Matrix::translate((
+            state.cursor_x + g.position.x,
+            state.cursor_y + g.position.y,
+        ));
+        glyph_path = glyph_path.with_transform(&m);
+        state.acc = Some(match state.acc.take() {
+            None => glyph_path,
+            Some(prev) => {
+                skia_safe::op(&prev, &glyph_path, skia_safe::PathOp::Union).unwrap_or(prev)
+            }
+        });
+    }
+    state.cursor_x += total.x;
+    state.cursor_y += total.y;
+}
+
 /// Resolve a CSS `font-family` list against the host-supplied
 /// [`FontResolver`]. Walks the comma-separated list, querying the
 /// resolver for each token at the requested style, and falls through

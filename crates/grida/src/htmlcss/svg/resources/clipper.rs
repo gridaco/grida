@@ -191,9 +191,20 @@ fn walk_clipper_children(
             continue;
         }
 
-        let mut child_path = match build_child_path(dom, resources, child, kind)? {
-            Some(p) => p,
-            None => continue,
+        let mut child_path = if matches!(kind, ElementKind::Text) {
+            // `<text>` inside `<clipPath>` contributes its rendered
+            // glyph geometry as the clip region (SVG 2 §14.3.5). Built
+            // through the text painter so font / shaping / positioning
+            // mirror the paint pass.
+            match super::super::paint::svg_text_painter::build_text_clip_path(ctx, child) {
+                Some(p) => p,
+                None => continue,
+            }
+        } else {
+            match build_child_path(dom, resources, child, kind)? {
+                Some(p) => p,
+                None => continue,
+            }
         };
 
         if let Some(t) = get_attr(child, "transform").and_then(parse_transform) {
@@ -293,6 +304,7 @@ fn is_supported_clipper_child(kind: ElementKind) -> bool {
             | ElementKind::Polygon
             | ElementKind::Polyline
             | ElementKind::Use
+            | ElementKind::Text
             | ElementKind::Title
             | ElementKind::Desc
             | ElementKind::Metadata
