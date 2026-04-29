@@ -1191,11 +1191,24 @@ fn parse_turbulence(node: &DemoNode) -> Option<FilterEffect> {
     // Negatives are clamped to 0 per Blink `fe_turbulence.cc:119-124`.
     let base_freq_x = fx.max(0.0);
     let base_freq_y = fy.max(0.0);
-    let num_octaves = get_attr(node, "numOctaves")
+    let num_octaves_raw = get_attr(node, "numOctaves")
         .and_then(|s| s.trim().parse::<i32>().ok())
-        .unwrap_or(1)
-        // Blink caps at 9 (`fe_turbulence.cc:144`).
-        .clamp(1, 9) as u32;
+        .unwrap_or(1);
+    if num_octaves_raw <= 0 {
+        // SVG Filter Effects 1 §15.31: numOctaves "must be a positive
+        // integer". Non-positive values produce no noise — Blink's
+        // octave loop in `fe_turbulence.cc` (PaintingDataForCurrentFrame)
+        // iterates `[0, num_octaves_)`, so 0 / negative yields a zero
+        // sample. Chrome/Firefox/Safari/resvg/inkscape all render an
+        // empty filter region. Emit a transparent flood so the rect
+        // disappears (default fill="black" doesn't leak through).
+        return Some(FilterEffect::Flood {
+            color: Color::TRANSPARENT,
+            opacity: 0.0,
+        });
+    }
+    // Blink caps at 9 (`fe_turbulence.cc:144`).
+    let num_octaves = num_octaves_raw.clamp(1, 9) as u32;
     let seed = get_attr(node, "seed")
         .and_then(parse_length_px)
         .unwrap_or(0.0);
