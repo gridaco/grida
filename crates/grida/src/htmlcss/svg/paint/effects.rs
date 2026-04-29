@@ -70,6 +70,15 @@ pub(crate) fn resolve_filter_chain(
 
     let cc = super::super::resources::svg_filter_builder::resolve_current_color(ctx.dom, node);
     let fs = resolve_font_size_px(ctx.dom, node);
+    // A solitary `url(#…)` whose target cannot be resolved is the
+    // "invalid funcIRI" case: the resvg-aligned consensus behavior is
+    // to *hide* the element entirely (see svg_container_painter early
+    // return on `filter_failed_invalid`). When the same `url(#missing)`
+    // appears alongside other entries, CSS Filter Effects 2 / SVG 2
+    // §15.4 demand we treat it as the identity instead — the rest of
+    // the list still applies. Branch on list length to keep both shapes
+    // correct.
+    let single_url_invalid = items.len() == 1 && items[0].0.eq_ignore_ascii_case("url");
     for (name, args) in &items {
         if name.eq_ignore_ascii_case("url") {
             let id = args
@@ -82,10 +91,11 @@ pub(crate) fn resolve_filter_chain(
             });
             match resolved {
                 Some(inv) => out.push(inv),
-                None => {
+                None if single_url_invalid => {
                     *failed_invalid = true;
                     return Vec::new();
                 }
+                None => {}
             }
         } else {
             let segment = format!("{}({})", name, args);

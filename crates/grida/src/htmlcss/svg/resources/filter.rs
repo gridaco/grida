@@ -43,7 +43,7 @@ use super::svg_filter_builder::{
     FeInput, FilterEffect, LightSource, LightingKind, MorphOp, Primitive, TransferFn,
     TurbulenceKind,
 };
-use super::svg_resources::Resources;
+use super::svg_resources::{parse_url_ref, Resources};
 use crate::htmlcss::svg::dom::attrs::{compute_image_dst_rect, parse_length_px};
 use crate::htmlcss::svg::dom::element::{get_attr, ElementKind};
 use crate::htmlcss::svg::dom::href::{href_attr, same_document_fragment};
@@ -158,6 +158,7 @@ pub fn resolve<'a>(
         images,
         paint_ctx,
         user_viewport,
+        current_filter_id: filter_id,
     };
     let image_filter = build_dag(&primitives, &context)?;
     Some(FilterInvocation {
@@ -300,6 +301,12 @@ struct BuildContext<'a> {
     /// user units). Used to resolve `<percentage>` values on filter
     /// primitive subregion attrs when `primitiveUnits=userSpaceOnUse`.
     user_viewport: (f32, f32),
+    /// The `<filter>` element being resolved. `feImage` uses this to
+    /// detect direct self-reference cycles — if its internal `href`
+    /// target carries `filter=url(#self)`, recording the subtree would
+    /// re-enter this same filter and Chrome treats the result as
+    /// transparent black per Filter Effects §15.21.
+    current_filter_id: NodeId,
 }
 
 #[derive(Clone)]
@@ -783,6 +790,21 @@ fn build_primitive(
             let internal_filter = same_document_fragment(href).and_then(|id| {
                 let target = ctx.paint_ctx.resources.lookup(id)?;
                 let target_node = ctx.paint_ctx.dom.node(target);
+                // Direct self-reference: target carries `filter=url(#self)`
+                // pointing back at the filter we're inside. Recording its
+                // subtree would re-enter the same filter; Chrome treats
+                // the result as transparent black per Filter Effects
+                // §15.21 ("source unavailable"). Bail to the
+                // `transparent_flood` fallback below.
+                if let Some(raw) = get_attr(target_node, "filter") {
+                    if let Some(fid_str) = parse_url_ref(raw.trim()) {
+                        if let Some(fid) = ctx.paint_ctx.resources.lookup(fid_str) {
+                            if fid == ctx.current_filter_id {
+                                return None;
+                            }
+                        }
+                    }
+                }
                 let target_bbox =
                     super::super::layout::bbox::element_object_bbox(ctx.paint_ctx.dom, target_node);
                 // Compute internal-ref subregion. Explicit x/y/w/h
