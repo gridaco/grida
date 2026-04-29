@@ -431,7 +431,13 @@ fn paint_stroke(
     let Some(paint_choice) = resolution else {
         return;
     };
-    let width = num_attr(node, "stroke-width").unwrap_or(1.0);
+    // SVG 2 §7.10: percentages on `stroke-width` (and other length
+    // properties without an explicit axis) resolve against the
+    // viewport diagonal normalized by sqrt(2). `len_attr` with
+    // `Axis::D` does exactly that, so a `<rect ... stroke-width="10%">`
+    // inside a 200×200 viewBox renders the 20-px stroke Chrome and
+    // resvg agree on instead of falling back to 1px.
+    let width = len_attr(ctx, node, "stroke-width", Axis::D).unwrap_or(1.0);
     if width <= 0.0 {
         return;
     }
