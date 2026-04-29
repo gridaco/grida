@@ -22,7 +22,7 @@ use super::super::resources::masker;
 use super::super::resources::svg_resources::parse_url_ref;
 use super::super::style::cascade::cascade_property;
 use super::clip_path_clipper::apply_clip_path;
-use super::effects::{group_opacity, resolve_filter_chain};
+use super::effects::{group_opacity, isolation_isolate, mix_blend_mode, resolve_filter_chain};
 use super::scoped_svg_paint_state::{PaintCtx, MAX_FILTER_DEPTH, MAX_MASK_DEPTH};
 use super::svg_image_painter;
 use super::svg_shape_painter;
@@ -181,9 +181,16 @@ pub fn paint_node(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId) {
     // we used to have was too narrow; per spec opacity is a presentation
     // property usable on any rendered element.
     let opacity = group_opacity(node);
-    if opacity < 1.0 {
+    let blend_mode = mix_blend_mode(node);
+    let isolated = isolation_isolate(node);
+    if opacity < 1.0 || blend_mode.is_some() || isolated {
         let mut p = SkPaint::default();
-        p.set_alpha_f(opacity.max(0.0));
+        if opacity < 1.0 {
+            p.set_alpha_f(opacity.max(0.0));
+        }
+        if let Some(bm) = blend_mode {
+            p.set_blend_mode(bm);
+        }
         canvas.save_layer(&skia_safe::canvas::SaveLayerRec::default().paint(&p));
     }
 

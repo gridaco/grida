@@ -34,6 +34,74 @@ pub(crate) fn group_opacity(node: &DemoNode) -> f32 {
     1.0
 }
 
+/// Read `mix-blend-mode` (CSS Compositing 1) on `node`. Returns
+/// `Some(BlendMode)` when set to a non-`normal` value; `None`
+/// otherwise. Per spec, setting `mix-blend-mode` to non-normal
+/// makes the element form an isolated stacking context — wrapping
+/// the element in a `save_layer` with the given blend mode (which
+/// the caller does at the layer-paint site) implements that.
+///
+/// CSS-only: SVG 2 does NOT list `mix-blend-mode` as a presentation
+/// attribute. The resvg-test-suite's `as-property.svg` documents
+/// this — `<rect mix-blend-mode="overlay">` (bare attribute) must be
+/// ignored. Read from `style="…"` only.
+pub(crate) fn mix_blend_mode(node: &DemoNode) -> Option<skia_safe::BlendMode> {
+    let style = get_attr(node, "style")?;
+    let mut found: Option<String> = None;
+    for decl in style.split(';') {
+        if let Some((k, v)) = decl.split_once(':') {
+            if k.trim().eq_ignore_ascii_case("mix-blend-mode") {
+                found = Some(v.trim().to_string());
+                break;
+            }
+        }
+    }
+    let raw = found?;
+    let v = raw.trim().to_ascii_lowercase();
+    use skia_safe::BlendMode as B;
+    match v.as_str() {
+        "normal" | "" | "initial" | "unset" | "inherit" => None,
+        "multiply" => Some(B::Multiply),
+        "screen" => Some(B::Screen),
+        "overlay" => Some(B::Overlay),
+        "darken" => Some(B::Darken),
+        "lighten" => Some(B::Lighten),
+        "color-dodge" => Some(B::ColorDodge),
+        "color-burn" => Some(B::ColorBurn),
+        "hard-light" => Some(B::HardLight),
+        "soft-light" => Some(B::SoftLight),
+        "difference" => Some(B::Difference),
+        "exclusion" => Some(B::Exclusion),
+        "hue" => Some(B::Hue),
+        "saturation" => Some(B::Saturation),
+        "color" => Some(B::Color),
+        "luminosity" => Some(B::Luminosity),
+        // SVG 2 also defines `plus-darker` / `plus-lighter` but
+        // CSS Compositing 1 doesn't list them as `mix-blend-mode`
+        // values. Skip.
+        _ => None,
+    }
+}
+
+/// Read CSS `isolation` (CSS Compositing 1 §3.4) on `node`.
+/// `isolation: isolate` forces the element into its own stacking
+/// context, so that descendant `mix-blend-mode` blends only against
+/// the element's own contents, not the outer backdrop. Returns
+/// `true` for `isolate`. CSS-only property — read from `style="…"`.
+pub(crate) fn isolation_isolate(node: &DemoNode) -> bool {
+    let Some(style) = get_attr(node, "style") else {
+        return false;
+    };
+    for decl in style.split(';') {
+        if let Some((k, v)) = decl.split_once(':') {
+            if k.trim().eq_ignore_ascii_case("isolation") {
+                return v.trim().eq_ignore_ascii_case("isolate");
+            }
+        }
+    }
+    false
+}
+
 pub(crate) fn parse_opacity_value(s: &str) -> Option<f32> {
     let s = s.trim();
     if let Some(p) = s.strip_suffix('%') {
