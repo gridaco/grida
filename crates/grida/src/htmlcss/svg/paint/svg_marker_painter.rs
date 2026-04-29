@@ -70,6 +70,18 @@ fn collect_positions(path: &Path) -> Vec<MarkerPosition> {
         match verb {
             Verb::Move => {
                 let p = pts[0];
+                // If there's a pending Mid marker from the previous
+                // subpath's last drawn segment, backpatch its angle
+                // using only that segment's outgoing tangent — there
+                // is no continuing draw across a Move boundary, so the
+                // bisector rule that `backpatch_prev_angle` applies
+                // for inline vertices doesn't apply here. Without
+                // this, the trailing marker of subpath N gets
+                // `angle = 0` (uninitialized) when subpath N+1 is
+                // started by a bare Move.
+                if let (Some(prev_out), Some(prev)) = (prev_out_slope, out.last_mut()) {
+                    prev.angle = slope_to_angle(prev_out);
+                }
                 // First emit a position for the moveto. Angle is
                 // backpatched when we see the first segment of this
                 // subpath (its incoming `out_slope` becomes our
@@ -220,6 +232,15 @@ fn collect_positions(path: &Path) -> Vec<MarkerPosition> {
             Verb::Done => break,
         }
     }
+    // End-of-path: the trailing marker (about to become marker-end)
+    // has no next-segment incoming slope to bisect against, so use
+    // the last drawn segment's outgoing tangent only. Mirrors the
+    // Move-boundary patch above. Without this, marker-end on a path
+    // ending in a curve renders horizontally instead of along the
+    // curve's exit tangent.
+    if let (Some(prev_out), Some(last)) = (prev_out_slope, out.last_mut()) {
+        last.angle = slope_to_angle(prev_out);
+    }
     if let Some(first) = out.first_mut() {
         first.kind = MarkerKind::Start;
     }
@@ -298,18 +319,40 @@ fn bisecting_angle(in_s: (f32, f32), out_s: (f32, f32)) -> f32 {
 /// the `marker` shorthand). SVG 2 §11.6.1 marks all four as
 /// inherited; we walk ancestors looking for the first explicit value
 /// that isn't `none`.
+///
+/// The bare `marker` shorthand is a CSS-only property — SVG 2 does
+/// NOT list it as a presentation attribute. The resvg-test-suite's
+/// `the-marker-property.svg` documents this ("Should be ignored")
+/// by setting `<path marker="url(...)">` and expecting no markers.
+/// `marker-start` / `marker-mid` / `marker-end` ARE presentation
+/// attributes, so the bare-attribute path is fine for those.
 fn read_marker_url(ctx: &PaintCtx<'_>, node: &DemoNode, prop: &str) -> Option<String> {
-    fn read(node: &DemoNode, name: &str) -> Option<String> {
-        if let Some(v) = get_attr(node, name) {
-            let v = v.trim();
-            if !v.is_empty() {
-                return Some(v.to_string());
-            }
+    use crate::htmlcss::svg::style::cascade::cascade_property;
+    let dom = Some(ctx.dom);
+    let sheet = Some(&ctx.resources.stylesheet);
+    // Per-property: marker-start/mid/end ARE presentation attributes,
+    // so cascade reads attribute, inline style, and `<style>` rules.
+    let read_prop =
+        |n: &DemoNode| cascade_property(dom, sheet, n, prop).filter(|s| !s.trim().is_empty());
+    // The bare `marker` shorthand is CSS-only — read from the
+    // cascade (matches `<style>path { marker: url(...) }`) or from
+    // the element's inline style declaration, but NEVER the bare
+    // attribute. Implement by going through `cascade_property` and
+    // skipping the presentation-attribute fallback (the cascade
+    // function's last step). We do this by trying the matched rule
+    // and inline style explicitly:
+    let read_shorthand = |n: &DemoNode| -> Option<String> {
+        let matched = ctx
+            .resources
+            .stylesheet
+            .match_property(ctx.dom, n, "marker");
+        if let Some((value, _spec, true, _order)) = &matched {
+            return Some(value.clone());
         }
-        if let Some(style) = get_attr(node, "style") {
+        if let Some(style) = get_attr(n, "style") {
             for decl in style.split(';') {
                 if let Some((k, v)) = decl.split_once(':') {
-                    if k.trim().eq_ignore_ascii_case(name) {
+                    if k.trim().eq_ignore_ascii_case("marker") {
                         let v = v.trim();
                         if !v.is_empty() {
                             return Some(v.to_string());
@@ -318,12 +361,15 @@ fn read_marker_url(ctx: &PaintCtx<'_>, node: &DemoNode, prop: &str) -> Option<St
                 }
             }
         }
+        if let Some((v, _, _, _)) = matched {
+            return Some(v);
+        }
         None
-    }
+    };
     // Try the leaf node first, then walk up via `parent` like other
     // inherited-property helpers in this crate.
-    if let Some(v) = read(node, prop).or_else(|| read(node, "marker")) {
-        if v == "none" {
+    if let Some(v) = read_prop(node).or_else(|| read_shorthand(node)) {
+        if v.trim() == "none" {
             return None;
         }
         return Some(v);
@@ -331,8 +377,8 @@ fn read_marker_url(ctx: &PaintCtx<'_>, node: &DemoNode, prop: &str) -> Option<St
     let mut current = node.parent;
     while let Some(id) = current {
         let n = ctx.dom.node(id);
-        if let Some(v) = read(n, prop).or_else(|| read(n, "marker")) {
-            if v == "none" {
+        if let Some(v) = read_prop(n).or_else(|| read_shorthand(n)) {
+            if v.trim() == "none" {
                 return None;
             }
             return Some(v);
