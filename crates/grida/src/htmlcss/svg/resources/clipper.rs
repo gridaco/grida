@@ -345,19 +345,37 @@ fn build_child_path(
             parse_path(d)
         }
         ElementKind::Use => {
-            // Resolve the href target and recurse into its geometry.
-            // For the path strategy we only support a `<use>` that
-            // references a single shape (path/rect/circle/etc) — a
-            // `<use>` of a `<g>` would need full subtree walking
-            // which we defer.
-            let target_id = deref_use_target(_dom, _resources, node)?;
+            // Per CSS Masking 1 §6.2 a `<use>` in `<clipPath>` is only
+            // valid when it directly references a basic shape, `<path>`
+            // or `<text>`. Any other target (`<g>`, `<symbol>`, nested
+            // `<use>`, etc.) is a spec-invalid clipPath child: Chrome,
+            // Firefox, Safari, resvg and librsvg drop the contribution
+            // silently — the clipPath stays in the cascade and becomes
+            // empty if no other valid children remain (empty clipPath
+            // clips everything per SVG 2 §14.3.5). We mirror that:
+            // return `Some(None)` to drop the use's geometry without
+            // bailing the path strategy. An unresolved href falls into
+            // the same bucket.
+            let Some(target_id) = deref_use_target(_dom, _resources, node) else {
+                return Some(None);
+            };
             let target = _dom.node(target_id);
             let DemoNodeData::Element(td) = &target.data else {
                 return Some(None);
             };
             let target_kind = ElementKind::from_local_name(td.name.local.as_ref());
-            if !is_supported_clipper_child(target_kind) || target_kind == ElementKind::Use {
-                return None;
+            let target_is_shape = matches!(
+                target_kind,
+                ElementKind::Path
+                    | ElementKind::Rect
+                    | ElementKind::Circle
+                    | ElementKind::Ellipse
+                    | ElementKind::Line
+                    | ElementKind::Polygon
+                    | ElementKind::Polyline
+            );
+            if !target_is_shape {
+                return Some(None);
             }
             let mut p = match build_child_path(_dom, _resources, target, target_kind)? {
                 Some(p) => p,
