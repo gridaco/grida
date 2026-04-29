@@ -93,6 +93,35 @@ pub struct PaintCtx<'a> {
     /// recursion adds one frame on the caller's stack and points
     /// `use_chain` at it.
     pub use_chain: Option<&'a UseFrame<'a>>,
+    /// Stack of `<mask>` elements currently being applied, innermost
+    /// last. Lets us detect a `mask=` reference that points back at a
+    /// mask already in flight (direct self-reference, mutual
+    /// `#a → #b → #a`, or any longer cycle) and treat it as
+    /// `mask: none` per CSS Masking 1 — invalid mask funcIRIs render
+    /// the element unmasked. Same linked-list shape as `use_chain` so
+    /// `PaintCtx` stays `Copy`.
+    pub mask_chain: Option<&'a MaskFrame<'a>>,
+}
+
+/// One link in the active-mask stack. Holds the mask element's id so
+/// the chain walk can detect cycles before reopening another save
+/// layer.
+#[derive(Clone, Copy)]
+pub struct MaskFrame<'a> {
+    pub mask_id: NodeId,
+    pub parent: Option<&'a MaskFrame<'a>>,
+}
+
+impl<'a> MaskFrame<'a> {
+    pub fn contains(&self, id: NodeId) -> bool {
+        if self.mask_id == id {
+            return true;
+        }
+        match self.parent {
+            Some(p) => p.contains(id),
+            None => false,
+        }
+    }
 }
 
 /// One link in the `<use>` recursion stack. Carries the `<use>`
@@ -153,12 +182,20 @@ impl<'a> PaintCtx<'a> {
             marker_depth: 0,
             initial_viewport,
             use_chain: None,
+            mask_chain: None,
         }
     }
 
     pub fn with_use_chain(self, frame: &'a UseFrame<'a>) -> Self {
         Self {
             use_chain: Some(frame),
+            ..self
+        }
+    }
+
+    pub fn with_mask_chain(self, frame: &'a MaskFrame<'a>) -> Self {
+        Self {
+            mask_chain: Some(frame),
             ..self
         }
     }

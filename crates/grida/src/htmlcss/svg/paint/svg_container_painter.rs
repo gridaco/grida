@@ -258,6 +258,14 @@ pub fn paint_node(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId) {
             .filter(|v| !v.is_empty() && *v != "none")
             .and_then(parse_url_ref)
             .and_then(|id| ctx.resources.lookup(id))
+            // CSS Masking 1: a `mask=` whose target is already on the
+            // active-mask stack would create a cycle. Treat the
+            // reference as `mask: none` so the element renders
+            // unmasked — matches Chrome / resvg.
+            .filter(|target| match ctx.mask_chain {
+                Some(chain) => !chain.contains(*target),
+                None => true,
+            })
             .and_then(|target| {
                 let bbox = element_object_bbox(ctx.dom, node);
                 masker::resolve(ctx.dom, target, bbox)
@@ -360,7 +368,14 @@ fn apply_mask(canvas: &Canvas, ctx: &PaintCtx<'_>, inv: &masker::MaskInvocation)
         canvas.concat(&inv.content_to_user_space);
     }
 
-    let deeper = ctx.with_deeper_mask();
+    // Push this mask onto the active-mask chain so any descendant or
+    // chained reference back to it is detected as a cycle and treated
+    // as `mask: none` per CSS Masking 1.
+    let mask_frame = super::scoped_svg_paint_state::MaskFrame {
+        mask_id: inv.mask_id,
+        parent: ctx.mask_chain,
+    };
+    let deeper = ctx.with_deeper_mask().with_mask_chain(&mask_frame);
     let mask_node = ctx.dom.node(inv.mask_id);
     let chained = if deeper.mask_depth >= MAX_MASK_DEPTH {
         None
@@ -370,6 +385,7 @@ fn apply_mask(canvas: &Canvas, ctx: &PaintCtx<'_>, inv: &masker::MaskInvocation)
             .filter(|v| !v.is_empty() && *v != "none")
             .and_then(parse_url_ref)
             .and_then(|id| ctx.resources.lookup(id))
+            .filter(|target| !mask_frame.contains(*target))
             .and_then(|target| {
                 let bbox = element_object_bbox(ctx.dom, mask_node);
                 masker::resolve(ctx.dom, target, bbox)
