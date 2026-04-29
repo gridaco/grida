@@ -882,8 +882,22 @@ fn resolve_text_path(ctx: &PaintCtx<'_>, node: &DemoNode) -> Option<TextPathInfo
         // Apply the referenced `<path>`'s own transform attribute. Per
         // SVG 2 §11.4.3 & Blink, this fold-in happens once before the
         // arc-length walk so glyph positions are in user-space.
+        // `transform-origin` on the path wraps `transform` as
+        // `translate(o) * transform * translate(-o)` per CSS Transforms
+        // 1 §3.5 — without this a `transform="rotate(90)" transform-
+        // origin="center"` rotates around (0, 0) instead of the
+        // viewport center.
         if let Some(t) = get_attr(target, "transform").and_then(parse_transform) {
-            p = p.with_transform(&t);
+            let (ox, oy) = super::super::layout::transform::transform_origin_for(ctx, target);
+            let final_transform = if ox == 0.0 && oy == 0.0 {
+                t
+            } else {
+                let mut m = skia_safe::Matrix::translate((ox, oy));
+                m.pre_concat(&t);
+                m.pre_concat(&skia_safe::Matrix::translate((-ox, -oy)));
+                m
+            };
+            p = p.with_transform(&final_transform);
         }
         p
     };
