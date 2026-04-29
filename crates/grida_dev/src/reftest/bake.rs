@@ -1,11 +1,11 @@
-//! `reftest bake` — drive puppeteer to bake Chrome PNGs.
+//! `reftest bake` — drive Playwright's chromium to bake Chrome PNGs.
 //!
-//! `BAKE_ERRORS.log` is written by the underlying mjs script next
-//! to the baseline when a fixture errors. We delete it before each
-//! run so its presence afterwards unambiguously means "the latest
-//! run had errors." `--retry-failed` reads the prior log,
-//! regenerates only those fixtures in a single batched node
-//! invocation, and exits non-zero if any are still broken.
+//! `BAKE_ERRORS.log` is written by the underlying script next to the
+//! baseline when a fixture errors. We delete it before each run so its
+//! presence afterwards unambiguously means "the latest run had errors."
+//! `--retry-failed` reads the prior log, regenerates only those
+//! fixtures in a single batched invocation, and exits non-zero if any
+//! are still broken.
 
 use anyhow::{bail, Context, Result};
 use std::fs;
@@ -17,14 +17,13 @@ use crate::reftest::args::BakeArgs;
 pub(crate) async fn run(args: BakeArgs) -> Result<()> {
     let suite_dir = canonicalize_suite(&args.suite_dir)?;
     let scripts_dir = scripts_dir();
-    let mjs = scripts_dir.join("reftest_bake_chrome.mjs");
-    if !mjs.exists() {
+    let script = scripts_dir.join("reftest_bake_chrome.ts");
+    if !script.exists() {
         bail!(
             "bake script not found at {}; run from the grida repo root",
-            mjs.display()
+            script.display()
         );
     }
-    ensure_puppeteer_installed(&scripts_dir)?;
 
     let baseline = suite_dir.join("chrome-baseline");
     let errors_log = baseline.join("BAKE_ERRORS.log");
@@ -52,7 +51,7 @@ pub(crate) async fn run(args: BakeArgs) -> Result<()> {
         // Wipe the log; only re-created by the script if anything still fails.
         let _ = fs::remove_file(&errors_log);
         let status = invoke_bake_script(
-            &mjs,
+            &script,
             &suite_dir,
             BakeFilter::PathsFrom(&paths_file),
             args.concurrency,
@@ -77,7 +76,7 @@ pub(crate) async fn run(args: BakeArgs) -> Result<()> {
         // Clear any stale error log so post-run inspection is unambiguous.
         let _ = fs::remove_file(&errors_log);
         let status = invoke_bake_script(
-            &mjs,
+            &script,
             &suite_dir,
             BakeFilter::Substring(args.filter.as_deref()),
             args.concurrency,
@@ -99,21 +98,29 @@ pub(crate) async fn run(args: BakeArgs) -> Result<()> {
 
 /// Either a substring filter (matches every rel-path containing it)
 /// or a path to a newline-delimited list of exact suite-relative
-/// paths. The mjs script honors both.
+/// paths. The script honors both.
 enum BakeFilter<'a> {
     Substring(Option<&'a str>),
     PathsFrom(&'a Path),
 }
 
 fn invoke_bake_script(
-    mjs: &Path,
+    script: &Path,
     suite_dir: &Path,
     filter: BakeFilter<'_>,
     concurrency: u32,
     force: bool,
 ) -> Result<std::process::ExitStatus> {
-    let mut cmd = Command::new("node");
-    cmd.arg(mjs)
+    // Run via `pnpm --filter @grida/reftest exec tsx` so the script
+    // resolves `@playwright/test` from `packages/grida-reftest`'s
+    // node_modules without needing a local package.json next to the
+    // script. Mirrors the existing `refbrowser_render.ts` invocation.
+    let mut cmd = Command::new("pnpm");
+    cmd.arg("--filter")
+        .arg("@grida/reftest")
+        .arg("exec")
+        .arg("tsx")
+        .arg(script)
         .arg("--suite")
         .arg(suite_dir)
         .arg("--concurrency")
@@ -131,18 +138,7 @@ fn invoke_bake_script(
         cmd.arg("--force");
     }
     cmd.status()
-        .with_context(|| "failed to spawn `node`; install Node.js to bake Chrome PNGs")
-}
-
-fn ensure_puppeteer_installed(scripts_dir: &Path) -> Result<()> {
-    let pp = scripts_dir.join("node_modules").join("puppeteer");
-    if pp.exists() {
-        return Ok(());
-    }
-    bail!(
-        "puppeteer is not installed.\n  Run once:  cd {} && npm install puppeteer\n  Then retry: cargo run -p grida_dev -- reftest bake [...]",
-        scripts_dir.display()
-    );
+        .with_context(|| "failed to spawn `pnpm`; install pnpm and run `pnpm install` at repo root")
 }
 
 fn canonicalize_suite(p: &Path) -> Result<PathBuf> {
