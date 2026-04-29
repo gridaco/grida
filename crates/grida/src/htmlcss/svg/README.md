@@ -153,12 +153,21 @@ Reftest corpus:
 — 1,679 SVGs across 7 categories (`filters/`, `masking/`, `paint-servers/`,
 `painting/`, `shapes/`, `structure/`, `text/`).
 
-Run via:
+Run via the `grida_dev reftest` subcommands:
 
 ```bash
-cargo run -p grida_dev --bin reftest -- \
-  --suite fixtures/local/resvg-test-suite \
-  --renderer htmlcss
+# one-time: bake Chrome PNGs as the second oracle
+cd crates/grida_dev/scripts && npm install puppeteer && cd -
+cargo run --release -p grida_dev -- reftest bake
+
+# every dev cycle
+cargo run --release -p grida_dev -- reftest run \
+  --suite-dir fixtures/local/resvg-test-suite --renderer htmlcss
+
+# inspect / summarize results
+cargo run --release -p grida_dev -- reftest summary
+cargo run --release -p grida_dev -- reftest inspect filters_feSpecularLighting_specularExponent=0
+cargo run --release -p grida_dev -- reftest view target/reftests/resvg-test-suite.htmlcss
 ```
 
 Output: `target/reftests/resvg-test-suite.htmlcss/report.json`.
@@ -171,6 +180,36 @@ in the suite's score budget.
 For Chromium parity on inline `<svg>` in HTML, additional reftests live
 under the existing htmlcss reftest suites (rendered via Playwright
 Chromium as the oracle).
+
+### Multi-oracle scoring (consensus / disputed / UB)
+
+`expected.png` shipped by resvg-test-suite is one oracle (the suite
+author's read of the spec). The harness also ingests two more
+ground-truth sources, configured under `[test.oracles]` in
+[`fixtures/local/resvg-test-suite/reftest.toml`](../../../../../fixtures/local/resvg-test-suite/reftest.toml):
+
+- **`results.csv`** — upstream per-renderer status matrix (chrome /
+  firefox / safari / resvg / batik / inkscape / librsvg / svgnet /
+  qtsvg). Each cell records whether that renderer passed against
+  `expected.png`. Drives per-fixture classification:
+  - `consensus` (chrome=PASSED): `expected.png` is authoritative.
+  - `disputed` (chrome=FAILED/CRASHED): Chrome diverges from
+    `expected.png`; the harness scores against both and accepts the
+    better match.
+  - `ub` (chrome=UNKNOWN): formally undefined behavior; excluded from
+    headline parity.
+- **`chrome-baseline/`** — pre-baked Chrome PNGs mirroring the input
+  layout. Bake with
+  [`crates/grida_dev/scripts/reftest-bake-chrome.sh`](../../../../../crates/grida_dev/scripts/reftest-bake-chrome.sh)
+  (one-time, deterministic per Chrome version). When present, every
+  test gets a `vs_chrome` similarity score alongside `vs_expected`,
+  and the effective score is `max(vs_expected, vs_chrome)`.
+
+The headline parity number reported in `report.json` is
+`oracle_buckets.consensus.passing / oracle_buckets.consensus.total` —
+the fraction of well-defined Chrome-consensus fixtures we clear at
+`pass_floor` (default 0.95). UB and disputed fixtures are still
+tracked but don't dilute the number.
 
 ## Module map (Grida ↔ Blink)
 

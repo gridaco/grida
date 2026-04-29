@@ -36,6 +36,34 @@ avg/p50/p95/p99 frame latencies without window/vsync overhead.
 
 Do **not** draw conclusions from debug-mode frame rates.
 
+## SVG reftest
+
+One CLI surface for the resvg-test-suite reftest harness. Use these
+instead of poking `report.json` with `jq`:
+
+```bash
+cargo run --release -p grida_dev -- reftest run        # render + score
+cargo run --release -p grida_dev -- reftest bake       # one-time: bake Chrome PNGs
+cargo run --release -p grida_dev -- reftest summary    # headline + worst-N (--json for parsing)
+cargo run --release -p grida_dev -- reftest inspect <fixture>   # full per-fixture diagnostic
+cargo run --release -p grida_dev -- reftest view <result-dir>   # serve dashboard
+```
+
+`inspect` accepts either `cat_group_name` (test-name form, as in
+`report.json`) or `cat/group/name.svg` (suite-relative path), and
+prints oracle flags, scores, and image paths. Add `--json` to consume
+programmatically.
+
+`summary` reads `target/reftests/resvg-test-suite.htmlcss/report.json`
+by default and reports the consensus pass-rate (the headline parity
+number) plus the top-10 worst consensus failures — the real-bug
+shortlist. Add `--json` for orchestration.
+
+The harness scores each fixture against `expected.png` and (when a
+Chrome baseline is baked) `chrome.png`, classifying by upstream
+`results.csv` into consensus / disputed / UB buckets. See
+[`crates/grida/src/htmlcss/svg/README.md`](../grida/src/htmlcss/svg/README.md#multi-oracle-scoring-consensus--disputed--ub).
+
 ## Notes
 
 - The binary hosts the native window stack internally but still uses the shared `UnknownTargetApplication`, so it inherits all keyboard shortcuts from the classic demo (⌘+/- zoom, ⌘⇧C copy PNG, etc.).

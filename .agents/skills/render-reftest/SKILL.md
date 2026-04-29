@@ -130,19 +130,43 @@ strategy before authoring a new fixture.
 
 ### SVG — pre-baked reference vs. resvg-generated reference
 
-Two strategies, depending on whether a reference image already exists:
+Three strategies, depending on what oracle data is available:
 
-**Strategy A — pre-baked reference (preferred when available)**
+**Strategy A — pre-baked reference (single oracle)**
 
 Use if the SVG comes from a test suite that ships reference PNGs alongside it
-(W3C SVG 1.1, resvg-test-suite, Oxygen Icons). The oracle is the co-located
-PNG; `grida_dev reftest` picks it up automatically via `reftest.toml`.
+(W3C SVG 1.1, Oxygen Icons). The oracle is the co-located PNG;
+`grida_dev reftest run` picks it up automatically via `reftest.toml`.
 
 ```sh
 # W3C suite — reference PNGs are in png/ next to svg/
-cargo run -p grida_dev --release -- reftest \
+cargo run -p grida_dev --release -- reftest run \
   --suite-dir fixtures/local/W3C_SVG_11_TestSuite --bg white
 ```
+
+**Strategy A+ — pre-baked reference + Chrome bake (multi-oracle)**
+
+Use for `resvg-test-suite`. The vendored `expected.png` is the suite
+author's read of the spec, but for ~12% of fixtures Chrome diverges
+from it. The harness ingests the suite's `results.csv` (a 9-renderer
+status matrix) and a baked Chrome PNG to classify each fixture into
+**consensus** / **disputed** / **UB** buckets. Effective per-fixture
+score is `max(vs_expected, vs_chrome)`; the headline parity number is
+the consensus pass-rate (excludes disputed and UB).
+
+```sh
+# One-time: bake Chrome PNGs (puppeteer; deterministic per Chrome version)
+cargo run -p grida_dev --release -- reftest bake
+
+# Run + summarize
+cargo run -p grida_dev --release -- reftest run \
+  --suite-dir fixtures/local/resvg-test-suite --renderer htmlcss
+cargo run -p grida_dev --release -- reftest summary
+```
+
+For the full driver loop (audit → ground → fixture → impl → verify
+against the multi-oracle gate), see
+[`dev-render-htmlcss-svg-feature`](../dev-render-htmlcss-svg-feature/SKILL.md).
 
 **Strategy B — resvg as dynamic oracle (when no pre-baked image exists)**
 

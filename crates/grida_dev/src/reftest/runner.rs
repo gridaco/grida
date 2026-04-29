@@ -1,6 +1,7 @@
-use crate::reftest::args::{BgColor, ReftestArgs, SvgRenderer};
-use crate::reftest::compare::{compare_images, ScoringMask};
+use crate::reftest::args::{BgColor, RunArgs, SvgRenderer};
+use crate::reftest::compare::{compare_images, ComparisonResult, ScoringMask};
 use crate::reftest::config::ReftestToml;
+use crate::reftest::oracles::{rel_key, OracleFlags, OracleIndex, OracleStatus};
 use crate::reftest::render::{
     find_test_pairs_from_glob, find_test_pairs_in_dirs, render_svg_to_png,
     render_svg_to_png_via_htmlcss, TestPair,
@@ -10,6 +11,10 @@ use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::panic;
 use std::path::{Path, PathBuf};
+
+/// Default similarity floor for the "passing" count in oracle
+/// buckets when `[test.scoring].pass_floor` is unset.
+const DEFAULT_PASS_FLOOR: f64 = 0.95;
 
 fn repo_target_reftests_dir() -> PathBuf {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -43,7 +48,36 @@ fn get_score_category(score: f64) -> &'static str {
     }
 }
 
-pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
+/// Bundle of compare settings threaded through the per-test loop.
+/// Avoids passing seven parameters around when we add a second
+/// oracle (Chrome baseline).
+#[derive(Clone, Copy)]
+struct CompareSettings {
+    threshold: f32,
+    detect_aa: bool,
+    bg: BgColor,
+    mask: ScoringMask,
+}
+
+/// Result of evaluating a rendered output against the available
+/// oracles (always `expected.png`; optionally a baked Chrome PNG).
+struct DualScore {
+    vs_expected: ComparisonResult,
+    vs_chrome: Option<ComparisonResult>,
+    /// Path to the diff image we want to keep — generated against
+    /// whichever oracle the *effective* score was taken from. Lets the
+    /// dashboard show the diff against the oracle the test was scored
+    /// on, not always against expected.
+    diff_against: DiffAgainst,
+}
+
+#[derive(Clone, Copy)]
+enum DiffAgainst {
+    Expected,
+    Chrome,
+}
+
+pub(crate) async fn run_reftest(args: &RunArgs) -> Result<()> {
     // Load optional config from suite-dir/reftest.toml
     let cfg = ReftestToml::load_from_dir(&args.suite_dir).unwrap_or(None);
 
@@ -115,7 +149,8 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     let cfg_scoring = cfg.as_ref().and_then(|c| c.resolve_scoring());
     let test_kind = cfg.as_ref().and_then(|c| c.resolve_kind());
     let mask = cfg_scoring
-        .and_then(|s| s.mask)
+        .as_ref()
+        .and_then(|s| s.mask.clone())
         .as_deref()
         .map(|m| match m {
             "alpha" => ScoringMask::Alpha,
@@ -129,10 +164,57 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                 ScoringMask::None
             }
         });
+    let pass_floor = cfg_scoring
+        .as_ref()
+        .and_then(|s| s.pass_floor)
+        .unwrap_or(DEFAULT_PASS_FLOOR);
+
+    let compare_settings = CompareSettings {
+        threshold,
+        detect_aa,
+        bg,
+        mask,
+    };
+
+    // Optional — when missing, every test falls into the "unknown"
+    // bucket and chrome scores are simply absent.
+    let oracles = OracleIndex::load_from_dir(&args.suite_dir);
+    if oracles.len() > 0 {
+        println!("Loaded {} oracle rows from results.csv", oracles.len());
+    }
+    if let Some(dir) = oracles.chrome_baseline_dir.as_ref() {
+        println!("Chrome baseline: {}", dir.display());
+    }
 
     // Handle existing output directory
     let overwrite = args.overwrite.unwrap_or(true);
     if output_dir.exists() {
+        // `reftest view` drops `index.html` / `tests` symlinks here
+        // and serves the dir via `python3 -m http.server`. While the
+        // server is alive, file operations against the tree race
+        // against its active opendir/readdir on macOS — the symptom
+        // is sporadic ENOTEMPTY on remove_dir_all up front, or
+        // ENOENT on the temp-output rename mid-run, with a confusing
+        // "failed to move output PNG" error. Refuse early when the
+        // symlinks are present so the user gets one clear message
+        // instead of debugging a phantom file system race.
+        let view_marker = output_dir.join("index.html");
+        let tests_link = output_dir.join("tests");
+        let is_symlink = |p: &Path| {
+            std::fs::symlink_metadata(p)
+                .ok()
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false)
+        };
+        if is_symlink(&view_marker) || is_symlink(&tests_link) {
+            anyhow::bail!(
+                "`reftest view` left symlinks at {} — stop the running `reftest view` (Ctrl-C / kill its `python3 -m http.server`) before running `reftest run`, then retry. If view is no longer running, remove {} and {} manually.",
+                output_dir.display(),
+                view_marker.display(),
+                tests_link.display(),
+            );
+        }
+
         if overwrite {
             std::fs::remove_dir_all(&output_dir).with_context(|| {
                 format!(
@@ -202,6 +284,14 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     for pair in test_pairs.iter() {
         pb.set_message(format!("processing {}", pair.test_name));
 
+        // Resolve oracle row + chrome PNG path for this fixture.
+        let oracle_key = pair.rel_svg_path.as_deref().map(rel_key);
+        let oracle_flags: Option<OracleFlags> =
+            oracle_key.as_deref().and_then(|k| oracles.lookup(k));
+        let chrome_baseline_png = oracle_key
+            .as_deref()
+            .and_then(|k| oracles.chrome_png_for(k));
+
         // Load reference PNG to get target dimensions for scaling
         let target_size = image::open(&pair.ref_png_path).ok().map(|img| {
             let rgba = img.to_rgba8();
@@ -244,20 +334,30 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
 
         match render_result {
             Ok(_) => {
-                // Compare images
                 let temp_diff_png = output_dir.join(format!("{}-temp-diff.png", pair.test_name));
-                match compare_images(
+                let dual = dual_compare(
                     &temp_output_png,
                     &pair.ref_png_path,
+                    chrome_baseline_png.as_deref(),
                     Some(&temp_diff_png),
-                    threshold,
-                    detect_aa,
-                    bg,
-                    mask,
-                ) {
-                    Ok(comparison) => {
-                        // Determine score category and create subdirectory
-                        let category = get_score_category(comparison.similarity_score);
+                    compare_settings,
+                );
+
+                match dual {
+                    Ok(dual) => {
+                        let vs_expected_score = dual.vs_expected.similarity_score;
+                        let vs_chrome_score = dual.vs_chrome.as_ref().map(|c| c.similarity_score);
+                        // Effective score: prefer whichever oracle we
+                        // matched best against. When chrome PNG is
+                        // present, this lets a fixture that diverges
+                        // from expected.png but matches Chrome still
+                        // count as passing.
+                        let effective_score = vs_chrome_score
+                            .map(|c| c.max(vs_expected_score))
+                            .unwrap_or(vs_expected_score);
+                        let diff_pct = 100.0 * (1.0 - effective_score.clamp(0.0, 1.0));
+
+                        let category = get_score_category(effective_score);
                         let category_dir = output_dir.join(category);
                         std::fs::create_dir_all(&category_dir).with_context(|| {
                             format!(
@@ -266,15 +366,15 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                             )
                         })?;
 
-                        // Move files to category directory with new naming
                         let final_current_png =
                             category_dir.join(format!("{}.current.png", pair.test_name));
                         let final_expected_png =
                             category_dir.join(format!("{}.expected.png", pair.test_name));
+                        let final_chrome_png =
+                            category_dir.join(format!("{}.chrome.png", pair.test_name));
                         let final_diff_png =
                             category_dir.join(format!("{}.diff.png", pair.test_name));
 
-                        // Copy reference PNG as expected.png
                         std::fs::copy(&pair.ref_png_path, &final_expected_png).with_context(
                             || {
                                 format!(
@@ -284,7 +384,6 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                             },
                         )?;
 
-                        // Rename output PNG to current.png
                         std::fs::rename(&temp_output_png, &final_current_png).with_context(
                             || {
                                 format!(
@@ -293,6 +392,18 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                                 )
                             },
                         )?;
+
+                        let chrome_png_str = if let Some(src) = chrome_baseline_png.as_deref() {
+                            std::fs::copy(src, &final_chrome_png).with_context(|| {
+                                format!(
+                                    "failed to copy chrome baseline PNG to {}",
+                                    final_chrome_png.display()
+                                )
+                            })?;
+                            Some(final_chrome_png.to_string_lossy().to_string())
+                        } else {
+                            None
+                        };
 
                         let diff_png_str = if temp_diff_png.exists() {
                             std::fs::rename(&temp_diff_png, &final_diff_png).with_context(
@@ -308,29 +419,52 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                             None
                         };
 
-                        test_results.push(TestResult {
-                            test_name: pair.test_name.clone(),
-                            similarity_score: comparison.similarity_score,
-                            diff_percentage: comparison.diff_percentage,
-                            output_png: final_current_png.to_string_lossy().to_string(),
-                            diff_png: diff_png_str,
-                            error: comparison.error,
+                        // Carry through the better of the two compare
+                        // errors (if either had one) — typically a
+                        // dimension mismatch from one side.
+                        let error = dual
+                            .vs_expected
+                            .error
+                            .clone()
+                            .or_else(|| dual.vs_chrome.as_ref().and_then(|c| c.error.clone()));
+
+                        // Classify oracle status.
+                        let oracle_status = oracle_flags.map(|f| f.classify()).or_else(|| {
+                            // No CSV row at all: mark "unknown" so
+                            // dashboards can split it out.
+                            if oracle_key.is_some() && oracles.len() > 0 {
+                                Some(OracleStatus::Unknown)
+                            } else {
+                                None
+                            }
                         });
 
-                        pb.set_message(format!(
-                            "{:.2}% → {}",
-                            comparison.similarity_score * 100.0,
-                            category
-                        ));
+                        // Record which oracle the diff PNG is taken
+                        // against, for dashboard/debug purposes.
+                        let _ = dual.diff_against;
+
+                        test_results.push(TestResult {
+                            test_name: pair.test_name.clone(),
+                            similarity_score: effective_score,
+                            diff_percentage: diff_pct,
+                            output_png: final_current_png.to_string_lossy().to_string(),
+                            diff_png: diff_png_str,
+                            vs_expected: Some(vs_expected_score),
+                            vs_chrome: vs_chrome_score,
+                            chrome_png: chrome_png_str,
+                            oracle_flags,
+                            oracle_status,
+                            error,
+                        });
+
+                        pb.set_message(format!("{:.2}% → {}", effective_score * 100.0, category));
                     }
                     Err(e) => {
-                        // On compare error, route to err directory (not a score bucket)
                         let err_dir = output_dir.join("err");
                         std::fs::create_dir_all(&err_dir).with_context(|| {
                             format!("failed to create error directory {}", err_dir.display())
                         })?;
 
-                        // Copy reference PNG as expected.png
                         let final_expected_png =
                             err_dir.join(format!("{}.expected.png", pair.test_name));
                         let final_current_png =
@@ -361,6 +495,11 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                             diff_percentage: 100.0,
                             output_png: final_current_png.to_string_lossy().to_string(),
                             diff_png: None,
+                            vs_expected: None,
+                            vs_chrome: None,
+                            chrome_png: None,
+                            oracle_flags,
+                            oracle_status: oracle_flags.map(|f| f.classify()),
                             error: Some(format!("Comparison failed: {}", e)),
                         });
 
@@ -369,13 +508,11 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                 }
             }
             Err(e) => {
-                // On render error, route to err directory (not a score bucket)
                 let err_dir = output_dir.join("err");
                 std::fs::create_dir_all(&err_dir).with_context(|| {
                     format!("failed to create error directory {}", err_dir.display())
                 })?;
 
-                // Copy reference PNG as expected.png even if rendering failed
                 let final_expected_png = err_dir.join(format!("{}.expected.png", pair.test_name));
                 std::fs::copy(&pair.ref_png_path, &final_expected_png).with_context(|| {
                     format!(
@@ -390,6 +527,11 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
                     diff_percentage: 100.0,
                     output_png: String::new(),
                     diff_png: None,
+                    vs_expected: None,
+                    vs_chrome: None,
+                    chrome_png: None,
+                    oracle_flags,
+                    oracle_status: oracle_flags.map(|f| f.classify()),
                     error: Some(format!("Rendering failed: {}", e)),
                 });
 
@@ -401,7 +543,7 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     }
 
     // Generate report
-    let report = ReftestReport::new(&args.suite_dir, &output_dir, test_results);
+    let report = ReftestReport::new(&args.suite_dir, &output_dir, test_results, pass_floor);
     let report_path = output_dir.join("report.json");
     generate_json_report(&report, &report_path)?;
 
@@ -423,10 +565,150 @@ pub(crate) async fn run_reftest(args: &ReftestArgs) -> Result<()> {
     println!("Min similarity: {:.2}%", report.min_similarity * 100.0);
     println!("Max similarity: {:.2}%", report.max_similarity * 100.0);
 
+    let buckets = &report.oracle_buckets;
+    if buckets.consensus.total + buckets.disputed.total + buckets.ub.total > 0 {
+        let consensus_rate = if buckets.consensus.total > 0 {
+            100.0 * buckets.consensus.passing as f64 / buckets.consensus.total as f64
+        } else {
+            0.0
+        };
+        println!(
+            "\n── Oracle buckets (pass floor = {:.2}) ──",
+            buckets.pass_floor
+        );
+        println!(
+            "consensus : n={:<5} avg={:.3}  passing={} ({:.2}%)  vs_expected={:.3}{}",
+            buckets.consensus.total,
+            buckets.consensus.avg_similarity,
+            buckets.consensus.passing,
+            consensus_rate,
+            buckets.consensus.avg_vs_expected,
+            buckets
+                .consensus
+                .avg_vs_chrome
+                .map(|v| format!("  vs_chrome={v:.3}"))
+                .unwrap_or_default(),
+        );
+        println!(
+            "disputed  : n={:<5} avg={:.3}  vs_expected={:.3}{}",
+            buckets.disputed.total,
+            buckets.disputed.avg_similarity,
+            buckets.disputed.avg_vs_expected,
+            buckets
+                .disputed
+                .avg_vs_chrome
+                .map(|v| format!("  vs_chrome={v:.3}"))
+                .unwrap_or_default(),
+        );
+        println!(
+            "ub        : n={:<5} (excluded from headline parity)",
+            buckets.ub.total
+        );
+        if buckets.unknown.total > 0 {
+            println!("unknown   : n={:<5} (no oracle row)", buckets.unknown.total);
+        }
+    }
+
     Ok(())
 }
 
+/// Compare the rendered output against `expected.png`, and against
+/// `chrome_baseline.png` when one is available. Returns both scores
+/// plus the diff image taken against whichever oracle the rendered
+/// output is *closer* to (so diffs in the dashboard are meaningful).
+fn dual_compare(
+    actual: &Path,
+    expected: &Path,
+    chrome: Option<&Path>,
+    diff_output: Option<&Path>,
+    settings: CompareSettings,
+) -> Result<DualScore> {
+    // Always compare against expected. We take the diff here, then
+    // possibly overwrite it with the chrome diff if chrome scores
+    // higher (and is enabled).
+    let vs_expected = compare_images(
+        actual,
+        expected,
+        diff_output,
+        settings.threshold,
+        settings.detect_aa,
+        settings.bg,
+        settings.mask,
+    )
+    .with_context(|| format!("compare against expected.png ({})", expected.display()))?;
+
+    let Some(chrome_path) = chrome else {
+        return Ok(DualScore {
+            vs_expected,
+            vs_chrome: None,
+            diff_against: DiffAgainst::Expected,
+        });
+    };
+
+    // Compare against Chrome PNG. We always run this to a *separate*
+    // temp file first, then decide which diff to keep based on which
+    // oracle won.
+    let chrome_diff_tmp = diff_output.map(|p| {
+        let parent = p.parent().unwrap_or(Path::new("."));
+        let stem = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        parent.join(format!("{stem}-chrome.png"))
+    });
+
+    let vs_chrome = compare_images(
+        actual,
+        chrome_path,
+        chrome_diff_tmp.as_deref(),
+        settings.threshold,
+        settings.detect_aa,
+        settings.bg,
+        settings.mask,
+    )
+    .with_context(|| {
+        format!(
+            "compare against chrome baseline ({})",
+            chrome_path.display()
+        )
+    })?;
+
+    // Pick the diff PNG to keep — whichever side the renderer
+    // matched best against is more useful to inspect.
+    let diff_against = if vs_chrome.similarity_score > vs_expected.similarity_score {
+        if let Some(out) = diff_output {
+            // Replace the expected-diff with the chrome-diff. dify
+            // omits the diff PNG entirely when the two images are
+            // identical, so a missing chrome temp here means a
+            // perfect match — drop the now-misleading expected-diff
+            // too, so the dashboard shows "no diff" instead of the
+            // huge red diff against expected.
+            match chrome_diff_tmp.as_deref() {
+                Some(p) if p.exists() => {
+                    let _ = std::fs::rename(p, out);
+                }
+                _ => {
+                    let _ = std::fs::remove_file(out);
+                }
+            }
+        }
+        DiffAgainst::Chrome
+    } else {
+        // Keep the expected diff; clean up the chrome temp file.
+        if let Some(p) = chrome_diff_tmp.as_deref() {
+            let _ = std::fs::remove_file(p);
+        }
+        DiffAgainst::Expected
+    };
+
+    Ok(DualScore {
+        vs_expected,
+        vs_chrome: Some(vs_chrome),
+        diff_against,
+    })
+}
+
 // Convenience wrapper to match main.rs signature (takes owned args)
-pub(crate) async fn run(args: ReftestArgs) -> Result<()> {
+pub(crate) async fn run(args: RunArgs) -> Result<()> {
     run_reftest(&args).await
 }

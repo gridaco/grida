@@ -19,9 +19,15 @@ pub(crate) struct TestPair {
     pub svg_path: PathBuf,
     pub ref_png_path: PathBuf,
     pub test_name: String,
+    /// Suite-relative path of the SVG (e.g.
+    /// `filters/enable-background/new.svg`). `None` for the legacy
+    /// directory-scan path which has no multi-level relative key. Used
+    /// by the oracle harness to look up the fixture's row in
+    /// `results.csv` and to resolve a baked Chrome PNG.
+    pub rel_svg_path: Option<PathBuf>,
 }
 
-fn name_from_rel_path(rel: &Path) -> String {
+pub(crate) fn name_from_rel_path(rel: &Path) -> String {
     // Convert a relative path like `dir/sub/icon.svg` to `dir_sub_icon`
     let mut parts: Vec<String> = Vec::new();
     let components: Vec<String> = rel
@@ -112,6 +118,7 @@ pub(crate) fn find_test_pairs_from_glob(
             svg_path: path,
             ref_png_path,
             test_name,
+            rel_svg_path: Some(rel),
         });
     }
 
@@ -144,6 +151,7 @@ pub(crate) fn find_test_pairs_in_dirs(svg_dir: &Path, png_dir: &Path) -> Result<
                 svg_path,
                 ref_png_path,
                 test_name,
+                rel_svg_path: None,
             });
         }
     }
