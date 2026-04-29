@@ -621,7 +621,17 @@ fn paint_stroke(
         Some("bevel") => Join::Bevel,
         _ => Join::Miter,
     });
-    if let Some(ml) = num_attr(node, "stroke-miterlimit") {
+    // SVG 2 §11.5: `stroke-miterlimit` is a `<number>`, not a
+    // `<length>` — values with unit suffixes (`5mm`, `4px`, `2em`)
+    // are invalid and must fall back to the initial value (4 — Skia's
+    // default when `set_stroke_miter` is not called). Parse strictly
+    // as f32 instead of routing through `parse_length_px`, which
+    // would silently accept `5mm` as 18.9 and produce a too-long
+    // miter spike.
+    if let Some(ml) = get_attr(node, "stroke-miterlimit")
+        .map(str::trim)
+        .and_then(|s| s.parse::<f32>().ok())
+    {
         p.set_stroke_miter(ml.max(1.0));
     }
 
