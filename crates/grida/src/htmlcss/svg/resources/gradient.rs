@@ -85,7 +85,29 @@ pub fn resolve_to_shader(
             m
         }
     };
-    let local = Matrix::concat(&bbox_matrix, &common.transform);
+    // SVG 2 §8.3 / CSS Transforms 1: `transform-origin` shifts the
+    // pivot of `gradientTransform`. The pivot lives in the same space
+    // `gradientTransform` operates in — for `gradientUnits=objectBoundingBox`
+    // that's the unit square (0..1), for `userSpaceOnUse` it's the
+    // SVG viewport. Wrap as `T(o) ∘ M ∘ T(-o)` before composing with
+    // `bbox_matrix`.
+    let gradient_transform = {
+        let origin_box = match common.units {
+            GradientUnits::ObjectBoundingBox => (0.0, 0.0, 1.0, 1.0),
+            GradientUnits::UserSpaceOnUse => (0.0, 0.0, viewport.0, viewport.1),
+        };
+        let origin =
+            crate::htmlcss::svg::layout::transform::transform_origin_in_box(node, origin_box);
+        if origin == (0.0, 0.0) {
+            common.transform
+        } else {
+            let mut wrapped = Matrix::translate(origin);
+            wrapped.pre_concat(&common.transform);
+            wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
+            wrapped
+        }
+    };
+    let local = Matrix::concat(&bbox_matrix, &gradient_transform);
 
     // NOTE: do NOT pass an explicit `Some(ColorSpace::new_srgb())` here.
     // skia-safe 0.93.x has a use-after-free in

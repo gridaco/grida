@@ -88,23 +88,6 @@ pub fn build_shader(ctx: &PaintCtx<'_>, node: NodeId, bbox: Rect) -> Option<Shad
     if !attrs.has_children {
         return None;
     }
-    // SVG 2 §8.3 / CSS Transforms 1: `transform-origin` shifts the
-    // pivot of `patternTransform` (the value sits on the pattern
-    // element itself, not the href chain). Wrap the parsed matrix in
-    // `T(o) ∘ M ∘ T(-o)` once here so the rest of the builder treats
-    // it as an opaque user-space transform.
-    if let Some(t) = attrs.pattern_transform {
-        let pattern_node = ctx.dom.node(node);
-        let origin =
-            crate::htmlcss::svg::layout::transform::transform_origin_for(ctx, pattern_node);
-        if origin != (0.0, 0.0) {
-            let mut wrapped = Matrix::translate(origin);
-            wrapped.pre_concat(&t);
-            wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
-            attrs.pattern_transform = Some(wrapped);
-        }
-    }
-
     // Defaults per SVG 1.1 §13.3 / SVG 2 §13.3:
     // - patternUnits: objectBoundingBox
     // - patternContentUnits: userSpaceOnUse
@@ -159,6 +142,26 @@ pub fn build_shader(ctx: &PaintCtx<'_>, node: NodeId, bbox: Rect) -> Option<Shad
 
     if tile.width() <= 0.0 || tile.height() <= 0.0 {
         return None;
+    }
+
+    // SVG 2 §8.3 / CSS Transforms 1: `transform-origin` shifts the
+    // pivot of `patternTransform`. The pivot lives in tile-pixel space
+    // (the same space `shader_local` applies `patternTransform` in),
+    // so we resolve `transform-origin` against the tile rect — for
+    // `patternUnits=objectBoundingBox` that's the bbox-sized tile,
+    // not the SVG viewport. Wrap as `T(o) ∘ M ∘ T(-o)`.
+    if let Some(t) = attrs.pattern_transform {
+        let pattern_node = ctx.dom.node(node);
+        let origin = crate::htmlcss::svg::layout::transform::transform_origin_in_box(
+            pattern_node,
+            (0.0, 0.0, tile.width(), tile.height()),
+        );
+        if origin != (0.0, 0.0) {
+            let mut wrapped = Matrix::translate(origin);
+            wrapped.pre_concat(&t);
+            wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
+            attrs.pattern_transform = Some(wrapped);
+        }
     }
 
     // Reject singular `patternTransform` (e.g. `matrix(0 0 0 0 0 0)`).

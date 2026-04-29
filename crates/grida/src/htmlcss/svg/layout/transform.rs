@@ -26,6 +26,29 @@ pub(crate) fn transform_origin_for(ctx: &PaintCtx<'_>, node: &DemoNode) -> (f32,
         viewport_box_for(ctx, node)
     };
 
+    parse_transform_origin(&raw, (rx, ry, rw, rh))
+}
+
+/// Resolve the `transform-origin` / `transform-box` declarations on
+/// `node` against an explicit reference box `(rx, ry, rw, rh)`. The
+/// box is the coordinate system in which the resulting origin will be
+/// applied — for `<pattern>` / `<linearGradient>` /
+/// `<radialGradient>` with `gradientUnits=objectBoundingBox` (or the
+/// pattern equivalent) that's the tile / unit-bbox space, not the
+/// element's SVG viewport. Returns `(0, 0)` when no `transform-origin`
+/// is set.
+pub(crate) fn transform_origin_in_box(
+    node: &DemoNode,
+    ref_box: (f32, f32, f32, f32),
+) -> (f32, f32) {
+    let Some(raw) = read_attr_or_style(node, "transform-origin") else {
+        return (0.0, 0.0);
+    };
+    parse_transform_origin(&raw, ref_box)
+}
+
+fn parse_transform_origin(raw: &str, ref_box: (f32, f32, f32, f32)) -> (f32, f32) {
+    let (rx, ry, rw, rh) = ref_box;
     let tokens: Vec<&str> = raw.split_ascii_whitespace().collect();
     let parse_axis = |tok: &str, axis_size: f32, axis_origin: f32| -> Option<f32> {
         let t = tok.trim();
