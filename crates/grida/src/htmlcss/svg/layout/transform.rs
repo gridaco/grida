@@ -1,18 +1,32 @@
 //! SVG transform helpers.
 
 use csscascade::dom::DemoNode;
+use skia_safe::Matrix;
 
 use crate::htmlcss::svg::dom::attrs::parse_length_px;
-use crate::htmlcss::svg::dom::element::get_attr;
 use crate::htmlcss::svg::layout::bbox::element_object_bbox;
 use crate::htmlcss::svg::layout::viewport::viewport_box_for;
 use crate::htmlcss::svg::paint::scoped_svg_paint_state::PaintCtx;
+use crate::htmlcss::svg::style::cascade::get_attr_or_style;
+
+/// Wrap `m` so it is applied around `origin` per CSS Transforms 1 §3.5:
+/// `translate(o) * m * translate(-o)`. Returns `m` unchanged when
+/// `origin == (0, 0)`.
+pub(crate) fn wrap_with_origin(m: &Matrix, origin: (f32, f32)) -> Matrix {
+    if origin == (0.0, 0.0) {
+        return *m;
+    }
+    let mut wrapped = Matrix::translate(origin);
+    wrapped.pre_concat(m);
+    wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
+    wrapped
+}
 
 pub(crate) fn transform_origin_for(ctx: &PaintCtx<'_>, node: &DemoNode) -> (f32, f32) {
-    let raw = read_attr_or_style(node, "transform-origin");
+    let raw = get_attr_or_style(node, "transform-origin");
     let Some(raw) = raw else { return (0.0, 0.0) };
 
-    let transform_box = read_attr_or_style(node, "transform-box");
+    let transform_box = get_attr_or_style(node, "transform-box");
     let use_fill_box = transform_box
         .as_deref()
         .map(str::trim)
@@ -41,7 +55,7 @@ pub(crate) fn transform_origin_in_box(
     node: &DemoNode,
     ref_box: (f32, f32, f32, f32),
 ) -> (f32, f32) {
-    let Some(raw) = read_attr_or_style(node, "transform-origin") else {
+    let Some(raw) = get_attr_or_style(node, "transform-origin") else {
         return (0.0, 0.0);
     };
     parse_transform_origin(&raw, ref_box)
@@ -93,20 +107,4 @@ fn parse_transform_origin(raw: &str, ref_box: (f32, f32, f32, f32)) -> (f32, f32
         }
         _ => (0.0, 0.0),
     }
-}
-
-fn read_attr_or_style(node: &DemoNode, name: &str) -> Option<String> {
-    if let Some(v) = get_attr(node, name) {
-        return Some(v.to_string());
-    }
-    if let Some(style) = get_attr(node, "style") {
-        for decl in style.split(';') {
-            if let Some((k, v)) = decl.split_once(':') {
-                if k.trim().eq_ignore_ascii_case(name) {
-                    return Some(v.trim().to_string());
-                }
-            }
-        }
-    }
-    None
 }

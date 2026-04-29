@@ -98,14 +98,7 @@ pub fn resolve_to_shader(
         };
         let origin =
             crate::htmlcss::svg::layout::transform::transform_origin_in_box(node, origin_box);
-        if origin == (0.0, 0.0) {
-            common.transform
-        } else {
-            let mut wrapped = Matrix::translate(origin);
-            wrapped.pre_concat(&common.transform);
-            wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
-            wrapped
-        }
+        crate::htmlcss::svg::layout::transform::wrap_with_origin(&common.transform, origin)
     };
     let local = Matrix::concat(&bbox_matrix, &gradient_transform);
 

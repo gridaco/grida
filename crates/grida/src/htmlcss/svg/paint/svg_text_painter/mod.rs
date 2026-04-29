@@ -944,16 +944,10 @@ fn resolve_text_path(ctx: &PaintCtx<'_>, node: &DemoNode) -> Option<TextPathInfo
         // origin="center"` rotates around (0, 0) instead of the
         // viewport center.
         if let Some(t) = get_attr(target, "transform").and_then(parse_transform) {
-            let (ox, oy) = super::super::layout::transform::transform_origin_for(ctx, target);
-            let final_transform = if ox == 0.0 && oy == 0.0 {
-                t
-            } else {
-                let mut m = skia_safe::Matrix::translate((ox, oy));
-                m.pre_concat(&t);
-                m.pre_concat(&skia_safe::Matrix::translate((-ox, -oy)));
-                m
-            };
-            p = p.with_transform(&final_transform);
+            let origin = super::super::layout::transform::transform_origin_for(ctx, target);
+            p = p.with_transform(&super::super::layout::transform::wrap_with_origin(
+                &t, origin,
+            ));
         }
         p
     };
@@ -1732,19 +1726,14 @@ fn build_text_fill_paint(
             // funcIRI didn't resolve. Per SVG 2 §11.3, the funcIRI
             // syntax permits a trailing fallback color: `fill=
             // "url(#g) red"`. Try parsing the trailing portion.
-            if let Some(end) = v.find(')') {
-                let trail = v[end + 1..].trim();
-                if !trail.is_empty() {
-                    if let Some(Paint::Color(c)) =
-                        crate::htmlcss::svg::dom::attrs::parse_paint(trail)
-                    {
-                        paint.set_color(c);
-                        if opacity_factor < 1.0 {
-                            let a = (c.a() as f32 / 255.0) * opacity_factor;
-                            paint.set_alpha_f(a);
-                        }
-                        return Some(paint);
+            if let Some(trail) = crate::htmlcss::svg::resources::paint_server::paint_fallback(v) {
+                if let Some(Paint::Color(c)) = crate::htmlcss::svg::dom::attrs::parse_paint(trail) {
+                    paint.set_color(c);
+                    if opacity_factor < 1.0 {
+                        let a = (c.a() as f32 / 255.0) * opacity_factor;
+                        paint.set_alpha_f(a);
                     }
+                    return Some(paint);
                 }
             }
             // Default to black.
@@ -1843,15 +1832,12 @@ fn build_text_stroke_paint(
             }
         }
         // funcIRI fallback color (SVG 2 §11.3): `stroke="url(#g) red"`.
-        if let Some(end) = v.find(')') {
-            let trail = v[end + 1..].trim();
-            if !trail.is_empty() {
-                if let Some(Paint::Color(c)) = crate::htmlcss::svg::dom::attrs::parse_paint(trail) {
-                    paint.set_color(c);
-                    let a = (c.a() as f32 / 255.0) * opacity_factor;
-                    paint.set_alpha_f(a);
-                    return Some(paint);
-                }
+        if let Some(trail) = crate::htmlcss::svg::resources::paint_server::paint_fallback(v) {
+            if let Some(Paint::Color(c)) = crate::htmlcss::svg::dom::attrs::parse_paint(trail) {
+                paint.set_color(c);
+                let a = (c.a() as f32 / 255.0) * opacity_factor;
+                paint.set_alpha_f(a);
+                return Some(paint);
             }
         }
         // No fallback resolved → SVG 2 says treat as if the property

@@ -149,14 +149,9 @@ pub fn paint_node(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId) {
         // Default origin is `(0, 0)` (the existing behavior); `center`
         // resolves to the bbox center for legacy SVG-1 parity.
         let origin = transform_origin_for(ctx, node);
-        if origin != (0.0, 0.0) {
-            let mut wrapped = skia_safe::Matrix::translate(origin);
-            wrapped.pre_concat(&t);
-            wrapped.pre_concat(&skia_safe::Matrix::translate((-origin.0, -origin.1)));
-            canvas.concat(&wrapped);
-        } else {
-            canvas.concat(&t);
-        }
+        canvas.concat(&crate::htmlcss::svg::layout::transform::wrap_with_origin(
+            &t, origin,
+        ));
     }
 
     // `clip-path=` on this element. Path-strategy only — bail (return

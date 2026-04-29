@@ -158,7 +158,7 @@ pub(crate) fn viewport_box_for(ctx: &PaintCtx<'_>, node: &DemoNode) -> (f32, f32
 /// supplied axis extent. Bare numbers and absolute units pass through
 /// `parse_length_px`. Used by callers that need a single hop of
 /// percentage resolution against a known viewport axis.
-fn length_or_percent(s: &str, axis: f32) -> Option<f32> {
+pub(crate) fn length_or_percent(s: &str, axis: f32) -> Option<f32> {
     let s = s.trim();
     if let Some(p) = s.strip_suffix('%') {
         let n: f32 = p.trim().parse().ok()?;

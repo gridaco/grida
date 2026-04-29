@@ -29,7 +29,7 @@ use crate::htmlcss::svg::dom::attrs::{
 use crate::htmlcss::svg::dom::element::{get_attr, ElementKind};
 use crate::htmlcss::svg::dom::href::{href_attr, same_document_fragment};
 use crate::htmlcss::svg::dom::path_d::parse_path;
-use crate::htmlcss::svg::layout::transform::transform_origin_for;
+use crate::htmlcss::svg::layout::transform::{transform_origin_for, wrap_with_origin};
 use crate::htmlcss::svg::paint::scoped_svg_paint_state::{ClipFrame, PaintCtx};
 
 use super::svg_resources::Resources;
@@ -117,14 +117,7 @@ pub fn resolve_to_path(ctx: &PaintCtx<'_>, clip_id: NodeId, object_bbox: Rect) -
     // origin is `(0, 0)` (the existing behavior).
     if let Some(t) = get_attr(node, "transform").and_then(parse_transform) {
         let origin = transform_origin_for(ctx, node);
-        if origin != (0.0, 0.0) {
-            let mut wrapped = Matrix::translate(origin);
-            wrapped.pre_concat(&t);
-            wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
-            path = path.with_transform(&wrapped);
-        } else {
-            path = path.with_transform(&t);
-        }
+        path = path.with_transform(&wrap_with_origin(&t, origin));
     }
 
     // Compose the clipPath's own chained `clip-path=` reference (after

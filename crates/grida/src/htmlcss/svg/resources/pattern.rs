@@ -156,12 +156,9 @@ pub fn build_shader(ctx: &PaintCtx<'_>, node: NodeId, bbox: Rect) -> Option<Shad
             pattern_node,
             (0.0, 0.0, tile.width(), tile.height()),
         );
-        if origin != (0.0, 0.0) {
-            let mut wrapped = Matrix::translate(origin);
-            wrapped.pre_concat(&t);
-            wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
-            attrs.pattern_transform = Some(wrapped);
-        }
+        attrs.pattern_transform = Some(crate::htmlcss::svg::layout::transform::wrap_with_origin(
+            &t, origin,
+        ));
     }
 
     // Reject singular `patternTransform` (e.g. `matrix(0 0 0 0 0 0)`).
