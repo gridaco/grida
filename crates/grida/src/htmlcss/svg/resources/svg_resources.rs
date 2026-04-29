@@ -33,7 +33,11 @@ impl Resources {
                 continue;
             }
             if let Some(s) = get_attr(node, "id") {
-                by_id.insert(s.to_string(), id);
+                // Per DOM Core / SVG 2: when multiple elements share the
+                // same `id`, the *first* in document order wins for
+                // `getElementById`-style lookups. Use `or_insert` so a
+                // later duplicate doesn't shadow the first declaration.
+                by_id.entry(s.to_string()).or_insert(id);
             }
         }
         let stylesheet = Stylesheet::collect(dom, css);
