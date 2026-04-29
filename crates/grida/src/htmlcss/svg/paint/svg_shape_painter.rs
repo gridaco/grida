@@ -17,13 +17,12 @@ use skia_safe::{
     PathEffect, PathFillType, Point, RRect, Rect,
 };
 
-use super::super::dom::attrs::{parse_length_px, parse_paint, parse_points, parse_viewbox, Paint};
-use super::super::dom::element::{get_attr, ElementKind};
+use super::super::dom::attrs::{parse_length_px, parse_paint, parse_points, Paint};
+use super::super::dom::element::get_attr;
 use super::super::dom::path_d::parse_path;
 use super::super::resources::paint_server::{self, Resolved};
 use super::super::style::cascade::cascade_property;
 use super::scoped_svg_paint_state::PaintCtx;
-use csscascade::dom::DemoNodeData;
 
 /// Axis used to resolve a `<percentage>` against the SVG viewport
 /// (per SVG 2 §10.2 "Length values"). `X` resolves against viewport
@@ -42,26 +41,7 @@ enum Axis {
 /// `width`/`height` attributes. Returns `(0,0,0,0)` if no viewport
 /// is reachable; that collapses any percentage to 0.
 fn viewport_box_for(ctx: &PaintCtx<'_>, node: &DemoNode) -> (f32, f32, f32, f32) {
-    let mut current = node.parent;
-    while let Some(id) = current {
-        let n = ctx.dom.node(id);
-        if let DemoNodeData::Element(d) = &n.data {
-            if ElementKind::from_local_name(d.name.local.as_ref()) == ElementKind::Svg {
-                if let Some(vb) = get_attr(n, "viewBox").and_then(parse_viewbox) {
-                    return vb;
-                }
-                let w = get_attr(n, "width")
-                    .and_then(parse_length_px)
-                    .unwrap_or(0.0);
-                let h = get_attr(n, "height")
-                    .and_then(parse_length_px)
-                    .unwrap_or(0.0);
-                return (0.0, 0.0, w, h);
-            }
-        }
-        current = n.parent;
-    }
-    (0.0, 0.0, 0.0, 0.0)
+    super::super::layout::viewport::viewport_box_for(ctx, node)
 }
 
 fn axis_extent(viewport: (f32, f32, f32, f32), axis: Axis) -> f32 {

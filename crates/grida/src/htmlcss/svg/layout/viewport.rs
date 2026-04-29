@@ -12,10 +12,20 @@ use crate::htmlcss::svg::paint::scoped_svg_paint_state::PaintCtx;
 use crate::htmlcss::svg::paint::svg_container_painter::paint_children;
 
 pub(crate) fn paint_nested_svg(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId, node: &DemoNode) {
-    let x = get_attr(node, "x").and_then(parse_length_px).unwrap_or(0.0);
-    let y = get_attr(node, "y").and_then(parse_length_px).unwrap_or(0.0);
-    let w = get_attr(node, "width").and_then(parse_length_px);
-    let h = get_attr(node, "height").and_then(parse_length_px);
+    // SVG 2 §7.7: x, y, width, height on a nested `<svg>` accept
+    // `<length-percentage>`. Percentages resolve against the parent
+    // viewport (the enclosing `<svg>` element's viewBox or
+    // width/height). `parse_length_px` returns None for `%`, so
+    // resolve those explicitly here.
+    let (_, _, parent_w, parent_h) = viewport_box_for(ctx, node);
+    let x = get_attr(node, "x")
+        .and_then(|s| length_or_percent(s, parent_w))
+        .unwrap_or(0.0);
+    let y = get_attr(node, "y")
+        .and_then(|s| length_or_percent(s, parent_h))
+        .unwrap_or(0.0);
+    let w = get_attr(node, "width").and_then(|s| length_or_percent(s, parent_w));
+    let h = get_attr(node, "height").and_then(|s| length_or_percent(s, parent_h));
 
     let viewport_w = w.unwrap_or(0.0);
     let viewport_h = h.unwrap_or(0.0);
@@ -106,11 +116,17 @@ pub(crate) fn viewport_box_for(ctx: &PaintCtx<'_>, node: &DemoNode) -> (f32, f32
                 if let Some(vb) = get_attr(n, "viewBox").and_then(parse_viewbox) {
                     return vb;
                 }
+                // SVG 2 §7.7: a nested `<svg>` accepts percentage
+                // width/height that resolve against its own enclosing
+                // viewport. Recurse so a `<rect width="100%">` inside
+                // a nested `<svg width="50%">` ultimately measures
+                // against the outer viewBox / canvas.
+                let (_, _, parent_w, parent_h) = viewport_box_for(ctx, n);
                 let w = get_attr(n, "width")
-                    .and_then(parse_length_px)
+                    .and_then(|s| length_or_percent(s, parent_w))
                     .unwrap_or(0.0);
                 let h = get_attr(n, "height")
-                    .and_then(parse_length_px)
+                    .and_then(|s| length_or_percent(s, parent_h))
                     .unwrap_or(0.0);
                 return (0.0, 0.0, w, h);
             }
@@ -118,6 +134,19 @@ pub(crate) fn viewport_box_for(ctx: &PaintCtx<'_>, node: &DemoNode) -> (f32, f32
         current = n.parent;
     }
     (0.0, 0.0, 0.0, 0.0)
+}
+
+/// Parse an SVG `<length-percentage>` token, resolving `%` against the
+/// supplied axis extent. Bare numbers and absolute units pass through
+/// `parse_length_px`. Used by callers that need a single hop of
+/// percentage resolution against a known viewport axis.
+fn length_or_percent(s: &str, axis: f32) -> Option<f32> {
+    let s = s.trim();
+    if let Some(p) = s.strip_suffix('%') {
+        let n: f32 = p.trim().parse().ok()?;
+        return Some(n / 100.0 * axis);
+    }
+    parse_length_px(s)
 }
 
 pub(crate) fn compute_viewbox_matrix(
