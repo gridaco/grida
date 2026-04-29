@@ -101,6 +101,14 @@ pub struct PaintCtx<'a> {
     /// the element unmasked. Same linked-list shape as `use_chain` so
     /// `PaintCtx` stays `Copy`.
     pub mask_chain: Option<&'a MaskFrame<'a>>,
+    /// Stack of `<clipPath>` elements currently being resolved,
+    /// innermost last. Mirrors `mask_chain` for `clip-path=` chained
+    /// references on clipPath elements or their direct children. CSS
+    /// Masking 1 §6.4 leaves clip-path cycles to "implementation
+    /// defined"; Chrome/Safari/resvg break the cycle at the first
+    /// repeat (treating the inner reference as absent), and the
+    /// reftest expected PNGs follow that behavior.
+    pub clip_chain: Option<&'a ClipFrame<'a>>,
 }
 
 /// One link in the active-mask stack. Holds the mask element's id so
@@ -115,6 +123,28 @@ pub struct MaskFrame<'a> {
 impl<'a> MaskFrame<'a> {
     pub fn contains(&self, id: NodeId) -> bool {
         if self.mask_id == id {
+            return true;
+        }
+        match self.parent {
+            Some(p) => p.contains(id),
+            None => false,
+        }
+    }
+}
+
+/// One link in the active-clipPath stack. Holds the clipPath element
+/// id so the chain walk can detect cycles when a chained
+/// `clip-path=url(#…)` reference points back at a clipPath already in
+/// flight.
+#[derive(Clone, Copy)]
+pub struct ClipFrame<'a> {
+    pub clip_id: NodeId,
+    pub parent: Option<&'a ClipFrame<'a>>,
+}
+
+impl<'a> ClipFrame<'a> {
+    pub fn contains(&self, id: NodeId) -> bool {
+        if self.clip_id == id {
             return true;
         }
         match self.parent {
@@ -183,6 +213,14 @@ impl<'a> PaintCtx<'a> {
             initial_viewport,
             use_chain: None,
             mask_chain: None,
+            clip_chain: None,
+        }
+    }
+
+    pub fn with_clip_chain(self, frame: &'a ClipFrame<'a>) -> Self {
+        Self {
+            clip_chain: Some(frame),
+            ..self
         }
     }
 

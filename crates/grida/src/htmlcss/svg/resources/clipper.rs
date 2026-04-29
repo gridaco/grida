@@ -30,7 +30,7 @@ use crate::htmlcss::svg::dom::element::{get_attr, ElementKind};
 use crate::htmlcss::svg::dom::href::{href_attr, same_document_fragment};
 use crate::htmlcss::svg::dom::path_d::parse_path;
 use crate::htmlcss::svg::layout::transform::transform_origin_for;
-use crate::htmlcss::svg::paint::scoped_svg_paint_state::PaintCtx;
+use crate::htmlcss::svg::paint::scoped_svg_paint_state::{ClipFrame, PaintCtx};
 
 use super::svg_resources::Resources;
 
@@ -63,15 +63,23 @@ pub fn resolve_to_path(ctx: &PaintCtx<'_>, clip_id: NodeId, object_bbox: Rect) -
         _ => ClipPathUnits::UserSpaceOnUse,
     };
 
-    // SVG 2 says a `clip-path` chained on the `<clipPath>` itself
-    // composes another clipping region, but resvg's handling — which
-    // our reference PNGs follow — ignores the chained reference when
-    // it cycles back to the same element (the most common case in the
-    // test suite). We can't represent chained clipPaths via the path
-    // strategy regardless, so the simplest correct approximation is
-    // to treat them as absent here. `mask=` / `filter=` on a clipPath
-    // are likewise unimplemented and ignored.
-    let _ = has_nontrivial_attr; // helper retained for any future chain probe
+    // SVG 2 §14.3.5 / CSS Masking 1 §6.4: a `clip-path=` chained on
+    // the `<clipPath>` element itself composes another clipping
+    // region. A chain to an *empty* (or unresolvable) clipPath is the
+    // "fully clipped" sentinel — return an empty path. Otherwise we
+    // recursively resolve the chained clipPath and intersect; cycles
+    // are broken via `clip_chain` (Chrome/Safari/resvg break at the
+    // first repeat, treating the inner reference as absent).
+    if references_empty_clip_path(dom, resources, get_attr(node, "clip-path")) {
+        return Some(Path::default());
+    }
+
+    let frame = ClipFrame {
+        clip_id,
+        parent: ctx.clip_chain,
+    };
+    let inner_ctx = ctx.with_clip_chain(&frame);
+    let chained_self = chained_clip_path(&inner_ctx, get_attr(node, "clip-path"), object_bbox);
 
     // `clip-rule` cascades through ancestors of each shape — both
     // through `<g>` wrappers inside the clipPath and (via CSS
@@ -79,20 +87,9 @@ pub fn resolve_to_path(ctx: &PaintCtx<'_>, clip_id: NodeId, object_bbox: Rect) -
     // resolve the clipper's own inherited rule once and pass it as the
     // default into the child walk. Children's own `clip-rule` (or a
     // wrapping `<g>`'s) overrides.
-    // SVG 2 §14.3.5 / CSS Masking 1 §6.4: a `clip-path=` chained on
-    // the `<clipPath>` element itself composes another clipping
-    // region. Generic composition is out of scope for the path
-    // strategy, but a chain to an *empty* (or unresolvable) clipPath
-    // is the common spec-edge case and clips everything — the rect
-    // ends up fully clipped. Detect that here so we return an empty
-    // path instead of silently ignoring the chained reference.
-    if references_empty_clip_path(dom, resources, get_attr(node, "clip-path")) {
-        return Some(Path::default());
-    }
-
     let initial_rule = inherited_clip_rule(dom, node);
     let mut acc: Option<Path> = None;
-    walk_clipper_children(dom, resources, node, initial_rule, &mut acc)?;
+    walk_clipper_children(&inner_ctx, node, initial_rule, object_bbox, &mut acc)?;
 
     // SVG 2 §14.3.5: a clipPath with no effective children clips
     // everything (output is empty). Distinguish that from the
@@ -130,7 +127,33 @@ pub fn resolve_to_path(ctx: &PaintCtx<'_>, clip_id: NodeId, object_bbox: Rect) -
         }
     }
 
+    // Compose the clipPath's own chained `clip-path=` reference (after
+    // its transform), per CSS Masking 1 §6.4. Cycles were skipped by
+    // `chained_clip_path` returning `None`.
+    if let Some(chained) = chained_self {
+        path = skia_safe::op(&path, &chained, PathOp::Intersect).unwrap_or_default();
+    }
+
     Some(path)
+}
+
+/// Resolve the chained `clip-path=url(#…)` reference on a clipPath or
+/// one of its direct children to a path in user space. Returns `None`
+/// when the attribute is absent, malformed, the referenced clipPath
+/// is already in flight on `ctx.clip_chain` (cycle — break it), or
+/// resolution otherwise fails.
+fn chained_clip_path(ctx: &PaintCtx<'_>, attr: Option<&str>, object_bbox: Rect) -> Option<Path> {
+    let raw = attr
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("none"))?;
+    let id = super::svg_resources::parse_url_ref(raw)?;
+    let target_id = ctx.resources.lookup(id)?;
+    if let Some(chain) = ctx.clip_chain {
+        if chain.contains(target_id) {
+            return None;
+        }
+    }
+    resolve_to_path(ctx, target_id, object_bbox)
 }
 
 /// Walk a clipPath's direct children, building each shape's
@@ -141,12 +164,14 @@ pub fn resolve_to_path(ctx: &PaintCtx<'_>, clip_id: NodeId, object_bbox: Rect) -
 /// `g-is-not-a-valid-child.svg`). Per-shape `clip-rule` falls back to
 /// the cascade resolved by the caller into `inherited_rule`.
 fn walk_clipper_children(
-    dom: &DemoDom,
-    resources: &Resources,
+    ctx: &PaintCtx<'_>,
     parent: &DemoNode,
     inherited_rule: Option<PathFillType>,
+    object_bbox: Rect,
     acc: &mut Option<Path>,
 ) -> Option<()> {
+    let dom = ctx.dom;
+    let resources = ctx.resources;
     for child_id in parent.children.iter().copied() {
         let child = dom.node(child_id);
         let DemoNodeData::Element(child_data) = &child.data else {
@@ -175,10 +200,19 @@ fn walk_clipper_children(
             child_path = child_path.with_transform(&t);
         }
 
+        // Set fill type before any boolean op — Skia `PathOp::Intersect`
+        // uses each input's fill type to decide what's "inside".
         let rule = read_clip_rule_attr(child)
             .or(inherited_rule)
             .unwrap_or(PathFillType::Winding);
         child_path.set_fill_type(rule);
+
+        // Child's own chained `clip-path=` composes another clipping
+        // region around this shape. Cycles back to a clipPath already
+        // in flight on `ctx.clip_chain` are broken.
+        if let Some(chained) = chained_clip_path(ctx, get_attr(child, "clip-path"), object_bbox) {
+            child_path = skia_safe::op(&child_path, &chained, PathOp::Intersect)?;
+        }
 
         *acc = Some(match acc.take() {
             None => child_path,
@@ -276,13 +310,6 @@ fn deref_use_target(
 ) -> Option<NodeId> {
     let id = href_attr(use_node).and_then(same_document_fragment)?;
     resources.lookup(id)
-}
-
-fn has_nontrivial_attr(node: &csscascade::dom::DemoNode, name: &str) -> bool {
-    match get_attr(node, name).map(str::trim) {
-        Some("none") | Some("") | None => false,
-        Some(_) => true,
-    }
 }
 
 fn build_child_path(
