@@ -36,7 +36,17 @@ pub(crate) fn paint_nested_svg(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId, 
 
     let viewport_rect = Rect::from_xywh(x, y, viewport_w, viewport_h);
     canvas.save();
-    canvas.clip_rect(viewport_rect, skia_safe::ClipOp::Intersect, true);
+    // SVG 2 §7.7: a nested `<svg>` clips to its viewport unless the
+    // `overflow` property says otherwise. The default is `hidden`,
+    // but `visible` / `auto` (Chrome treats `auto` like `visible`
+    // here) skip the clip so children can extend past the box.
+    let overflow = get_attr(node, "overflow")
+        .map(str::trim)
+        .unwrap_or("hidden");
+    let clip_to_viewport = !matches!(overflow, "visible" | "auto");
+    if clip_to_viewport {
+        canvas.clip_rect(viewport_rect, skia_safe::ClipOp::Intersect, true);
+    }
 
     if let Some(view_box) = get_attr(node, "viewBox").and_then(parse_viewbox) {
         let par = get_attr(node, "preserveAspectRatio")

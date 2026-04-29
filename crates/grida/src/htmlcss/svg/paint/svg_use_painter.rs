@@ -69,7 +69,17 @@ pub(crate) fn paint_use(canvas: &Canvas, ctx: &PaintCtx<'_>, use_id: NodeId) {
     if let DemoNodeData::Element(d) = &target.data {
         let kind = ElementKind::from_local_name(d.name.local.as_ref());
         match kind {
-            ElementKind::Symbol => paint_symbol_use(canvas, ctx, &deeper, use_id, target_id),
+            // Per SVG 2 §5.6.5, `<use>` to a `<symbol>` *or* an
+            // `<svg>` establishes a new viewport: the `<use>`'s
+            // `width` / `height` override the target's own size, and
+            // the target's `viewBox` / `preserveAspectRatio` /
+            // `overflow` apply within it. `paint_symbol_use` already
+            // implements that contract; route both kinds through it
+            // so a fixture like `<use href="#svg2" width="100">`
+            // doesn't paint the referenced svg at full natural size.
+            ElementKind::Symbol | ElementKind::Svg => {
+                paint_symbol_use(canvas, ctx, &deeper, use_id, target_id)
+            }
             _ => paint_node(canvas, &deeper, target_id),
         }
     }
@@ -102,6 +112,27 @@ fn paint_symbol_use(
     let viewport_h = use_h
         .or_else(|| get_attr(target, "height").and_then(parse_length_px))
         .unwrap_or(vp_h_default);
+
+    // SVG 2 §5.6.5: when the target is an `<svg>`, the cloned svg
+    // keeps its own `x` / `y` translation (they're properties of the
+    // referenced element, not overridden by the use). `<symbol>`
+    // doesn't have x/y attributes, so this no-ops for that path.
+    let target_kind = if let DemoNodeData::Element(d) = &target.data {
+        ElementKind::from_local_name(d.name.local.as_ref())
+    } else {
+        ElementKind::Unknown
+    };
+    if target_kind == ElementKind::Svg {
+        let tx = get_attr(target, "x")
+            .and_then(parse_length_px)
+            .unwrap_or(0.0);
+        let ty = get_attr(target, "y")
+            .and_then(parse_length_px)
+            .unwrap_or(0.0);
+        if tx != 0.0 || ty != 0.0 {
+            canvas.translate((tx, ty));
+        }
+    }
 
     let overflow = get_attr(target, "overflow")
         .map(str::trim)
