@@ -116,7 +116,14 @@ pub fn build_shader(ctx: &PaintCtx<'_>, node: NodeId, bbox: Rect) -> Option<Shad
     // basis: in `objectBoundingBox` we multiply fractions (and percent,
     // which the spec also treats as a fraction here) by bbox extents;
     // in `userSpaceOnUse` raw lengths pass through and percent resolves
-    // against the viewport.
+    // against the *current SVG viewport* (the enclosing `<svg>`'s
+    // viewBox or width/height) per SVG 2 §13.3 — not the host pixel
+    // canvas in `ctx.initial_viewport`. Use `nearest_svg_viewport`,
+    // which walks up to the closest `<svg>` and reports its user-space
+    // extents.
+    let pattern_node = ctx.dom.node(node);
+    let (svg_vp_w, svg_vp_h) =
+        crate::htmlcss::svg::layout::viewport::nearest_svg_viewport(ctx, pattern_node);
     let resolve = |v: Option<Length>, axis: Axis| -> f32 {
         let Some(v) = v else { return 0.0 };
         match (pattern_units, v) {
@@ -132,8 +139,8 @@ pub fn build_shader(ctx: &PaintCtx<'_>, node: NodeId, bbox: Rect) -> Option<Shad
             },
             (Units::UserSpaceOnUse, Length::Px(n)) => n,
             (Units::UserSpaceOnUse, Length::Percent(p)) => match axis {
-                Axis::X => ctx.initial_viewport.0 * (p / 100.0),
-                Axis::Y => ctx.initial_viewport.1 * (p / 100.0),
+                Axis::X => svg_vp_w * (p / 100.0),
+                Axis::Y => svg_vp_h * (p / 100.0),
             },
         }
     };
