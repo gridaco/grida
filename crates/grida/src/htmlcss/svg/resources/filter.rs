@@ -854,7 +854,15 @@ fn build_primitive(
                             *par,
                         );
                         let src = Rect::from_iwh(image.width(), image.height());
-                        let sampling = skia_safe::SamplingOptions::default();
+                        // CSS `image-rendering: auto` (the SVG default
+                        // for `feImage`) uses smooth resampling. Skia
+                        // `SamplingOptions::default()` is nearest-
+                        // neighbor — produces blocky upscaled images
+                        // that don't match Chrome / resvg.
+                        let sampling = skia_safe::SamplingOptions::new(
+                            skia_safe::FilterMode::Linear,
+                            skia_safe::MipmapMode::None,
+                        );
                         image_filters::image(image, Some(&src), Some(&dst), sampling)
                     }
                     None => transparent_flood(crop),
