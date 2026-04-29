@@ -348,13 +348,23 @@ fn resolve_paint_order(ctx: &PaintCtx<'_>, node: &DemoNode) -> [PaintPhase; 3] {
     {
         return [PaintPhase::Fill, PaintPhase::Stroke, PaintPhase::Markers];
     }
+    // CSS Paint Order spec / CSS Values 4 §3.4: a property declaration
+    // with any invalid token is invalid as a whole — treated as if the
+    // property weren't set. Don't silently skip unknown keywords;
+    // rejecting the whole value matches Chrome/Firefox + the
+    // resvg-test-suite `paint-order_trailing-data.svg` fixture
+    // ("stroke markers fill qwe" → default, not "stroke markers fill").
     let mut listed: Vec<PaintPhase> = Vec::with_capacity(3);
+    let mut seen_invalid = false;
     for tok in trimmed.split_ascii_whitespace() {
         let phase = match tok.to_ascii_lowercase().as_str() {
             "fill" => Some(PaintPhase::Fill),
             "stroke" => Some(PaintPhase::Stroke),
             "markers" => Some(PaintPhase::Markers),
-            _ => None,
+            _ => {
+                seen_invalid = true;
+                break;
+            }
         };
         if let Some(p) = phase {
             if !listed.contains(&p) {
@@ -362,7 +372,7 @@ fn resolve_paint_order(ctx: &PaintCtx<'_>, node: &DemoNode) -> [PaintPhase; 3] {
             }
         }
     }
-    if listed.is_empty() {
+    if seen_invalid || listed.is_empty() {
         return [PaintPhase::Fill, PaintPhase::Stroke, PaintPhase::Markers];
     }
     // Append canonical-order phases not already present.
