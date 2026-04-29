@@ -163,7 +163,7 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
     let Some(typeface) = pick_typeface(ctx.fonts, font_family.as_deref(), style) else {
         return;
     };
-    let font = Font::from_typeface(typeface, font_size);
+    let mut font = Font::from_typeface(typeface, font_size);
 
     // 2. Resolve dominant-baseline / alignment-baseline → constant
     //    y-offset added to every glyph's pen y, so the chosen baseline
@@ -266,6 +266,62 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
         let (shaped_glyphs, shaped_total) = shape_text(&shaped_text, &font);
         compute_kerned_advances(&glyph_attrs, &shaped_glyphs, shaped_total)
     };
+
+    // SVG 1.1 §10.5: `textLength` on `<text>` adjusts the total
+    // advance of the contained glyphs.
+    // - `lengthAdjust=spacing` (default): inter-glyph advance scales,
+    //   each glyph is drawn at its natural size.
+    // - `lengthAdjust=spacingAndGlyphs`: advance AND glyph rendering
+    //   scale by the same factor — Skia's `Font::set_scale_x` lets
+    //   the font draw glyphs with a horizontal x-scale, so we set
+    //   that and also scale the kerned advances.
+    // Tspan-level textLength isn't applied here yet — needs per-tspan
+    // advance subgroups.
+    let mut kerned_advances = kerned_advances;
+    // Per-tspan textLength: scale advances within each tspan's glyph
+    // range. Inner (smaller) ranges scale first so an outer textLength
+    // sees the already-adjusted advances. Tspans with their own
+    // explicit `x` reset the chunk, so the outer text root's
+    // textLength wouldn't span across them — applied only when no
+    // descendant tspan has explicit `x`. Mirrors Blink's nesting
+    // semantics for SVG 1.1 §10.5.
+    let tl_ranges = collect_text_length_ranges(ctx, root_id, &glyph_attrs, font_size);
+    let has_tspan_text_length = tl_ranges.iter().any(|r| !r.is_root);
+    let mut root_target_len: Option<f32> = None;
+    let mut root_spacing_and_glyphs = false;
+    for tr in &tl_ranges {
+        if tr.is_root {
+            root_target_len = Some(tr.target_len);
+            root_spacing_and_glyphs = tr.spacing_and_glyphs;
+            continue;
+        }
+        let slice = &mut kerned_advances[tr.first..=tr.last];
+        let natural: f32 = slice.iter().sum();
+        if natural > 0.0 && tr.target_len > 0.0 {
+            let scale = tr.target_len / natural;
+            for a in slice.iter_mut() {
+                *a *= scale;
+            }
+        }
+    }
+    // The text-root textLength only applies when descendant tspans
+    // don't supply their own — otherwise tspans with explicit `x`
+    // form their own chunks and the outer textLength would
+    // double-scale text that's already been positioned independently.
+    if !has_tspan_text_length {
+        if let Some(target_len) = root_target_len {
+            let natural: f32 = kerned_advances.iter().sum();
+            if natural > 0.0 && target_len > 0.0 {
+                let scale = target_len / natural;
+                for a in &mut kerned_advances {
+                    *a *= scale;
+                }
+                if root_spacing_and_glyphs {
+                    font.set_scale_x(font.scale_x() * scale);
+                }
+            }
+        }
+    }
 
     let mut glyphs = resolve_positions(
         &glyph_attrs,
@@ -1433,6 +1489,116 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
         }
         i = j;
     }
+}
+
+/// One contiguous run of glyphs whose `textLength` should be honored.
+/// Indexes into the painter's `glyph_attrs` Vec.
+struct TextLengthRange {
+    first: usize,
+    last: usize,
+    target_len: f32,
+    is_root: bool,
+    spacing_and_glyphs: bool,
+}
+
+/// Walk the text DOM (root + descendants) collecting every element
+/// that carries a `textLength` attribute, then turn each one into a
+/// `[first, last]` glyph index range. Inner ranges (smaller, deeper)
+/// come first in the returned Vec so callers that scale in order
+/// produce the nested-textLength behavior Blink uses.
+fn collect_text_length_ranges(
+    ctx: &PaintCtx<'_>,
+    root_id: NodeId,
+    glyph_attrs: &[GlyphAttr],
+    font_size: f32,
+) -> Vec<TextLengthRange> {
+    let mut out: Vec<TextLengthRange> = Vec::new();
+
+    fn walk(
+        ctx: &PaintCtx<'_>,
+        root_id: NodeId,
+        node_id: NodeId,
+        glyph_attrs: &[GlyphAttr],
+        font_size: f32,
+        out: &mut Vec<TextLengthRange>,
+    ) {
+        let n = ctx.dom.node(node_id);
+        if let Some(target_len) = read_text_length(ctx, n, font_size) {
+            let mut first = None;
+            let mut last = None;
+            for (i, ga) in glyph_attrs.iter().enumerate() {
+                let mut cur = Some(ga.source);
+                let mut is_in_range = false;
+                while let Some(id) = cur {
+                    if id == node_id {
+                        is_in_range = true;
+                        break;
+                    }
+                    if id == root_id && node_id != root_id {
+                        break;
+                    }
+                    cur = ctx.dom.node(id).parent;
+                }
+                if is_in_range {
+                    if first.is_none() {
+                        first = Some(i);
+                    }
+                    last = Some(i);
+                }
+            }
+            if let (Some(first), Some(last)) = (first, last) {
+                let length_adjust = get_attr(n, "lengthAdjust").map(str::trim);
+                out.push(TextLengthRange {
+                    first,
+                    last,
+                    target_len,
+                    is_root: node_id == root_id,
+                    spacing_and_glyphs: matches!(length_adjust, Some("spacingAndGlyphs")),
+                });
+            }
+        }
+        for &cid in &n.children {
+            let child = ctx.dom.node(cid);
+            if !matches!(&child.data, DemoNodeData::Element(_)) {
+                continue;
+            }
+            walk(ctx, root_id, cid, glyph_attrs, font_size, out);
+        }
+    }
+
+    walk(ctx, root_id, root_id, glyph_attrs, font_size, &mut out);
+    // Inner ranges first so the cumulative scaling produces nested
+    // semantics (outer textLength sees the inner-adjusted advances).
+    out.sort_by_key(|r| r.last - r.first);
+    out
+}
+
+/// Read `textLength` from a text-root element. Accepts a CSS
+/// `<length>` (px / em / mm / etc.), a percentage of the SVG
+/// viewport's diagonal axis (per SVG 2 §11.4.1), or a unitless
+/// number in user units. Negative / zero values yield `None`.
+fn read_text_length(ctx: &PaintCtx<'_>, node: &DemoNode, font_size: f32) -> Option<f32> {
+    let raw = get_attr(node, "textLength")?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if let Some(num) = lower.strip_suffix('%') {
+        let n: f32 = num.trim().parse().ok()?;
+        let (vw, vh) = crate::htmlcss::svg::layout::viewport::nearest_svg_viewport(ctx, node);
+        let diag = (vw * vw + vh * vh).sqrt() / std::f32::consts::SQRT_2;
+        return Some(n / 100.0 * diag).filter(|v| *v > 0.0);
+    }
+    if let Some(num) = lower.strip_suffix("em") {
+        let n: f32 = num.trim().parse().ok()?;
+        return Some(n * font_size).filter(|v| *v > 0.0);
+    }
+    if let Some(num) = lower.strip_suffix("ex") {
+        let n: f32 = num.trim().parse().ok()?;
+        return Some(n * font_size * 0.5).filter(|v| *v > 0.0);
+    }
+    parse_length_px(trimmed).filter(|v| *v > 0.0)
 }
 
 /// Resolve a `filter=` attribute on a tspan / anchor source element to
