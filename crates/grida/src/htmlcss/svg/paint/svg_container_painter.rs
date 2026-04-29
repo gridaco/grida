@@ -275,7 +275,8 @@ pub fn paint_node(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId) {
             })
             .and_then(|target| {
                 let bbox = element_object_bbox(ctx.dom, node);
-                masker::resolve(ctx.dom, target, bbox)
+                let viewport = super::super::layout::viewport::nearest_svg_viewport(ctx, node);
+                masker::resolve(ctx.dom, target, bbox, viewport)
             })
     };
     if mask_invocation.is_some() {
@@ -399,7 +400,8 @@ pub(super) fn apply_mask(canvas: &Canvas, ctx: &PaintCtx<'_>, inv: &masker::Mask
             .filter(|target| !chained_mask_would_cycle(ctx, *target, &mask_frame))
             .and_then(|target| {
                 let bbox = element_object_bbox(ctx.dom, mask_node);
-                masker::resolve(ctx.dom, target, bbox)
+                let viewport = super::super::layout::viewport::nearest_svg_viewport(ctx, mask_node);
+                masker::resolve(ctx.dom, target, bbox, viewport)
             })
     };
     if let Some(chained_inv) = chained {

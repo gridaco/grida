@@ -57,7 +57,12 @@ pub struct MaskInvocation {
 
 /// Resolve `<mask>` reference geometry against the masked element's
 /// bbox. Returns `None` if the target isn't a `<mask>` element.
-pub fn resolve(dom: &DemoDom, mask_id: NodeId, object_bbox: Rect) -> Option<MaskInvocation> {
+pub fn resolve(
+    dom: &DemoDom,
+    mask_id: NodeId,
+    object_bbox: Rect,
+    viewport: (f32, f32),
+) -> Option<MaskInvocation> {
     let node = dom.node(mask_id);
     let DemoNodeData::Element(data) = &node.data else {
         return None;
@@ -110,21 +115,27 @@ pub fn resolve(dom: &DemoDom, mask_id: NodeId, object_bbox: Rect) -> Option<Mask
             )
         }
         Units::UserSpaceOnUse => {
-            let to_px = |v: LengthOrPct, fallback: f32| match v {
+            // SVG 2 §14.4: x/y/width/height with `maskUnits=
+            // userSpaceOnUse` are `<length-percentage>` resolving
+            // against the SVG viewport (not the masked element's
+            // bbox). The default region (-10%/-10%/120%/120%) is in
+            // bbox space — we translate that into user-space px.
+            let (vw, vh) = viewport;
+            let to_px = |v: LengthOrPct, axis_extent: f32| match v {
                 LengthOrPct::Px(n) => n,
-                LengthOrPct::Pct(_) => fallback,
+                LengthOrPct::Pct(p) => p / 100.0 * axis_extent,
             };
             let x = raw_x
-                .map(|v| to_px(v, object_bbox.left))
+                .map(|v| to_px(v, vw))
                 .unwrap_or(object_bbox.left - 0.1 * object_bbox.width());
             let y = raw_y
-                .map(|v| to_px(v, object_bbox.top))
+                .map(|v| to_px(v, vh))
                 .unwrap_or(object_bbox.top - 0.1 * object_bbox.height());
             let w = raw_w
-                .map(|v| to_px(v, object_bbox.width()))
+                .map(|v| to_px(v, vw))
                 .unwrap_or(1.2 * object_bbox.width());
             let h = raw_h
-                .map(|v| to_px(v, object_bbox.height()))
+                .map(|v| to_px(v, vh))
                 .unwrap_or(1.2 * object_bbox.height());
             Rect::from_xywh(x, y, w, h)
         }

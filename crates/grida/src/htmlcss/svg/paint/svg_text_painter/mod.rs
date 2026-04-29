@@ -1480,7 +1480,8 @@ fn resolve_tspan_mask(
         }
     }
     let bbox = run_bbox(run, font);
-    super::super::resources::masker::resolve(ctx.dom, target, bbox)
+    let viewport = super::super::layout::viewport::nearest_svg_viewport(ctx, node);
+    super::super::resources::masker::resolve(ctx.dom, target, bbox, viewport)
 }
 
 /// Build the SkPaint used for the fill draws of a text run. Resolves
