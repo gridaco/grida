@@ -312,18 +312,86 @@ pub fn paint_path(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode) {
 
 // ─── shared paint helpers ──────────────────────────────────────────────
 
+/// Three sub-paint phases of an SVG shape, in document/spec order
+/// (fill/stroke/markers). The painter resolves the element's
+/// `paint-order` value into a permutation of this slice.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PaintPhase {
+    Fill,
+    Stroke,
+    Markers,
+}
+
+/// Resolve `paint-order` (CSS / SVG Paint Order Level 1) on `node`.
+/// The property names the phases in the order they should paint;
+/// any of `fill`/`stroke`/`markers` that's omitted is appended in
+/// the canonical order (fill, stroke, markers). Default (absent /
+/// invalid value) is `[fill, stroke, markers]`. Resolved through
+/// the CSS cascade so `<style>` selectors and inline style work.
+fn resolve_paint_order(ctx: &PaintCtx<'_>, node: &DemoNode) -> [PaintPhase; 3] {
+    use crate::htmlcss::svg::style::cascade::cascade_property;
+    let raw = cascade_property(
+        Some(ctx.dom),
+        Some(&ctx.resources.stylesheet),
+        node,
+        "paint-order",
+    );
+    let Some(raw) = raw else {
+        return [PaintPhase::Fill, PaintPhase::Stroke, PaintPhase::Markers];
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("normal")
+        || trimmed.eq_ignore_ascii_case("inherit")
+        || trimmed.eq_ignore_ascii_case("initial")
+        || trimmed.eq_ignore_ascii_case("unset")
+    {
+        return [PaintPhase::Fill, PaintPhase::Stroke, PaintPhase::Markers];
+    }
+    let mut listed: Vec<PaintPhase> = Vec::with_capacity(3);
+    for tok in trimmed.split_ascii_whitespace() {
+        let phase = match tok.to_ascii_lowercase().as_str() {
+            "fill" => Some(PaintPhase::Fill),
+            "stroke" => Some(PaintPhase::Stroke),
+            "markers" => Some(PaintPhase::Markers),
+            _ => None,
+        };
+        if let Some(p) = phase {
+            if !listed.contains(&p) {
+                listed.push(p);
+            }
+        }
+    }
+    if listed.is_empty() {
+        return [PaintPhase::Fill, PaintPhase::Stroke, PaintPhase::Markers];
+    }
+    // Append canonical-order phases not already present.
+    for canonical in [PaintPhase::Fill, PaintPhase::Stroke, PaintPhase::Markers] {
+        if !listed.contains(&canonical) {
+            listed.push(canonical);
+        }
+    }
+    [listed[0], listed[1], listed[2]]
+}
+
 fn fill_and_stroke(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode, path: &Path) {
     // Element-level `opacity` is now applied by `container_painter`
     // as a `save_layer` wrapping the element's draws — applying it
     // again into the fill/stroke alpha would double-dim. Pass 1.0.
     let element_opacity = 1.0_f32;
 
-    paint_fill(canvas, ctx, node, path, element_opacity);
-    paint_stroke(canvas, ctx, node, path, element_opacity);
-    // Markers paint *over* fill+stroke (SVG 2 §11.6: "in front of
-    // the shape's stroke"). Resolved per-vertex from `marker-start`,
-    // `marker-mid`, `marker-end` (inherited).
-    super::svg_marker_painter::paint(canvas, ctx, node, path);
+    let order = resolve_paint_order(ctx, node);
+    for phase in order {
+        match phase {
+            PaintPhase::Fill => paint_fill(canvas, ctx, node, path, element_opacity),
+            PaintPhase::Stroke => paint_stroke(canvas, ctx, node, path, element_opacity),
+            // Markers paint *over* fill+stroke by default (SVG 2
+            // §11.6: "in front of the shape's stroke"); paint-order
+            // can move them earlier or later. Resolved per-vertex
+            // from `marker-start`, `marker-mid`, `marker-end`.
+            PaintPhase::Markers => super::svg_marker_painter::paint(canvas, ctx, node, path),
+        }
+    }
 }
 
 fn stroke_only(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode, path: &Path) {
@@ -331,8 +399,16 @@ fn stroke_only(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode, path: &Path
     // as a `save_layer` wrapping the element's draws — applying it
     // again into the fill/stroke alpha would double-dim. Pass 1.0.
     let element_opacity = 1.0_f32;
-    paint_stroke(canvas, ctx, node, path, element_opacity);
-    super::svg_marker_painter::paint(canvas, ctx, node, path);
+    let order = resolve_paint_order(ctx, node);
+    for phase in order {
+        match phase {
+            // `stroke_only` callers (line, polyline) skip fill by
+            // construction — drop that phase.
+            PaintPhase::Fill => {}
+            PaintPhase::Stroke => paint_stroke(canvas, ctx, node, path, element_opacity),
+            PaintPhase::Markers => super::svg_marker_painter::paint(canvas, ctx, node, path),
+        }
+    }
 }
 
 fn paint_fill(
