@@ -79,6 +79,17 @@ pub fn resolve_to_path(ctx: &PaintCtx<'_>, clip_id: NodeId, object_bbox: Rect) -
     // resolve the clipper's own inherited rule once and pass it as the
     // default into the child walk. Children's own `clip-rule` (or a
     // wrapping `<g>`'s) overrides.
+    // SVG 2 §14.3.5 / CSS Masking 1 §6.4: a `clip-path=` chained on
+    // the `<clipPath>` element itself composes another clipping
+    // region. Generic composition is out of scope for the path
+    // strategy, but a chain to an *empty* (or unresolvable) clipPath
+    // is the common spec-edge case and clips everything — the rect
+    // ends up fully clipped. Detect that here so we return an empty
+    // path instead of silently ignoring the chained reference.
+    if references_empty_clip_path(dom, resources, get_attr(node, "clip-path")) {
+        return Some(Path::default());
+    }
+
     let initial_rule = inherited_clip_rule(dom, node);
     let mut acc: Option<Path> = None;
     walk_clipper_children(dom, resources, node, initial_rule, &mut acc)?;
@@ -147,6 +158,14 @@ fn walk_clipper_children(
             continue;
         }
 
+        // A child carrying its own `clip-path=` that resolves to an
+        // empty `<clipPath>` is fully clipped — its geometry
+        // contributes nothing to the union. Drop the child instead of
+        // letting its raw shape leak through the path strategy.
+        if references_empty_clip_path(dom, resources, get_attr(child, "clip-path")) {
+            continue;
+        }
+
         let mut child_path = match build_child_path(dom, resources, child, kind)? {
             Some(p) => p,
             None => continue,
@@ -197,6 +216,36 @@ fn inherited_clip_rule(dom: &DemoDom, start: &DemoNode) -> Option<PathFillType> 
         cur = n.parent;
     }
     None
+}
+
+/// Returns true when `attr` is a `url(#id)` whose target is a
+/// `<clipPath>` with no element children. An empty `<clipPath>` clips
+/// everything per SVG 2 §14.3.5, so a chain pointing at one is the
+/// "fully clipped" sentinel for the path strategy. Missing attribute,
+/// `none`, malformed reference, or non-clipPath target return false —
+/// we leave broader chained-clipPath handling to a future extension.
+fn references_empty_clip_path(dom: &DemoDom, resources: &Resources, attr: Option<&str>) -> bool {
+    let raw = match attr.map(str::trim) {
+        Some(s) if !s.is_empty() && !s.eq_ignore_ascii_case("none") => s,
+        _ => return false,
+    };
+    let Some(id) = super::svg_resources::parse_url_ref(raw) else {
+        return false;
+    };
+    let Some(target_id) = resources.lookup(id) else {
+        return false;
+    };
+    let target = dom.node(target_id);
+    let DemoNodeData::Element(d) = &target.data else {
+        return false;
+    };
+    if ElementKind::from_local_name(d.name.local.as_ref()) != ElementKind::ClipPath {
+        return false;
+    }
+    !target
+        .children
+        .iter()
+        .any(|&cid| matches!(dom.node(cid).data, DemoNodeData::Element(_)))
 }
 
 fn is_supported_clipper_child(kind: ElementKind) -> bool {
