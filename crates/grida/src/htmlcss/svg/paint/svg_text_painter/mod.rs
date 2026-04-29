@@ -1353,7 +1353,7 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
             },
             None => Some(Color::BLACK),
         };
-        if let Some(c) = fill_color {
+        let fill_paint = fill_color.map(|c| {
             let mut paint = SkPaint::default();
             paint.set_anti_alias(true);
             paint.set_style(PaintStyle::Fill);
@@ -1364,30 +1364,54 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
                 let a = (c.a() as f32 / 255.0) * op.clamp(0.0, 1.0);
                 paint.set_alpha_f(a);
             }
-            draw_glyphs(canvas, run, font, &paint);
-        }
+            paint
+        });
 
         // Stroke — only if non-`none` and a valid color resolves.
-        if let Some(raw) = read_inherited(ctx, node, "stroke") {
+        let stroke_paint = (|| -> Option<SkPaint> {
+            let raw = read_inherited(ctx, node, "stroke")?;
             let v = raw.trim();
-            if !v.eq_ignore_ascii_case("none") {
-                if let Some(Paint::Color(c)) = crate::htmlcss::svg::dom::attrs::parse_paint(v) {
-                    let width = read_inherited(ctx, node, "stroke-width")
-                        .and_then(|v| parse_length_px(&v))
-                        .unwrap_or(1.0);
-                    if width > 0.0 {
-                        let mut paint = SkPaint::default();
-                        paint.set_anti_alias(true);
-                        paint.set_style(PaintStyle::Stroke);
-                        paint.set_color(c);
-                        paint.set_stroke_width(width);
-                        if let Some(op) = read_inherited(ctx, node, "stroke-opacity")
-                            .and_then(|v| parse_opacity(&v))
-                        {
-                            let a = (c.a() as f32 / 255.0) * op.clamp(0.0, 1.0);
-                            paint.set_alpha_f(a);
-                        }
-                        draw_glyphs(canvas, run, font, &paint);
+            if v.eq_ignore_ascii_case("none") {
+                return None;
+            }
+            let Paint::Color(c) = crate::htmlcss::svg::dom::attrs::parse_paint(v)? else {
+                return None;
+            };
+            let width = read_inherited(ctx, node, "stroke-width")
+                .and_then(|v| parse_length_px(&v))
+                .unwrap_or(1.0);
+            if width <= 0.0 {
+                return None;
+            }
+            let mut paint = SkPaint::default();
+            paint.set_anti_alias(true);
+            paint.set_style(PaintStyle::Stroke);
+            paint.set_color(c);
+            paint.set_stroke_width(width);
+            if let Some(op) =
+                read_inherited(ctx, node, "stroke-opacity").and_then(|v| parse_opacity(&v))
+            {
+                let a = (c.a() as f32 / 255.0) * op.clamp(0.0, 1.0);
+                paint.set_alpha_f(a);
+            }
+            Some(paint)
+        })();
+
+        // Paint-order on the run's source element: SVG 2 §11.3 +
+        // CSS Paint Order Level 1. Markers don't apply to text;
+        // the property reduces to fill/stroke ordering. Default
+        // (or invalid) → fill, then stroke.
+        let order = resolve_text_paint_order(ctx, node);
+        for phase in order {
+            match phase {
+                TextPhase::Fill => {
+                    if let Some(p) = fill_paint.as_ref() {
+                        draw_glyphs(canvas, run, font, p);
+                    }
+                }
+                TextPhase::Stroke => {
+                    if let Some(p) = stroke_paint.as_ref() {
+                        draw_glyphs(canvas, run, font, p);
                     }
                 }
             }
@@ -1398,6 +1422,73 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
         }
         i = j;
     }
+}
+
+/// Two-phase paint-order: fill / stroke. Text doesn't have markers,
+/// so `markers` tokens in `paint-order` collapse to no-op.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TextPhase {
+    Fill,
+    Stroke,
+}
+
+/// Resolve the effective `paint-order` for a text run's source
+/// element. CSS Paint Order Level 1 / SVG 2 §11.3: a property with
+/// any invalid token is invalid as a whole; otherwise listed phases
+/// paint in declared order, missing phases append in canonical
+/// order (fill, stroke, markers — markers ignored for text).
+fn resolve_text_paint_order(ctx: &PaintCtx<'_>, node: &DemoNode) -> [TextPhase; 2] {
+    use crate::htmlcss::svg::style::cascade::cascade_property;
+    let raw = cascade_property(
+        Some(ctx.dom),
+        Some(&ctx.resources.stylesheet),
+        node,
+        "paint-order",
+    );
+    let Some(raw) = raw else {
+        return [TextPhase::Fill, TextPhase::Stroke];
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("normal")
+        || trimmed.eq_ignore_ascii_case("inherit")
+        || trimmed.eq_ignore_ascii_case("initial")
+        || trimmed.eq_ignore_ascii_case("unset")
+    {
+        return [TextPhase::Fill, TextPhase::Stroke];
+    }
+    let mut listed: Vec<TextPhase> = Vec::with_capacity(2);
+    let mut seen_invalid = false;
+    for tok in trimmed.split_ascii_whitespace() {
+        match tok.to_ascii_lowercase().as_str() {
+            "fill" => {
+                if !listed.contains(&TextPhase::Fill) {
+                    listed.push(TextPhase::Fill);
+                }
+            }
+            "stroke" => {
+                if !listed.contains(&TextPhase::Stroke) {
+                    listed.push(TextPhase::Stroke);
+                }
+            }
+            "markers" => {
+                // Valid token, ignored for text (no markers).
+            }
+            _ => {
+                seen_invalid = true;
+                break;
+            }
+        }
+    }
+    if seen_invalid || listed.is_empty() {
+        return [TextPhase::Fill, TextPhase::Stroke];
+    }
+    for canonical in [TextPhase::Fill, TextPhase::Stroke] {
+        if !listed.contains(&canonical) {
+            listed.push(canonical);
+        }
+    }
+    [listed[0], listed[1]]
 }
 
 /// Walk from `node` up to (but not including) the root `<svg>`,
