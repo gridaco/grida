@@ -357,7 +357,7 @@ pub fn paint_node(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId) {
 /// pair so the chain composites correctly. Mirrors Blink, where
 /// `LayoutSVGResourceMasker::CreatePaintRecord` records the chained
 /// mask as part of the mask's own paint subtree.
-fn apply_mask(canvas: &Canvas, ctx: &PaintCtx<'_>, inv: &masker::MaskInvocation) {
+pub(super) fn apply_mask(canvas: &Canvas, ctx: &PaintCtx<'_>, inv: &masker::MaskInvocation) {
     use masker::MaskType;
     let mut mask_paint = SkPaint::default();
     mask_paint.set_blend_mode(skia_safe::BlendMode::DstIn);

@@ -1342,60 +1342,50 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
             false
         };
 
-        // Fill — default is black (SVG 2 §11.3) when no inherited
-        // value resolves.
-        let fill_color = match read_inherited(ctx, node, "fill").as_deref().map(str::trim) {
-            Some("none") => None,
-            Some(v) => match crate::htmlcss::svg::dom::attrs::parse_paint(v) {
-                Some(Paint::Color(c)) => Some(c),
-                Some(Paint::CurrentColor) => Some(resolve_current_color(ctx, node)),
-                _ => Some(Color::BLACK),
-            },
-            None => Some(Color::BLACK),
-        };
-        let fill_paint = fill_color.map(|c| {
-            let mut paint = SkPaint::default();
-            paint.set_anti_alias(true);
-            paint.set_style(PaintStyle::Fill);
-            paint.set_color(c);
-            if let Some(op) =
-                read_inherited(ctx, node, "fill-opacity").and_then(|v| parse_opacity(&v))
-            {
-                let a = (c.a() as f32 / 255.0) * op.clamp(0.0, 1.0);
-                paint.set_alpha_f(a);
-            }
-            paint
-        });
+        // `filter=` on a `<tspan>` (CSS Filter Effects 1 / SVG 2
+        // §11.4): resolve the funcIRI / function-list against the
+        // run's user-space bbox, open one save_layer per filter step
+        // carrying the composed `ImageFilter`. Restored last-in-
+        // first-out below.
+        let tspan_filter_invs = resolve_tspan_filter(ctx, node, run, font);
+        let tspan_filter_layers = tspan_filter_invs.len();
+        for inv in tspan_filter_invs.iter().rev() {
+            let mut p = SkPaint::default();
+            p.set_image_filter(Some(inv.image_filter.clone()));
+            let rec = skia_safe::canvas::SaveLayerRec::default()
+                .bounds(&inv.region_user_space)
+                .paint(&p);
+            canvas.save_layer(&rec);
+        }
 
-        // Stroke — only if non-`none` and a valid color resolves.
-        let stroke_paint = (|| -> Option<SkPaint> {
-            let raw = read_inherited(ctx, node, "stroke")?;
-            let v = raw.trim();
-            if v.eq_ignore_ascii_case("none") {
-                return None;
-            }
-            let Paint::Color(c) = crate::htmlcss::svg::dom::attrs::parse_paint(v)? else {
-                return None;
-            };
-            let width = read_inherited(ctx, node, "stroke-width")
-                .and_then(|v| parse_length_px(&v))
-                .unwrap_or(1.0);
-            if width <= 0.0 {
-                return None;
-            }
-            let mut paint = SkPaint::default();
-            paint.set_anti_alias(true);
-            paint.set_style(PaintStyle::Stroke);
-            paint.set_color(c);
-            paint.set_stroke_width(width);
-            if let Some(op) =
-                read_inherited(ctx, node, "stroke-opacity").and_then(|v| parse_opacity(&v))
-            {
-                let a = (c.a() as f32 / 255.0) * op.clamp(0.0, 1.0);
-                paint.set_alpha_f(a);
-            }
-            Some(paint)
-        })();
+        // `mask=` on a `<tspan>` (CSS Masking 1 / SVG 2 §11.4):
+        // resolve the referenced `<mask>` against the run's
+        // user-space bbox, open a content layer for the run's draws,
+        // then composite the mask via `apply_mask` after the run is
+        // painted. Per SVG 2 §6.6 effect order (filter, clip, mask,
+        // opacity), the mask layer sits inside the filter layer so
+        // the filter operates on the masked content. Mirrors the
+        // container path.
+        let tspan_mask_inv = resolve_tspan_mask(ctx, node, run, font);
+        let tspan_mask_layer = tspan_mask_inv.is_some();
+        if tspan_mask_layer {
+            canvas.save_layer(&skia_safe::canvas::SaveLayerRec::default());
+        }
+
+        // Fill — default is black (SVG 2 §11.3) when no inherited
+        // value resolves. `url(#…)` paint references resolve to a
+        // gradient or pattern shader and are applied via
+        // `paint.set_shader`. Pattern resolution needs the run's
+        // user-space bbox (gradient/pattern in `objectBoundingBox`
+        // units maps against it).
+        let fill_paint = build_text_fill_paint(ctx, node, run, font);
+
+        // Stroke — only if non-`none` and a valid paint resolves.
+        // `url(#…)` paint references resolve to a gradient or pattern
+        // shader (mirrors the fill branch). Pattern/gradient mapping
+        // for `objectBoundingBox` units uses the run's user-space
+        // bbox.
+        let stroke_paint = build_text_stroke_paint(ctx, node, run, font);
 
         // Paint-order on the run's source element: SVG 2 §11.3 +
         // CSS Paint Order Level 1. Markers don't apply to text;
@@ -1417,11 +1407,327 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
             }
         }
 
+        if let Some(inv) = tspan_mask_inv.as_ref() {
+            super::svg_container_painter::apply_mask(canvas, ctx, inv);
+            canvas.restore();
+        }
+        for _ in 0..tspan_filter_layers {
+            canvas.restore();
+        }
         if group_layer_opened {
             canvas.restore();
         }
         i = j;
     }
+}
+
+/// Resolve a `filter=` attribute on a tspan / anchor source element to
+/// a list of `FilterInvocation`s. Returns an empty vec when nothing
+/// resolves (or the chain is invalid). Reference bbox is the run's
+/// `run_bbox` so `objectBoundingBox` filter regions cover the glyphs
+/// themselves.
+fn resolve_tspan_filter(
+    ctx: &PaintCtx<'_>,
+    node: &DemoNode,
+    run: &[ResolvedGlyph],
+    font: &Font,
+) -> Vec<super::super::resources::filter::FilterInvocation> {
+    use super::scoped_svg_paint_state::MAX_FILTER_DEPTH;
+
+    if ctx.filter_depth >= MAX_FILTER_DEPTH {
+        return Vec::new();
+    }
+    let Some(raw) = get_attr(node, "filter") else {
+        return Vec::new();
+    };
+    let v = raw.trim();
+    if v.is_empty() || v.eq_ignore_ascii_case("none") {
+        return Vec::new();
+    }
+    let bbox = run_bbox(run, font);
+    let mut failed_invalid = false;
+    super::effects::resolve_filter_chain(ctx, node, v, bbox, &mut failed_invalid)
+}
+
+/// Resolve a `mask=` attribute on a tspan / anchor source element to a
+/// `MaskInvocation`. Returns `None` for missing / `none` / unresolved /
+/// cyclic / over-depth references, mirroring the container painter's
+/// pre-flight checks. The reference bbox is the run's approximate
+/// user-space bbox (`run_bbox`) so `objectBoundingBox` mask units map
+/// against the glyphs themselves.
+fn resolve_tspan_mask(
+    ctx: &PaintCtx<'_>,
+    node: &DemoNode,
+    run: &[ResolvedGlyph],
+    font: &Font,
+) -> Option<super::super::resources::masker::MaskInvocation> {
+    use super::super::resources::svg_resources::parse_url_ref;
+    use super::scoped_svg_paint_state::MAX_MASK_DEPTH;
+
+    if ctx.mask_depth >= MAX_MASK_DEPTH {
+        return None;
+    }
+    let raw = get_attr(node, "mask")?;
+    let v = raw.trim();
+    if v.is_empty() || v.eq_ignore_ascii_case("none") {
+        return None;
+    }
+    let id = parse_url_ref(v)?;
+    let target = ctx.resources.lookup(id)?;
+    if let Some(chain) = ctx.mask_chain {
+        if chain.contains(target) {
+            return None;
+        }
+    }
+    let bbox = run_bbox(run, font);
+    super::super::resources::masker::resolve(ctx.dom, target, bbox)
+}
+
+/// Build the SkPaint used for the fill draws of a text run. Resolves
+/// `fill` to either a solid color or a gradient/pattern shader (via
+/// `paint_server::resolve`), respecting `fill-opacity`. Returns
+/// `None` for `fill="none"`.
+fn build_text_fill_paint(
+    ctx: &PaintCtx<'_>,
+    node: &DemoNode,
+    run: &[ResolvedGlyph],
+    font: &Font,
+) -> Option<SkPaint> {
+    let raw = read_inherited(ctx, node, "fill");
+    let value = raw.as_deref().map(str::trim);
+    if matches!(value, Some("none")) {
+        return None;
+    }
+    let mut paint = SkPaint::default();
+    paint.set_anti_alias(true);
+    paint.set_style(PaintStyle::Fill);
+    let opacity_factor = read_inherited(ctx, node, "fill-opacity")
+        .and_then(|v| parse_opacity(&v))
+        .map(|v| v.clamp(0.0, 1.0))
+        .unwrap_or(1.0);
+    if let Some(v) = value {
+        if v.starts_with("url(") {
+            // Resolve to gradient/pattern. Use the inferred run
+            // bbox from the glyph positions (advance + font height
+            // approximation) so `objectBoundingBox` units map
+            // against the glyphs' visible extent.
+            let bbox = run_bbox(run, font);
+            let viewport = crate::htmlcss::svg::layout::viewport::nearest_svg_viewport(ctx, node);
+            if let Some(resolved) = super::super::resources::paint_server::resolve(
+                ctx.dom,
+                ctx.resources,
+                v,
+                bbox,
+                viewport,
+            ) {
+                use super::super::resources::paint_server::Resolved;
+                match resolved {
+                    Resolved::Shader(s) => {
+                        paint.set_shader(s);
+                        if opacity_factor < 1.0 {
+                            paint.set_alpha_f(opacity_factor);
+                        }
+                        return Some(paint);
+                    }
+                    Resolved::Pattern {
+                        node: pid,
+                        bbox: pbbox,
+                    } => {
+                        if let Some(s) =
+                            super::super::resources::pattern::build_shader(ctx, pid, pbbox)
+                        {
+                            paint.set_shader(s);
+                            if opacity_factor < 1.0 {
+                                paint.set_alpha_f(opacity_factor);
+                            }
+                            return Some(paint);
+                        }
+                        // Pattern unresolvable → fall through to
+                        // funcIRI fallback (default black, per SVG 2).
+                    }
+                    _ => {}
+                }
+            }
+            // funcIRI didn't resolve. Per SVG 2 §11.3, the funcIRI
+            // syntax permits a trailing fallback color: `fill=
+            // "url(#g) red"`. Try parsing the trailing portion.
+            if let Some(end) = v.find(')') {
+                let trail = v[end + 1..].trim();
+                if !trail.is_empty() {
+                    if let Some(Paint::Color(c)) =
+                        crate::htmlcss::svg::dom::attrs::parse_paint(trail)
+                    {
+                        paint.set_color(c);
+                        if opacity_factor < 1.0 {
+                            let a = (c.a() as f32 / 255.0) * opacity_factor;
+                            paint.set_alpha_f(a);
+                        }
+                        return Some(paint);
+                    }
+                }
+            }
+            // Default to black.
+            paint.set_color(Color::BLACK);
+            if opacity_factor < 1.0 {
+                paint.set_alpha_f(opacity_factor);
+            }
+            return Some(paint);
+        }
+        // Solid color or currentColor.
+        let color = match crate::htmlcss::svg::dom::attrs::parse_paint(v) {
+            Some(Paint::Color(c)) => c,
+            Some(Paint::CurrentColor) => resolve_current_color(ctx, node),
+            _ => Color::BLACK,
+        };
+        paint.set_color(color);
+        if opacity_factor < 1.0 {
+            let a = (color.a() as f32 / 255.0) * opacity_factor;
+            paint.set_alpha_f(a);
+        }
+        return Some(paint);
+    }
+    // No fill attribute set → black.
+    paint.set_color(Color::BLACK);
+    if opacity_factor < 1.0 {
+        paint.set_alpha_f(opacity_factor);
+    }
+    Some(paint)
+}
+
+/// Build the SkPaint used for the stroke draws of a text run. Mirrors
+/// `build_text_fill_paint` for the stroke branch — resolves `stroke`
+/// to either a solid color or a gradient/pattern shader (via
+/// `paint_server::resolve`), respecting `stroke-opacity`. Returns
+/// `None` for `stroke="none"`, missing `stroke`, or non-positive
+/// `stroke-width`.
+fn build_text_stroke_paint(
+    ctx: &PaintCtx<'_>,
+    node: &DemoNode,
+    run: &[ResolvedGlyph],
+    font: &Font,
+) -> Option<SkPaint> {
+    let raw = read_inherited(ctx, node, "stroke")?;
+    let v = raw.trim();
+    if v.eq_ignore_ascii_case("none") {
+        return None;
+    }
+    let width = read_inherited(ctx, node, "stroke-width")
+        .and_then(|v| parse_length_px(&v))
+        .unwrap_or(1.0);
+    if width <= 0.0 {
+        return None;
+    }
+    let opacity_factor = read_inherited(ctx, node, "stroke-opacity")
+        .and_then(|v| parse_opacity(&v))
+        .map(|v| v.clamp(0.0, 1.0))
+        .unwrap_or(1.0);
+    let mut paint = SkPaint::default();
+    paint.set_anti_alias(true);
+    paint.set_style(PaintStyle::Stroke);
+    paint.set_stroke_width(width);
+
+    if v.starts_with("url(") {
+        let bbox = run_bbox(run, font);
+        let viewport = crate::htmlcss::svg::layout::viewport::nearest_svg_viewport(ctx, node);
+        if let Some(resolved) = super::super::resources::paint_server::resolve(
+            ctx.dom,
+            ctx.resources,
+            v,
+            bbox,
+            viewport,
+        ) {
+            use super::super::resources::paint_server::Resolved;
+            match resolved {
+                Resolved::Shader(s) => {
+                    paint.set_shader(s);
+                    if opacity_factor < 1.0 {
+                        paint.set_alpha_f(opacity_factor);
+                    }
+                    return Some(paint);
+                }
+                Resolved::Pattern {
+                    node: pid,
+                    bbox: pbbox,
+                } => {
+                    if let Some(s) = super::super::resources::pattern::build_shader(ctx, pid, pbbox)
+                    {
+                        paint.set_shader(s);
+                        if opacity_factor < 1.0 {
+                            paint.set_alpha_f(opacity_factor);
+                        }
+                        return Some(paint);
+                    }
+                }
+                _ => {}
+            }
+        }
+        // funcIRI fallback color (SVG 2 §11.3): `stroke="url(#g) red"`.
+        if let Some(end) = v.find(')') {
+            let trail = v[end + 1..].trim();
+            if !trail.is_empty() {
+                if let Some(Paint::Color(c)) = crate::htmlcss::svg::dom::attrs::parse_paint(trail) {
+                    paint.set_color(c);
+                    let a = (c.a() as f32 / 255.0) * opacity_factor;
+                    paint.set_alpha_f(a);
+                    return Some(paint);
+                }
+            }
+        }
+        // No fallback resolved → SVG 2 says treat as if the property
+        // had its initial value, which for `stroke` is `none`. Don't
+        // paint the stroke at all.
+        return None;
+    }
+
+    let color = match crate::htmlcss::svg::dom::attrs::parse_paint(v)? {
+        Paint::Color(c) => c,
+        Paint::CurrentColor => resolve_current_color(ctx, node),
+        _ => return None,
+    };
+    paint.set_color(color);
+    let a = (color.a() as f32 / 255.0) * opacity_factor;
+    paint.set_alpha_f(a);
+    Some(paint)
+}
+
+/// Approximate user-space bbox of a glyph run for `objectBoundingBox`
+/// paint-server / mask reference-box resolution. Uses each glyph's
+/// `(x, y, advance)` for the horizontal extent and the font's typo /
+/// hhea metrics for the vertical extent so the bbox covers the glyph
+/// box (not just the advance-square).
+fn run_bbox(run: &[ResolvedGlyph], font: &Font) -> skia_safe::Rect {
+    if run.is_empty() {
+        return skia_safe::Rect::default();
+    }
+    let metrics = font.metrics().1;
+    // Skia exposes `ascent` as a negative number (above baseline) and
+    // `descent` as positive (below). Fall back to 0.8em / 0.2em of the
+    // font size when the font doesn't supply usable metrics.
+    let size = font.size();
+    let ascent_above = if metrics.ascent < 0.0 {
+        -metrics.ascent
+    } else {
+        0.8 * size
+    };
+    let descent_below = if metrics.descent > 0.0 {
+        metrics.descent
+    } else {
+        0.2 * size
+    };
+    let mut min_x = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+    for g in run {
+        min_x = min_x.min(g.x);
+        max_x = max_x.max(g.x + g.advance);
+        min_y = min_y.min(g.y - ascent_above);
+        max_y = max_y.max(g.y + descent_below);
+    }
+    if !min_x.is_finite() {
+        return skia_safe::Rect::default();
+    }
+    skia_safe::Rect::new(min_x, min_y, max_x, max_y)
 }
 
 /// Two-phase paint-order: fill / stroke. Text doesn't have markers,
