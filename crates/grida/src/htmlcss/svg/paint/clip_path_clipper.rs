@@ -43,7 +43,7 @@ pub(super) fn apply_clip_path(
     // resvg renders unclipped, and the design doc commits to resvg's
     // formulation.)
     let bbox = element_object_bbox(ctx.dom, node);
-    let Some(path) = clipper::resolve_to_path(ctx.dom, ctx.resources, target, bbox) else {
+    let Some(path) = clipper::resolve_to_path(ctx, target, bbox) else {
         return true;
     };
     canvas.clip_path(&path, ClipOp::Intersect, true);

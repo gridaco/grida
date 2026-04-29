@@ -29,6 +29,8 @@ use crate::htmlcss::svg::dom::attrs::{
 use crate::htmlcss::svg::dom::element::{get_attr, ElementKind};
 use crate::htmlcss::svg::dom::href::{href_attr, same_document_fragment};
 use crate::htmlcss::svg::dom::path_d::parse_path;
+use crate::htmlcss::svg::layout::transform::transform_origin_for;
+use crate::htmlcss::svg::paint::scoped_svg_paint_state::PaintCtx;
 
 use super::svg_resources::Resources;
 
@@ -45,12 +47,9 @@ enum ClipPathUnits {
 /// element's local coordinate space (the same space its `transform=` was
 /// just concatenated into). `None` means "this clipper has features
 /// outside the path strategy — caller should fall back".
-pub fn resolve_to_path(
-    dom: &DemoDom,
-    resources: &Resources,
-    clip_id: NodeId,
-    object_bbox: Rect,
-) -> Option<Path> {
+pub fn resolve_to_path(ctx: &PaintCtx<'_>, clip_id: NodeId, object_bbox: Rect) -> Option<Path> {
+    let dom = ctx.dom;
+    let resources = ctx.resources;
     let node = dom.node(clip_id);
     let DemoNodeData::Element(data) = &node.data else {
         return None;
@@ -105,8 +104,19 @@ pub fn resolve_to_path(
     }
 
     // `transform=` on the clipper itself, applied in user space.
+    // SVG 2 §8.3 / CSS Transforms 1: `transform-origin` shifts the
+    // pivot; the effective transform is `T(o) ∘ M ∘ T(-o)`. Default
+    // origin is `(0, 0)` (the existing behavior).
     if let Some(t) = get_attr(node, "transform").and_then(parse_transform) {
-        path = path.with_transform(&t);
+        let origin = transform_origin_for(ctx, node);
+        if origin != (0.0, 0.0) {
+            let mut wrapped = Matrix::translate(origin);
+            wrapped.pre_concat(&t);
+            wrapped.pre_concat(&Matrix::translate((-origin.0, -origin.1)));
+            path = path.with_transform(&wrapped);
+        } else {
+            path = path.with_transform(&t);
+        }
     }
 
     Some(path)
