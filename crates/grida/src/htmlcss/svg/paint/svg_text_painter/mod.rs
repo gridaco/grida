@@ -80,8 +80,10 @@ fn resolve_baseline(value: Option<&str>) -> BaselineKind {
         Some("hanging") => BaselineKind::Hanging,
         Some("mathematical") => BaselineKind::Math,
         Some("ideographic") => BaselineKind::IdeographicUnder,
-        Some("text-before-edge") | Some("text-top") => BaselineKind::TextOver,
-        Some("text-after-edge") | Some("text-bottom") => BaselineKind::TextUnder,
+        Some("text-before-edge") | Some("text-top") | Some("before-edge") => BaselineKind::TextOver,
+        Some("text-after-edge") | Some("text-bottom") | Some("after-edge") => {
+            BaselineKind::TextUnder
+        }
         // `auto`, `alphabetic`, `use-script`, `no-change`, `reset-size` and
         // anything unknown all collapse to alphabetic. SVG 2 §10.9.2: in
         // horizontal flow `auto` resolves to `alphabetic`. `use-script`
@@ -99,19 +101,32 @@ fn baseline_offset(metrics: &skia_safe::FontMetrics, kind: BaselineKind) -> f32 
     let ascent = metrics.ascent; // negative in Skia
     let descent = metrics.descent; // positive
     let x_height = metrics.x_height; // positive (0 if font doesn't expose)
+    let cap_height = metrics.cap_height; // positive (0 if font doesn't expose)
     match kind {
         BaselineKind::Alphabetic => 0.0,
         BaselineKind::TextOver => -ascent,
         BaselineKind::TextUnder => -descent,
         BaselineKind::Central => -(ascent + descent) / 2.0,
         BaselineKind::XMiddle => x_height / 2.0,
-        // CSS Inline Layout 3 §5.1.1: hanging baseline ≈ em-square top
-        // (Tibetan / Indic scripts). Full ascent up from alphabetic.
-        // Browsers vary; Blink uses cap-height-ish (~0.7 * ascent).
-        // Em-top (full ascent) matches the resvg-test-suite expecteds
-        // most consistently for Latin glyphs without an OS/2 hanging
-        // baseline declared in the font.
-        BaselineKind::Hanging => -ascent,
+        // CSS Inline Layout 3 §5.1.1: hanging baseline ≈ cap-height
+        // top in the dominant script. Blink's `SimpleFontData::
+        // GetBaseline(kHangingBaseline)` returns `cap_height` when
+        // OS/2 doesn't declare an explicit hanging metric, putting
+        // the glyph's cap-line on the user's y. Resvg-test-suite
+        // expecteds match this: e.g. `<tspan alignment-baseline=
+        // hanging>long</tspan>` renders with the top of "long"'s
+        // cap at the user-y, not the full em-top. Earlier we used
+        // `-ascent` (em-top), which over-shifted by ~30%. Falls back
+        // to `0.8 * (-ascent)` when the font doesn't expose
+        // `cap_height` (Devanagari script in
+        // `dominant-baseline_hanging.svg` lands closer there).
+        BaselineKind::Hanging => {
+            if cap_height > 0.0 {
+                cap_height
+            } else {
+                -ascent * 0.8
+            }
+        }
         BaselineKind::Math => -ascent / 2.0,
         BaselineKind::IdeographicUnder => -descent,
     }
@@ -150,9 +165,27 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
     };
     let font = Font::from_typeface(typeface, font_size);
 
-    // 2. Resolve dominant-baseline → constant y-offset added to every
-    //    glyph's pen y, so the chosen baseline lands on the user y.
-    let baseline = resolve_baseline(read_inherited(ctx, node, "dominant-baseline").as_deref());
+    // 2. Resolve dominant-baseline / alignment-baseline → constant
+    //    y-offset added to every glyph's pen y, so the chosen baseline
+    //    lands on the user y. SVG 2 §11.10.2.6 + CSS Inline Layout 3
+    //    §3.3: `alignment-baseline` on the layout root takes
+    //    precedence over `dominant-baseline`; `auto` / `baseline` /
+    //    absent falls back to `dominant-baseline`. `read_inherited`
+    //    already handles `inherit` by walking ancestors.
+    let baseline = {
+        let ab = read_inherited(ctx, node, "alignment-baseline");
+        let active = match ab.as_deref().map(str::trim) {
+            Some(v)
+                if !v.is_empty()
+                    && !v.eq_ignore_ascii_case("auto")
+                    && !v.eq_ignore_ascii_case("baseline") =>
+            {
+                Some(v.to_string())
+            }
+            _ => read_inherited(ctx, node, "dominant-baseline"),
+        };
+        resolve_baseline(active.as_deref())
+    };
     let (_line_spacing, metrics) = font.metrics();
     let baseline_y = baseline_offset(&metrics, baseline);
 
@@ -203,9 +236,36 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
     // advance, and every fixture rendering "Text" scores ~64% from the
     // resulting accumulated drift (Skia's `Font::measureText` only
     // applies the legacy `kern` table, not GPOS).
+    // CSS Fonts 4 §6.5 `font-kerning`: `auto` / `normal` apply
+    // kerning; `none` disables it. We approximate "kerning off" by
+    // skipping the GPOS shaping pass and using standalone per-glyph
+    // widths from `font.measure_str` (which only applies the legacy
+    // `kern` table, not GPOS pair adjustments — same fallback Blink
+    // hits when GPOS is suppressed). Per SVG 2, `font-kerning` is
+    // not a presentation attribute — the resvg-test-suite's
+    // `as-property.svg` documents this behavior ("must be inside
+    // style, otherwise ignored"). Read from `style="…"` (or its
+    // ancestor cascade) only, never from the bare attribute.
+    let kerning_off = inherited_style_only(ctx, node, "font-kerning")
+        .as_deref()
+        .map(str::trim)
+        .map(|v| v.eq_ignore_ascii_case("none"))
+        .unwrap_or(false);
     let shaped_text: String = glyph_attrs.iter().map(|g| g.ch).collect();
-    let (shaped_glyphs, shaped_total) = shape_text(&shaped_text, &font);
-    let kerned_advances = compute_kerned_advances(&glyph_attrs, &shaped_glyphs, shaped_total);
+    let kerned_advances = if kerning_off {
+        let mut buf = [0u8; 4];
+        glyph_attrs
+            .iter()
+            .map(|g| {
+                let s = g.ch.encode_utf8(&mut buf);
+                let (w, _) = font.measure_str(s, None);
+                w
+            })
+            .collect::<Vec<_>>()
+    } else {
+        let (shaped_glyphs, shaped_total) = shape_text(&shaped_text, &font);
+        compute_kerned_advances(&glyph_attrs, &shaped_glyphs, shaped_total)
+    };
 
     let mut glyphs = resolve_positions(
         &glyph_attrs,
@@ -215,18 +275,15 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
         wm,
         v_perp_x,
         &kerned_advances,
+        &metrics,
     );
 
-    // 4. Apply text-anchor per anchored chunk (SVG 2 §11.4.4).
-    let anchor = match read_inherited(ctx, node, "text-anchor")
-        .as_deref()
-        .map(str::trim)
-    {
-        Some("middle") => TextAnchor::Middle,
-        Some("end") => TextAnchor::End,
-        _ => TextAnchor::Start,
-    };
-    apply_anchor(&mut glyphs, anchor, wm);
+    // 4. Apply text-anchor per anchored chunk (SVG 2 §11.4.4). Each
+    //    chunk's anchor is resolved by walking ancestors of the
+    //    element that started the chunk (the source of the first
+    //    glyph), not the root `<text>`. Lets a `<tspan x=… text-anchor=
+    //    middle>` shift only its own chunk.
+    apply_anchor(ctx, &mut glyphs, wm);
 
     // 4b. Map any `<textPath>` glyphs onto their referenced path. Runs
     //     after anchor so the chunk's anchor shift is naturally folded
@@ -286,6 +343,13 @@ pub(super) struct GlyphAttr {
     /// through nesting; `baseline-shift: baseline` adds 0 (i.e. equals
     /// the parent shift). Applied as an extra dy at resolve time.
     baseline_shift_dy: f32,
+    /// Per-tspan `alignment-baseline` override (innermost frame on the
+    /// stack at emit time wins). When `Some`, the glyph's y becomes
+    /// `pen_y + baseline_offset(metrics, kind) + baseline_shift_dy`
+    /// instead of using the root's baseline_y. Lets a single tspan
+    /// inside a `<text dominant-baseline="...">` use a different
+    /// baseline. SVG 2 §11.10.2 / CSS Inline Layout 3 §3.3.
+    alignment_baseline_kind: Option<BaselineKind>,
 }
 
 /// Resolved geometry for one `<textPath>` element. Built once at
@@ -325,6 +389,12 @@ struct ElemAttrs {
     /// Cumulative `baseline-shift` for this stack frame in SVG y
     /// direction. Equals `parent.baseline_shift_dy + parse(local)`.
     baseline_shift_dy: f32,
+    /// Local `alignment-baseline` on this element only (no ancestor
+    /// walk — that would conflict with the root's `dominant-baseline`
+    /// which is already applied uniformly). When set, every glyph
+    /// emitted at or below this stack frame picks up this kind as
+    /// its `alignment_baseline_kind` override.
+    alignment_baseline: Option<BaselineKind>,
 }
 
 impl ElemAttrs {
@@ -332,6 +402,18 @@ impl ElemAttrs {
         let local_shift = read_local(node, "baseline-shift")
             .map(|v| parse_baseline_shift(&v, font_size))
             .unwrap_or(0.0);
+        let alignment_baseline = read_local(node, "alignment-baseline").and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty()
+                || trimmed.eq_ignore_ascii_case("auto")
+                || trimmed.eq_ignore_ascii_case("baseline")
+                || trimmed.eq_ignore_ascii_case("inherit")
+            {
+                None
+            } else {
+                Some(resolve_baseline(Some(trimmed)))
+            }
+        });
         Self {
             // Coord lists may use `em`/`ex` units; resolve them against
             // the current font-size rather than CSS initial 16px.
@@ -344,6 +426,7 @@ impl ElemAttrs {
             consumed: 0,
             is_text_path: false,
             baseline_shift_dy: parent_shift_dy + local_shift,
+            alignment_baseline,
         }
     }
 }
@@ -408,17 +491,22 @@ fn parse_spacing_length(value: &str, font_size: f32) -> f32 {
 /// Parse `baseline-shift` to a SVG-y delta (down is positive).
 ///
 /// CSS Inline Layout 3 §5: `baseline` (or `0`) means no shift relative
-/// to the parent baseline; `super` raises by ~0.5em; `sub` lowers by
-/// ~0.5em; a `<percentage>` resolves against the current font-size and
-/// raises by that amount; a `<length>` is taken raw and raises by that
-/// amount. Positive values raise; we negate the sign because SVG y
-/// grows downward.
+/// to the parent baseline; `super`/`sub` use the font's own
+/// superscript/subscript metrics (`OS/2.ySuperscriptYOffset` /
+/// `ySubscriptYOffset`). Blink approximates with ~0.333em / ~0.2em
+/// when those metrics aren't reachable — that matches the observed
+/// resvg-test-suite expecteds. Earlier we used 0.5em which over-shot
+/// the baseline by a noticeable margin in the diff for `super.svg` /
+/// `sub.svg` / `with-rotate.svg` and the nested-super variants.
+/// `<percentage>` resolves against the current font-size and raises
+/// by that amount; `<length>` raises raw. SVG y grows downward, so
+/// "raise" → negative delta.
 fn parse_baseline_shift(value: &str, font_size: f32) -> f32 {
     let v = value.trim();
     match v {
         "" | "0" | "baseline" | "initial" | "auto" | "inherit" | "unset" => 0.0,
-        "super" => -0.5 * font_size,
-        "sub" => 0.5 * font_size,
+        "super" => -font_size / 3.0,
+        "sub" => font_size / 5.0,
         _ => {
             if let Some(pct) = v.strip_suffix('%') {
                 pct.trim()
@@ -493,6 +581,7 @@ fn flatten_glyphs(
         last_was_space: false,
         has_emitted: false,
     };
+    let root_preserve = xml_space_preserve(root);
     walk_glyphs(
         ctx,
         root_id,
@@ -503,11 +592,50 @@ fn flatten_glyphs(
         &mut paths,
         &mut out,
         &mut ws,
+        root_preserve,
     );
-    while matches!(out.last(), Some(g) if g.ch == ' ') {
-        out.pop();
+    if !root_preserve {
+        // SVG 1.1 §10.15 default xml:space: strip trailing whitespace
+        // of the entire content. Skip when root is in `preserve` mode.
+        while matches!(out.last(), Some(g) if g.ch == ' ') {
+            out.pop();
+        }
     }
     (out, paths)
+}
+
+/// Read the effective `xml:space` on `node`. `xml:space="preserve"`
+/// suppresses XML whitespace collapse for this element and its
+/// descendants until overridden. We don't walk ancestors here —
+/// callers thread the inherited value down through `walk_glyphs` so
+/// a child's local `xml:space="default"` can override.
+///
+/// `html5ever` stores the xml-namespaced attribute with local name
+/// `space` (the prefix `xml:` is stripped into a namespace), so
+/// `get_attr` lookup uses the bare local name.
+fn xml_space_preserve(node: &DemoNode) -> bool {
+    matches!(read_xml_space(node), Some("preserve"))
+}
+
+fn xml_space_for(node: &DemoNode, parent_preserve: bool) -> bool {
+    match read_xml_space(node) {
+        Some("preserve") => true,
+        Some("default") => false,
+        _ => parent_preserve,
+    }
+}
+
+fn read_xml_space(node: &DemoNode) -> Option<&str> {
+    let DemoNodeData::Element(data) = &node.data else {
+        return None;
+    };
+    for attr in &data.attrs {
+        let local = attr.name.local.as_ref();
+        if local == "space" || local == "xml:space" {
+            return Some(attr.value.as_ref().trim());
+        }
+    }
+    None
 }
 
 /// XML-whitespace collapse state, threaded through the recursive walk
@@ -532,11 +660,30 @@ fn walk_glyphs(
     paths: &mut Vec<TextPathInfo>,
     out: &mut Vec<GlyphAttr>,
     ws: &mut WhitespaceState,
+    preserve: bool,
 ) {
     for &cid in &node.children {
         let child = ctx.dom.node(cid);
         match &child.data {
             DemoNodeData::Text(s) => {
+                if preserve {
+                    // SVG 1.1 §10.15 `xml:space="preserve"`: \n/\r/\t
+                    // become space, but spaces are NOT collapsed and
+                    // leading/trailing are NOT stripped. Reset the
+                    // collapse-state cursor so spaces flanking this
+                    // run are kept.
+                    for raw in s.chars() {
+                        let ch = if matches!(raw, '\n' | '\r' | '\t') {
+                            ' '
+                        } else {
+                            raw
+                        };
+                        ws.last_was_space = ch == ' ';
+                        ws.has_emitted = true;
+                        emit_glyph(ch, node_id, stack, path_stack, out);
+                    }
+                    continue;
+                }
                 for raw in s.chars() {
                     let ch = if matches!(raw, '\n' | '\r' | '\t') {
                         ' '
@@ -590,8 +737,18 @@ fn walk_glyphs(
                         }
                         let parent_shift = stack.last().map(|e| e.baseline_shift_dy).unwrap_or(0.0);
                         stack.push(ElemAttrs::from_node(child, font_size, parent_shift));
+                        let child_preserve = xml_space_for(child, preserve);
                         walk_glyphs(
-                            ctx, cid, child, font_size, stack, path_stack, paths, out, ws,
+                            ctx,
+                            cid,
+                            child,
+                            font_size,
+                            stack,
+                            path_stack,
+                            paths,
+                            out,
+                            ws,
+                            child_preserve,
                         );
                         stack.pop();
                     }
@@ -611,8 +768,18 @@ fn walk_glyphs(
                             tp_attrs.dy.clear();
                             tp_attrs.is_text_path = true;
                             stack.push(tp_attrs);
+                            let child_preserve = xml_space_for(child, preserve);
                             walk_glyphs(
-                                ctx, cid, child, font_size, stack, path_stack, paths, out, ws,
+                                ctx,
+                                cid,
+                                child,
+                                font_size,
+                                stack,
+                                path_stack,
+                                paths,
+                                out,
+                                ws,
+                                child_preserve,
                             );
                             stack.pop();
                             path_stack.pop();
@@ -638,6 +805,11 @@ fn emit_glyph(
     path_stack: &[usize],
     out: &mut Vec<GlyphAttr>,
 ) {
+    // Innermost stack frame with a local `alignment-baseline` wins.
+    // Walk inner→outer until the first non-`None` is found; the root
+    // <text> doesn't set this (its `dominant-baseline`/`alignment-
+    // baseline` is already folded into `baseline_y` for all glyphs).
+    let alignment_baseline_kind = stack.iter().rev().find_map(|e| e.alignment_baseline);
     let mut attr = GlyphAttr {
         ch,
         x: None,
@@ -651,6 +823,7 @@ fn emit_glyph(
         // push time (parent + local). The innermost frame holds the
         // value to apply to this glyph.
         baseline_shift_dy: stack.last().map(|e| e.baseline_shift_dy).unwrap_or(0.0),
+        alignment_baseline_kind,
     };
     for elem in stack.iter().rev() {
         let i = elem.consumed;
@@ -836,6 +1009,7 @@ fn resolve_positions(
     wm: WritingMode,
     v_perp_x: f32,
     kerned_advances: &[f32],
+    metrics: &skia_safe::FontMetrics,
 ) -> Vec<ResolvedGlyph> {
     let mut pen_x = 0.0f32;
     let mut pen_y = 0.0f32;
@@ -908,6 +1082,13 @@ fn resolve_positions(
         // baseline, but for a simple MVP we drop the perpendicular
         // baseline shift in vertical so glyphs stack on the same x.
         let user_rotate = g.rotate.unwrap_or(0.0);
+        // Per-glyph baseline override: a tspan with its own
+        // `alignment-baseline` overrides the root's baseline_y for
+        // glyphs in that subtree.
+        let glyph_baseline_y = match g.alignment_baseline_kind {
+            Some(kind) => baseline_offset(metrics, kind),
+            None => baseline_y,
+        };
         let (gx, gy, glyph_rotate) = if wm.is_vertical() {
             // Glyph at (pen_x + perp, pen_y), rotated 90° CW. The
             // perpendicular offset places the rotated baseline on the
@@ -916,7 +1097,11 @@ fn resolve_positions(
         } else if g.text_path_idx.is_some() {
             (pen_x, pen_y + g.baseline_shift_dy, user_rotate)
         } else {
-            (pen_x, pen_y + baseline_y + g.baseline_shift_dy, user_rotate)
+            (
+                pen_x,
+                pen_y + glyph_baseline_y + g.baseline_shift_dy,
+                user_rotate,
+            )
         };
         out.push(ResolvedGlyph {
             ch: g.ch,
@@ -1062,32 +1247,39 @@ impl ArcLengthMapper {
     }
 }
 
-/// Apply `text-anchor` per anchored chunk. Each chunk's effective width
-/// is the sum of its glyph advances; middle subtracts half, end
-/// subtracts the whole, start is a no-op. (Blink: `ApplyAnchoring` in
-/// `svg_text_layout_algorithm.cc`.)
-fn apply_anchor(glyphs: &mut [ResolvedGlyph], anchor: TextAnchor, wm: WritingMode) {
-    if matches!(anchor, TextAnchor::Start) {
-        return;
-    }
+/// Apply `text-anchor` per anchored chunk. Each chunk's effective
+/// width is the sum of its glyph advances; middle subtracts half, end
+/// subtracts the whole, start is a no-op. The anchor is read from the
+/// element that started the chunk (the source of the first glyph),
+/// walking ancestors via CSS inheritance. Lets a
+/// `<tspan x=… text-anchor=middle>` shift only the chunk it spawned,
+/// not the whole `<text>`. Blink: `ApplyAnchoring` in
+/// `svg_text_layout_algorithm.cc`.
+fn apply_anchor(ctx: &PaintCtx<'_>, glyphs: &mut [ResolvedGlyph], wm: WritingMode) {
     let mut i = 0;
     while i < glyphs.len() {
         let cid = glyphs[i].chunk_id;
+        let chunk_source = glyphs[i].source;
         let mut j = i;
         let mut width = 0.0;
         while j < glyphs.len() && glyphs[j].chunk_id == cid {
             width += glyphs[j].advance;
             j += 1;
         }
+        let anchor = match read_inherited(ctx, ctx.dom.node(chunk_source), "text-anchor")
+            .as_deref()
+            .map(str::trim)
+        {
+            Some("middle") => TextAnchor::Middle,
+            Some("end") => TextAnchor::End,
+            _ => TextAnchor::Start,
+        };
         let shift = match anchor {
             TextAnchor::Middle => -width / 2.0,
             TextAnchor::End => -width,
             TextAnchor::Start => 0.0,
         };
         if shift != 0.0 {
-            // In vertical writing-mode, the inline axis is Y, so the
-            // anchor shift moves glyphs along Y. Per Blink
-            // `ApplyAnchoring` (svg_text_layout_algorithm.cc:541-597).
             for g in &mut glyphs[i..j] {
                 if wm.is_vertical() {
                     g.y += shift;
@@ -1378,13 +1570,14 @@ fn paint_anchor_decoration(
         // Default ~30% of font size above the baseline.
         -font.size() * 0.3
     });
-    // Overline sits on the cap height — for fonts that don't expose
-    // `cap_height` we fall back to the ascent.
-    let overline_position = if metrics.cap_height > 0.0 {
-        -metrics.cap_height
-    } else {
-        metrics.ascent
-    };
+    // Overline sits at the top of the em box (font ascent), with
+    // ~one underline-thickness of air above the cap. CSS Text
+    // Decoration 3 §3.2.4 leaves position implementation-defined;
+    // Blink/Chromium use the line-box top (approximately
+    // `metrics.ascent`), and the resvg-test-suite expecteds match
+    // that — placing the bar visually above the cap, not touching
+    // it. `ascent` is negative (Skia y-up).
+    let overline_position = metrics.ascent;
 
     // Build coalesced runs: groups of consecutive glyph indices
     // (after sorting and dedup), broken when a glyph's `chunk_id`
@@ -1886,12 +2079,54 @@ fn read_local(node: &DemoNode, name: &str) -> Option<String> {
     if let Some(v) = get_attr(node, name) {
         return Some(v.to_string());
     }
-    if let Some(style) = get_attr(node, "style") {
-        for decl in style.split(';') {
-            if let Some((k, v)) = decl.split_once(':') {
-                if k.trim().eq_ignore_ascii_case(name) {
-                    return Some(v.trim().to_string());
-                }
+    read_local_style_only(node, name)
+}
+
+/// Like [`read_local`] but ignores the bare attribute — only reads
+/// from `style="…"`. Used for non-presentation CSS properties like
+/// `font-kerning` that SVG 2 specifies as not-an-attribute.
+fn read_local_style_only(node: &DemoNode, name: &str) -> Option<String> {
+    let style = get_attr(node, "style")?;
+    for decl in style.split(';') {
+        if let Some((k, v)) = decl.split_once(':') {
+            if k.trim().eq_ignore_ascii_case(name) {
+                return Some(v.trim().to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Walk the ancestor chain reading a non-presentation CSS property
+/// from `style="…"` only. Mirrors [`read_inherited`]'s `inherit`
+/// keyword handling but skips the bare-attribute hop.
+fn inherited_style_only(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Option<String> {
+    fn is_skip(v: &str) -> bool {
+        matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "inherit" | "initial" | "unset" | "revert"
+        )
+    }
+    if let Some(v) = read_local_style_only(node, name) {
+        if !is_skip(&v) {
+            return Some(v);
+        }
+    }
+    let mut current = node.parent;
+    while let Some(id) = current {
+        let n = ctx.dom.node(id);
+        if let Some(v) = read_local_style_only(n, name) {
+            if !is_skip(&v) {
+                return Some(v);
+            }
+        }
+        current = n.parent;
+    }
+    for use_id in super::scoped_svg_paint_state::use_chain_iter(ctx.use_chain) {
+        let n = ctx.dom.node(use_id);
+        if let Some(v) = read_local_style_only(n, name) {
+            if !is_skip(&v) {
+                return Some(v);
             }
         }
     }
