@@ -1688,7 +1688,19 @@ fn parse_amount_strict(s: &str) -> Option<f32> {
     if s.is_empty() {
         return Some(1.0);
     }
-    parse_amount(s)
+    // CSS Filter Effects 1 §3.1 explicitly forbids negative values for
+    // every shorthand that flows through here — `brightness`,
+    // `contrast`, `grayscale`, `invert`, `opacity`, `saturate`,
+    // `sepia`. Per the same section: an invalid argument invalidates
+    // the entire `filter` property, and the element renders as if
+    // there were no filter. Reject negatives here so the calling
+    // chain bails via the `?` and reverts to the unfiltered draw,
+    // instead of clamping to zero and producing a black/gray result.
+    let v = parse_amount(s)?;
+    if v < 0.0 {
+        return None;
+    }
+    Some(v)
 }
 
 /// Strict CSS `<length>` parser used by `blur(<length>)`. Empty arg
