@@ -464,7 +464,14 @@ fn paint_stroke(
     }
 
     if let Some(dash_attr) = get_attr(node, "stroke-dasharray") {
-        if let Some(intervals) = parse_dash_intervals(dash_attr) {
+        // SVG 2 §11.5: each entry in `stroke-dasharray` is a
+        // `<length-percentage>` resolving against the viewport
+        // diagonal normalized by sqrt(2) — same axis as
+        // `stroke-width`. Per-token resolution lets `15% 30%`
+        // produce a real dashed stroke instead of silently dropping
+        // the percent tokens and rendering solid.
+        let dash_extent = axis_extent(viewport_box_for(ctx, node), Axis::D);
+        if let Some(intervals) = parse_dash_intervals_with_extent(dash_attr, dash_extent) {
             // SVG 2 §11.5: `stroke-dashoffset` is a `<length-percentage>`
             // and percentages resolve against the viewport diagonal
             // normalized by sqrt(2) — same axis as `stroke-width`. Use
@@ -623,15 +630,22 @@ fn points_bbox(pts: &[(f32, f32)]) -> Rect {
     Rect::new(minx, miny, maxx, maxy)
 }
 
-fn parse_dash_intervals(s: &str) -> Option<Vec<f32>> {
+fn parse_dash_intervals_with_extent(s: &str, dash_extent: f32) -> Option<Vec<f32>> {
     let s = s.trim();
     if s.is_empty() || s.eq_ignore_ascii_case("none") {
         return None;
     }
+    let resolve = |p: &str| -> Option<f32> {
+        if let Some(num) = p.strip_suffix('%') {
+            let v: f32 = num.trim().parse().ok()?;
+            return Some(v / 100.0 * dash_extent);
+        }
+        parse_length_px(p)
+    };
     let mut nums: Vec<f32> = s
         .split(|c: char| c.is_ascii_whitespace() || c == ',')
         .filter(|p| !p.is_empty())
-        .filter_map(parse_length_px)
+        .filter_map(resolve)
         .collect();
     if nums.is_empty() || nums.iter().all(|n| *n == 0.0) {
         return None;
