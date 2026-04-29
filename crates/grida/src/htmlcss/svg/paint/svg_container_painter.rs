@@ -385,7 +385,11 @@ fn apply_mask(canvas: &Canvas, ctx: &PaintCtx<'_>, inv: &masker::MaskInvocation)
             .filter(|v| !v.is_empty() && *v != "none")
             .and_then(parse_url_ref)
             .and_then(|id| ctx.resources.lookup(id))
-            .filter(|target| !mask_frame.contains(*target))
+            // Reject the chained mask if applying it would close a
+            // mask-reference cycle. Direct self-reference is `target
+            // is in chain`; mutual / longer cycles need a transitive
+            // walk through `mask=` attrs on each mask element.
+            .filter(|target| !chained_mask_would_cycle(ctx, *target, &mask_frame))
             .and_then(|target| {
                 let bbox = element_object_bbox(ctx.dom, mask_node);
                 masker::resolve(ctx.dom, target, bbox)
@@ -404,4 +408,41 @@ fn apply_mask(canvas: &Canvas, ctx: &PaintCtx<'_>, inv: &masker::MaskInvocation)
     }
 
     canvas.restore();
+}
+
+/// Walk a candidate chained-mask target's `mask=` chain and return
+/// true if any node along the way is already in `chain` (or appears
+/// twice in the walk itself). Catches mutual `<mask a mask=#b>` /
+/// `<mask b mask=#a>` cycles and longer rings that the immediate
+/// `chain.contains(target)` check misses.
+fn chained_mask_would_cycle(
+    ctx: &PaintCtx<'_>,
+    target: csscascade::dom::NodeId,
+    chain: &super::scoped_svg_paint_state::MaskFrame<'_>,
+) -> bool {
+    let mut cur = target;
+    let mut visited: Vec<csscascade::dom::NodeId> = Vec::new();
+    for _ in 0..super::scoped_svg_paint_state::MAX_MASK_DEPTH as usize + 4 {
+        if chain.contains(cur) || visited.contains(&cur) {
+            return true;
+        }
+        visited.push(cur);
+        let n = ctx.dom.node(cur);
+        let Some(raw) = get_attr(n, "mask") else {
+            return false;
+        };
+        let raw = raw.trim();
+        if raw.is_empty() || raw.eq_ignore_ascii_case("none") {
+            return false;
+        }
+        let Some(id) = parse_url_ref(raw) else {
+            return false;
+        };
+        let Some(next) = ctx.resources.lookup(id) else {
+            return false;
+        };
+        cur = next;
+    }
+    // Walk exceeded its bound — be conservative and treat as a cycle.
+    true
 }
