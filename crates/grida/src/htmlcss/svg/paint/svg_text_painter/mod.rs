@@ -454,7 +454,12 @@ struct ElemAttrs {
 }
 
 impl ElemAttrs {
-    fn from_node(node: &DemoNode, font_size: f32, parent_shift_dy: f32) -> Self {
+    fn from_node(
+        node: &DemoNode,
+        font_size: f32,
+        parent_shift_dy: f32,
+        viewport: (f32, f32),
+    ) -> Self {
         let local_shift = read_local(node, "baseline-shift")
             .map(|v| parse_baseline_shift(&v, font_size))
             .unwrap_or(0.0);
@@ -472,11 +477,13 @@ impl ElemAttrs {
         });
         Self {
             // Coord lists may use `em`/`ex` units; resolve them against
-            // the current font-size rather than CSS initial 16px.
-            x: parse_number_list_with_font(get_attr(node, "x"), font_size),
-            y: parse_number_list_with_font(get_attr(node, "y"), font_size),
-            dx: parse_number_list_with_font(get_attr(node, "dx"), font_size),
-            dy: parse_number_list_with_font(get_attr(node, "dy"), font_size),
+            // the current font-size rather than CSS initial 16px. Per
+            // SVG 2 §8.5, percentages on `x`/`dx` resolve against the
+            // viewport width and `y`/`dy` against the viewport height.
+            x: parse_number_list_with_font_pct(get_attr(node, "x"), font_size, viewport.0),
+            y: parse_number_list_with_font_pct(get_attr(node, "y"), font_size, viewport.1),
+            dx: parse_number_list_with_font_pct(get_attr(node, "dx"), font_size, viewport.0),
+            dy: parse_number_list_with_font_pct(get_attr(node, "dy"), font_size, viewport.1),
             // `rotate` is unitless degrees — em/ex don't apply.
             rotate: parse_number_list(get_attr(node, "rotate")),
             consumed: 0,
@@ -601,6 +608,20 @@ fn parse_number_list_with_font(s: Option<&str>, font_size: f32) -> Vec<f32> {
         .collect()
 }
 
+/// Like [`parse_number_list_with_font`] but additionally resolves `%`
+/// tokens against `axis` (viewport width for x/dx, height for y/dy).
+/// Per SVG 2 §8.5 the x/y/dx/dy coordinate lists on `<text>` and
+/// `<tspan>` accept `<length-percentage>` items.
+fn parse_number_list_with_font_pct(s: Option<&str>, font_size: f32, axis: f32) -> Vec<f32> {
+    let Some(s) = s else {
+        return Vec::new();
+    };
+    s.split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|t| !t.is_empty())
+        .filter_map(|t| parse_length_px_em_pct(t, font_size, axis))
+        .collect()
+}
+
 /// Length parser that knows about the current font-size for `em`/`ex`.
 /// Falls through to [`parse_length_px`] for absolute units.
 fn parse_length_px_em(s: &str, font_size: f32) -> Option<f32> {
@@ -616,6 +637,17 @@ fn parse_length_px_em(s: &str, font_size: f32) -> Option<f32> {
     parse_length_px(s)
 }
 
+/// Length-or-percentage parser that knows about the current font-size
+/// for `em`/`ex` and resolves `%` against `axis`. Used for text x/y/
+/// dx/dy where percentages resolve against the viewport.
+fn parse_length_px_em_pct(s: &str, font_size: f32, axis: f32) -> Option<f32> {
+    let s = s.trim();
+    if let Some(num) = s.strip_suffix('%') {
+        return num.trim().parse::<f32>().ok().map(|n| n / 100.0 * axis);
+    }
+    parse_length_px_em(s, font_size)
+}
+
 fn flatten_glyphs(
     ctx: &PaintCtx<'_>,
     root_id: NodeId,
@@ -629,7 +661,11 @@ fn flatten_glyphs(
     // dominant-baseline. The root `<text>` has no such parent, so its
     // own baseline-shift declaration has no effect. The property is
     // also not inheritable, so children of `<text>` start at 0.
-    let mut root_frame = ElemAttrs::from_node(root, font_size, 0.0);
+    // SVG 2 §8.5: % on text x/y/dx/dy resolves against the SVG
+    // viewport. Compute it once at the root — it doesn't change for
+    // descendants since `<text>` doesn't host nested `<svg>`.
+    let viewport = crate::htmlcss::svg::layout::viewport::nearest_svg_viewport(ctx, root);
+    let mut root_frame = ElemAttrs::from_node(root, font_size, 0.0, viewport);
     root_frame.baseline_shift_dy = 0.0;
     let mut stack = vec![root_frame];
     let mut path_stack: Vec<usize> = Vec::new();
@@ -643,6 +679,7 @@ fn flatten_glyphs(
         root_id,
         root,
         font_size,
+        viewport,
         &mut stack,
         &mut path_stack,
         &mut paths,
@@ -711,6 +748,7 @@ fn walk_glyphs(
     node_id: NodeId,
     node: &DemoNode,
     font_size: f32,
+    viewport: (f32, f32),
     stack: &mut Vec<ElemAttrs>,
     path_stack: &mut Vec<usize>,
     paths: &mut Vec<TextPathInfo>,
@@ -792,13 +830,19 @@ fn walk_glyphs(
                             continue;
                         }
                         let parent_shift = stack.last().map(|e| e.baseline_shift_dy).unwrap_or(0.0);
-                        stack.push(ElemAttrs::from_node(child, font_size, parent_shift));
+                        stack.push(ElemAttrs::from_node(
+                            child,
+                            font_size,
+                            parent_shift,
+                            viewport,
+                        ));
                         let child_preserve = xml_space_for(child, preserve);
                         walk_glyphs(
                             ctx,
                             cid,
                             child,
                             font_size,
+                            viewport,
                             stack,
                             path_stack,
                             paths,
@@ -819,7 +863,8 @@ fn walk_glyphs(
                             // cascade — they'd fight the path placement.
                             let parent_shift =
                                 stack.last().map(|e| e.baseline_shift_dy).unwrap_or(0.0);
-                            let mut tp_attrs = ElemAttrs::from_node(child, font_size, parent_shift);
+                            let mut tp_attrs =
+                                ElemAttrs::from_node(child, font_size, parent_shift, viewport);
                             tp_attrs.y.clear();
                             tp_attrs.dy.clear();
                             tp_attrs.is_text_path = true;
@@ -830,6 +875,7 @@ fn walk_glyphs(
                                 cid,
                                 child,
                                 font_size,
+                                viewport,
                                 stack,
                                 path_stack,
                                 paths,
