@@ -1261,12 +1261,24 @@ fn parse_convolve_matrix(node: &DemoNode, is_first: bool) -> Option<FilterEffect
     if kernel_matrix.is_empty() || kernel_matrix.len() != (order_x as usize) * (order_y as usize) {
         return Some(transparent_flood());
     }
-    // `divisor` is unspecified → 0 sentinel (Blink
-    // `svg_fe_convolve_matrix_element.cc:169-175`); `0` triggers
-    // "use sum of kernel" at build time.
-    let divisor = get_attr(node, "divisor")
-        .and_then(parse_length_px)
-        .filter(|d| *d != 0.0);
+    // Filter Effects 1 §15.16: `divisor` is invalid when it parses to
+    // exactly 0 (the spec calls this an error and Chrome / Blink emit
+    // transparent black — `svg_fe_convolve_matrix_element.cc:169-175`
+    // checks `divisor != 0` before validating; primitives whose
+    // attributes fail this check are treated as if `display:none`).
+    // The "use sum of kernel" fallback only fires when `divisor` is
+    // *unspecified*. Distinguish the two here so an explicit `0`
+    // collapses the primitive instead of silently amplifying the
+    // input.
+    let divisor_attr = get_attr(node, "divisor").map(str::trim);
+    if let Some(raw) = divisor_attr {
+        if let Some(parsed) = parse_length_px(raw) {
+            if parsed == 0.0 {
+                return Some(transparent_flood());
+            }
+        }
+    }
+    let divisor = divisor_attr.and_then(parse_length_px);
     let bias = get_attr(node, "bias")
         .and_then(parse_length_px)
         .unwrap_or(0.0);
