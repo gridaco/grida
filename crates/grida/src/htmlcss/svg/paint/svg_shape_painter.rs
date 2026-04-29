@@ -681,13 +681,37 @@ fn inherited_paint(
         }
         None
     }
+    // SVG 2 §5.6.4: a `<use>`'s shadow tree is rooted at the cloned
+    // target — the source-DOM parent of the target is NOT in the
+    // cascade chain. Bound the source-ancestor walk at the innermost
+    // `<use>`'s `target_id`: process up to (and including) that node,
+    // then jump straight to the `use_chain`. When `node` itself is the
+    // use target, the source-DOM walk is skipped entirely.
+    let boundary = ctx.use_chain.map(|f| f.target_id);
     let mut current = node.parent;
+    if let Some(target) = boundary {
+        let mut p = current;
+        let mut descends = false;
+        while let Some(id) = p {
+            if id == target {
+                descends = true;
+                break;
+            }
+            p = ctx.dom.node(id).parent;
+        }
+        if !descends {
+            current = None;
+        }
+    }
     while let Some(id) = current {
         let n = ctx.dom.node(id);
         if let Some(v) = read(n, property) {
             if !v.eq_ignore_ascii_case("inherit") {
                 return resolve_paint_with_server(ctx, n, property, Some(&v), default_solid);
             }
+        }
+        if Some(id) == boundary {
+            break;
         }
         current = n.parent;
     }
