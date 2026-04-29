@@ -165,6 +165,26 @@ fn walk_clipper_children(
 ) -> Option<()> {
     let dom = ctx.dom;
     let resources = ctx.resources;
+
+    // SVG 2 §14.3.5 / CSS Masking 1 §6.4: a child's chained
+    // `clip-path=url(#…)` reference is resolved in user space (the
+    // clipper resource is independent of where it's referenced from),
+    // but the child's own geometry sits in the outer clipper's
+    // pre-`transform=` content space. When the outer clipper has a
+    // non-identity `transform=`, the two operands live in different
+    // coordinate systems and intersecting them as-is misplaces the
+    // chained region. Map the chained path back into the clipper's
+    // local space by applying the inverse of the clipper's own
+    // transform; `resolve_to_path` reapplies that transform to the
+    // composed result so the chained region lands in the right user
+    // space.
+    let clipper_inverse: Option<Matrix> = get_attr(parent, "transform")
+        .and_then(parse_transform)
+        .and_then(|t| {
+            let origin = transform_origin_for(ctx, parent);
+            wrap_with_origin(&t, origin).invert()
+        });
+
     for child_id in parent.children.iter().copied() {
         let child = dom.node(child_id);
         let DemoNodeData::Element(child_data) = &child.data else {
@@ -213,8 +233,14 @@ fn walk_clipper_children(
 
         // Child's own chained `clip-path=` composes another clipping
         // region around this shape. Cycles back to a clipPath already
-        // in flight on `ctx.clip_chain` are broken.
-        if let Some(chained) = chained_clip_path(ctx, get_attr(child, "clip-path"), object_bbox) {
+        // in flight on `ctx.clip_chain` are broken. The chained path is
+        // returned in user space; bring it into clipper-local space
+        // before intersecting (see `clipper_inverse` above).
+        if let Some(mut chained) = chained_clip_path(ctx, get_attr(child, "clip-path"), object_bbox)
+        {
+            if let Some(inv) = clipper_inverse {
+                chained = chained.with_transform(&inv);
+            }
             child_path = skia_safe::op(&child_path, &chained, PathOp::Intersect)?;
         }
 
