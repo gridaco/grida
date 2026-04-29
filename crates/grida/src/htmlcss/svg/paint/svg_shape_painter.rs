@@ -91,6 +91,16 @@ fn len_attr(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str, axis: Axis) -> Opti
         return Some(num * root_font_size(ctx));
     }
     // `em` / `ex` / `ch` resolve against the inherited `font-size`.
+    // For `ch` specifically, CSS Values 4 §6.1 defines it as the
+    // advance width of the `0` glyph in the inherited font — when
+    // the font is reachable we measure it directly. Falling back to
+    // 0.5em only when measurement is unavailable.
+    if lower.ends_with("ch") && !lower.ends_with("inch") {
+        let num: f32 = lower.trim_end_matches("ch").trim().parse().ok()?;
+        let font_size = inherited_font_size(ctx, node);
+        let advance = ch_advance(ctx, node, font_size).unwrap_or(font_size * 0.5);
+        return Some(num * advance);
+    }
     if let Some((suffix, unit_size_factor)) = font_relative_unit(&lower) {
         let font_size = inherited_font_size(ctx, node);
         let num: f32 = lower.trim_end_matches(suffix).trim().parse().ok()?;
@@ -138,6 +148,72 @@ fn viewport_unit_factor(s: &str, vw: f32, vh: f32) -> Option<f32> {
     } else {
         None
     }
+}
+
+/// CSS Values 4 §6.1.1: `1ch` = the advance width of the `0` glyph
+/// in the inherited font. Returns `None` when the font can't be
+/// resolved; the caller falls back to the 0.5em approximation.
+fn ch_advance(
+    ctx: &super::scoped_svg_paint_state::PaintCtx<'_>,
+    node: &DemoNode,
+    font_size: f32,
+) -> Option<f32> {
+    let chain = inherited_font_family(ctx, node);
+    let style = skia_safe::FontStyle::default();
+    let typeface = chain
+        .as_deref()
+        .and_then(|list| {
+            list.split(',').find_map(|raw| {
+                let name = raw.trim().trim_matches(|c| c == '"' || c == '\'');
+                if name.is_empty() {
+                    None
+                } else {
+                    ctx.fonts.resolve(name, style)
+                }
+            })
+        })
+        .or_else(|| ctx.fonts.fallback(style))?;
+    let font = skia_safe::Font::from_typeface(typeface, font_size);
+    let (w, _) = font.measure_str("0", None);
+    if w > 0.0 {
+        Some(w)
+    } else {
+        None
+    }
+}
+
+/// Walk the ancestor chain for the first explicit `font-family`.
+fn inherited_font_family(
+    ctx: &super::scoped_svg_paint_state::PaintCtx<'_>,
+    node: &DemoNode,
+) -> Option<String> {
+    fn read(node: &DemoNode) -> Option<String> {
+        if let Some(v) = get_attr(node, "font-family") {
+            return Some(v.to_string());
+        }
+        if let Some(style) = get_attr(node, "style") {
+            for decl in style.split(';') {
+                if let Some((k, v)) = decl.split_once(':') {
+                    if k.trim().eq_ignore_ascii_case("font-family") {
+                        return Some(v.trim().to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+    if let Some(v) = read(node) {
+        return Some(v);
+    }
+    let mut current = node.parent;
+    while let Some(id) = current {
+        let n = ctx.dom.node(id);
+        if let Some(v) = read(n) {
+            return Some(v);
+        }
+        current = n.parent;
+    }
+    None
 }
 
 fn font_relative_unit(s: &str) -> Option<(&'static str, f32)> {
