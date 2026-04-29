@@ -2440,9 +2440,75 @@ fn paint_decoration_run(
 /// transform — Skia's `SkTextBlobBuilder::allocRunRSXform` would let us
 /// batch these into a single blob, but per-char `draw_str` is fast
 /// enough for our short SVG fixtures and avoids the extra plumbing.
+/// True when `ch` is a bidi/cursive/complex script character that
+/// loses contextual shaping when drawn one codepoint at a time:
+/// Arabic (U+0600..U+06FF, U+0750..U+077F, U+08A0..U+08FF), Arabic
+/// supplements / presentation forms (U+FB50..U+FDFF, U+FE70..U+FEFF),
+/// Hebrew (U+0590..U+05FF), Devanagari + other Indic blocks
+/// (U+0900..U+0DFF, U+0F00..U+0FFF). For these scripts a per-char
+/// `draw_str` produces isolated forms — joining and reordering need
+/// the whole run to be passed to Skia at once.
+fn ch_needs_run_shaping(ch: char) -> bool {
+    let cp = ch as u32;
+    matches!(
+        cp,
+        0x0590..=0x05FF       // Hebrew
+            | 0x0600..=0x06FF // Arabic
+            | 0x0700..=0x074F // Syriac
+            | 0x0750..=0x077F // Arabic Supplement
+            | 0x0780..=0x07BF // Thaana
+            | 0x07C0..=0x07FF // NKo
+            | 0x0800..=0x083F // Samaritan
+            | 0x0840..=0x085F // Mandaic
+            | 0x08A0..=0x08FF // Arabic Extended-A
+            | 0x0900..=0x0DFF // Devanagari/Bengali/etc.
+            | 0x0F00..=0x0FFF // Tibetan
+            | 0xFB50..=0xFDFF // Arabic Presentation Forms-A
+            | 0xFE70..=0xFEFF // Arabic Presentation Forms-B
+    )
+}
+
 fn draw_glyphs(canvas: &Canvas, glyphs: &[ResolvedGlyph], font: &Font, paint: &SkPaint) {
-    for g in glyphs {
+    let mut i = 0;
+    while i < glyphs.len() {
+        let g = &glyphs[i];
         if g.hidden {
+            i += 1;
+            continue;
+        }
+        // Bidi / cursive shaping: when a contiguous run of glyphs
+        // sits on a simple baseline (no rotate, no textPath, no
+        // hidden chars in the middle, no per-char positioning gaps)
+        // and contains any character that needs run-level shaping
+        // (Arabic, Hebrew, Devanagari, etc.), draw the whole run as
+        // a single string so Skia's HarfBuzz integration sees the
+        // full context. Drawing one codepoint at a time yields
+        // isolated forms and breaks Arabic joining + bidi.
+        let mut j = i + 1;
+        let simple = g.on_path.is_none() && g.rotate_deg.abs() < 0.001;
+        let mut needs_run = ch_needs_run_shaping(g.ch);
+        if simple {
+            while j < glyphs.len() {
+                let n = &glyphs[j];
+                if n.hidden || n.on_path.is_some() || n.rotate_deg.abs() >= 0.001 {
+                    break;
+                }
+                if ch_needs_run_shaping(n.ch) {
+                    needs_run = true;
+                }
+                j += 1;
+            }
+        }
+        if simple && needs_run && j > i + 1 {
+            let mut s = String::with_capacity((j - i) * 4);
+            for run_glyph in &glyphs[i..j] {
+                s.push(run_glyph.ch);
+            }
+            // Anchor at the run's first glyph position. Skia's
+            // HarfBuzz shaper produces correct per-glyph offsets
+            // (joining + bidi reorder) within that run.
+            canvas.draw_str(&s, Point::new(g.x, g.y), font, paint);
+            i = j;
             continue;
         }
         let mut buf = [0u8; 4];
@@ -2469,6 +2535,7 @@ fn draw_glyphs(canvas: &Canvas, glyphs: &[ResolvedGlyph], font: &Font, paint: &S
             canvas.draw_str(s, Point::new(0.0, 0.0), font, paint);
             canvas.restore_to_count(restore);
         }
+        i += 1;
     }
 }
 
