@@ -64,7 +64,17 @@ pub(crate) fn element_object_bbox(dom: &DemoDom, node: &DemoNode) -> Rect {
         }
         ElementKind::Path => get_attr(node, "d")
             .map(crate::htmlcss::svg::dom::path_d::parse_path)
-            .map(|path| *path.bounds())
+            .map(|path| {
+                // SVG 2 §6.13: a path's object bounding box is the
+                // tight bbox of the rendered geometry — control
+                // points DO NOT contribute. Skia `path.bounds()`
+                // returns the loose (control-point) bbox; use
+                // `compute_tight_bounds()` for the spec value.
+                // `filters_filter_path-bbox.svg` documents this with
+                // a Q curve whose control point sits above the
+                // actual rendered apex.
+                path.compute_tight_bounds()
+            })
             .unwrap_or_default(),
         ElementKind::G | ElementKind::Svg | ElementKind::Switch | ElementKind::Anchor => {
             let mut acc: Option<Rect> = None;
