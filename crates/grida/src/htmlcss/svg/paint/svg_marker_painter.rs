@@ -440,17 +440,36 @@ fn paint_one(
     pos: &MarkerPosition,
     stroke_width: f32,
 ) {
+    // Percentage values on markerWidth / markerHeight / refX / refY
+    // resolve against the nearest SVG viewport per Chrome / Firefox
+    // (SVG 2 §11.6.2 leaves it implementation-defined; resvg-test-
+    // suite expecteds match the browser behavior). x-axis values
+    // (markerWidth, refX) → viewport width; y-axis values
+    // (markerHeight, refY) → viewport height.
+    let (vp_w, vp_h) =
+        crate::htmlcss::svg::layout::viewport::nearest_svg_viewport(ctx, marker_node);
+    let parse_len = |raw: &str, axis_extent: f32| -> Option<f32> {
+        let s = raw.trim();
+        if let Some(p) = s.strip_suffix('%') {
+            return p
+                .trim()
+                .parse::<f32>()
+                .ok()
+                .map(|n| n / 100.0 * axis_extent);
+        }
+        parse_length_px(s)
+    };
     let marker_width = get_attr(marker_node, "markerWidth")
-        .and_then(parse_length_px)
+        .and_then(|s| parse_len(s, vp_w))
         .unwrap_or(3.0);
     let marker_height = get_attr(marker_node, "markerHeight")
-        .and_then(parse_length_px)
+        .and_then(|s| parse_len(s, vp_h))
         .unwrap_or(3.0);
     let ref_x = get_attr(marker_node, "refX")
-        .and_then(parse_length_px)
+        .and_then(|s| parse_len(s, vp_w))
         .unwrap_or(0.0);
     let ref_y = get_attr(marker_node, "refY")
-        .and_then(parse_length_px)
+        .and_then(|s| parse_len(s, vp_h))
         .unwrap_or(0.0);
 
     // markerUnits: `strokeWidth` (default) scales by the stroke
