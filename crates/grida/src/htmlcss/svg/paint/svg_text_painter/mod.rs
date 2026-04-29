@@ -2757,13 +2757,37 @@ fn read_inherited(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Option<Str
             return Some(v);
         }
     }
+    // SVG 2 §5.6.4: when rendering through a `<use>`, the source-DOM
+    // parent of the cloned target is NOT in the cascade — the use
+    // shadow tree's effective parent of `target_id` is the `<use>`
+    // element itself. Bound the source-DOM walk at `target_id`, then
+    // continue from the use chain. Mirrors the fix already applied to
+    // `inherited_paint` in svg_shape_painter.
+    let boundary = ctx.use_chain.map(|f| f.target_id);
     let mut current = node.parent;
+    if let Some(target) = boundary {
+        let mut p = current;
+        let mut descends = false;
+        while let Some(id) = p {
+            if id == target {
+                descends = true;
+                break;
+            }
+            p = ctx.dom.node(id).parent;
+        }
+        if !descends {
+            current = None;
+        }
+    }
     while let Some(id) = current {
         let n = ctx.dom.node(id);
         if let Some(v) = read_local_font(n, name) {
             if !is_skip_keyword(&v) {
                 return Some(v);
             }
+        }
+        if Some(id) == boundary {
+            break;
         }
         current = n.parent;
     }
@@ -2794,11 +2818,33 @@ fn resolve_font_size_at(ctx: &PaintCtx<'_>, node: &DemoNode) -> f32 {
     if let Some(v) = read_local_font(node, "font-size") {
         chain.push(v);
     }
+    // Bound the source-DOM walk at the innermost `<use>` target — the
+    // cloned subtree's effective parent is the `<use>`, not the
+    // target's source-DOM parent (SVG 2 §5.6.4). Same shape as
+    // `read_inherited` above.
+    let boundary = ctx.use_chain.map(|f| f.target_id);
     let mut cur = node.parent;
+    if let Some(target) = boundary {
+        let mut p = cur;
+        let mut descends = false;
+        while let Some(id) = p {
+            if id == target {
+                descends = true;
+                break;
+            }
+            p = ctx.dom.node(id).parent;
+        }
+        if !descends {
+            cur = None;
+        }
+    }
     while let Some(id) = cur {
         let n = ctx.dom.node(id);
         if let Some(v) = read_local_font(n, "font-size") {
             chain.push(v);
+        }
+        if Some(id) == boundary {
+            break;
         }
         cur = n.parent;
     }
