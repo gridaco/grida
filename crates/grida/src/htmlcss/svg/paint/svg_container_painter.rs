@@ -84,7 +84,7 @@ fn paint_switch_child(canvas: &Canvas, ctx: &PaintCtx<'_>, parent_id: NodeId) {
     }
 }
 
-fn required_extensions_match(node: &DemoNode) -> bool {
+pub(crate) fn required_extensions_match(node: &DemoNode) -> bool {
     match get_attr(node, "requiredExtensions").map(str::trim) {
         // Missing or empty list — selection passes per §5.8.2.
         None | Some("") => true,
@@ -93,7 +93,7 @@ fn required_extensions_match(node: &DemoNode) -> bool {
     }
 }
 
-fn system_language_match(node: &DemoNode) -> bool {
+pub(crate) fn system_language_match(node: &DemoNode) -> bool {
     match get_attr(node, "systemLanguage").map(str::trim) {
         None => true,
         Some(s) => s

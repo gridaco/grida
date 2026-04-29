@@ -562,7 +562,32 @@ fn walk_glyphs(
             DemoNodeData::Element(data) => {
                 let kind = ElementKind::from_local_name(data.name.local.as_ref());
                 match kind {
-                    ElementKind::TSpan => {
+                    ElementKind::TSpan | ElementKind::Anchor => {
+                        // SVG 2 §5.10.1 / §11: conditional-processing
+                        // attributes (`requiredExtensions`,
+                        // `systemLanguage`) and `display:none` apply to
+                        // `<tspan>` just like any other rendered
+                        // element. The container painter's `paint_node`
+                        // gate doesn't fire for tspans (they're walked
+                        // by the text painter, not dispatched), so
+                        // re-apply the same checks here — otherwise a
+                        // `<tspan systemLanguage="ru-RU">` paints over
+                        // the previous run instead of being skipped.
+                        //
+                        // SVG 2 §A: `<a>` is a transparent grouping
+                        // element — inside `<text>` it's equivalent to
+                        // a `<tspan>` for layout/paint purposes (it
+                        // adds hyperlink semantics on top, which the
+                        // reftest renderer ignores). Walk its
+                        // children with the same gate so `<a>Text</a>`
+                        // emits glyphs instead of being silently
+                        // dropped.
+                        let skip = !super::svg_container_painter::required_extensions_match(child)
+                            || !super::svg_container_painter::system_language_match(child)
+                            || super::visibility::has_display_none(child);
+                        if skip {
+                            continue;
+                        }
                         let parent_shift = stack.last().map(|e| e.baseline_shift_dy).unwrap_or(0.0);
                         stack.push(ElemAttrs::from_node(child, font_size, parent_shift));
                         walk_glyphs(
