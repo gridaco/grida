@@ -530,11 +530,11 @@ fn paint_one(
     canvas.concat(&transform);
 
     // overflow: default `hidden` (UA stylesheet). `overflow: visible`
-    // suppresses the clip to the marker viewport.
-    let overflow_visible = get_attr(marker_node, "overflow")
-        .map(str::trim)
-        .map(|v| v.eq_ignore_ascii_case("visible") || v.eq_ignore_ascii_case("auto"))
-        .unwrap_or(false);
+    // / `auto` suppresses the clip to the marker viewport. The
+    // explicit value `inherit` walks ancestors — the SVG root in
+    // particular often carries `overflow="visible"` and the spec
+    // (CSS Display Module 3 §3.4) says inheritance must be honored.
+    let overflow_visible = is_overflow_visible(ctx, marker_node);
     if !overflow_visible {
         canvas.clip_rect(viewport, skia_safe::ClipOp::Intersect, true);
     }
@@ -552,6 +552,45 @@ fn paint_one(
 
     canvas.restore_to_count(restore);
     let _ = marker_id;
+}
+
+/// Resolve the effective `overflow` on `node` to a boolean visibility.
+/// Default is `hidden` (the UA default for `<marker>`). `visible` /
+/// `auto` make it visible. `inherit` walks the ancestor chain. Reads
+/// from the bare attribute or `style="…"` declaration.
+fn is_overflow_visible(ctx: &PaintCtx<'_>, node: &DemoNode) -> bool {
+    fn read(node: &DemoNode) -> Option<String> {
+        if let Some(v) = get_attr(node, "overflow") {
+            return Some(v.trim().to_string());
+        }
+        let style = get_attr(node, "style")?;
+        for decl in style.split(';') {
+            if let Some((k, v)) = decl.split_once(':') {
+                if k.trim().eq_ignore_ascii_case("overflow") {
+                    return Some(v.trim().to_string());
+                }
+            }
+        }
+        None
+    }
+    let mut cursor: &DemoNode = node;
+    loop {
+        match read(cursor)
+            .as_deref()
+            .map(str::trim)
+            .map(str::to_ascii_lowercase)
+        {
+            Some(v) if v == "visible" || v == "auto" => return true,
+            Some(v) if v == "hidden" || v == "scroll" || v == "clip" => return false,
+            Some(v) if v == "inherit" => {
+                let Some(id) = cursor.parent else {
+                    return false;
+                };
+                cursor = ctx.dom.node(id);
+            }
+            _ => return false,
+        }
+    }
 }
 
 fn parse_orient_angle(s: &str) -> Option<f32> {
