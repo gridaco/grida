@@ -27,8 +27,16 @@ pub(crate) fn paint_nested_svg(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId, 
     let w = get_attr(node, "width").and_then(|s| length_or_percent(s, parent_w));
     let h = get_attr(node, "height").and_then(|s| length_or_percent(s, parent_h));
 
-    let viewport_w = w.unwrap_or(0.0);
-    let viewport_h = h.unwrap_or(0.0);
+    // SVG 2 §5.1.2: a nested `<svg>` with `viewBox` but no `width`/
+    // `height` defaults each missing dimension to `100%` of the
+    // containing block (the parent viewport). Without this default a
+    // `<svg viewBox="0 0 200 100">` placed inside another `<svg>` had
+    // viewport_w/h = 0, fell through to `paint_children` raw, and the
+    // `viewBox` transform was silently dropped — so children rendered
+    // in the parent's coordinate space at full scale.
+    let has_view_box = get_attr(node, "viewBox").is_some();
+    let viewport_w = w.unwrap_or(if has_view_box { parent_w } else { 0.0 });
+    let viewport_h = h.unwrap_or(if has_view_box { parent_h } else { 0.0 });
     if viewport_w <= 0.0 || viewport_h <= 0.0 {
         paint_children(canvas, ctx, id);
         return;
