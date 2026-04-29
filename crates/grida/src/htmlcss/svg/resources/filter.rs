@@ -855,14 +855,15 @@ fn build_primitive(
                         );
                         let src = Rect::from_iwh(image.width(), image.height());
                         // CSS `image-rendering: auto` (the SVG default
-                        // for `feImage`) uses smooth resampling. Skia
-                        // `SamplingOptions::default()` is nearest-
-                        // neighbor — produces blocky upscaled images
-                        // that don't match Chrome / resvg.
-                        let sampling = skia_safe::SamplingOptions::new(
-                            skia_safe::FilterMode::Linear,
-                            skia_safe::MipmapMode::None,
-                        );
+                        // for `feImage`) uses smooth resampling. Bicubic
+                        // (Mitchell — B=1/3, C=1/3) matches Chrome/
+                        // Blink's default feImage upscaling more
+                        // closely than plain bilinear; bilinear was
+                        // dropping high-frequency edge detail and
+                        // showed as a 1-2 pixel ring of differences
+                        // on the SVG-logo fixtures.
+                        let sampling =
+                            skia_safe::SamplingOptions::from(skia_safe::CubicResampler::mitchell());
                         image_filters::image(image, Some(&src), Some(&dst), sampling)
                     }
                     None => transparent_flood(crop),
