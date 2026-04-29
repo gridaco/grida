@@ -481,8 +481,20 @@ fn build_primitive(
             // logic insert the correct sRGB→linear wrap at the boundary
             // into a linearRGB consumer (and the chain tail's linear→sRGB
             // wrap is then a no-op for solo-flood chains).
-            let shader = skia_safe::shaders::color(*color);
-            let filter = image_filters::shader(shader, crop);
+            //
+            // Filter Effects 1 §15.5: a primitive whose subregion has
+            // collapsed to empty (e.g. `feFlood x=0 y=0 w=10 h=10`
+            // entirely outside the filter region) produces no graphical
+            // output. Skia's `image_filters::shader` with an empty
+            // crop rect treats the crop as absent and floods the
+            // shader across the whole filter region instead, so we
+            // explicitly substitute a transparent flood here.
+            let filter = if crop.is_empty() {
+                transparent_flood(crop)
+            } else {
+                let shader = skia_safe::shaders::color(*color);
+                image_filters::shader(shader, crop)
+            };
             Some(ResolvedResult {
                 filter,
                 subregion: crop,
@@ -1248,10 +1260,16 @@ fn subregion_for(prim: &Primitive, filter_region: Rect, ctx: &BuildContext<'_>) 
         .map(|v| resolve_extent(v, bbox.height(), viewport.1))
         .unwrap_or(filter_region.height());
     // Intersect with filter region — every primitive is bounded by the
-    // filter region per Blink (`filter_effect.cc:50-55`).
+    // filter region per Blink (`filter_effect.cc:50-55`). Skia's
+    // `Rect::intersect` leaves the rect untouched when the inputs
+    // don't overlap (it just reports `false`); we want an empty rect
+    // in that case so downstream primitives can detect "no graphical
+    // output" via `is_empty()`.
     let raw = Rect::from_xywh(x, y, w, h);
     let mut out = raw;
-    out.intersect(filter_region);
+    if !out.intersect(filter_region) {
+        out = Rect::new_empty();
+    }
     out
 }
 
