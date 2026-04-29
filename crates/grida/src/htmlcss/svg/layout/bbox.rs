@@ -73,6 +73,14 @@ pub(crate) fn element_object_bbox(dom: &DemoDom, node: &DemoNode) -> Rect {
                 if !matches!(&child.data, DemoNodeData::Element(_)) {
                     continue;
                 }
+                // SVG 2 §11.4: a `display:none` element does not
+                // contribute to its parent's bbox. The
+                // `painting_display_bBox-impact.svg` fixture asserts
+                // this — a display:none rect inside a clip-path'd
+                // group must not enlarge the clip's reference bbox.
+                if super::super::paint::visibility::has_display_none(child) {
+                    continue;
+                }
                 let r = element_object_bbox(dom, child);
                 if r.is_empty() {
                     continue;
