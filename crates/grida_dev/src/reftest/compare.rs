@@ -7,7 +7,8 @@ use crate::reftest::args::BgColor;
 
 pub(crate) struct ComparisonResult {
     pub similarity_score: f64, // 0.0 (completely different) to 1.0 (identical)
-    pub diff_percentage: f64,  // percentage of pixels that differ
+    #[allow(dead_code)] // written by the comparator; consumers now use a separately-computed value
+    pub diff_percentage: f64, // percentage of pixels that differ
     pub error: Option<String>, // if comparison failed
 }
 
