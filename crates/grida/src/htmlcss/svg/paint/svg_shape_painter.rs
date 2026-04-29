@@ -633,7 +633,8 @@ fn paint_stroke(
         // produce a real dashed stroke instead of silently dropping
         // the percent tokens and rendering solid.
         let dash_extent = axis_extent(viewport_box_for(ctx, node), Axis::D);
-        if let Some(intervals) = parse_dash_intervals_with_extent(dash_attr, dash_extent) {
+        if let Some(intervals) = parse_dash_intervals_with_extent(ctx, node, dash_attr, dash_extent)
+        {
             // SVG 2 §11.5: `stroke-dashoffset` is a `<length-percentage>`
             // and percentages resolve against the viewport diagonal
             // normalized by sqrt(2) — same axis as `stroke-width`. Use
@@ -792,17 +793,44 @@ fn points_bbox(pts: &[(f32, f32)]) -> Rect {
     Rect::new(minx, miny, maxx, maxy)
 }
 
-fn parse_dash_intervals_with_extent(s: &str, dash_extent: f32) -> Option<Vec<f32>> {
+fn parse_dash_intervals_with_extent(
+    ctx: &PaintCtx<'_>,
+    node: &DemoNode,
+    s: &str,
+    dash_extent: f32,
+) -> Option<Vec<f32>> {
     let s = s.trim();
     if s.is_empty() || s.eq_ignore_ascii_case("none") {
         return None;
     }
     let resolve = |p: &str| -> Option<f32> {
-        if let Some(num) = p.strip_suffix('%') {
+        let trimmed = p.trim();
+        if let Some(num) = trimmed.strip_suffix('%') {
             let v: f32 = num.trim().parse().ok()?;
             return Some(v / 100.0 * dash_extent);
         }
-        parse_length_px(p)
+        let lower = trimmed.to_ascii_lowercase();
+        // `em` / `ex` / `ch` resolve against the inherited font-size,
+        // not the constant 16 that `parse_length_px` falls back to.
+        // Without this, `stroke-dasharray="2em 1em"` on a g with
+        // `font-size="20"` was rendered with 32px / 16px segments
+        // (16px constant) instead of 40 / 20.
+        if lower.ends_with("ch") && !lower.ends_with("inch") {
+            let num: f32 = lower.trim_end_matches("ch").trim().parse().ok()?;
+            let font_size = inherited_font_size(ctx, node);
+            let advance = ch_advance(ctx, node, font_size).unwrap_or(font_size * 0.5);
+            return Some(num * advance);
+        }
+        if lower.ends_with("rem") {
+            let num: f32 = lower.trim_end_matches("rem").trim().parse().ok()?;
+            return Some(num * root_font_size(ctx));
+        }
+        if let Some((suffix, factor)) = font_relative_unit(&lower) {
+            let font_size = inherited_font_size(ctx, node);
+            let num: f32 = lower.trim_end_matches(suffix).trim().parse().ok()?;
+            return Some(num * font_size * factor);
+        }
+        parse_length_px(trimmed)
     };
     let mut nums: Vec<f32> = s
         .split(|c: char| c.is_ascii_whitespace() || c == ',')
