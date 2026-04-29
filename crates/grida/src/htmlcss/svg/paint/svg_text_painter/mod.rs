@@ -2646,25 +2646,59 @@ fn parse_font_shorthand(value: &str) -> Option<FontShorthand> {
 }
 
 /// Read a font-* sub-property locally (attribute or inline `style`),
-/// falling back to extraction from a local `font` shorthand.
+/// falling back to extraction from a local `font` shorthand. Per
+/// CSS Fonts 4 §3.10 the `font` shorthand resets every sub-property
+/// it doesn't mention to its initial value, so a parsed shorthand
+/// shadows ancestor longhands even when the requested sub-property
+/// wasn't named — without this, `style="font: 50px sans"` lets a
+/// parent `font-weight: bold` leak through.
 fn read_local_font(node: &DemoNode, prop: &str) -> Option<String> {
     if let Some(v) = read_local(node, prop) {
         return Some(v);
     }
-    if !matches!(
+    // Per CSS Fonts 4 §3.10 the `font` shorthand also resets font-
+    // variant, font-kerning, font-size-adjust, font-feature-settings,
+    // font-language-override, font-optical-sizing, font-variation-
+    // settings, line-height — even though it doesn't accept tokens
+    // for them. Sub-properties that *can* appear in the shorthand
+    // grammar are returned from the parsed result; other shorthand-
+    // resettable properties resolve to their initial value so the
+    // cascade short-circuits at this node.
+    let parsed_in_shorthand = matches!(
         prop,
         "font-style" | "font-weight" | "font-stretch" | "font-size" | "font-family"
-    ) {
+    );
+    let reset_only = matches!(
+        prop,
+        "font-variant" | "font-kerning" | "font-size-adjust" | "line-height"
+    );
+    if !parsed_in_shorthand && !reset_only {
         return None;
     }
     let raw = read_local(node, "font")?;
     let parts = parse_font_shorthand(&raw)?;
+    if parsed_in_shorthand {
+        let from_shorthand = match prop {
+            "font-style" => parts.style.clone(),
+            "font-weight" => parts.weight.clone(),
+            "font-stretch" => parts.stretch.clone(),
+            "font-size" => parts.size.clone(),
+            "font-family" => parts.family.clone(),
+            _ => None,
+        };
+        if from_shorthand.is_some() {
+            return from_shorthand;
+        }
+    }
+    // Sub-property not present in the shorthand → return its initial
+    // value so the cascade stops here. `font-size` and `font-family`
+    // are required by the CSS Fonts grammar; if the shorthand parsed
+    // without them something is broken upstream — we shouldn't have
+    // gotten this far. Everything else (style/weight/stretch/variant/
+    // kerning/size-adjust/line-height) resets to "normal".
     match prop {
-        "font-style" => parts.style,
-        "font-weight" => parts.weight,
-        "font-stretch" => parts.stretch,
-        "font-size" => parts.size,
-        "font-family" => parts.family,
+        "font-style" | "font-weight" | "font-stretch" | "font-variant" | "font-kerning"
+        | "font-size-adjust" | "line-height" => Some("normal".to_string()),
         _ => None,
     }
 }
@@ -2701,10 +2735,24 @@ fn inherited_style_only(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Opti
             "inherit" | "initial" | "unset" | "revert"
         )
     }
+    // Per CSS Fonts 4 §3.10 a `font:` shorthand resets several
+    // longhands the grammar doesn't accept tokens for (font-kerning,
+    // font-variant, font-size-adjust, line-height) — so a parent's
+    // `font-kerning: none` should NOT leak through a node whose
+    // `style` contains `font: ...`. Treat the shorthand as a
+    // cascade barrier for those longhands.
+    let shorthand_reset = matches!(
+        name,
+        "font-kerning" | "font-variant" | "font-size-adjust" | "line-height"
+    );
+    let has_font_shorthand = |n: &DemoNode| read_local_style_only(n, "font").is_some();
     if let Some(v) = read_local_style_only(node, name) {
         if !is_skip(&v) {
             return Some(v);
         }
+    }
+    if shorthand_reset && has_font_shorthand(node) {
+        return Some("normal".to_string());
     }
     let mut current = node.parent;
     while let Some(id) = current {
@@ -2713,6 +2761,9 @@ fn inherited_style_only(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Opti
             if !is_skip(&v) {
                 return Some(v);
             }
+        }
+        if shorthand_reset && has_font_shorthand(n) {
+            return Some("normal".to_string());
         }
         current = n.parent;
     }
