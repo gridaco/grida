@@ -548,6 +548,15 @@ fn paint_one(
 /// Default is `hidden` (the UA default for `<marker>`). `visible` /
 /// `auto` make it visible. `inherit` walks the ancestor chain. Reads
 /// from the bare attribute or `style="…"` declaration.
+///
+/// Per CSS Overflow 3 §2 `overflow` is *not* an inheritable property,
+/// so `inherit` is an explicit request: take the parent's computed
+/// value. When the parent has no declared overflow, its computed
+/// value is its UA default — `visible` for the outermost `<svg>` /
+/// most CSS boxes, `hidden` for nested `<svg>` and `<marker>`. The
+/// resvg-test-suite spells this out in `inherit-on-marker-without-
+/// parent.svg`: a `<marker overflow="inherit">` sitting directly
+/// under the SVG root should fall back to `visible`, not `hidden`.
 fn is_overflow_visible(ctx: &PaintCtx<'_>, node: &DemoNode) -> bool {
     fn read(node: &DemoNode) -> Option<String> {
         if let Some(v) = get_attr(node, "overflow") {
@@ -564,6 +573,7 @@ fn is_overflow_visible(ctx: &PaintCtx<'_>, node: &DemoNode) -> bool {
         None
     }
     let mut cursor: &DemoNode = node;
+    let mut walking_inherit = false;
     loop {
         match read(cursor)
             .as_deref()
@@ -573,13 +583,66 @@ fn is_overflow_visible(ctx: &PaintCtx<'_>, node: &DemoNode) -> bool {
             Some(v) if v == "visible" || v == "auto" => return true,
             Some(v) if v == "hidden" || v == "scroll" || v == "clip" => return false,
             Some(v) if v == "inherit" => {
+                walking_inherit = true;
                 let Some(id) = cursor.parent else {
-                    return false;
+                    // Walked off the document root via `inherit`.
+                    // CSS initial value is `visible`.
+                    return true;
                 };
                 cursor = ctx.dom.node(id);
             }
-            _ => return false,
+            _ => {
+                if walking_inherit {
+                    // No explicit overflow on this ancestor — its
+                    // computed value is its UA default. The outermost
+                    // `<svg>` and most CSS boxes default to visible;
+                    // only nested `<svg>` and `<marker>` default to
+                    // hidden. We've already handled the marker case
+                    // (the walk started from a marker, but the marker
+                    // had `inherit`, so we never read its UA default —
+                    // we resolve against the parent chain).
+                    return overflow_ua_default_visible(ctx, cursor);
+                }
+                // No `overflow` declared on the marker itself — use
+                // marker's UA default of `hidden`.
+                return false;
+            }
         }
+    }
+}
+
+/// UA-stylesheet default for `overflow` at `node`, resolved against
+/// element kind. Per CSS Overflow 3 §3.1 / SVG 2 §3.6: the outermost
+/// `<svg>` and most CSS boxes default to `visible`; nested `<svg>` and
+/// `<marker>`/`<pattern>`/`<symbol>` default to `hidden`. The
+/// "outermost" check follows Blink (`SVGSVGElement::IsOutermostSVGSVG`):
+/// no SVG ancestor.
+fn overflow_ua_default_visible(ctx: &PaintCtx<'_>, node: &DemoNode) -> bool {
+    let DemoNodeData::Element(d) = &node.data else {
+        return true;
+    };
+    let kind = ElementKind::from_local_name(d.name.local.as_ref());
+    match kind {
+        ElementKind::Svg => {
+            // Walk ancestors looking for another `<svg>` — if found
+            // we're a nested viewport (UA default hidden), otherwise
+            // outermost (UA default visible).
+            let mut cur = node.parent;
+            while let Some(id) = cur {
+                let n = ctx.dom.node(id);
+                if let DemoNodeData::Element(pd) = &n.data {
+                    let pkind = ElementKind::from_local_name(pd.name.local.as_ref());
+                    if matches!(pkind, ElementKind::Svg) {
+                        return false;
+                    }
+                }
+                cur = n.parent;
+            }
+            true
+        }
+        ElementKind::Marker => false,
+        // CSS initial value for everything else.
+        _ => true,
     }
 }
 
