@@ -54,7 +54,16 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode) {
     let Some(href) = href_attr(node) else {
         return;
     };
-    let Some(image) = resolve_image(href, ctx) else {
+    // Pre-compute the box dims so inline-SVG rasterization can target
+    // them — without this an embedded SVG with viewBox="0 0 20 20"
+    // gets rasterized at 20x20 and stretches blurry into a 128-px
+    // image element. Knowing the destination size lets us pick a
+    // raster resolution that matches the painter's draw step.
+    let (target_px_w, target_px_h) = match (w_attr, h_attr) {
+        (Some(pw), Some(ph)) => (pw.max(1.0) as u32, ph.max(1.0) as u32),
+        _ => (512, 512),
+    };
+    let Some(image) = resolve_image_sized(href, ctx, Some((target_px_w, target_px_h))) else {
         return;
     };
     let img_w = image.width().max(1) as f32;
@@ -116,13 +125,25 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode) {
 /// them. Mirrors what Skia svg::Dom does internally for
 /// `<image href="data:image/svg+xml,...">` (`SkSVGImage.cpp:LoadImage`).
 pub fn resolve_image(href: &str, ctx: &PaintCtx<'_>) -> Option<Image> {
+    resolve_image_sized(href, ctx, None)
+}
+
+/// Like [`resolve_image`] but lets the caller hint a pixel size to
+/// rasterize an inline SVG against. Sharpens embedded SVGs whose
+/// viewBox is small (e.g. 20x20) but whose `<image>` host stretches
+/// them into a much larger pixel rect.
+pub fn resolve_image_sized(
+    href: &str,
+    ctx: &PaintCtx<'_>,
+    target_px: Option<(u32, u32)>,
+) -> Option<Image> {
     let trimmed = href.trim();
     if trimmed.starts_with("data:image/svg+xml")
         || trimmed.starts_with("DATA:image/svg+xml")
         || trimmed.starts_with("data:IMAGE/SVG+XML")
     {
         if let Some(bytes) = decode_data_uri(trimmed) {
-            return rasterize_inline_svg(&bytes, ctx);
+            return rasterize_inline_svg(&bytes, ctx, target_px);
         }
     }
     if let Some(bytes) = decode_data_uri(trimmed) {
@@ -132,18 +153,50 @@ pub fn resolve_image(href: &str, ctx: &PaintCtx<'_>) -> Option<Image> {
 }
 
 /// Render an embedded SVG document (from a `data:image/svg+xml,...`
-/// URI) to an Image. Sniffs the SVG's `width`/`height`/`viewBox` for a
-/// reasonable raster size; falls back to 512×512.
-fn rasterize_inline_svg(bytes: &[u8], ctx: &PaintCtx<'_>) -> Option<Image> {
+/// URI) to an Image. When the caller hints a target pixel size, raster
+/// at that size for sharp output; otherwise sniff the SVG's
+/// `width`/`height`/`viewBox` and fall back to 512×512. The
+/// `render_to_picture_with_images` viewport always uses the SVG's own
+/// natural dimensions so the picture's coordinate system matches the
+/// data — only the raster resolution scales up.
+fn rasterize_inline_svg(
+    bytes: &[u8],
+    ctx: &PaintCtx<'_>,
+    target_px: Option<(u32, u32)>,
+) -> Option<Image> {
     let xml = std::str::from_utf8(bytes).ok()?;
-    let (w, h) = sniff_svg_size(xml).unwrap_or((512, 512));
-    let pic =
-        crate::htmlcss::svg::render_to_picture_with_images(xml, w as f32, h as f32, ctx.images)
-            .ok()?;
-    let mut surface = skia_safe::surfaces::raster_n32_premul((w as i32, h as i32))?;
+    let (svg_w, svg_h) = sniff_svg_size(xml).unwrap_or((512, 512));
+    // Pick a raster resolution that's sharp at the painter's draw
+    // step but preserves the inline SVG's intrinsic aspect ratio —
+    // stretching it here would defeat the host `<image>`'s
+    // preserveAspectRatio handling, which sees the rasterized image
+    // as the intrinsic source. When the caller hints a target pixel
+    // size, scale by `max(tw/sw, th/sh)` so neither axis raster is
+    // smaller than the corresponding draw axis.
+    let (rw, rh) = match target_px {
+        Some((tw, th)) => {
+            let sx = tw as f32 / svg_w as f32;
+            let sy = th as f32 / svg_h as f32;
+            let s = sx.max(sy).max(1.0);
+            (
+                ((svg_w as f32 * s).round() as u32).max(1),
+                ((svg_h as f32 * s).round() as u32).max(1),
+            )
+        }
+        None => (svg_w, svg_h),
+    };
+    let pic = crate::htmlcss::svg::render_to_picture_with_images(
+        xml,
+        svg_w as f32,
+        svg_h as f32,
+        ctx.images,
+    )
+    .ok()?;
+    let mut surface = skia_safe::surfaces::raster_n32_premul((rw as i32, rh as i32))?;
     {
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::TRANSPARENT);
+        canvas.scale((rw as f32 / svg_w as f32, rh as f32 / svg_h as f32));
         canvas.draw_picture(&pic, None, None);
     }
     Some(surface.image_snapshot())
