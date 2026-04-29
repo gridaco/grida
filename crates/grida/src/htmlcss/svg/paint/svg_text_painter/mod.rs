@@ -1313,6 +1313,23 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
         let run = &glyphs[i..j];
         let node = ctx.dom.node(source);
 
+        // Per-tspan group `opacity`: applied to the composited run as
+        // a save_layer (not multiplied into per-glyph fill alpha,
+        // which would over-darken at kerning overlaps). SVG 2 §6.13:
+        // `opacity` is a presentation attribute on `<tspan>` /
+        // `<a>` / `<text>` that wraps the rendered output. We walk
+        // ancestors source→`<text>` so a `<tspan opacity="0.5">`
+        // inside a `<g opacity="0.5">` ends up at 0.25.
+        let group_alpha = ancestor_group_opacity(ctx, node);
+        let group_layer_opened = if group_alpha < 1.0 {
+            let mut p = SkPaint::default();
+            p.set_alpha_f(group_alpha.max(0.0));
+            canvas.save_layer(&skia_safe::canvas::SaveLayerRec::default().paint(&p));
+            true
+        } else {
+            false
+        };
+
         // Fill — default is black (SVG 2 §11.3) when no inherited
         // value resolves.
         let fill_color = match read_inherited(ctx, node, "fill").as_deref().map(str::trim) {
@@ -1364,8 +1381,37 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
             }
         }
 
+        if group_layer_opened {
+            canvas.restore();
+        }
         i = j;
     }
+}
+
+/// Walk from `node` up to (but not including) the root `<svg>`,
+/// multiplying each ancestor's `opacity`. Matches the way SVG layers
+/// compose — a tspan with `opacity=0.5` inside a `<g opacity=0.5>`
+/// composites at 0.25. The text root's own opacity is consumed by
+/// `paint_root_node` already, so we stop at the `<text>`'s parent
+/// (which is the typical traversal scope here).
+fn ancestor_group_opacity(ctx: &PaintCtx<'_>, node: &DemoNode) -> f32 {
+    let mut acc = super::effects::group_opacity(node);
+    let mut current = node.parent;
+    while let Some(id) = current {
+        let n = ctx.dom.node(id);
+        if let DemoNodeData::Element(d) = &n.data {
+            let kind = ElementKind::from_local_name(d.name.local.as_ref());
+            if kind == ElementKind::Text {
+                // Root <text> opacity is applied by the container
+                // painter when it dispatched into us; don't double-
+                // apply.
+                break;
+            }
+        }
+        acc *= super::effects::group_opacity(n);
+        current = n.parent;
+    }
+    acc
 }
 
 /// Bitset of which line decorations a `text-decoration` declaration
