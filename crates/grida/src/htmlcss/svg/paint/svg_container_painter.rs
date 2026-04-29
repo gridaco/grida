@@ -62,25 +62,34 @@ fn paint_switch_child(canvas: &Canvas, ctx: &PaintCtx<'_>, parent_id: NodeId) {
         if matches!(kind, ElementKind::Unknown) {
             continue;
         }
-        // `requiredFeatures` / `requiredExtensions` are deprecated and
-        // accepted-when-empty (Blink returns true unconditionally).
-        // `systemLanguage` defaults to true unless explicitly mismatched.
-        if !system_language_match(n) {
+        // SVG 1.1 §5.8.2 selection criteria:
+        //   - `requiredFeatures` (deprecated; Blink returns true unconditionally,
+        //     so an empty-or-missing list is true and a non-empty list is also
+        //     accepted as true today)
+        //   - `requiredExtensions`: a list of extension URIs; we don't claim any
+        //     UA extensions, so a present, non-empty list fails the test
+        //   - `systemLanguage`: defaults to true unless explicitly mismatched
+        // `display:none` / `visibility:hidden` are *not* selection criteria —
+        // the selected child is the first whose system tests pass, and normal
+        // display/visibility rules then apply to its paint (so a selected
+        // `display:none` child silently bypasses the entire `<switch>`).
+        if !required_extensions_match(n) {
             continue;
         }
-        // `display:none` / `visibility:hidden` skip the candidate (still
-        // counts as visited — the next sibling becomes eligible).
-        // Visibility check uses the *inherited* result so a
-        // `<switch visibility="hidden">` (or any ancestor `hidden`)
-        // doesn't pin the first child as winner just because it lacks
-        // its own `visibility` declaration. Without this, a hidden
-        // ancestor would let the first eligible child swallow the
-        // selection while painting nothing.
-        if has_display_none(n) || !is_visible_inherited(ctx.dom, id) {
+        if !system_language_match(n) {
             continue;
         }
         paint_node(canvas, ctx, id);
         return;
+    }
+}
+
+fn required_extensions_match(node: &DemoNode) -> bool {
+    match get_attr(node, "requiredExtensions").map(str::trim) {
+        // Missing or empty list — selection passes per §5.8.2.
+        None | Some("") => true,
+        // We don't claim any extension URIs, so any non-empty list fails.
+        Some(_) => false,
     }
 }
 
@@ -102,6 +111,16 @@ pub fn paint_node(canvas: &Canvas, ctx: &PaintCtx<'_>, id: NodeId) {
         return;
     };
     if kind.is_hidden_container() {
+        return;
+    }
+    // SVG 2 §5.10.1 conditional processing: `requiredExtensions` and
+    // `systemLanguage` act as render-time filters on any element, not
+    // just `<switch>` children. A failing test omits the element from
+    // the rendering tree entirely. (Resource-only containers such as
+    // `<defs>` / `<clipPath>` are already handled above by
+    // `is_hidden_container`; their conditional-processing semantics
+    // belong on the resource lookup path, not here.)
+    if !required_extensions_match(node) || !system_language_match(node) {
         return;
     }
     // SVG 2 §11.1: `display: none` skips the entire subtree. But
