@@ -1313,6 +1313,18 @@ fn paint_glyph_groups(canvas: &Canvas, ctx: &PaintCtx<'_>, glyphs: &[ResolvedGly
         let run = &glyphs[i..j];
         let node = ctx.dom.node(source);
 
+        // SVG 2 §11.4 / CSS Display 3: `visibility: hidden` on a
+        // `<tspan>` makes the glyphs invisible but they still
+        // contribute to text layout (advances are counted by
+        // `resolve_positions` upstream — we just skip the fill +
+        // stroke draws here). `visibility: collapse` is treated the
+        // same in inline-text contexts. The cascade walks ancestors
+        // because `visibility` inherits.
+        if !super::visibility::is_visible_inherited(ctx.dom, source) {
+            i = j;
+            continue;
+        }
+
         // Per-tspan group `opacity`: applied to the composited run as
         // a save_layer (not multiplied into per-glyph fill alpha,
         // which would over-darken at kerning overlaps). SVG 2 §6.13:
