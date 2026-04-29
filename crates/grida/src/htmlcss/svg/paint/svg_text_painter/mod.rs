@@ -143,9 +143,19 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
     // resolves against the *parent* element's computed font-size, %
     // against parent's font-size as well, and named keywords map to a
     // canonical absolute size.
-    let font_size = resolve_font_size_at(ctx, node).max(0.0);
+    let mut font_size = resolve_font_size_at(ctx, node).max(0.0);
     if font_size <= 0.0 {
-        return;
+        // SVG 2 §10 / CSS Fonts 4 §3.3: a zero `font-size` on the
+        // text root means the root's *direct* text would be invisible,
+        // but descendant `<tspan>` elements can override with their
+        // own non-zero `font-size` and remain visible. Walk the
+        // subtree and pick the first descendant with a resolved
+        // non-zero size as the effective painter size; if none exists
+        // there genuinely is nothing to draw.
+        font_size = first_nonzero_descendant_font_size(ctx, node).unwrap_or(0.0);
+        if font_size <= 0.0 {
+            return;
+        }
     }
 
     // 1. Flatten DOM text into per-character attribute records, walking
@@ -3144,6 +3154,27 @@ fn read_inherited(ctx: &PaintCtx<'_>, node: &DemoNode, name: &str) -> Option<Str
 /// then resolves outermost-to-innermost so each `em`/`ex`/`%`/`smaller`
 /// /`larger` is computed against the parent's resolved size. Initial
 /// value is CSS's `medium` = 16px (CSS Fonts 4 §3.3).
+/// Walk the subtree rooted at `node` (DFS) and return the first
+/// descendant whose resolved `font-size` is strictly positive. Used
+/// only as a fallback when the text root itself resolves to zero —
+/// without this a `<text font-size="0"><tspan font-size="40">…</tspan></text>`
+/// would short-circuit on the root and skip the visible tspan.
+fn first_nonzero_descendant_font_size(ctx: &PaintCtx<'_>, node: &DemoNode) -> Option<f32> {
+    for &cid in &node.children {
+        let child = ctx.dom.node(cid);
+        if matches!(child.data, DemoNodeData::Element(_)) {
+            let s = resolve_font_size_at(ctx, child).max(0.0);
+            if s > 0.0 {
+                return Some(s);
+            }
+            if let Some(s) = first_nonzero_descendant_font_size(ctx, child) {
+                return Some(s);
+            }
+        }
+    }
+    None
+}
+
 fn resolve_font_size_at(ctx: &PaintCtx<'_>, node: &DemoNode) -> f32 {
     let mut chain: Vec<String> = Vec::new();
     if let Some(v) = read_local_font(node, "font-size") {
