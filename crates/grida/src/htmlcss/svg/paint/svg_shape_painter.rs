@@ -465,7 +465,14 @@ fn paint_stroke(
 
     if let Some(dash_attr) = get_attr(node, "stroke-dasharray") {
         if let Some(intervals) = parse_dash_intervals(dash_attr) {
-            let phase = num_attr(node, "stroke-dashoffset").unwrap_or(0.0);
+            // SVG 2 §11.5: `stroke-dashoffset` is a `<length-percentage>`
+            // and percentages resolve against the viewport diagonal
+            // normalized by sqrt(2) — same axis as `stroke-width`. Use
+            // `len_attr` with `Axis::D` so a value like
+            // `stroke-dashoffset="20%"` on a 200×200 viewBox produces
+            // the 40-px offset Chrome and resvg agree on, instead of
+            // silently falling back to 0 from `num_attr`'s `%` reject.
+            let phase = len_attr(ctx, node, "stroke-dashoffset", Axis::D).unwrap_or(0.0);
             if let Some(effect) = PathEffect::dash(&intervals, phase) {
                 p.set_path_effect(effect);
             }
