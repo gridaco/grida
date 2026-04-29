@@ -82,7 +82,27 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode) {
     // visible as blocky pixels on JPEG/PNG fixtures. Force linear.
     let sampling = SamplingOptions::from(skia_safe::FilterMode::Linear);
     let paint = SkPaint::default();
+    // SVG 2 §8.13: the `slice` keyword in `preserveAspectRatio` scales
+    // the image to fully cover the viewport, with overflow clipped at
+    // the viewport edges. `compute_image_dst_rect` returns the full
+    // (scaled) image rect — without this clip, slice-mode `<image>`
+    // bleeds past the box. `meet` always fits inside, `none` fills
+    // exactly; only slice requires the clip.
+    let needs_clip = dst.left < viewport.left
+        || dst.top < viewport.top
+        || dst.right > viewport.right
+        || dst.bottom > viewport.bottom;
+    let restore = if needs_clip {
+        let r = canvas.save();
+        canvas.clip_rect(viewport, skia_safe::ClipOp::Intersect, true);
+        Some(r)
+    } else {
+        None
+    };
     canvas.draw_image_rect_with_sampling_options(&image, None, dst, sampling, &paint);
+    if let Some(r) = restore {
+        canvas.restore_to_count(r);
+    }
 }
 
 /// Resolve `href` into an `Image`, handling both inline `data:` URIs
