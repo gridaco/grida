@@ -469,6 +469,15 @@ struct ElemAttrs {
     /// emitted at or below this stack frame picks up this kind as
     /// its `alignment_baseline_kind` override.
     alignment_baseline: Option<BaselineKind>,
+    /// Local `dominant-baseline` on this element only. Applies to
+    /// glyphs emitted at or below this frame (descendants inherit the
+    /// dominant baseline per CSS Inline Layout 3 §3.3). The root's
+    /// dominant-baseline is already folded into `baseline_y` at paint
+    /// entry, so this field is consulted only on non-root frames —
+    /// i.e. a `<tspan dominant-baseline="middle">` shifts only its
+    /// own subtree, not the root's "Some text" siblings. SVG 2
+    /// §11.10.2.6.
+    dominant_baseline: Option<BaselineKind>,
 }
 
 impl ElemAttrs {
@@ -493,6 +502,30 @@ impl ElemAttrs {
                 Some(resolve_baseline(Some(trimmed)))
             }
         });
+        let dominant_baseline = read_local(node, "dominant-baseline").and_then(|v| {
+            let trimmed = v.trim();
+            // `auto` / `baseline` / `inherit`: inherit parent's
+            // dominant baseline — no per-tspan override needed.
+            // `no-change` / `use-script` / `reset-size`: SVG 1.1
+            // shorthand for "keep current baseline" (deprecated in SVG 2
+            // but the suite still tests them). Treating them as
+            // resolve_baseline → Alphabetic would WIPE the parent's
+            // middle/hanging baseline, regressing
+            // `dominant-baseline_no-change` and friends. Map them to
+            // None so the inherited baseline_y stands.
+            if trimmed.is_empty()
+                || trimmed.eq_ignore_ascii_case("auto")
+                || trimmed.eq_ignore_ascii_case("baseline")
+                || trimmed.eq_ignore_ascii_case("inherit")
+                || trimmed.eq_ignore_ascii_case("no-change")
+                || trimmed.eq_ignore_ascii_case("use-script")
+                || trimmed.eq_ignore_ascii_case("reset-size")
+            {
+                None
+            } else {
+                Some(resolve_baseline(Some(trimmed)))
+            }
+        });
         Self {
             // Coord lists may use `em`/`ex` units; resolve them against
             // the current font-size rather than CSS initial 16px. Per
@@ -508,6 +541,7 @@ impl ElemAttrs {
             is_text_path: false,
             baseline_shift_dy: parent_shift_dy + local_shift,
             alignment_baseline,
+            dominant_baseline,
         }
     }
 }
@@ -925,11 +959,18 @@ fn emit_glyph(
     path_stack: &[usize],
     out: &mut Vec<GlyphAttr>,
 ) {
-    // Innermost stack frame with a local `alignment-baseline` wins.
-    // Walk inner→outer until the first non-`None` is found; the root
-    // <text> doesn't set this (its `dominant-baseline`/`alignment-
-    // baseline` is already folded into `baseline_y` for all glyphs).
-    let alignment_baseline_kind = stack.iter().rev().find_map(|e| e.alignment_baseline);
+    // Innermost stack frame with a local `alignment-baseline` OR
+    // `dominant-baseline` wins. Walk inner→outer, skipping the root
+    // (its baseline is already folded into `baseline_y` for all
+    // glyphs); per CSS Inline Layout 3 §3.3 a tspan's
+    // `alignment-baseline` overrides its own `dominant-baseline`,
+    // and either kind on a tspan shifts only that tspan's subtree.
+    let frames_above_root = stack.len().saturating_sub(1);
+    let alignment_baseline_kind = stack[..stack.len()]
+        .iter()
+        .rev()
+        .take(frames_above_root)
+        .find_map(|e| e.alignment_baseline.or(e.dominant_baseline));
     let mut attr = GlyphAttr {
         ch,
         x: None,
