@@ -239,39 +239,87 @@ fn font_relative_unit(s: &str) -> Option<(&'static str, f32)> {
 /// resolve it to a px value. Returns 16 (CSS default) when no
 /// ancestor declares one.
 fn inherited_font_size(ctx: &PaintCtx<'_>, node: &DemoNode) -> f32 {
-    fn read(node: &DemoNode) -> Option<&str> {
+    fn read(node: &DemoNode) -> Option<String> {
         if let Some(v) = get_attr(node, "font-size") {
-            return Some(v);
+            return Some(v.to_string());
         }
         if let Some(style) = get_attr(node, "style") {
             for decl in style.split(';') {
                 if let Some((k, v)) = decl.split_once(':') {
                     if k.trim().eq_ignore_ascii_case("font-size") {
-                        // SAFETY: we re-borrow the static substring;
-                        // caller copies as needed via parse.
-                        return Some(v.trim());
+                        return Some(v.trim().to_string());
                     }
                 }
             }
         }
         None
     }
+    // Collect the chain of declared `font-size` values from the
+    // element up to the root, then resolve outermost-to-innermost so
+    // each `em` / `%` / `larger` / `smaller` step can see the parent's
+    // already-resolved size. CSS Fonts 4 §3.3 keywords (`xx-small` …
+    // `xx-large`) are absolute; percentages and the `larger`/`smaller`
+    // relative keywords need the parent context. Without this chain
+    // walk a `<rect font-size="xx-large" width="10em">` resolved its
+    // `em` against the parent's 12px (via `parse_length_px("xx-large")
+    // == None`) and rendered all named-value rects at the same width.
+    let mut chain: Vec<String> = Vec::new();
     if let Some(v) = read(node) {
-        if let Some(px) = parse_length_px(v) {
-            return px;
-        }
+        chain.push(v);
     }
     let mut current = node.parent;
     while let Some(id) = current {
         let n = ctx.dom.node(id);
         if let Some(v) = read(n) {
-            if let Some(px) = parse_length_px(v) {
-                return px;
-            }
+            chain.push(v);
         }
         current = n.parent;
     }
-    16.0
+    chain.reverse(); // root → leaf
+    let mut size = 16.0_f32;
+    for v in &chain {
+        size = resolve_font_size_step(v, size).max(0.0);
+    }
+    size
+}
+
+/// Apply a single CSS `font-size` declaration against the parent's
+/// resolved size. Mirror of `svg_text_painter::resolve_font_size_step`
+/// scoped to shape-attribute em resolution. Supports lengths,
+/// keywords (`xx-small`…`xx-large` per CSS Fonts 4 §3.3 table at
+/// medium=16), percentages, and the relative `smaller`/`larger`
+/// scaling. Unknown / unparseable values inherit the parent.
+fn resolve_font_size_step(value: &str, parent: f32) -> f32 {
+    let v = value.trim();
+    match v {
+        "" | "medium" | "initial" | "inherit" | "unset" => return parent.max(16.0),
+        "xx-small" => return 9.0,
+        "x-small" => return 10.0,
+        "small" => return 13.0,
+        "large" => return 18.0,
+        "x-large" => return 24.0,
+        "xx-large" => return 32.0,
+        "smaller" => return parent / 1.2,
+        "larger" => return parent * 1.2,
+        _ => {}
+    }
+    if let Some(pct) = v.strip_suffix('%') {
+        return pct
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(|n| (n / 100.0) * parent)
+            .unwrap_or(parent);
+    }
+    if let Some(num) = v.strip_suffix("em").or_else(|| v.strip_suffix("EM")) {
+        return num
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(|n| n * parent)
+            .unwrap_or(parent);
+    }
+    parse_length_px(v).unwrap_or(parent)
 }
 
 // ─── per-shape entry points ────────────────────────────────────────────
