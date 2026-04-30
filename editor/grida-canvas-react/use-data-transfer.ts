@@ -13,6 +13,7 @@ import { iofigma } from "@grida/io-figma";
 import { nanoid } from "nanoid";
 import { datatransfer } from "@/grida-canvas/data-transfer";
 import type { editor } from "@/grida-canvas";
+import { getCenteredCanvasInsertionPoint } from "./data-transfer-position";
 
 /**
  * Hook that provides file insertion utilities for the Grida canvas editor.
@@ -54,12 +55,17 @@ export function useInsertFile() {
         clientY: number;
       }
     ) => {
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        position ? [position.clientX, position.clientY] : [0, 0]
-      );
-
       const bytes = await file.arrayBuffer();
       const image = await instance.createImage(new Uint8Array(bytes));
+      const [x, y] = getCenteredCanvasInsertionPoint({
+        clientPosition: position
+          ? [position.clientX, position.clientY]
+          : [0, 0],
+        size: image,
+        clientPointToCanvasPoint: instance.camera.clientPointToCanvasPoint.bind(
+          instance.camera
+        ),
+      });
 
       // Create rectangle node with image paint instead of image node
       const node = instance.commands.createRectangleNode();
@@ -96,24 +102,24 @@ export function useInsertFile() {
     ) => {
       const node = await instance.commands.createNodeFromSvg(svg);
 
-      const center_dx =
-        typeof node.$.layout_target_width === "number" &&
-        node.$.layout_target_width > 0
-          ? node.$.layout_target_width / 2
-          : 0;
-
-      const center_dy =
-        typeof node.$.layout_target_height === "number" &&
-        node.$.layout_target_height > 0
-          ? node.$.layout_target_height / 2
-          : 0;
-
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        cmath.vector2.sub(
-          position ? [position.clientX, position.clientY] : [0, 0],
-          [center_dx, center_dy]
-        )
-      );
+      const [x, y] = getCenteredCanvasInsertionPoint({
+        clientPosition: position
+          ? [position.clientX, position.clientY]
+          : [0, 0],
+        size: {
+          width:
+            typeof node.$.layout_target_width === "number"
+              ? node.$.layout_target_width
+              : 0,
+          height:
+            typeof node.$.layout_target_height === "number"
+              ? node.$.layout_target_height
+              : 0,
+        },
+        clientPointToCanvasPoint: instance.camera.clientPointToCanvasPoint.bind(
+          instance.camera
+        ),
+      });
 
       node.$.name = name;
       node.$.layout_inset_left = x;
@@ -595,17 +601,23 @@ export function useDataTransferEventTarget() {
             const { name, src, width, height } = data;
             const task = (async () => {
               const imageRef = await instance.createImageAsync(src);
-              const [x, y] = instance.camera.clientPointToCanvasPoint([
-                event.clientX,
-                event.clientY,
-              ]);
+              const imageWidth = width ?? imageRef.width;
+              const imageHeight = height ?? imageRef.height;
+              const [x, y] = getCenteredCanvasInsertionPoint({
+                clientPosition: [event.clientX, event.clientY],
+                size: { width: imageWidth, height: imageHeight },
+                clientPointToCanvasPoint:
+                  instance.camera.clientPointToCanvasPoint.bind(
+                    instance.camera
+                  ),
+              });
               const node = instance.commands.createRectangleNode();
               node.$.layout_positioning = "absolute";
               node.$.name = name || "Photo";
               node.$.layout_inset_left = x;
               node.$.layout_inset_top = y;
-              node.$.layout_target_width = width || imageRef.width;
-              node.$.layout_target_height = height || imageRef.height;
+              node.$.layout_target_width = imageWidth;
+              node.$.layout_target_height = imageHeight;
               node.$.fill_paints = [
                 {
                   type: "image",
@@ -664,7 +676,7 @@ export function useDataTransferEventTarget() {
         }
       }
     },
-    [insertFromFile, insertSVG]
+    [insertFromFile, insertSVG, instance]
   );
   //
 
