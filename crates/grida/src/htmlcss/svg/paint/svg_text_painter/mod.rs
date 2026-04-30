@@ -296,6 +296,19 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
     // Tspan-level textLength isn't applied here yet — needs per-tspan
     // advance subgroups.
     let mut kerned_advances = kerned_advances;
+    // Per-tspan font-size scaling. Shaping was done at the painter's
+    // root font size; if a tspan overrode the size (e.g. inner tspan
+    // sets `font-size=80` inside a `font-size=48` text), scale that
+    // glyph's advance proportionally so the next glyph's pen starts at
+    // the right edge of the larger / smaller character. The glyph
+    // itself gets drawn with a font set to root × scale in
+    // `draw_glyphs`. Applied BEFORE textLength so a textLength=N over
+    // the run still produces the targeted total width.
+    for (i, g) in glyph_attrs.iter().enumerate() {
+        if (g.font_size_scale - 1.0).abs() > 0.0001 {
+            kerned_advances[i] *= g.font_size_scale;
+        }
+    }
     // Per-tspan textLength: scale advances within each tspan's glyph
     // range. Inner (smaller) ranges scale first so an outer textLength
     // sees the already-adjusted advances. Tspans with their own
@@ -438,6 +451,14 @@ pub(super) struct GlyphAttr {
     /// inside a `<text dominant-baseline="...">` use a different
     /// baseline. SVG 2 §11.10.2 / CSS Inline Layout 3 §3.3.
     alignment_baseline_kind: Option<BaselineKind>,
+    /// Effective font-size for THIS glyph divided by the painter's
+    /// root font size. `1.0` means "draw with the root font as-is";
+    /// any other value swaps to a font sized at `root_size * scale`
+    /// for both `compute_kerned_advances` and `draw_glyphs`. Lets a
+    /// `<text font-size=48><tspan font-size=80>ex</tspan></text>` mix
+    /// 48px and 80px glyphs on a shared baseline. SVG 2 §11.4 / CSS
+    /// Fonts 4 §3.3 (font-size inherits, per-tspan override allowed).
+    font_size_scale: f32,
 }
 
 /// Resolved geometry for one `<textPath>` element. Built once at
@@ -492,15 +513,32 @@ struct ElemAttrs {
     /// own subtree, not the root's "Some text" siblings. SVG 2
     /// §11.10.2.6.
     dominant_baseline: Option<BaselineKind>,
+    /// Effective font-size for THIS frame (already CSS-cascade-
+    /// resolved against the root). Inherited from the parent unless a
+    /// local `font-size=` overrides. Stored on the frame so
+    /// `emit_glyph` can read it innermost-first to set
+    /// `GlyphAttr::font_size_scale = frame_size / root_size`. Lets a
+    /// nested `<tspan font-size=80>` mix a different glyph size into
+    /// the run.
+    font_size: f32,
 }
 
 impl ElemAttrs {
     fn from_node(
         node: &DemoNode,
-        font_size: f32,
+        parent_font_size: f32,
         parent_shift_dy: f32,
         viewport: (f32, f32),
     ) -> Self {
+        // Resolve this frame's font-size: local `font-size=` cascades
+        // against the parent's already-resolved size (CSS Fonts 4 §3.3:
+        // em/%/keywords resolve relative to the parent), otherwise
+        // inherit the parent's value as-is. The local resolution
+        // mirrors the shape-painter's `resolve_font_size_step`.
+        let font_size = read_local(node, "font-size")
+            .map(|v| resolve_font_size_step(&v, parent_font_size))
+            .unwrap_or(parent_font_size)
+            .max(0.0);
         let local_shift = read_local(node, "baseline-shift")
             .map(|v| parse_baseline_shift(&v, font_size))
             .unwrap_or(0.0);
@@ -556,6 +594,7 @@ impl ElemAttrs {
             baseline_shift_dy: parent_shift_dy + local_shift,
             alignment_baseline,
             dominant_baseline,
+            font_size,
         }
     }
 }
@@ -985,6 +1024,17 @@ fn emit_glyph(
         .rev()
         .take(frames_above_root)
         .find_map(|e| e.alignment_baseline.or(e.dominant_baseline));
+    // Per-glyph font-size scale: innermost frame's resolved
+    // `font_size` divided by the root frame's. `1.0` means "draw
+    // with the painter's root font as-is"; any other value swaps to
+    // a scaled font in `compute_kerned_advances` and `draw_glyphs`.
+    let root_font_size = stack.first().map(|e| e.font_size).unwrap_or(16.0);
+    let glyph_font_size = stack.last().map(|e| e.font_size).unwrap_or(root_font_size);
+    let font_size_scale = if root_font_size > 0.0 {
+        glyph_font_size / root_font_size
+    } else {
+        1.0
+    };
     let mut attr = GlyphAttr {
         ch,
         x: None,
@@ -999,6 +1049,7 @@ fn emit_glyph(
         // value to apply to this glyph.
         baseline_shift_dy: stack.last().map(|e| e.baseline_shift_dy).unwrap_or(0.0),
         alignment_baseline_kind,
+        font_size_scale,
     };
     for elem in stack.iter().rev() {
         let i = elem.consumed;
@@ -1164,6 +1215,11 @@ struct ResolvedGlyph {
     /// [`GlyphAttr::source`]). Drives per-`<tspan>` paint and
     /// `text-decoration` anchor enumeration at draw time.
     source: NodeId,
+    /// Per-glyph font-size scale (carried from `GlyphAttr`). `1.0`
+    /// uses the painter's root font; any other value swaps to a
+    /// scaled font for `draw_glyphs`. The advance has already been
+    /// scaled in `compute_kerned_advances`.
+    font_size_scale: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1297,6 +1353,7 @@ fn resolve_positions(
             hidden: false,
             on_path: None,
             source: g.source,
+            font_size_scale: g.font_size_scale,
         });
         // letter-spacing adds tracking after each typographic character
         // (CSS Text 3 §10.1). We add it to the pen but not to the
@@ -2576,6 +2633,25 @@ fn ch_needs_run_shaping(ch: char) -> bool {
 }
 
 fn draw_glyphs(canvas: &Canvas, glyphs: &[ResolvedGlyph], font: &Font, paint: &SkPaint) {
+    // Lazily-built scaled fonts keyed by exact scale value. Most
+    // mixed-size runs use one or two distinct scales (e.g.
+    // 48 / 80 from a single nested tspan), so a tiny linear search
+    // is cheap.
+    let mut scaled_fonts: Vec<(f32, Font)> = Vec::new();
+    let mut font_for = |scale: f32, base: &Font| -> Font {
+        if (scale - 1.0).abs() <= 0.0001 {
+            return base.clone();
+        }
+        for (s, f) in &scaled_fonts {
+            if (s - scale).abs() <= 0.0001 {
+                return f.clone();
+            }
+        }
+        let mut f = base.clone();
+        f.set_size(base.size() * scale);
+        scaled_fonts.push((scale, f.clone()));
+        f
+    };
     let mut i = 0;
     while i < glyphs.len() {
         let g = &glyphs[i];
@@ -2583,21 +2659,35 @@ fn draw_glyphs(canvas: &Canvas, glyphs: &[ResolvedGlyph], font: &Font, paint: &S
             i += 1;
             continue;
         }
+        let g_owned;
+        let g_font: &Font = if (g.font_size_scale - 1.0).abs() <= 0.0001 {
+            font
+        } else {
+            g_owned = font_for(g.font_size_scale, font);
+            &g_owned
+        };
         // Bidi / cursive shaping: when a contiguous run of glyphs
         // sits on a simple baseline (no rotate, no textPath, no
-        // hidden chars in the middle, no per-char positioning gaps)
-        // and contains any character that needs run-level shaping
-        // (Arabic, Hebrew, Devanagari, etc.), draw the whole run as
-        // a single string so Skia's HarfBuzz integration sees the
-        // full context. Drawing one codepoint at a time yields
-        // isolated forms and breaks Arabic joining + bidi.
+        // hidden chars in the middle, no per-char positioning gaps,
+        // and a uniform font-size scale) and contains any character
+        // that needs run-level shaping (Arabic, Hebrew, Devanagari,
+        // etc.), draw the whole run as a single string so Skia's
+        // HarfBuzz integration sees the full context. Drawing one
+        // codepoint at a time yields isolated forms and breaks Arabic
+        // joining + bidi. Break the run on any font-size change.
         let mut j = i + 1;
-        let simple = g.on_path.is_none() && g.rotate_deg.abs() < 0.001;
+        let simple = g.on_path.is_none()
+            && g.rotate_deg.abs() < 0.001
+            && (g.font_size_scale - 1.0).abs() <= 0.0001;
         let mut needs_run = ch_needs_run_shaping(g.ch);
         if simple {
             while j < glyphs.len() {
                 let n = &glyphs[j];
-                if n.hidden || n.on_path.is_some() || n.rotate_deg.abs() >= 0.001 {
+                if n.hidden
+                    || n.on_path.is_some()
+                    || n.rotate_deg.abs() >= 0.001
+                    || (n.font_size_scale - 1.0).abs() > 0.0001
+                {
                     break;
                 }
                 if ch_needs_run_shaping(n.ch) {
@@ -2614,7 +2704,7 @@ fn draw_glyphs(canvas: &Canvas, glyphs: &[ResolvedGlyph], font: &Font, paint: &S
             // Anchor at the run's first glyph position. Skia's
             // HarfBuzz shaper produces correct per-glyph offsets
             // (joining + bidi reorder) within that run.
-            canvas.draw_str(&s, Point::new(g.x, g.y), font, paint);
+            canvas.draw_str(&s, Point::new(g.x, g.y), g_font, paint);
             i = j;
             continue;
         }
@@ -2631,15 +2721,15 @@ fn draw_glyphs(canvas: &Canvas, glyphs: &[ResolvedGlyph], font: &Font, paint: &S
             canvas.translate((p.point.x, p.point.y));
             canvas.rotate(p.tangent_deg + g.rotate_deg, None);
             canvas.translate((-g.advance / 2.0, p.baseline_shift));
-            canvas.draw_str(s, Point::new(0.0, 0.0), font, paint);
+            canvas.draw_str(s, Point::new(0.0, 0.0), g_font, paint);
             canvas.restore_to_count(restore);
         } else if g.rotate_deg.abs() < 0.001 {
-            canvas.draw_str(s, Point::new(g.x, g.y), font, paint);
+            canvas.draw_str(s, Point::new(g.x, g.y), g_font, paint);
         } else {
             let restore = canvas.save();
             canvas.translate((g.x, g.y));
             canvas.rotate(g.rotate_deg, None);
-            canvas.draw_str(s, Point::new(0.0, 0.0), font, paint);
+            canvas.draw_str(s, Point::new(0.0, 0.0), g_font, paint);
             canvas.restore_to_count(restore);
         }
         i += 1;
