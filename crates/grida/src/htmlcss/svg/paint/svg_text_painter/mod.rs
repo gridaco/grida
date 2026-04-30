@@ -174,6 +174,14 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
         return;
     };
     let mut font = Font::from_typeface(typeface, font_size);
+    // Subpixel positioning lets per-glyph advances accumulate at
+    // fractional precision instead of snapping each glyph to integer
+    // user units. SVG-suite expecteds were rendered with subpixel
+    // shaping; without it our pen advances quantize and accumulate a
+    // visible left/right drift across long text runs (especially
+    // visible under text-anchor=middle/end where the drift becomes
+    // an off-center anchor).
+    font.set_subpixel(true);
 
     // 2. Resolve dominant-baseline / alignment-baseline → constant
     //    y-offset added to every glyph's pen y, so the chosen baseline
