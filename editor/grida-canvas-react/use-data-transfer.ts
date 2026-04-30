@@ -100,36 +100,27 @@ function insertImageRectangle(args: {
   height: number;
   src: string;
 }) {
+  const nodeId = nanoid();
   const paint = createImagePaint(args.src);
   const prototype = {
     type: "rectangle",
+    _$id: nodeId,
     name: args.name,
     layout_positioning: "absolute",
-    layout_inset_left: 0,
-    layout_inset_top: 0,
+    layout_inset_left: args.x,
+    layout_inset_top: args.y,
     layout_target_width: args.width,
     layout_target_height: args.height,
     fill: paint,
     fill_paints: [paint],
   } satisfies grida.program.nodes.NodePrototype;
 
-  const [nodeId] = args.editor.insert(
-    { prototype },
-    args.editor.state.scene_id ?? null
-  );
-
-  if (!nodeId) return;
-
   args.editor.doc.dispatch({
-    type: "node/change/*",
-    node_id: nodeId,
-    layout_positioning: "absolute",
-    name: args.name,
-    layout_inset_left: args.x,
-    layout_inset_top: args.y,
-    layout_target_width: args.width,
-    layout_target_height: args.height,
-    fill_paints: [paint],
+    type: "insert",
+    id: nodeId,
+    prototype,
+    target: null,
+    placement: "none",
   });
   args.editor.doc.select([nodeId], "reset");
 }
