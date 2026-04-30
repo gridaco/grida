@@ -2125,23 +2125,25 @@ impl DecorationLines {
 }
 
 /// Parse a CSS / SVG `text-decoration` (or `text-decoration-line`)
-/// value. Per CSS Text Decoration 3 §2.2 the value is a space-separated
-/// list of `none | underline | overline | line-through | blink`. We
-/// ignore `blink` and any unknown tokens (e.g. `text-decoration-color`
-/// arguments accidentally passed to the line property).
+/// value. Per CSS Text Decoration 3 §2.2 the value is a
+/// **space-separated** list of `none | underline | overline |
+/// line-through | blink`. Commas are NOT a valid separator — a value
+/// like `"underline,overline"` is syntactically invalid and per CSS
+/// Values 4 cascading rules falls back to the initial value (`none`).
+/// We ignore `blink` and any unknown tokens (e.g.
+/// `text-decoration-color` arguments accidentally passed to the line
+/// property).
 ///
-/// Returns `None` for `none` (or only-`none`); otherwise returns the
-/// flagged set. Also returns `None` for an empty / whitespace-only
-/// value.
+/// Returns `None` for `none` (or only-`none`), for invalid values
+/// (commas present), and for empty / whitespace-only input.
 fn parse_decoration_lines(s: &str) -> Option<DecorationLines> {
+    if s.contains(',') {
+        return None;
+    }
     let mut lines = DecorationLines::default();
     let mut saw_any = false;
-    for token in s.split(|c: char| c.is_whitespace() || c == ',') {
-        let t = token.trim();
-        if t.is_empty() {
-            continue;
-        }
-        let lower = t.to_ascii_lowercase();
+    for token in s.split_ascii_whitespace() {
+        let lower = token.to_ascii_lowercase();
         match lower.as_str() {
             "none" => return None,
             "underline" => {
