@@ -16,6 +16,13 @@ import type { editor } from "@/grida-canvas";
 import { getCenteredCanvasInsertionPoint } from "./data-transfer-position";
 import type grida from "@grida/schema";
 
+type ClientPosition = {
+  clientX: number;
+  clientY: number;
+};
+
+type Vector2 = [number, number];
+
 function createImagePaint(src: string): cg.ImagePaint {
   return {
     type: "image",
@@ -104,20 +111,14 @@ export function useInsertFile() {
   const instance = useCurrentEditor();
 
   const insertImage = useCallback(
-    async (
-      name: string,
-      file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
+    async (name: string, file: File, position?: ClientPosition) => {
+      const clientPosition: Vector2 = position
+        ? [position.clientX, position.clientY]
+        : [0, 0];
       const bytes = await file.arrayBuffer();
       const image = await instance.createImage(new Uint8Array(bytes));
       const [x, y] = getCenteredCanvasInsertionPoint({
-        clientPosition: position
-          ? [position.clientX, position.clientY]
-          : [0, 0],
+        clientPosition,
         size: image,
         clientPointToCanvasPoint: instance.camera.clientPointToCanvasPoint.bind(
           instance.camera
@@ -138,20 +139,14 @@ export function useInsertFile() {
   );
 
   const insertSVG = useCallback(
-    async (
-      name: string,
-      svg: string,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
+    async (name: string, svg: string, position?: ClientPosition) => {
+      const clientPosition: Vector2 = position
+        ? [position.clientX, position.clientY]
+        : [0, 0];
       const node = await instance.commands.createNodeFromSvg(svg);
 
       const [x, y] = getCenteredCanvasInsertionPoint({
-        clientPosition: position
-          ? [position.clientX, position.clientY]
-          : [0, 0],
+        clientPosition,
         size: {
           width:
             typeof node.$.layout_target_width === "number"
@@ -175,14 +170,7 @@ export function useInsertFile() {
   );
 
   const insertMarkdown = useCallback(
-    async (
-      name: string,
-      markdown: string,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
+    async (name: string, markdown: string, position?: ClientPosition) => {
       const [x, y] = instance.camera.clientPointToCanvasPoint(
         position ? [position.clientX, position.clientY] : [0, 0]
       );
@@ -199,10 +187,7 @@ export function useInsertFile() {
     (
       type: io.clipboard.ValidFileType,
       file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
+      position?: ClientPosition
     ) => {
       if (type === "image/svg+xml") {
         const reader = new FileReader();
@@ -622,6 +607,10 @@ export function useDataTransferEventTarget() {
   const ondrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      const dropPosition: ClientPosition = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
 
       const knwondata = event.dataTransfer.getData("x-grida-data-transfer");
       if (knwondata) {
@@ -633,7 +622,7 @@ export function useDataTransferEventTarget() {
               cache: "no-store",
             }).then((res) =>
               res.text().then((text) => {
-                insertSVG(name, text, event);
+                insertSVG(name, text, dropPosition);
               })
             );
 
@@ -650,7 +639,7 @@ export function useDataTransferEventTarget() {
               const imageWidth = width ?? imageRef.width;
               const imageHeight = height ?? imageRef.height;
               const [x, y] = getCenteredCanvasInsertionPoint({
-                clientPosition: [event.clientX, event.clientY],
+                clientPosition: [dropPosition.clientX, dropPosition.clientY],
                 size: { width: imageWidth, height: imageHeight },
                 clientPointToCanvasPoint:
                   instance.camera.clientPointToCanvasPoint.bind(
@@ -706,7 +695,7 @@ export function useDataTransferEventTarget() {
 
         const [valid, type] = io.clipboard.filetype(file);
         if (valid) {
-          insertFromFile(type, file, event);
+          insertFromFile(type, file, dropPosition);
         } else {
           toast.error(`file type '${type}' is not supported`);
         }
