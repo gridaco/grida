@@ -207,11 +207,22 @@ fn rasterize_inline_svg(
         }
         None => (svg_w, svg_h),
     };
-    let pic = crate::htmlcss::svg::render_to_picture_with_images(
+    // SVG referenced via `<image href=data:image/svg+xml,...>` is a
+    // "resource document" — Chrome / Firefox / Safari render it in a
+    // sandboxed context where text glyph rendering is disabled (see
+    // CSS Images 4 §5: image documents have no font cascade). Mirror
+    // that by passing an empty FontResolver so the embedded text
+    // painter's `pick_typeface` returns None and `<text>` short-
+    // circuits before draw. The host's image provider stays wired for
+    // nested `<image>` references inside the embedded SVG.
+    let no_fonts = crate::htmlcss::svg::PreloadedFonts::new();
+    let inner_ctx =
+        crate::htmlcss::svg::RenderContext::new(ctx.images, &crate::htmlcss::svg::NoCss, &no_fonts);
+    let pic = crate::htmlcss::svg::render_to_picture_with_context(
         xml,
         svg_w as f32,
         svg_h as f32,
-        ctx.images,
+        inner_ctx,
     )
     .ok()?;
     let mut surface = skia_safe::surfaces::raster_n32_premul((rw as i32, rh as i32))?;
