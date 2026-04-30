@@ -962,16 +962,23 @@ fn walk_glyphs(
                             let idx = paths.len();
                             paths.push(info);
                             path_stack.push(idx);
-                            // Per SVG 2 §11.4: inside `<textPath>`, the
-                            // perpendicular-to-flow attributes (y/dy in
-                            // horizontal mode) are dropped from the
-                            // cascade — they'd fight the path placement.
+                            // Per SVG 2 §11.4: `<textPath>` itself is not a
+                            // valid host for x/y/dx/dy/rotate — those
+                            // attributes are ignored on the element. We
+                            // still let an enclosing `<text>`'s `x`/`dx`
+                            // (inline-axis) leak through as along-path
+                            // offsets in `emit_glyph`; `y`/`dy`
+                            // (perpendicular) are blocked there since they
+                            // would fight the path placement.
                             let parent_shift =
                                 stack.last().map(|e| e.baseline_shift_dy).unwrap_or(0.0);
                             let mut tp_attrs =
                                 ElemAttrs::from_node(child, font_size, parent_shift, viewport);
+                            tp_attrs.x.clear();
                             tp_attrs.y.clear();
+                            tp_attrs.dx.clear();
                             tp_attrs.dy.clear();
+                            tp_attrs.rotate.clear();
                             tp_attrs.is_text_path = true;
                             stack.push(tp_attrs);
                             let child_preserve = xml_space_for(child, preserve);
@@ -1051,34 +1058,41 @@ fn emit_glyph(
         alignment_baseline_kind,
         font_size_scale,
     };
+    // When walking past a `<textPath>` frame (going outer), only the
+    // inline-axis attributes (`x`/`dx`) of an enclosing `<text>` flow
+    // through to the textPath's glyphs — they shift each character
+    // along the arc-length. Per SVG 2 §11.4 the perpendicular attrs
+    // (`y`/`dy`) and `rotate` from outside the textPath are dropped:
+    // they'd fight the per-tangent placement and rotation. Mirrors
+    // Blink's `SvgTextLayoutAttributesBuilder` (only `x`/`dx` are
+    // collected for textPath chars from ancestor `<text>`).
+    let mut past_text_path = false;
     for elem in stack.iter().rev() {
         let i = elem.consumed;
         if attr.x.is_none() && i < elem.x.len() {
             attr.x = Some(elem.x[i]);
         }
-        if attr.y.is_none() && i < elem.y.len() {
-            attr.y = Some(elem.y[i]);
-        }
         if attr.dx.is_none() && i < elem.dx.len() {
             attr.dx = Some(elem.dx[i]);
         }
-        if attr.dy.is_none() && i < elem.dy.len() {
-            attr.dy = Some(elem.dy[i]);
+        if !past_text_path {
+            if attr.y.is_none() && i < elem.y.len() {
+                attr.y = Some(elem.y[i]);
+            }
+            if attr.dy.is_none() && i < elem.dy.len() {
+                attr.dy = Some(elem.dy[i]);
+            }
+            if attr.rotate.is_none() && !elem.rotate.is_empty() {
+                let r = if i < elem.rotate.len() {
+                    elem.rotate[i]
+                } else {
+                    *elem.rotate.last().unwrap()
+                };
+                attr.rotate = Some(r);
+            }
         }
-        if attr.rotate.is_none() && !elem.rotate.is_empty() {
-            let r = if i < elem.rotate.len() {
-                elem.rotate[i]
-            } else {
-                *elem.rotate.last().unwrap()
-            };
-            attr.rotate = Some(r);
-        }
-        // Stop the walk at a `<textPath>` frame — the textPath itself
-        // contributes its own attrs, but ancestors above it (the
-        // enclosing `<text>`) MUST NOT, otherwise their x/y leak in
-        // and yank the first glyph off the path.
         if elem.is_text_path {
-            break;
+            past_text_path = true;
         }
     }
     out.push(attr);
