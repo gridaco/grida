@@ -59,9 +59,31 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, node: &DemoNode) {
     // gets rasterized at 20x20 and stretches blurry into a 128-px
     // image element. Knowing the destination size lets us pick a
     // raster resolution that matches the painter's draw step.
+    //
+    // The host `<image>`'s user-space dimensions are NOT the final
+    // device-pixel dimensions: an outer viewBox-induced canvas scale
+    // (e.g. viewBox="0 0 80 80" rendered at 500×500 ⇒ 6.25×) means a
+    // 64-user-unit `<image>` lands at 400 device pixels. Pull the
+    // current canvas matrix to recover that scale and bump the
+    // rasterization target so the embedded SVG picture is sampled at
+    // its actual on-screen resolution rather than the user-space
+    // resolution. Mirrors Blink's `SVGImagePainter::PaintForeignObject`
+    // approach of using device-space sizing for image rasterization.
+    let canvas_scale = {
+        let m = canvas.local_to_device_as_3x3();
+        // For mostly-uniform scale matrices (which is the common case
+        // for an outer viewBox transform), `|det|.sqrt()` recovers
+        // the geometric mean scale. Clamp to ≥1.0 so we never raster
+        // at lower resolution than user-space.
+        let det = m.scale_x() * m.scale_y() - m.skew_x() * m.skew_y();
+        det.abs().sqrt().max(1.0)
+    };
     let (target_px_w, target_px_h) = match (w_attr, h_attr) {
-        (Some(pw), Some(ph)) => (pw.max(1.0) as u32, ph.max(1.0) as u32),
-        _ => (512, 512),
+        (Some(pw), Some(ph)) => (
+            (pw.max(1.0) * canvas_scale) as u32,
+            (ph.max(1.0) * canvas_scale) as u32,
+        ),
+        _ => ((512.0 * canvas_scale) as u32, (512.0 * canvas_scale) as u32),
     };
     let Some(image) = resolve_image_sized(href, ctx, Some((target_px_w, target_px_h))) else {
         return;
