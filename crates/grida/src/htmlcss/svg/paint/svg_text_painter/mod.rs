@@ -26,7 +26,7 @@
 use csscascade::dom::{DemoDom, DemoNode, DemoNodeData, NodeId};
 use skia_safe::{
     Canvas, Color, ContourMeasure, ContourMeasureIter, Font, FontStyle, Paint as SkPaint,
-    PaintStyle, Path, Point, Typeface, Vector,
+    PaintStyle, Path, Point, Rect, Typeface, Vector,
 };
 
 pub(super) mod shaping;
@@ -2347,7 +2347,19 @@ fn paint_anchor_decoration(
     metrics: &skia_safe::FontMetrics,
 ) {
     let anchor_node = ctx.dom.node(anchor_id);
-    let (fill_paint, stroke_paint) = decoration_paints(ctx, anchor_node);
+    // Compute the union bbox of the anchor's covered glyphs in user
+    // space. Used as the reference box when fill/stroke is a
+    // `url(#…)` reference to an objectBoundingBox-units paint server
+    // (gradient or pattern). For userSpaceOnUse the bbox is ignored
+    // by the resolver, so a coarse approximation is fine.
+    let anchor_bbox = run_bbox(
+        &glyph_indices
+            .iter()
+            .filter_map(|&i| glyphs.get(i).copied())
+            .collect::<Vec<_>>(),
+        font,
+    );
+    let (fill_paint, stroke_paint) = decoration_paints(ctx, anchor_node, anchor_bbox);
     if fill_paint.is_none() && stroke_paint.is_none() {
         return;
     }
@@ -2452,58 +2464,141 @@ fn paint_anchor_decoration(
 /// Text Decoration 3 §3.1: "the color of text decorations is set
 /// initially by the value of the 'color' property at the point where
 /// the decoration is declared", and SVG inherits that into `fill`.
-fn decoration_paints(ctx: &PaintCtx<'_>, node: &DemoNode) -> (Option<SkPaint>, Option<SkPaint>) {
-    let fill_color = match read_inherited(ctx, node, "fill").as_deref().map(str::trim) {
-        Some("none") => None,
-        Some(v) => match crate::htmlcss::svg::dom::attrs::parse_paint(v) {
-            Some(Paint::Color(c)) => Some(c),
-            Some(Paint::CurrentColor) => Some(resolve_current_color(ctx, node)),
-            _ => Some(Color::BLACK),
-        },
-        None => Some(Color::BLACK),
+///
+/// `bbox` is the union of the anchor's covered glyphs in user space,
+/// used as the reference box when the fill / stroke is a `url(#…)`
+/// reference to a pattern or gradient declared with
+/// `*Units="objectBoundingBox"`.
+fn decoration_paints(
+    ctx: &PaintCtx<'_>,
+    node: &DemoNode,
+    bbox: Rect,
+) -> (Option<SkPaint>, Option<SkPaint>) {
+    let fill_paint = build_decoration_paint(ctx, node, bbox, "fill", "fill-opacity", None);
+    let stroke_width = read_inherited(ctx, node, "stroke-width")
+        .and_then(|v| parse_length_px(&v))
+        .unwrap_or(1.0);
+    let stroke_paint = if stroke_width <= 0.0 {
+        None
+    } else {
+        build_decoration_paint(
+            ctx,
+            node,
+            bbox,
+            "stroke",
+            "stroke-opacity",
+            Some(stroke_width),
+        )
     };
-    let fill_paint = fill_color.map(|c| {
-        let mut p = SkPaint::default();
-        p.set_anti_alias(true);
-        p.set_style(PaintStyle::Fill);
-        p.set_color(c);
-        if let Some(op) = read_inherited(ctx, node, "fill-opacity").and_then(|v| parse_opacity(&v))
-        {
-            let a = (c.a() as f32 / 255.0) * op.clamp(0.0, 1.0);
-            p.set_alpha_f(a);
-        }
-        p
-    });
-
-    let stroke_paint = read_inherited(ctx, node, "stroke").and_then(|raw| {
-        let v = raw.trim();
-        if v.eq_ignore_ascii_case("none") {
-            return None;
-        }
-        let Some(Paint::Color(c)) = crate::htmlcss::svg::dom::attrs::parse_paint(v) else {
-            return None;
-        };
-        let width = read_inherited(ctx, node, "stroke-width")
-            .and_then(|v| parse_length_px(&v))
-            .unwrap_or(1.0);
-        if width <= 0.0 {
-            return None;
-        }
-        let mut p = SkPaint::default();
-        p.set_anti_alias(true);
-        p.set_style(PaintStyle::Stroke);
-        p.set_color(c);
-        p.set_stroke_width(width);
-        if let Some(op) =
-            read_inherited(ctx, node, "stroke-opacity").and_then(|v| parse_opacity(&v))
-        {
-            let a = (c.a() as f32 / 255.0) * op.clamp(0.0, 1.0);
-            p.set_alpha_f(a);
-        }
-        Some(p)
-    });
-
     (fill_paint, stroke_paint)
+}
+
+/// Build one decoration paint (either fill or stroke) honoring CSS
+/// color, `currentColor`, and `url(#…)` paint-server references. When
+/// the fill resolves to a pattern or gradient, the resulting shader
+/// gives decoration lines the same fill the text glyphs use, mirroring
+/// SVG 1.1 §10.12.1's "fill and stroke of the text decoration".
+fn build_decoration_paint(
+    ctx: &PaintCtx<'_>,
+    node: &DemoNode,
+    bbox: Rect,
+    paint_attr: &str,
+    opacity_attr: &str,
+    stroke_width: Option<f32>,
+) -> Option<SkPaint> {
+    let raw = read_inherited(ctx, node, paint_attr);
+    let value = raw.as_deref().map(str::trim);
+    if matches!(value, Some("none")) {
+        return None;
+    }
+    let opacity_factor = read_inherited(ctx, node, opacity_attr)
+        .and_then(|v| parse_opacity(&v))
+        .map(|v| v.clamp(0.0, 1.0))
+        .unwrap_or(1.0);
+    let mut paint = SkPaint::default();
+    paint.set_anti_alias(true);
+    if let Some(w) = stroke_width {
+        paint.set_style(PaintStyle::Stroke);
+        paint.set_stroke_width(w);
+    } else {
+        paint.set_style(PaintStyle::Fill);
+    }
+    if let Some(v) = value {
+        if v.starts_with("url(") {
+            let viewport = crate::htmlcss::svg::layout::viewport::nearest_svg_viewport(ctx, node);
+            if let Some(resolved) = super::super::resources::paint_server::resolve(
+                ctx.dom,
+                ctx.resources,
+                v,
+                bbox,
+                viewport,
+            ) {
+                use super::super::resources::paint_server::Resolved;
+                match resolved {
+                    Resolved::Shader(s) => {
+                        paint.set_shader(s);
+                        if opacity_factor < 1.0 {
+                            paint.set_alpha_f(opacity_factor);
+                        }
+                        return Some(paint);
+                    }
+                    Resolved::Pattern {
+                        node: pid,
+                        bbox: pbbox,
+                    } => {
+                        if let Some(s) =
+                            super::super::resources::pattern::build_shader(ctx, pid, pbbox)
+                        {
+                            paint.set_shader(s);
+                            if opacity_factor < 1.0 {
+                                paint.set_alpha_f(opacity_factor);
+                            }
+                            return Some(paint);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            // funcIRI didn't resolve — try the trailing fallback color
+            // (`fill="url(#g) red"`), then default to black per SVG 2.
+            if let Some(trail) = crate::htmlcss::svg::resources::paint_server::paint_fallback(v) {
+                if let Some(Paint::Color(c)) = crate::htmlcss::svg::dom::attrs::parse_paint(trail) {
+                    paint.set_color(c);
+                    if opacity_factor < 1.0 {
+                        let a = (c.a() as f32 / 255.0) * opacity_factor;
+                        paint.set_alpha_f(a);
+                    }
+                    return Some(paint);
+                }
+            }
+            paint.set_color(Color::BLACK);
+            if opacity_factor < 1.0 {
+                paint.set_alpha_f(opacity_factor);
+            }
+            return Some(paint);
+        }
+        let color = match crate::htmlcss::svg::dom::attrs::parse_paint(v) {
+            Some(Paint::Color(c)) => c,
+            Some(Paint::CurrentColor) => resolve_current_color(ctx, node),
+            Some(Paint::None) => return None,
+            _ => Color::BLACK,
+        };
+        paint.set_color(color);
+        if opacity_factor < 1.0 {
+            let a = (color.a() as f32 / 255.0) * opacity_factor;
+            paint.set_alpha_f(a);
+        }
+        return Some(paint);
+    }
+    // Absent attribute: fill defaults to black, stroke defaults to none.
+    if stroke_width.is_some() {
+        return None;
+    }
+    paint.set_color(Color::BLACK);
+    if opacity_factor < 1.0 {
+        paint.set_alpha_f(opacity_factor);
+    }
+    Some(paint)
 }
 
 /// Paint each requested line type for one coalesced glyph run. Lines
