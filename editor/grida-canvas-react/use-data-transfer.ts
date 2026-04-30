@@ -13,7 +13,6 @@ import { iofigma } from "@grida/io-figma";
 import { nanoid } from "nanoid";
 import { datatransfer } from "@/grida-canvas/data-transfer";
 import type { editor } from "@/grida-canvas";
-import { getCenteredCanvasInsertionPoint } from "./data-transfer-position";
 import type grida from "@grida/schema";
 
 type ClientPosition = {
@@ -21,7 +20,63 @@ type ClientPosition = {
   clientY: number;
 };
 
+type CanvasPosition = {
+  canvasX: number;
+  canvasY: number;
+};
+
+type InsertionPosition = ClientPosition | CanvasPosition;
+
 type Vector2 = [number, number];
+
+type Size = {
+  width: number;
+  height: number;
+};
+
+function isCanvasPosition(
+  position: InsertionPosition
+): position is CanvasPosition {
+  return "canvasX" in position && "canvasY" in position;
+}
+
+function getInsertionCanvasPoint(
+  editor: Editor,
+  position?: InsertionPosition
+): Vector2 {
+  if (!position) return [0, 0];
+  if (isCanvasPosition(position)) return [position.canvasX, position.canvasY];
+  return editor.camera.clientPointToCanvasPoint([
+    position.clientX,
+    position.clientY,
+  ]);
+}
+
+function getDropCanvasPoint(
+  editor: Editor,
+  event: React.DragEvent<HTMLElement>
+): Vector2 {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const viewportPoint: Vector2 = [
+    event.clientX - rect.left,
+    event.clientY - rect.top,
+  ];
+  return cmath.vector2.transform(
+    viewportPoint,
+    cmath.transform.invert(editor.state.transform)
+  );
+}
+
+function centerCanvasPoint(canvasPoint: Vector2, size: Size): Vector2 {
+  return [
+    canvasPoint[0] - getPositiveHalf(size.width),
+    canvasPoint[1] - getPositiveHalf(size.height),
+  ];
+}
+
+function getPositiveHalf(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value / 2 : 0;
+}
 
 function createImagePaint(src: string): cg.ImagePaint {
   return {
@@ -111,19 +166,11 @@ export function useInsertFile() {
   const instance = useCurrentEditor();
 
   const insertImage = useCallback(
-    async (name: string, file: File, position?: ClientPosition) => {
-      const clientPosition: Vector2 = position
-        ? [position.clientX, position.clientY]
-        : [0, 0];
+    async (name: string, file: File, position?: InsertionPosition) => {
+      const canvasPoint = getInsertionCanvasPoint(instance, position);
       const bytes = await file.arrayBuffer();
       const image = await instance.createImage(new Uint8Array(bytes));
-      const [x, y] = getCenteredCanvasInsertionPoint({
-        clientPosition,
-        size: image,
-        clientPointToCanvasPoint: instance.camera.clientPointToCanvasPoint.bind(
-          instance.camera
-        ),
-      });
+      const [x, y] = centerCanvasPoint(canvasPoint, image);
 
       insertImageRectangle({
         editor: instance,
@@ -139,27 +186,19 @@ export function useInsertFile() {
   );
 
   const insertSVG = useCallback(
-    async (name: string, svg: string, position?: ClientPosition) => {
-      const clientPosition: Vector2 = position
-        ? [position.clientX, position.clientY]
-        : [0, 0];
+    async (name: string, svg: string, position?: InsertionPosition) => {
+      const canvasPoint = getInsertionCanvasPoint(instance, position);
       const node = await instance.commands.createNodeFromSvg(svg);
 
-      const [x, y] = getCenteredCanvasInsertionPoint({
-        clientPosition,
-        size: {
-          width:
-            typeof node.$.layout_target_width === "number"
-              ? node.$.layout_target_width
-              : 0,
-          height:
-            typeof node.$.layout_target_height === "number"
-              ? node.$.layout_target_height
-              : 0,
-        },
-        clientPointToCanvasPoint: instance.camera.clientPointToCanvasPoint.bind(
-          instance.camera
-        ),
+      const [x, y] = centerCanvasPoint(canvasPoint, {
+        width:
+          typeof node.$.layout_target_width === "number"
+            ? node.$.layout_target_width
+            : 0,
+        height:
+          typeof node.$.layout_target_height === "number"
+            ? node.$.layout_target_height
+            : 0,
       });
 
       node.$.name = name;
@@ -170,10 +209,8 @@ export function useInsertFile() {
   );
 
   const insertMarkdown = useCallback(
-    async (name: string, markdown: string, position?: ClientPosition) => {
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        position ? [position.clientX, position.clientY] : [0, 0]
-      );
+    async (name: string, markdown: string, position?: InsertionPosition) => {
+      const [x, y] = getInsertionCanvasPoint(instance, position);
 
       const node = instance.commands.createMarkdownNode(markdown);
       node.$.name = name;
@@ -187,7 +224,7 @@ export function useInsertFile() {
     (
       type: io.clipboard.ValidFileType,
       file: File,
-      position?: ClientPosition
+      position?: InsertionPosition
     ) => {
       if (type === "image/svg+xml") {
         const reader = new FileReader();
@@ -607,9 +644,10 @@ export function useDataTransferEventTarget() {
   const ondrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      const dropPosition: ClientPosition = {
-        clientX: event.clientX,
-        clientY: event.clientY,
+      const dropCanvasPoint = getDropCanvasPoint(instance, event);
+      const dropPosition: CanvasPosition = {
+        canvasX: dropCanvasPoint[0],
+        canvasY: dropCanvasPoint[1],
       };
 
       const knwondata = event.dataTransfer.getData("x-grida-data-transfer");
@@ -638,13 +676,9 @@ export function useDataTransferEventTarget() {
               const imageRef = await instance.createImageAsync(src);
               const imageWidth = width ?? imageRef.width;
               const imageHeight = height ?? imageRef.height;
-              const [x, y] = getCenteredCanvasInsertionPoint({
-                clientPosition: [dropPosition.clientX, dropPosition.clientY],
-                size: { width: imageWidth, height: imageHeight },
-                clientPointToCanvasPoint:
-                  instance.camera.clientPointToCanvasPoint.bind(
-                    instance.camera
-                  ),
+              const [x, y] = centerCanvasPoint(dropCanvasPoint, {
+                width: imageWidth,
+                height: imageHeight,
               });
               insertImageRectangle({
                 editor: instance,
