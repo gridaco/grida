@@ -97,6 +97,7 @@ export const FileUploadField = ({
     () => data.map((info) => info.path).filter(Boolean) as string[],
     [data]
   );
+  const uploadedFilesValue = uploadedFilesPaths.join(",");
 
   const shouldBlockSubmit = shouldBlockSubmitForFileUpload({
     isMultipartFile,
@@ -112,6 +113,29 @@ export const FileUploadField = ({
   useEffect(() => {
     uploadedFileValueRef.current?.setCustomValidity(validationMessage);
   }, [validationMessage]);
+
+  useEffect(() => {
+    const input = uploadedFileValueRef.current;
+    const form = input?.form;
+
+    if (!input || !form || isMultipartFile) return;
+
+    const handleSubmit = (event: SubmitEvent) => {
+      if (!shouldBlockSubmit) return;
+
+      input.setCustomValidity(validationMessage);
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      input.reportValidity();
+    };
+
+    form.addEventListener("submit", handleSubmit, true);
+
+    return () => {
+      form.removeEventListener("submit", handleSubmit, true);
+    };
+  }, [isMultipartFile, shouldBlockSubmit, validationMessage]);
 
   return (
     <FileUploader
@@ -135,7 +159,7 @@ export const FileUploadField = ({
               ref={uploadedFileValueRef}
               name={name}
               required={required || shouldBlockSubmit}
-              value={uploadedFilesPaths}
+              value={uploadedFilesValue}
             />
           )}
         </>
