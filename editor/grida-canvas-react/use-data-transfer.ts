@@ -14,6 +14,63 @@ import { nanoid } from "nanoid";
 import { datatransfer } from "@/grida-canvas/data-transfer";
 import type { editor } from "@/grida-canvas";
 import { getCenteredCanvasInsertionPoint } from "./data-transfer-position";
+import type grida from "@grida/schema";
+
+function createImagePaint(src: string): cg.ImagePaint {
+  return {
+    type: "image",
+    src,
+    fit: "cover",
+    transform: cmath.transform.identity,
+    filters: cg.def.IMAGE_FILTERS,
+    blend_mode: cg.def.BLENDMODE,
+    opacity: 1,
+    active: true,
+  };
+}
+
+function insertImageRectangle(args: {
+  editor: Editor;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  src: string;
+}) {
+  const paint = createImagePaint(args.src);
+  const prototype = {
+    type: "rectangle",
+    name: args.name,
+    layout_positioning: "absolute",
+    layout_inset_left: 0,
+    layout_inset_top: 0,
+    layout_target_width: args.width,
+    layout_target_height: args.height,
+    fill: paint,
+    fill_paints: [paint],
+  } satisfies grida.program.nodes.NodePrototype;
+
+  const [nodeId] = args.editor.insert(
+    { prototype },
+    args.editor.state.scene_id ?? null
+  );
+
+  if (!nodeId) return;
+
+  args.editor.doc.dispatch({
+    type: "node/change/*",
+    node_id: nodeId,
+    layout_positioning: "absolute",
+    name: args.name,
+    layout_inset_left: args.x,
+    layout_inset_top: args.y,
+    layout_target_width: args.width,
+    layout_target_height: args.height,
+    fill_paints: [paint],
+  });
+  args.editor.doc.select([nodeId], "reset");
+}
 
 /**
  * Hook that provides file insertion utilities for the Grida canvas editor.
@@ -67,26 +124,15 @@ export function useInsertFile() {
         ),
       });
 
-      // Create rectangle node with image paint instead of image node
-      const node = instance.commands.createRectangleNode();
-      node.$.layout_positioning = "absolute";
-      node.$.name = name;
-      node.$.layout_inset_left = x;
-      node.$.layout_inset_top = y;
-      node.$.layout_target_width = image.width;
-      node.$.layout_target_height = image.height;
-      node.$.fill_paints = [
-        {
-          type: "image",
-          src: image.url,
-          fit: "cover",
-          transform: cmath.transform.identity,
-          filters: cg.def.IMAGE_FILTERS,
-          blend_mode: cg.def.BLENDMODE,
-          opacity: 1,
-          active: true,
-        } satisfies cg.ImagePaint,
-      ];
+      insertImageRectangle({
+        editor: instance,
+        name,
+        x,
+        y,
+        width: image.width,
+        height: image.height,
+        src: image.url,
+      });
     },
     [instance]
   );
@@ -611,25 +657,15 @@ export function useDataTransferEventTarget() {
                     instance.camera
                   ),
               });
-              const node = instance.commands.createRectangleNode();
-              node.$.layout_positioning = "absolute";
-              node.$.name = name || "Photo";
-              node.$.layout_inset_left = x;
-              node.$.layout_inset_top = y;
-              node.$.layout_target_width = imageWidth;
-              node.$.layout_target_height = imageHeight;
-              node.$.fill_paints = [
-                {
-                  type: "image",
-                  src: imageRef.url,
-                  fit: "cover",
-                  transform: cmath.transform.identity,
-                  filters: cg.def.IMAGE_FILTERS,
-                  blend_mode: cg.def.BLENDMODE,
-                  opacity: 1,
-                  active: true,
-                } satisfies cg.ImagePaint,
-              ];
+              insertImageRectangle({
+                editor: instance,
+                name: name || "Photo",
+                x,
+                y,
+                width: imageWidth,
+                height: imageHeight,
+                src: imageRef.url,
+              });
             })();
 
             toast.promise(task, {
