@@ -320,6 +320,20 @@ pub fn paint(canvas: &Canvas, ctx: &PaintCtx<'_>, root_id: NodeId, node: &DemoNo
             for a in slice.iter_mut() {
                 *a *= scale;
             }
+            // `lengthAdjust=spacingAndGlyphs` on a non-root carrier
+            // (e.g. `<textPath textLength=… lengthAdjust=
+            // spacingAndGlyphs>`) needs both advances AND the font's
+            // x-scale to scale together — otherwise the spacing
+            // stretches but glyphs render at natural width and the
+            // text appears squashed. `Font::set_scale_x` is global to
+            // the painter's font instance, so we only apply it when
+            // the range covers ALL glyphs (single-textPath /
+            // single-tspan case). Multi-range cases would need
+            // per-range Font instances and stay on `spacing` semantics
+            // for the rest.
+            if tr.spacing_and_glyphs && tr.first == 0 && tr.last + 1 == kerned_advances.len() {
+                font.set_scale_x(font.scale_x() * scale);
+            }
         }
     }
     // The text-root textLength only applies when descendant tspans
