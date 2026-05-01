@@ -958,6 +958,17 @@ fn walk_glyphs(
                         stack.pop();
                     }
                     ElementKind::TextPath => {
+                        // SVG 2 §11.4: a `<textPath>` element shall not
+                        // have descendant `<textPath>` elements. Browsers
+                        // (Blink/WebKit/Gecko) drop the nested element AND
+                        // its text content entirely — the outer textPath's
+                        // own content still renders, but the inner one is
+                        // a no-op. Without this skip, our walker recurses
+                        // into the inner textPath and emits a duplicate
+                        // run on the second path.
+                        if !path_stack.is_empty() {
+                            continue;
+                        }
                         if let Some(info) = resolve_text_path(ctx, child) {
                             let idx = paths.len();
                             paths.push(info);
