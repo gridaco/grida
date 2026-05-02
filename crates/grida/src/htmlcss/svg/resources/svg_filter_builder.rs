@@ -638,10 +638,14 @@ fn parse_gaussian_blur(node: &DemoNode, is_first: bool) -> Option<FilterEffect> 
         .filter(|p| !p.is_empty())
         .filter_map(|p| p.parse::<f32>().ok())
         .collect();
+    // SVG 2 §15.13.4 stdDeviation: one or two numbers. Per CSS Values 4
+    // §3.2 grammar matching, an attribute with too many values fails to
+    // parse and falls back to its lacuna value (0) — i.e. the filter
+    // becomes a pass-through. Don't silently take the first two numbers.
     let (sx, sy) = match nums.as_slice() {
-        [] => (0.0, 0.0),
         [a] => (*a, *a),
-        [a, b, ..] => (*a, *b),
+        [a, b] => (*a, *b),
+        _ => (0.0, 0.0),
     };
     // Negative values are an error per §15.13; fall back to 0.
     let std_dev_x = sx.max(0.0);
