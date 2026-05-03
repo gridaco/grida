@@ -642,10 +642,33 @@ mod tests {
 
     #[test]
     fn preload_css_picks_up_external_import() {
-        let svg_path = std::path::Path::new(
-            "../../fixtures/local/resvg-test-suite/tests/structure/style/external-CSS.svg",
-        );
-        let svg = std::fs::read_to_string(svg_path).expect("read fixture");
+        // Mirror the resvg-test-suite layout (which lives under the gitignored
+        // `fixtures/local/`) inside a temp dir so this test runs in CI.
+        let root = std::env::temp_dir().join(format!(
+            "grida-preload-css-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let style_dir = root.join("tests/structure/style");
+        let resources_dir = root.join("resources");
+        std::fs::create_dir_all(&style_dir).expect("create style dir");
+        std::fs::create_dir_all(&resources_dir).expect("create resources dir");
+        let svg_path = style_dir.join("external-CSS.svg");
+        let css_path = resources_dir.join("green.css");
+        std::fs::write(
+            &svg_path,
+            r#"<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <style>@import "../../../resources/green.css"</style>
+    <rect id="rect1" x="20" y="20" width="160" height="160" fill="red"/>
+</svg>"#,
+        )
+        .expect("write svg");
+        std::fs::write(&css_path, "#rect1 { fill:green; }\n").expect("write css");
+
+        let svg = std::fs::read_to_string(&svg_path).expect("read svg");
         let parent = svg_path.parent().unwrap();
         use grida::htmlcss::svg::CssLoader;
         let mut css = grida::htmlcss::svg::PreloadedCss::new();
@@ -657,5 +680,7 @@ mod tests {
             body.contains("#rect1 { fill:green; }"),
             "imported css body unexpected: {body}"
         );
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
