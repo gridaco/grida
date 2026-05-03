@@ -79,14 +79,18 @@ export interface ModelSpec {
 }
 
 // ---------------------------------------------------------------------------
-// Current model assignments — edit here when bumping models
+// Catalog — every model the editor knows about
+//
+// Single source of truth. Tiered models (see `tierAssignments` below) are
+// included in the free budget; everything else is opt-in and billed as
+// metered at the provider's published per-token rates.
 //
 // All values from https://models.dev/api.json
 // To look up: python .tools/model_info.py <model_id>
 // ---------------------------------------------------------------------------
 
-const specs = {
-  nano: {
+const catalogSpecs = {
+  "openai/gpt-5.4-nano": {
     id: "openai/gpt-5.4-nano",
     label: "GPT-5.4 Nano",
     multimodal: true,
@@ -94,7 +98,7 @@ const specs = {
     outputLimit: 128_000,
     cost: { input: 0.2, output: 1.25, cacheRead: 0.02 },
   },
-  mini: {
+  "openai/gpt-5.4-mini": {
     id: "openai/gpt-5.4-mini",
     label: "GPT-5.4 Mini",
     multimodal: true,
@@ -102,7 +106,23 @@ const specs = {
     outputLimit: 128_000,
     cost: { input: 0.75, output: 4.5, cacheRead: 0.075 },
   },
-  pro: {
+  "openai/gpt-5.5": {
+    id: "openai/gpt-5.5",
+    label: "GPT-5.5",
+    multimodal: true,
+    contextWindow: 1_050_000,
+    outputLimit: 128_000,
+    cost: { input: 5, output: 30, cacheRead: 0.5 },
+  },
+  "openai/gpt-5.5-pro": {
+    id: "openai/gpt-5.5-pro",
+    label: "GPT-5.5 Pro",
+    multimodal: true,
+    contextWindow: 1_050_000,
+    outputLimit: 128_000,
+    cost: { input: 30, output: 180 },
+  },
+  "anthropic/claude-sonnet-4.6": {
     id: "anthropic/claude-sonnet-4.6",
     label: "Claude Sonnet 4.6",
     multimodal: true,
@@ -110,22 +130,64 @@ const specs = {
     outputLimit: 128_000,
     cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   },
-  max: {
-    id: "anthropic/claude-opus-4.6",
-    label: "Claude Opus 4.6",
+  "anthropic/claude-opus-4.7": {
+    id: "anthropic/claude-opus-4.7",
+    label: "Claude Opus 4.7",
     multimodal: true,
     contextWindow: 1_000_000,
     outputLimit: 128_000,
     cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   },
-} as const satisfies Record<ModelTier, ModelSpec>;
+} as const satisfies Record<string, ModelSpec>;
+
+export type CatalogId = keyof typeof catalogSpecs;
+
+// ---------------------------------------------------------------------------
+// Tier assignments — which catalog entry powers each tier
+//
+// Edit here when bumping a tier to a different catalog model.
+// ---------------------------------------------------------------------------
+
+const tierAssignments = {
+  nano: "openai/gpt-5.4-nano",
+  mini: "openai/gpt-5.4-mini",
+  pro: "anthropic/claude-sonnet-4.6",
+  max: "anthropic/claude-opus-4.7",
+} as const satisfies Record<ModelTier, CatalogId>;
+
+const specs: Record<ModelTier, ModelSpec> = {
+  nano: catalogSpecs[tierAssignments.nano],
+  mini: catalogSpecs[tierAssignments.mini],
+  pro: catalogSpecs[tierAssignments.pro],
+  max: catalogSpecs[tierAssignments.max],
+};
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Read-only map of tier → model spec. */
+/** Read-only map of tier → model spec (resolved from the catalog). */
 export const models: Record<ModelTier, ModelSpec> = specs;
+
+/** Read-only map of catalog model ID → spec. Includes tier and metered models. */
+export const catalog: Record<CatalogId, ModelSpec> = catalogSpecs;
+
+/** Read-only map of tier → catalog model ID. */
+export const tiers: Record<ModelTier, CatalogId> = tierAssignments;
+
+/**
+ * Returns the tier (if any) that currently uses the given catalog model.
+ * `undefined` for metered-only models.
+ */
+export function tierOf(catalogId: CatalogId): ModelTier | undefined {
+  for (const [tier, id] of Object.entries(tierAssignments) as [
+    ModelTier,
+    CatalogId,
+  ][]) {
+    if (id === catalogId) return tier;
+  }
+  return undefined;
+}
 
 /**
  * Look up a model spec by model ID.
@@ -137,7 +199,7 @@ export const models: Record<ModelTier, ModelSpec> = specs;
  *   snapshot date to the model ID in their API responses)
  */
 export function modelSpecById(modelId: string): ModelSpec | undefined {
-  for (const spec of Object.values(specs)) {
+  for (const spec of Object.values(catalogSpecs)) {
     // Exact match (gateway format)
     if (spec.id === modelId) return spec;
 
