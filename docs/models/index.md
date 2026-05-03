@@ -55,7 +55,7 @@ Per 1M tokens.
 | Name                                              | Input  | Cache Write | Cache Read | Output  |
 | ------------------------------------------------- | ------ | ----------- | ---------- | ------- |
 | GPT-5.4 Nano (`openai/gpt-5.4-nano`)              | $0.20  | —           | $0.02      | $1.25   |
-| GPT-5.4 Mini (`openai/gpt-5.4-mini`)              | $0.75  | —           | $0.07      | $4.50   |
+| GPT-5.4 Mini (`openai/gpt-5.4-mini`)              | $0.75  | —           | $0.075     | $4.50   |
 | Claude Sonnet 4.6 (`anthropic/claude-sonnet-4.6`) | $3.00  | $3.75       | $0.30      | $15.00  |
 | Claude Opus 4.7 (`anthropic/claude-opus-4.7`)     | $5.00  | $6.25       | $0.50      | $25.00  |
 | GPT-5.5 (`openai/gpt-5.5`)                        | $5.00  | —           | $0.50      | $30.00  |
@@ -123,17 +123,17 @@ Flat per-image pricing.
 
 ### Image Sizes
 
-| Model              | Min Size  | Max Size  | Aspect Ratios |
-| ------------------ | --------- | --------- | ------------- |
-| GPT Image 2        | —         | 3840x3840 | up to 3:1     |
-| GPT Image 1.5      | 1024x1024 | 1536x1536 | 1:1, 2:3, 3:2 |
-| GPT Image Mini     | 1024x1024 | 1536x1536 | 1:1, 2:3, 3:2 |
-| Gemini Flash Image | —         | 1536x1536 | Flexible      |
-| Gemini Pro Image   | —         | 1536x1536 | Flexible      |
-| Flux 2 Pro         | 256x256   | 1440x1440 | Flexible      |
-| Flux Kontext Max   | —         | 1820x1820 | Flexible      |
-| Flux Kontext Pro   | —         | 1820x1820 | Flexible      |
-| Flux Pro 1.1       | 256x256   | 1440x1440 | Flexible      |
+| Model              | Min Size  | Max Size                         | Aspect Ratios |
+| ------------------ | --------- | -------------------------------- | ------------- |
+| GPT Image 2        | —         | edges ≤ 3840 px, ≤ 8.3M px total | up to 3:1     |
+| GPT Image 1.5      | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
+| GPT Image Mini     | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
+| Gemini Flash Image | —         | 1536x1536                        | Flexible      |
+| Gemini Pro Image   | —         | 1536x1536                        | Flexible      |
+| Flux 2 Pro         | 256x256   | 1440x1440                        | Flexible      |
+| Flux Kontext Max   | —         | 1820x1820                        | Flexible      |
+| Flux Kontext Pro   | —         | 1820x1820                        | Flexible      |
+| Flux Pro 1.1       | 256x256   | 1440x1440                        | Flexible      |
 
 ## Image Tools
 

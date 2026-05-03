@@ -381,8 +381,13 @@ function TextModelRow({ tier, spec }: { tier: ModelTier; spec: ModelSpec }) {
   );
 }
 
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 3,
+});
+
 function fmtCost(value: number | undefined): string {
-  return value === undefined ? "—" : `$${value.toFixed(2)}`;
+  return value === undefined ? "—" : `$${usdFormatter.format(value)}`;
 }
 
 function CatalogRow({ spec }: { spec: ModelSpec }) {

@@ -650,10 +650,8 @@ export namespace ai {
           [1024, 1536, "2:3"],
           [1536, 1024, "3:2"],
         ],
-        constraints: {
-          min_edge: 1024,
-          max_edge: 1536,
-        },
+        // Preset-only — provider rejects arbitrary sizes.
+        constraints: null,
         // https://developers.openai.com/api/docs/models/gpt-image-1.5
         pricing: {
           type: "per_image_tiered",
@@ -699,10 +697,8 @@ export namespace ai {
           [1024, 1536, "2:3"],
           [1536, 1024, "3:2"],
         ],
-        constraints: {
-          min_edge: 1024,
-          max_edge: 1536,
-        },
+        // Preset-only — provider rejects arbitrary sizes.
+        constraints: null,
         // https://developers.openai.com/api/docs/models/gpt-image-1-mini
         pricing: {
           type: "per_image_tiered",
