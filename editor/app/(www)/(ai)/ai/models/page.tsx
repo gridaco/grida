@@ -2,6 +2,13 @@ import type { FC } from "react";
 import type { Metadata } from "next";
 import ai from "@/lib/ai";
 import {
+  models as textModels,
+  catalog as textCatalog,
+  type CatalogId,
+  type ModelSpec,
+  type ModelTier,
+} from "@/lib/ai/models";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -75,8 +82,8 @@ function dimLabel(model: AITypes.image.ImageModelCard) {
   if (model.sizes?.length) {
     return model.sizes.map(([w, h, r]) => `${w}x${h} (${r})`).join(", ");
   }
-  if (model.max_width > 0) {
-    return `Up to ${model.max_width}x${model.max_height}`;
+  if (model.constraints?.max_edge) {
+    return `Up to ${model.constraints.max_edge}x${model.constraints.max_edge}`;
   }
   return "Flexible";
 }
@@ -112,6 +119,28 @@ function PricingBadge({
   }
 }
 
+function TokenRates({ rates }: { rates: AITypes.image.PerTokenRates }) {
+  const rows: [string, number][] = [["Text input", rates.input]];
+  if (rates.cached_input !== undefined)
+    rows.push(["Text input (cached)", rates.cached_input]);
+  if (rates.image_input !== undefined)
+    rows.push(["Image input", rates.image_input]);
+  if (rates.cached_image_input !== undefined)
+    rows.push(["Image input (cached)", rates.cached_image_input]);
+  rows.push(["Output", rates.output]);
+  return (
+    <div className="space-y-0.5 text-xs">
+      <p className="text-muted-foreground mb-1">Per 1M tokens</p>
+      {rows.map(([label, price]) => (
+        <div key={label} className="flex justify-between">
+          <span className="text-muted-foreground">{label}</span>
+          <span className="font-mono text-foreground">${price.toFixed(2)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PricingDetail({
   pricing,
 }: {
@@ -137,32 +166,40 @@ function PricingDetail({
         qualities.set(quality, list);
       }
       return (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-20 px-0">Quality</TableHead>
-              <TableHead className="px-0">Size</TableHead>
-              <TableHead className="text-right px-0">Price</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {[...qualities.entries()].map(([quality, sizes]) =>
-              sizes.map(([size, price], i) => (
-                <TableRow key={`${quality}/${size}`} className="border-0">
-                  <TableCell className="py-1 px-0 capitalize text-muted-foreground">
-                    {i === 0 ? quality : ""}
-                  </TableCell>
-                  <TableCell className="py-1 px-0 font-mono text-xs text-muted-foreground">
-                    {size}
-                  </TableCell>
-                  <TableCell className="py-1 px-0 text-right font-mono">
-                    ${price.toFixed(3)}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <div className="space-y-3">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-20 px-0">Quality</TableHead>
+                <TableHead className="px-0">Size</TableHead>
+                <TableHead className="text-right px-0">Price</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...qualities.entries()].map(([quality, sizes]) =>
+                sizes.map(([size, price], i) => (
+                  <TableRow key={`${quality}/${size}`} className="border-0">
+                    <TableCell className="py-1 px-0 capitalize text-muted-foreground">
+                      {i === 0 ? quality : ""}
+                    </TableCell>
+                    <TableCell className="py-1 px-0 font-mono text-xs text-muted-foreground">
+                      {size}
+                    </TableCell>
+                    <TableCell className="py-1 px-0 text-right font-mono">
+                      ${price.toFixed(3)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          {pricing.tokens && (
+            <>
+              <Separator />
+              <TokenRates rates={pricing.tokens} />
+            </>
+          )}
+        </div>
       );
     }
     case "per_token":
@@ -182,6 +219,49 @@ function PricingDetail({
         </div>
       );
   }
+}
+
+function ConstraintsDetail({
+  constraints,
+}: {
+  constraints: AITypes.image.ImageSizeConstraints;
+}) {
+  const rows: [string, string][] = [];
+  if (constraints.max_edge !== undefined) {
+    const min = constraints.min_edge ?? 0;
+    rows.push([
+      "Edge",
+      min > 0
+        ? `${min}–${constraints.max_edge} px`
+        : `≤ ${constraints.max_edge} px`,
+    ]);
+  }
+  if (constraints.step !== undefined) {
+    rows.push(["Step", `multiples of ${constraints.step} px`]);
+  }
+  if (
+    constraints.min_pixels !== undefined ||
+    constraints.max_pixels !== undefined
+  ) {
+    const min = constraints.min_pixels?.toLocaleString() ?? "0";
+    const max = constraints.max_pixels?.toLocaleString() ?? "—";
+    rows.push(["Pixels", `${min}–${max}`]);
+  }
+  if (constraints.aspect_ratio?.max !== undefined) {
+    rows.push(["Aspect ratio", `up to ${constraints.aspect_ratio.max}:1`]);
+  }
+  if (rows.length === 0) return null;
+  return (
+    <div className="space-y-0.5 text-xs">
+      <p className="text-muted-foreground mb-1">Constraints</p>
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex justify-between">
+          <span className="text-muted-foreground">{label}</span>
+          <span className="font-mono text-foreground">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ── Card ─────────────────────────────────────────────────────────────────────
@@ -210,6 +290,14 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
         {/* Pricing */}
         <PricingDetail pricing={model.pricing} />
 
+        {/* Constraints */}
+        {model.constraints && (
+          <>
+            <Separator />
+            <ConstraintsDetail constraints={model.constraints} />
+          </>
+        )}
+
         {/* Specs */}
         <div className="mt-auto space-y-2 text-xs text-muted-foreground">
           <div className="flex justify-between">
@@ -217,8 +305,8 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
             <span className="font-mono text-foreground">
               {model.sizes?.length
                 ? `${model.sizes.length} presets`
-                : model.max_width > 0
-                  ? `up to ${model.max_width}x${model.max_height}`
+                : model.constraints?.max_edge
+                  ? `up to ${model.constraints.max_edge}x${model.constraints.max_edge}`
                   : "Flexible"}
             </span>
           </div>
@@ -226,9 +314,189 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
             <span>Model ID</span>
             <code className="text-foreground">{model.id}</code>
           </div>
+          {model.deprecated && (
+            <div className="flex justify-between">
+              <span>Status</span>
+              <Badge variant="outline" className="text-xs h-4 font-normal">
+                Deprecated
+              </Badge>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ── Text models ─────────────────────────────────────────────────────────────
+
+function vendorOf(modelId: string): string {
+  return modelId.includes("/") ? modelId.split("/")[0] : "openai";
+}
+
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(0)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return `${n}`;
+}
+
+function TextModelRow({ tier, spec }: { tier: ModelTier; spec: ModelSpec }) {
+  const vendor = vendorOf(spec.id);
+  const Logo = Logos[vendor];
+  return (
+    <TableRow>
+      <TableCell>
+        <Badge variant="secondary" className="capitalize font-mono text-xs">
+          {tier}
+        </Badge>
+      </TableCell>
+      <TableCell className="font-medium">
+        <div className="flex items-center gap-2">
+          {Logo && <Logo className="size-4 shrink-0" />}
+          <div>
+            <div className="font-medium">{spec.label}</div>
+            <code className="text-xs text-muted-foreground">{spec.id}</code>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="hidden md:table-cell font-mono text-xs">
+        {fmtTokens(spec.contextWindow)}
+      </TableCell>
+      <TableCell className="hidden md:table-cell font-mono text-xs">
+        {fmtTokens(spec.outputLimit)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.input)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.cacheWrite)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.cacheRead)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.output)}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 3,
+});
+
+function fmtCost(value: number | undefined): string {
+  return value === undefined ? "—" : `$${usdFormatter.format(value)}`;
+}
+
+function CatalogRow({ spec }: { spec: ModelSpec }) {
+  const vendor = vendorOf(spec.id);
+  const Logo = Logos[vendor];
+  return (
+    <TableRow>
+      <TableCell className="font-medium">
+        <div className="flex items-center gap-2">
+          {Logo && <Logo className="size-4 shrink-0" />}
+          <div>
+            <div className="font-medium">{spec.label}</div>
+            <code className="text-xs text-muted-foreground">{spec.id}</code>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.input)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.cacheWrite)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.cacheRead)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">
+        {fmtCost(spec.cost.output)}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function CatalogSection() {
+  const entries = Object.entries(textCatalog) as [CatalogId, ModelSpec][];
+  if (entries.length === 0) return null;
+  return (
+    <div className="container mx-auto px-4 pb-12">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold tracking-tight mb-1">
+          All Models
+        </h3>
+        <p className="text-xs text-muted-foreground">Per 1M tokens.</p>
+      </div>
+      <div className="rounded-lg border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-[260px]">Name</TableHead>
+              <TableHead className="text-right">Input</TableHead>
+              <TableHead className="text-right">Cache Write</TableHead>
+              <TableHead className="text-right">Cache Read</TableHead>
+              <TableHead className="text-right">Output</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {entries.map(([id, spec]) => (
+              <CatalogRow key={id} spec={spec} />
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function TextModelsSection() {
+  const tiers = Object.entries(textModels) as [ModelTier, ModelSpec][];
+  return (
+    <>
+      {/* Hero */}
+      <div className="container px-4 pt-16 pb-10">
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Agent Models</h1>
+        <p className="text-base text-muted-foreground max-w-xl">
+          Models powering agentic features in the editor — chat, code, tool use,
+          and reasoning. Tiered models are included in the free budget;
+          everything else is available metered at provider rates.
+        </p>
+      </div>
+
+      {/* Tier table */}
+      <div className="container mx-auto px-4 pb-12">
+        <p className="text-xs text-muted-foreground mb-2">
+          Cost columns are USD per 1M tokens.
+        </p>
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="w-[100px]">Tier</TableHead>
+                <TableHead className="w-[260px]">Model</TableHead>
+                <TableHead className="hidden md:table-cell">Context</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Output limit
+                </TableHead>
+                <TableHead className="text-right">Input</TableHead>
+                <TableHead className="text-right">Cache Write</TableHead>
+                <TableHead className="text-right">Cache Read</TableHead>
+                <TableHead className="text-right">Output</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tiers.map(([tier, spec]) => (
+                <TextModelRow key={tier} tier={tier} spec={spec} />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -240,6 +508,12 @@ export default function AIModelsCatalogPage() {
   return (
     <main className="min-h-screen">
       <Header className="relative top-0 z-50" />
+
+      <TextModelsSection />
+
+      <CatalogSection />
+
+      <Separator />
 
       {/* Hero */}
       <div className="container px-4 pt-16 pb-10">

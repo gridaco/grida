@@ -363,6 +363,7 @@ export namespace ai {
      */
     export type ImageModelId =
       // OpenAI
+      | "openai/gpt-image-2"
       | "openai/gpt-image-1.5"
       | "openai/gpt-image-1-mini"
       // Google (multimodal LLMs with image output)
@@ -386,6 +387,39 @@ export namespace ai {
     // ── Pricing ───────────────────────────────────────────────────────
 
     /**
+     * Per-token rate sheet, in USD per **1 million** tokens.
+     *
+     * The authoritative pricing unit for token-billed models. For
+     * tiered/flat per-image pricing, the same provider often publishes
+     * an equivalent token-based meter — store it here so that arbitrary
+     * sizes (outside the tiered map) can be priced exactly.
+     *
+     * Providers that distinguish text-input vs image-input modalities
+     * (e.g. OpenAI image models) populate both `input` and `image_input`,
+     * each with its own optional cached counterpart. Models that bill all
+     * inputs uniformly (e.g. Google Gemini) leave the image-side fields
+     * unset.
+     */
+    export type PerTokenRates = {
+      /** USD per 1M text input tokens. */
+      input: number;
+      /** USD per 1M cached text input tokens. */
+      cached_input?: number;
+      /** USD per 1M image input tokens (edits/refs). */
+      image_input?: number;
+      /** USD per 1M cached image input tokens. */
+      cached_image_input?: number;
+      /**
+       * USD per 1M output tokens.
+       *
+       * For image models this is the image-output rate. Some providers
+       * publish a separate text-output rate for multimodal flows; that's
+       * out of scope for this spec.
+       */
+      output: number;
+    };
+
+    /**
      * Per-image pricing with quality × size tiers (e.g. OpenAI).
      *
      * Values from the provider's official pricing page.
@@ -394,6 +428,16 @@ export namespace ai {
       type: "per_image_tiered";
       /** USD per image, keyed by `"quality/WxH"` (e.g. `"medium/1024x1024"`). */
       tiers: Record<string, number>;
+      /**
+       * Authoritative underlying per-token rates.
+       *
+       * `tiers` covers the provider's published per-image equivalents for
+       * popular sizes; arbitrary in-envelope sizes (see
+       * {@link ImageSizeConstraints}) are billed by token count using
+       * these rates. Always present when the provider documents a token
+       * meter for the model.
+       */
+      tokens?: PerTokenRates;
     };
 
     /**
@@ -407,16 +451,9 @@ export namespace ai {
 
     /**
      * Per-token pricing (e.g. Google Gemini image models).
-     *
-     * Values are USD per **1 million** tokens, matching the convention
-     * in `lib/ai/models.ts`.
      */
-    export type PerTokenPricing = {
+    export type PerTokenPricing = PerTokenRates & {
       type: "per_token";
-      /** USD per 1M input tokens. */
-      input: number;
-      /** USD per 1M output tokens. */
-      output: number;
     };
 
     /**
@@ -429,6 +466,55 @@ export namespace ai {
       | PerImageTieredPricing
       | PerImageFlatPricing
       | PerTokenPricing;
+
+    // ── Size constraints ──────────────────────────────────────────────
+
+    /**
+     * Continuous size constraints for an image model.
+     *
+     * Models accept arbitrary widths and heights within these bounds.
+     * Use alongside (or instead of) `sizes` (discrete presets):
+     *
+     * - **Presets only** — fixed-size models (legacy OpenAI image).
+     * - **Constraints only** — fully flexible (Flux, Gemini).
+     * - **Both** — `gpt-image-2`: documented preset prices plus arbitrary
+     *   sizes within the engine's pixel/aspect envelope.
+     *
+     * **Validation precedence.** When both `sizes` (presets) and
+     * `constraints` are present on a card, `constraints` is the
+     * authoritative validator: a request must satisfy every constraint
+     * field. `sizes` is a UI hint and a pricing-tier anchor — off-preset
+     * but in-envelope requests are valid, but their cost falls back to
+     * the nearest priced tier (see `PerImageTieredPricing`).
+     *
+     * All bounds are inclusive. Omit a field when the provider does not
+     * document that constraint.
+     */
+    export type ImageSizeConstraints = {
+      /**
+       * Pixel quantization. Width and height must be multiples of `step`.
+       * Default `1` (no quantization).
+       *
+       * @example 16 // gpt-image-2
+       */
+      step?: number;
+      /** Per-edge bounds, in px. Applies symmetrically to width and height. */
+      min_edge?: number;
+      max_edge?: number;
+      /** Total pixel-count bounds (`width × height`). */
+      min_pixels?: number;
+      max_pixels?: number;
+      /**
+       * Aspect-ratio bounds, expressed as the long edge over the short
+       * edge (always `>= 1`). Applies in either orientation.
+       *
+       * @example { max: 3 } // up to 3:1
+       */
+      aspect_ratio?: {
+        min?: number;
+        max?: number;
+      };
+    };
 
     // ── Card types ────────────────────────────────────────────────────
 
@@ -452,11 +538,14 @@ export namespace ai {
       styles: string[] | null;
       speed_label: SpeedLabel;
       speed_max: string;
-      min_width: number;
-      max_width: number;
-      min_height: number;
-      max_height: number;
+      /** Discrete preset sizes (UI suggestions and pricing-tier anchors). */
       sizes: SizeSpec[] | null;
+      /**
+       * Continuous size constraints for arbitrary dimensions.
+       * Authoritative for input validation when present (see
+       * {@link ImageSizeConstraints}).
+       */
+      constraints: ImageSizeConstraints | null;
       /** Real provider pricing data. */
       pricing: ImageModelPricing;
       /**
@@ -491,13 +580,13 @@ export namespace ai {
       // -----------------------------------------------------------------
       // OpenAI
       // -----------------------------------------------------------------
-      // https://developers.openai.com/api/docs/models/gpt-image-1.5
-      "openai/gpt-image-1.5": {
-        id: "openai/gpt-image-1.5",
-        label: "GPT Image 1.5",
+      // https://developers.openai.com/api/docs/models/gpt-image-2
+      "openai/gpt-image-2": {
+        id: "openai/gpt-image-2",
+        label: "GPT Image 2",
         deprecated: false,
         short_description:
-          "State-of-the-art image generation with better instruction following",
+          "State-of-the-art image generation and editing with flexible resolutions",
         vendor: "openai",
         provider: "gateway",
         speed_label: "medium",
@@ -508,10 +597,61 @@ export namespace ai {
           [1024, 1536, "2:3"],
           [1536, 1024, "3:2"],
         ],
-        min_width: 1024,
-        max_width: 1536,
-        min_height: 1024,
-        max_height: 1536,
+        constraints: {
+          step: 16,
+          max_edge: 3840,
+          min_pixels: 655_360,
+          max_pixels: 8_294_400,
+          aspect_ratio: { max: 3 },
+        },
+        // https://developers.openai.com/api/docs/models/gpt-image-2
+        pricing: {
+          type: "per_image_tiered",
+          tiers: {
+            "low/1024x1024": 0.006,
+            "low/1024x1536": 0.005,
+            "low/1536x1024": 0.005,
+            "medium/1024x1024": 0.053,
+            "medium/1024x1536": 0.041,
+            "medium/1536x1024": 0.041,
+            "high/1024x1024": 0.211,
+            "high/1024x1536": 0.165,
+            "high/1536x1024": 0.165,
+          },
+          tokens: {
+            input: 5.0,
+            cached_input: 1.25,
+            image_input: 8.0,
+            cached_image_input: 2.0,
+            output: 30.0,
+          },
+        },
+        avg_cost_usd: 0.053, // medium/1024x1024
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // https://developers.openai.com/api/docs/models/gpt-image-1.5
+      "openai/gpt-image-1.5": {
+        id: "openai/gpt-image-1.5",
+        label: "GPT Image 1.5",
+        deprecated: true,
+        short_description:
+          "Previous-generation image model. Superseded by GPT Image 2.",
+        vendor: "openai",
+        provider: "gateway",
+        speed_label: "medium",
+        speed_max: "1m",
+        styles: null,
+        sizes: [
+          [1024, 1024, "1:1"],
+          [1024, 1536, "2:3"],
+          [1536, 1024, "3:2"],
+        ],
+        // Preset-only — provider rejects arbitrary sizes.
+        constraints: null,
         // https://developers.openai.com/api/docs/models/gpt-image-1.5
         pricing: {
           type: "per_image_tiered",
@@ -525,6 +665,13 @@ export namespace ai {
             "high/1024x1024": 0.133,
             "high/1024x1536": 0.2,
             "high/1536x1024": 0.2,
+          },
+          tokens: {
+            input: 5.0,
+            cached_input: 1.25,
+            image_input: 8.0,
+            cached_image_input: 2.0,
+            output: 32.0,
           },
         },
         avg_cost_usd: 0.034, // medium/1024x1024
@@ -550,10 +697,8 @@ export namespace ai {
           [1024, 1536, "2:3"],
           [1536, 1024, "3:2"],
         ],
-        min_width: 1024,
-        max_width: 1536,
-        min_height: 1024,
-        max_height: 1536,
+        // Preset-only — provider rejects arbitrary sizes.
+        constraints: null,
         // https://developers.openai.com/api/docs/models/gpt-image-1-mini
         pricing: {
           type: "per_image_tiered",
@@ -567,6 +712,13 @@ export namespace ai {
             "high/1024x1024": 0.036,
             "high/1024x1536": 0.052,
             "high/1536x1024": 0.052,
+          },
+          tokens: {
+            input: 2.0,
+            cached_input: 0.2,
+            image_input: 2.5,
+            cached_image_input: 0.25,
+            output: 8.0,
           },
         },
         avg_cost_usd: 0.011, // medium/1024x1024
@@ -593,10 +745,7 @@ export namespace ai {
         speed_max: "15s",
         styles: null,
         sizes: null,
-        min_width: 0,
-        max_width: 1536,
-        min_height: 0,
-        max_height: 1536,
+        constraints: { max_edge: 1536 },
         pricing: { type: "per_token", input: 0.5, output: 3.0 },
         avg_cost_usd: 0.004, // conservative per-image estimate for budget
         default: {
@@ -619,10 +768,7 @@ export namespace ai {
         speed_max: "30s",
         styles: null,
         sizes: null,
-        min_width: 0,
-        max_width: 1536,
-        min_height: 0,
-        max_height: 1536,
+        constraints: { max_edge: 1536 },
         pricing: { type: "per_token", input: 2.0, output: 12.0 },
         avg_cost_usd: 0.015, // conservative per-image estimate for budget
         default: {
@@ -648,10 +794,7 @@ export namespace ai {
         speed_max: "30s",
         styles: null,
         sizes: null,
-        min_width: 256,
-        max_width: 1440,
-        min_height: 256,
-        max_height: 1440,
+        constraints: { min_edge: 256, max_edge: 1440 },
         pricing: { type: "per_image_flat", usd: 0.06 },
         avg_cost_usd: 0.06,
         default: {
@@ -672,10 +815,7 @@ export namespace ai {
         speed_max: "30s",
         styles: null,
         sizes: null,
-        min_width: 0,
-        min_height: 0,
-        max_width: 1820,
-        max_height: 1820,
+        constraints: { max_edge: 1820 },
         pricing: { type: "per_image_flat", usd: 0.08 },
         avg_cost_usd: 0.08,
         default: {
@@ -695,10 +835,7 @@ export namespace ai {
         speed_max: "20s",
         styles: null,
         sizes: null,
-        min_width: 0,
-        min_height: 0,
-        max_width: 1820,
-        max_height: 1820,
+        constraints: { max_edge: 1820 },
         pricing: { type: "per_image_flat", usd: 0.05 },
         avg_cost_usd: 0.05,
         default: {
@@ -719,10 +856,7 @@ export namespace ai {
         speed_max: "30s",
         styles: null,
         sizes: null,
-        min_width: 256,
-        max_width: 1440,
-        min_height: 256,
-        max_height: 1440,
+        constraints: { min_edge: 256, max_edge: 1440 },
         pricing: { type: "per_image_flat", usd: 0.04 },
         avg_cost_usd: 0.04,
         default: {
