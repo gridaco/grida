@@ -1727,7 +1727,9 @@ fn parse_first_length_strict(s: &str) -> Option<f32> {
 ///
 /// Grammar per CSS Filter Effects 1 §3.1.10:
 ///
-///     drop-shadow( [<color>]? && <length>{2,3} )
+/// ```text
+/// drop-shadow( [<color>]? && <length>{2,3} )
+/// ```
 ///
 /// — a color (in any position) and exactly two or three lengths,
 /// whitespace-separated. Commas are **not** allowed; an extra token,
