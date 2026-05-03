@@ -209,6 +209,10 @@ node-compile-cache/
 **/__tests__/artifacts/
 **/__tests__/.tmp/
 
+# Reftest harness — generated baseline PNGs and puppeteer install
+crates/grida_dev/scripts/package.json
+crates/grida_dev/scripts/package-lock.json
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/

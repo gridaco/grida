@@ -518,8 +518,8 @@ fn detect_img_element(node: &DemoNode) -> ReplacedContent {
 /// (components/script/dom/svg/svgsvgelement.rs): the `<svg>` subtree is
 /// flattened to a standalone XML string so it can be parsed by an
 /// out-of-band SVG renderer. Unlike Servo, Grida hands the string to
-/// Skia's built-in `svg::Dom` (GPU-capable) rather than resvg's
-/// tiny-skia rasterizer.
+/// the in-tree `htmlcss::svg` renderer (Skia-backed, GPU-capable)
+/// rather than resvg's tiny-skia rasterizer or Skia's built-in svg::Dom.
 fn serialize_svg_subtree(dom: &DemoDom, svg_node: &DemoNode) -> String {
     let mut out = String::new();
     write_svg_element(dom, svg_node, &mut out, /*inject_xmlns=*/ true);
@@ -618,7 +618,7 @@ fn parse_view_box(s: &str) -> Option<(f32, f32, f32, f32)> {
 /// Walks the subtree to produce a standalone XML document, reads
 /// `width` / `height` / `viewBox` attributes for intrinsic sizing, and
 /// stashes the serialized source on `ReplacedContent` for paint-time
-/// delegation to `skia_safe::svg::Dom`.
+/// routing through `htmlcss::svg::render_into`.
 fn detect_svg_element(dom: &DemoDom, node: &DemoNode) -> ReplacedContent {
     let xml = serialize_svg_subtree(dom, node);
 
@@ -692,8 +692,8 @@ fn detect_widget(tag: &str, node_data: &DemoNode, dom: &DemoDom, el: &mut Styled
         }
         "svg" => {
             // Treat inline <svg> as a replaced element whose content is
-            // an XML-serialized subtree. Paint time delegates to
-            // skia_safe::svg::Dom (see htmlcss/paint.rs). Children are
+            // an XML-serialized subtree. Paint time routes through
+            // htmlcss::svg::render_into (see htmlcss/paint.rs). Children are
             // captured in the serialized XML — the normal DOM walker
             // must not descend into them (they'd be painted twice and
             // misinterpreted as HTML text nodes).

@@ -201,11 +201,12 @@ pub struct ReplacedContent {
     ///
     /// When `Some`, the replaced element is an `<svg>` whose content has
     /// been XML-serialized (with `xmlns="http://www.w3.org/2000/svg"`
-    /// injected if missing). Paint time parses this via
-    /// `skia_safe::svg::Dom::from_bytes` and renders it onto the canvas.
-    /// Follows the Servo-style architectural pattern of treating inline
-    /// SVG as a replaced element, but uses Skia's built-in SVG module
-    /// (GPU-capable) instead of resvg + tiny-skia.
+    /// injected if missing). Paint time hands this to
+    /// `crate::htmlcss::svg::render_into`, which parses with our DemoDom
+    /// pipeline and paints directly onto the SkCanvas. Follows the
+    /// Servo-style architectural pattern of treating inline SVG as a
+    /// replaced element, but uses our in-tree Skia-backed renderer
+    /// rather than resvg + tiny-skia or Skia's built-in svg::Dom.
     pub svg_xml: Option<String>,
     /// Parsed `viewBox="min-x min-y width height"` for SVG intrinsic
     /// aspect-ratio resolution. Only populated when `svg_xml` is set.

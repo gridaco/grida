@@ -337,6 +337,117 @@ fn scene_from_svg_path(path: &Path) -> Result<Scene> {
     })
 }
 
+/// Best-effort intrinsic size from the root <svg> tag — width/height first,
+/// then viewBox. Returns None if the file isn't a single rooted SVG with
+/// parseable dimensions; caller should fall back to measure-based sizing.
+fn sniff_svg_size(xml: &str) -> Option<(f32, f32)> {
+    let open = xml.find("<svg").map(|i| &xml[i..])?;
+    let tag_end = open.find('>')?;
+    let tag = &open[..tag_end];
+    fn attr(tag: &str, name: &str) -> Option<f32> {
+        let needle = format!("{}=", name);
+        let start = tag.find(&needle)? + needle.len();
+        let rest = &tag[start..];
+        let (quote, rest) = rest.split_at(1);
+        let q = quote.chars().next()?;
+        if q != '"' && q != '\'' {
+            return None;
+        }
+        let end = rest.find(q)?;
+        let raw = &rest[..end];
+        let numeric_end = raw
+            .find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-'))
+            .unwrap_or(raw.len());
+        raw[..numeric_end].parse::<f32>().ok().map(|v| v.max(1.0))
+    }
+    if let (Some(w), Some(h)) = (attr(tag, "width"), attr(tag, "height")) {
+        return Some((w, h));
+    }
+    let vb = {
+        let needle = "viewBox=";
+        let start = tag.find(needle)? + needle.len();
+        let rest = &tag[start..];
+        let (quote, rest) = rest.split_at(1);
+        let q = quote.chars().next()?;
+        if q != '"' && q != '\'' {
+            return None;
+        }
+        let end = rest.find(q)?;
+        rest[..end].to_string()
+    };
+    let parts: Vec<f32> = vb
+        .split(|c: char| c.is_whitespace() || c == ',')
+        .filter_map(|s| s.parse::<f32>().ok())
+        .collect();
+    if parts.len() >= 4 {
+        Some((parts[2].max(1.0), parts[3].max(1.0)))
+    } else {
+        None
+    }
+}
+
+async fn scene_from_svg_embed_path(path: &Path) -> Result<HtmlEmbedScene> {
+    use grida::cg::prelude::CGColor;
+    use grida::node::factory::NodeFactory;
+    use grida::node::scene_graph::{Parent, SceneGraph};
+    use grida::node::schema::Node;
+
+    let svg_source = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+
+    // htmlcss renders inline <svg> inside HTML via the same code path as standalone
+    // SVG, so wrapping is a thin envelope — no parsing/serialization roundtrip on the
+    // SVG body itself.
+    let html = format!(
+        "<!doctype html><html><body style=\"margin:0;padding:0\">{}</body></html>",
+        svg_source
+    );
+
+    let (width, height) = match sniff_svg_size(&svg_source) {
+        Some((w, h)) => (w, h),
+        None => {
+            let temp_fonts = {
+                use grida::resources::ByteStore;
+                use grida::runtime::font_repository::FontRepository;
+                let mut repo = FontRepository::new(std::sync::Arc::new(std::sync::Mutex::new(
+                    ByteStore::new(),
+                )));
+                repo.enable_system_fallback();
+                repo
+            };
+            let w = 800.0_f32;
+            let h = grida::htmlcss::measure_content_height(
+                &html,
+                w,
+                &temp_fonts,
+                &grida::htmlcss::NoImages,
+            )
+            .unwrap_or(600.0);
+            (w, h)
+        }
+    };
+
+    let nf = NodeFactory::new();
+    let mut node = nf.create_html_embed_node();
+    node.html = html;
+    node.size = grida::node::schema::Size { width, height };
+
+    let mut graph = SceneGraph::new();
+    graph.append_child(Node::HTMLEmbed(node), Parent::Root);
+
+    Ok(HtmlEmbedScene {
+        scene: Scene {
+            name: path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "SVG (Embed)".to_string()),
+            graph,
+            background_color: Some(CGColor::from_u32(0xFFFFFFFF)),
+        },
+        images: Vec::new(),
+    })
+}
+
 fn scene_from_html_path(path: &Path) -> Result<Scene> {
     use grida::cg::prelude::CGColor;
     let html_source = std::fs::read_to_string(path)
@@ -421,6 +532,26 @@ fn ask_html_import_mode() -> bool {
     let result = MessageDialog::new()
         .set_title("HTML Import Mode")
         .set_description("How would you like to import this HTML file?\n\n\u{2022} Embed \u{2014} Render as opaque picture (CSS-accurate, non-editable)\n\u{2022} Convert \u{2014} Convert to editable Grida IR nodes (lossy CSS)")
+        .set_buttons(MessageButtons::OkCancelCustom("Embed".to_string(), "Convert".to_string()))
+        .show();
+
+    match result {
+        MessageDialogResult::Ok => true,
+        MessageDialogResult::Custom(s) if s == "Embed" => true,
+        _ => false,
+    }
+}
+
+/// Show a dialog asking the user to choose between Embed and Convert for SVG files.
+/// Returns true for Embed, false for Convert.
+fn ask_svg_import_mode() -> bool {
+    use rfd::MessageButtons;
+    use rfd::MessageDialog;
+    use rfd::MessageDialogResult;
+
+    let result = MessageDialog::new()
+        .set_title("SVG Import Mode")
+        .set_description("How would you like to import this SVG file?\n\n\u{2022} Embed \u{2014} Render as opaque picture (htmlcss-accurate, non-editable)\n\u{2022} Convert \u{2014} Convert to editable Grida vector nodes (lossy SVG)")
         .set_buttons(MessageButtons::OkCancelCustom("Embed".to_string(), "Convert".to_string()))
         .show();
 
@@ -538,10 +669,20 @@ async fn load_master_scenes_from_path(path: &Path) -> Result<LoadedScenes> {
                     images: Vec::new(),
                 })
         }
-        "svg" => scene_from_svg_path(path).map(|s| LoadedScenes {
-            scenes: vec![s],
-            images: Vec::new(),
-        }),
+        "svg" => {
+            if ask_svg_import_mode() {
+                let result = scene_from_svg_embed_path(path).await?;
+                Ok(LoadedScenes {
+                    scenes: vec![result.scene],
+                    images: result.images,
+                })
+            } else {
+                scene_from_svg_path(path).map(|s| LoadedScenes {
+                    scenes: vec![s],
+                    images: Vec::new(),
+                })
+            }
+        }
         "html" | "htm" => {
             if ask_html_import_mode() {
                 let result = scene_from_html_embed_path(path).await?;

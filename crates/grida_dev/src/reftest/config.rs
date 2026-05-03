@@ -15,6 +15,33 @@ pub(crate) struct DiffConfig {
 pub(crate) struct ScoringConfig {
     #[serde(default)]
     pub mask: Option<String>, // "none" | "alpha"
+    /// Similarity floor at or above which a fixture is considered
+    /// "passing". Defaults to `0.95` if unset. Used by aggregate
+    /// reporting (consensus pass rate, etc.) — does not change
+    /// per-test scoring.
+    #[serde(default)]
+    pub pass_floor: Option<f64>,
+}
+
+/// `[test.oracles]` — additional ground-truth sources beyond the
+/// suite's `expected.png`. Both fields are paths relative to
+/// `suite_dir`.
+///
+/// - `results_csv` — upstream per-renderer status matrix (used by
+///   `resvg-test-suite`). Each row records whether
+///   chrome/firefox/safari/resvg/etc. passed against that fixture's
+///   `expected.png`. Drives the consensus / disputed / UB
+///   classification.
+/// - `chrome_baseline` — directory of pre-baked Chrome PNGs that
+///   mirror the input layout (`<chrome_baseline>/<rel>.png`). When
+///   present, the runner adds a second similarity score (vs. Chrome)
+///   so disputed fixtures can pass against either oracle.
+#[derive(Debug, Deserialize, Default, Clone)]
+pub(crate) struct OraclesConfig {
+    #[serde(default)]
+    pub results_csv: Option<String>,
+    #[serde(default)]
+    pub chrome_baseline: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -35,6 +62,8 @@ pub(crate) struct TestConfig {
     pub diff: Option<DiffConfig>,
     #[serde(default)]
     pub scoring: Option<ScoringConfig>,
+    #[serde(default)]
+    pub oracles: Option<OraclesConfig>,
     #[serde(default)]
     pub bg: Option<String>, // "black" | "white"
 }
@@ -86,6 +115,7 @@ impl ReftestToml {
             expects: self.expects.clone(),
             diff: self.diff,
             scoring: None, // Legacy configs don't have scoring
+            oracles: None, // Legacy configs don't have oracles
             bg: self.bg.clone(),
         }
     }
@@ -118,6 +148,9 @@ impl ReftestToml {
     }
     pub(crate) fn resolve_scoring(&self) -> Option<ScoringConfig> {
         self.pick_test().scoring
+    }
+    pub(crate) fn resolve_oracles(&self) -> Option<OraclesConfig> {
+        self.pick_test().oracles
     }
     pub(crate) fn resolve_kind(&self) -> Option<String> {
         self.pick_test().kind

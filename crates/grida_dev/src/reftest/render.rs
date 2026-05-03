@@ -19,9 +19,15 @@ pub(crate) struct TestPair {
     pub svg_path: PathBuf,
     pub ref_png_path: PathBuf,
     pub test_name: String,
+    /// Suite-relative path of the SVG (e.g.
+    /// `filters/enable-background/new.svg`). `None` for the legacy
+    /// directory-scan path which has no multi-level relative key. Used
+    /// by the oracle harness to look up the fixture's row in
+    /// `results.csv` and to resolve a baked Chrome PNG.
+    pub rel_svg_path: Option<PathBuf>,
 }
 
-fn name_from_rel_path(rel: &Path) -> String {
+pub(crate) fn name_from_rel_path(rel: &Path) -> String {
     // Convert a relative path like `dir/sub/icon.svg` to `dir_sub_icon`
     let mut parts: Vec<String> = Vec::new();
     let components: Vec<String> = rel
@@ -112,6 +118,7 @@ pub(crate) fn find_test_pairs_from_glob(
             svg_path: path,
             ref_png_path,
             test_name,
+            rel_svg_path: Some(rel),
         });
     }
 
@@ -144,21 +151,22 @@ pub(crate) fn find_test_pairs_in_dirs(svg_dir: &Path, png_dir: &Path) -> Result<
                 svg_path,
                 ref_png_path,
                 test_name,
+                rel_svg_path: None,
             });
         }
     }
     Ok(pairs)
 }
 
-/// Render an SVG file through the new htmlcss → `skia_safe::svg::Dom`
-/// path and write a PNG.
+/// Render an SVG file through `grida::htmlcss::render_svg` (the
+/// in-tree htmlcss::svg renderer) and write a PNG.
 ///
 /// Unlike [`render_svg_to_png`], which round-trips through the Grida
-/// scene graph via `grida::import::svg::pack`, this path delegates directly to
-/// Skia's SVG module — matching Chromium's rendering for WPT-style
-/// reftests. Target size is the reference PNG's pixel dimensions;
-/// `viewBox` + `preserveAspectRatio` inside the SVG map user units to
-/// that box.
+/// scene graph via `grida::import::svg::pack`, this path uses our
+/// own Skia-backed SVG renderer end-to-end — there is no fallback to
+/// Skia's built-in `svg::Dom`. Target size is the reference PNG's
+/// pixel dimensions; `viewBox` + `preserveAspectRatio` inside the SVG
+/// map user units to that box.
 pub(crate) fn render_svg_to_png_via_htmlcss(
     svg_path: &Path,
     output_path: &Path,
@@ -180,10 +188,34 @@ pub(crate) fn render_svg_to_png_via_htmlcss(
         }
     };
 
-    // Record the SVG into a Skia Picture via the htmlcss module's public
-    // entry point.
-    let picture = grida::htmlcss::render_svg(&svg_source, width as f32, height as f32)
-        .map_err(|e| anyhow!("htmlcss::render_svg failed: {e}"))?;
+    // Pre-resolve any relative `xlink:href` / `href` references in the
+    // SVG against the fixture's directory so the painter's
+    // `ImageProvider` can find them. Without this, fixtures using
+    // `<image href="../resources/foo.jpg">` render blank.
+    let mut images = grida::htmlcss::PreloadedImages::new();
+    let mut css = grida::htmlcss::svg::PreloadedCss::new();
+    if let Some(parent) = svg_path.parent() {
+        preload_referenced_images(&svg_source, parent, &mut images);
+        preload_referenced_css(&svg_source, parent, &mut css);
+    }
+
+    // Build a font resolver. For the resvg-test-suite path, this loads
+    // the suite's bundled `fonts/` directory and applies the same
+    // generic-family map vdiff sets up via `--*-family` flags. Mirrors
+    // `--skip-system-fonts`: families not in the curated set return
+    // `None` rather than silently falling through to CoreText/fontconfig.
+    let fonts = resolve_test_suite_fonts(svg_path);
+
+    // Record the SVG into a Skia Picture via the htmlcss module's
+    // resource-aware entry point.
+    let context = grida::htmlcss::svg::RenderContext::new(&images, &css, &fonts);
+    let picture = grida::htmlcss::svg::render_to_picture_with_context(
+        &svg_source,
+        width as f32,
+        height as f32,
+        context,
+    )
+    .map_err(|e| anyhow!("htmlcss::svg::render_to_picture_with_context failed: {e}"))?;
 
     // Rasterize the Picture onto a CPU-backed surface. Transparent clear
     // lets the reftest's background masking (`bg = white|black`) composite
@@ -236,70 +268,37 @@ fn sniff_svg_dimensions(svg: &str) -> Option<(u32, u32)> {
             .unwrap_or(raw.len());
         raw[..numeric_end].parse::<f32>().ok().map(|v| v as u32)
     }
-    let w = attr(tag, "width")?;
-    let h = attr(tag, "height")?;
-    Some((w.max(1), h.max(1)))
+    if let (Some(w), Some(h)) = (attr(tag, "width"), attr(tag, "height")) {
+        return Some((w.max(1), h.max(1)));
+    }
+    // No explicit width/height — derive intrinsic dims from viewBox.
+    // Per SVG 2 §5.4 / CSS Images 3 §5, an SVG with only a viewBox has
+    // intrinsic dimensions equal to the viewBox extents.
+    let vb = sniff_view_box(tag)?;
+    Some((vb.0.max(1.0) as u32, vb.1.max(1.0) as u32))
 }
 
-/// Render an SVG file through **Skia's native SVG module** with the
-/// thinnest possible wrapper.
-///
-/// Pipeline: `fs::read` → `Data::new_copy` → `svg::Dom::from_bytes` →
-/// `surface.canvas()` → `dom.render()` → PNG. No htmlcss module, no
-/// `PictureRecorder`, no Grida tree surgery.
-///
-/// Purpose: attribute reftest failures correctly. A test that fails
-/// here is a limitation of Skia's own `svg::Dom` implementation, not
-/// of Grida's wiring. If the same test fails identically under
-/// `--renderer htmlcss`, then our htmlcss wrapping adds zero
-/// divergence; any delta between the two backends attributes to the
-/// `PictureRecorder` round-trip we add in htmlcss.
-pub(crate) fn render_svg_to_png_via_sksvg(
-    svg_path: &Path,
-    output_path: &Path,
-    target_size: Option<(u32, u32)>,
-) -> Result<()> {
-    use skia_safe::{surfaces, svg, Color as SkColor, Data, EncodedImageFormat, FontMgr, Size};
-
-    let svg_bytes = fs::read(svg_path)
-        .with_context(|| format!("failed to read SVG file {}", svg_path.display()))?;
-
-    let (width, height) = match target_size {
-        Some((w, h)) => (w.max(1) as i32, h.max(1) as i32),
-        None => {
-            let svg_source = std::str::from_utf8(&svg_bytes)
-                .with_context(|| format!("SVG file {} is not UTF-8", svg_path.display()))?;
-            let (w, h) = sniff_svg_dimensions(svg_source).unwrap_or((512, 512));
-            (w as i32, h as i32)
-        }
-    };
-
-    let data = Data::new_copy(&svg_bytes);
-    let mut dom = svg::Dom::from_bytes(&data, FontMgr::default())
-        .map_err(|e| anyhow!("skia svg::Dom::from_bytes failed: {e}"))?;
-    dom.set_container_size(Size::new(width as f32, height as f32));
-
-    let mut surface = surfaces::raster_n32_premul((width, height))
-        .ok_or_else(|| anyhow!("failed to create raster surface {}x{}", width, height))?;
-    {
-        let canvas = surface.canvas();
-        canvas.clear(SkColor::TRANSPARENT);
-        dom.render(canvas);
+fn sniff_view_box(tag: &str) -> Option<(f32, f32)> {
+    let needle = "viewBox=";
+    let start = tag.find(needle)? + needle.len();
+    let rest = &tag[start..];
+    let (quote, rest) = rest.split_at(1);
+    let quote = quote.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
     }
-
-    let image = surface.image_snapshot();
-    let encoded = image
-        .encode(None, EncodedImageFormat::PNG, None)
-        .ok_or_else(|| anyhow!("Failed to encode PNG"))?;
-
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("failed to create output directory {}", parent.display()))?;
+    let end = rest.find(quote)?;
+    let raw = &rest[..end];
+    let parts: Vec<f32> = raw
+        .split(|c: char| c == ',' || c.is_ascii_whitespace())
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| s.parse::<f32>().ok())
+        .collect();
+    if parts.len() == 4 {
+        Some((parts[2], parts[3]))
+    } else {
+        None
     }
-    fs::write(output_path, encoded.as_bytes())
-        .with_context(|| format!("failed to write PNG to {}", output_path.display()))?;
-
-    Ok(())
 }
 
 pub(crate) fn render_svg_to_png(
@@ -405,4 +404,283 @@ pub(crate) fn render_svg_to_png(
         .with_context(|| format!("failed to write PNG to {}", output_path.display()))?;
 
     Ok(())
+}
+
+/// Scan an SVG document for `xlink:href="…"` and `href="…"` attribute
+/// values that look like local file references, resolve each against
+/// the SVG's directory, and pre-decode them into `images`. This makes
+/// fixtures using `<image href="../resources/foo.jpg">` (the common
+/// resvg-test-suite shape) render correctly through the standalone
+/// `render_to_picture_with_images` entry point.
+///
+/// Excluded: empty values, fragment-only refs (`#id`), and `data:`
+/// URIs (the painter decodes those itself).
+fn preload_referenced_images(
+    svg: &str,
+    base_dir: &Path,
+    images: &mut grida::htmlcss::PreloadedImages,
+) {
+    preload_referenced_images_inner(svg, base_dir, images, 0);
+}
+
+/// Preload the bodies of any CSS files the SVG `@import`s into a
+/// [`grida::htmlcss::svg::PreloadedCss`]. Mirrors `preload_referenced_images`:
+/// the renderer's stylesheet collector queries the loader by path
+/// during parsing, so the harness's job is just to read every
+/// reachable `.css` file from disk and stuff it in.
+///
+/// Recursive imports (CSS A imports CSS B) are handled by recursing
+/// into each loaded file with the *file's own* parent directory as
+/// the base, so chained relative paths resolve correctly.
+fn preload_referenced_css(svg: &str, base_dir: &Path, css: &mut grida::htmlcss::svg::PreloadedCss) {
+    let mut visited: std::collections::HashSet<std::path::PathBuf> =
+        std::collections::HashSet::new();
+    preload_css_recursive(svg, base_dir, css, &mut visited, 0);
+}
+
+/// Cap on the harness preload's recursion depth. Independent of the
+/// renderer's `MAX_IMPORT_DEPTH` — the harness side is bounded by the
+/// `visited` canonical-path set, this is just a belt against deep
+/// chains taking too long to walk on disk.
+const MAX_CSS_IMPORT_DEPTH: u32 = 8;
+
+/// Build the font resolver used when rendering a resvg-test-suite
+/// fixture. Walks up from the fixture path looking for a sibling
+/// `fonts/` directory; if found, registers every `.ttf` / `.otf` and
+/// applies the generic-family bindings vdiff configures via `--*-family`
+/// flags (see `fixtures/.../tools/vdiff/src/render.cpp`):
+///
+/// - default + `sans-serif` → `Noto Sans`
+/// - `serif` → `Noto Serif`
+/// - `cursive` → `Yellowtail`
+/// - `fantasy` → `Sedgwick Ave Display`
+/// - `monospace` → `Noto Mono`
+///
+/// When no `fonts/` directory is found, returns an empty resolver —
+/// the painter then no-ops on `<text>` rather than silently falling
+/// through to system fonts. That matches the suite's
+/// `--skip-system-fonts` invariant: any text scoring difference is
+/// then attributable to the renderer, not to font availability.
+fn resolve_test_suite_fonts(svg_path: &Path) -> grida::htmlcss::svg::PreloadedFonts {
+    let mut fonts = grida::htmlcss::svg::PreloadedFonts::new();
+    let Some(fonts_dir) = find_test_suite_fonts_dir(svg_path) else {
+        return fonts;
+    };
+    if let Ok(entries) = fs::read_dir(&fonts_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_font = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|ext| ext.eq_ignore_ascii_case("ttf") || ext.eq_ignore_ascii_case("otf"))
+                .unwrap_or(false);
+            if !is_font {
+                continue;
+            }
+            if let Ok(bytes) = fs::read(&path) {
+                fonts.register(&bytes);
+            }
+        }
+    }
+    // Generic-family bindings — verbatim from vdiff's CLI flags.
+    //
+    // Note: the suite's expected PNGs for `font-family/{cursive,fantasy,
+    // serif}.svg` appear to have been rendered against the host's
+    // system fallbacks rather than against these vdiff-config fonts.
+    // Our render uses the documented Noto Serif / Yellowtail / Sedgwick
+    // Ave Display (matching vdiff itself); divergence on those three
+    // generic fixtures is a property of the test data, not a wiring
+    // bug. `sans-serif` and `monospace` agree on metrics with most
+    // host defaults so they score high regardless.
+    fonts.set_generic("serif", "Noto Serif");
+    fonts.set_generic("sans-serif", "Noto Sans");
+    fonts.set_generic("cursive", "Yellowtail");
+    fonts.set_generic("fantasy", "Sedgwick Ave Display");
+    fonts.set_generic("monospace", "Noto Mono");
+
+    // One fixture (`tspan/style-override.svg`) references "Times New
+    // Roman" via inline CSS but the suite ships no matching .ttf. Map
+    // it to Noto Serif — the closest registered face — so the fixture
+    // renders something rather than blank text. Mirrors the per-host
+    // alias hosts get for free on macOS / Windows.
+    fonts.set_alias("Times New Roman", "Noto Serif");
+
+    fonts.set_default_family("Noto Sans");
+    fonts
+}
+
+/// Walk up from `svg_path` looking for a sibling `fonts/` directory
+/// (the resvg-test-suite layout has `fonts/` at the suite root, with
+/// fixtures nested under `tests/<category>/<name>.svg`). Returns the
+/// first hit, or `None` if no ancestor has one.
+fn find_test_suite_fonts_dir(svg_path: &Path) -> Option<PathBuf> {
+    let mut cursor = svg_path.parent()?;
+    loop {
+        let candidate = cursor.join("fonts");
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+        cursor = cursor.parent()?;
+    }
+}
+
+fn preload_css_recursive(
+    css_or_svg_text: &str,
+    base_dir: &Path,
+    css: &mut grida::htmlcss::svg::PreloadedCss,
+    visited: &mut std::collections::HashSet<std::path::PathBuf>,
+    depth: u32,
+) {
+    if depth >= MAX_CSS_IMPORT_DEPTH {
+        return;
+    }
+    for path in grida::htmlcss::svg::style::stylesheet::scan_imports(css_or_svg_text) {
+        if path.starts_with("http://") || path.starts_with("https://") || path.starts_with("data:")
+        {
+            continue;
+        }
+        let resolved = base_dir.join(&path);
+        let canonical = resolved.canonicalize().unwrap_or_else(|_| resolved.clone());
+        if !visited.insert(canonical.clone()) {
+            continue;
+        }
+        let Ok(body) = fs::read_to_string(&resolved) else {
+            continue;
+        };
+        // Register under the original (unresolved) path the SVG used
+        // so the renderer's `CssLoader::get(path)` lookup hits.
+        css.insert(path.clone(), body.clone());
+        // Recurse — chained imports resolve relative to the imported
+        // file's own directory.
+        let nested_base = resolved.parent().unwrap_or(base_dir).to_path_buf();
+        preload_css_recursive(&body, &nested_base, css, visited, depth + 1);
+    }
+}
+
+const MAX_NESTED_SVG_DEPTH: u32 = 4;
+
+fn preload_referenced_images_inner(
+    svg: &str,
+    base_dir: &Path,
+    images: &mut grida::htmlcss::PreloadedImages,
+    depth: u32,
+) {
+    use std::collections::HashSet;
+    let mut seen: HashSet<String> = HashSet::new();
+    for needle in ["xlink:href=\"", "xlink:href='", "href=\"", "href='"] {
+        let mut rest = svg;
+        while let Some(idx) = rest.find(needle) {
+            let after = &rest[idx + needle.len()..];
+            let quote = needle.chars().last().unwrap();
+            let Some(end) = after.find(quote) else {
+                break;
+            };
+            let value = &after[..end];
+            rest = &after[end + 1..];
+            if value.is_empty() || value.starts_with('#') {
+                continue;
+            }
+            if value.starts_with("data:") || value.starts_with("DATA:") {
+                continue;
+            }
+            if value.starts_with("http://")
+                || value.starts_with("https://")
+                || value.starts_with("file://")
+            {
+                continue;
+            }
+            if !seen.insert(value.to_string()) {
+                continue;
+            }
+            let path = base_dir.join(value);
+            let Ok(bytes) = fs::read(&path) else {
+                continue;
+            };
+            let lower = value.to_ascii_lowercase();
+            if lower.ends_with(".svg") {
+                if depth >= MAX_NESTED_SVG_DEPTH {
+                    continue;
+                }
+                if let Ok(svg_str) = std::str::from_utf8(&bytes) {
+                    if let Some(image) = rasterize_external_svg(svg_str, base_dir, depth + 1) {
+                        if let Some(png) = image.encode(None, EncodedImageFormat::PNG, None) {
+                            images.insert_bytes(value.to_string(), png.as_bytes());
+                        }
+                    }
+                }
+            } else {
+                images.insert_bytes(value.to_string(), &bytes);
+            }
+        }
+    }
+}
+
+/// Render an external `.svg` file to an in-memory `skia_safe::Image`
+/// at its sniffed intrinsic size (or 512×512 fallback). Recursive
+/// `<image>` references inside the embedded SVG are resolved against
+/// the same `base_dir` as the outer SVG.
+fn rasterize_external_svg(svg: &str, base_dir: &Path, depth: u32) -> Option<skia_safe::Image> {
+    use skia_safe::{surfaces, Color as SkColor};
+    let (w, h) = sniff_svg_dimensions(svg).unwrap_or((512, 512));
+    let mut nested = grida::htmlcss::PreloadedImages::new();
+    preload_referenced_images_inner(svg, base_dir, &mut nested, depth);
+    let picture =
+        grida::htmlcss::svg::render_to_picture_with_images(svg, w as f32, h as f32, &nested)
+            .ok()?;
+    let mut surface = surfaces::raster_n32_premul((w as i32, h as i32))?;
+    {
+        let canvas = surface.canvas();
+        canvas.clear(SkColor::TRANSPARENT);
+        canvas.draw_picture(&picture, None, None);
+    }
+    Some(surface.image_snapshot())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preload_css_picks_up_external_import() {
+        // Mirror the resvg-test-suite layout (which lives under the gitignored
+        // `fixtures/local/`) inside a temp dir so this test runs in CI.
+        let root = std::env::temp_dir().join(format!(
+            "grida-preload-css-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let style_dir = root.join("tests/structure/style");
+        let resources_dir = root.join("resources");
+        std::fs::create_dir_all(&style_dir).expect("create style dir");
+        std::fs::create_dir_all(&resources_dir).expect("create resources dir");
+        let svg_path = style_dir.join("external-CSS.svg");
+        let css_path = resources_dir.join("green.css");
+        std::fs::write(
+            &svg_path,
+            r#"<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <style>@import "../../../resources/green.css"</style>
+    <rect id="rect1" x="20" y="20" width="160" height="160" fill="red"/>
+</svg>"#,
+        )
+        .expect("write svg");
+        std::fs::write(&css_path, "#rect1 { fill:green; }\n").expect("write css");
+
+        let svg = std::fs::read_to_string(&svg_path).expect("read svg");
+        let parent = svg_path.parent().unwrap();
+        use grida::htmlcss::svg::CssLoader;
+        let mut css = grida::htmlcss::svg::PreloadedCss::new();
+        preload_referenced_css(&svg, parent, &mut css);
+        let body = css
+            .get("../../../resources/green.css")
+            .expect("imported css preloaded under its original path");
+        assert!(
+            body.contains("#rect1 { fill:green; }"),
+            "imported css body unexpected: {body}"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

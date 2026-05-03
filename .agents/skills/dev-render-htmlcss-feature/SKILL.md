@@ -14,6 +14,12 @@ load only when the user explicitly runs it. The loop is a conductor
 over `/research`, `/fixtures`, and `/render-reftest` — those auto-trigger
 on their own for narrower work.
 
+**Sibling skill.** For features in the SVG path
+(`crates/grida/src/htmlcss/svg/`, `resvg-test-suite` corpus,
+multi-oracle scoring against expected.png + baked Chrome PNG), use
+[`dev-render-htmlcss-svg-feature`](../dev-render-htmlcss-svg-feature/SKILL.md)
+instead. Same five-phase shape, different tooling.
+
 **Lifecycle.** Expect this skill to grow as new divergence patterns
 surface. It will likely go stale in parts once htmlcss hits
 Chromium-parity on L0/L1; treat the _phase structure_ as durable and

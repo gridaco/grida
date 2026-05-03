@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>htmlcss reftest dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @theme {
+        --font-sans:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      body {
+        font-feature-settings: "ss01", "cv11";
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100 antialiased"
+  >
+    <header
+      class="sticky top-0 z-10 backdrop-blur bg-stone-50/85 dark:bg-stone-950/85 border-b border-stone-200 dark:border-stone-800"
+    >
+      <div
+        class="max-w-[1400px] mx-auto px-6 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5"
+      >
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span class="font-semibold text-sm">htmlcss reftest</span>
+          <span class="text-stone-400 dark:text-stone-600">·</span>
+          <code
+            class="font-mono text-[11px] px-1 py-0.5 rounded bg-stone-200/70 dark:bg-stone-800 text-stone-700 dark:text-stone-300"
+            >resvg-test-suite</code
+          >
+        </div>
+        <div
+          id="summary"
+          class="num text-xs text-stone-600 dark:text-stone-400 flex flex-wrap items-center gap-x-3 gap-y-1"
+        ></div>
+        <details class="relative ml-auto">
+          <summary
+            class="text-xs text-stone-500 dark:text-stone-400 cursor-pointer hover:text-stone-700 dark:hover:text-stone-200 select-none list-none px-2 py-1 rounded hover:bg-stone-200/60 dark:hover:bg-stone-800"
+          >
+            categories ▾
+          </summary>
+          <div
+            id="categories"
+            class="absolute right-0 top-full mt-1 w-[420px] max-h-[60vh] overflow-auto p-2 grid grid-cols-1 gap-1 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg shadow-lg z-20"
+          ></div>
+        </details>
+      </div>
+      <div class="border-t border-stone-200/60 dark:border-stone-800/60">
+        <div
+          class="max-w-[1400px] mx-auto px-6 py-2 flex flex-wrap items-center gap-2"
+        >
+          <input
+            type="search"
+            id="q"
+            placeholder="filter by test name…"
+            autocomplete="off"
+            class="text-sm px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 min-w-[220px]"
+          />
+          <select
+            id="cat"
+            class="text-sm px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900"
+          >
+            <option value="">all categories</option>
+          </select>
+          <div
+            class="flex items-center rounded-md border border-stone-300 dark:border-stone-700 overflow-hidden text-xs num"
+            id="buckets"
+          >
+            <button
+              data-bucket="all"
+              class="px-2 py-1 bg-stone-900 text-white dark:bg-white dark:text-stone-900"
+            >
+              all
+            </button>
+            <button
+              data-bucket="S99"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S99
+            </button>
+            <button
+              data-bucket="S95"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S95
+            </button>
+            <button
+              data-bucket="S90"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S90
+            </button>
+            <button
+              data-bucket="S75"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              S75
+            </button>
+            <button
+              data-bucket="err"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+            >
+              err
+            </button>
+          </div>
+          <div
+            class="flex items-center rounded-md border border-stone-300 dark:border-stone-700 overflow-hidden text-xs num"
+            id="oracles"
+            title="filter by oracle status"
+          >
+            <button
+              data-oracle="all"
+              class="px-2 py-1 bg-stone-900 text-white dark:bg-white dark:text-stone-900"
+            >
+              all
+            </button>
+            <button
+              data-oracle="consensus"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+              title="chrome agrees with expected.png"
+            >
+              consensus
+            </button>
+            <button
+              data-oracle="disputed"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+              title="chrome diverges from expected.png — chrome.png used as 2nd oracle"
+            >
+              disputed
+            </button>
+            <button
+              data-oracle="ub"
+              class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 border-l border-stone-300 dark:border-stone-700"
+              title="UB / no oracle (excluded from headline parity)"
+            >
+              ub
+            </button>
+          </div>
+          <select
+            id="sort"
+            class="text-sm px-2.5 py-1 rounded-md border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900"
+          >
+            <option value="score-asc">worst score first</option>
+            <option value="score-desc">best score first</option>
+            <option value="name-asc">name A–Z</option>
+            <option value="name-desc">name Z–A</option>
+          </select>
+          <span
+            class="num text-xs text-stone-500 dark:text-stone-400 ml-auto"
+            id="count"
+            >—</span
+          >
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-[1400px] mx-auto px-6 py-6 pb-20">
+      <div
+        id="grid"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+      ></div>
+    </main>
+
+    <div
+      id="lightbox"
+      class="fixed inset-0 z-50 bg-black/85 hidden items-center justify-center"
+      onclick="
+        this.classList.add('hidden');
+        this.classList.remove('flex');
+      "
+    >
+      <button
+        class="absolute top-4 right-5 text-white/70 hover:text-white text-2xl leading-none"
+      >
+        ×
+      </button>
+      <img
+        id="lightbox-img"
+        class="max-w-[92vw] max-h-[92vh] [image-rendering:pixelated] bg-white ring-1 ring-stone-700"
+        src=""
+        alt=""
+      />
+    </div>
+
+    <script>
+      // __REPORT_INLINE_PLACEHOLDER__
+    </script>
+
+    <script>
+      (async function () {
+        let report = window.__REPORT__;
+        if (!report) {
+          try {
+            const res = await fetch("report.json", { cache: "no-store" });
+            report = await res.json();
+          } catch (e) {
+            document.getElementById("grid").innerHTML =
+              `<div class="col-span-full text-center text-stone-500 py-16 text-sm">no report data — serve a result dir over HTTP, or inline via <code class="font-mono">build_reftest_dashboard.py</code></div>`;
+            return;
+          }
+        }
+
+        function bucketFor(score, err) {
+          if (err) return "err";
+          const p = score * 100;
+          if (p >= 99) return "S99";
+          if (p >= 95) return "S95";
+          if (p >= 90) return "S90";
+          return "S75";
+        }
+
+        const tests = (report.tests || []).map((t) => ({
+          name: t.test_name,
+          score: t.similarity_score,
+          vs_expected: t.vs_expected ?? null,
+          vs_chrome: t.vs_chrome ?? null,
+          chrome_png: t.chrome_png || null,
+          oracle_status: t.oracle_status || null,
+          oracle_flags: t.oracle_flags || null,
+          diff_pct: t.diff_percentage,
+          error: t.error || null,
+          bucket: bucketFor(t.similarity_score, t.error),
+          category: t.test_name.split("_")[0],
+        }));
+
+        const total = report.total ?? tests.length;
+        const avg = (report.average_similarity ?? 0) * 100;
+        const counts = { S99: 0, S95: 0, S90: 0, S75: 0, err: 0 };
+        for (const t of tests) counts[t.bucket]++;
+        const passing = counts.S99 + counts.S95;
+
+        // Oracle bucket counts — drives headline parity numbers.
+        const oracleBuckets = report.oracle_buckets || null;
+        const oracleCounts = { consensus: 0, disputed: 0, ub: 0, unknown: 0 };
+        for (const t of tests) {
+          const k = t.oracle_status || "unknown";
+          if (k in oracleCounts) oracleCounts[k]++;
+        }
+
+        const chip = (label, value, color) => `
+    <span class="inline-flex items-center gap-1">
+      <span class="text-stone-400 dark:text-stone-500 text-[10px] uppercase tracking-wider">${label}</span>
+      <span class="font-semibold ${color || "text-stone-800 dark:text-stone-200"}">${value}</span>
+    </span>`;
+        const dot = (color) =>
+          `<span class="inline-block w-1.5 h-1.5 rounded-full ${color}"></span>`;
+        const bucketChip = (label, n, dotColor, textColor) => `
+    <span class="inline-flex items-center gap-1">
+      ${dot(dotColor)}
+      <span class="text-stone-400 dark:text-stone-500 text-[10px] uppercase tracking-wider">${label}</span>
+      <span class="font-semibold ${textColor}">${n.toLocaleString()}</span>
+    </span>`;
+
+        // Headline parity number: consensus pass-rate (excludes UB &
+        // disputed). Falls back to the legacy "≥95%" chip when no
+        // oracle data is loaded.
+        const consensus = oracleBuckets?.consensus;
+        const headlineChip =
+          consensus && consensus.total > 0
+            ? chip(
+                "consensus",
+                `${((consensus.passing / consensus.total) * 100).toFixed(2)}%`,
+                "text-emerald-600 dark:text-emerald-400"
+              ) +
+              chip(
+                "n",
+                `${consensus.passing}/${consensus.total}`,
+                "text-stone-500"
+              )
+            : chip(
+                "≥95%",
+                passing.toLocaleString(),
+                "text-emerald-600 dark:text-emerald-400"
+              );
+
+        document.getElementById("summary").innerHTML = [
+          chip("total", total.toLocaleString()),
+          chip("avg", `${avg.toFixed(2)}%`),
+          headlineChip,
+          oracleBuckets && oracleBuckets.disputed.total > 0
+            ? chip(
+                "disputed",
+                oracleBuckets.disputed.total.toLocaleString(),
+                "text-amber-600 dark:text-amber-400"
+              )
+            : "",
+          oracleBuckets && oracleBuckets.ub.total > 0
+            ? chip(
+                "ub",
+                oracleBuckets.ub.total.toLocaleString(),
+                "text-stone-500"
+              )
+            : "",
+          `<span class="w-px h-3 bg-stone-300 dark:bg-stone-700 mx-1"></span>`,
+          bucketChip(
+            "S99",
+            counts.S99,
+            "bg-emerald-500",
+            "text-emerald-600 dark:text-emerald-400"
+          ),
+          bucketChip(
+            "S95",
+            counts.S95,
+            "bg-lime-500",
+            "text-lime-600 dark:text-lime-400"
+          ),
+          bucketChip(
+            "S90",
+            counts.S90,
+            "bg-amber-500",
+            "text-amber-600 dark:text-amber-400"
+          ),
+          bucketChip(
+            "S75",
+            counts.S75,
+            "bg-red-500",
+            "text-red-600 dark:text-red-400"
+          ),
+          counts.err
+            ? bucketChip("err", counts.err, "bg-stone-400", "text-stone-500")
+            : "",
+        ].join("");
+
+        // Per-category breakdown
+        const byCat = new Map();
+        for (const t of tests) {
+          const c = byCat.get(t.category) ?? { n: 0, sum: 0 };
+          c.n++;
+          c.sum += t.score;
+          byCat.set(t.category, c);
+        }
+        const catRows = [...byCat.entries()].sort((a, b) =>
+          a[0].localeCompare(b[0])
+        );
+        document.getElementById("categories").innerHTML = catRows
+          .map(([cat, c]) => {
+            const pct = (c.sum / c.n) * 100;
+            const barColor =
+              pct >= 90
+                ? "bg-emerald-500"
+                : pct >= 75
+                  ? "bg-lime-500"
+                  : pct >= 60
+                    ? "bg-amber-500"
+                    : "bg-red-500";
+            return `<div class="grid grid-cols-[110px_1fr_55px_36px] gap-2.5 items-center bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded px-2.5 py-1.5 text-xs">
+      <span class="font-medium truncate">${cat}</span>
+      <div class="h-1.5 bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden"><div class="h-full ${barColor}" style="width:${pct.toFixed(1)}%"></div></div>
+      <span class="num text-right text-stone-500">${pct.toFixed(1)}%</span>
+      <span class="num text-right text-stone-400 text-[10px]">${c.n}</span>
+    </div>`;
+          })
+          .join("");
+
+        // Populate category select
+        const catSel = document.getElementById("cat");
+        for (const [cat, c] of catRows) {
+          const o = document.createElement("option");
+          o.value = cat;
+          o.textContent = `${cat} (${c.n})`;
+          catSel.appendChild(o);
+        }
+
+        const grid = document.getElementById("grid");
+        const countEl = document.getElementById("count");
+        let bucketFilter = "all";
+        let oracleFilter = "all";
+
+        function pathFor(t) {
+          const dir = t.bucket;
+          // Prefer the baked Chrome PNG (from `chrome-baseline/`) when
+          // present — it's the second oracle the harness scored
+          // against. Fall back to inlining the source SVG (browser
+          // renders it natively) so old result dirs without baked
+          // baselines still show *something* in the chrome tile.
+          const chromePng = t.chrome_png ? `${dir}/${t.name}.chrome.png` : null;
+          return {
+            current: `${dir}/${t.name}.current.png`,
+            expected: `${dir}/${t.name}.expected.png`,
+            diff: `${dir}/${t.name}.diff.png`,
+            chrome: chromePng || svgPathFor(t.name),
+            chromeIsBaked: !!chromePng,
+          };
+        }
+
+        // resvg test names map: <cat>_<group>_<rest> -> tests/<cat>/<group>/<rest>.svg
+        function svgPathFor(name) {
+          const i1 = name.indexOf("_");
+          if (i1 < 0) return null;
+          const i2 = name.indexOf("_", i1 + 1);
+          if (i2 < 0) return null;
+          const cat = name.slice(0, i1);
+          const group = name.slice(i1 + 1, i2);
+          const file = name.slice(i2 + 1);
+          return `tests/${cat}/${group}/${file}.svg`;
+        }
+
+        const badgeColor = (b) =>
+          ({
+            S99: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
+            S95: "bg-lime-100 text-lime-900 dark:bg-lime-950 dark:text-lime-300",
+            S90: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
+            S75: "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300",
+            err: "bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
+          })[b];
+
+        // Per-card oracle status badge. Tooltip shows the upstream
+        // chrome/firefox/safari/resvg flags so reviewers can decide
+        // whether a "fail" is us-vs-everyone or expected-png-being-old.
+        function oracleBadgeHtml(t) {
+          const s = t.oracle_status;
+          if (!s) return "";
+          const styles = {
+            consensus:
+              "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900",
+            disputed:
+              "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-900",
+            ub: "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400 border-stone-200 dark:border-stone-700",
+            unknown:
+              "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-500 border-stone-200 dark:border-stone-700",
+          };
+          const labels = {
+            consensus: "consensus",
+            disputed: "disputed",
+            ub: "ub",
+            unknown: "no-oracle",
+          };
+          const tip = t.oracle_flags
+            ? Object.entries(t.oracle_flags)
+                .map(([r, v]) => `${r}=${v}`)
+                .join("\n")
+            : "";
+          return `<span title="${tip}" class="num shrink-0 px-1.5 py-0.5 rounded border text-[10px] uppercase tracking-wider ${styles[s] || styles.unknown}">${labels[s] || s}</span>`;
+        }
+
+        // Sub-score row: vs_expected and vs_chrome side by side. Hidden
+        // when the harness only had a single oracle (no chrome baseline
+        // baked yet).
+        function subScoresHtml(t) {
+          if (t.vs_expected == null && t.vs_chrome == null) return "";
+          const fmt = (v) => (v == null ? "—" : (v * 100).toFixed(2) + "%");
+          const chromeCell =
+            t.vs_chrome != null
+              ? `<span class="text-stone-400">vs.chrome</span> <span class="num font-semibold ${cellColor(t.vs_chrome)}">${fmt(t.vs_chrome)}</span>`
+              : "";
+          return `<div class="px-3 py-1.5 flex items-center gap-3 text-[10px] border-b border-stone-100 dark:border-stone-800 text-stone-500 dark:text-stone-500">
+            <span><span class="text-stone-400">vs.expected</span> <span class="num font-semibold ${cellColor(t.vs_expected)}">${fmt(t.vs_expected)}</span></span>
+            ${chromeCell}
+          </div>`;
+        }
+        function cellColor(v) {
+          if (v == null) return "text-stone-400";
+          const p = v * 100;
+          if (p >= 99) return "text-emerald-600 dark:text-emerald-400";
+          if (p >= 95) return "text-lime-600 dark:text-lime-400";
+          if (p >= 90) return "text-amber-600 dark:text-amber-400";
+          return "text-red-600 dark:text-red-400";
+        }
+
+        function render() {
+          const q = document.getElementById("q").value.trim().toLowerCase();
+          const cat = catSel.value;
+          const sort = document.getElementById("sort").value;
+          let rows = tests.filter((t) => {
+            if (bucketFilter !== "all" && t.bucket !== bucketFilter)
+              return false;
+            if (
+              oracleFilter !== "all" &&
+              (t.oracle_status || "unknown") !== oracleFilter
+            )
+              return false;
+            if (cat && t.category !== cat) return false;
+            if (q && !t.name.toLowerCase().includes(q)) return false;
+            return true;
+          });
+          switch (sort) {
+            case "score-asc":
+              rows.sort((a, b) => a.score - b.score);
+              break;
+            case "score-desc":
+              rows.sort((a, b) => b.score - a.score);
+              break;
+            case "name-asc":
+              rows.sort((a, b) => a.name.localeCompare(b.name));
+              break;
+            case "name-desc":
+              rows.sort((a, b) => b.name.localeCompare(a.name));
+              break;
+          }
+          countEl.textContent = `${rows.length.toLocaleString()} of ${tests.length.toLocaleString()}`;
+          if (rows.length === 0) {
+            grid.innerHTML = `<div class="col-span-full text-center text-stone-500 py-16 text-sm">no tests match the current filters</div>`;
+            return;
+          }
+          const capped = rows.slice(0, 500);
+          grid.innerHTML = capped
+            .map((t) => {
+              const p = pathFor(t);
+              const pct = (t.score * 100).toFixed(2);
+              const cat = t.name.split("_")[0];
+              const tail = t.name.slice(cat.length + 1);
+              const badge = `<span class="num shrink-0 px-2 py-0.5 rounded text-[11px] font-semibold ${badgeColor(t.bucket)}">${t.bucket === "err" ? "ERR" : pct + "%"}</span>`;
+              const oracleBadge = oracleBadgeHtml(t);
+              const subScores = subScoresHtml(t);
+              const chromeLabel = p.chromeIsBaked ? "chrome" : "source";
+              const chromeColor = p.chromeIsBaked
+                ? "bg-sky-600/80"
+                : "bg-stone-500/80";
+              const tiles = ["chrome", "expected", "current", "diff"]
+                .map((k) =>
+                  p[k]
+                    ? `
+            <figure class="m-0 relative aspect-square bg-white overflow-hidden">
+              <figcaption class="absolute top-1 left-1 text-[9px] uppercase tracking-wider px-1 py-0.5 rounded ${k === "chrome" ? chromeColor : "bg-black/60"} text-white pointer-events-none z-[1]">${k === "chrome" ? chromeLabel : k}</figcaption>
+              <img loading="lazy" class="w-full h-full object-contain cursor-zoom-in" src="${p[k]}" onerror="this.replaceWith(noImg('${k}'))" />
+            </figure>`
+                    : `
+            <figure class="m-0 relative aspect-square bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-[10px] text-stone-400">
+              <figcaption class="absolute top-1 left-1 text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-black/40 text-white pointer-events-none z-[1]">${k}</figcaption>
+              no ${k}
+            </figure>`
+                )
+                .join("");
+              return `<article class="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden hover:border-stone-300 dark:hover:border-stone-700 transition">
+        <header class="px-3 py-2.5 flex items-center gap-2.5 border-b border-stone-100 dark:border-stone-800">
+          ${badge}
+          ${oracleBadge}
+          <div class="font-mono text-[11px] leading-tight break-all min-w-0 flex-1"><span class="text-stone-400">${cat}/</span>${tail}</div>
+        </header>
+        ${subScores}
+        <div class="grid grid-cols-4 gap-px bg-stone-200 dark:bg-stone-800">
+          ${tiles}
+        </div>
+      </article>`;
+            })
+            .join("");
+          if (rows.length > 500) {
+            grid.insertAdjacentHTML(
+              "beforeend",
+              `<div class="col-span-full text-center text-stone-500 py-6 text-sm">${rows.length - 500} more hidden — narrow the filter to see them</div>`
+            );
+          }
+        }
+
+        window.noImg = function (label) {
+          const f = document.createElement("figure");
+          f.className =
+            "m-0 relative aspect-square bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-[11px] text-stone-400";
+          f.textContent = `no ${label}`;
+          return f;
+        };
+
+        document.addEventListener("click", (e) => {
+          if (e.target.tagName === "IMG" && e.target.closest("article")) {
+            const lb = document.getElementById("lightbox");
+            const img = document.getElementById("lightbox-img");
+            img.src = e.target.src;
+            lb.classList.remove("hidden");
+            lb.classList.add("flex");
+            e.stopPropagation();
+          }
+        });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            const lb = document.getElementById("lightbox");
+            lb.classList.add("hidden");
+            lb.classList.remove("flex");
+          }
+        });
+
+        document.getElementById("q").addEventListener("input", render);
+        catSel.addEventListener("change", render);
+        document.getElementById("sort").addEventListener("change", render);
+        document.querySelectorAll("#buckets button").forEach((b) => {
+          b.addEventListener("click", () => {
+            bucketFilter = b.dataset.bucket;
+            document.querySelectorAll("#buckets button").forEach((x) => {
+              const active = x === b;
+              x.classList.toggle("bg-stone-900", active);
+              x.classList.toggle("text-white", active);
+              x.classList.toggle("dark:bg-white", active);
+              x.classList.toggle("dark:text-stone-900", active);
+            });
+            render();
+          });
+        });
+        document.querySelectorAll("#oracles button").forEach((b) => {
+          b.addEventListener("click", () => {
+            oracleFilter = b.dataset.oracle;
+            document.querySelectorAll("#oracles button").forEach((x) => {
+              const active = x === b;
+              x.classList.toggle("bg-stone-900", active);
+              x.classList.toggle("text-white", active);
+              x.classList.toggle("dark:bg-white", active);
+              x.classList.toggle("dark:text-stone-900", active);
+            });
+            render();
+          });
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>
