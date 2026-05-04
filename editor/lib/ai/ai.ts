@@ -203,6 +203,69 @@ export namespace ai {
        * @see https://replicate.com/851-labs/background-remover/api/schema
        * @see https://replicate.com/recraft-ai/recraft-remove-background/api/schema
        */
+      /**
+       * Lyria audio model ID constants (Replicate)
+       * @see https://replicate.com/google/lyria-3
+       * @see https://replicate.com/google/lyria-3-pro
+       */
+      export const MODEL_ID_GOOGLE_LYRIA_3 = "google/lyria-3";
+      export const MODEL_ID_GOOGLE_LYRIA_3_PRO = "google/lyria-3-pro";
+
+      export type AudioGenerationModelId =
+        | typeof MODEL_ID_GOOGLE_LYRIA_3
+        | typeof MODEL_ID_GOOGLE_LYRIA_3_PRO;
+
+      /**
+       * Options for Lyria audio generation models.
+       */
+      export type LyriaAudioOptions = {
+        /** Prompt describing the music. Required. */
+        prompt: string;
+        /**
+         * Optional reference images (data URLs or http(s) URLs) used as
+         * additional inspiration for composition. Up to 10 supported by the
+         * provider.
+         */
+        image_inputs?: string[];
+        /** Optional language hint passed through to the model. */
+        language?: string;
+        /** Optional negative prompt. */
+        negative_prompt?: string;
+        /** Optional seed for reproducibility. */
+        seed?: number;
+      };
+
+      export type AudioGenerationResult = {
+        /** Public URL to the generated audio (mp3). */
+        url: string;
+      };
+
+      /**
+       * Generate audio from a prompt using a Lyria model on Replicate.
+       */
+      export async function generateAudio(
+        model_id: AudioGenerationModelId,
+        options: LyriaAudioOptions
+      ): Promise<AudioGenerationResult> {
+        const input: Record<string, unknown> = {
+          prompt: options.prompt,
+        };
+        if (options.image_inputs && options.image_inputs.length > 0) {
+          input.image_inputs = options.image_inputs;
+        }
+        if (options.language) input.language = options.language;
+        if (options.negative_prompt) {
+          input.negative_prompt = options.negative_prompt;
+        }
+        if (typeof options.seed === "number") input.seed = options.seed;
+
+        const outputUrl = await ai.server.providers.replicate.run(
+          model_id,
+          input
+        );
+        return { url: outputUrl };
+      }
+
       export async function removeBackground<
         TModel extends RemoveBackgroundModelId,
       >(
@@ -343,6 +406,106 @@ export namespace ai {
         cost_usd: 0.002,
       },
     } as const;
+  }
+
+  /**
+   * Audio generation models namespace.
+   *
+   * Currently houses Google's Lyria family on Replicate. Pricing is taken
+   * from the public Replicate model pages; update if the provider changes
+   * its meter.
+   *
+   * Schema mirrors {@link ai.image} where it makes sense — vendor, provider,
+   * speed, deprecation, and a discriminated `pricing` union — so it can be
+   * rendered next to image models on the public model catalog.
+   */
+  export namespace audio {
+    export type AudioModelId = "google/lyria-3" | "google/lyria-3-pro";
+
+    export type AudioModelCategory = "audio/generation";
+
+    export type AudioProvider = "replicate";
+
+    /**
+     * Flat per-run pricing — one fee per generation regardless of duration.
+     *
+     * This is the meter Replicate publishes for the Lyria models today.
+     */
+    export type PerRunFlatPricing = {
+      type: "per_run_flat";
+      usd: number;
+    };
+
+    export type AudioModelPricing = PerRunFlatPricing;
+
+    export type AudioModelCard = {
+      id: AudioModelId;
+      label: string;
+      deprecated: boolean;
+      short_description: string;
+      vendor: Vendor;
+      provider: AudioProvider;
+      category: AudioModelCategory;
+      /** Approximate output duration. */
+      duration_label: string;
+      /** Sample format produced by the model. */
+      output_format: string;
+      /** Sample rate label (e.g. "48 kHz stereo"). */
+      sample_rate_label: string;
+      speed_label: image.SpeedLabel;
+      speed_max: string;
+      pricing: AudioModelPricing;
+      /**
+       * Average cost per invocation in USD, used by the rate limiter.
+       * For flat-rate models this is just `pricing.usd`.
+       */
+      avg_cost_usd: number;
+      /** Public model page on the provider. */
+      url: string;
+    };
+
+    export const models: Record<AudioModelId, AudioModelCard> = {
+      "google/lyria-3": {
+        id: "google/lyria-3",
+        label: "Lyria 3",
+        deprecated: false,
+        short_description:
+          "Generate 30-second 48kHz stereo music clips from text or images.",
+        vendor: "google",
+        provider: "replicate",
+        category: "audio/generation",
+        duration_label: "30s",
+        output_format: "mp3",
+        sample_rate_label: "48 kHz stereo",
+        speed_label: "fast",
+        speed_max: "20s",
+        // Source: replicate.com/google/lyria-3 — "$0.04 per output audio file"
+        pricing: { type: "per_run_flat", usd: 0.04 },
+        avg_cost_usd: 0.04,
+        url: "https://replicate.com/google/lyria-3",
+      },
+      "google/lyria-3-pro": {
+        id: "google/lyria-3-pro",
+        label: "Lyria 3 Pro",
+        deprecated: false,
+        short_description:
+          "Generate full-length tracks up to ~3 minutes from text or images.",
+        vendor: "google",
+        provider: "replicate",
+        category: "audio/generation",
+        duration_label: "up to 3m",
+        output_format: "mp3",
+        sample_rate_label: "48 kHz stereo",
+        speed_label: "medium",
+        speed_max: "60s",
+        // Source: replicate.com/google/lyria-3-pro — "$0.08 per output audio file"
+        pricing: { type: "per_run_flat", usd: 0.08 },
+        avg_cost_usd: 0.08,
+        url: "https://replicate.com/google/lyria-3-pro",
+      },
+    } as const;
+
+    export const audio_model_ids = Object.keys(models) as AudioModelId[];
   }
 
   export namespace image {

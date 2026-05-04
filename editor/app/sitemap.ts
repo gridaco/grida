@@ -167,5 +167,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.5,
     },
+    {
+      url: "https://grida.co/tools/remove-bg",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/ai/music",
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: "https://grida.co/ai/music/playground",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
   ];
 }
