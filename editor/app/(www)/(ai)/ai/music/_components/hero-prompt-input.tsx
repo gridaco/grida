@@ -19,7 +19,7 @@ export function HeroPromptInput() {
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
-      const text = message.text?.trim();
+      const text = message.text?.trim().slice(0, 4000);
       if (!text) return;
       const url = `${PLAYGROUND_HREF}?prompt=${encodeURIComponent(text)}`;
       router.push(url);

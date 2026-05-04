@@ -109,7 +109,7 @@ const categories: { name: string; tools: Tool[] }[] = [
       {
         title: "Remove Background",
         description:
-          "Remove image backgrounds with AI. Free, no signup to try.",
+          "Remove image backgrounds with AI. Free monthly budget — sign in to use.",
         link: "/tools/remove-bg",
         icon: EraserIcon,
       },

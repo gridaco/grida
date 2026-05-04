@@ -90,14 +90,14 @@ export async function generateAudio(
     };
   }
 
-  const card = ai.audio.models[input.model];
-  if (!card) {
+  if (!Object.hasOwn(ai.audio.models, input.model)) {
     return {
       success: false,
       message: "invalid model",
       status: 400,
     };
   }
+  const card = ai.audio.models[input.model];
 
   const cost_mills = ai.toMills(card.avg_cost_usd);
   const authError = await validateAuthAndRateLimit(cost_mills);

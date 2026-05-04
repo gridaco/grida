@@ -211,7 +211,11 @@ function Workspace() {
             Start over
           </Button>
           <div className="flex-1" />
-          <Button variant="ghost" onClick={() => inputRef.current?.click()}>
+          <Button
+            variant="ghost"
+            onClick={() => inputRef.current?.click()}
+            disabled={loading}
+          >
             <UploadIcon className="size-4 mr-2" />
             Replace image
           </Button>

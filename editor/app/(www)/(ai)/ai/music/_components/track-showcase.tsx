@@ -26,8 +26,12 @@ export function TrackShowcase({ tracks }: { tracks: ShowcaseTrack[] }) {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Track the currently-loaded audio source so play/pause toggles don't reset
+  // currentTime. We can't compare against `a.src` because the browser
+  // normalizes it to an absolute URL while `track.audio` is a relative path.
+  const loadedSrcRef = useRef<string | null>(null);
 
-  const activeTrack = tracks[active];
+  const activeTrack: ShowcaseTrack | undefined = tracks[active];
 
   // Lazily create the singleton audio element on the client.
   const ensureAudio = useCallback(() => {
@@ -46,13 +50,15 @@ export function TrackShowcase({ tracks }: { tracks: ShowcaseTrack[] }) {
 
   // Sync audio with autoPlay + active.
   useEffect(() => {
+    if (!activeTrack) return;
     const a = ensureAudio();
 
     if (autoPlay) {
-      if (a.src !== activeTrack.audio) {
+      if (loadedSrcRef.current !== activeTrack.audio) {
         a.src = activeTrack.audio;
         a.currentTime = 0;
         setProgress(0);
+        loadedSrcRef.current = activeTrack.audio;
       }
       const p = a.play();
       if (p) {
@@ -109,9 +115,19 @@ export function TrackShowcase({ tracks }: { tracks: ShowcaseTrack[] }) {
     setActive((i) => Math.min(n - 1, i + 1));
   }, [n]);
 
-  // Keyboard arrows
+  // Keyboard arrows — bound to window but skipped when the user is typing or
+  // interacting with another control, so Space/arrows don't hijack scrolling
+  // or input fields elsewhere on the page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          'input, textarea, select, button, a, [contenteditable="true"]'
+        )
+      ) {
+        return;
+      }
       if (e.key === "ArrowLeft") goPrev();
       else if (e.key === "ArrowRight") goNext();
       else if (e.key === " ") {
@@ -122,6 +138,8 @@ export function TrackShowcase({ tracks }: { tracks: ShowcaseTrack[] }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [goPrev, goNext]);
+
+  if (!activeTrack) return null;
 
   return (
     <div className="relative w-screen left-1/2 -translate-x-1/2 max-w-none">

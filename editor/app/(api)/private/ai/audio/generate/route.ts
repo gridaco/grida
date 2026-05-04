@@ -12,7 +12,12 @@ export type GenerateAudioApiResponse = {
 };
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as GenerateAudioApiRequestBody;
+  let body: GenerateAudioApiRequestBody;
+  try {
+    body = (await req.json()) as GenerateAudioApiRequestBody;
+  } catch {
+    return NextResponse.json({ message: "invalid json" }, { status: 400 });
+  }
 
   const result = await generateAudio(body);
 

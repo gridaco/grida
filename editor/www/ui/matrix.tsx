@@ -239,14 +239,7 @@ export function vu(columns: number, levels: number[]): Frame {
     for (let row = 0; row < rows; row++) {
       const rowFromBottom = rows - 1 - row;
       if (rowFromBottom < height) {
-        let brightness = 1;
-        if (row < rows * 0.3) {
-          brightness = 1;
-        } else if (row < rows * 0.6) {
-          brightness = 0.8;
-        } else {
-          brightness = 0.6;
-        }
+        const brightness = row < rows * 0.3 ? 1 : row < rows * 0.6 ? 0.8 : 0.6;
         frame[row][col] = brightness;
       }
     }
