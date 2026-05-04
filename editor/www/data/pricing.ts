@@ -3,10 +3,9 @@ type Pricing = {
   highlight: PricingCategory;
   integrations: PricingCategory;
   storage: PricingCategory;
-  support: PricingCategory;
-  ticketing: PricingCategory;
   commerce: PricingCategory;
   channels: PricingCategory;
+  support: PricingCategory;
   commingsoon: PricingCategory;
 };
 
@@ -47,7 +46,7 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "Generated Image License",
+        title: "Generated Media License",
         plans: {
           free: "Public (CC0)",
           pro: "Full ownership",
@@ -67,20 +66,10 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "Credits Rollover",
-        plans: {
-          free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
         title: "Buy extra credits",
         plans: {
           free: false,
-          pro: false,
+          pro: true,
           team: true,
           enterprise: true,
         },
@@ -182,45 +171,20 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "Advanced Analytics",
+        title: "Simulator",
         plans: {
           free: false,
           pro: false,
-          team: true,
+          team: false,
           enterprise: true,
         },
-        usage_based: false,
+        usage_based: true,
       },
       {
         title: "Remove branding from Sites",
         plans: {
           free: false,
           pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-    ],
-  },
-  support: {
-    title: "Support",
-    features: [
-      {
-        title: "Community Support",
-        plans: {
-          free: true,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Live chat support",
-        plans: {
-          free: false,
-          pro: false,
           team: true,
           enterprise: true,
         },
@@ -257,26 +221,6 @@ export const pricing: Pricing = {
     title: "Integrations",
     features: [
       {
-        title: "Connect to Google sheets",
-        plans: {
-          free: false,
-          pro: false,
-          team: false,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Connect to Notion Database",
-        plans: {
-          free: false,
-          pro: false,
-          team: false,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
         title: "Custom Domain",
         plans: {
           free: false,
@@ -298,43 +242,6 @@ export const pricing: Pricing = {
       },
     ],
   },
-  ticketing: {
-    title: "Ticketing",
-    features: [
-      {
-        title: "Concurrent Users",
-        plans: {
-          free: "Up to 50 concurrencies",
-          pro: "Up to 100 concurrencies",
-          team: "Up to 250 concurrencies",
-          enterprise:
-            "250 concurrencies included. then $100 / 500 concurrencies",
-        },
-        usage_based: true,
-      },
-      {
-        title: "Dedicated Servers for High demand",
-        plans: {
-          free: false,
-          pro: false,
-          team: false,
-          enterprise:
-            "$3,000 initially. then $2,500 per 10,000 concurrencies (may vary)",
-        },
-        usage_based: true,
-      },
-      {
-        title: "Simulator",
-        plans: {
-          free: false,
-          pro: false,
-          team: false,
-          enterprise: true,
-        },
-        usage_based: true,
-      },
-    ],
-  },
   commerce: {
     title: "Commerce",
     features: [
@@ -345,26 +252,6 @@ export const pricing: Pricing = {
           pro: "No additional fee",
           team: "No additional fee",
           enterprise: "No additional fee",
-        },
-        usage_based: false,
-      },
-      {
-        title: "Payments with Toss (for 🇰🇷)",
-        plans: {
-          free: false,
-          pro: false,
-          team: "Contact Sales",
-          enterprise: "Contact Sales",
-        },
-        usage_based: false,
-      },
-      {
-        title: "Ticketing for Events",
-        plans: {
-          free: false,
-          pro: false,
-          team: true,
-          enterprise: true,
         },
         usage_based: false,
       },
@@ -403,10 +290,15 @@ export const pricing: Pricing = {
         },
         usage_based: false,
       },
+    ],
+  },
+  support: {
+    title: "Support",
+    features: [
       {
-        title: "WhatsApp Notifications",
+        title: "Community Support",
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,
@@ -414,12 +306,12 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "KakaoTalk Notifications (for 🇰🇷)",
+        title: "Live chat support",
         plans: {
           free: false,
           pro: false,
-          team: false,
-          enterprise: "Contact Sales",
+          team: true,
+          enterprise: true,
         },
         usage_based: false,
       },
