@@ -78,6 +78,18 @@ function vendorLabel(vendor: string) {
   );
 }
 
+function groupAudioByVendor(
+  models: Record<string, AITypes.audio.AudioModelCard>
+) {
+  const groups = new Map<string, AITypes.audio.AudioModelCard[]>();
+  for (const model of Object.values(models)) {
+    const list = groups.get(model.vendor) ?? [];
+    list.push(model);
+    groups.set(model.vendor, list);
+  }
+  return groups;
+}
+
 function dimLabel(model: AITypes.image.ImageModelCard) {
   if (model.sizes?.length) {
     return model.sizes.map(([w, h, r]) => `${w}x${h} (${r})`).join(", ");
@@ -599,8 +611,207 @@ export default function AIModelsCatalogPage() {
         );
       })}
 
+      <Separator />
+
+      {/* Audio models hero */}
+      <div className="container px-4 pt-16 pb-10">
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Audio Models</h1>
+        <p className="text-base text-muted-foreground max-w-xl">
+          Music and audio generation models available on Grida. Pricing is
+          sourced directly from each provider.
+        </p>
+      </div>
+
+      {/* Audio comparison table */}
+      <AudioModelsTable />
+
+      <Separator />
+
+      {/* Audio detail cards by vendor */}
+      <AudioModelsCards />
+
       <div className="h-40" />
       <Footer />
     </main>
+  );
+}
+
+// ── Audio models ────────────────────────────────────────────────────────────
+
+function AudioPricingBadge({
+  pricing,
+}: {
+  pricing: AITypes.audio.AudioModelPricing;
+}) {
+  return (
+    <span className="font-mono text-sm">${pricing.usd.toFixed(3)}/run</span>
+  );
+}
+
+function AudioPricingDetail({
+  pricing,
+}: {
+  pricing: AITypes.audio.AudioModelPricing;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-2xl font-mono font-semibold tracking-tight">
+        ${pricing.usd.toFixed(3)}
+      </span>
+      <span className="text-sm text-muted-foreground">per generation</span>
+    </div>
+  );
+}
+
+function AudioModelCard({ model }: { model: AITypes.audio.AudioModelCard }) {
+  return (
+    <Card className="flex flex-col bg-card/50 border-muted overflow-hidden">
+      <CardHeader className="pb-3 h-20">
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-base font-semibold">
+            {model.label}
+          </CardTitle>
+          <Badge
+            variant="outline"
+            className="shrink-0 capitalize text-xs font-normal"
+          >
+            {model.speed_label} &middot; ~{model.speed_max}
+          </Badge>
+        </div>
+        <CardDescription className="text-sm line-clamp-2 overflow-hidden text-ellipsis">
+          {model.short_description}
+        </CardDescription>
+      </CardHeader>
+      <Separator />
+      <CardContent className="flex-1 flex flex-col gap-4 pt-4">
+        <AudioPricingDetail pricing={model.pricing} />
+
+        <Separator />
+
+        <div className="space-y-0.5 text-xs">
+          <p className="text-muted-foreground mb-1">Output</p>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Duration</span>
+            <span className="font-mono text-foreground">
+              {model.duration_label}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Format</span>
+            <span className="font-mono text-foreground uppercase">
+              {model.output_format}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Audio</span>
+            <span className="font-mono text-foreground">
+              {model.sample_rate_label}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-auto space-y-2 text-xs text-muted-foreground">
+          <div className="flex justify-between">
+            <span>Provider</span>
+            <span className="font-mono text-foreground capitalize">
+              {model.provider}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Model ID</span>
+            <code className="text-foreground">{model.id}</code>
+          </div>
+          {model.deprecated && (
+            <div className="flex justify-between">
+              <span>Status</span>
+              <Badge variant="outline" className="text-xs h-4 font-normal">
+                Deprecated
+              </Badge>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AudioModelsTable() {
+  const grouped = groupAudioByVendor(ai.audio.models);
+  return (
+    <div className="container mx-auto px-4 pb-12">
+      <div className="rounded-lg border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-[260px]">Model</TableHead>
+              <TableHead>Pricing</TableHead>
+              <TableHead className="hidden md:table-cell">Speed</TableHead>
+              <TableHead className="hidden lg:table-cell">Output</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[...grouped.entries()].map(([vendor, models]) => {
+              const Logo = Logos[vendor];
+              return models.map((model) => (
+                <TableRow key={model.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {Logo && <Logo className="size-4 shrink-0" />}
+                      <div>
+                        <div className="font-medium">{model.label}</div>
+                        <code className="text-xs text-muted-foreground">
+                          {model.id}
+                        </code>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <AudioPricingBadge pricing={model.pricing} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Badge
+                      variant="outline"
+                      className="capitalize font-normal text-xs"
+                    >
+                      {model.speed_label}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ~{model.speed_max}
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                    {model.duration_label} · {model.sample_rate_label}
+                  </TableCell>
+                </TableRow>
+              ));
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function AudioModelsCards() {
+  const grouped = groupAudioByVendor(ai.audio.models);
+  return (
+    <>
+      {[...grouped.entries()].map(([vendor, models]) => {
+        const Logo = Logos[vendor];
+        return (
+          <section key={vendor} className="container mx-auto px-4 py-12">
+            <div className="flex items-center gap-3 mb-6">
+              {Logo && <Logo className="size-6" />}
+              <h2 className="text-xl font-semibold">{vendorLabel(vendor)}</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {models.map((model) => (
+                <AudioModelCard key={model.id} model={model} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </>
   );
 }
