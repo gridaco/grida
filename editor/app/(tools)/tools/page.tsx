@@ -10,6 +10,7 @@ import Link from "next/link";
 import {
   BoxIcon,
   CodeIcon,
+  EraserIcon,
   FigmaIcon,
   FrameIcon,
   ImageIcon,
@@ -20,11 +21,13 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Grida Tools | Free Developer & Design Tools",
   description:
-    "Free tools for developers and designers. Generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
+    "Free tools for developers and designers. Remove image backgrounds, generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
   keywords: [
     "free tools",
     "developer tools",
     "design tools",
+    "remove background",
+    "ai background remover",
     "server secret generator",
     "blob generator",
     "halftone generator",
@@ -38,7 +41,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Grida Tools | Free Developer & Design Tools",
     description:
-      "Free tools for developers and designers. Generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
+      "Free tools for developers and designers. Remove image backgrounds, generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
     type: "website",
     url: "https://grida.co/tools",
   },
@@ -103,6 +106,13 @@ const categories: { name: string; tools: Tool[] }[] = [
   {
     name: "AI & Testing",
     tools: [
+      {
+        title: "Remove Background",
+        description:
+          "Remove image backgrounds with AI. Free, no signup to try.",
+        link: "/tools/remove-bg",
+        icon: EraserIcon,
+      },
       {
         title: "Image Playground",
         description: "Test & Evaluate Image Models.",
