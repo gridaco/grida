@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   console.log("[INSIDER] Sign in successful");
 
   if (redirect_uri) {
-    return NextResponse.redirect(redirect_uri, {
+    return NextResponse.redirect(new URL(redirect_uri, requestUrl.origin), {
       status: 302,
     });
   }
