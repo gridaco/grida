@@ -1,12 +1,5 @@
 import { Button } from "@/components/ui/button";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
   Card,
   CardContent,
   CardFooter,
@@ -16,7 +9,6 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { notFound, redirect } from "next/navigation";
-import { GridaLogo } from "@/components/grida-logo";
 import { DeleteOrganizationConfirm } from "./delete";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
@@ -53,8 +45,7 @@ export default async function OrganizationsSettingsProfilePage({
   const iamowner = data.owner_id === auth.user.id;
 
   return (
-    <main className="container mx-auto max-w-screen-md mt-20 mb-40 grid gap-40">
-      <Nav org={organization_name} />
+    <main className="container mx-auto max-w-screen-md py-10 grid gap-10">
       <Card>
         <CardHeader>
           <CardTitle>General</CardTitle>
@@ -160,36 +151,5 @@ export default async function OrganizationsSettingsProfilePage({
         </CardContent>
       </Card>
     </main>
-  );
-}
-
-function Nav({ org }: { org: string }) {
-  return (
-    <header className="fixed top-0 left-0 right-0 w-full p-4">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <Link href="/">
-              <GridaLogo className="size-4" />
-            </Link>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <Link href="/organizations">organizations</Link>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <Link href={`/organizations/${org}`}>{org}</Link>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <Link href={`/organizations/${org}/settings`}>settings</Link>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbPage>profile</BreadcrumbPage>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <nav></nav>
-    </header>
   );
 }

@@ -34,7 +34,7 @@ import * as ERR from "@/k/error";
 
 // #region ─── Route registry ──────────────────────────────────────────────────
 
-export type UniversalRouteScope = "project" | "document";
+export type UniversalRouteScope = "project" | "document" | "organization";
 
 type UniversalRouteConfig = {
   scope: UniversalRouteScope;
@@ -43,6 +43,19 @@ type UniversalRouteConfig = {
   /** When set, the universal resolver only shows documents of these types. */
   requiredDoctypes?: ReadonlyArray<GDocumentType>;
 };
+
+/**
+ * Organization-scoped routes — pages that live under
+ * `/organizations/<orgName>/<path>` and require only org context (no project,
+ * no document). Settings, members, billing all belong here.
+ */
+const ORGANIZATION_ROUTE_CONFIGS = {
+  settings: { scope: "organization" },
+  "settings/billing": { scope: "organization" },
+  "settings/billing/upgrade": { scope: "organization" },
+  people: { scope: "organization" },
+  invite: { scope: "organization" },
+} satisfies Record<string, UniversalRouteConfig>;
 
 /**
  * Project-scoped routes — console / workspace pages that live under
@@ -134,10 +147,11 @@ const DOCUMENT_ROUTE_CONFIGS = {
 /** Stable document route keys — derived directly from the config above. */
 type StableDocumentRouteType = keyof typeof DOCUMENT_ROUTE_CONFIGS;
 
-/** Merged registry of all project + document routes. */
+/** Merged registry of all project + document + organization routes. */
 const UNIVERSAL_ROUTE_CONFIGS = {
   ...PROJECT_ROUTE_CONFIGS,
   ...DOCUMENT_ROUTE_CONFIGS,
+  ...ORGANIZATION_ROUTE_CONFIGS,
 } satisfies Record<string, UniversalRouteConfig>;
 
 /** All registered universal route keys. */
@@ -284,14 +298,16 @@ export function matchUniversalRoute(path: string) {
 
 export type UniversalRouteContext = {
   org: string;
-  proj: string;
+  proj?: string;
   docId?: string | null;
 };
 
 type UniversalRouteContextFor<P extends UniversalRouteType> =
   (typeof UNIVERSAL_ROUTE_CONFIGS)[P]["scope"] extends "document"
     ? { org: string; proj: string; docId: string }
-    : { org: string; proj: string };
+    : (typeof UNIVERSAL_ROUTE_CONFIGS)[P]["scope"] extends "organization"
+      ? { org: string }
+      : { org: string; proj: string };
 
 /** Strict overload: when the exact route literal is known at compile time. */
 export function buildUniversalDestination<P extends UniversalRouteType>(
@@ -308,8 +324,14 @@ export function buildUniversalDestination(
   context: UniversalRouteContext
 ) {
   const route = getUniversalRouteDefinition(page);
-  const base = `/${context.org}/${context.proj}`;
   const suffix = normalizeUniversalPath(route.path);
+
+  if (route.scope === "organization") {
+    const base = `/organizations/${context.org}`;
+    return suffix ? `${base}/${suffix}` : base;
+  }
+
+  const base = `/${context.org}/${context.proj}`;
 
   if (route.scope === "project") {
     return suffix ? `${base}/${suffix}` : base;

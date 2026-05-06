@@ -1,0 +1,714 @@
+"use server";
+
+// Reads use `createClient()` (user-authed, RLS-aware) against `v_billing_*`.
+// Mutations and Stripe-side reads go through `service_role.workspace`.
+
+import { createClient } from "@/lib/supabase/server";
+import {
+  stripe,
+  BillingError,
+  assertOrgMember,
+  assertOrgOwner,
+  resolveOrCreateStripeCustomer,
+  getCatalogueStripeIds,
+  getActivePaidSubscription,
+  getCustomerId,
+  countOrgMembers,
+  assertAllowedRedirect,
+} from "@/lib/billing";
+import { headers } from "next/headers";
+
+async function requireUserId(): Promise<string> {
+  const sb = await createClient();
+  const { data } = await sb.auth.getUser();
+  if (!data.user) {
+    throw new BillingError("unauthorized", "unauthorized", 401);
+  }
+  return data.user.id;
+}
+
+async function getOrigin(): Promise<string> {
+  const h = await headers();
+  const fromHeader = h.get("origin");
+  if (fromHeader) return fromHeader;
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (host) return `${proto}://${host}`;
+  const base = process.env.NEXT_PUBLIC_BASE_URL;
+  if (base) return new URL(base).origin;
+  throw new Error("could not determine request origin");
+}
+
+// ---------------------------------------------------------------------------
+// getBillingSummary
+// ---------------------------------------------------------------------------
+
+export type BillingSummary = {
+  org_id: number;
+  plan: string;
+  status: string;
+  is_free: boolean;
+  seat_count: number;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  has_active_subscription: boolean;
+  /** "month" | "year" for paid subs; null for free. Read from Stripe. */
+  interval: "month" | "year" | null;
+};
+
+export async function getBillingSummary(
+  org_id: number
+): Promise<BillingSummary> {
+  const user_id = await requireUserId();
+  await assertOrgMember(user_id, org_id);
+
+  const sb = await createClient();
+  const subRes = await sb
+    .from("v_billing_subscription")
+    .select("*")
+    .eq("organization_id", org_id)
+    .maybeSingle();
+  if (subRes.error) {
+    throw new Error(`v_billing_subscription: ${subRes.error.message}`);
+  }
+
+  const sub = subRes.data;
+  let interval: "month" | "year" | null = null;
+  if (sub?.stripe_subscription_id) {
+    const stripeSub = await stripe.subscriptions
+      .retrieve(sub.stripe_subscription_id)
+      .catch(() => null);
+    const i = stripeSub?.items.data[0]?.price.recurring?.interval;
+    if (i === "month" || i === "year") interval = i;
+  }
+
+  return {
+    org_id,
+    plan: sub?.plan ?? "free",
+    status: sub?.status ?? "active",
+    is_free: sub?.is_free ?? true,
+    seat_count: sub?.quantity ?? 1,
+    current_period_start: sub?.current_period_start ?? null,
+    current_period_end: sub?.current_period_end ?? null,
+    cancel_at_period_end: sub?.cancel_at_period_end ?? false,
+    has_active_subscription:
+      !!sub?.stripe_subscription_id && sub.status !== "canceled",
+    interval,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// listInvoices
+// ---------------------------------------------------------------------------
+
+type PaymentMethodSummary = {
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+} | null;
+
+type UpcomingSummary = {
+  amount_due_cents: number;
+  period_end_unix: number | null;
+  line_count: number;
+} | null;
+
+type PastInvoice = {
+  id: string;
+  status: string;
+  amount_paid_cents: number;
+  created_unix: number;
+  hosted_invoice_url: string | null;
+  invoice_pdf: string | null;
+};
+
+export type InvoicesPayload = {
+  upcoming: UpcomingSummary;
+  past: PastInvoice[];
+  payment_method: PaymentMethodSummary;
+  billing_email: string | null;
+};
+
+const TTL_MS = 30_000;
+const invoicesCache = new Map<number, { at: number; data: InvoicesPayload }>();
+
+export async function listInvoices(org_id: number): Promise<InvoicesPayload> {
+  const user_id = await requireUserId();
+  await assertOrgMember(user_id, org_id);
+
+  const now = Date.now();
+  const cached = invoicesCache.get(org_id);
+  if (cached && now - cached.at < TTL_MS) return cached.data;
+
+  const customerId = await getCustomerId(org_id);
+  if (!customerId) {
+    const empty: InvoicesPayload = {
+      upcoming: null,
+      past: [],
+      payment_method: null,
+      billing_email: null,
+    };
+    invoicesCache.set(org_id, { at: now, data: empty });
+    return empty;
+  }
+
+  const [upcoming, pastList, customer] = await Promise.all([
+    stripe.invoices
+      .createPreview({ customer: customerId })
+      .then(
+        (inv): UpcomingSummary => ({
+          amount_due_cents: inv.amount_due ?? 0,
+          period_end_unix: inv.period_end ?? null,
+          line_count: inv.lines?.data?.length ?? 0,
+        })
+      )
+      .catch(() => null),
+    stripe.invoices
+      .list({ customer: customerId, limit: 10 })
+      .then((res) =>
+        res.data.map(
+          (inv): PastInvoice => ({
+            id: inv.id ?? "",
+            status: inv.status ?? "unknown",
+            amount_paid_cents: inv.amount_paid ?? 0,
+            created_unix: inv.created ?? 0,
+            hosted_invoice_url: inv.hosted_invoice_url ?? null,
+            invoice_pdf: inv.invoice_pdf ?? null,
+          })
+        )
+      )
+      .catch((): PastInvoice[] => []),
+    stripe.customers
+      .retrieve(customerId, {
+        expand: ["invoice_settings.default_payment_method"],
+      })
+      .catch(() => null),
+  ]);
+
+  let payment_method: PaymentMethodSummary = null;
+  let billing_email: string | null = null;
+
+  if (customer && !("deleted" in customer && customer.deleted)) {
+    billing_email = customer.email ?? null;
+    const def = customer.invoice_settings?.default_payment_method;
+    if (def && typeof def !== "string" && def.card) {
+      payment_method = {
+        brand: def.card.brand ?? "card",
+        last4: def.card.last4 ?? "",
+        exp_month: def.card.exp_month ?? 0,
+        exp_year: def.card.exp_year ?? 0,
+      };
+    }
+  }
+
+  const data: InvoicesPayload = {
+    upcoming,
+    past: pastList,
+    payment_method,
+    billing_email,
+  };
+  invoicesCache.set(org_id, { at: now, data });
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Portal-flow helpers
+//
+// Every portal session we create is a deep-link `flow_data` session — the
+// user lands on a single Stripe-hosted screen scoped to one intent (update
+// card, change plan, etc). We deliberately do not expose the generic
+// portal dashboard.
+// ---------------------------------------------------------------------------
+
+async function v1ConfigId(): Promise<string | undefined> {
+  const list = await stripe.billingPortal.configurations.list({ limit: 100 });
+  return list.data.find((c) => c.metadata?.grida_billing_id === "portal.v1")
+    ?.id;
+}
+
+export type PortalFlowResult = { portal_url: string };
+
+export async function startPaymentMethodUpdate(
+  org_id: number,
+  params: { return_url: string }
+): Promise<PortalFlowResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  const origin = await getOrigin();
+  const return_url = assertAllowedRedirect(params.return_url, origin);
+
+  const customerId = await getCustomerId(org_id);
+  if (!customerId) {
+    throw new BillingError(
+      "No Stripe customer for this organization yet.",
+      "no_stripe_customer",
+      400,
+      "billing/upgrade"
+    );
+  }
+
+  const configuration = await v1ConfigId();
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url,
+    ...(configuration ? { configuration } : {}),
+    flow_data: {
+      type: "payment_method_update",
+      after_completion: {
+        type: "redirect",
+        redirect: { return_url },
+      },
+    },
+  });
+
+  return { portal_url: session.url };
+}
+
+// ---------------------------------------------------------------------------
+// startPlanChangeConfirm
+//
+// Existing-subscription mutation via Stripe Portal's `flow_data` deep link.
+// Server picks the target price; Stripe shows a single confirm page (no
+// plan picker) with the prorated total. After completion, redirects back.
+// Used for paid→paid transitions: plan switch (Pro↔Team) and/or interval
+// switch (monthly↔annual).
+// ---------------------------------------------------------------------------
+
+export type PlanChangeConfirmResult = { portal_url: string };
+
+export async function startPlanChangeConfirm(
+  org_id: number,
+  params: {
+    plan: "pro" | "team";
+    interval: "month" | "year";
+    return_url: string;
+  }
+): Promise<PlanChangeConfirmResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  if (params.plan !== "pro" && params.plan !== "team") {
+    throw new BillingError(
+      `plan must be 'pro' or 'team' (got '${params.plan}').`,
+      "invalid_plan",
+      400
+    );
+  }
+  if (params.interval !== "month" && params.interval !== "year") {
+    throw new BillingError(
+      `interval must be 'month' or 'year' (got '${params.interval}').`,
+      "invalid_interval",
+      400
+    );
+  }
+
+  const origin = await getOrigin();
+  const return_url = assertAllowedRedirect(params.return_url, origin);
+
+  const sub = await getActivePaidSubscription(org_id);
+  if (!sub) {
+    throw new BillingError(
+      "No active paid subscription to change. Upgrade first.",
+      "not_subscribed",
+      400,
+      "billing/upgrade"
+    );
+  }
+
+  const customerId = await getCustomerId(org_id);
+  if (!customerId) {
+    throw new BillingError(
+      "This organization does not have a Stripe customer.",
+      "no_stripe_customer",
+      400,
+      "billing/upgrade"
+    );
+  }
+
+  const catalogueId =
+    params.interval === "year"
+      ? (`plan.${params.plan}.annual` as const)
+      : (`plan.${params.plan}` as const);
+  const cat = await getCatalogueStripeIds(catalogueId);
+  if (!cat) {
+    throw new BillingError(
+      `Stripe price for ${catalogueId} is not yet wired.`,
+      "billing_not_provisioned",
+      500
+    );
+  }
+
+  // Fetch the current subscription's first item id — Portal flow_data
+  // requires it to know which item to update in place.
+  const stripeSub = await stripe.subscriptions.retrieve(
+    sub.stripe_subscription_id
+  );
+  const itemId = stripeSub.items.data[0]?.id;
+  if (!itemId) {
+    throw new Error(
+      `Stripe subscription ${sub.stripe_subscription_id} has no items`
+    );
+  }
+
+  const configuration = await v1ConfigId();
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url,
+    ...(configuration ? { configuration } : {}),
+    flow_data: {
+      type: "subscription_update_confirm",
+      subscription_update_confirm: {
+        subscription: sub.stripe_subscription_id,
+        items: [
+          {
+            id: itemId,
+            price: cat.stripe_price_id,
+            quantity: sub.quantity,
+          },
+        ],
+      },
+      after_completion: {
+        type: "redirect",
+        redirect: { return_url },
+      },
+    },
+  });
+
+  return { portal_url: session.url };
+}
+
+// ---------------------------------------------------------------------------
+// startSubscribeCheckout
+// ---------------------------------------------------------------------------
+
+export type SubscribeCheckoutResult = {
+  checkout_url: string | null;
+  session_id: string;
+  quantity: number;
+};
+
+export async function startSubscribeCheckout(
+  org_id: number,
+  params: {
+    plan: "pro" | "team";
+    interval?: "month" | "year";
+    quantity?: number;
+    success_url: string;
+    cancel_url: string;
+  }
+): Promise<SubscribeCheckoutResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  if (params.plan !== "pro" && params.plan !== "team") {
+    throw new BillingError(
+      `plan must be 'pro' or 'team' (got '${params.plan}').`,
+      "invalid_plan",
+      400
+    );
+  }
+  const interval: "month" | "year" = params.interval ?? "month";
+  if (interval !== "month" && interval !== "year") {
+    throw new BillingError(
+      `interval must be 'month' or 'year' (got '${params.interval}').`,
+      "invalid_interval",
+      400
+    );
+  }
+
+  if (await getActivePaidSubscription(org_id)) {
+    throw new BillingError(
+      "Organization already has an active paid subscription.",
+      "already_subscribed",
+      409
+    );
+  }
+
+  const origin = await getOrigin();
+  const success_url = assertAllowedRedirect(params.success_url, origin);
+  const cancel_url = assertAllowedRedirect(params.cancel_url, origin);
+
+  // Annual catalogue rows are keyed `plan.<name>.annual`; monthly stays `plan.<name>`.
+  const catalogueId =
+    interval === "year"
+      ? (`plan.${params.plan}.annual` as const)
+      : (`plan.${params.plan}` as const);
+  const cat = await getCatalogueStripeIds(catalogueId);
+  if (!cat) {
+    throw new BillingError(
+      `Stripe price for ${catalogueId} is not yet wired.`,
+      "billing_not_provisioned",
+      500
+    );
+  }
+
+  const memberCount = await countOrgMembers(org_id);
+  const quantity = Math.max(
+    1,
+    Math.min(
+      Number.isInteger(params.quantity) ? Number(params.quantity) : memberCount,
+      memberCount || 1
+    )
+  );
+
+  const customer = await resolveOrCreateStripeCustomer(org_id);
+  const idempotencyKey = `subscribe:${org_id}:${params.plan}:${interval}:${Math.floor(Date.now() / 60000)}`;
+
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "subscription",
+      customer,
+      line_items: [{ price: cat.stripe_price_id, quantity }],
+      subscription_data: {
+        metadata: {
+          grida_organization_id: String(org_id),
+          grida_plan: params.plan,
+          grida_interval: interval,
+        },
+      },
+      success_url,
+      cancel_url,
+      metadata: {
+        grida_organization_id: String(org_id),
+        kind: "subscribe",
+        plan: params.plan,
+        interval,
+        quantity: String(quantity),
+      },
+      allow_promotion_codes: true,
+    },
+    { idempotencyKey }
+  );
+
+  return {
+    checkout_url: session.url,
+    session_id: session.id,
+    quantity,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// startCancelSubscription
+//
+// Stripe Portal `subscription_cancel` flow_data — single confirm screen,
+// "Cancel at period end" by config. After completion, Stripe fires
+// `customer.subscription.updated` with `cancel_at_period_end=true`, which
+// the projector mirrors to the local subscription row.
+// ---------------------------------------------------------------------------
+
+export async function startCancelSubscription(
+  org_id: number,
+  params: { return_url: string }
+): Promise<PortalFlowResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  const origin = await getOrigin();
+  const return_url = assertAllowedRedirect(params.return_url, origin);
+
+  const sub = await getActivePaidSubscription(org_id);
+  if (!sub) {
+    throw new BillingError(
+      "No active paid subscription to cancel.",
+      "not_subscribed",
+      400,
+      "billing"
+    );
+  }
+
+  const customerId = await getCustomerId(org_id);
+  if (!customerId) {
+    throw new BillingError(
+      "This organization does not have a Stripe customer.",
+      "no_stripe_customer",
+      400
+    );
+  }
+
+  const configuration = await v1ConfigId();
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url,
+    ...(configuration ? { configuration } : {}),
+    flow_data: {
+      type: "subscription_cancel",
+      subscription_cancel: { subscription: sub.stripe_subscription_id },
+      after_completion: {
+        type: "redirect",
+        redirect: { return_url },
+      },
+    },
+  });
+
+  return { portal_url: session.url };
+}
+
+// ---------------------------------------------------------------------------
+// updateSeats
+//
+// Stripe-side mutation. Quantity is server-bounded by `members + 50` to
+// prevent a runaway request from billing 1M seats.
+// ---------------------------------------------------------------------------
+
+export type UpdateSeatsResult = {
+  new_quantity: number;
+  no_op?: boolean;
+  stripe_subscription_id?: string;
+};
+
+export async function updateSeats(
+  org_id: number,
+  params: { delta?: number; target_quantity?: number }
+): Promise<UpdateSeatsResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  const sub = await getActivePaidSubscription(org_id);
+  if (!sub) {
+    throw new BillingError(
+      "Organization is on Free. Upgrade before changing seat count.",
+      "not_subscribed",
+      400,
+      "billing/upgrade"
+    );
+  }
+  if (sub.status !== "active" && sub.status !== "trialing") {
+    throw new BillingError(
+      `Subscription status is '${sub.status}'. Resolve payment issues first.`,
+      "subscription_not_active",
+      400,
+      "billing"
+    );
+  }
+
+  let target: number;
+  if (typeof params.target_quantity === "number") {
+    target = Math.trunc(params.target_quantity);
+  } else if (typeof params.delta === "number") {
+    target = sub.quantity + Math.trunc(params.delta);
+  } else {
+    throw new BillingError(
+      "Provide either delta or target_quantity",
+      "invalid_body",
+      400
+    );
+  }
+
+  if (!Number.isInteger(target) || target < 1) {
+    throw new BillingError(
+      "target quantity must be >= 1",
+      "invalid_quantity",
+      400
+    );
+  }
+
+  const memberCount = await countOrgMembers(org_id);
+  if (target > memberCount + 50) {
+    throw new BillingError(
+      `target ${target} exceeds reasonable bound (members=${memberCount})`,
+      "quantity_too_large",
+      400
+    );
+  }
+
+  if (target === sub.quantity) {
+    return { new_quantity: target, no_op: true };
+  }
+
+  const stripeSub = await stripe.subscriptions.retrieve(
+    sub.stripe_subscription_id
+  );
+  const itemId = stripeSub.items.data[0]?.id;
+  if (!itemId) {
+    throw new Error(
+      `Stripe subscription ${sub.stripe_subscription_id} has no items`
+    );
+  }
+
+  const updated = await stripe.subscriptions.update(
+    sub.stripe_subscription_id,
+    {
+      items: [{ id: itemId, quantity: target }],
+      proration_behavior: "create_prorations",
+      metadata: {
+        grida_organization_id: String(org_id),
+        last_seat_change_actor: user_id,
+      },
+    },
+    { idempotencyKey: `${org_id}:seat_change:${target}` }
+  );
+
+  return {
+    new_quantity: updated.items?.data?.[0]?.quantity ?? target,
+    stripe_subscription_id: updated.id,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// listBillingAudit
+//
+// Owner-only paginated read of the audit feed. Backed by `v_billing_audit`
+// which RLS-filters to the org's owner.
+// ---------------------------------------------------------------------------
+
+export type AuditRow = {
+  id: number;
+  organization_id: number;
+  user_id: string | null;
+  operation: string;
+  amount_cents: number | null;
+  stripe_event_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_invoice_id: string | null;
+  event_type: string | null;
+  plan: string | null;
+  status: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type AuditListResult = {
+  rows: AuditRow[];
+  next_cursor: string | null;
+  limit: number;
+};
+
+export async function listBillingAudit(
+  org_id: number,
+  params: { cursor?: string; limit?: number } = {}
+): Promise<AuditListResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  const cursor = params.cursor ?? null;
+  const limitRaw = Number(params.limit ?? 50);
+  const limit = Math.max(
+    1,
+    Math.min(Number.isFinite(limitRaw) ? limitRaw : 50, 200)
+  );
+
+  const sb = await createClient();
+  let q = sb
+    .from("v_billing_audit")
+    .select(
+      "id, organization_id, user_id, operation, amount_cents, stripe_event_id, stripe_subscription_id, stripe_invoice_id, event_type, plan, status, note, created_at"
+    )
+    .eq("organization_id", org_id)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (cursor) q = q.lt("created_at", cursor);
+
+  const { data, error } = await q;
+  if (error) throw new Error(`audit list: ${error.message}`);
+
+  const rows = (data ?? []) as AuditRow[];
+  const next_cursor =
+    rows.length === limit ? rows[rows.length - 1].created_at : null;
+
+  return { rows, next_cursor, limit };
+}
