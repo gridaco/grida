@@ -28,6 +28,23 @@ export async function GET(
     return notFound();
   }
 
+  // Resolve plan per org from the Stripe-backed billing source. Orgs without
+  // an active subscription fall back to "free".
+  const orgIds = organizations.map((o) => o.id);
+  const { data: billingRows } = await client
+    .from("v_billing_subscription")
+    .select("organization_id, plan")
+    .in("organization_id", orgIds);
+  const planByOrg = new Map<number, "free" | "pro" | "team">();
+  for (const r of billingRows ?? []) {
+    if (r.organization_id != null && r.plan) {
+      const p = r.plan;
+      if (p === "free" || p === "pro" || p === "team") {
+        planByOrg.set(r.organization_id, p);
+      }
+    }
+  }
+
   const { data: projects, error: __projects_err } = await client
     .from("project")
     .select("*")
@@ -60,6 +77,7 @@ export async function GET(
       organizations: organizations.map((org) => ({
         ...org,
         avatar_url: org.avatar_path ? avatar_url(org.avatar_path) : null,
+        plan: planByOrg.get(org.id) ?? "free",
       })),
       projects,
       documents,

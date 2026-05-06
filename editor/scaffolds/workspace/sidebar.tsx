@@ -64,7 +64,7 @@ import type {
   GDocument,
   OrganizationWithAvatar,
   OrganizationWithMembers,
-  PlatformPricingTier,
+  PlanTier,
 } from "@/types";
 import Link from "next/link";
 import "core-js/features/object/group-by";
@@ -190,23 +190,22 @@ function PricingTierCard({
 }: {
   organization: OrganizationWithAvatar & OrganizationWithMembers;
 }) {
-  const { display_plan: tier, members } = organization;
+  const { plan, is_enterprise, members } = organization;
   const ENTERPRISE_DEFAULT_SEATS = 5;
-  const label = Labels.priceTier(tier);
-  const isEnterprise = tier === "v0_enterprise";
-  const isTeam = tier === "v0_team";
+  const label = Labels.planTier(plan, is_enterprise);
+  const isEnterprise = is_enterprise;
+  const isTeam = plan === "team";
   const canUpgrade = !isEnterprise && !isTeam;
 
-  const tierMessages: Record<PlatformPricingTier, string> = {
+  const tierMessages: Record<PlanTier, string> = {
     free: "You're currently on the Free Plan. Upgrade to unlock premium features!",
-    v0_pro:
-      "Thanks for being a Pro user! You're accessing advanced capabilities.",
-    v0_team: "You're on our Team plan, optimized for collaboration.",
-    v0_enterprise:
-      "You're on Enterprise Plan—thank you for your continued partnership",
+    pro: "Thanks for being a Pro user! You're accessing advanced capabilities.",
+    team: "You're on our Team plan, optimized for collaboration.",
   };
 
-  const message = tierMessages[tier] ?? `Thanks for subscribing to ${label}!`;
+  const message = isEnterprise
+    ? "You're on Enterprise Plan—thank you for your continued partnership"
+    : (tierMessages[plan] ?? `Thanks for subscribing to ${label}!`);
 
   return (
     <div className="relative rounded-lg border p-3">
@@ -219,7 +218,9 @@ function PricingTierCard({
       </div>
       <p className="mb-3 text-xs text-muted-foreground">{message}</p>
       {canUpgrade && (
-        <Link href={sitemap.links.pricing} target="_blank">
+        <Link
+          href={`/organizations/${organization.name}/settings/billing/upgrade`}
+        >
           <Button size="xs" variant="outline">
             Upgrade Plan
           </Button>
@@ -519,7 +520,7 @@ function OrganizationSwitcher({
                     variant="outline"
                     className="ms-auto text-xs px-1.5 py-0.5 font-normal text-muted-foreground"
                   >
-                    {Labels.priceTier(org.display_plan)}
+                    {Labels.planTier(org.plan, org.is_enterprise)}
                   </Badge>
                 </DropdownMenuItem>
               </Link>
