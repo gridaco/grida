@@ -4,11 +4,40 @@
   "rules": {
     // --- react-hooks (all OFF — progressive enablement) ------------
     "react/exhaustive-deps": "off",
+
+    // --- billing single-seam enforcement -------------------------------
+    // The Stripe SDK may only be imported by `editor/lib/billing/index.ts`.
+    // Other call sites must go through that seam so billing-side concerns
+    // (test-mode guard, money-safety, audit) are on by default.
+    //
+    // Type-only imports are allowed everywhere; only value imports are
+    // restricted.
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "stripe",
+            "message": "Use editor/lib/billing instead.",
+            "allowTypeImports": true,
+          },
+        ],
+      },
+    ],
   },
   "ignorePatterns": [
     // shadcn / generated UI (no control over code):
     "components/ui/**",
     "components/ui2/**",
     "components/ai-elements/**",
+  ],
+  "overrides": [
+    {
+      // The single Stripe seam.
+      "files": ["lib/billing/index.ts"],
+      "rules": {
+        "no-restricted-imports": "off",
+      },
+    },
   ],
 }
