@@ -2,11 +2,11 @@
 --
 -- Covers: provisioning trigger, Stripe projector (subscription, invoice,
 -- dispute, idempotency), org-delete guard, RLS on
--- public.v_billing_subscription / v_billing_audit / v_billing_seat_drift.
+-- public.v_billing_subscription / v_billing_audit.
 
 BEGIN;
 
-SELECT plan(38);
+SELECT plan(37);
 
 -- Stash seed UUIDs (regenerated on every `supabase db reset`).
 DO $$
@@ -278,18 +278,6 @@ UPDATE grida_billing.subscription
 SELECT lives_ok($$
   DELETE FROM public.organization WHERE id = 1
 $$, 'org deletes after Stripe sub canceled');
-
--- ---------------------------------------------------------------------
--- 8. v_billing_seat_drift requires service_role.
--- ---------------------------------------------------------------------
-
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub', current_setting('test.alice_uid'), true);
-SELECT throws_ok($$
-  SELECT * FROM public.v_billing_seat_drift
-$$, '42501', NULL,
-  'authenticated cannot SELECT v_billing_seat_drift');
-RESET ROLE;
 
 -- ---------------------------------------------------------------------
 -- 9. RLS on v_billing_subscription. (Local org was deleted above, use acme.)

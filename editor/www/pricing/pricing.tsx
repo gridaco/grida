@@ -2,7 +2,10 @@
 
 import React, { useState } from "react";
 import { PricingCard, PricingCardButton } from "@/www/pricing/pricing-card";
-import { plans as nosave_plans, save_plans } from "@/www/data/plans";
+import {
+  plans as nosave_plans,
+  save_plans,
+} from "@/lib/billing/marketing-plans";
 import PricingComparisonTable from "./pricing-comparison-table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";

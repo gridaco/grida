@@ -32,12 +32,19 @@ import {
   startCancelSubscription,
   startPaymentMethodUpdate,
 } from "./_actions";
+import {
+  PAID_PLANS,
+  price_dollars,
+  type Interval,
+  type PaidPlanId,
+  type PlanId,
+} from "@/lib/billing/plans";
 
 type BillingState = {
   org_id: number;
-  plan: string;
+  plan: PlanId;
   status: string;
-  seat_count: number;
+  interval: Interval | null;
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -249,10 +256,16 @@ export default function BillingView({
     );
   }
 
-  const isPaid = state.plan === "pro" || state.plan === "team";
-  const planLabel =
-    state.plan === "team" ? "Team" : state.plan === "pro" ? "Pro" : "Free";
-  const seatPriceDollars = state.plan === "team" ? 60 : 20;
+  const paidPlan: PaidPlanId | null =
+    state.plan === "pro" || state.plan === "team" ? state.plan : null;
+  const isPaid = paidPlan !== null;
+  const planLabel = paidPlan ? PAID_PLANS[paidPlan].name : "Free";
+  // v1: single-seat. Prices come from the catalogue source of truth.
+  const priceLabel = paidPlan
+    ? state.interval === "year"
+      ? `$${price_dollars(paidPlan, "year")}/yr`
+      : `$${price_dollars(paidPlan, "month")}/mo`
+    : "$0/mo";
   // Destructive payment-failure states. `incomplete` / `incomplete_expired`
   // mean the *first* invoice never settled (e.g. test card 4000 0000 0000 0002);
   // UX is the same as a renewal failure — point the user at the Stripe portal
@@ -280,7 +293,7 @@ export default function BillingView({
       <header className="mb-10">
         <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
         <p className="text-sm text-muted-foreground mt-2">
-          Manage subscription, seats, and invoices for{" "}
+          Manage your subscription and invoices for{" "}
           <span className="font-medium text-foreground">{orgName}</span>
         </p>
       </header>
@@ -338,11 +351,7 @@ export default function BillingView({
                 </CardTitle>
               </div>
               <CardDescription className="mt-2">
-                {isPaid
-                  ? `${state.seat_count} seat${state.seat_count === 1 ? "" : "s"} × $${seatPriceDollars}/mo = $${(
-                      state.seat_count * seatPriceDollars
-                    ).toFixed(2)}/mo`
-                  : "$0/mo"}
+                {isPaid ? priceLabel : "$0/mo"}
               </CardDescription>
             </CardHeader>
             {isPaid && (periodStartLabel || periodEndLabel) && (

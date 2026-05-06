@@ -249,7 +249,6 @@ export async function getCatalogueStripeIds(
 export async function getActivePaidSubscription(org_id: number): Promise<{
   stripe_subscription_id: string;
   status: string;
-  quantity: number;
 } | null> {
   const { data, error } = await service_role.workspace.rpc(
     "fn_billing_get_active_subscription",
@@ -261,23 +260,12 @@ export async function getActivePaidSubscription(org_id: number): Promise<{
   const row = firstRow<{
     stripe_subscription_id?: string | null;
     status?: string | null;
-    quantity?: number | null;
   }>(data);
   if (!row?.stripe_subscription_id) return null;
   return {
     stripe_subscription_id: row.stripe_subscription_id,
     status: row.status ?? "active",
-    quantity: row.quantity ?? 1,
   };
-}
-
-export async function countOrgMembers(org_id: number): Promise<number> {
-  const { count, error } = await service_role.workspace
-    .from("organization_member")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", org_id);
-  if (error) throw new Error(`countOrgMembers: ${error.message}`);
-  return count ?? 0;
 }
 
 // Resolve `account.stripe_customer_id` for an org; mint + persist if absent.

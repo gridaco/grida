@@ -4706,27 +4706,6 @@ export type Database = {
           },
         ]
       }
-      v_billing_seat_drift: {
-        Row: {
-          db_quantity: number | null
-          drift: number | null
-          member_count: number | null
-          organization_id: number | null
-          plan: string | null
-          status: string | null
-          stripe_subscription_id: string | null
-          updated_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organization"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       v_billing_subscription: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -5412,4 +5391,3 @@ export const Constants = {
     },
   },
 } as const
-

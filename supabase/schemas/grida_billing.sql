@@ -109,11 +109,13 @@ CREATE TABLE grida_billing.product_catalogue (
   surface                text NOT NULL DEFAULT '*' CHECK (surface IN ('editor','cors','*')),
   stripe_product_id      text,
   stripe_price_id        text,
-  -- Per-month per-seat price for kind='plan'.
-  per_seat_price_cents      integer CHECK (per_seat_price_cents IS NULL OR per_seat_price_cents >= 0),
-  created_at                timestamptz NOT NULL DEFAULT now(),
+  -- Unit price in cents for the billing period implied by the catalogue id
+  -- (monthly for `plan.<x>`, yearly for `plan.<x>.annual`). Stripe is the
+  -- runtime authority for what gets charged — this column is informational.
+  unit_amount_cents      integer CHECK (unit_amount_cents IS NULL OR unit_amount_cents >= 0),
+  created_at             timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT product_catalogue_plan_has_price CHECK (
-    kind <> 'plan' OR per_seat_price_cents IS NOT NULL
+    kind <> 'plan' OR unit_amount_cents IS NOT NULL
   )
 );
 
@@ -127,12 +129,12 @@ CREATE POLICY default_deny_anon          ON grida_billing.product_catalogue AS R
 REVOKE ALL ON TABLE grida_billing.product_catalogue FROM anon, authenticated;
 GRANT  ALL ON TABLE grida_billing.product_catalogue TO   service_role;
 
-INSERT INTO grida_billing.product_catalogue (id, kind, per_seat_price_cents) VALUES
+INSERT INTO grida_billing.product_catalogue (id, kind, unit_amount_cents) VALUES
   ('plan.free',         'plan',     0),
-  ('plan.pro',          'plan',  2000),  -- $20 / seat / mo
-  ('plan.team',         'plan',  6000),  -- $60 / seat / mo
-  ('plan.pro.annual',   'plan', 19200),  -- $192 / seat / yr (20% off $240)
-  ('plan.team.annual',  'plan', 57600)   -- $576 / seat / yr (20% off $720)
+  ('plan.pro',          'plan',  2000),  -- $20 / mo
+  ('plan.team',         'plan',  6000),  -- $60 / mo
+  ('plan.pro.annual',   'plan', 19200),  -- $192 / yr (20% off $240)
+  ('plan.team.annual',  'plan', 57600)   -- $576 / yr (20% off $720)
 ON CONFLICT (id) DO NOTHING;
 
 
@@ -370,166 +372,12 @@ END;
 $$;
 
 
--- Seat-sync triggers ----------------------------------------------------------
--- Bumping subscription.quantity when membership changes is a billing concern.
-
----------------------------------------------------------------------
--- [grida_billing.fn_seat_add]
--- Internal: bump quantity for org's active pro/team sub.
----------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION grida_billing.fn_seat_add(
-  p_org_id        bigint,
-  p_member_user_id uuid
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
-AS $$
-DECLARE
-  v_sub_id   uuid;
-  v_quantity integer;
-BEGIN
-  SELECT id, quantity INTO v_sub_id, v_quantity
-    FROM grida_billing.subscription
-   WHERE organization_id = p_org_id
-     AND is_free = false
-     AND status <> 'canceled'
-   LIMIT 1;
-
-  IF v_sub_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  UPDATE grida_billing.subscription
-     SET quantity   = quantity + 1,
-         updated_at = now()
-   WHERE id = v_sub_id;
-
-  INSERT INTO grida_billing.audit (
-    organization_id, user_id, operation,
-    member_user_id, prev_quantity, new_quantity, note
-  ) VALUES (
-    p_org_id, (SELECT auth.uid()), 'seat_add',
-    p_member_user_id, v_quantity, v_quantity + 1, 'pending stripe sync'
-  );
-END;
-$$;
-
-
----------------------------------------------------------------------
--- [grida_billing.fn_seat_remove]
--- Internal: decrement quantity for org's active pro/team sub.
----------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION grida_billing.fn_seat_remove(
-  p_org_id        bigint,
-  p_member_user_id uuid
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
-AS $$
-DECLARE
-  v_sub_id   uuid;
-  v_quantity integer;
-BEGIN
-  SELECT id, quantity INTO v_sub_id, v_quantity
-    FROM grida_billing.subscription
-   WHERE organization_id = p_org_id
-     AND is_free = false
-     AND status <> 'canceled'
-   LIMIT 1;
-
-  IF v_sub_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  UPDATE grida_billing.subscription
-     SET quantity   = greatest(quantity - 1, 1),
-         updated_at = now()
-   WHERE id = v_sub_id;
-
-  INSERT INTO grida_billing.audit (
-    organization_id, user_id, operation,
-    member_user_id, prev_quantity, new_quantity, note
-  ) VALUES (
-    p_org_id, (SELECT auth.uid()), 'seat_remove',
-    p_member_user_id, v_quantity, greatest(v_quantity - 1, 1), 'pending stripe sync'
-  );
-END;
-$$;
-
-
----------------------------------------------------------------------
--- [grida_billing.tg_organization_member_after_insert]
----------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION grida_billing.tg_organization_member_after_insert()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
-AS $$
-BEGIN
-  PERFORM grida_billing.fn_seat_add(NEW.organization_id, NEW.user_id);
-  RETURN NULL;
-END;
-$$;
-
-CREATE TRIGGER tg_billing_organization_member_after_insert
-  AFTER INSERT ON public.organization_member
-  FOR EACH ROW EXECUTE FUNCTION grida_billing.tg_organization_member_after_insert();
-
-
----------------------------------------------------------------------
--- [grida_billing.tg_organization_member_after_delete]
----------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION grida_billing.tg_organization_member_after_delete()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
-AS $$
-BEGIN
-  PERFORM grida_billing.fn_seat_remove(OLD.organization_id, OLD.user_id);
-  RETURN NULL;
-END;
-$$;
-
-CREATE TRIGGER tg_billing_organization_member_after_delete
-  AFTER DELETE ON public.organization_member
-  FOR EACH ROW EXECUTE FUNCTION grida_billing.tg_organization_member_after_delete();
-
-
----------------------------------------------------------------------
--- [grida_billing.tg_organization_member_after_update]
--- Defensive: org transfer (organization_id change) maps to a
--- delete-from-old + add-to-new pair. user_id changes (account merge)
--- don't affect quantity since the seat is preserved.
----------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION grida_billing.tg_organization_member_after_update()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
-AS $$
-BEGIN
-  IF NEW.organization_id IS DISTINCT FROM OLD.organization_id THEN
-    PERFORM grida_billing.fn_seat_remove(OLD.organization_id, OLD.user_id);
-    PERFORM grida_billing.fn_seat_add(NEW.organization_id, NEW.user_id);
-  END IF;
-  RETURN NULL;
-END;
-$$;
-
-CREATE TRIGGER tg_billing_organization_member_after_update
-  AFTER UPDATE ON public.organization_member
-  FOR EACH ROW EXECUTE FUNCTION grida_billing.tg_organization_member_after_update();
+-- Seat-sync triggers intentionally absent in v1.
+-- Multi-seat billing is deferred: paid subs are billed at the quantity
+-- chosen at Checkout (default 1) and changed only via the webhook.
+-- Membership changes do not mutate subscription.quantity. When seat
+-- management lands, it'll go through a server action that calls Stripe
+-- with an idempotency key — never a local-mirror trigger.
 
 
 ---------------------------------------------------------------------
@@ -937,39 +785,6 @@ WHERE a.organization_id IN (
 );
 
 GRANT SELECT ON public.v_billing_audit TO authenticated, service_role;
-
-
----------------------------------------------------------------------
--- [public.v_billing_seat_drift]
--- Operator (service_role) view: orgs whose subscription.quantity
--- does not match count(organization_member). Surfaces seat-sync
--- divergence (TC-BILLING-SUB-031).
----------------------------------------------------------------------
-
-CREATE OR REPLACE VIEW public.v_billing_seat_drift
-WITH (security_invoker = false)
-AS
-SELECT
-  s.organization_id,
-  s.plan,
-  s.status,
-  s.quantity                            AS db_quantity,
-  coalesce(mc.member_count, 0)::integer AS member_count,
-  (s.quantity - coalesce(mc.member_count, 0))::integer AS drift,
-  s.stripe_subscription_id,
-  s.updated_at
-FROM grida_billing.subscription s
-LEFT JOIN LATERAL (
-  SELECT count(*)::integer AS member_count
-    FROM public.organization_member om
-   WHERE om.organization_id = s.organization_id
-) mc ON true
-WHERE s.is_free = false
-  AND s.status NOT IN ('canceled')
-  AND s.quantity <> coalesce(mc.member_count, 0);
-
-REVOKE ALL ON public.v_billing_seat_drift FROM PUBLIC, authenticated, anon;
-GRANT  SELECT ON public.v_billing_seat_drift TO service_role;
 
 
 ---------------------------------------------------------------------

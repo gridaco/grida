@@ -1,5 +1,5 @@
 #!/usr/bin/env -S pnpm tsx
-// Idempotent Stripe test-mode setup: products, per-seat prices, and Customer
+// Idempotent Stripe test-mode setup: products, prices, and Customer
 // Portal config. Match-or-create by `metadata.grida_billing_id`. Writes the
 // resulting Stripe ids into `grida_billing.product_catalogue`.
 //
@@ -53,21 +53,26 @@ async function main(): Promise<void> {
   const { service_role } = await import("../../lib/supabase/server");
 
   // -----------------------------------------------------------------------
-  // Plan products + per-seat prices (monthly + annual)
+  // Plan products + prices (monthly + annual)
   // -----------------------------------------------------------------------
   //
   // One Stripe product per plan ("Grida Pro", "Grida Team"); two prices per
   // product (monthly + annual). Annual prices encode the 20% discount in
-  // `unit_amount` directly (no separate coupon line). The catalogue gets one
-  // row per (plan, interval) pair, keyed `plan.<name>` for monthly and
-  // `plan.<name>.annual` for annual.
+  // `unit_amount` directly (no separate coupon line). The catalogue gets
+  // one row per (plan, interval) pair, keyed `plan.<name>` for monthly
+  // and `plan.<name>.annual` for annual.
+  //
+  // Numeric prices come from `lib/billing/plans.ts` (single source of
+  // truth) — never hardcode them here.
 
+  const { PAID_PLAN_LIST, catalogueId } =
+    await import("../../lib/billing/plans");
   type Interval = "month" | "year";
 
   type PlanProduct = {
     name: string;
     description: string;
-    product_grida_id: "plan.pro" | "plan.team";
+    product_grida_id: `plan.${"pro" | "team"}`;
   };
 
   type PriceSpec = {
@@ -81,55 +86,40 @@ async function main(): Promise<void> {
     nickname: string;
   };
 
-  const PRO: PlanProduct = {
-    name: "Grida Pro",
-    description: "Grida Pro: $20/seat/mo or $192/seat/yr (20% off).",
-    product_grida_id: "plan.pro",
-  };
-  const TEAM: PlanProduct = {
-    name: "Grida Team",
-    description: "Grida Team: $60/seat/mo or $576/seat/yr (20% off).",
-    product_grida_id: "plan.team",
-  };
+  const PRODUCTS = Object.fromEntries(
+    PAID_PLAN_LIST.map((p): [typeof p.id, PlanProduct] => [
+      p.id,
+      {
+        name: `Grida ${p.name}`,
+        description: `Grida ${p.name}: $${p.monthly_cents / 100}/mo or $${
+          p.annual_cents / 100
+        }/yr (20% off).`,
+        product_grida_id: `plan.${p.id}`,
+      },
+    ])
+  ) as Record<"pro" | "team", PlanProduct>;
 
-  const PRICES: { product: PlanProduct; price: PriceSpec }[] = [
-    {
-      product: PRO,
-      price: {
-        catalogue_id: "plan.pro",
-        interval: "month",
-        unit_amount_cents: 2000,
-        nickname: "Pro monthly per-seat",
+  const PRICES: { product: PlanProduct; price: PriceSpec }[] =
+    PAID_PLAN_LIST.flatMap((p) => [
+      {
+        product: PRODUCTS[p.id],
+        price: {
+          catalogue_id: catalogueId(p.id, "month"),
+          interval: "month" as const,
+          unit_amount_cents: p.monthly_cents,
+          nickname: `${p.name} monthly`,
+        },
       },
-    },
-    {
-      product: PRO,
-      price: {
-        catalogue_id: "plan.pro.annual",
-        interval: "year",
-        unit_amount_cents: 19200,
-        nickname: "Pro annual per-seat",
+      {
+        product: PRODUCTS[p.id],
+        price: {
+          catalogue_id: catalogueId(p.id, "year"),
+          interval: "year" as const,
+          unit_amount_cents: p.annual_cents,
+          nickname: `${p.name} annual`,
+        },
       },
-    },
-    {
-      product: TEAM,
-      price: {
-        catalogue_id: "plan.team",
-        interval: "month",
-        unit_amount_cents: 6000,
-        nickname: "Team monthly per-seat",
-      },
-    },
-    {
-      product: TEAM,
-      price: {
-        catalogue_id: "plan.team.annual",
-        interval: "year",
-        unit_amount_cents: 57600,
-        nickname: "Team annual per-seat",
-      },
-    },
-  ];
+    ]);
 
   // We list+filter instead of products.search because search is eventually
   // consistent and can miss a product we created seconds ago, breaking
@@ -290,12 +280,12 @@ async function main(): Promise<void> {
 
   // Provision both products in parallel, then their 4 prices in parallel.
   const [pro_product_id, team_product_id] = await Promise.all([
-    ensureProduct(PRO),
-    ensureProduct(TEAM),
+    ensureProduct(PRODUCTS.pro),
+    ensureProduct(PRODUCTS.team),
   ]);
 
   const productIdFor = (p: PlanProduct): string =>
-    p === PRO ? pro_product_id : team_product_id;
+    p === PRODUCTS.pro ? pro_product_id : team_product_id;
 
   const priceIds = await Promise.all(
     PRICES.map(async ({ product, price }) => {

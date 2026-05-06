@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
 import { pricing } from "../data/pricing";
-import { PricingInformation } from "../data/plans";
+import { PricingInformation } from "@/lib/billing/marketing-plans";
 import {
   PricingTableRowDesktop,
   PricingTableRowMobile,

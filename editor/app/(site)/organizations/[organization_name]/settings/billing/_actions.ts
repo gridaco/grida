@@ -13,10 +13,19 @@ import {
   getCatalogueStripeIds,
   getActivePaidSubscription,
   getCustomerId,
-  countOrgMembers,
   assertAllowedRedirect,
 } from "@/lib/billing";
+import {
+  price_catalogue_id,
+  type Interval,
+  type PaidPlanId,
+  type PlanId,
+} from "@/lib/billing/plans";
 import { headers } from "next/headers";
+
+function asPlanId(raw: string | null | undefined): PlanId {
+  return raw === "pro" || raw === "team" ? raw : "free";
+}
 
 async function requireUserId(): Promise<string> {
   const sb = await createClient();
@@ -45,16 +54,15 @@ async function getOrigin(): Promise<string> {
 
 export type BillingSummary = {
   org_id: number;
-  plan: string;
+  plan: PlanId;
   status: string;
   is_free: boolean;
-  seat_count: number;
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   has_active_subscription: boolean;
   /** "month" | "year" for paid subs; null for free. Read from Stripe. */
-  interval: "month" | "year" | null;
+  interval: Interval | null;
 };
 
 export async function getBillingSummary(
@@ -74,7 +82,7 @@ export async function getBillingSummary(
   }
 
   const sub = subRes.data;
-  let interval: "month" | "year" | null = null;
+  let interval: Interval | null = null;
   if (sub?.stripe_subscription_id) {
     const stripeSub = await stripe.subscriptions
       .retrieve(sub.stripe_subscription_id)
@@ -85,10 +93,9 @@ export async function getBillingSummary(
 
   return {
     org_id,
-    plan: sub?.plan ?? "free",
+    plan: asPlanId(sub?.plan),
     status: sub?.status ?? "active",
     is_free: sub?.is_free ?? true,
-    seat_count: sub?.quantity ?? 1,
     current_period_start: sub?.current_period_start ?? null,
     current_period_end: sub?.current_period_end ?? null,
     cancel_at_period_end: sub?.cancel_at_period_end ?? false,
@@ -282,8 +289,8 @@ export type PlanChangeConfirmResult = { portal_url: string };
 export async function startPlanChangeConfirm(
   org_id: number,
   params: {
-    plan: "pro" | "team";
-    interval: "month" | "year";
+    plan: PaidPlanId;
+    interval: Interval;
     return_url: string;
   }
 ): Promise<PlanChangeConfirmResult> {
@@ -328,26 +335,24 @@ export async function startPlanChangeConfirm(
     );
   }
 
-  const catalogueId =
-    params.interval === "year"
-      ? (`plan.${params.plan}.annual` as const)
-      : (`plan.${params.plan}` as const);
-  const cat = await getCatalogueStripeIds(catalogueId);
+  const id = price_catalogue_id(params.plan, params.interval);
+  const cat = await getCatalogueStripeIds(id);
   if (!cat) {
     throw new BillingError(
-      `Stripe price for ${catalogueId} is not yet wired.`,
+      `Stripe price for ${id} is not yet wired.`,
       "billing_not_provisioned",
       500
     );
   }
 
-  // Fetch the current subscription's first item id — Portal flow_data
-  // requires it to know which item to update in place.
+  // Fetch the current subscription's first item — Portal flow_data
+  // requires its id to know which item to update, and we preserve the
+  // existing quantity (v1 = 1) so a plan/interval change doesn't reset it.
   const stripeSub = await stripe.subscriptions.retrieve(
     sub.stripe_subscription_id
   );
-  const itemId = stripeSub.items.data[0]?.id;
-  if (!itemId) {
+  const item = stripeSub.items.data[0];
+  if (!item) {
     throw new Error(
       `Stripe subscription ${sub.stripe_subscription_id} has no items`
     );
@@ -364,9 +369,9 @@ export async function startPlanChangeConfirm(
         subscription: sub.stripe_subscription_id,
         items: [
           {
-            id: itemId,
+            id: item.id,
             price: cat.stripe_price_id,
-            quantity: sub.quantity,
+            quantity: item.quantity ?? 1,
           },
         ],
       },
@@ -387,15 +392,13 @@ export async function startPlanChangeConfirm(
 export type SubscribeCheckoutResult = {
   checkout_url: string | null;
   session_id: string;
-  quantity: number;
 };
 
 export async function startSubscribeCheckout(
   org_id: number,
   params: {
-    plan: "pro" | "team";
-    interval?: "month" | "year";
-    quantity?: number;
+    plan: PaidPlanId;
+    interval?: Interval;
     success_url: string;
     cancel_url: string;
   }
@@ -410,7 +413,7 @@ export async function startSubscribeCheckout(
       400
     );
   }
-  const interval: "month" | "year" = params.interval ?? "month";
+  const interval: Interval = params.interval ?? "month";
   if (interval !== "month" && interval !== "year") {
     throw new BillingError(
       `interval must be 'month' or 'year' (got '${params.interval}').`,
@@ -431,28 +434,20 @@ export async function startSubscribeCheckout(
   const success_url = assertAllowedRedirect(params.success_url, origin);
   const cancel_url = assertAllowedRedirect(params.cancel_url, origin);
 
-  // Annual catalogue rows are keyed `plan.<name>.annual`; monthly stays `plan.<name>`.
-  const catalogueId =
-    interval === "year"
-      ? (`plan.${params.plan}.annual` as const)
-      : (`plan.${params.plan}` as const);
-  const cat = await getCatalogueStripeIds(catalogueId);
+  const id = price_catalogue_id(params.plan, interval);
+  const cat = await getCatalogueStripeIds(id);
   if (!cat) {
     throw new BillingError(
-      `Stripe price for ${catalogueId} is not yet wired.`,
+      `Stripe price for ${id} is not yet wired.`,
       "billing_not_provisioned",
       500
     );
   }
 
-  const memberCount = await countOrgMembers(org_id);
-  const quantity = Math.max(
-    1,
-    Math.min(
-      Number.isInteger(params.quantity) ? Number(params.quantity) : memberCount,
-      memberCount || 1
-    )
-  );
+  // v1 ships single-seat only. Multi-seat billing is deferred — when it
+  // lands, the quantity will come from a "Manage seats" UI that pushes
+  // through Stripe, never inferred from member count here.
+  const quantity = 1;
 
   const customer = await resolveOrCreateStripeCustomer(org_id);
   const idempotencyKey = `subscribe:${org_id}:${params.plan}:${interval}:${Math.floor(Date.now() / 60000)}`;
@@ -476,7 +471,6 @@ export async function startSubscribeCheckout(
         kind: "subscribe",
         plan: params.plan,
         interval,
-        quantity: String(quantity),
       },
       allow_promotion_codes: true,
     },
@@ -486,7 +480,6 @@ export async function startSubscribeCheckout(
   return {
     checkout_url: session.url,
     session_id: session.id,
-    quantity,
   };
 }
 
@@ -544,107 +537,6 @@ export async function startCancelSubscription(
   });
 
   return { portal_url: session.url };
-}
-
-// ---------------------------------------------------------------------------
-// updateSeats
-//
-// Stripe-side mutation. Quantity is server-bounded by `members + 50` to
-// prevent a runaway request from billing 1M seats.
-// ---------------------------------------------------------------------------
-
-export type UpdateSeatsResult = {
-  new_quantity: number;
-  no_op?: boolean;
-  stripe_subscription_id?: string;
-};
-
-export async function updateSeats(
-  org_id: number,
-  params: { delta?: number; target_quantity?: number }
-): Promise<UpdateSeatsResult> {
-  const user_id = await requireUserId();
-  await assertOrgOwner(user_id, org_id);
-
-  const sub = await getActivePaidSubscription(org_id);
-  if (!sub) {
-    throw new BillingError(
-      "Organization is on Free. Upgrade before changing seat count.",
-      "not_subscribed",
-      400,
-      "billing/upgrade"
-    );
-  }
-  if (sub.status !== "active" && sub.status !== "trialing") {
-    throw new BillingError(
-      `Subscription status is '${sub.status}'. Resolve payment issues first.`,
-      "subscription_not_active",
-      400,
-      "billing"
-    );
-  }
-
-  let target: number;
-  if (typeof params.target_quantity === "number") {
-    target = Math.trunc(params.target_quantity);
-  } else if (typeof params.delta === "number") {
-    target = sub.quantity + Math.trunc(params.delta);
-  } else {
-    throw new BillingError(
-      "Provide either delta or target_quantity",
-      "invalid_body",
-      400
-    );
-  }
-
-  if (!Number.isInteger(target) || target < 1) {
-    throw new BillingError(
-      "target quantity must be >= 1",
-      "invalid_quantity",
-      400
-    );
-  }
-
-  const memberCount = await countOrgMembers(org_id);
-  if (target > memberCount + 50) {
-    throw new BillingError(
-      `target ${target} exceeds reasonable bound (members=${memberCount})`,
-      "quantity_too_large",
-      400
-    );
-  }
-
-  if (target === sub.quantity) {
-    return { new_quantity: target, no_op: true };
-  }
-
-  const stripeSub = await stripe.subscriptions.retrieve(
-    sub.stripe_subscription_id
-  );
-  const itemId = stripeSub.items.data[0]?.id;
-  if (!itemId) {
-    throw new Error(
-      `Stripe subscription ${sub.stripe_subscription_id} has no items`
-    );
-  }
-
-  const updated = await stripe.subscriptions.update(
-    sub.stripe_subscription_id,
-    {
-      items: [{ id: itemId, quantity: target }],
-      proration_behavior: "create_prorations",
-      metadata: {
-        grida_organization_id: String(org_id),
-        last_seat_change_actor: user_id,
-      },
-    },
-    { idempotencyKey: `${org_id}:seat_change:${target}` }
-  );
-
-  return {
-    new_quantity: updated.items?.data?.[0]?.quantity ?? target,
-    stripe_subscription_id: updated.id,
-  };
 }
 
 // ---------------------------------------------------------------------------

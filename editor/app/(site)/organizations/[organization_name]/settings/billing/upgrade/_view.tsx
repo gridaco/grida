@@ -20,62 +20,25 @@ import {
   startSubscribeCheckout,
   startPlanChangeConfirm,
 } from "../_actions";
-
-type CurrentState = {
-  plan: "free" | "pro" | "team" | string;
-  status: string;
-  seat_count: number;
-  interval: "month" | "year" | null;
-} | null;
-
-type Interval = "month" | "year";
-
-type PlanDef = {
-  id: "free" | "pro" | "team";
-  name: string;
-  description: string;
-  /** Sticker monthly price per seat. Annual is this × 12 × 0.8 (20% off). */
-  monthly_per_seat: number;
-  features: ReadonlyArray<string>;
-};
+import {
+  PAID_PLAN_LIST,
+  PLAN_RANK,
+  price_monthly_equivalent_dollars,
+  price_dollars,
+  type Interval,
+  type PaidPlanDefinition,
+  type PlanId,
+} from "@/lib/billing/plans";
 
 // Free is intentionally not listed here. Downgrading to Free means
 // canceling the paid subscription, which is handled in the Stripe Customer
 // Portal — not from this upgrade page.
-const PLANS: ReadonlyArray<PlanDef> = [
-  {
-    id: "pro",
-    name: "Pro",
-    description: "For teams with creative workflows.",
-    monthly_per_seat: 20,
-    features: [
-      "Stripe-managed billing & invoices",
-      "Per-seat pricing scales with your team",
-      "Cancel or switch plans anytime via the Customer Portal",
-    ],
-  },
-  {
-    id: "team",
-    name: "Team",
-    description: "For larger teams.",
-    monthly_per_seat: 60,
-    features: [
-      "Everything in Pro",
-      "More storage & monthly active users",
-      "Chat support",
-    ],
-  },
-] as const;
 
-const PLAN_RANK: Record<PlanDef["id"], number> = { free: 0, pro: 1, team: 2 };
-
-// Annual discount is encoded inline (20% off the sticker monthly × 12).
-function annualPerSeat(plan: PlanDef): number {
-  return plan.monthly_per_seat * 12 * 0.8;
-}
-function effectiveMonthly(plan: PlanDef, interval: Interval): number {
-  return interval === "year" ? annualPerSeat(plan) / 12 : plan.monthly_per_seat;
-}
+type CurrentState = {
+  plan: PlanId;
+  status: string;
+  interval: Interval | null;
+} | null;
 
 export default function UpgradeView({
   orgId,
@@ -101,7 +64,6 @@ export default function UpgradeView({
         setCurrent({
           plan: data.plan ?? "free",
           status: data.status ?? "active",
-          seat_count: data.seat_count ?? 1,
           interval: data.interval ?? null,
         });
         if (data.interval) setInterval(data.interval);
@@ -110,7 +72,6 @@ export default function UpgradeView({
         setCurrent({
           plan: "free",
           status: "active",
-          seat_count: 1,
           interval: null,
         })
       );
@@ -119,16 +80,14 @@ export default function UpgradeView({
     };
   }, [orgId]);
 
-  const subscribe = async (plan: PlanDef) => {
-    if (!current || plan.id === "free") return;
-    if (plan.id !== "pro" && plan.id !== "team") return;
+  const subscribe = async (plan: PaidPlanDefinition) => {
+    if (!current) return;
     setSubmittingPlan(plan.id);
     try {
       const origin = window.location.origin;
       const result = await startSubscribeCheckout(orgId, {
         plan: plan.id,
         interval,
-        quantity: current.seat_count,
         success_url: `${origin}${baseUrl}?subscribe=success`,
         cancel_url: `${origin}${baseUrl}?subscribe=canceled`,
       });
@@ -146,8 +105,7 @@ export default function UpgradeView({
 
   // Paid→paid plan/interval change. Server picks the price; Stripe Portal
   // shows a single confirm page (no plan picker) with the prorated total.
-  const changePlan = async (plan: PlanDef) => {
-    if (plan.id === "free") return;
+  const changePlan = async (plan: PaidPlanDefinition) => {
     setSubmittingPlan(plan.id);
     try {
       const result = await startPlanChangeConfirm(orgId, {
@@ -164,9 +122,9 @@ export default function UpgradeView({
     }
   };
 
-  const renderPlanAction = (plan: PlanDef) => {
+  const renderPlanAction = (plan: PaidPlanDefinition) => {
     if (!current) return <Skeleton className="h-9 w-full" />;
-    const currentRank = PLAN_RANK[current.plan as PlanDef["id"]] ?? 0;
+    const currentRank = PLAN_RANK[current.plan] ?? 0;
     const planRank = PLAN_RANK[plan.id];
     const samePlan = plan.id === current.plan;
     const sameInterval = current.interval === interval;
@@ -242,18 +200,22 @@ export default function UpgradeView({
 
   const headerTitle = (() => {
     if (!current) return "Plans";
-    const currentRank = PLAN_RANK[current.plan as PlanDef["id"]] ?? 0;
-    const hasUpgrade = PLANS.some((p) => PLAN_RANK[p.id] > currentRank);
+    const currentRank = PLAN_RANK[current.plan] ?? 0;
+    const hasUpgrade = PAID_PLAN_LIST.some(
+      (p) => PLAN_RANK[p.id] > currentRank
+    );
     return hasUpgrade ? "Upgrade" : "Adjust plan";
   })();
 
   const headerSubtitle = (() => {
-    if (!current) return "Choose a plan to fit your team.";
-    const currentRank = PLAN_RANK[current.plan as PlanDef["id"]] ?? 0;
-    const hasUpgrade = PLANS.some((p) => PLAN_RANK[p.id] > currentRank);
+    if (!current) return "Choose a plan that fits your work.";
+    const currentRank = PLAN_RANK[current.plan] ?? 0;
+    const hasUpgrade = PAID_PLAN_LIST.some(
+      (p) => PLAN_RANK[p.id] > currentRank
+    );
     return hasUpgrade
-      ? "Pick a plan that scales with your team."
-      : "You're on the highest plan. Manage seats or downgrade in the Stripe Portal.";
+      ? "Pick a plan that fits your work."
+      : "You're on the highest plan. Switch interval or downgrade anytime.";
   })();
 
   const intervalToggle = (
@@ -297,10 +259,13 @@ export default function UpgradeView({
       <div className="mb-6 flex justify-end">{intervalToggle}</div>
 
       <div className="grid gap-4 md:grid-cols-3 items-stretch">
-        {PLANS.map((plan) => {
+        {PAID_PLAN_LIST.map((plan) => {
           const isCurrent = current?.plan === plan.id;
-          const monthlyEquivalent = effectiveMonthly(plan, interval);
-          const annualSticker = annualPerSeat(plan);
+          const monthlyEquivalent = price_monthly_equivalent_dollars(
+            plan.id,
+            interval
+          );
+          const annualSticker = price_dollars(plan.id, "year");
           return (
             <Card
               key={plan.id}
@@ -319,12 +284,12 @@ export default function UpgradeView({
                     ${monthlyEquivalent.toFixed(0)}
                     <span className="text-base font-normal text-muted-foreground">
                       {" "}
-                      / seat / mo
+                      / mo
                     </span>
                   </p>
                   {interval === "year" && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Billed ${annualSticker.toFixed(0)} / seat annually
+                      Billed ${annualSticker.toFixed(0)} annually
                     </p>
                   )}
                 </div>
@@ -336,20 +301,6 @@ export default function UpgradeView({
                     </li>
                   ))}
                 </ul>
-                {current && (
-                  <p className="text-xs text-muted-foreground border-t pt-2 mt-2">
-                    Total at {current.seat_count} seat
-                    {current.seat_count === 1 ? "" : "s"}:{" "}
-                    <strong>
-                      $
-                      {(interval === "year"
-                        ? current.seat_count * annualSticker
-                        : current.seat_count * plan.monthly_per_seat
-                      ).toFixed(2)}
-                      {interval === "year" ? " / yr" : " / mo"}
-                    </strong>
-                  </p>
-                )}
               </CardContent>
               <CardFooter>{renderPlanAction(plan)}</CardFooter>
             </Card>
