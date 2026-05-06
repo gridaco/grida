@@ -1,8 +1,0 @@
-boto3
-click
-tqdm
-cairosvg
-pillow
-pylette==4.4.0
-python-dotenv
-supabase

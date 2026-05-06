@@ -80,7 +80,6 @@ Colinear = "Colinear"
 # Exclude example files (may contain intentional content)
 extend-exclude = [
   "**/data/figma-archives/**",
-  "**/library/class/*.txt",
   "**/data/fake/**",
   "**/editor/i18n/**",
   "**/editor/theme/**/messages.json",
