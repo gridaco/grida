@@ -296,3 +296,50 @@ Possible after a Stripe region failover.
 
 Customer Portal cancels via the newer cancel-at timestamp; the webhook payload has both the legacy boolean and the timestamp.
 **Expected:** The system normalizes both — if either implies "cancel at period end," treat the subscription as scheduled to cancel.
+
+## Same-plan interval upgrade (monthly ↔ annual)
+
+The pricing page and `docs/platform/billing.mdx` advertise a 20% annual discount on Pro and Team. As of v1, **annual is unprovisioned** end-to-end — the cases below capture both the eventual desired behavior and the silent failure modes if a user gets there through the Stripe Dashboard before the implementation lands.
+
+### TC-BILLING-SUB-052 — Pro monthly → Pro annual via Customer Portal
+
+Pro monthly user, mid-period (15 days into a 30-day cycle, 5 seats), hits the portal and selects the annual price.
+**Expected:** Stripe issues an immediate prorated invoice — credit the unused 15 days of monthly ($5 × 5 seats × 15/30 = $50 credit) against the annual line ($192 × 5 = $960), net charge $910 today. `subscription.updated` fires with the new annual price and `current_period_end` ≈ 365 days out. Local subscription mirrors plan='pro', status='active', new period bounds. Receipt shows both lines.
+**Open gap:** The portal config (`setup-stripe-test.ts` `setupPortal`) only lists monthly prices in `subscription_update.products[].prices`. A user cannot today initiate this from inside Grida's Customer Portal — they'd have to do it from the Stripe Dashboard. Treat this TC as "what we want once annual is wired."
+
+### TC-BILLING-SUB-053 — Annual price not in product_catalogue → silent fallback
+
+Admin manually creates a Pro-annual price in Stripe Dashboard (no `metadata.grida_billing_id`) and switches a customer to it. Webhook fires.
+**Expected:** Catalogue lookup in `fn_billing_apply_stripe_event` fails to match the price; `v_plan` defaults to 'pro'. Subscription row updates with the new period bounds but stays `plan='pro'`. **No error logged, no audit signal.** This is a silent forensic gap until annual is properly catalogued.
+**Niche:** `plan` is `text CHECK plan IN ('free','pro','team')`, so even encoding "pro_annual" would fail the constraint. Today's behavior is "lose the interval silently"; tomorrow's design decision is whether interval becomes its own column or `plan_id` widens to include intervals.
+
+### TC-BILLING-SUB-054 — Annual upgrade jumps current_period_end forward 11 months
+
+Pro monthly user (`current_period_end = today + 15 days`) switches to annual. The projector mirrors Stripe's new period, so `current_period_end` becomes ~today + 365 days in a single update.
+**Expected:** Local view is correct from a billing-cycle standpoint. UI's "next renewal" date jumps by ~11 months — confirm this is shown clearly and isn't mistaken for a bug by the user.
+**Money/quota gap:** AI allowance uses `current_period_*` directly (see TC-BILLING-AI-018). After this jump the user receives one allowance lump intended to cover 12 months, then no refresh until the annual renewal. Annual needs separate monthly bookkeeping before the AI side passes.
+
+### TC-BILLING-SUB-055 — Proration invoice declines on monthly → annual
+
+User selects annual in the portal. Stripe's `always_invoice` proration tries to collect $910 immediately; card declines.
+**Expected:** Stripe's behavior is to apply the price change anyway and mark the new invoice unpaid → subscription enters `past_due`. Local mirror reflects `past_due` on the new (annual) period. User keeps Pro access through Smart Retries grace, same as TC-BILLING-PAY-002. If retries exhaust, transitions to `unpaid`/`canceled` per existing past-due policy.
+**Niche:** The price change is NOT reverted on decline. The user is now on annual at `past_due`, not on monthly at `active`. UI must say "your interval was changed but the invoice is unpaid" rather than implying the upgrade was rolled back.
+
+### TC-BILLING-SUB-056 — Annual discount applies correctly on the new line
+
+Same setup as SUB-052; verify the math. Annual line should be $192/seat (20% off $240 sticker), not $240/seat with a separate discount line.
+**Expected:** `unit_amount` on the annual price is $19,200 cents ($192). Proration is computed against that price directly. No separate "discount" line item, no coupon.
+**Open gap:** Annual prices are not yet provisioned by `setup-stripe-test.ts`. When they are, the discount must be encoded inline in `unit_amount`; otherwise the docs claim ("20% off comes out of platform margin") drifts from the receipt.
+
+### TC-BILLING-SUB-057 — Annual → monthly downgrade mid-cycle
+
+Pro annual user, 60 days in (305 days remaining), switches back to monthly via the portal.
+**Expected:** Stripe credits the unused annual portion (~$160 × 5 seats = $800) to the Customer Balance, charges the new monthly invoice from balance, and rolls future monthly invoices off it. `current_period_end` shrinks from ~305 days to ~30 days. Audit log records both the price change and the credit.
+**Niche:** Customer Balance interaction is asymmetric with the upgrade case (which charges immediately). TC-BILLING-PAY-015 covers Customer Balance at cancellation, but not the mid-cycle case where it accumulates from a downgrade. Confirm we display the balance to the user.
+**Policy question:** Do we even want to allow this? An annual customer paid for the discount; letting them flip back monthly mid-cycle and harvest the credit may be against intent. May warrant blocking via portal config rather than enabling.
+
+### TC-BILLING-SUB-058 — Self-service interval switch via the upgrade page (not portal)
+
+User on Pro monthly clicks an "annual" toggle on the in-app upgrade page (or pricing page) — separate flow from the Customer Portal.
+**Expected:** A new Stripe Checkout session targeting the annual price, with proration applied to the existing subscription. On success, same end state as SUB-052.
+**Open gap:** `startSubscribeCheckout` currently accepts only `plan: 'pro' | 'team'` — no `interval` parameter. The upgrade page (`upgrade/_view.tsx`) shows no annual toggle. This TC documents the missing surface, not current behavior.
