@@ -8,7 +8,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 
 export function Pricing() {
-  const [save, setSave] = useState(true);
+  // Default to monthly so visitors first see the real default price.
+  // Annual is opt-in.
+  const [save, setSave] = useState(false);
 
   const plans = save ? save_plans : nosave_plans;
 
