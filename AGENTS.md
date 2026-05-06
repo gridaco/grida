@@ -26,7 +26,6 @@ Currently, we have below features / modules.
 | [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app                      |
 | [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                          |
 | [apps](./apps)         | -                                            | -                                            | micro sites for Grida                         |
-| [library](./library)   | [`library/README.md`](./library/README.md)   | -                                            | hosted library workers                        |
 | [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                                   |
 | [test](./test)         | [`test/README.md`](./test/README.md)         | [`test/AGENTS.md`](./test/AGENTS.md)         | manual test cases & UX behavior specs         |
 | [.legacy](./.legacy)   | -                                            | -                                            | will be removed (fully ignore this directory) |
@@ -37,7 +36,7 @@ Currently, we have below features / modules.
 
 - Node.js 24 LTS - main runtime for most apps
 - TypeScript 5 - main language for most apps
-- Python 3.12 - partially used for tasks / jobs, that are independent, e.g. `/library`
+- Python 3.12 - partially used for tasks / jobs that are independent (hosted out-of-tree, e.g. [gridaco/library](https://github.com/gridaco/library))
 - Deno - partially used for tasks / jobs, that shares the codebase, e.g. `/jobs`
 - Rust (2024 edition) - used for wasm builds, mostly for graphics core.
 
@@ -153,12 +152,6 @@ In any cases, bots will never have access to the main (production) database.
 Importance: **Low**
 
 Jobs are hosted on railway.com
-
-## `/library`
-
-Importance: **Low**
-
-Library workers are hosted on railway.com
 
 ## `/packages/*`
 
