@@ -13,23 +13,42 @@ import { service_role } from "../supabase/server";
 
 const STRIPE_API_VERSION = "2026-04-22.dahlia" as const;
 
-const stripeKey = process.env.STRIPE_SECRET_KEY;
-if (!stripeKey) {
-  throw new Error("STRIPE_SECRET_KEY is required.");
-}
-if (
-  process.env.BILLING_TEST_MODE === "true" &&
-  !stripeKey.startsWith("sk_test_")
-) {
-  throw new Error(
-    "BILLING_TEST_MODE=true but STRIPE_SECRET_KEY is not a test key."
-  );
+// Lazy Stripe client — instantiated on first property access, not at module
+// load. This matters because Next.js evaluates route handlers during `next
+// build` to collect page data, and Vercel build envs typically don't have
+// runtime secrets like STRIPE_SECRET_KEY available. Throwing at module load
+// breaks the build; throwing at first call only fails actual requests
+// (where the env var IS available at runtime).
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (_stripe) return _stripe;
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    throw new Error("STRIPE_SECRET_KEY is required.");
+  }
+  if (
+    process.env.BILLING_TEST_MODE === "true" &&
+    !stripeKey.startsWith("sk_test_")
+  ) {
+    throw new Error(
+      "BILLING_TEST_MODE=true but STRIPE_SECRET_KEY is not a test key."
+    );
+  }
+  _stripe = new Stripe(stripeKey, {
+    apiVersion: STRIPE_API_VERSION,
+    httpClient: Stripe.createFetchHttpClient(),
+    typescript: true,
+  });
+  return _stripe;
 }
 
-export const stripe = new Stripe(stripeKey, {
-  apiVersion: STRIPE_API_VERSION,
-  httpClient: Stripe.createFetchHttpClient(),
-  typescript: true,
+// Proxy preserves the `stripe.subscriptions.create(...)` API at all call
+// sites while deferring the env check. Each property access goes through
+// `getStripe()` which short-circuits after first init.
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getStripe(), prop, receiver);
+  },
 });
 export type { Stripe };
 
