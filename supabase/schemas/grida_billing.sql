@@ -20,13 +20,25 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 CREATE SCHEMA IF NOT EXISTS grida_billing;
 ALTER SCHEMA grida_billing OWNER TO postgres;
 
--- Schema lockdown. No USAGE for anon/authenticated.
+-- Schema USAGE: authenticated needs it because security_invoker=true views
+-- in `public` resolve `grida_billing.*` as the calling role. Granting USAGE
+-- alone exposes nothing — table-level GRANTs (further down) decide what
+-- authenticated can actually read. anon has no USAGE here at all; the
+-- public views aren't granted to anon either, so anon never reaches in.
+REVOKE ALL ON SCHEMA grida_billing FROM PUBLIC;
+GRANT  USAGE ON SCHEMA grida_billing TO authenticated, service_role;
+
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_billing GRANT ALL ON TABLES    TO service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_billing GRANT ALL ON ROUTINES  TO service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_billing GRANT ALL ON SEQUENCES TO service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON TABLES    FROM authenticated, anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON ROUTINES  FROM authenticated, anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON SEQUENCES FROM authenticated, anon;
+-- Default-privileges only revoke from authenticated/anon explicitly; PUBLIC
+-- still inherits EXECUTE on every routine and authenticated inherits PUBLIC.
+-- Strip PUBLIC too so the schema USAGE we grant above doesn't make signed-in
+-- users able to call internal SECURITY DEFINER functions like the projector.
+ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE EXECUTE ON ROUTINES FROM PUBLIC;
 
 
 ---------------------------------------------------------------------
@@ -41,11 +53,23 @@ CREATE TABLE grida_billing.account (
   updated_at          timestamptz NOT NULL DEFAULT now()
 );
 
+-- Read access pattern: authenticated org members may SELECT their account
+-- row through the SELECT grant + permissive policy below. Writes stay
+-- service-role only (no INSERT/UPDATE/DELETE grant; no permissive policy
+-- for those ops → RLS denies). anon has no grant at all and cannot reach
+-- the table.
 ALTER TABLE grida_billing.account ENABLE ROW LEVEL SECURITY;
-CREATE POLICY default_deny_authenticated ON grida_billing.account AS RESTRICTIVE FOR ALL TO authenticated USING (false) WITH CHECK (false);
-CREATE POLICY default_deny_anon          ON grida_billing.account AS RESTRICTIVE FOR ALL TO anon          USING (false) WITH CHECK (false);
 REVOKE ALL ON TABLE grida_billing.account FROM anon, authenticated;
-GRANT  ALL ON TABLE grida_billing.account TO   service_role;
+GRANT  ALL    ON TABLE grida_billing.account TO   service_role;
+GRANT  SELECT ON TABLE grida_billing.account TO   authenticated;
+CREATE POLICY member_can_select ON grida_billing.account
+  FOR SELECT TO authenticated
+  USING (
+    organization_id IN (
+      SELECT om.organization_id FROM public.organization_member om
+       WHERE om.user_id = (SELECT auth.uid())
+    )
+  );
 
 
 ---------------------------------------------------------------------
@@ -91,11 +115,20 @@ CREATE UNIQUE INDEX subscription_one_active_per_org_idx
 CREATE INDEX subscription_organization_id_idx
   ON grida_billing.subscription (organization_id);
 
+-- Same pattern as account: members SELECT their org's row; writes are
+-- webhook-projector / service-role only.
 ALTER TABLE grida_billing.subscription ENABLE ROW LEVEL SECURITY;
-CREATE POLICY default_deny_authenticated ON grida_billing.subscription AS RESTRICTIVE FOR ALL TO authenticated USING (false) WITH CHECK (false);
-CREATE POLICY default_deny_anon          ON grida_billing.subscription AS RESTRICTIVE FOR ALL TO anon          USING (false) WITH CHECK (false);
 REVOKE ALL ON TABLE grida_billing.subscription FROM anon, authenticated;
-GRANT  ALL ON TABLE grida_billing.subscription TO   service_role;
+GRANT  ALL    ON TABLE grida_billing.subscription TO   service_role;
+GRANT  SELECT ON TABLE grida_billing.subscription TO   authenticated;
+CREATE POLICY member_can_select ON grida_billing.subscription
+  FOR SELECT TO authenticated
+  USING (
+    organization_id IN (
+      SELECT om.organization_id FROM public.organization_member om
+       WHERE om.user_id = (SELECT auth.uid())
+    )
+  );
 
 
 ---------------------------------------------------------------------
@@ -223,11 +256,27 @@ CREATE INDEX audit_stripe_invoice_id_idx
   ON grida_billing.audit (stripe_invoice_id)
   WHERE stripe_invoice_id IS NOT NULL;
 
+-- Owner-only read: only the org owner sees audit rows (TC-BILLING-OPS-009/010).
+-- Members other than the owner are excluded by the policy USING clause.
+-- Writes stay webhook-projector only.
 ALTER TABLE grida_billing.audit ENABLE ROW LEVEL SECURITY;
-CREATE POLICY default_deny_authenticated ON grida_billing.audit AS RESTRICTIVE FOR ALL TO authenticated USING (false) WITH CHECK (false);
-CREATE POLICY default_deny_anon          ON grida_billing.audit AS RESTRICTIVE FOR ALL TO anon          USING (false) WITH CHECK (false);
 REVOKE ALL ON TABLE grida_billing.audit FROM anon, authenticated;
-GRANT  ALL ON TABLE grida_billing.audit TO   service_role;
+GRANT  ALL    ON TABLE grida_billing.audit TO   service_role;
+GRANT  SELECT ON TABLE grida_billing.audit TO   authenticated;
+CREATE POLICY owner_can_select ON grida_billing.audit
+  FOR SELECT TO authenticated
+  USING (
+    organization_id IN (
+      SELECT o.id FROM public.organization o
+       WHERE o.owner_id = (SELECT auth.uid())
+    )
+  );
+
+-- The owner_can_select subquery looks up `public.organization` by owner_id,
+-- which has no other index. Without this, every RLS evaluation on the
+-- audit table seq-scans organization. Cheap fix.
+CREATE INDEX IF NOT EXISTS organization_owner_id_idx
+  ON public.organization (owner_id);
 
 
 -- ============================================================================
@@ -787,16 +836,31 @@ AS $$
 $$;
 
 
+-- All grida_billing.* routines stay service-role only. The schema USAGE
+-- granted to authenticated above makes them reachable; explicit revoke
+-- here closes the privilege-escalation path PUBLIC EXECUTE would create
+-- (e.g. signed-in users calling fn_apply_stripe_event directly and
+-- bypassing webhook signature verification).
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA grida_billing FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON ALL FUNCTIONS IN SCHEMA grida_billing TO   service_role;
+
+
 -- ============================================================================
 -- public.* wrapper surface (PostgREST)
 -- ============================================================================
 
 ---------------------------------------------------------------------
 -- [public.v_billing_subscription]
+--
+-- security_invoker = true: the view runs as the caller, so RLS on the
+-- base tables (grida_billing.subscription / .account) does the row
+-- filtering. The view body keeps only the business filter
+-- (status <> 'canceled') — auth-side scoping is done by the table-level
+-- `member_can_select` policies. This satisfies splinter lint 0010.
 ---------------------------------------------------------------------
 
 CREATE OR REPLACE VIEW public.v_billing_subscription
-WITH (security_invoker = false)
+WITH (security_invoker = true)
 AS
 SELECT
   s.organization_id,
@@ -811,14 +875,13 @@ SELECT
   acc.stripe_customer_id
 FROM grida_billing.subscription s
 LEFT JOIN grida_billing.account acc ON acc.organization_id = s.organization_id
-WHERE s.status <> 'canceled'
-  AND s.organization_id IN (
-    SELECT om.organization_id
-      FROM public.organization_member om
-     WHERE om.user_id = (SELECT auth.uid())
-  );
+WHERE s.status <> 'canceled';
 
-GRANT SELECT ON public.v_billing_subscription TO authenticated, service_role;
+-- REVOKE before GRANT: Supabase's default privileges on `public` grant ALL
+-- to anon/authenticated/service_role on new objects. Strip first, then add
+-- back only the roles that should actually see the view.
+REVOKE ALL    ON public.v_billing_subscription FROM PUBLIC, anon, authenticated;
+GRANT  SELECT ON public.v_billing_subscription TO   authenticated, service_role;
 
 
 ---------------------------------------------------------------------
@@ -828,7 +891,7 @@ GRANT SELECT ON public.v_billing_subscription TO authenticated, service_role;
 ---------------------------------------------------------------------
 
 CREATE OR REPLACE VIEW public.v_billing_audit
-WITH (security_invoker = false)
+WITH (security_invoker = true)
 AS
 SELECT
   a.id,
@@ -850,13 +913,12 @@ SELECT
   a.amount_cents,
   a.note,
   a.created_at
-FROM grida_billing.audit a
-WHERE a.organization_id IN (
-  SELECT o.id FROM public.organization o
-   WHERE o.owner_id = (SELECT auth.uid())
-);
+FROM grida_billing.audit a;
+-- Owner-only filter is enforced by the `owner_can_select` RLS policy on
+-- grida_billing.audit (security_invoker = true means RLS runs as caller).
 
-GRANT SELECT ON public.v_billing_audit TO authenticated, service_role;
+REVOKE ALL    ON public.v_billing_audit FROM PUBLIC, anon, authenticated;
+GRANT  SELECT ON public.v_billing_audit TO   authenticated, service_role;
 
 
 ---------------------------------------------------------------------
