@@ -313,11 +313,6 @@ export default function UpgradeView({
           );
         })}
       </div>
-
-      <p className="text-xs text-muted-foreground mt-4">
-        Test mode: use card <code>4242 4242 4242 4242</code>. After payment,
-        you&apos;ll be redirected back here. Provisioning takes a few seconds.
-      </p>
     </>
   );
 
