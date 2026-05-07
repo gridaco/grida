@@ -65,6 +65,17 @@ const workspaceReducer = (state: __WorkspaceState, action: WorkspaceAction) =>
     switch (action.type) {
       case "init/organizations":
         draft.organizations = action.organizations;
+        // The reducer's `organization` field came from a server-render prop
+        // and can be stale (e.g. derived fields like `plan`). Refresh it from
+        // the SWR-fetched list when the active org appears there.
+        {
+          const fresh = action.organizations.find(
+            (o) => o.id === draft.organization.id
+          );
+          if (fresh) {
+            draft.organization = { ...draft.organization, ...fresh };
+          }
+        }
         break;
       case "init/projects":
         draft.projects = action.projects;
@@ -138,6 +149,10 @@ export function Workspace({
       avatar_url: organization.avatar_path
         ? PublicUrls.organization_avatar_url(supabase)(organization.avatar_path)
         : null,
+      // `plan` is server-resolved by the workspace API (from
+      // `v_billing_subscription`). Default to "free" until the SWR fetch lands
+      // and the reducer refreshes `state.organization` with the real value.
+      plan: "free" as const,
     },
     organizations: [],
     projects: [],

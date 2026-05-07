@@ -4403,9 +4403,9 @@ export type Database = {
           created_at: string
           description: string | null
           display_name: string
-          display_plan: Database["public"]["Enums"]["pricing_tier"]
           email: string | null
           id: number
+          is_enterprise: boolean
           name: string
           owner_id: string
         }
@@ -4415,9 +4415,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_name?: string
-          display_plan?: Database["public"]["Enums"]["pricing_tier"]
           email?: string | null
           id?: number
+          is_enterprise?: boolean
           name: string
           owner_id?: string
         }
@@ -4427,9 +4427,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_name?: string
-          display_plan?: Database["public"]["Enums"]["pricing_tier"]
           email?: string | null
           id?: number
+          is_enterprise?: boolean
           name?: string
           owner_id?: string
         }
@@ -4632,7 +4632,103 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_billing_audit: {
+        Row: {
+          amount_cents: number | null
+          attempt_count: number | null
+          billing_reason: string | null
+          created_at: string | null
+          event_type: string | null
+          id: number | null
+          member_user_id: string | null
+          new_quantity: number | null
+          note: string | null
+          operation: string | null
+          organization_id: number | null
+          plan: string | null
+          prev_quantity: number | null
+          status: string | null
+          stripe_customer_id: string | null
+          stripe_event_id: string | null
+          stripe_invoice_id: string | null
+          stripe_subscription_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount_cents?: number | null
+          attempt_count?: number | null
+          billing_reason?: string | null
+          created_at?: string | null
+          event_type?: string | null
+          id?: number | null
+          member_user_id?: string | null
+          new_quantity?: number | null
+          note?: string | null
+          operation?: string | null
+          organization_id?: number | null
+          plan?: string | null
+          prev_quantity?: number | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_event_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_cents?: number | null
+          attempt_count?: number | null
+          billing_reason?: string | null
+          created_at?: string | null
+          event_type?: string | null
+          id?: number | null
+          member_user_id?: string | null
+          new_quantity?: number | null
+          note?: string | null
+          operation?: string | null
+          organization_id?: number | null
+          plan?: string | null
+          prev_quantity?: number | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_event_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_billing_subscription: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          current_period_end: string | null
+          current_period_start: string | null
+          is_free: boolean | null
+          organization_id: number | null
+          plan: string | null
+          quantity: number | null
+          status: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       delete_project: {
@@ -4656,6 +4752,59 @@ export type Database = {
         }
       }
       flatten_jsonb_object_values: { Args: { obj: Json }; Returns: string }
+      fn_billing_apply_stripe_event: {
+        Args: { p_event_id: string; p_event_type: string; p_payload: Json }
+        Returns: {
+          handler: string
+          result: string
+        }[]
+      }
+      fn_billing_attach_stripe_customer: {
+        Args: { p_org_id: number; p_stripe_customer_id: string }
+        Returns: {
+          attached: boolean
+          stripe_customer_id: string
+        }[]
+      }
+      fn_billing_get_active_subscription: {
+        Args: { p_org_id: number }
+        Returns: {
+          cancel_at_period_end: boolean
+          current_period_end: string
+          current_period_start: string
+          plan: string
+          quantity: number
+          status: string
+          stripe_subscription_id: string
+        }[]
+      }
+      fn_billing_get_catalogue: {
+        Args: { p_id: string }
+        Returns: {
+          stripe_price_id: string
+          stripe_product_id: string
+        }[]
+      }
+      fn_billing_get_customer_id: {
+        Args: { p_org_id: number }
+        Returns: string
+      }
+      fn_billing_setup_product: {
+        Args: {
+          p_grida_billing_id: string
+          p_stripe_price_id: string
+          p_stripe_product_id: string
+        }
+        Returns: {
+          id: string
+          stripe_price_id: string
+          stripe_product_id: string
+        }[]
+      }
+      fn_billing_stamp_failure: {
+        Args: { p_event_id: string; p_event_type: string; p_reason: string }
+        Returns: undefined
+      }
       gen_random_slug: { Args: never; Returns: string }
       generate_combinations:
         | {
@@ -4746,7 +4895,6 @@ export type Database = {
         | "ar"
         | "hi"
         | "nl"
-      pricing_tier: "free" | "v0_pro" | "v0_team" | "v0_enterprise"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5240,8 +5388,6 @@ export const Constants = {
         "hi",
         "nl",
       ],
-      pricing_tier: ["free", "v0_pro", "v0_team", "v0_enterprise"],
     },
   },
 } as const
-

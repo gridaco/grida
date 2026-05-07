@@ -53,8 +53,7 @@ INSERT INTO public.organization (
   email,
   description,
   blog,
-  display_name,
-  display_plan
+  display_name
 )
 VALUES (
   'local',
@@ -63,8 +62,7 @@ VALUES (
   'hello@grida.co',
   'Local test organization for development purposes.',
   'https://grida.co',
-  'Local',
-  'free'
+  'Local'
 );
 
 -- Organization: "acme" (owned by alice@acme.com)
@@ -75,8 +73,7 @@ INSERT INTO public.organization (
   email,
   description,
   blog,
-  display_name,
-  display_plan
+  display_name
 )
 VALUES (
   'acme',
@@ -85,8 +82,7 @@ VALUES (
   'hello@acme.com',
   'ACME test organization for multi-tenant testing.',
   'https://acme.com',
-  'ACME',
-  'free'
+  'ACME'
 );
 -- #endregion organization
 
@@ -122,3 +118,7 @@ INSERT INTO grida_library.category (id, name)
 VALUES ('generated', 'Generated')
 ON CONFLICT (id) DO NOTHING;
 -- #endregion library categories
+
+-- Note: grida_billing.account + free grida_billing.subscription rows are
+-- provisioned automatically by tg_billing_provision_on_org_insert when the
+-- seed inserts the local/acme orgs above. No seed-time backfill needed.

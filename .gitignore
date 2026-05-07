@@ -107,8 +107,10 @@ typings/
 
 # dotenv environment variables file
 .env
-.env.test
 .env*.local
+# Note: `.env.test` is intentionally NOT ignored — it holds non-secret,
+# deterministic test defaults (e.g. local Supabase URL, BILLING_E2E gate).
+# Per-developer secrets go in `.env.test.local`, which is covered above.
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -232,3 +234,6 @@ __pycache__/
 .claude/worktrees
 .claude/scheduled_tasks.lock
 CLAUDE.local.md
+
+# Local-only tracking docs
+/TODO.md

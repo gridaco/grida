@@ -55,6 +55,86 @@ export default async function UniversalRoutePicker({
     return redirect(`/sign-in?next=${encodeURIComponent(nextPath)}`);
   }
 
+  if (route.scope === "organization") {
+    const { data: memberships } = await client
+      .from("organization_member")
+      .select(`organization:organization(name)`)
+      .eq("user_id", auth.user.id);
+
+    const orgs: { name: string }[] = [];
+    const seen = new Set<string>();
+    for (const m of memberships ?? []) {
+      const org = m.organization as { name: string } | null;
+      if (!org?.name || seen.has(org.name)) continue;
+      seen.add(org.name);
+      orgs.push({ name: org.name });
+    }
+
+    if (orgs.length === 1) {
+      return redirect(
+        buildUniversalDestination(route.id, { org: orgs[0]!.name })
+      );
+    }
+
+    return (
+      <main className="mx-auto w-full max-w-3xl px-6 py-10">
+        <header className="mb-8">
+          <h1 className="text-2xl font-semibold">Select an organization</h1>
+          <p className="text-sm text-muted-foreground">
+            Choose the organization for{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              {formatUniversalPath(route.path)}
+            </code>
+            .
+          </p>
+        </header>
+        {orgs.length === 0 ? (
+          <Item variant="muted" size="sm" className="border">
+            <ItemMedia variant="icon">
+              <Folder className="size-4" />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>No organizations available</ItemTitle>
+              <ItemDescription>
+                You don’t belong to any organization yet.
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+        ) : (
+          <ItemGroup className="gap-2">
+            {orgs.map((org) => {
+              const destination = buildUniversalDestination(route.id, {
+                org: org.name,
+              });
+              return (
+                <Item
+                  key={org.name}
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="hover:bg-accent/50"
+                >
+                  <Link href={destination} prefetch={false}>
+                    <ItemMedia variant="icon">
+                      <Folder className="size-4" />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>{org.name}</ItemTitle>
+                    </ItemContent>
+                    <ItemActions className="text-muted-foreground">
+                      <span className="text-sm">Open</span>
+                      <ArrowRight className="size-4" />
+                    </ItemActions>
+                  </Link>
+                </Item>
+              );
+            })}
+          </ItemGroup>
+        )}
+      </main>
+    );
+  }
+
   if (route.scope === "project") {
     const { data: memberships } = await client
       .from("organization_member")

@@ -1,4 +1,4 @@
-import type { GDocumentType, PlatformPricingTier } from "@/types";
+import type { GDocumentType, PlanTier } from "@/types";
 
 export namespace Labels {
   const doctype_labels = {
@@ -10,19 +10,19 @@ export namespace Labels {
     v0_campaign_referral: "Campaign",
   } as const;
 
-  const price_tier_labels = {
+  const plan_labels = {
     free: "Free",
-    v0_pro: "Pro",
-    v0_team: "Team",
-    v0_enterprise: "Enterprise",
-  } as const;
+    pro: "Pro",
+    team: "Team",
+  } as const satisfies Record<PlanTier, string>;
 
   export function doctype(dt: GDocumentType) {
     return doctype_labels[dt];
   }
 
-  export function priceTier(tier: PlatformPricingTier) {
-    return price_tier_labels[tier];
+  export function planTier(plan: PlanTier, is_enterprise = false): string {
+    if (is_enterprise) return "Enterprise";
+    return plan_labels[plan];
   }
 
   /**

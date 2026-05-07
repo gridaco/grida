@@ -1,0 +1,231 @@
+---
+title: How Grida billing works
+description: A plain-English guide to Grida's plans, AI credits, and billing. No legalese.
+keywords:
+  - billing
+  - pricing
+  - plans
+  - AI credits
+  - subscription
+  - top-up
+  - Pro
+  - Team
+sidebar_label: Billing
+sidebar_position: 1
+---
+
+# How Grida billing works
+
+This page explains how Grida charges you, how AI credits work, and what to expect on your bill. If you have a specific question, jump to the [Common questions](#common-questions) at the bottom.
+
+> Heads up: specific dollar amounts on this page (plan price, monthly credit allotment, top-up range) can change as we tune things. We'll update this doc when they do.
+
+## Plans
+
+Grida has four plans.
+
+| Plan       | Price                      | Monthly AI credit                      |
+| ---------- | -------------------------- | -------------------------------------- |
+| Free       | $0                         | $0.50 (shared by everyone in your org) |
+| Pro        | **$20 / month**            | **$10**, pooled across the org         |
+| Team       | **$60 / month**            | **$35**, pooled across the org         |
+| Enterprise | Custom (from $599 / month) | Custom                                 |
+
+**Today, Pro and Team are flat-rate plans.** One subscription per organization at a single price — Pro is $20/month, Team is $60/month — regardless of how many teammates you've invited. Everyone in the org collaborates on the same projects and shares the same AI credit pool. Per-seat billing (with prorated invites and credit that scales with headcount) is on the roadmap; until it ships, your invoice doesn't change when teammates join or leave.
+
+The difference between Pro and Team is what's bundled with the base price: Team gets a bigger AI credit allotment, more storage, more monthly active users on published projects, and chat support. You can switch between them whenever your team's needs change — Stripe prorates the difference automatically.
+
+Annual billing on Pro and Team is available at a **20% discount** ($192/yr for Pro, $576/yr for Team). The annual discount comes out of platform margin — your monthly AI credit is the same on monthly or annual.
+
+## How AI credits work
+
+Every AI feature in Grida — generating an image, generating audio, and so on — costs credit. Your balance drops by exactly what we paid the model provider for that call.
+
+A few things to know:
+
+- **AI is sold at cost.** We don't mark it up. If a provider charges us $0.04 for an image, you pay $0.04.
+- **Monthly credit doesn't roll over.** Whatever's left of your monthly credit at the end of your billing period is gone. This is how monthly plans normally work — same idea as Vercel, v0, Linear, or Cursor.
+- **Top-up credit never expires.** If you bought $25 of credit and only used $3, the other $22 stays in your account. Even if you cancel and come back next year, it's still there.
+- **Monthly credit is spent first.** Because monthly credit is about to expire, we burn it before touching your top-up balance. That way your top-ups stick around as long as possible.
+
+### The $0.25 minimum balance
+
+If your balance drops below **$0.25**, AI calls are blocked until you top up or your monthly credit refreshes.
+
+This is a safety floor. No AI feature in Grida today costs more than $0.25 per call, so the floor guarantees no single call can drive you into the negative. You're never going to get a surprise bill from one expensive request.
+
+If we add models in the future that cost more per call (video, for instance), we'll raise the floor for those features and clearly mark it.
+
+## Top-ups
+
+When your monthly credit runs out, you have two choices: wait for the next month, or buy more credit on demand.
+
+A top-up is a one-time purchase. You pick any amount between **$5 and $1000** and that exact amount lands in your balance.
+
+Card processors take a small fee on every transaction. We pass that through transparently — we don't pad it or absorb it into the credit you receive. So if you top up $25:
+
+- You receive **$25.00** of credit.
+- Your card is charged about **$26.06** ($25.00 + roughly 2.9% + $0.30 for the processor).
+
+Both numbers are shown on the checkout page and on your receipt before you confirm. Nothing surprising.
+
+Top-up credit never expires.
+
+## What happens when you run out
+
+If your balance hits the $0.25 floor:
+
+- AI features pause.
+- Everything else keeps working — saving, editing, designing, exporting, all of it. Only the AI buttons stop responding.
+- You can either wait for next month's credit to land, or top up.
+
+We will never charge your card to "cover" an AI call. You only ever spend credit you've already paid for or that came with your plan.
+
+## What happens if your card fails
+
+This section is for paid plans only. Free users have nothing to renew.
+
+Each month we try to charge your card for the renewal. If the charge fails (expired card, insufficient funds, anything), here's what happens:
+
+- **Your subscription pauses quickly.** Not in 24 hours, not after a 7-day grace period — usually within a few minutes of the failed charge.
+- **Your monthly AI credit is suspended** until the card succeeds.
+- **Top-up credit keeps working.** You bought it, you own it. Use it whenever.
+- **We retry the card automatically** a handful of times over the next two weeks. The moment a retry succeeds, your plan turns back on and the monthly credit lands.
+- You can update your card any time from the billing settings page. As soon as the new card succeeds, you're back.
+
+> Good to know: while your plan is paused for non-payment, you do **not** drop down to the Free $0.50 monthly credit. A pause is a "payment broken" state, not a downgrade. To return to Free properly (and get the $0.50 monthly), you need to actually cancel.
+
+## Working with a team
+
+Everyone in your org collaborates on the same projects and shares the same AI credit pool — the way Cursor or Linear's free tier handles teamwork.
+
+A few things to know:
+
+- **The subscription is one flat price** — Pro $20/month, Team $60/month — regardless of how many teammates you invite. Your invoice doesn't change when people join or leave.
+- **Inviting and removing teammates is free** today. Add as many as you want.
+- **AI credit pools at the org level.** A teammate's heavy week doesn't strand yours; everyone draws from the same balance.
+- **Free orgs can have multiple members.** They share the $0.50 monthly credit pool — same total whether your org has 1 person or 5.
+- **Only the org owner can manage billing** today. Member-role permissions are on the roadmap.
+- **Per-seat billing is coming.** When it ships, prorated invites, prorated removals, and credit that scales with headcount will turn on for new and existing paid orgs alike. Until then, the flat plan price is what you pay.
+
+## Pro vs. Team: how to choose
+
+Both plans pool credit at the org level. Pick based on how much AI your team uses:
+
+- **Pro** ($20/month) is for individuals and small teams whose AI usage fits comfortably in $10/month, or who plan to top up occasionally.
+- **Team** ($60/month) is for teams that lean heavily on AI — the larger $35 credit pool means less time spent topping up, and the plan also raises storage and monthly-active-user limits.
+
+You can switch between Pro and Team at any time. Stripe prorates the difference automatically, and your top-up balance carries across the switch unchanged.
+
+## Cancel anytime
+
+You can cancel from your account settings at any time, no questions asked.
+
+When you cancel:
+
+- You keep your plan and the current month's credit until the end of the period you've already paid for.
+- After that, you switch to Free and start getting $0.50 of credit each month (shared across the org if you have multiple members).
+- Any top-up credit you have stays in your account.
+
+There's nothing to "downgrade" manually. Cancellation handles it.
+
+## Examples
+
+A few quick walkthroughs to make this concrete.
+
+### Maya is on Free
+
+Maya has $0.50 of credit at the start of the month.
+
+- She generates 5 images at $0.04 each → spends $0.20. Balance: $0.30.
+- She generates an audio clip at $0.04 → balance: $0.26.
+- She tries one more image. Blocked — she's below the $0.25 floor.
+
+She waits a week. The new month rolls over. Her balance refreshes to $0.50 and she's back in business.
+
+### Jordan upgrades to Pro
+
+Jordan upgrades the org to Pro — $20/month, $10 of monthly AI credit.
+
+Jordan generates a lot of images and a lot of audio tracks throughout the month. Late one night, the balance is at $0.20 — blocked by the floor.
+
+Jordan tops up $25.
+
+- The card is charged about **$26.06** (the $25 top-up plus the processor fee).
+- Jordan's balance becomes **$25.20**.
+
+Jordan keeps working. When the next month begins, $10 of fresh Pro credit lands on top of whatever top-up credit is still left.
+
+### Priya's team upgrades to Team
+
+Priya runs a 4-person design team on Free. They share $0.50/month — clearly not enough for the AI work they want to do.
+
+Priya considers Pro ($20/month with $10 of pooled credit) but the team generates a lot of images, so she upgrades the org to **Team** instead.
+
+- The first invoice is **$60** — the flat Team subscription.
+- The team's credit pool jumps to **$35/month**, shared across all 4 people. Anyone on the team can spend any of it.
+
+A week later, they invite a fifth person. The invoice doesn't change — the flat $60/month covers the whole org.
+
+A month later, someone leaves the team. Priya removes them. Still $60/month; nothing else changes. (When per-seat billing ships, this is the section that will gain prorated math.)
+
+### Sam's card fails
+
+Sam is on Pro and has $25.00 in top-up credit sitting in the account.
+
+The monthly Pro renewal hits Sam's card. The charge fails (expired card).
+
+- Pro pauses. Sam's $10 monthly credit is suspended.
+- Sam's $25 top-up credit keeps working — Sam can still use AI features against that balance.
+
+Three days later, the card is renewed and the next retry succeeds.
+
+- Pro resumes immediately.
+- The next monthly $10 lands on schedule on Sam's normal renewal date.
+
+## Common questions
+
+**Do my unused monthly credits roll over?**
+No. Monthly credit (Free, Pro, or Team) resets each billing period. This is how all monthly plans work.
+
+**What about credits I bought as a top-up?**
+Top-up credit never expires. It stays in your balance until you spend it, even if you cancel and come back later.
+
+**Can I get a refund?**
+See our refund policy at `/support/refund-policy`. The short version: we'll work with you on accidental top-ups and obvious billing errors.
+
+**What happens if I cancel mid-month?**
+You keep your plan and your remaining monthly credit until the end of the period you've already paid for. After that, you're on Free. Top-ups stay.
+
+**Why is there a $0.25 minimum balance?**
+So no single AI call can ever take you negative. It's a safety floor, not a fee.
+
+**Are AI prices marked up?**
+No. We charge you exactly what the model provider charges us. We make our money on the plan base price (the part that isn't AI credit), not on AI usage.
+
+**Can I see how much I've used?**
+Yes — your billing settings show your current balance, what was spent this month, and a per-call history.
+
+**What payment methods do you accept?**
+Major credit and debit cards. Apple Pay and Google Pay where supported by your browser.
+
+**Do you charge tax?**
+We collect VAT/GST/sales tax where the law requires it, based on your billing address. Tax (if any) is shown on the checkout page before you confirm and itemized on your receipt.
+
+**I run a team — how does pricing work?**
+Today, Pro and Team are flat-rate plans — one subscription per org at one price ($20 or $60 per month) regardless of how many teammates you've invited. AI credit is shared across the team. Per-seat billing is on the roadmap.
+
+**What's the difference between Pro and Team?**
+Both pool credit at the org level. Team raises the AI credit ($35 vs $10), storage, and monthly active users on published projects, and adds chat support. The decision usually comes down to how much AI your team actually uses.
+
+**Is the credit really shared, or is each person locked to their seat's allotment?**
+Shared. We pool it at the org level so a teammate's heavy week doesn't stop yours, and an admin's spending doesn't strand junior team members. If you need stricter per-user controls, that's on the roadmap.
+
+**Who can manage billing for a team?**
+The org owner today. Member-role permissions (admin, billing-only, etc.) are coming.
+
+**Is there an annual plan?**
+Yes — Pro and Team are both available annually at a 20% discount. The discount comes out of platform margin, not your AI credit; monthly credit is the same either way.
+
+**What if a model's price changes?**
+Providers occasionally adjust their prices. When they do, we update what we charge you to match. We never charge you more than we pay the provider.

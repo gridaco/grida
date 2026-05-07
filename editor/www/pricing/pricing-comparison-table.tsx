@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
 import { pricing } from "../data/pricing";
-import { PricingInformation } from "../data/plans";
+import { PricingInformation } from "@/lib/billing/marketing-plans";
 import {
   PricingTableRowDesktop,
   PricingTableRowMobile,
@@ -17,7 +17,6 @@ import {
   PlugZapIcon,
   ShoppingBagIcon,
   SparklesIcon,
-  TicketIcon,
 } from "lucide-react";
 
 function PricingMobileHeader({
@@ -67,7 +66,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   return (
     <div
       id="compare-plans"
-      className="sm:pb-18 container relative top-48 mx-auto px-0 pb-16 md:pb-16 lg:px-16 xl:px-20"
+      className="sm:pb-18 container relative mt-48 mx-auto px-0 pb-16 md:pb-16 lg:px-16 xl:px-20"
     >
       {/* <!-- xs to lg --> */}
       <div className="lg:hidden">
@@ -128,11 +127,6 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               icon={<ShoppingBagIcon className="size-4" />}
             />
             <PricingTableRowMobile
-              category={pricing.ticketing}
-              plan={"free"}
-              icon={<TicketIcon className="size-4" />}
-            />
-            <PricingTableRowMobile
               category={pricing.channels}
               plan={"free"}
               icon={<MessageCircleIcon className="size-4" />}
@@ -177,11 +171,6 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               category={pricing.commerce}
               plan={"pro"}
               icon={<ShoppingBagIcon className="size-4" />}
-            />
-            <PricingTableRowMobile
-              category={pricing.ticketing}
-              plan={"pro"}
-              icon={<TicketIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.channels}
@@ -230,11 +219,6 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               icon={<ShoppingBagIcon className="size-4" />}
             />
             <PricingTableRowMobile
-              category={pricing.ticketing}
-              plan={"team"}
-              icon={<TicketIcon className="size-4" />}
-            />
-            <PricingTableRowMobile
               category={pricing.channels}
               plan={"team"}
               icon={<MessageCircleIcon className="size-4" />}
@@ -276,11 +260,6 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               category={pricing.commerce}
               plan={"enterprise"}
               icon={<ShoppingBagIcon className="size-4" />}
-            />
-            <PricingTableRowMobile
-              category={pricing.ticketing}
-              plan={"enterprise"}
-              icon={<TicketIcon className="size-4" />}
             />
             <PricingTableRowMobile
               category={pricing.channels}
@@ -378,19 +357,14 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               sectionId="commerce"
             />
             <PricingTableRowDesktop
-              category={pricing.ticketing}
-              icon={<TicketIcon className="size-4" />}
-              sectionId="ticketing"
+              category={pricing.channels}
+              icon={<MessageCircleIcon className="size-4" />}
+              sectionId="channels"
             />
             <PricingTableRowDesktop
               category={pricing.support}
               icon={<MessageCircleQuestionIcon className="size-4" />}
               sectionId="support"
-            />
-            <PricingTableRowDesktop
-              category={pricing.channels}
-              icon={<MessageCircleIcon className="size-4" />}
-              sectionId="channels"
             />
           </tbody>
         </table>

@@ -94,6 +94,19 @@ const __create_service_role_client = <
 };
 
 /**
+ * Service-role Supabase clients (RLS-bypassing). Per-schema namespace —
+ * pick the one matching the table you're querying.
+ *
+ * Usage rule: **always reference `service_role.<schema>` inline at every
+ * call site.** Do not alias it to a local variable (`const db = service_role.workspace`)
+ * or re-export it. The point of the long, explicit name is that any reviewer
+ * can grep `service_role` and find every privileged DB touch — aliasing
+ * defeats that.
+ *
+ * @example
+ *   await service_role.workspace.from("organization").select("id");   // ✅
+ *   const db = service_role.workspace; await db.from(...);             // ❌ defeats grep
+ *
  * @deprecated - deprecation warning for extra security (not actually deprecated)
  */
 export namespace service_role {

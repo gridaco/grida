@@ -1,10 +1,12 @@
 import grida from "@grida/schema";
 
-export type PlatformPricingTier =
-  | "free"
-  | "v0_pro"
-  | "v0_team"
-  | "v0_enterprise";
+/**
+ * Plan tier as it appears in the Grida UI. Sourced from
+ * `grida_billing.subscription.plan` (Stripe-backed) — `'free' | 'pro' | 'team'`.
+ * Enterprise is a separate ops flag (`organization.is_enterprise`); when true,
+ * the UI renders Enterprise regardless of the underlying plan.
+ */
+export type PlanTier = "free" | "pro" | "team";
 
 export type JSONValue =
   | string
@@ -102,7 +104,8 @@ export interface Organization {
   blog: string | null;
   description: string | null;
   display_name: string;
-  display_plan: PlatformPricingTier;
+  /** Manual ops flag — overrides `plan` for UI rendering when true. */
+  is_enterprise: boolean;
   id: number;
   name: string;
   owner_id: string;
@@ -114,6 +117,12 @@ export type OrganizationWithMembers = Organization & {
 
 export type OrganizationWithAvatar = Organization & {
   avatar_url: string | null;
+  /**
+   * Stripe-driven plan from `v_billing_subscription`, resolved server-side
+   * by the workspace API. Not a DB column — only present on responses that
+   * went through that API path.
+   */
+  plan: PlanTier;
 };
 
 export interface OrganizationMember {
