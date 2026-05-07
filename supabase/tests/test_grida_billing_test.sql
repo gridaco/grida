@@ -393,60 +393,20 @@ SELECT is(
 );
 
 -- ---------------------------------------------------------------------
--- 13. Direct RLS / GRANT denial on grida_billing internal tables.
---     The schema is locked-down: REVOKE ALL FROM anon, authenticated +
---     RESTRICTIVE deny policies. Verify both `anon` and `authenticated`
---     get permission_denied (SQLSTATE 42501) on read AND write paths so
---     a future stray GRANT or policy loosen-up gets caught here.
---     Tables: account, subscription, product_catalogue, stripe_event, audit.
+-- 13. Direct RLS / GRANT contract on grida_billing internal tables.
+--     Pattern A (post-PR): account/subscription/audit are SELECT-able by
+--     authenticated org members (filtered by table-level RLS); the views
+--     run as the caller via security_invoker=true. catalogue/stripe_event
+--     remain fully locked (no API consumer reads them). Writes are
+--     service-role-only on every table. anon has no grant on any table.
+--
+--     This section catches privilege drift in either direction:
+--     - A future GRANT to anon (any table)
+--     - A future write GRANT to authenticated
+--     - A future GRANT to authenticated on the locked tables
 -- ---------------------------------------------------------------------
 
--- authenticated role.
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub', current_setting('test.insider_uid'), true);
-
-SELECT throws_ok(
-  $$ SELECT 1 FROM grida_billing.account LIMIT 1 $$, '42501', NULL,
-  'authenticated cannot SELECT grida_billing.account'
-);
-SELECT throws_ok(
-  $$ INSERT INTO grida_billing.account (organization_id) VALUES (1) $$, '42501', NULL,
-  'authenticated cannot INSERT grida_billing.account'
-);
-SELECT throws_ok(
-  $$ SELECT 1 FROM grida_billing.subscription LIMIT 1 $$, '42501', NULL,
-  'authenticated cannot SELECT grida_billing.subscription'
-);
-SELECT throws_ok(
-  $$ INSERT INTO grida_billing.subscription (organization_id, plan, is_free, status) VALUES (1, 'free', true, 'active') $$, '42501', NULL,
-  'authenticated cannot INSERT grida_billing.subscription'
-);
-SELECT throws_ok(
-  $$ SELECT 1 FROM grida_billing.product_catalogue LIMIT 1 $$, '42501', NULL,
-  'authenticated cannot SELECT grida_billing.product_catalogue'
-);
-SELECT throws_ok(
-  $$ INSERT INTO grida_billing.product_catalogue (id, kind) VALUES ('plan.x', 'plan') $$, '42501', NULL,
-  'authenticated cannot INSERT grida_billing.product_catalogue'
-);
-SELECT throws_ok(
-  $$ SELECT 1 FROM grida_billing.stripe_event LIMIT 1 $$, '42501', NULL,
-  'authenticated cannot SELECT grida_billing.stripe_event'
-);
-SELECT throws_ok(
-  $$ INSERT INTO grida_billing.stripe_event (id, type) VALUES ('evt_x', 'customer.created') $$, '42501', NULL,
-  'authenticated cannot INSERT grida_billing.stripe_event'
-);
-SELECT throws_ok(
-  $$ SELECT 1 FROM grida_billing.audit LIMIT 1 $$, '42501', NULL,
-  'authenticated cannot SELECT grida_billing.audit'
-);
-SELECT throws_ok(
-  $$ INSERT INTO grida_billing.audit (organization_id, operation) VALUES (1, 'customer_attach') $$, '42501', NULL,
-  'authenticated cannot INSERT grida_billing.audit'
-);
-
--- anon role (no JWT, no auth.uid()).
+-- ── anon: zero access on every internal table. ─────────────────────
 SET LOCAL ROLE anon;
 
 SELECT throws_ok(
@@ -488,6 +448,55 @@ SELECT throws_ok(
 SELECT throws_ok(
   $$ INSERT INTO grida_billing.audit (organization_id, operation) VALUES (1, 'customer_attach') $$, '42501', NULL,
   'anon cannot INSERT grida_billing.audit'
+);
+
+-- ── authenticated, no org membership: SELECTs are filtered to 0 rows
+--    on the open tables, hard-denied on the locked tables, INSERTs hard-
+--    denied everywhere. ───────────────────────────────────────────────
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', current_setting('test.random_uid'), true);
+
+SELECT is(
+  (SELECT count(*) FROM grida_billing.account)::bigint, 0::bigint,
+  'authenticated non-member sees 0 rows from grida_billing.account (RLS-filtered)'
+);
+SELECT is(
+  (SELECT count(*) FROM grida_billing.subscription)::bigint, 0::bigint,
+  'authenticated non-member sees 0 rows from grida_billing.subscription'
+);
+SELECT is(
+  (SELECT count(*) FROM grida_billing.audit)::bigint, 0::bigint,
+  'authenticated non-owner sees 0 rows from grida_billing.audit'
+);
+
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.product_catalogue LIMIT 1 $$, '42501', NULL,
+  'authenticated cannot SELECT grida_billing.product_catalogue (locked)'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.stripe_event LIMIT 1 $$, '42501', NULL,
+  'authenticated cannot SELECT grida_billing.stripe_event (locked)'
+);
+
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.account (organization_id) VALUES (999) $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.account'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.subscription (organization_id, plan, is_free, status) VALUES (999, 'free', true, 'active') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.subscription'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.product_catalogue (id, kind) VALUES ('plan.x', 'plan') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.product_catalogue'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.stripe_event (id, type) VALUES ('evt_x', 'customer.created') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.stripe_event'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.audit (organization_id, operation) VALUES (999, 'customer_attach') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.audit'
 );
 
 RESET ROLE;

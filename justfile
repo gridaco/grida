@@ -18,6 +18,25 @@ check:
 test:
     pnpm turbo test
 
+# Run Supabase Splinter advisors against the local database — same set
+# of security + performance lints the Dashboard's "Database Advisors"
+# page shows. CLI doesn't ship a native command for this yet; we curl
+# the upstream `splinter.sql` and pipe through psql, then awk to filter
+# the wide row format down to `[level] name: detail`.
+# Requires `supabase start`. Pass `levels=WARN,ERROR,INFO` for strict.
+#
+# Tracking upstream:
+#   https://github.com/supabase/cli/issues/3839
+#   https://github.com/supabase/cli/issues/3839#issuecomment-4397668907  (our comment)
+# Drop this recipe when the CLI ships `supabase db check` or equivalent.
+lint-supabase-db url="postgresql://postgres:postgres@127.0.0.1:54322/postgres" levels="WARN,ERROR":
+    @curl -sSfL https://raw.githubusercontent.com/supabase/splinter/main/splinter.sql -o /tmp/splinter.sql
+    @psql {{url}} -X -qtA -F$'\t' --pset=pager=off \
+        -c "BEGIN READ ONLY;" -f /tmp/splinter.sql -c "COMMIT;" \
+      | awk -F'\t' -v lvls="^({{replace(levels, ",", "|")}})$" \
+          'NF >= 7 && $3 ~ lvls { print "  [" $3 "] " $1 ": " $7 }' \
+      | sort -u
+
 # Dev setup
 dev packages:
     pnpm dev:packages
