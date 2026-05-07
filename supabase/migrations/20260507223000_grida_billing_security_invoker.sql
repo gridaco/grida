@@ -27,6 +27,23 @@ REVOKE ALL ON SCHEMA grida_billing FROM PUBLIC;
 GRANT  USAGE ON SCHEMA grida_billing TO authenticated, service_role;
 
 
+-- ─── 1a. Lock internal SECURITY DEFINER routines ──────────────────
+-- Schema USAGE alone makes every existing function in grida_billing
+-- callable by authenticated, because EXECUTE on functions is granted
+-- to PUBLIC by default in Postgres and authenticated inherits PUBLIC.
+-- The DEFAULT PRIVILEGES line in the original migration only revoked
+-- from authenticated/anon explicitly — not from PUBLIC — so existing
+-- routines still let signed-in users call e.g. fn_apply_stripe_event
+-- directly and bypass webhook-signature verification.
+--
+-- Strip every existing function in grida_billing to service_role-only,
+-- then patch the DEFAULT PRIVILEGES so future functions are locked
+-- down at create time too.
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA grida_billing FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON ALL FUNCTIONS IN SCHEMA grida_billing TO   service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE EXECUTE ON ROUTINES FROM PUBLIC;
+
+
 -- ─── 2a. account ─────────────────────────────────────────────────
 DROP POLICY IF EXISTS default_deny_authenticated ON grida_billing.account;
 DROP POLICY IF EXISTS default_deny_anon          ON grida_billing.account;
@@ -73,6 +90,13 @@ CREATE POLICY owner_can_select ON grida_billing.audit
        WHERE o.owner_id = (SELECT auth.uid())
     )
   );
+
+-- The owner_can_select subquery looks up `public.organization` by
+-- `owner_id`, which has no index by default. Without this, every RLS
+-- evaluation on the audit table would seq-scan organization. Cheap fix.
+-- (organization_member.user_id is already indexed.)
+CREATE INDEX IF NOT EXISTS organization_owner_id_idx
+  ON public.organization (owner_id);
 
 
 -- ─── 3. product_catalogue and stripe_event stay locked ──────────

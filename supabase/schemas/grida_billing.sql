@@ -34,6 +34,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_billing GRANT ALL ON 
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON TABLES    FROM authenticated, anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON ROUTINES  FROM authenticated, anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON SEQUENCES FROM authenticated, anon;
+-- Default-privileges only revoke from authenticated/anon explicitly; PUBLIC
+-- still inherits EXECUTE on every routine and authenticated inherits PUBLIC.
+-- Strip PUBLIC too so the schema USAGE we grant above doesn't make signed-in
+-- users able to call internal SECURITY DEFINER functions like the projector.
+ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE EXECUTE ON ROUTINES FROM PUBLIC;
 
 
 ---------------------------------------------------------------------
@@ -266,6 +271,12 @@ CREATE POLICY owner_can_select ON grida_billing.audit
        WHERE o.owner_id = (SELECT auth.uid())
     )
   );
+
+-- The owner_can_select subquery looks up `public.organization` by owner_id,
+-- which has no other index. Without this, every RLS evaluation on the
+-- audit table seq-scans organization. Cheap fix.
+CREATE INDEX IF NOT EXISTS organization_owner_id_idx
+  ON public.organization (owner_id);
 
 
 -- ============================================================================
@@ -823,6 +834,15 @@ AS $$
     failed_at      = EXCLUDED.failed_at,
     failure_reason = EXCLUDED.failure_reason;
 $$;
+
+
+-- All grida_billing.* routines stay service-role only. The schema USAGE
+-- granted to authenticated above makes them reachable; explicit revoke
+-- here closes the privilege-escalation path PUBLIC EXECUTE would create
+-- (e.g. signed-in users calling fn_apply_stripe_event directly and
+-- bypassing webhook signature verification).
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA grida_billing FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON ALL FUNCTIONS IN SCHEMA grida_billing TO   service_role;
 
 
 -- ============================================================================
