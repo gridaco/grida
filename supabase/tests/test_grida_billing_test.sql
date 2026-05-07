@@ -49,6 +49,10 @@ SELECT ok(
 -- ---------------------------------------------------------------------
 
 DO $$ BEGIN PERFORM public.fn_billing_attach_stripe_customer(1, 'cus_test_org1'); END $$;
+-- Wire the test price id onto plan.pro so the fail-closed projector can map
+-- it. Without this the subscription.created event below RAISEs with "unknown
+-- stripe price" — see fn_apply_stripe_event.
+DO $$ BEGIN PERFORM public.fn_billing_setup_product('plan.pro', 'prod_test_pro', 'price_pro_test'); END $$;
 
 SELECT is(
   (SELECT stripe_customer_id FROM grida_billing.account WHERE organization_id=1),

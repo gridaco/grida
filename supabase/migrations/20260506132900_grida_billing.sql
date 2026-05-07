@@ -243,7 +243,7 @@ CREATE OR REPLACE FUNCTION grida_billing.fn_provision_account(p_org_id bigint)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
   INSERT INTO grida_billing.account (organization_id)
@@ -268,7 +268,7 @@ CREATE OR REPLACE FUNCTION grida_billing.tg_provision_on_org_insert()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
   PERFORM grida_billing.fn_provision_account(NEW.id);
@@ -300,7 +300,7 @@ CREATE OR REPLACE FUNCTION grida_billing.tg_organization_before_delete()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_active_sub_id text;
@@ -344,7 +344,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_existing  text;
@@ -354,6 +354,14 @@ BEGIN
     FROM grida_billing.account acc
    WHERE acc.organization_id = p_org_id
    FOR UPDATE;
+
+  -- The account row is provisioned by `tg_billing_provision_on_org_insert`.
+  -- Its absence means either the trigger didn't fire (data inconsistency) or
+  -- p_org_id is bogus — either way, refuse to silently report "attached".
+  IF NOT FOUND THEN
+    RAISE EXCEPTION
+      'billing account not provisioned for organization %', p_org_id;
+  END IF;
 
   IF v_existing IS NULL THEN
     UPDATE grida_billing.account
@@ -408,7 +416,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing, public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_existing       grida_billing.stripe_event%ROWTYPE;
@@ -434,12 +442,18 @@ BEGIN
     RAISE EXCEPTION 'fn_apply_stripe_event: missing required argument';
   END IF;
 
-  -- Idempotency.
+  -- Idempotency. Insert-or-noop, then SELECT FOR UPDATE so concurrent
+  -- deliveries of the same event id serialise here: the second one waits for
+  -- the first to commit, then sees `processed_at` set and short-circuits.
+  -- Without the row lock both could read processed_at IS NULL and re-project.
   INSERT INTO grida_billing.stripe_event (id, type)
   VALUES (p_event_id, p_event_type)
   ON CONFLICT (id) DO NOTHING;
 
-  SELECT * INTO v_existing FROM grida_billing.stripe_event WHERE id = p_event_id;
+  SELECT * INTO v_existing
+    FROM grida_billing.stripe_event
+   WHERE id = p_event_id
+   FOR UPDATE;
   IF v_existing.processed_at IS NOT NULL THEN
     RETURN QUERY SELECT 'replayed'::text, v_existing.handler;
     RETURN;
@@ -499,17 +513,25 @@ BEGIN
     v_period_end   := to_timestamp(nullif(v_first_item->>'current_period_end',  '')::bigint);
     v_price_id     := v_first_item->'price'->>'id';
 
-    v_plan := 'pro';
+    -- Map Stripe price → plan via the catalogue. Fail closed: an unknown or
+    -- newly-provisioned price must not silently project as 'pro' (would
+    -- mis-entitle the org). RAISE so Stripe retries while ops fixes the
+    -- catalogue mapping.
+    v_plan := NULL;
     IF v_price_id IS NOT NULL THEN
       SELECT CASE
                WHEN id IN ('plan.team', 'plan.team.annual') THEN 'team'
                WHEN id IN ('plan.pro',  'plan.pro.annual')  THEN 'pro'
-               ELSE 'pro'
+               ELSE NULL
              END
         INTO v_plan
         FROM grida_billing.product_catalogue
        WHERE stripe_price_id = v_price_id;
-      v_plan := coalesce(v_plan, 'pro');
+    END IF;
+    IF v_plan IS NULL THEN
+      RAISE EXCEPTION
+        'subscription % has unknown stripe price % — add it to grida_billing.product_catalogue',
+        v_sub_id, v_price_id;
     END IF;
 
     -- Cancel the free sentinel row before the upsert (resolves
@@ -628,16 +650,25 @@ BEGIN
         RAISE EXCEPTION 'invoice.payment_failed: no subscription row for %', v_sub_id;
       END IF;
 
+      -- First-invoice failures arrive while Stripe holds the sub in
+      -- `incomplete` (then `incomplete_expired` after ~23h). Don't collapse
+      -- those into `past_due` — that's the renewal-failure status, and the UI
+      -- branches on the distinction.
       UPDATE grida_billing.subscription
-         SET status = 'past_due', updated_at = now()
-       WHERE stripe_subscription_id = v_sub_id;
+         SET status = CASE
+               WHEN status IN ('incomplete', 'incomplete_expired') THEN status
+               ELSE 'past_due'
+             END,
+             updated_at = now()
+       WHERE stripe_subscription_id = v_sub_id
+       RETURNING status INTO v_status;
 
       INSERT INTO grida_billing.audit (
         organization_id, operation, stripe_event_id, stripe_subscription_id,
         stripe_invoice_id, event_type, status, attempt_count
       ) VALUES (
         v_org_id, 'webhook.received', p_event_id, v_sub_id,
-        v_invoice_id, p_event_type, 'past_due', v_attempt_count
+        v_invoice_id, p_event_type, v_status, v_attempt_count
       );
       v_handler := 'invoice_payment_failed';
     END IF;
@@ -706,7 +737,7 @@ CREATE OR REPLACE FUNCTION grida_billing.fn_stamp_failure(
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = pg_catalog, grida_billing
+SET search_path = pg_catalog, public
 AS $$
   UPDATE grida_billing.stripe_event
      SET failed_at      = now(),
@@ -799,7 +830,7 @@ CREATE OR REPLACE FUNCTION public.fn_billing_apply_stripe_event(
 RETURNS TABLE (result text, handler text)
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = grida_billing, public, pg_temp
+SET search_path = pg_catalog, public
 AS $$
   SELECT * FROM grida_billing.fn_apply_stripe_event(p_event_id, p_event_type, p_payload);
 $$;
@@ -819,7 +850,7 @@ CREATE OR REPLACE FUNCTION public.fn_billing_stamp_failure(
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = grida_billing, public, pg_temp
+SET search_path = pg_catalog, public
 AS $$
   SELECT grida_billing.fn_stamp_failure(p_event_id, p_reason);
 $$;
@@ -839,7 +870,7 @@ CREATE OR REPLACE FUNCTION public.fn_billing_attach_stripe_customer(
 RETURNS TABLE (attached boolean, stripe_customer_id text)
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = grida_billing, public, pg_temp
+SET search_path = pg_catalog, public
 AS $$
   SELECT * FROM grida_billing.fn_attach_stripe_customer(p_org_id, p_stripe_customer_id);
 $$;
@@ -858,7 +889,7 @@ CREATE OR REPLACE FUNCTION public.fn_billing_get_customer_id(p_org_id bigint)
 RETURNS text
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = grida_billing, public, pg_temp
+SET search_path = pg_catalog, public
 AS $$
   SELECT stripe_customer_id FROM grida_billing.account WHERE organization_id = p_org_id;
 $$;
@@ -885,7 +916,7 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = grida_billing, public, pg_temp
+SET search_path = pg_catalog, public
 AS $$
   SELECT s.stripe_subscription_id, s.status, s.quantity, s.plan,
          s.cancel_at_period_end, s.current_period_start, s.current_period_end
@@ -915,7 +946,7 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = grida_billing, public, pg_temp
+SET search_path = pg_catalog, public
 AS $$
   SELECT stripe_product_id, stripe_price_id
     FROM grida_billing.product_catalogue
@@ -938,7 +969,7 @@ CREATE OR REPLACE FUNCTION public.fn_billing_setup_product(
 RETURNS TABLE (id text, stripe_product_id text, stripe_price_id text)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = grida_billing, public, pg_temp
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
   IF p_grida_billing_id NOT IN (

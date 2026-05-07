@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CreditCardIcon, ExternalLinkIcon, FileTextIcon } from "lucide-react";
@@ -29,12 +28,14 @@ import { format } from "date-fns";
 import {
   getBillingSummary,
   listInvoices,
+  resumeSubscription,
   startCancelSubscription,
   startPaymentMethodUpdate,
 } from "./_actions";
 import {
   PAID_PLANS,
   price_dollars,
+  price_monthly_equivalent_dollars,
   type Interval,
   type PaidPlanId,
   type PlanId,
@@ -49,6 +50,7 @@ type BillingState = {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   has_active_subscription: boolean;
+  is_test_mode: boolean;
 };
 
 type PaymentMethod = {
@@ -120,7 +122,6 @@ export default function BillingView({
   orgId: number;
   orgName: string;
 }) {
-  const searchParams = useSearchParams();
   const [state, setState] = useState<BillingState | null>(null);
   const [invoices, setInvoices] = useState<InvoicesState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,47 +167,16 @@ export default function BillingView({
     void refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    const sub = searchParams.get("subscribe");
-    if (sub === "success") {
-      toast.success("Welcome!", {
-        description: "Your subscription is provisioning.",
-      });
-    }
-  }, [searchParams]);
-
-  // After Stripe Checkout / Portal return, poll the read view a few times so
-  // the UI catches the webhook-driven state change. This NEVER reaches out to
-  // Stripe — the webhook is the only source of truth. If the webhook is slow
-  // or missing (e.g., `stripe listen` not running), the page stays stale; the
-  // fix is to deliver the webhook, not to bypass it from the client.
-  useEffect(() => {
-    const sub = searchParams.get("subscribe");
-    if (sub !== "success") return;
-
-    let cancelled = false;
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts += 1;
-      if (cancelled || attempts > 5) {
-        clearInterval(interval);
-        return;
-      }
-      void refresh();
-    }, 2_000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [searchParams, refresh]);
+  // Post-Stripe-flow waiting (subscribe success, payment-method update,
+  // etc.) lives on the dedicated `/billing/return` callback page, NOT here.
+  // This page's only responsibility is rendering the current billing state.
 
   const updatePaymentMethod = useCallback(async () => {
     try {
-      // `?subscribe=success` triggers the polling effect on return so the UI
-      // catches the webhook-driven status flip from past_due → active.
+      // Stripe Portal completion → dedicated callback page that polls until
+      // the webhook flips status from past_due → active, then forwards back.
       const result = await startPaymentMethodUpdate(orgId, {
-        return_url: `${window.location.origin}${baseUrl}?subscribe=success`,
+        return_url: `${window.location.origin}${baseUrl}/return?intent=payment_method`,
       });
       window.location.href = result.portal_url;
     } catch (e) {
@@ -219,7 +189,7 @@ export default function BillingView({
   const cancelSubscription = useCallback(async () => {
     try {
       const result = await startCancelSubscription(orgId, {
-        return_url: `${window.location.origin}${baseUrl}?subscribe=success`,
+        return_url: `${window.location.origin}${baseUrl}`,
       });
       window.location.href = result.portal_url;
     } catch (e) {
@@ -228,6 +198,45 @@ export default function BillingView({
       });
     }
   }, [orgId, baseUrl]);
+
+  // Undo a pending cancellation. Optimistic update: we flip
+  // `cancel_at_period_end` locally on click so the badge clears and the
+  // Resume button vanishes immediately — the user sees zero latency. The
+  // Stripe write happens in the background; the webhook projects the same
+  // value into the DB shortly after. If the Stripe call fails (rare), we
+  // revert local state and surface the error.
+  //
+  // No `refresh()` loop / loading flag: that pattern repaints the whole
+  // page through the skeleton gate, which is awful UX for a one-bool flip.
+  const resume = useCallback(async () => {
+    if (!state) return;
+    const previous = state;
+    setState({ ...state, cancel_at_period_end: false });
+    try {
+      await resumeSubscription(orgId);
+    } catch (e) {
+      setState(previous);
+      toast.error("Could not resume subscription", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }, [orgId, state]);
+
+  // First-load failure: state is still null AND err is set. Render the error
+  // panel ahead of the skeleton gate so the Retry button is reachable. Once
+  // a successful load has happened, transient refresh errors are toasted by
+  // refresh() and the existing UI keeps rendering.
+  if (err && !state) {
+    return (
+      <main className="container mx-auto py-10 max-w-4xl">
+        <h1 className="text-3xl font-bold mb-4">Billing</h1>
+        <p className="text-destructive">Failed to load billing: {err}</p>
+        <Button onClick={refresh} className="mt-4" variant="outline">
+          Retry
+        </Button>
+      </main>
+    );
+  }
 
   if (loading || !state) {
     return (
@@ -244,26 +253,15 @@ export default function BillingView({
     );
   }
 
-  if (err) {
-    return (
-      <main className="container mx-auto py-10 max-w-4xl">
-        <h1 className="text-3xl font-bold mb-4">Billing</h1>
-        <p className="text-destructive">Failed to load billing: {err}</p>
-        <Button onClick={refresh} className="mt-4" variant="outline">
-          Retry
-        </Button>
-      </main>
-    );
-  }
-
   const paidPlan: PaidPlanId | null =
     state.plan === "pro" || state.plan === "team" ? state.plan : null;
   const isPaid = paidPlan !== null;
   const planLabel = paidPlan ? PAID_PLANS[paidPlan].name : "Free";
-  // v1: single-seat. Prices come from the catalogue source of truth.
+  // v1: single-seat. Prices come from the catalogue source of truth. Annual
+  // shows the monthly equivalent inline so users can sanity-check the discount.
   const priceLabel = paidPlan
     ? state.interval === "year"
-      ? `$${price_dollars(paidPlan, "year")}/yr`
+      ? `$${price_dollars(paidPlan, "year")}/yr (~$${price_monthly_equivalent_dollars(paidPlan, "year").toFixed(0)}/mo)`
       : `$${price_dollars(paidPlan, "month")}/mo`
     : "$0/mo";
   // Destructive payment-failure states. `incomplete` / `incomplete_expired`
@@ -371,7 +369,9 @@ export default function BillingView({
             )}
             <CardFooter className="gap-2">
               {/* Plan changes blocked while billing is in a degraded state —
-                  Stripe rejects price-change on past_due/incomplete subs. */}
+                  Stripe rejects price-change on past_due/incomplete subs.
+                  Cancellation lives in the Danger zone at the bottom of the
+                  page; intentionally not surfaced alongside everyday actions. */}
               {!isPastDue && !isPaused && (
                 <Link href={`${baseUrl}/upgrade`}>
                   <Button variant={isPaid ? "outline" : "default"}>
@@ -379,13 +379,15 @@ export default function BillingView({
                   </Button>
                 </Link>
               )}
-              {isPaid && !state.cancel_at_period_end && !isPastDue && (
-                <Button
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  onClick={cancelSubscription}
-                >
-                  Cancel subscription
+              {/* Resume = undo a pending `cancel_at_period_end`. Stripe charges
+                  nothing — the existing sub continues on its current schedule.
+                  Visible alongside everyday actions on purpose: undoing a
+                  destructive action should be at least as easy as taking it.
+                  No loading state needed — the click optimistically flips
+                  `cancel_at_period_end` so the button vanishes instantly. */}
+              {state.cancel_at_period_end && (
+                <Button variant="default" onClick={resume}>
+                  Resume subscription
                 </Button>
               )}
             </CardFooter>
@@ -500,13 +502,48 @@ export default function BillingView({
             </Button>
           </div>
         </SectionShell>
+
+        {/* 4. Danger zone — destructive actions are pushed to the bottom of
+             the page on purpose, behind a visually distinct boundary. Hidden
+             when there's nothing to cancel (free plans, already-canceling,
+             past_due/paused subs that need recovery first). */}
+        {isPaid && !state.cancel_at_period_end && !isPastDue && !isPaused && (
+          <SectionShell
+            id="danger-zone"
+            title="Danger zone"
+            description="Irreversible and account-affecting actions."
+          >
+            <div className="rounded-xl border border-destructive/30 bg-card p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Cancel subscription</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your plan stays active until the end of the current billing
+                    period, then reverts to Free. Top-up balance is preserved.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10 border-destructive/40"
+                  onClick={cancelSubscription}
+                >
+                  Cancel subscription
+                </Button>
+              </div>
+            </div>
+          </SectionShell>
+        )}
       </div>
 
-      <Separator className="mt-12" />
-      <p className="mt-6 text-xs text-muted-foreground">
-        Charges in test mode use Stripe&apos;s sandbox and never bill a real
-        card.
-      </p>
+      {state.is_test_mode && (
+        <>
+          <Separator className="mt-12" />
+          <p className="mt-6 text-xs text-muted-foreground">
+            Charges in test mode use Stripe&apos;s sandbox and never bill a real
+            card.
+          </p>
+        </>
+      )}
     </main>
   );
 }

@@ -90,7 +90,7 @@ A few names that don't change and are useful to know:
 
 Anything else (file layout under `editor/`, server action names, type names) is a moving target — read the code.
 
-User-facing billing docs: [`docs/platform/billing.mdx`](../platform/billing.mdx). Behaviour test cases: [`test/billing-*.md`](../../test/).
+User-facing billing docs: [`docs/platform/billing.mdx`](../platform/billing.mdx). Behaviour test cases live at `test/billing-*.md` in the repo root.
 
 ---
 

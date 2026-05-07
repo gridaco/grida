@@ -1,6 +1,15 @@
 ---
 title: How Grida billing works
 description: A plain-English guide to Grida's plans, AI credits, and billing. No legalese.
+keywords:
+  - billing
+  - pricing
+  - plans
+  - AI credits
+  - subscription
+  - top-up
+  - Pro
+  - Team
 sidebar_label: Billing
 sidebar_position: 1
 ---
@@ -15,18 +24,18 @@ This page explains how Grida charges you, how AI credits work, and what to expec
 
 Grida has four plans.
 
-| Plan       | Price                      | Monthly AI credit (per seat)            |
-| ---------- | -------------------------- | --------------------------------------- |
-| Free       | $0                         | $0.50 (shared by everyone in your org)  |
-| Pro        | **$20 per seat / month**   | **$10 per seat**, pooled across the org |
-| Team       | **$60 per seat / month**   | **$35 per seat**, pooled across the org |
-| Enterprise | Custom (from $599 / month) | Custom                                  |
+| Plan       | Price                      | Monthly AI credit                      |
+| ---------- | -------------------------- | -------------------------------------- |
+| Free       | $0                         | $0.50 (shared by everyone in your org) |
+| Pro        | **$20 / month**            | **$10**, pooled across the org         |
+| Team       | **$60 / month**            | **$35**, pooled across the org         |
+| Enterprise | Custom (from $599 / month) | Custom                                 |
 
-**Pro and Team are both seat-based.** Every member of your organization is a paid seat, including the owner. Solo users are just a 1-seat subscription; a 5-person team is 5 seats. AI credit pools at the **organization** level, not per individual — anyone on the team can spend any of it.
+**Today, Pro and Team are flat-rate plans.** One subscription per organization at a single price — Pro is $20/month, Team is $60/month — regardless of how many teammates you've invited. Everyone in the org collaborates on the same projects and shares the same AI credit pool. Per-seat billing (with prorated invites and credit that scales with headcount) is on the roadmap; until it ships, your invoice doesn't change when teammates join or leave.
 
-The difference between Pro and Team is what each seat carries beyond the base price: Team gets a bigger AI credit allotment, more storage, more monthly active users on published projects, and chat support. Both plans charge per seat and prorate the same way; you can switch between them whenever your team's needs change.
+The difference between Pro and Team is what's bundled with the base price: Team gets a bigger AI credit allotment, more storage, more monthly active users on published projects, and chat support. You can switch between them whenever your team's needs change — Stripe prorates the difference automatically.
 
-Annual billing on Pro and Team is available at a **20% discount**. The annual discount comes out of platform margin — your monthly AI credit is the same on monthly or annual.
+Annual billing on Pro and Team is available at a **20% discount** ($192/yr for Pro, $576/yr for Team). The annual discount comes out of platform margin — your monthly AI credit is the same on monthly or annual.
 
 ## How AI credits work
 
@@ -88,23 +97,23 @@ Each month we try to charge your card for the renewal. If the charge fails (expi
 
 ## Working with a team
 
-Pro and Team both charge per seat — and everyone in your org shares the same credit pool, the same way Cursor Teams or Linear handle it.
+Everyone in your org collaborates on the same projects and shares the same AI credit pool — the way Cursor or Linear's free tier handles teamwork.
 
 A few things to know:
 
-- **Every member of a paid org is a paid seat.** Each seat charges the per-seat price and contributes its credit allotment to the shared pool. The owner counts as a seat too.
-- **Inviting someone to your org adds a seat.** Their cost is prorated for the rest of the current period — e.g., adding Bob halfway through the month adds about half a seat's price to your next invoice.
-- **Removing someone from your org removes their seat next period.** The current period's credit pool is unaffected (it was already paid for and minted at the start of the period). Stripe issues a small prorated credit for the unused portion of their seat.
-- **Pending invitations don't count as seats.** A seat starts costing only when the person accepts and joins the org.
-- **Free orgs can have multiple members.** They all share one $0.50 monthly credit pool — same total whether your org has 1 person or 5. If you need more credit, upgrade to Pro or Team and seats scale automatically.
-- **Only the org owner can manage seats and billing** today. Member-role permissions are coming.
+- **The subscription is one flat price** — Pro $20/month, Team $60/month — regardless of how many teammates you invite. Your invoice doesn't change when people join or leave.
+- **Inviting and removing teammates is free** today. Add as many as you want.
+- **AI credit pools at the org level.** A teammate's heavy week doesn't strand yours; everyone draws from the same balance.
+- **Free orgs can have multiple members.** They share the $0.50 monthly credit pool — same total whether your org has 1 person or 5.
+- **Only the org owner can manage billing** today. Member-role permissions are on the roadmap.
+- **Per-seat billing is coming.** When it ships, prorated invites, prorated removals, and credit that scales with headcount will turn on for new and existing paid orgs alike. Until then, the flat plan price is what you pay.
 
 ## Pro vs. Team: how to choose
 
-Both plans charge per seat and pool credit at the org level. Pick based on what each seat needs:
+Both plans pool credit at the org level. Pick based on how much AI your team uses:
 
-- **Pro** ($20/seat) is for individuals and small teams whose AI usage fits comfortably in $10/seat/month, or who plan to top up occasionally.
-- **Team** ($60/seat) is for teams that lean heavily on AI — the larger $35/seat credit pool means less time spent topping up, and the plan also raises storage and monthly-active-user limits.
+- **Pro** ($20/month) is for individuals and small teams whose AI usage fits comfortably in $10/month, or who plan to top up occasionally.
+- **Team** ($60/month) is for teams that lean heavily on AI — the larger $35 credit pool means less time spent topping up, and the plan also raises storage and monthly-active-user limits.
 
 You can switch between Pro and Team at any time. Stripe prorates the difference automatically, and your top-up balance carries across the switch unchanged.
 
@@ -134,9 +143,9 @@ Maya has $0.50 of credit at the start of the month.
 
 She waits a week. The new month rolls over. Her balance refreshes to $0.50 and she's back in business.
 
-### Jordan upgrades to Pro (solo)
+### Jordan upgrades to Pro
 
-Jordan is the only person in their org. Upgrading to Pro buys 1 seat — $20/month, $10 of monthly AI credit.
+Jordan upgrades the org to Pro — $20/month, $10 of monthly AI credit.
 
 Jordan generates a lot of images and a lot of audio tracks throughout the month. Late one night, the balance is at $0.20 — blocked by the floor.
 
@@ -151,22 +160,14 @@ Jordan keeps working. When the next month begins, $10 of fresh Pro credit lands 
 
 Priya runs a 4-person design team on Free. They share $0.50/month — clearly not enough for the AI work they want to do.
 
-Priya considers Pro ($20/seat × 4 = $80/month with $40 of pooled credit) but the team generates a lot of images, so she upgrades to **Team** instead.
+Priya considers Pro ($20/month with $10 of pooled credit) but the team generates a lot of images, so she upgrades the org to **Team** instead.
 
-- The seat count is set automatically to **4** (everyone currently in the org).
-- The first invoice is **$240** (4 × $60).
-- The team's credit pool jumps to **$140/month** (4 × $35), shared across all 4 people. Anyone on the team can spend any of it.
+- The first invoice is **$60** — the flat Team subscription.
+- The team's credit pool jumps to **$35/month**, shared across all 4 people. Anyone on the team can spend any of it.
 
-A week later, they invite a fifth person.
+A week later, they invite a fifth person. The invoice doesn't change — the flat $60/month covers the whole org.
 
-- Bob accepts the invitation. Stripe charges a **prorated $30** for the rest of the period.
-- The seat count is now 5. Next month's pool will be **$175** (5 × $35).
-
-A month later, someone leaves the team. Priya removes them.
-
-- The seat count drops to 4. Stripe issues a **prorated credit** of about $20 to the next invoice.
-- The current month's $175 pool is unchanged (it was already paid for and minted at the start of the period).
-- Next month's pool will be **$140**.
+A month later, someone leaves the team. Priya removes them. Still $60/month; nothing else changes. (When per-seat billing ships, this is the section that will gain prorated math.)
 
 ### Sam's card fails
 
@@ -191,7 +192,7 @@ No. Monthly credit (Free, Pro, or Team) resets each billing period. This is how 
 Top-up credit never expires. It stays in your balance until you spend it, even if you cancel and come back later.
 
 **Can I get a refund?**
-See the [refund policy](/support/refund-policy). The short version: we'll work with you on accidental top-ups and obvious billing errors.
+See our refund policy at `/support/refund-policy`. The short version: we'll work with you on accidental top-ups and obvious billing errors.
 
 **What happens if I cancel mid-month?**
 You keep your plan and your remaining monthly credit until the end of the period you've already paid for. After that, you're on Free. Top-ups stay.
@@ -200,7 +201,7 @@ You keep your plan and your remaining monthly credit until the end of the period
 So no single AI call can ever take you negative. It's a safety floor, not a fee.
 
 **Are AI prices marked up?**
-No. We charge you exactly what the model provider charges us. We make our money on the per-seat base difference (the part of the seat price that isn't AI credit), not on AI usage.
+No. We charge you exactly what the model provider charges us. We make our money on the plan base price (the part that isn't AI credit), not on AI usage.
 
 **Can I see how much I've used?**
 Yes — your billing settings show your current balance, what was spent this month, and a per-call history.
@@ -212,10 +213,10 @@ Major credit and debit cards. Apple Pay and Google Pay where supported by your b
 We collect VAT/GST/sales tax where the law requires it, based on your billing address. Tax (if any) is shown on the checkout page before you confirm and itemized on your receipt.
 
 **I run a team — how does pricing work?**
-Pro and Team are both per-seat. Every member of your org is a seat, including the owner. Adding a member adds a seat (prorated); removing one credits the next invoice. AI credit is shared across the team. Pick Pro for lighter AI usage, Team for heavier — you can switch any time.
+Today, Pro and Team are flat-rate plans — one subscription per org at one price ($20 or $60 per month) regardless of how many teammates you've invited. AI credit is shared across the team. Per-seat billing is on the roadmap.
 
 **What's the difference between Pro and Team?**
-Both are seat-based and both pool credit at the org level. Team raises the per-seat AI credit ($35 vs $10), storage, and monthly active users on published projects, and adds chat support. The decision usually comes down to how much AI your team actually uses.
+Both pool credit at the org level. Team raises the AI credit ($35 vs $10), storage, and monthly active users on published projects, and adds chat support. The decision usually comes down to how much AI your team actually uses.
 
 **Is the credit really shared, or is each person locked to their seat's allotment?**
 Shared. We pool it at the org level so a teammate's heavy week doesn't stop yours, and an admin's spending doesn't strand junior team members. If you need stricter per-user controls, that's on the roadmap.

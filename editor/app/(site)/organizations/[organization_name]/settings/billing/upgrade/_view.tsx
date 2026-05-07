@@ -88,7 +88,9 @@ export default function UpgradeView({
       const result = await startSubscribeCheckout(orgId, {
         plan: plan.id,
         interval,
-        success_url: `${origin}${baseUrl}?subscribe=success`,
+        // Stripe-side completion → dedicated callback page that polls until
+        // the webhook lands, then forwards to the billing dashboard.
+        success_url: `${origin}${baseUrl}/return?intent=subscribe`,
         cancel_url: `${origin}${baseUrl}?subscribe=canceled`,
       });
       if (!result.checkout_url) {

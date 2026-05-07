@@ -269,8 +269,13 @@ export async function getActivePaidSubscription(org_id: number): Promise<{
 }
 
 // Resolve `account.stripe_customer_id` for an org; mint + persist if absent.
-// Race-safe via `fn_billing_attach_stripe_customer` — concurrent callers
-// converge on the first-written id.
+// Race-safe via two layers:
+//   1. Stripe `idempotencyKey: "customer:<org_id>"` collapses concurrent
+//      `customers.create` calls into a single Stripe customer.
+//   2. After-create recheck of `getCustomerId` catches the case where another
+//      request finished its attach between our cached read and the Stripe call.
+//   3. `fn_billing_attach_stripe_customer` is row-locked, so concurrent
+//      attaches converge on the first-written id.
 export async function resolveOrCreateStripeCustomer(
   org_id: number
 ): Promise<string> {
@@ -286,11 +291,21 @@ export async function resolveOrCreateStripeCustomer(
     orgRow.data?.display_name ?? orgRow.data?.name ?? `org-${org_id}`;
   const ownerEmail = orgRow.data?.email ?? undefined;
 
-  const created = await stripe.customers.create({
-    name: orgName,
-    email: ownerEmail,
-    metadata: { grida_organization_id: String(org_id) },
-  });
+  const created = await stripe.customers.create(
+    {
+      name: orgName,
+      email: ownerEmail,
+      metadata: { grida_organization_id: String(org_id) },
+    },
+    { idempotencyKey: `customer:${org_id}` }
+  );
+
+  // Another request may have attached its (idempotent-twin) customer between
+  // our cached read and now. Re-read before attaching ours; if a winner is
+  // already in the DB, return it and let the duplicate Stripe customer fall
+  // away (it is the same id under Stripe's idempotency key, so this is safe).
+  const concurrent = await getCustomerId(org_id);
+  if (concurrent) return concurrent;
 
   const attachRes = await service_role.workspace.rpc(
     "fn_billing_attach_stripe_customer",

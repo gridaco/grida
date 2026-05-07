@@ -4,8 +4,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 // Auto-load `.env.test` and `.env.test.local` so `pnpm vitest run` works
-// without `set -a; . ./.env.test.local` ceremony. Precedence (later loses):
-// .env.test.local > .env.test > shell. Existing process.env always wins.
+// without `set -a; . ./.env.test.local` ceremony.
+// Precedence (highest wins): shell > .env.test.local > .env.test.
+// `loadEnvFile()` only sets a key when not already in process.env, so an
+// existing shell-exported value is never overridden by a file.
 function loadEnvFile(filePath: string): void {
   if (!fs.existsSync(filePath)) return;
   for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {

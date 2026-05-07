@@ -343,3 +343,12 @@ Pro annual user, 60 days in (305 days remaining), switches back to monthly via t
 User on Pro monthly clicks an "annual" toggle on the in-app upgrade page (or pricing page) — separate flow from the Customer Portal.
 **Expected:** A new Stripe Checkout session targeting the annual price, with proration applied to the existing subscription. On success, same end state as SUB-052.
 **Open gap:** `startSubscribeCheckout` currently accepts only `plan: 'pro' | 'team'` — no `interval` parameter. The upgrade page (`upgrade/_view.tsx`) shows no annual toggle. This TC documents the missing surface, not current behavior.
+
+### TC-BILLING-SUB-059 — Concurrent checkout sessions can produce duplicate live Stripe subscriptions (known issue)
+
+Two `startSubscribeCheckout` calls fire for the same Free org before the first completion is projected (e.g. user opens Stripe Checkout in two tabs and pays in both, or two devices race past the local `getActivePaidSubscription` guard). Both sessions complete in Stripe.
+**Current behavior (v1):** The second `customer.subscription.created` webhook hits the `subscription_one_active_per_org_idx` partial unique index and the projector rejects the second row. The second Stripe subscription continues to bill the customer with no local mirror — Grida sees one paid sub, Stripe has two.
+**Why we accept this for v1:** The race requires deliberate parallel checkouts in two browser tabs/devices within the same minute (the idempotency-key bucket). Realistic occurrence is very low; risk is to **us**, not the customer (we'd refund the duplicate manually). Investing in a Stripe-side `subscriptions.list` pre-check or a DB advisory lock during checkout creation is deferred until we see real-world incidence.
+**Detection (manual):** Stripe Dashboard → Customers → search org → if a paid customer has 2+ `active` subscriptions, that's this case.
+**Recovery (manual):** Cancel the orphan Stripe subscription via the Stripe Dashboard and refund the prorated amount. The local row already reflects the surviving subscription.
+**Tracking:** GRIDA-60 (multi-seat work) will introduce the durable-intent / outbox layer that closes this race.

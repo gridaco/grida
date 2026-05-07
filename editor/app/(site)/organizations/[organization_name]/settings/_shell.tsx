@@ -67,8 +67,18 @@ export default function SettingsShell({
             <SidebarGroupContent>
               <SidebarMenu>
                 {categories.map((c) => {
-                  const isActive =
-                    pathname === c.href || pathname?.startsWith(`${c.href}/`);
+                  // A parent's prefix-match would also light up when a child
+                  // route is active (e.g. `/billing` matching on `/billing/upgrade`).
+                  // Disable prefix-match when any sibling category is a child of
+                  // this one — the more specific category will mark itself active.
+                  const hasSiblingChild = categories.some(
+                    (other) =>
+                      other !== c && other.href.startsWith(`${c.href}/`)
+                  );
+                  const isActive = hasSiblingChild
+                    ? pathname === c.href
+                    : pathname === c.href ||
+                      (pathname?.startsWith(`${c.href}/`) ?? false);
                   return (
                     <SidebarMenuItem key={c.href}>
                       <SidebarMenuButton asChild isActive={isActive}>

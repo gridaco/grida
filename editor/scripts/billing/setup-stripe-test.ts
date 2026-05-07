@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   // Numeric prices come from `lib/billing/plans.ts` (single source of
   // truth) — never hardcode them here.
 
-  const { PAID_PLAN_LIST, catalogueId } =
+  const { PAID_PLAN_LIST, price_catalogue_id } =
     await import("../../lib/billing/plans");
   type Interval = "month" | "year";
 
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
       {
         product: PRODUCTS[p.id],
         price: {
-          catalogue_id: catalogueId(p.id, "month"),
+          catalogue_id: price_catalogue_id(p.id, "month"),
           interval: "month" as const,
           unit_amount_cents: p.monthly_cents,
           nickname: `${p.name} monthly`,
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
       {
         product: PRODUCTS[p.id],
         price: {
-          catalogue_id: catalogueId(p.id, "year"),
+          catalogue_id: price_catalogue_id(p.id, "year"),
           interval: "year" as const,
           unit_amount_cents: p.annual_cents,
           nickname: `${p.name} annual`,

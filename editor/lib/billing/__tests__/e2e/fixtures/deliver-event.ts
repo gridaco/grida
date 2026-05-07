@@ -72,11 +72,16 @@ export async function deliverEvent<T extends { id: string }>(
     },
     body: payload,
   });
+  // Read once as text, then try to parse as JSON. If we called `res.json()`
+  // first and it threw, the stream would already be drained — `res.text()` in
+  // the catch would yield "" and we'd lose the actual error body Stripe (or
+  // the route) returned, which is the most useful diagnostic.
+  const raw = await res.text();
   let body: DeliverResult["body"];
   try {
-    body = (await res.json()) as DeliverResult["body"];
+    body = JSON.parse(raw) as DeliverResult["body"];
   } catch {
-    body = { error: `non-json: ${await res.text()}` };
+    body = { error: `non-json: ${raw}` };
   }
   return { status: res.status, body };
 }

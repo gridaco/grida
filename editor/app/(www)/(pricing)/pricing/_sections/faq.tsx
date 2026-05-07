@@ -13,10 +13,10 @@ const faqs: { question: string; answer: React.ReactNode }[] = [
     answer: (
       <>
         Each plan includes a monthly AI credit — $0.50 on Free,{" "}
-        <strong>$10 per seat</strong> on Pro, <strong>$35 per seat</strong> on
-        Team. AI features draw from this balance at the model provider&apos;s
-        cost; we never mark up AI usage. Unused monthly credit resets at the
-        start of the next billing period.{" "}
+        <strong>$10</strong> on Pro, <strong>$35</strong> on Team. AI features
+        draw from this balance at the model provider&apos;s cost; we never mark
+        up AI usage. Unused monthly credit resets at the start of the next
+        billing period.{" "}
         <Link
           href="/docs/platform/billing"
           className="underline underline-offset-4"
@@ -30,7 +30,7 @@ const faqs: { question: string; answer: React.ReactNode }[] = [
   {
     question: "What's the difference between Pro and Team?",
     answer:
-      "Both are per-seat and both pool AI credit at the org level. Team raises the per-seat AI credit ($35 vs $10), storage, and monthly active users on published projects, and adds chat support. Pro is for individuals and small teams with lighter AI usage; Team is for teams that lean heavily on AI. You can switch between them any time — Stripe prorates the difference automatically.",
+      "Both pool AI credit at the org level. Team raises the AI credit ($35 vs $10), storage, and monthly active users on published projects, and adds chat support. Pro is for individuals and small teams with lighter AI usage; Team is for teams that lean heavily on AI. You can switch between them any time — Stripe prorates the difference automatically.",
   },
   {
     question: "Can I buy credit ahead of time?",
@@ -45,7 +45,7 @@ const faqs: { question: string; answer: React.ReactNode }[] = [
   {
     question: "Are AI prices marked up?",
     answer:
-      "No. We charge you exactly what the model provider charges us. Our margin lives in the per-seat base price (the part of the seat that isn't AI credit), not in AI usage. When provider prices change, we update what we charge to match.",
+      "No. We charge you exactly what the model provider charges us. Our margin lives in the plan base price (the part that isn't AI credit), not in AI usage. When provider prices change, we update what we charge to match.",
   },
   {
     question: "What happens if I cancel?",
@@ -53,9 +53,9 @@ const faqs: { question: string; answer: React.ReactNode }[] = [
       "You keep your plan and the current month's credit until the end of the period you've already paid for. After that, you switch to Free and start receiving $0.50 of credit each month. Any top-up credit you have stays in your account.",
   },
   {
-    question: "How does pricing work for teams?",
+    question: "Can my whole team work together?",
     answer:
-      "Pro and Team are both per-seat. Every member of your org is a seat, including the owner — pending invites don't count until accepted. Adding a member adds a seat (prorated for the rest of the period); removing one credits the next invoice. AI credit is pooled at the org level, so anyone on the team can spend any of it. A 5-seat Team org pays $300/month and gets a $175/month shared AI pool.",
+      "Yes — invite as many teammates as you want and everyone collaborates on the same projects. Today the subscription is a single flat plan price (one Pro org pays $20/month, one Team org pays $60/month) regardless of how many teammates you've invited. Per-seat billing with prorated invites is on the roadmap.",
   },
 ];
 

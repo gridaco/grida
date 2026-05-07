@@ -47,10 +47,14 @@ type UniversalRouteConfig = {
 /**
  * Organization-scoped routes — pages that live under
  * `/organizations/<orgName>/<path>` and require only org context (no project,
- * no document). Settings, members, billing all belong here.
+ * no document). Settings sub-pages, members, billing all belong here.
+ *
+ * Note: the bare `settings` segment is intentionally **not** registered here
+ * because it collides with the document-scoped `settings` route. Universal
+ * shorthand `/_/settings` resolves to a document; `/organizations/<org>/settings`
+ * is reachable only by direct link.
  */
 const ORGANIZATION_ROUTE_CONFIGS = {
-  settings: { scope: "organization" },
   "settings/billing": { scope: "organization" },
   "settings/billing/upgrade": { scope: "organization" },
   people: { scope: "organization" },
@@ -331,13 +335,23 @@ export function buildUniversalDestination(
     return suffix ? `${base}/${suffix}` : base;
   }
 
+  if (!context.proj) {
+    throw new Error(
+      `buildUniversalDestination(${page}): missing project context`
+    );
+  }
   const base = `/${context.org}/${context.proj}`;
 
   if (route.scope === "project") {
     return suffix ? `${base}/${suffix}` : base;
   }
 
-  const docId = "docId" in context ? context.docId : "";
+  if (!context.docId) {
+    throw new Error(
+      `buildUniversalDestination(${page}): missing document context`
+    );
+  }
+  const docId = context.docId;
   return suffix ? `${base}/${docId}/${suffix}` : `${base}/${docId}`;
 }
 

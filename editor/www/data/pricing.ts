@@ -66,12 +66,15 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
+        // Top-up flow is not yet shipped — keep the row visible (so the
+        // comparison stays informational) but advertise it as unavailable
+        // across all tiers until the feature lands.
         title: "Buy extra credits",
         plans: {
           free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
+          pro: false,
+          team: false,
+          enterprise: false,
         },
         usage_based: false,
       },

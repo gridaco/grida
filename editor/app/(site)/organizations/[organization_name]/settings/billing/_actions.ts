@@ -63,6 +63,9 @@ export type BillingSummary = {
   has_active_subscription: boolean;
   /** "month" | "year" for paid subs; null for free. Read from Stripe. */
   interval: Interval | null;
+  /** Server-side test-mode signal (BILLING_TEST_MODE env). Drives the sandbox
+   *  disclaimer on the billing page — never default to true client-side. */
+  is_test_mode: boolean;
 };
 
 export async function getBillingSummary(
@@ -102,6 +105,7 @@ export async function getBillingSummary(
     has_active_subscription:
       !!sub?.stripe_subscription_id && sub.status !== "canceled",
     interval,
+    is_test_mode: process.env.BILLING_TEST_MODE === "true",
   };
 }
 
@@ -324,6 +328,18 @@ export async function startPlanChangeConfirm(
       "billing/upgrade"
     );
   }
+  // Mirror the UI's `isDegraded` gate: never open the plan-change Portal flow
+  // for a sub that is past_due / unpaid / paused / incomplete*. The recovery
+  // path is "Update payment method" — surface that, don't let Stripe's Portal
+  // be the final defender.
+  if (sub.status !== "active" && sub.status !== "trialing") {
+    throw new BillingError(
+      "Resolve the current billing issue before changing plans.",
+      "subscription_degraded",
+      409,
+      "billing"
+    );
+  }
 
   const customerId = await getCustomerId(org_id);
   if (!customerId) {
@@ -449,6 +465,14 @@ export async function startSubscribeCheckout(
   // through Stripe, never inferred from member count here.
   const quantity = 1;
 
+  // KNOWN ISSUE (TC-BILLING-SUB-059): the local-only check above does not
+  // prevent two concurrent `startSubscribeCheckout` calls (e.g. user opens
+  // Checkout in two tabs and pays in both) from producing two live Stripe
+  // subscriptions. The second `customer.subscription.created` webhook is
+  // rejected by `subscription_one_active_per_org_idx`, so locally we see one
+  // sub while Stripe has two. Acceptable for v1 — risk is to Grida (we
+  // refund manually), not the customer. Closure tracked in GRIDA-60.
+
   const customer = await resolveOrCreateStripeCustomer(org_id);
   const idempotencyKey = `subscribe:${org_id}:${params.plan}:${interval}:${Math.floor(Date.now() / 60000)}`;
 
@@ -540,6 +564,40 @@ export async function startCancelSubscription(
 }
 
 // ---------------------------------------------------------------------------
+// resumeSubscription
+//
+// Undoes a `cancel_at_period_end=true` flag set by an earlier cancellation,
+// while the period is still active. Stripe charges nothing — the existing
+// subscription simply continues on its current schedule.
+//
+// No Portal flow exists for this (Stripe ships `subscription_cancel`,
+// `subscription_update_confirm`, `payment_method_update`, but no
+// `subscription_resume`), so this is the one Stripe-mutation server action
+// that bypasses the Portal. The webhook (`customer.subscription.updated`
+// with `cancel_at_period_end=false`) projects the flip back into the local
+// row, keeping the "webhook is sole source of truth" rule intact for state.
+// ---------------------------------------------------------------------------
+
+export async function resumeSubscription(org_id: number): Promise<void> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  const sub = await getActivePaidSubscription(org_id);
+  if (!sub) {
+    throw new BillingError(
+      "No active subscription to resume.",
+      "not_subscribed",
+      400,
+      "billing"
+    );
+  }
+
+  await stripe.subscriptions.update(sub.stripe_subscription_id, {
+    cancel_at_period_end: false,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // listBillingAudit
 //
 // Owner-only paginated read of the audit feed. Backed by `v_billing_audit`
@@ -582,6 +640,20 @@ export async function listBillingAudit(
     Math.min(Number.isFinite(limitRaw) ? limitRaw : 50, 200)
   );
 
+  // Composite cursor "<created_at>|<id>" — pure created_at would skip rows
+  // sharing a boundary timestamp because the page filter would race with the
+  // `(created_at DESC, id DESC)` order.
+  let cursorAt: string | null = null;
+  let cursorId: number | null = null;
+  if (cursor) {
+    const sep = cursor.indexOf("|");
+    if (sep > 0) {
+      cursorAt = cursor.slice(0, sep);
+      const parsed = Number(cursor.slice(sep + 1));
+      cursorId = Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
   const sb = await createClient();
   let q = sb
     .from("v_billing_audit")
@@ -593,14 +665,23 @@ export async function listBillingAudit(
     .order("id", { ascending: false })
     .limit(limit);
 
-  if (cursor) q = q.lt("created_at", cursor);
+  if (cursorAt && cursorId !== null) {
+    // (created_at, id) lexicographic seek: strictly older timestamp, OR same
+    // timestamp with strictly smaller id. Expressed as a postgrest `or`.
+    q = q.or(
+      `created_at.lt.${cursorAt},and(created_at.eq.${cursorAt},id.lt.${cursorId})`
+    );
+  } else if (cursorAt) {
+    q = q.lt("created_at", cursorAt);
+  }
 
   const { data, error } = await q;
   if (error) throw new Error(`audit list: ${error.message}`);
 
   const rows = (data ?? []) as AuditRow[];
+  const last = rows[rows.length - 1];
   const next_cursor =
-    rows.length === limit ? rows[rows.length - 1].created_at : null;
+    rows.length === limit && last ? `${last.created_at}|${last.id}` : null;
 
   return { rows, next_cursor, limit };
 }

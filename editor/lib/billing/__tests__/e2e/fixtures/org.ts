@@ -78,18 +78,22 @@ export async function teardownOrg(org: EphemeralOrg): Promise<void> {
         }
       }
     } catch (err) {
-      console.warn(
-        `[e2e/org] subscription cleanup: ${err instanceof Error ? err.message : err}`
-      );
+      // Surface the failure: a swallowed cancel leaves orphaned Stripe state
+      // that pollutes the test sandbox over time. Only "already gone" errors
+      // are tolerated and they're handled inside the inner cancel catch above.
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`[e2e/org] subscription cleanup failed: ${msg}`);
     }
 
     try {
       await stripe.customers.del(customerId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (!/No such customer|resource_missing/i.test(msg)) {
-        console.warn(`[e2e/org] customer delete: ${msg}`);
-      }
+      // "Already deleted" is fine; everything else is a real teardown failure
+      // and must not be silently logged — orphan customers compound across
+      // runs and eventually trip the test sandbox limits.
+      if (/No such customer|resource_missing/i.test(msg)) return;
+      throw new Error(`[e2e/org] customer delete failed: ${msg}`);
     }
   }
 
