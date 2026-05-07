@@ -402,15 +402,19 @@ export async function dispatchStripeEvent(
 }
 
 // Failure stamps go through a separate RPC so they survive the projector's
-// RAISE-driven rollback.
+// RAISE-driven rollback. Passes `eventType` so the RPC can UPSERT — the
+// projector's `INSERT INTO stripe_event` rolls back with the failure, and an
+// UPDATE-only stamp would silently match nothing on first failure.
 export async function stampStripeEventFailure(
   eventId: string,
+  eventType: string,
   reason: string
 ): Promise<void> {
   const { error } = await service_role.workspace.rpc(
     "fn_billing_stamp_failure",
     {
       p_event_id: eventId,
+      p_event_type: eventType,
       p_reason: reason,
     }
   );

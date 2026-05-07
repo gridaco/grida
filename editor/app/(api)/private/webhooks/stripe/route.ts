@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       `[webhook/stripe] handler error for ${event.type} (${event.id}):`,
       msg
     );
-    await stampStripeEventFailure(event.id, msg);
+    await stampStripeEventFailure(event.id, event.type, msg);
     return NextResponse.json(
       { error: "handler_failed", detail: msg },
       { status: 500 }

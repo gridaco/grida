@@ -262,7 +262,11 @@ export default function UpgradeView({
 
       <div className="grid gap-4 md:grid-cols-3 items-stretch">
         {PAID_PLAN_LIST.map((plan) => {
-          const isCurrent = current?.plan === plan.id;
+          // Match plan AND interval so a plan card doesn't claim "Current"
+          // when the user has the same plan on a different interval (and a
+          // switch is actually being offered).
+          const isCurrent =
+            current?.plan === plan.id && current?.interval === interval;
           const monthlyEquivalent = price_monthly_equivalent_dollars(
             plan.id,
             interval

@@ -373,11 +373,11 @@ export default function BillingView({
                   Cancellation lives in the Danger zone at the bottom of the
                   page; intentionally not surfaced alongside everyday actions. */}
               {!isPastDue && !isPaused && (
-                <Link href={`${baseUrl}/upgrade`}>
-                  <Button variant={isPaid ? "outline" : "default"}>
+                <Button asChild variant={isPaid ? "outline" : "default"}>
+                  <Link href={`${baseUrl}/upgrade`}>
                     {isPaid ? "Adjust plan" : "Upgrade"}
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               )}
               {/* Resume = undo a pending `cancel_at_period_end`. Stripe charges
                   nothing — the existing sub continues on its current schedule.

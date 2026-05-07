@@ -4802,7 +4802,7 @@ export type Database = {
         }[]
       }
       fn_billing_stamp_failure: {
-        Args: { p_event_id: string; p_reason: string }
+        Args: { p_event_id: string; p_event_type: string; p_reason: string }
         Returns: undefined
       }
       gen_random_slug: { Args: never; Returns: string }

@@ -373,6 +373,15 @@ BEGIN
 
     INSERT INTO grida_billing.audit (organization_id, operation, stripe_customer_id)
     VALUES (p_org_id, 'customer_attach', p_stripe_customer_id);
+  ELSIF v_existing <> p_stripe_customer_id THEN
+    -- Fail closed on attach-time drift. Mismatched ids = ops contamination
+    -- (manual SQL, leaked fixtures, double-create races). Silent skip would
+    -- return the existing id and the caller's freshly-created Stripe
+    -- customer would orphan on Stripe's side. Surface the conflict so
+    -- whoever is calling can investigate.
+    RAISE EXCEPTION
+      'organization % is already attached to Stripe customer %, refusing %',
+      p_org_id, v_existing, p_stripe_customer_id;
   END IF;
 
   RETURN QUERY SELECT v_attached, v_existing;
@@ -464,6 +473,27 @@ BEGIN
     v_org_id := nullif(p_payload->'metadata'->>'grida_organization_id', '')::bigint;
 
     IF v_org_id IS NOT NULL THEN
+      -- Fail closed on stripe_customer_id drift: if the org is already
+      -- attached to a *different* customer, refuse rather than silently
+      -- no-oping. Mismatched ids almost always mean ops contamination
+      -- (manual SQL, leaked test data) and silent skip turns later
+      -- subscription events into ghosts. Stripe will retry the webhook
+      -- while ops fixes the binding.
+      DECLARE
+        v_existing_cust text;
+      BEGIN
+        SELECT stripe_customer_id INTO v_existing_cust
+          FROM grida_billing.account
+         WHERE organization_id = v_org_id;
+        IF FOUND
+           AND v_existing_cust IS NOT NULL
+           AND v_existing_cust <> v_customer_id THEN
+          RAISE EXCEPTION
+            'organization % already attached to Stripe customer %, refusing webhook for customer %',
+            v_org_id, v_existing_cust, v_customer_id;
+        END IF;
+      END;
+
       UPDATE grida_billing.account
          SET stripe_customer_id = v_customer_id,
              updated_at         = now()
@@ -728,21 +758,32 @@ $$;
 -- [grida_billing.fn_stamp_failure]
 -- Forensic stamp called from the receiver's catch path AFTER
 -- fn_apply_stripe_event has rolled back. Separate transaction.
+--
+-- UPSERT, not UPDATE: when the projector RAISEs, the entire transaction
+-- (including the INSERT INTO stripe_event at the top of fn_apply_stripe_event)
+-- rolls back. So on a first-time failure, no row exists yet and an
+-- UPDATE-only stamp would silently match nothing. INSERT … ON CONFLICT
+-- handles both cases — first failure inserts the forensic row; later
+-- failures update the existing one.
 ---------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS grida_billing.fn_stamp_failure(text, text);
+
 CREATE OR REPLACE FUNCTION grida_billing.fn_stamp_failure(
-  p_event_id text,
-  p_reason   text
+  p_event_id   text,
+  p_event_type text,
+  p_reason     text
 )
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
-  UPDATE grida_billing.stripe_event
-     SET failed_at      = now(),
-         failure_reason = left(p_reason, 2000)
-   WHERE id = p_event_id;
+  INSERT INTO grida_billing.stripe_event (id, type, failed_at, failure_reason)
+  VALUES (p_event_id, p_event_type, now(), left(p_reason, 2000))
+  ON CONFLICT (id) DO UPDATE SET
+    failed_at      = EXCLUDED.failed_at,
+    failure_reason = EXCLUDED.failure_reason;
 $$;
 
 
@@ -843,20 +884,23 @@ GRANT EXECUTE ON FUNCTION public.fn_billing_apply_stripe_event(text, text, jsonb
 -- [public.fn_billing_stamp_failure]
 ---------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS public.fn_billing_stamp_failure(text, text);
+
 CREATE OR REPLACE FUNCTION public.fn_billing_stamp_failure(
-  p_event_id text,
-  p_reason   text
+  p_event_id   text,
+  p_event_type text,
+  p_reason     text
 )
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
-  SELECT grida_billing.fn_stamp_failure(p_event_id, p_reason);
+  SELECT grida_billing.fn_stamp_failure(p_event_id, p_event_type, p_reason);
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_stamp_failure(text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_billing_stamp_failure(text, text) TO service_role;
+REVOKE ALL ON FUNCTION public.fn_billing_stamp_failure(text, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_billing_stamp_failure(text, text, text) TO service_role;
 
 
 ---------------------------------------------------------------------

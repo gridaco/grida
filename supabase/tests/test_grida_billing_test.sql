@@ -6,7 +6,7 @@
 
 BEGIN;
 
-SELECT plan(37);
+SELECT plan(57);
 
 -- Stash seed UUIDs (regenerated on every `supabase db reset`).
 DO $$
@@ -391,6 +391,106 @@ SELECT is(
   true,
   'service_role can set is_enterprise = true'
 );
+
+-- ---------------------------------------------------------------------
+-- 13. Direct RLS / GRANT denial on grida_billing internal tables.
+--     The schema is locked-down: REVOKE ALL FROM anon, authenticated +
+--     RESTRICTIVE deny policies. Verify both `anon` and `authenticated`
+--     get permission_denied (SQLSTATE 42501) on read AND write paths so
+--     a future stray GRANT or policy loosen-up gets caught here.
+--     Tables: account, subscription, product_catalogue, stripe_event, audit.
+-- ---------------------------------------------------------------------
+
+-- authenticated role.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', current_setting('test.insider_uid'), true);
+
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.account LIMIT 1 $$, '42501', NULL,
+  'authenticated cannot SELECT grida_billing.account'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.account (organization_id) VALUES (1) $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.account'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.subscription LIMIT 1 $$, '42501', NULL,
+  'authenticated cannot SELECT grida_billing.subscription'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.subscription (organization_id, plan, is_free, status) VALUES (1, 'free', true, 'active') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.subscription'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.product_catalogue LIMIT 1 $$, '42501', NULL,
+  'authenticated cannot SELECT grida_billing.product_catalogue'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.product_catalogue (id, kind) VALUES ('plan.x', 'plan') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.product_catalogue'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.stripe_event LIMIT 1 $$, '42501', NULL,
+  'authenticated cannot SELECT grida_billing.stripe_event'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.stripe_event (id, type) VALUES ('evt_x', 'customer.created') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.stripe_event'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.audit LIMIT 1 $$, '42501', NULL,
+  'authenticated cannot SELECT grida_billing.audit'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.audit (organization_id, operation) VALUES (1, 'customer_attach') $$, '42501', NULL,
+  'authenticated cannot INSERT grida_billing.audit'
+);
+
+-- anon role (no JWT, no auth.uid()).
+SET LOCAL ROLE anon;
+
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.account LIMIT 1 $$, '42501', NULL,
+  'anon cannot SELECT grida_billing.account'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.account (organization_id) VALUES (1) $$, '42501', NULL,
+  'anon cannot INSERT grida_billing.account'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.subscription LIMIT 1 $$, '42501', NULL,
+  'anon cannot SELECT grida_billing.subscription'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.subscription (organization_id, plan, is_free, status) VALUES (1, 'free', true, 'active') $$, '42501', NULL,
+  'anon cannot INSERT grida_billing.subscription'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.product_catalogue LIMIT 1 $$, '42501', NULL,
+  'anon cannot SELECT grida_billing.product_catalogue'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.product_catalogue (id, kind) VALUES ('plan.x', 'plan') $$, '42501', NULL,
+  'anon cannot INSERT grida_billing.product_catalogue'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.stripe_event LIMIT 1 $$, '42501', NULL,
+  'anon cannot SELECT grida_billing.stripe_event'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.stripe_event (id, type) VALUES ('evt_x', 'customer.created') $$, '42501', NULL,
+  'anon cannot INSERT grida_billing.stripe_event'
+);
+SELECT throws_ok(
+  $$ SELECT 1 FROM grida_billing.audit LIMIT 1 $$, '42501', NULL,
+  'anon cannot SELECT grida_billing.audit'
+);
+SELECT throws_ok(
+  $$ INSERT INTO grida_billing.audit (organization_id, operation) VALUES (1, 'customer_attach') $$, '42501', NULL,
+  'anon cannot INSERT grida_billing.audit'
+);
+
+RESET ROLE;
 
 SELECT * FROM finish();
 ROLLBACK;

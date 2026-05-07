@@ -89,11 +89,13 @@ export async function teardownOrg(org: EphemeralOrg): Promise<void> {
       await stripe.customers.del(customerId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // "Already deleted" is fine; everything else is a real teardown failure
-      // and must not be silently logged — orphan customers compound across
-      // runs and eventually trip the test sandbox limits.
-      if (/No such customer|resource_missing/i.test(msg)) return;
-      throw new Error(`[e2e/org] customer delete failed: ${msg}`);
+      // "Already deleted" is fine — fall through to the local org delete.
+      // Anything else is a real teardown failure and must not be silently
+      // logged — orphan customers compound across runs and eventually trip
+      // the test sandbox limits.
+      if (!/No such customer|resource_missing/i.test(msg)) {
+        throw new Error(`[e2e/org] customer delete failed: ${msg}`);
+      }
     }
   }
 
