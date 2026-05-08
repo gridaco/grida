@@ -1,9 +1,13 @@
 /**
  * Stripe webhook receiver — single endpoint for all event types.
  *
- * Effective URL: `/private/webhooks/stripe`. The `(api)` route group is
- * URL-invisible, but `private/` is a normal path segment (no parens).
- * Configure `stripe listen --forward-to localhost:3000/private/webhooks/stripe`.
+ * `GRIDA-SEC-001` —
+ * see `editor/app/(ingest)/README.md` for the trust contract this file
+ * is bound by, and `/SECURITY.md` for the threat model.
+ *
+ * Effective URL: `/webhooks/stripe`. The `(ingest)` route group is
+ * URL-invisible.
+ * Configure: `stripe listen --forward-to localhost:3000/webhooks/stripe`.
  *
  * Pipeline:
  *   1. Read raw body (signature verification needs raw bytes).
@@ -42,6 +46,7 @@ export async function POST(req: NextRequest) {
 
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
+    // GRIDA-SEC-001: rule 2 — fail closed when secret is missing.
     console.error("[webhook/stripe] STRIPE_WEBHOOK_SECRET not configured");
     return NextResponse.json(
       { error: "webhook secret not configured" },
