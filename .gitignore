@@ -235,5 +235,8 @@ __pycache__/
 .claude/scheduled_tasks.lock
 CLAUDE.local.md
 
+# Local-only cherry-pick / snapshot scratch
+/.tmp/
+
 # Local-only tracking docs
 /TODO.md
