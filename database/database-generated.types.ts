@@ -4752,6 +4752,13 @@ export type Database = {
         }
       }
       flatten_jsonb_object_values: { Args: { obj: Json }; Returns: string }
+      fn_billing_apply_metronome_event: {
+        Args: { p_event_id: string; p_event_type: string; p_payload: Json }
+        Returns: {
+          handler: string
+          result: string
+        }[]
+      }
       fn_billing_apply_stripe_event: {
         Args: { p_event_id: string; p_event_type: string; p_payload: Json }
         Returns: {
@@ -4764,6 +4771,13 @@ export type Database = {
         Returns: {
           attached: boolean
           stripe_customer_id: string
+        }[]
+      }
+      fn_billing_debit_balance_cache: {
+        Args: { p_cents: number; p_floor_cents?: number; p_org: number }
+        Returns: {
+          cached_balance_cents: number
+          customer_entitled: boolean
         }[]
       }
       fn_billing_get_active_subscription: {
@@ -4788,6 +4802,61 @@ export type Database = {
       fn_billing_get_customer_id: {
         Args: { p_org_id: number }
         Returns: string
+      }
+      fn_billing_get_metronome_account: {
+        Args: { p_org: number }
+        Returns: {
+          auto_reload_amount_cents: number
+          auto_reload_enabled: boolean
+          auto_reload_threshold_cents: number
+          cached_balance_at: string
+          cached_balance_cents: number
+          customer_entitled: boolean
+          metronome_contract_id: string
+          metronome_customer_id: string
+          organization_id: number
+          provisioning_uid: string
+          stripe_customer_id: string
+        }[]
+      }
+      fn_billing_list_metronome_events: {
+        Args: { p_limit?: number; p_org?: number }
+        Returns: {
+          customer_id: string
+          event_id: string
+          event_type: string
+          failure_reason: string
+          payment_status: string
+          processed_at: string
+          received_at: string
+        }[]
+      }
+      fn_billing_list_provisioned_orgs: {
+        Args: never
+        Returns: {
+          organization_id: number
+        }[]
+      }
+      fn_billing_resolve_org_by_metronome_customer: {
+        Args: { p_customer_id: string }
+        Returns: number
+      }
+      fn_billing_set_auto_reload: {
+        Args: {
+          p_amount_cents: number
+          p_enabled: boolean
+          p_org: number
+          p_threshold_cents: number
+        }
+        Returns: undefined
+      }
+      fn_billing_set_balance_cache: {
+        Args: { p_balance_cents: number; p_entitled: boolean; p_org: number }
+        Returns: undefined
+      }
+      fn_billing_set_metronome_ids: {
+        Args: { p_contract_id: string; p_customer_id: string; p_org: number }
+        Returns: undefined
       }
       fn_billing_setup_product: {
         Args: {
@@ -5391,3 +5460,4 @@ export const Constants = {
     },
   },
 } as const
+

@@ -49,6 +49,12 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE EXECUTE ON ROUTINES FROM
 CREATE TABLE grida_billing.account (
   organization_id     bigint PRIMARY KEY REFERENCES public.organization(id) ON DELETE CASCADE,
   stripe_customer_id  text UNIQUE,
+  -- Per-account UUID used to namespace identities in external billing
+  -- systems (Metronome ingest_alias, etc). Non-deterministic by design
+  -- — regenerated on every fresh row. Purpose: prevents silent reuse
+  -- of orphan cloud-side customers across local DB resets. Stable for
+  -- the lifetime of the row in production.
+  provisioning_uid    uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now()
 );

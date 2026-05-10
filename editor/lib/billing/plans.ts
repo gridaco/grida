@@ -45,7 +45,6 @@ export const PAID_PLANS: Readonly<Record<PaidPlanId, PaidPlanDefinition>> = {
     annual_cents: 19200,
     features: [
       "Stripe-managed billing & invoices",
-      "Higher monthly AI allowance",
       "Cancel or switch plans anytime via the Customer Portal",
     ],
   },
