@@ -15,7 +15,7 @@
 --      org by metronome_customer_id, list recent webhook events, and
 --      atomically debit the balance cache after a successful ingest.
 --
--- See docs/wg/platform/ai-credits.md for the architectural rationale.
+-- See docs/wg/platform/billing/ai-credits.md for the architectural rationale.
 
 BEGIN;
 

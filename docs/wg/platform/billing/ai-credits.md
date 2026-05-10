@@ -75,7 +75,7 @@ changes.
   target $25–$500 (whole dollars). Recharge target must exceed
   threshold. Same markup formula applies on the _initial_ setup
   Checkout. **Silent recharges thereafter run at-cost** — see
-  [billing-known-issues.md KI-BILL-001](./billing-known-issues.md#ki-bill-001--silent-auto-recharge-runs-at-cost-markup-gap)
+  [KI-BILL-001](./known-issues.md#ki-bill-001--silent-auto-recharge-runs-at-cost-markup-gap)
   for cause + planned fix. v1 mitigation: **auto-reload is gated behind
   an active paid subscription** so the loss is bounded by base-plan
   margin. Manual top-up is unaffected and remains free-tier accessible.

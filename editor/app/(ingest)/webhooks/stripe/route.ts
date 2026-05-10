@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
   // Subscription cancel → disable Metronome auto-reload.
   //
   // Auto-reload is gated behind an active paid subscription
-  // (KI-BILL-001 mitigation in `docs/wg/platform/billing-known-issues.md`).
+  // (KI-BILL-001 mitigation in `docs/wg/platform/billing/known-issues.md`).
   // When the subscription cancels, leaving auto-reload enabled means the
   // org keeps eating silent-recharge cost forever — exactly what the gate
   // was meant to prevent. Best-effort: log on failure but don't fail the

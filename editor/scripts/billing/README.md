@@ -5,7 +5,7 @@ your **sandbox** Stripe + Metronome accounts.
 
 > Setup guide (env, tunnel, accounts) lives in
 > [`docs/contributing/billing.md`](../../../docs/contributing/billing.md).
-> Design notes: [`docs/wg/platform/ai-credits.md`](../../../docs/wg/platform/ai-credits.md).
+> Design notes: [`docs/wg/platform/billing/ai-credits.md`](../../../docs/wg/platform/billing/ai-credits.md).
 
 ## Usage
 

@@ -8,7 +8,7 @@
 // All service functions take `organizationId: number` and persist Metronome-
 // side ids on `grida_billing.account`. Idempotent end-to-end.
 //
-// Architectural rationale: docs/wg/platform/ai-credits.md.
+// Architectural rationale: docs/wg/platform/billing/ai-credits.md.
 
 import * as crypto from "node:crypto";
 import Metronome from "@metronome/sdk";
@@ -159,7 +159,7 @@ export async function getSubstrate(): Promise<Substrate> {
 }
 
 // ---------------------------------------------------------------------------
-// drain-order priorities (see docs/wg/platform/ai-credits.md)
+// drain-order priorities (see docs/wg/platform/billing/ai-credits.md)
 // ---------------------------------------------------------------------------
 
 export const COMMIT_PRIORITY = {

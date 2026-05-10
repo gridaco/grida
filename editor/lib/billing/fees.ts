@@ -1,7 +1,7 @@
 // Pass-through markup on AI-credit top-ups.
 //
 // Why:
-//   The AI-credits design (docs/wg/platform/ai-credits.md) commits to
+//   The AI-credits design (docs/wg/platform/billing/ai-credits.md) commits to
 //   "AI is sold at cost." For the credit balance to actually be at-cost
 //   we need to pass payment-processing costs through to the customer —
 //   otherwise we lose money on every top-up. Grida is not a payment

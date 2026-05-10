@@ -101,8 +101,8 @@ we can cap at the product layer in five lines.
   threshold-config call (the at-cost path).
 - `editor/app/(site)/organizations/[organization_name]/settings/billing/_actions.ts > assertAutoReloadAllowed`
   — subscription gate.
-- `docs/wg/platform/ai-credits.md` "Auto-reload envelope" — references
-  this entry.
+- `docs/wg/platform/billing/ai-credits.md` "Auto-reload envelope" —
+  references this entry.
 
 ---
 

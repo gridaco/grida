@@ -148,7 +148,7 @@ See the suite's own README for the contract.
 - **Service module**: `editor/lib/billing/metronome.ts` — `provisionOrg`, `addStripeChargedCommit`, `setAutoReload`, `getEntitlement`, `ingestUsageEvent`.
 - **`grida_billing.account.provisioning_uid`**: per-account UUID composed into Metronome aliases. `supabase db reset` produces fresh aliases — any orphan Metronome customers from previous instances are inert. No manual cleanup needed.
 
-User-facing billing copy: [`docs/platform/billing.mdx`](../platform/billing.mdx). Design notes: [`docs/wg/platform/ai-credits.md`](../wg/platform/ai-credits.md), [`docs/wg/platform/metronome.md`](../wg/platform/metronome.md). Known issues: [`docs/wg/platform/billing-known-issues.md`](../wg/platform/billing-known-issues.md). CLI guide: [`editor/scripts/billing/README.md`](../../editor/scripts/billing/README.md).
+User-facing billing copy: [`docs/platform/billing.mdx`](../platform/billing.mdx). Design notes: [`docs/wg/platform/billing/`](../wg/platform/billing/) (AI credits master plan, Metronome integration, known issues). CLI guide: [`editor/scripts/billing/README.md`](../../editor/scripts/billing/README.md).
 
 ---
 

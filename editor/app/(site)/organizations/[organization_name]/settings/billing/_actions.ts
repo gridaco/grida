@@ -738,7 +738,7 @@ export type AiCreditsSummary = {
   /** True when local cache disagrees with the live read. */
   drifted: boolean;
   /** True when the org has an active paid (Pro/Team) subscription. Drives the
-   *  auto-reload gate — see docs/wg/platform/billing-known-issues.md "Auto-reload
+   *  auto-reload gate — see docs/wg/platform/billing/known-issues.md "Auto-reload
    *  markup gap". Manual top-up is always available. */
   has_active_subscription: boolean;
 };
@@ -884,7 +884,7 @@ export async function setAiAutoReload(
  * surface to a population whose base-plan margin already covers it.
  *
  * Manual top-up does NOT need this gate — it always goes through Checkout
- * and pays the full markup. See docs/wg/platform/billing-known-issues.md.
+ * and pays the full markup. See docs/wg/platform/billing/known-issues.md.
  */
 async function assertAutoReloadAllowed(org_id: number): Promise<void> {
   const sub = await getActivePaidSubscription(org_id);
@@ -913,7 +913,7 @@ export async function disableAiAutoReload(
 
 // ---------------------------------------------------------------------------
 // Checkout-based authorization flows (every NEW commitment goes through
-// Stripe Checkout — see docs/wg/platform/metronome.md "card authorization").
+// Stripe Checkout — see docs/wg/platform/billing/metronome.md "card authorization").
 //
 // Why: Stripe doesn't expose a perfect "PM ready for off-session?" signal,
 // and any cached PM can fail tomorrow (expiry, dispute, SCA invalidation).
@@ -961,7 +961,7 @@ export async function startTopUpCheckout(
 
   // Pass through Stripe's processing fee — user pays $X plus the fee,
   // receives exactly $X of credit. See lib/billing/fees.ts and
-  // docs/wg/platform/ai-credits.md "Money model".
+  // docs/wg/platform/billing/ai-credits.md "Money model".
   const totalCents = totalChargeForCredit(params.cents);
   const idempotencyKey = `ai_topup:${org_id}:${params.cents}:${Math.floor(Date.now() / 60000)}`;
 
@@ -1088,7 +1088,7 @@ export async function startEnableAutoReloadCheckout(
   // Checkout). Subsequent silent recharges via Metronome's
   // prepaid_balance_threshold_configuration run at-cost. v1 mitigation
   // is the subscription gate above; full fix is tracked as KI-BILL-001
-  // in docs/wg/platform/billing-known-issues.md.
+  // in docs/wg/platform/billing/known-issues.md.
   const totalCents = totalChargeForCredit(params.recharge_to_cents);
   const idempotencyKey = `ai_auto_reload:${org_id}:${params.threshold_cents}:${params.recharge_to_cents}:${Math.floor(Date.now() / 60000)}`;
 
