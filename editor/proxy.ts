@@ -30,6 +30,23 @@ export async function proxy(req: NextRequest) {
     return new NextResponse("Not Found", { status: 404 });
   }
 
+  // GRIDA-SEC-002 —
+  // see editor/app/(insiders)/layout.tsx and /SECURITY.md.
+  //
+  // The `(insiders)` route group is a developer harness with intentionally
+  // unauthenticated server actions (mutators that take an arbitrary
+  // `organizationId` as the first argument). It MUST NOT be reachable from
+  // any non-development environment. Block both page loads and server-action
+  // POSTs at the proxy — the gate runs before any handler, so this also
+  // covers `Next-Action` invocations against `/insiders/*`.
+  if (
+    (req.nextUrl.pathname === "/insiders" ||
+      req.nextUrl.pathname.startsWith("/insiders/")) &&
+    !IS_DEV
+  ) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
   // GRIDA-SEC-001 —
   // see editor/app/(ingest)/README.md and /SECURITY.md.
   //
