@@ -30,6 +30,10 @@ import {
   stampStripeEventFailure,
   type Stripe,
 } from "@/lib/billing";
+import {
+  disableAutoReload,
+  handleAiCreditCheckoutCompleted,
+} from "@/lib/billing/metronome";
 
 // Make sure Next doesn't try to parse the body before we can verify the signature.
 export const runtime = "nodejs";
@@ -88,6 +92,74 @@ export async function POST(req: NextRequest) {
   if (result.result === "replayed") {
     return NextResponse.json({ received: true, replayed: true });
   }
+
+  // AI credit Checkout post-processor — `dispatchStripeEvent` handles the
+  // generic projector path (subscribe sessions, payment lifecycle); this
+  // additional pass lands the Metronome commit + threshold config for
+  // sessions tagged with our AI credit metadata. No-op for any session
+  // without the right metadata.kind.
+  //
+  // On failure: return 500 so Stripe retries. The reconcile cron only
+  // refreshes balances — it does NOT replay missed top-ups / auto-reload
+  // setup, so swallowing the error means the customer paid and got no credit.
+  if (event.type === "checkout.session.completed") {
+    try {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const aiResult = await handleAiCreditCheckoutCompleted({
+        id: session.id,
+        payment_intent:
+          typeof session.payment_intent === "string"
+            ? session.payment_intent
+            : (session.payment_intent?.id ?? null),
+        payment_status: session.payment_status,
+        metadata: session.metadata as Record<string, string | undefined> | null,
+        amount_total: session.amount_total,
+      });
+      if (aiResult.result !== "noop") {
+        console.log(
+          `[webhook/stripe] ai-credit ${aiResult.result} for ${event.id}: ${aiResult.detail ?? ""}`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[webhook/stripe] ai-credit post-processor failed for ${event.id}:`,
+        msg
+      );
+      return NextResponse.json(
+        { error: "ai_credit_post_processor_failed", detail: msg },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Subscription cancel → disable Metronome auto-reload.
+  //
+  // Auto-reload is gated behind an active paid subscription
+  // (KI-BILL-001 mitigation in `docs/wg/platform/billing-known-issues.md`).
+  // When the subscription cancels, leaving auto-reload enabled means the
+  // org keeps eating silent-recharge cost forever — exactly what the gate
+  // was meant to prevent. Best-effort: log on failure but don't fail the
+  // webhook (the user-side cancel already projected; this is cleanup).
+  if (event.type === "customer.subscription.deleted") {
+    try {
+      const sub = event.data.object as Stripe.Subscription;
+      const orgIdRaw = sub.metadata?.grida_organization_id;
+      const orgId = orgIdRaw ? parseInt(orgIdRaw, 10) : NaN;
+      if (Number.isFinite(orgId)) {
+        await disableAutoReload(orgId);
+        console.log(
+          `[webhook/stripe] disabled auto-reload for org=${orgId} (sub=${sub.id})`
+        );
+      }
+    } catch (err) {
+      console.error(
+        `[webhook/stripe] disable auto-reload failed for ${event.id}:`,
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+
   return NextResponse.json({
     received: true,
     type: event.type,
