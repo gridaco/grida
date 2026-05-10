@@ -218,9 +218,6 @@ const nextConfig: NextConfig = {
       // #region pdfjs @see https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
       canvas: "./empty-module.ts",
       // #endregion
-      // #region handlebars https://github.com/handlebars-lang/handlebars.js/issues/1174#issuecomment-229918935
-      handlebars: "handlebars/dist/handlebars.min.js",
-      // #endregion
     },
   },
   // No `webpack:` block — `next build` defaults to Turbopack in Next 16.
