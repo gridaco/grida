@@ -24,6 +24,6 @@ AI credit, Stripe ↔ Metronome sync).
 
 ## See also
 
-- [Contributor setup](../../../contributing/billing) — local dev (Stripe
-  - Metronome sandbox + cloudflared tunnel).
+- [Contributor setup](../../../contributing/billing) — local dev with
+  Stripe + Metronome sandbox accounts and a cloudflared tunnel.
 - User-facing billing copy: [docs/platform/billing.mdx](../../../platform/billing.mdx).
