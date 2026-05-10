@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 import { Platform } from "@/lib/platform";
 import { withSentryConfig, type SentryBuildOptions } from "@sentry/nextjs";
@@ -18,6 +19,11 @@ const nextConfig: NextConfig = {
   experimental: {
     mdxRs: true,
   },
+  // CI typechecks via .github/workflows/test.yml (pnpm typecheck). Skipping
+  // the in-build TypeScript pass removes ~30s of redundant work from every
+  // Vercel deploy. Next 16 already does not run ESLint during `next build`,
+  // so no `eslint:` key is needed.
+  typescript: { ignoreBuildErrors: true },
   images: {
     dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",
     remotePatterns: [
@@ -204,28 +210,24 @@ const nextConfig: NextConfig = {
     ];
   },
   turbopack: {
+    // Pin the workspace root explicitly. Silences the "multiple lockfiles
+    // detected" warning that surfaces in worktrees and avoids extra path
+    // scanning during dependency resolution.
+    root: path.resolve(process.cwd(), ".."),
     resolveAlias: {
       // #region pdfjs @see https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
       canvas: "./empty-module.ts",
       // #endregion
+      // #region handlebars https://github.com/handlebars-lang/handlebars.js/issues/1174#issuecomment-229918935
+      handlebars: "handlebars/dist/handlebars.min.js",
+      // #endregion
     },
   },
-  webpack: (config, { isServer }) => {
-    // #region wasm emscripten (@grida/canvas-wasm `requires` fs and path)
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        path: false,
-      };
-    }
-    // #endregion
-
-    // #region handlebars https://github.com/handlebars-lang/handlebars.js/issues/1174#issuecomment-229918935
-    config.resolve.alias.handlebars = "handlebars/dist/handlebars.min.js";
-    // #endregion
-    return config;
-  },
+  // No `webpack:` block — `next build` defaults to Turbopack in Next 16.
+  // `next build --webpack` does not work on this codebase: @grida/canvas-wasm
+  // imports `node:fs`/`node:crypto`, which webpack rejects with
+  // UnhandledSchemeError. Turbopack stubs Node builtins on the browser target
+  // automatically, so no fs/path fallback is needed here.
 };
 
 const sentry_build_options: SentryBuildOptions | null = USE_TELEMETRY
