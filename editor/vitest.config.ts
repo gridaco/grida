@@ -3,11 +3,12 @@ import { fileURLToPath, URL } from "node:url";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-// Auto-load `.env.test` and `.env.test.local` so `pnpm vitest run` works
-// without `set -a; . ./.env.test.local` ceremony.
-// Precedence (highest wins): shell > .env.test.local > .env.test.
-// `loadEnvFile()` only sets a key when not already in process.env, so an
-// existing shell-exported value is never overridden by a file.
+// Auto-load env so `pnpm vitest run` works without `set -a; . ./.env.test.local`
+// ceremony.
+// Precedence (highest wins): shell > .env.test.local > .env.test > .env.local.
+// `.env.local` is a fallback so tokens kept there for the dev server are also
+// usable by the e2e suite without duplication. `loadEnvFile()` only sets a
+// key when not already in process.env, so the precedence chain holds.
 function loadEnvFile(filePath: string): void {
   if (!fs.existsSync(filePath)) return;
   for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
@@ -29,6 +30,7 @@ function loadEnvFile(filePath: string): void {
 const dir = path.dirname(fileURLToPath(import.meta.url));
 loadEnvFile(path.join(dir, ".env.test.local"));
 loadEnvFile(path.join(dir, ".env.test"));
+loadEnvFile(path.join(dir, ".env.local"));
 
 // The billing E2E suite under `lib/billing/__tests__/e2e/` hits real Stripe
 // (test mode) and the local webhook receiver. Slow, rate-limited, requires

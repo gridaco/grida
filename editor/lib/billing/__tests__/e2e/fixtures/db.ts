@@ -44,7 +44,7 @@ export async function getProPriceId(): Promise<string> {
   const cat = await getCatalogueStripeIds("plan.pro");
   if (!cat) {
     throw new Error(
-      "plan.pro price not wired. Run: pnpm tsx editor/scripts/billing/setup-stripe-test.ts"
+      "plan.pro price not wired. Run: pnpm tsx editor/scripts/billing/cli.ts setup:stripe"
     );
   }
   return cat.stripe_price_id;
