@@ -17,9 +17,21 @@
  *      idempotency (insert into `grida_billing.stripe_event` with ON CONFLICT
  *      DO NOTHING; replays return `result='replayed'`), event projection,
  *      and stamping `processed_at` on success.
- *   4. On error: catch, call `stampStripeEventFailure` (separate transaction)
- *      so the forensic record survives the projector's RAISE-driven
- *      rollback. Return 500 → Stripe retries.
+ *   4. AI-credit Checkout post-processor runs INDEPENDENTLY of the
+ *      projector's replayed/handled distinction, gated by a separate
+ *      per-event marker `stripe_event.ai_credit_processed_at` (read via
+ *      `readAiCreditMarker`, stamped via `stampAiCreditMarker`). This is
+ *      the retry-recovery path: if a previous delivery completed the
+ *      projector but failed the post-processor (Metronome 500, network
+ *      blip), the next Stripe retry sees `replayed` from the projector
+ *      but `marker IS NULL` from the DB, re-runs the post-processor, and
+ *      lands the Metronome commit. Without this split, replays
+ *      short-circuit before the post-processor and the customer pays
+ *      with no balance.
+ *   5. On error (projector OR post-processor): catch, call
+ *      `stampStripeEventFailure` (separate transaction) so the forensic
+ *      record survives the projector's RAISE-driven rollback. Return 500
+ *      → Stripe retries.
  */
 
 import type { NextRequest } from "next/server";
@@ -28,6 +40,8 @@ import {
   stripe,
   dispatchStripeEvent,
   stampStripeEventFailure,
+  readAiCreditMarker,
+  stampAiCreditMarker,
   type Stripe,
 } from "@/lib/billing";
 import {
@@ -89,20 +103,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (result.result === "replayed") {
-    return NextResponse.json({ received: true, replayed: true });
-  }
-
-  // AI credit Checkout post-processor — `dispatchStripeEvent` handles the
-  // generic projector path (subscribe sessions, payment lifecycle); this
-  // additional pass lands the Metronome commit + threshold config for
-  // sessions tagged with our AI credit metadata. No-op for any session
-  // without the right metadata.kind.
+  // AI credit Checkout post-processor — runs independently of `result.result`.
   //
-  // On failure: return 500 so Stripe retries. The reconcile cron only
-  // refreshes balances — it does NOT replay missed top-ups / auto-reload
+  // The projector and the post-processor have distinct idempotency markers:
+  //   - projector → `stripe_event.processed_at` (set inside the RPC)
+  //   - post-processor → `stripe_event.ai_credit_processed_at` (set below)
+  //
+  // We MUST consult the post-processor marker even on `replayed` projector
+  // results: a previous delivery may have completed the projector but failed
+  // the post-processor (Metronome 500, network blip). The reconcile cron
+  // only refreshes balances — it does NOT replay missed top-ups / auto-reload
   // setup, so swallowing the error means the customer paid and got no credit.
+  //
+  // No-op for any session without the right metadata.kind — the handler
+  // returns `result: 'noop'` and we still set the marker so future replays
+  // skip cleanly.
   if (event.type === "checkout.session.completed") {
+    const aiAlreadyProcessed = await readAiCreditMarker(event.id);
+    if (aiAlreadyProcessed === true) {
+      return NextResponse.json({
+        received: true,
+        replayed: result.result === "replayed",
+        ai_credit: "already_processed",
+      });
+    }
+
     try {
       const session = event.data.object as Stripe.Checkout.Session;
       const aiResult = await handleAiCreditCheckoutCompleted({
@@ -120,17 +145,28 @@ export async function POST(req: NextRequest) {
           `[webhook/stripe] ai-credit ${aiResult.result} for ${event.id}: ${aiResult.detail ?? ""}`
         );
       }
+      // Mark on success (including noop — noop means the event is not an
+      // AI-credit event and there's nothing to recover on retry).
+      await stampAiCreditMarker(event.id, event.type);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(
         `[webhook/stripe] ai-credit post-processor failed for ${event.id}:`,
         msg
       );
+      // Do NOT stamp the marker — Stripe will retry, the replay will see
+      // marker IS NULL, and we re-enter this branch.
       return NextResponse.json(
         { error: "ai_credit_post_processor_failed", detail: msg },
         { status: 500 }
       );
     }
+  }
+
+  // Replayed-and-not-AI-credit (or AI-credit just completed via the branch
+  // above): nothing more to do for replays.
+  if (result.result === "replayed") {
+    return NextResponse.json({ received: true, replayed: true });
   }
 
   // Subscription cancel → disable Metronome auto-reload.

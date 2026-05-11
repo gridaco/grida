@@ -189,7 +189,15 @@ CREATE TABLE grida_billing.stripe_event (
   processed_at    timestamptz,
   failed_at       timestamptz,
   failure_reason  text,
-  handler         text
+  handler         text,
+  -- Set by the webhook receiver after the AI-credit post-processor
+  -- (handleAiCreditCheckoutCompleted) successfully lands the Metronome
+  -- commit + auto-reload config for this event. NULL = either the event
+  -- is not an AI-credit event, or the post-processor has not yet
+  -- succeeded. The replay path consults this independently of
+  -- processed_at so a Stripe retry can recover from a previous
+  -- post-processor failure even after the projector returns 'replayed'.
+  ai_credit_processed_at timestamptz
 );
 
 CREATE INDEX stripe_event_handler_idx
@@ -1101,3 +1109,53 @@ $$;
 
 REVOKE ALL ON FUNCTION public.fn_billing_setup_product(text, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.fn_billing_setup_product(text, text, text) TO service_role;
+
+
+---------------------------------------------------------------------
+-- [public.fn_billing_get_ai_credit_processed]
+-- Returns whether the AI-credit post-processor has marked this event
+-- done. Returns NULL when no row exists yet. The webhook receiver
+-- treats NULL as "needs processing" for the post-processor branch.
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.fn_billing_get_ai_credit_processed(
+  p_event_id text
+)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT ai_credit_processed_at IS NOT NULL
+    FROM grida_billing.stripe_event
+   WHERE id = p_event_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.fn_billing_get_ai_credit_processed(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_billing_get_ai_credit_processed(text) TO service_role;
+
+
+---------------------------------------------------------------------
+-- [public.fn_billing_stamp_ai_credit_processed]
+-- UPSERT the AI-credit post-processor marker. INSERT-then-UPDATE
+-- pattern so a defensive call on a missing row still records the
+-- forensic state.
+---------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.fn_billing_stamp_ai_credit_processed(
+  p_event_id   text,
+  p_event_type text
+)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  INSERT INTO grida_billing.stripe_event (id, type, ai_credit_processed_at)
+  VALUES (p_event_id, p_event_type, now())
+  ON CONFLICT (id) DO UPDATE SET
+    ai_credit_processed_at = EXCLUDED.ai_credit_processed_at;
+$$;
+
+REVOKE ALL ON FUNCTION public.fn_billing_stamp_ai_credit_processed(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_billing_stamp_ai_credit_processed(text, text) TO service_role;
