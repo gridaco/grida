@@ -18,10 +18,11 @@ status: living
 > move them to the **Resolved** section with the PR / commit that closed
 > them. The history is the audit trail for "why did we do it that way."
 
-| ID          | Area                    | Severity | Status    |
-| ----------- | ----------------------- | -------- | --------- |
-| KI-BILL-001 | AI credit · auto-reload | Medium   | Mitigated |
-| KI-BILL-002 | Subscriptions           | Low      | Accepted  |
+| ID          | Area                       | Severity | Status    |
+| ----------- | -------------------------- | -------- | --------- |
+| KI-BILL-001 | AI credit · auto-reload    | Medium   | Mitigated |
+| KI-BILL-002 | Subscriptions              | Low      | Accepted  |
+| KI-BILL-003 | Subscriptions · plan grant | Medium   | Accepted  |
 
 ---
 
@@ -135,6 +136,34 @@ younger than the Checkout session TTL.
 **Why accepted for v1.** Risk is to Grida (we refund manually on the
 duplicate Stripe sub), not the customer. Volume in v1 is bounded by
 manual onboarding; not worth the schema work yet.
+
+---
+
+## KI-BILL-003 — Plan-included credit not granted
+
+**Area.** Subscriptions · plan-included AI credit.
+
+**Cause.** [`marketing-plans.ts`](../../../../editor/lib/billing/marketing-plans.ts)
+promises "$10 included" on paid plans; no grant mechanism exists.
+Metronome's native `recurring_credits` requires Metronome contracts, but
+v1 is Stripe-first (plan = Stripe Price, not rate-card scheduled charge).
+
+**Current behavior.** Paid orgs see the promise, get $0. Must top up
+to use AI — gate behaves same as free.
+
+**Planned fix — Path B (Metronome-first contracts).** Move plan fee to
+Metronome `scheduled_charge` + `recurring_credits`; Stripe becomes pure
+payment rail. ~4 engineer-days, ~1.2k LOC added / ~400 deleted, 1
+migration, new `metronome-contracts.ts` service + `webhooks/metronome`
+receiver, drop `customer.subscription.deleted` handler, migration script
+cancels existing Stripe subs at period end. Adds `COMMIT_PRIORITY.PLAN_GRANT = 10`.
+
+Path A (manual grant on `subscription.created`) rejected — recreates
+Metronome-native primitive in app code.
+
+**Why deferred.** Migration cost is constant whether done today or with
+seat-based subs later; no debt accrues at the contract layer. Re-enters
+scope with seat-based pricing.
 
 ---
 
