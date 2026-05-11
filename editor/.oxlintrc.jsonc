@@ -76,11 +76,7 @@
             // Block subpath imports of provider SDKs (e.g. `openai/resources`,
             // `@anthropic-ai/sdk/foo`, `replicate/lib/...`). The bare-name
             // imports are already blocked above via `paths`.
-            "group": [
-              "openai/**",
-              "replicate/**",
-              "@anthropic-ai/sdk/**",
-            ],
+            "group": ["openai/**", "replicate/**", "@anthropic-ai/sdk/**"],
             "message": "Use editor/lib/ai/server instead. GRIDA-SEC-003.",
             "allowTypeImports": true,
           },
