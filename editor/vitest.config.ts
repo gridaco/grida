@@ -46,6 +46,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./", import.meta.url)),
+      // `server-only` is a no-op shim under vitest — the runtime guard
+      // it provides is unnecessary in tests, and the package itself
+      // throws on import in non-Next contexts.
+      "server-only": fileURLToPath(
+        new URL("./lib/__tests__/server-only.shim.ts", import.meta.url)
+      ),
     },
   },
   test: {

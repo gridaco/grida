@@ -1,15 +1,9 @@
 import useSWR from "swr";
 import type OpenAI from "openai";
+import { listOpenAiModels } from "@/lib/ai/actions/models";
 
 export function useModels() {
-  return useSWR<{ data: OpenAI.Models.Model[] }>(
-    "/private/ai/models/openai",
-    async () => {
-      const res = await fetch("/private/ai/models/openai");
-      if (!res.ok) {
-        throw new Error("Failed to fetch models");
-      }
-      return res.json();
-    }
+  return useSWR<{ data: OpenAI.Models.Model[] }>("ai/models/openai", () =>
+    listOpenAiModels()
   );
 }

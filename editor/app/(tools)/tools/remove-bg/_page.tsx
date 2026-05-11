@@ -14,10 +14,7 @@ import {
   RotateCcwIcon,
   UploadIcon,
 } from "lucide-react";
-import type {
-  RemoveBackgroundImageApiRequestBody,
-  RemoveBackgroundImageApiResponse,
-} from "@/app/(api)/private/ai/image/remove-background/route";
+import { removeBackgroundImage } from "@/lib/ai/actions/image";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -88,25 +85,15 @@ function Workspace() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/private/ai/image/remove-background`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: sourceUrl,
-        } satisfies RemoveBackgroundImageApiRequestBody),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as {
-          message?: string;
-        };
-        setError(data.message ?? "Something went wrong.");
+      const env = await removeBackgroundImage({ image: sourceUrl });
+      if (!env.success) {
+        setError(env.message ?? "Something went wrong.");
         return;
       }
-      const data = (await res.json()) as RemoveBackgroundImageApiResponse;
       const url =
-        data.data.image.kind === "url"
-          ? data.data.image.url
-          : data.data.image.base64;
+        env.data.image.kind === "url"
+          ? env.data.image.url
+          : env.data.image.base64;
       setResultUrl(url);
     } catch (e) {
       setError(String(e));

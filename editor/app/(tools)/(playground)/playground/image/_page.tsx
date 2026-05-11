@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useTransition } from "react";
 import {
   ChatBoxFooter,
   ChatBox,
@@ -22,11 +22,9 @@ import {
   SelectGroup,
   SelectLabel,
 } from "@/components/ui/select";
-import {
-  useImageModelConfig,
-  useGenerateImage,
-  useCredits,
-} from "@/lib/ai/hooks";
+import { useImageModelConfig } from "@/lib/ai/hooks";
+import { generateAiImage } from "@/lib/ai/actions/image-generate";
+import { useAiCredits } from "@/lib/ai/credits";
 import {
   Selection,
   Zoom,
@@ -101,10 +99,10 @@ export default function ImagePlayground() {
 
 function CanvasConsumer() {
   const { withAuth, session } = useContinueWithAuth();
-  const credits = useCredits();
+  const credits = useAiCredits();
   const editor = useCurrentEditor();
   const model = useImageModelConfig("openai/gpt-image-1-mini");
-  const { generate, loading } = useGenerateImage();
+  const [loading, startGenerate] = useTransition();
 
   const onCommit = (value: { text: string }) => {
     const id = editor.commands.insertNode({
@@ -114,19 +112,18 @@ function CanvasConsumer() {
       layout_target_height: model.height,
       fit: "cover",
     });
-    generate({
-      model: model.modelId,
-      width: model.width,
-      height: model.height,
-      aspect_ratio: model.aspect_ratio,
-      prompt: value.text,
-    })
-      .then((image) => {
-        editor.commands.changeNodePropertySrc(id, image.src);
-      })
-      .finally(() => {
-        credits.refresh();
+    startGenerate(async () => {
+      const env = await generateAiImage({
+        model: model.modelId,
+        width: model.width,
+        height: model.height,
+        aspect_ratio: model.aspect_ratio,
+        prompt: value.text,
       });
+      const data = credits.consume(env, { next: "/playground/image" });
+      if (!data) return; // gate / redirect handled
+      editor.commands.changeNodePropertySrc(id, data.publicUrl);
+    });
   };
 
   return (
@@ -207,7 +204,7 @@ function BudgetBadge({
   credits,
   className,
 }: {
-  credits: ReturnType<typeof useCredits>;
+  credits: ReturnType<typeof useAiCredits>;
   className?: string;
 }) {
   return (
@@ -219,12 +216,12 @@ function BudgetBadge({
             className
           )}
         >
-          <span className="text-sm font-mono">{credits.remainingUSD}</span>
+          <span className="text-sm font-mono">{credits.formatted ?? "—"}</span>
         </div>
       </TooltipTrigger>
       <TooltipContent side="top" align="start">
         <div className="text-sm font-mono">
-          {credits.remainingUSD} free budget remaining
+          {credits.formattedExact ?? "—"} balance
         </div>
       </TooltipContent>
     </Tooltip>
@@ -242,7 +239,7 @@ function Chat({
   onCommit: (value: {
     text: string;
   }) => Promise<void> | Promise<false> | void | false;
-  credits: ReturnType<typeof useCredits> | null;
+  credits: ReturnType<typeof useAiCredits> | null;
 }) {
   const sizeGroups = useMemo(() => {
     const groups = {

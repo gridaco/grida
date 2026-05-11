@@ -12,7 +12,7 @@ import {
 } from "ai";
 import { createStreamableValue } from "@ai-sdk/rsc";
 import { request_schema, type StreamingResponse } from "./schema";
-import { gateway, model as tieredModel } from "@/lib/ai/models";
+import { grida, model as tieredModel } from "@/lib/ai/server";
 import assert from "assert";
 
 export type UserAttachment = {
@@ -23,6 +23,7 @@ export type UserAttachment = {
 };
 
 export async function generate({
+  organizationId,
   system,
   user,
   prompt,
@@ -31,6 +32,16 @@ export async function generate({
   temperature = undefined,
   topP = undefined,
 }: {
+  /**
+   * Verified organizationId — billed for this call. Caller is
+   * responsible for threading from a verified context (workspace
+   * shell / route param). See GRIDA-SEC-003.
+   *
+   * Optional only to make the dev-tool harness compile without a
+   * workspace; when omitted in non-superuser mode the seam middleware
+   * throws `MissingOrgIdError` at the first AI call.
+   */
+  organizationId?: number;
   system?: string;
   prompt?: string;
   user?: {
@@ -44,7 +55,7 @@ export async function generate({
 }) {
   // Dev tool: allow user-selected model override via the model selector UI;
   // fall back to the "mini" tier default.
-  const model = modelId ? gateway(modelId) : tieredModel("mini");
+  const model = modelId ? grida(modelId) : tieredModel("mini");
   const model_config = {
     maxOutputTokens: maxOutputTokens,
     temperature: temperature,
@@ -95,6 +106,9 @@ export async function generate({
   (async () => {
     const { partialOutputStream } = streamText({
       model,
+      providerOptions: {
+        grida: { organizationId, feature: "canvas/generate" },
+      },
       ...model_config,
       system,
       ...(message

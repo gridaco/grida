@@ -762,10 +762,18 @@ export async function reconcileAccountFromLive(
   organizationId: number,
   live: ContractLiveState
 ): Promise<void> {
+  // `cached_balance_cents` is `bigint` in the DB — the cache exists to
+  // serve sub-100ms gate checks at integer-cent precision. Metronome's
+  // live balance can be fractional (we ingest fractional `cost_mills`),
+  // so floor to the nearest integer cent here. Round DOWN, not up:
+  // overstating the cache could push a borderline account below the
+  // floor and gate it prematurely. Display surfaces still use the
+  // exact `live.balanceCents` directly.
+  const balanceCentsInt = Math.floor(live.balanceCents);
   await setBalanceCache(
     organizationId,
-    live.balanceCents,
-    live.balanceCents >= AI_GATE_FLOOR_CENTS
+    balanceCentsInt,
+    balanceCentsInt >= AI_GATE_FLOOR_CENTS
   );
   await setAutoReloadCache(
     organizationId,
@@ -1111,23 +1119,26 @@ export async function ingestUsageEvent(
   });
 
   // Optimistic local debit. mills → cents (round up to avoid under-debiting
-  // sub-cent costs that aggregate to real money).
+  // sub-cent costs that aggregate to real money). Don't fail the ingest
+  // if the cache debit fails — webhook reconcile will catch up.
+  //
+  // Supabase RPC does NOT throw on Postgres errors — it returns
+  // `{ data, error }`. We destructure explicitly so PG-level failures
+  // (function missing, permission denied, schema mismatch) are logged
+  // instead of silently swallowed.
   const costCents = Math.ceil(costMills / 10);
   if (costCents > 0) {
-    try {
-      await service_role.workspace.rpc(
-        "fn_billing_debit_balance_cache" as never,
-        {
-          p_org: organizationId,
-          p_cents: costCents,
-          p_floor_cents: AI_GATE_FLOOR_CENTS,
-        } as never
-      );
-    } catch (err) {
-      // Don't fail the ingest if the cache debit fails. Webhook reconcile
-      // will catch up. Log so we notice if it becomes systemic.
+    const { error } = await service_role.workspace.rpc(
+      "fn_billing_debit_balance_cache" as never,
+      {
+        p_org: organizationId,
+        p_cents: costCents,
+        p_floor_cents: AI_GATE_FLOOR_CENTS,
+      } as never
+    );
+    if (error) {
       console.warn(
-        `[billing.ingestUsageEvent] cache debit failed for org=${organizationId}: ${(err as Error).message}`
+        `[billing.ingestUsageEvent] cache debit failed for org=${organizationId}: ${error.message}`
       );
     }
   }

@@ -230,9 +230,14 @@ export function modelSpecById(modelId: string): ModelSpec | undefined {
 /**
  * Attributed AI Gateway instance.
  *
- * Use this instead of the bare `gateway` from `"ai"` so all requests carry
- * the app attribution headers. This is the **only** gateway instance that
- * should be used across the codebase.
+ * **Internal — seam consumers only.** This is the raw Vercel AI Gateway
+ * provider; it does NOT go through the billing seam. Any code outside
+ * `editor/lib/ai/_seam/**` should import `grida` from
+ * [editor/lib/ai/server.ts](./server.ts) instead, which wraps every model
+ * with gate + ingest middleware.
+ *
+ * Lint blocks direct imports of this export from non-seam files (see
+ * [editor/.oxlintrc.jsonc](../../.oxlintrc.jsonc)).
  */
 export const gateway = createGateway({
   headers: {
@@ -241,24 +246,6 @@ export const gateway = createGateway({
   },
 });
 
-/**
- * Return a `LanguageModelV3` instance for the given tier, ready to pass into
- * `streamText()`, `generateText()`, `streamObject()`, etc.
- *
- * Uses the Vercel AI Gateway provider so the same code works across OpenAI,
- * Anthropic, and any other supported backend.
- *
- * @example
- * ```ts
- * import { streamText } from "ai";
- * import { model } from "@/lib/ai/models";
- *
- * const result = streamText({
- *   model: model("mini"),
- *   prompt: "Hello",
- * });
- * ```
- */
-export function model(tier: ModelTier) {
-  return gateway(specs[tier].id);
-}
+// `model(tier)` lives in `editor/lib/ai/server.ts` so the seam owns the
+// public surface. Importing `model` from `@/lib/ai/models` is no longer
+// supported.

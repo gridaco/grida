@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "audit:ai-seam": "tsx scripts/audit-ai-seam.ts",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
