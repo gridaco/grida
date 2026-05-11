@@ -97,6 +97,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error in agent chat:", error);
-    return new Response("Internal error", { status: 500 });
+    return aiErrorResponse({
+      code: "internal",
+      status: 500,
+      message: "internal error",
+    });
   }
 }

@@ -1041,7 +1041,11 @@ export async function getAccountView(
     drift.autoReloadAmountCents =
       (db.auto_reload_amount_cents ?? null) !==
       (live.autoReload?.rechargeToCents ?? null);
-    drift.balanceCents = db.cached_balance_cents !== live.balanceCents;
+    // Cached value is `Math.floor(live.balanceCents)` (see refreshBalance);
+    // compare in the same precision to avoid spurious drift from sub-cent
+    // fractional balances returned by Metronome.
+    drift.balanceCents =
+      db.cached_balance_cents !== Math.floor(live.balanceCents);
   }
 
   let cacheAgeSeconds: number | null = null;

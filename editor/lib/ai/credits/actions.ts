@@ -15,7 +15,7 @@
  */
 
 import { withAiAuth, type AiActionResult } from "@/lib/ai/server";
-import { refreshBalance, getEntitlement } from "@/lib/billing/metronome";
+import { getEntitlement } from "@/lib/billing/metronome";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSessionOrganizationId } from "@/lib/auth/organization";
 
@@ -27,18 +27,31 @@ export type AiCreditsPreload = {
 const EMPTY: AiCreditsPreload = { cents: null, allowed: false };
 
 /**
- * Read live balance + entitlement for an org. Called from a server
- * `page.tsx` or route-group `layout.tsx` that has already resolved an
- * `orgId`. Returns `{cents: null, allowed: false}` for unauth visitors;
- * the caller decides whether to invoke this at all.
+ * Cache-first read of balance + entitlement for an org. Called from a
+ * server `page.tsx` or route-group `layout.tsx` that has already resolved
+ * an `orgId`.
+ *
+ * Reads `grida_billing.account` (sub-100ms RPC, never touches Metronome).
+ * The cache is the source of truth for first-paint chip rendering;
+ * webhooks (Stripe + Metronome) keep it fresh, and `useAiCredits().refresh()`
+ * re-syncs from Metronome on demand if a user wants the absolute latest.
+ *
+ * Tradeoff: a chip rendered immediately after a balance change (top-up,
+ * spend) may be a few seconds stale until the webhook lands. Acceptable —
+ * the post-action `withAiAuth` envelope's `balanceCents` updates the chip
+ * via the controller, and the explicit refresh button covers manual cases.
+ *
+ * Returns `{cents: null, allowed: false}` for unauth visitors; the caller
+ * decides whether to invoke this at all.
  */
 export async function preloadAiCredits(
   orgId: number
 ): Promise<AiCreditsPreload> {
-  const [{ cents }, ent] = await Promise.all([
-    refreshBalance(orgId),
-    getEntitlement(orgId),
-  ]);
+  const ent = await getEntitlement(orgId);
+  // Unprovisioned orgs return `cachedBalanceCents: 0` from getEntitlement;
+  // surface as `null` so the chip renders "—" instead of "$0.00".
+  const cents =
+    ent.reason === "not_provisioned" ? null : ent.cachedBalanceCents;
   return { cents, allowed: ent.allowed };
 }
 

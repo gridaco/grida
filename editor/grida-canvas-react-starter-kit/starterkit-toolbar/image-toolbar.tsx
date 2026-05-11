@@ -21,6 +21,7 @@ import { ImageUpscale } from "lucide-react";
 import { RemoveBackgroundIcon } from "../starterkit-icons/remove-background";
 import { upscaleImage, removeBackgroundImage } from "@/lib/ai/actions/image";
 import type { Editor } from "@/grida-canvas/editor";
+import { useStarterKitOrgId } from "../starterkit-host/org-id-provider";
 
 type ImageSelectionInfo = {
   node_id: string;
@@ -258,6 +259,7 @@ export function ImageToolbar() {
   const editor = useCurrentEditor();
   const { selection } = useSelectionState();
   const document_ctx = useEditorState(editor, (state) => state.document_ctx);
+  const organizationId = useStarterKitOrgId();
 
   // Only re-render when selection or document_ctx changes, not when node properties change
   // Get node from snapshot inside useMemo to avoid subscribing to all node changes
@@ -304,13 +306,15 @@ export function ImageToolbar() {
         return;
       }
 
+      if (organizationId == null) {
+        toast.error("Sign in to use AI tools");
+        return;
+      }
+
       const base64 = await extractImageBase64(editor, imageRef);
 
-      // TODO(ai-seam): thread `organizationId` from the editor host.
-      // This package can't depend on `useWorkspace` directly; the host
-      // app should pass an `organizationId` (or resolver fn) via props.
-      // Without it the server action returns 400 (GRIDA-SEC-003).
       const result = await upscaleImage({
+        organizationId,
         image: { kind: "base64", base64 },
         scale: 4,
       });
@@ -369,11 +373,15 @@ export function ImageToolbar() {
         return;
       }
 
+      if (organizationId == null) {
+        toast.error("Sign in to use AI tools");
+        return;
+      }
+
       const base64 = await extractImageBase64(editor, imageRef);
 
-      // TODO(ai-seam): thread `organizationId` from the editor host.
-      // See note above on the upscale call.
       const result = await removeBackgroundImage({
+        organizationId,
         image: { kind: "base64", base64 },
         format: "png",
         background_type: "rgba",

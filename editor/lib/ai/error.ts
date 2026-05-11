@@ -2,13 +2,10 @@
  * AI seam — shared error envelope + UX gate router.
  *
  * Every server-side AI surface returns errors in the {@link AiErrorResponse}
- * shape so a single client helper can route the user via the 2-step
- * GRIDA-SEC-003 gate:
- *   - `unauthorized` (401)    → `/sign-in?next=<current>`
- *   - `no_organization` (412) → `/organizations/new?next=<current>`
- *   - `blocked` (402)         → toast + top-up CTA
- *   - `bad_request` (400)     → toast
- *   - `internal` (500)        → toast
+ * shape so a single client helper can route the user via the GRIDA-SEC-003
+ * gate. Codes are a closed, documented union — extending them requires
+ * touching {@link AI_ERROR_CODES} so every consumer (typeguard, switch,
+ * tests, docs) updates together.
  *
  * Server-side: `aiErrorResponse`, `orgErrorToAiError`, `billingErrorToAiError`.
  * Client-side: `resolveAiError`, `handleAiFetchErrorResponse`, `isAiErrorResponse`.
@@ -17,12 +14,50 @@
 import type { BillingError } from "@/lib/billing";
 import type { BillingMetronomeError } from "@/lib/billing/metronome";
 
-export type AiErrorCode =
-  | "unauthorized"
-  | "no_organization"
-  | "blocked"
-  | "bad_request"
-  | "internal";
+// ---------------------------------------------------------------------------
+// AiErrorCode — single source of truth
+// ---------------------------------------------------------------------------
+
+/**
+ * Closed set of error codes the AI seam emits to clients.
+ *
+ * Adding a code: append to this array, add a JSDoc entry below, add a
+ * branch to {@link resolveAiError}'s switch (TS exhaustiveness will fail
+ * the build until you do), and add a test in `__tests__/error.test.ts`.
+ *
+ * Code semantics:
+ *   - **`unauthorized`** (401) — no signed-in user. Client redirects to
+ *     `/sign-in?next=<current>`.
+ *   - **`no_organization`** (412) — user is signed in but has no usable
+ *     org (no membership row, or a recoverable resolution failure such as
+ *     `not_member` / `org_not_found` / `missing_organization_id`). Client
+ *     redirects to `/organizations/new?next=<current>`. Real DB lookup
+ *     failures are NOT mapped here (see `orgErrorCode`) — they propagate
+ *     as exceptions.
+ *   - **`blocked`** (402) — gate refused the call (below floor / not
+ *     entitled / etc.). Client surfaces a warning toast with a top-up CTA.
+ *   - **`bad_request`** (400) — caller-side validation failure (malformed
+ *     header / input). Client surfaces an error toast.
+ *   - **`internal`** (500) — server-side failure. Message is sanitized
+ *     before being sent (raw exception text is logged server-side, never
+ *     leaked to the client). Client surfaces a generic error toast.
+ */
+export const AI_ERROR_CODES = [
+  "unauthorized",
+  "no_organization",
+  "blocked",
+  "bad_request",
+  "internal",
+] as const;
+
+export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
+
+const AI_ERROR_CODE_SET: ReadonlySet<string> = new Set(AI_ERROR_CODES);
+
+/** Type-guard for `AiErrorCode`. */
+export function isAiErrorCode(x: unknown): x is AiErrorCode {
+  return typeof x === "string" && AI_ERROR_CODE_SET.has(x);
+}
 
 export type AiErrorResponse = {
   success: false;
@@ -30,6 +65,9 @@ export type AiErrorResponse = {
   message: string;
   status: number;
 };
+
+/** User-facing message for the `internal` code. Server logs the raw error. */
+const INTERNAL_ERROR_MESSAGE = "Something went wrong. Please try again.";
 
 // ---------------------------------------------------------------------------
 // Server-side helpers
@@ -54,11 +92,15 @@ export function aiErrorResponse(opts: {
 }
 
 /**
- * Classify a `requireOrganizationId` (or any code-bearing) error.
+ * Classify a {@link requireOrganizationId}-thrown error into an
+ * `AiErrorResponse`.
  *
- * "no usable org" outcomes (missing id, slug miss, non-member) collapse
- * to `no_organization` so the client routes to `/organizations/new`
- * rather than dead-ending on 403.
+ * Recoverable codes route the user to sign-in or onboarding so the gate
+ * doesn't dead-end on a 403. Real DB lookup failures (`org_lookup_failed`)
+ * and any code we don't explicitly map are re-thrown so the caller's outer
+ * `try/catch` (or the framework) handles them as a generic 500 — they're
+ * "unlikely to happen" production faults that should not be silently
+ * mapped to a misleading user-facing redirect.
  */
 export function orgErrorToAiError(err: unknown): AiErrorResponse {
   const code = orgErrorCode(err);
@@ -66,6 +108,9 @@ export function orgErrorToAiError(err: unknown): AiErrorResponse {
     success: false,
     code,
     status: extractStatus(err, 403),
+    // Org-resolver `BillingError` messages are constructed by us with no
+    // user input, so they're safe to forward (e.g. `organization "foo"
+    // not found or not a member`). For non-Error inputs, fall back.
     message: err instanceof Error ? err.message : "forbidden",
   };
 }
@@ -78,17 +123,32 @@ function orgErrorCode(err: unknown): AiErrorCode {
     case "invalid_header":
     case "invalid_input":
       return "bad_request";
-    // missing_organization_id, org_not_found, not_member, org_lookup_failed,
-    // and any unknown code → onboarding path. Better than a 403 dead-end.
-    default:
+    case "missing_organization_id":
+    case "org_not_found":
+    case "not_member":
       return "no_organization";
+    default:
+      // `org_lookup_failed` (real DB exception) or any unknown code →
+      // do not silently route to onboarding. Re-throw so the caller's
+      // outer error handling (route try/catch or framework) treats it
+      // as a generic 500. Per project policy: real DB faults are
+      // unlikely-to-happen surfaces and should NOT be wrapped in a
+      // friendly redirect.
+      throw err;
   }
 }
 
 /**
  * Classify a {@link BillingMetronomeError} (or any code-bearing error)
- * from the billing seam: only `"blocked"` is surfaced to the client as
- * a gate denial; everything else is an internal failure.
+ * from the billing seam.
+ *
+ * `"blocked"` is the only billing failure the user should see verbatim —
+ * its message ("AI credit balance is below the floor", etc.) is curated
+ * for end-user display. Everything else collapses to `internal` with a
+ * sanitized message; the raw exception is logged server-side via
+ * `console.error` for debugging but NEVER leaks to the client (could
+ * include connection strings, account ids, stack traces, or other
+ * provider-internal detail).
  */
 export function billingErrorToAiError(
   err: BillingError | BillingMetronomeError | unknown,
@@ -107,7 +167,7 @@ export function billingErrorToAiError(
     success: false,
     code: "internal",
     status: extractStatus(err, 500),
-    message: err instanceof Error ? err.message : "something went wrong",
+    message: INTERNAL_ERROR_MESSAGE,
   };
 }
 
@@ -142,7 +202,9 @@ export type ResolveAiErrorOptions = {
 
 /**
  * Map an `AiErrorResponse` to an action. Pure — caller decides whether
- * to `window.location.href = ...` or render a toast.
+ * to `window.location.href = ...` or render a toast. Exhaustive over
+ * {@link AiErrorCode}; adding a new code without updating this switch is
+ * a TypeScript build failure.
  */
 export function resolveAiError(
   err: AiErrorResponse,
@@ -183,18 +245,30 @@ export function resolveAiError(
     case "internal":
       return {
         kind: "toast",
-        message: err.message || "Something went wrong.",
+        message: err.message || INTERNAL_ERROR_MESSAGE,
         tone: "error",
       };
+    default:
+      return assertNever(err.code);
   }
 }
 
+function assertNever(x: never): never {
+  throw new Error(`Unhandled AiErrorCode: ${String(x)}`);
+}
+
+/**
+ * Validate that `x` matches the {@link AiErrorResponse} shape AND that
+ * its `code` is a known {@link AiErrorCode}. An envelope with an unknown
+ * `code` is rejected (clients should not be silent about codes the seam
+ * never advertises).
+ */
 export function isAiErrorResponse(x: unknown): x is AiErrorResponse {
   if (!x || typeof x !== "object") return false;
   const o = x as Record<string, unknown>;
   return (
     o.success === false &&
-    typeof o.code === "string" &&
+    isAiErrorCode(o.code) &&
     typeof o.message === "string" &&
     typeof o.status === "number"
   );
@@ -222,5 +296,5 @@ export async function handleAiFetchErrorResponse(
     return { message: action.message };
   }
   const fallback = (data as { message?: string }).message;
-  return { message: fallback ?? "something went wrong" };
+  return { message: fallback ?? INTERNAL_ERROR_MESSAGE };
 }

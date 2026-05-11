@@ -34,6 +34,23 @@ export async function upscaleImage(
       status: 400,
     };
   }
+  // Validate scale before forwarding — the provider rejects out-of-range
+  // values with cryptic errors. Per real-esrgan schema: integer 1–10.
+  if (input.scale !== undefined) {
+    if (
+      typeof input.scale !== "number" ||
+      !Number.isFinite(input.scale) ||
+      input.scale < 1 ||
+      input.scale > 10
+    ) {
+      return {
+        success: false,
+        code: "bad_request",
+        message: "scale must be a number between 1 and 10",
+        status: 400,
+      };
+    }
+  }
   return withAiAuth("ai/image/upscale", input.organizationId, (orgId) =>
     methods.upscale(orgId, {
       image: ai.server.methods.toImageData(input.image),

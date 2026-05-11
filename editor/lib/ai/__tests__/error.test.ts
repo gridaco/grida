@@ -10,6 +10,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   aiErrorResponse,
+  AI_ERROR_CODES,
+  billingErrorToAiError,
+  isAiErrorCode,
   isAiErrorResponse,
   orgErrorToAiError,
   resolveAiError,
@@ -36,6 +39,33 @@ describe("isAiErrorResponse", () => {
     expect(
       isAiErrorResponse({ success: true, code: "x", message: "x", status: 1 })
     ).toBe(false);
+  });
+
+  it("rejects envelopes with unknown codes (closed AiErrorCode union)", () => {
+    expect(
+      isAiErrorResponse({
+        success: false,
+        code: "garbage",
+        message: "x",
+        status: 500,
+      })
+    ).toBe(false);
+  });
+});
+
+describe("isAiErrorCode", () => {
+  it("accepts every code in AI_ERROR_CODES", () => {
+    for (const code of AI_ERROR_CODES) {
+      expect(isAiErrorCode(code)).toBe(true);
+    }
+  });
+
+  it("rejects unknown strings and non-string inputs", () => {
+    expect(isAiErrorCode("garbage")).toBe(false);
+    expect(isAiErrorCode("")).toBe(false);
+    expect(isAiErrorCode(null)).toBe(false);
+    expect(isAiErrorCode(undefined)).toBe(false);
+    expect(isAiErrorCode(42)).toBe(false);
   });
 });
 
@@ -137,7 +167,7 @@ describe("orgErrorToAiError", () => {
     expect(e.code).toBe("unauthorized");
   });
 
-  it("membership / unknown failures → no_organization (onboarding flow)", () => {
+  it("membership failures (not_member) → no_organization (onboarding flow)", () => {
     const e = orgErrorToAiError({
       code: "not_member",
       status: 403,
@@ -146,10 +176,96 @@ describe("orgErrorToAiError", () => {
     expect(e.code).toBe("no_organization");
   });
 
-  it("non-error object → no_organization, 403", () => {
-    const e = orgErrorToAiError("string");
+  it("missing_organization_id → no_organization", () => {
+    const e = orgErrorToAiError({
+      code: "missing_organization_id",
+      status: 400,
+      message: "x",
+    });
     expect(e.code).toBe("no_organization");
-    expect(e.status).toBe(403);
+  });
+
+  it("org_not_found → no_organization", () => {
+    const e = orgErrorToAiError({
+      code: "org_not_found",
+      status: 404,
+      message: "x",
+    });
+    expect(e.code).toBe("no_organization");
+  });
+
+  it("invalid_input → bad_request", () => {
+    const e = orgErrorToAiError({
+      code: "invalid_input",
+      status: 400,
+      message: "x",
+    });
+    expect(e.code).toBe("bad_request");
+  });
+
+  it("real DB lookup failure (org_lookup_failed) is re-thrown", () => {
+    // Per project policy: real DB exceptions are not silently mapped to
+    // a friendly redirect. They propagate as exceptions and are handled
+    // by the caller's outer try/catch (or the framework) as a generic 500.
+    expect(() =>
+      orgErrorToAiError({
+        code: "org_lookup_failed",
+        status: 500,
+        message: "db down",
+      })
+    ).toThrow("db down");
+  });
+
+  it("unknown code is re-thrown (defensive — don't silently route)", () => {
+    expect(() =>
+      orgErrorToAiError({
+        code: "future_code_we_dont_know_about",
+        status: 500,
+        message: "future-code-msg",
+      })
+    ).toThrow("future-code-msg");
+  });
+
+  it("non-error input is re-thrown", () => {
+    expect(() => orgErrorToAiError("string")).toThrow("string");
+  });
+});
+
+describe("billingErrorToAiError", () => {
+  it("blocked code passes through with the original message", () => {
+    const e = billingErrorToAiError(
+      Object.assign(new Error("below floor"), { code: "blocked", status: 402 }),
+      "test"
+    );
+    expect(e).toEqual({
+      success: false,
+      code: "blocked",
+      message: "below floor",
+      status: 402,
+    });
+  });
+
+  it("internal failures sanitize the message (raw exception is logged, not echoed)", () => {
+    const e = billingErrorToAiError(
+      new Error("Internal: connection refused on db-prod-04:5432"),
+      "test"
+    );
+    expect(e.code).toBe("internal");
+    expect(e.message).not.toContain("db-prod-04");
+    expect(e.message).not.toContain("connection refused");
+  });
+
+  it("non-blocked code with status falls through to internal", () => {
+    const e = billingErrorToAiError(
+      Object.assign(new Error("Metronome 503"), {
+        code: "provider_down",
+        status: 503,
+      }),
+      "test"
+    );
+    expect(e.code).toBe("internal");
+    expect(e.status).toBe(503);
+    expect(e.message).not.toContain("Metronome");
   });
 });
 

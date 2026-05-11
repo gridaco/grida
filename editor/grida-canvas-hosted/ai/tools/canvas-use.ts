@@ -96,6 +96,14 @@ export namespace canvas_use {
           .describe("The text prompt describing the image to generate"),
         aspect_ratio: z
           .string()
+          // Constrain to `<int>:<int>` so the AI SDK rejects malformed
+          // values at validation time with a clear error the LLM can
+          // self-correct, instead of forwarding a bad string to the
+          // image provider and surfacing an opaque downstream failure.
+          .regex(
+            /^\d+:\d+$/,
+            "aspect_ratio must be `<int>:<int>` (e.g. '16:9' or '1:1')"
+          )
           .optional()
           .describe(
             "Aspect ratio as string like '16:9' or '1:1' (default: 1:1)"

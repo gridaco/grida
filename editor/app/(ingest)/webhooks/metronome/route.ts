@@ -63,7 +63,9 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(dateMs)) {
     return NextResponse.json({ error: "invalid date header" }, { status: 400 });
   }
-  if (Date.now() - dateMs > FIVE_MINUTES_MS) {
+  // Symmetric ±5 min freshness window. Reject stale events (replay-resistance)
+  // AND far-future timestamps (clock-skew/forgery defense).
+  if (Math.abs(Date.now() - dateMs) > FIVE_MINUTES_MS) {
     return NextResponse.json({ error: "stale event" }, { status: 400 });
   }
 

@@ -47,6 +47,15 @@ function errorMessage(err: unknown): string {
 }
 
 async function wrap<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
+  // GRIDA-SEC-002: defense-in-depth. Server actions are addressable by their
+  // generated hash from any page that imports them, regardless of route group;
+  // the proxy + (insiders) layout `notFound()` are the primary gates, but this
+  // runtime guard ensures these unauthenticated mutators refuse to execute
+  // outside local development even if an import accidentally crosses the
+  // boundary.
+  if (process.env.NODE_ENV !== "development") {
+    return { ok: false, error: "insiders actions are dev-only" };
+  }
   try {
     return { ok: true, data: await fn() };
   } catch (err) {

@@ -14,7 +14,7 @@ import {
   type AiActionResult,
   type ProviderUsage,
 } from "@/lib/ai/server";
-import { catalog, type CatalogId } from "@/lib/ai/models";
+import { catalog, tiers, type CatalogId } from "@/lib/ai/models";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
@@ -100,7 +100,9 @@ export async function runChat(input: RunChatInput): Promise<RunChatResponse> {
     const requested = input.model_id;
     const useModelId = requested && isCatalogId(requested) ? requested : null;
     const languageModel = useModelId ? grida(useModelId) : model("mini");
-    const resolvedId = useModelId ?? catalog["openai/gpt-5.4-mini"].id;
+    // Resolve the catalog id from the same source as `model("mini")` so
+    // a tier remap can't desync the billed cost card from the SDK call.
+    const resolvedId = useModelId ?? catalog[tiers.mini].id;
 
     const messages: Array<{
       role: "system" | "user" | "assistant";

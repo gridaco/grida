@@ -331,7 +331,12 @@ function extractContext(
         typeof g.costMills === "number" && g.costMills >= 0
           ? g.costMills
           : undefined,
-      awaitIngest: g.awaitIngest === true,
+      // Preserve `undefined` so `withTransaction`'s `?? true` default
+      // applies. Coercing to `false` would silently flip non-streaming
+      // calls to fire-and-forget ingest, leaving `withAiAuth`'s
+      // post-call `balanceCents` read stale.
+      awaitIngest:
+        typeof g.awaitIngest === "boolean" ? g.awaitIngest : undefined,
     };
   }
   if (isSuperuserDev()) {

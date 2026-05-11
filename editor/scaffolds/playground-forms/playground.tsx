@@ -117,14 +117,20 @@ export function Playground({
     // context; passing `undefined` for organizationId surfaces a 400
     // from `requireOrganizationId` on the server. Add a sign-in gate +
     // user-org lookup before reactivating this for unauthenticated use.
-    generate(undefined, prompt, initial?.slug).then(async ({ output }) => {
-      for await (const delta of readStreamableValue(output)) {
-        // setData(delta as JSONForm);
-        __set_schema_txt(JSON.stringify(delta, null, 2));
-      }
-      generating.current = false;
-      setBusy(false);
-    });
+    generate(undefined, prompt, initial?.slug)
+      .then(async ({ output }) => {
+        for await (const delta of readStreamableValue(output)) {
+          // setData(delta as JSONForm);
+          __set_schema_txt(JSON.stringify(delta, null, 2));
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+      })
+      .finally(() => {
+        generating.current = false;
+        setBusy(false);
+      });
   };
 
   useEffect(() => {

@@ -113,16 +113,25 @@ function CanvasConsumer() {
       fit: "cover",
     });
     startGenerate(async () => {
-      const env = await generateAiImage({
-        model: model.modelId,
-        width: model.width,
-        height: model.height,
-        aspect_ratio: model.aspect_ratio,
-        prompt: value.text,
-      });
-      const data = credits.consume(env, { next: "/playground/image" });
-      if (!data) return; // gate / redirect handled
-      editor.commands.changeNodePropertySrc(id, data.publicUrl);
+      try {
+        const env = await generateAiImage({
+          model: model.modelId,
+          width: model.width,
+          height: model.height,
+          aspect_ratio: model.aspect_ratio,
+          prompt: value.text,
+        });
+        const data = credits.consume(env, { next: "/playground/image" });
+        if (!data) {
+          // gate / redirect handled by credits.consume; remove orphan node
+          editor.commands.delete([id]);
+          return;
+        }
+        editor.commands.changeNodePropertySrc(id, data.publicUrl);
+      } catch (e) {
+        console.error(e);
+        editor.commands.delete([id]);
+      }
     });
   };
 
