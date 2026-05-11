@@ -183,6 +183,75 @@ harness, move it to `(site)/...` (with proper auth) or `(api)/...`
 
 ---
 
+### `GRIDA-SEC-003` — AI seam org-id trust boundary
+
+**What it protects.** Every call into the AI provider SDKs (Vercel AI
+SDK, Replicate, OpenAI, Anthropic) is gated and billed against an
+`organizationId`. If that id reaches the seam unverified, an attacker
+who can choose the id drains another org's credit balance. The
+boundary is the rule that **every `organizationId` reaching
+`editor/lib/ai/server.ts` has been verified as a member-org for the
+calling user.**
+
+**Vulnerable scenario (prevented).** A developer adds a new AI route
+handler that reads `organizationId` from the request body and forwards
+it straight into the seam. An attacker enumerates `organization_id`
+(sequential bigint) and submits requests with `organizationId =
+<victim>`. Each request bills the victim's balance, eventually flips
+their `customer_entitled = false`, and locks them out of AI until
+they top up. Worse, the attacker's free-tier user enjoys the victim's
+credit for as long as it lasts. Mass automation makes this an
+asymmetric DoS-by-billing attack.
+
+**Why it's specifically risky here.** AI route handlers and server
+actions sit on internal/private surfaces, but they are still HTTP
+endpoints reachable by any authenticated user. Org membership is
+checked by RLS on data reads, **not** on AI-seam writes — the seam
+calls Metronome (an external service), not our own DB, so no RLS
+gate fires. Without a structural producer-side rule, every new AI
+endpoint is a fresh chance to forget the membership check.
+
+**How the code prevents it.**
+
+1. **One verified producer** —
+   [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts)
+   exports `requireOrganizationId({ user_id, request, routeParams,
+inputOrgId })`. It resolves from: route param slug → request
+   header `X-Grida-Organization-Id` → explicit input. Every resolved
+   id is verified via `assertOrgMember(user_id, org_id)` before
+   return. No "current org" is read from session blob / cookie.
+2. **Runtime contract in the seam** —
+   [editor/lib/ai/\_seam/core.ts](editor/lib/ai/_seam/core.ts)
+   `withTransaction` (and the AI SDK middleware that wraps it) throw
+   `MissingOrgIdError` if `organizationId` is missing, non-integer,
+   or non-positive. Defense-in-depth — a caller that forgets to
+   verify still cannot pass a garbage value.
+3. **Single seam entry point** —
+   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) is the ONLY
+   file allowed to import `replicate`, `openai`, `@ai-sdk/*`,
+   `@anthropic-ai/sdk`. Enforced by oxlint
+   `no-restricted-imports` ([editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc))
+   and the CI audit script
+   ([editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts)).
+   A new file that bypasses the seam fails at lint or CI.
+
+**Files bound by this id.** Run `grep -rn GRIDA-SEC-003 .` to enumerate.
+Today:
+
+- [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts) — `requireOrganizationId`.
+- [editor/lib/ai/server.ts](editor/lib/ai/server.ts) — single seam entry.
+- [editor/lib/ai/\_seam/core.ts](editor/lib/ai/_seam/core.ts) — runtime gate.
+- [editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc) — import lint rule.
+- [editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts) — CI audit.
+
+**What does NOT belong here.** Reading `organizationId` directly off a
+request body in any AI-adjacent code. Even if you think you "trust"
+the body — Next.js server-action hashes ship in the client bundle and
+become public the moment they're shipped. Always go through
+`requireOrganizationId`.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
 1. Allocate the next sequential id (`GRIDA-SEC-003` for the next one).
