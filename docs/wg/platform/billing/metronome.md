@@ -364,7 +364,7 @@ Measured from our sandbox during spike testing:
 | ------------------------------------------------------- | --------------- |
 | Metronome eval pipeline (T0 ingest → T1 charge created) | ~3 min          |
 | Stripe processing + Metronome's post-charge webhook     | ~2 sec          |
-| Our projector + DB write                                | <100 ms         |
+| Our projector + DB write                                | sub-100 ms      |
 | **Total observed**                                      | **~3 min 12 s** |
 
 Well within the 5-minute documented bound. Metronome's eval cadence is
