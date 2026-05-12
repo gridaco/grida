@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Script from "next/script";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import { Button } from "@/components/ui/button";
@@ -114,11 +115,13 @@ export default function MusicLandingPage() {
   return (
     <main className="relative">
       <Header />
-      <script
+      <Script
+        id="ldjson-software"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }}
       />
-      <script
+      <Script
+        id="ldjson-faq"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
       />

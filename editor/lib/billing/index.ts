@@ -420,3 +420,43 @@ export async function stampStripeEventFailure(
   );
   if (error) console.warn("[billing] stamp_failure:", error.message);
 }
+
+// AI-credit post-processor marker — separate from the projector's
+// `processed_at` so a Stripe retry can recover from a previous
+// post-processor failure even after the projector returned `replayed`.
+// See `webhooks/stripe/route.ts` for the full rationale.
+//
+// Returns:
+//   - true  → marker is set; the post-processor already succeeded
+//   - false → marker is NULL; needs (re)processing
+//   - null  → read failed; receiver should treat as "needs processing"
+//             (better to attempt twice than skip a paid charge — the
+//             post-processor itself is idempotent).
+export async function readAiCreditMarker(
+  eventId: string
+): Promise<boolean | null> {
+  // `as never`: generated DB types may lag behind newly-added RPCs (matches
+  // the existing pattern in metronome.ts for fn_billing_get_metronome_account).
+  const { data, error } = await service_role.workspace.rpc(
+    "fn_billing_get_ai_credit_processed" as never,
+    { p_event_id: eventId } as never
+  );
+  if (error) {
+    console.warn("[billing] read_ai_credit_marker:", error.message);
+    return null;
+  }
+  // RPC returns NULL when no row exists yet; supabase-js surfaces that as
+  // `data === null`. Treat as "needs processing".
+  return data === true;
+}
+
+export async function stampAiCreditMarker(
+  eventId: string,
+  eventType: string
+): Promise<void> {
+  const { error } = await service_role.workspace.rpc(
+    "fn_billing_stamp_ai_credit_processed" as never,
+    { p_event_id: eventId, p_event_type: eventType } as never
+  );
+  if (error) console.warn("[billing] stamp_ai_credit_marker:", error.message);
+}

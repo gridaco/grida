@@ -62,7 +62,7 @@ export function assertSuiteSafety(): void {
     issues.push("SUPABASE_SECRET_KEY is required (service-role)");
   }
 
-  // App URL must also be local — the test signs and POSTs to APP_URL/private/webhooks/stripe.
+  // App URL must also be local — the test signs and POSTs to APP_URL/webhooks/stripe.
   const appUrl = process.env.APP_URL;
   if (!appUrl) {
     issues.push("APP_URL is required (e.g. http://localhost:3000)");

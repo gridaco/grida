@@ -28,8 +28,16 @@ export default async function BillingReturnPage({
 
   // Whitelist of supported intents — anything else falls back to a
   // generic wait. Drives the copy and the "settled" predicate in the view.
-  const intent: "subscribe" | "payment_method" | "generic" =
-    rawIntent === "subscribe" || rawIntent === "payment_method"
+  const intent:
+    | "subscribe"
+    | "payment_method"
+    | "topup"
+    | "auto_reload_enable"
+    | "generic" =
+    rawIntent === "subscribe" ||
+    rawIntent === "payment_method" ||
+    rawIntent === "topup" ||
+    rawIntent === "auto_reload_enable"
       ? rawIntent
       : "generic";
 

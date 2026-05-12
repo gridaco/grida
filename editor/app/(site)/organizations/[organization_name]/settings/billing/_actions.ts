@@ -16,6 +16,14 @@ import {
   assertAllowedRedirect,
 } from "@/lib/billing";
 import {
+  AUTO_RELOAD_RECHARGE_MAX_CENTS,
+  AUTO_RELOAD_RECHARGE_MIN_CENTS,
+  AUTO_RELOAD_THRESHOLD_MIN_CENTS,
+  TOPUP_MAX_CENTS,
+  TOPUP_MIN_CENTS,
+  totalChargeForCredit,
+} from "@/lib/billing/fees";
+import {
   price_catalogue_id,
   type Interval,
   type PaidPlanId,
@@ -684,4 +692,455 @@ export async function listBillingAudit(
     rows.length === limit && last ? `${last.created_at}|${last.id}` : null;
 
   return { rows, next_cursor, limit };
+}
+
+// ===========================================================================
+// AI Credits — Metronome-backed pre-charged credit + auto-reload.
+//
+// Reads expose live balance + gate decision + auto-reload state. Mutations
+// (top-up, auto-reload config) are owner-only and resolve a Stripe customer
+// + Metronome contract on demand (idempotent).
+// ===========================================================================
+
+import {
+  AI_CHECKOUT_KIND,
+  addStripeChargedCommit,
+  disableAutoReload,
+  getAccount,
+  getAccountView,
+  getEntitlement,
+  getTransactions,
+  provisionOrg,
+  refreshBalance,
+  setAutoReload,
+  type Transaction,
+} from "@/lib/billing/metronome";
+
+export type AiCreditsSummary = {
+  /** Live balance from Metronome (cents). null if substrate not provisioned. */
+  balance_cents: number | null;
+  /** Gate decision the AI seam will read. */
+  entitled: boolean;
+  /** Reason when blocked: "below_floor" | "no_account" | etc. */
+  blocked_reason: string | null;
+  /** Auto-reload — null when off. */
+  auto_reload: {
+    enabled: boolean;
+    threshold_cents: number;
+    recharge_to_cents: number;
+  } | null;
+  /** Whether a Stripe customer is on file (required for top-up). */
+  has_stripe_customer: boolean;
+  /** True when Metronome customer + contract are wired. */
+  provisioned: boolean;
+  /** ISO timestamp of the cache row's last update — drives "X ago" UI. */
+  cached_balance_at: string | null;
+  /** True when local cache disagrees with the live read. */
+  drifted: boolean;
+  /** True when the org has an active paid (Pro/Team) subscription. Drives the
+   *  auto-reload gate — see docs/wg/platform/billing/known-issues.md "Auto-reload
+   *  markup gap". Manual top-up is always available. */
+  has_active_subscription: boolean;
+};
+
+/**
+ * One-shot read for the user-facing AI Credits panel. Lazily provisions
+ * the Metronome contract on first call so newly-billed orgs don't see a
+ * "not provisioned" empty state.
+ *
+ * Hot-path note: this is polled every 15s by the open billing tab. Skip the
+ * provisionOrg round-trip entirely when the account is already wired —
+ * `provisionOrg` does several Metronome calls even on the happy path
+ * (`setBillingConfigurations`, `contracts.edit`, `provisionLowBalanceAlert`)
+ * and would otherwise hammer the API per poll per tab.
+ */
+export async function getAiCreditsSummary(
+  org_id: number
+): Promise<AiCreditsSummary> {
+  const user_id = await requireUserId();
+  await assertOrgMember(user_id, org_id);
+
+  // Lazy-provision only on cold start. Best-effort: a Metronome outage
+  // shouldn't break the billing page.
+  const account = await getAccount(org_id).catch(() => null);
+  const needsProvision =
+    !account?.metronome_customer_id || !account?.metronome_contract_id;
+  if (needsProvision) {
+    try {
+      await provisionOrg(org_id);
+    } catch (e) {
+      console.warn(
+        `[ai-credits] lazy provision failed for org=${org_id}:`,
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+  }
+
+  const [view, ent, sub] = await Promise.all([
+    getAccountView(org_id).catch(() => null),
+    getEntitlement(org_id).catch(() => null),
+    getActivePaidSubscription(org_id).catch(() => null),
+  ]);
+
+  const live = view?.live ?? null;
+  const db = view?.db ?? null;
+  const drift = view?.drift;
+
+  return {
+    balance_cents: live?.balanceCents ?? null,
+    entitled: ent?.allowed ?? false,
+    blocked_reason: ent?.allowed ? null : (ent?.reason ?? null),
+    auto_reload: live?.autoReload?.enabled
+      ? {
+          enabled: true,
+          threshold_cents: live.autoReload.thresholdCents ?? 0,
+          recharge_to_cents: live.autoReload.rechargeToCents ?? 0,
+        }
+      : null,
+    has_stripe_customer: !!db?.stripe_customer_id,
+    provisioned: !!db?.metronome_customer_id && !!db?.metronome_contract_id,
+    cached_balance_at: db?.cached_balance_at ?? null,
+    drifted: !!drift && Object.values(drift).some(Boolean),
+    has_active_subscription:
+      !!sub?.stripe_subscription_id &&
+      sub.status !== "canceled" &&
+      sub.status !== "incomplete_expired",
+  };
+}
+
+export async function listAiCreditTransactions(
+  org_id: number,
+  limit: number = 12
+): Promise<Transaction[]> {
+  const user_id = await requireUserId();
+  await assertOrgMember(user_id, org_id);
+  const all = await getTransactions(org_id);
+  return all.slice(0, Math.max(1, Math.min(limit, 50)));
+}
+
+/**
+ * Force a live read from Metronome and update the cache. Member-callable
+ * because the read is non-mutating beyond syncing local cache to live.
+ */
+export async function refreshAiCreditsBalance(org_id: number): Promise<void> {
+  const user_id = await requireUserId();
+  await assertOrgMember(user_id, org_id);
+  await refreshBalance(org_id);
+}
+
+/**
+ * Owner-only top-up via direct Metronome charge against the saved card.
+ * Used internally (e.g., from the post-Checkout return callback to land
+ * the credit when Stripe already collected). End-user Buy Credit flows
+ * go through `startTopUpCheckout` instead.
+ */
+export async function topUpAiCredits(
+  org_id: number,
+  amount_cents: number
+): Promise<{ ok: true }> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  if (!Number.isFinite(amount_cents) || amount_cents <= 0) {
+    throw new BillingError("invalid amount", "invalid_amount", 400);
+  }
+  const stripeCustomerId = await resolveOrCreateStripeCustomer(org_id);
+  await provisionOrg(org_id, { stripeCustomerId });
+  await addStripeChargedCommit(org_id, amount_cents);
+  return { ok: true };
+}
+
+/**
+ * Owner-only: edit-in-place auto-reload (already enabled). Lib enforces
+ * threshold > 0 and recharge >= $5. The card is already authorized from
+ * the original enable Checkout, so this is a direct apply (no Checkout).
+ *
+ * NEW enables go through `startEnableAutoReloadCheckout`, not this fn.
+ *
+ * Requires an active paid subscription — see assertAutoReloadAllowed.
+ */
+export async function setAiAutoReload(
+  org_id: number,
+  threshold_cents: number,
+  recharge_to_cents: number
+): Promise<{ ok: true }> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+  await assertAutoReloadAllowed(org_id);
+  const stripeCustomerId = await resolveOrCreateStripeCustomer(org_id);
+  await provisionOrg(org_id, { stripeCustomerId });
+  await setAutoReload(org_id, threshold_cents, recharge_to_cents);
+  return { ok: true };
+}
+
+/**
+ * Auto-reload is gated behind an active paid subscription.
+ *
+ * Why: Metronome's `prepaid_balance_threshold_configuration` runs silent
+ * recharges at-cost (the primitive can't separate "charged amount" from
+ * "credited amount", so we can't apply the markup envelope from
+ * `lib/billing/fees.ts`). On free orgs this would leak ~$1.75–$2.75 per
+ * silent fire indefinitely. Restricting to subscribers caps the loss
+ * surface to a population whose base-plan margin already covers it.
+ *
+ * Manual top-up does NOT need this gate — it always goes through Checkout
+ * and pays the full markup. See docs/wg/platform/billing/known-issues.md.
+ */
+async function assertAutoReloadAllowed(org_id: number): Promise<void> {
+  const sub = await getActivePaidSubscription(org_id);
+  const ok =
+    !!sub?.stripe_subscription_id &&
+    sub.status !== "canceled" &&
+    sub.status !== "incomplete_expired";
+  if (!ok) {
+    throw new BillingError(
+      "Auto-reload requires an active paid plan. Manual top-ups remain available without a subscription.",
+      "subscription_required",
+      403,
+      "billing/upgrade"
+    );
+  }
+}
+
+export async function disableAiAutoReload(
+  org_id: number
+): Promise<{ ok: true }> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+  await disableAutoReload(org_id);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Checkout-based authorization flows (every NEW commitment goes through
+// Stripe Checkout — see docs/wg/platform/billing/metronome.md "card authorization").
+//
+// Why: Stripe doesn't expose a perfect "PM ready for off-session?" signal,
+// and any cached PM can fail tomorrow (expiry, dispute, SCA invalidation).
+// Every Checkout is a fresh on-session authorization that satisfies SCA,
+// (re)applies `setup_future_usage: 'off_session'`, and confirms intent.
+//
+// The existing Stripe webhook receiver picks up `checkout.session.completed`
+// with our metadata.kind and routes to the right service-function tail.
+// ---------------------------------------------------------------------------
+
+export type AiCheckoutResult = { checkout_url: string };
+
+/**
+ * Owner-only. Returns a Stripe Checkout URL for buying $X of AI credit.
+ * Payment-mode session: charges immediately + saves card with
+ * `setup_future_usage: 'off_session'` for future direct charges
+ * (Metronome's silent auto-recharges and edit-in-place auto-reload).
+ */
+export async function startTopUpCheckout(
+  org_id: number,
+  params: { cents: number; success_url: string; cancel_url: string }
+): Promise<AiCheckoutResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+
+  if (
+    !Number.isFinite(params.cents) ||
+    params.cents < TOPUP_MIN_CENTS ||
+    params.cents > TOPUP_MAX_CENTS
+  ) {
+    throw new BillingError(
+      `Top-up must be between $${TOPUP_MIN_CENTS / 100} and $${TOPUP_MAX_CENTS / 100}.`,
+      "invalid_amount",
+      400
+    );
+  }
+
+  const origin = await getOrigin();
+  const success_url = assertAllowedRedirect(params.success_url, origin);
+  const cancel_url = assertAllowedRedirect(params.cancel_url, origin);
+
+  const stripeCustomerId = await resolveOrCreateStripeCustomer(org_id);
+  // Provision Metronome too — the webhook needs the contract to land the commit.
+  await provisionOrg(org_id, { stripeCustomerId });
+
+  // Pass through Stripe's processing fee — user pays $X plus the fee,
+  // receives exactly $X of credit. See lib/billing/fees.ts and
+  // docs/wg/platform/billing/ai-credits.md "Money model".
+  const totalCents = totalChargeForCredit(params.cents);
+  const idempotencyKey = `ai_topup:${org_id}:${params.cents}:${Math.floor(Date.now() / 60000)}`;
+
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "payment",
+      customer: stripeCustomerId,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: totalCents,
+            product_data: {
+              name: "Grida AI Credit",
+              description: `$${(params.cents / 100).toFixed(2)} of credit · includes Stripe processing fee.`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      payment_intent_data: {
+        setup_future_usage: "off_session",
+        metadata: {
+          grida_organization_id: String(org_id),
+          kind: AI_CHECKOUT_KIND.TOPUP,
+          // `cents` = credit amount landed on Metronome (NOT the total
+          // charged via Stripe). The fee delta is already in our Stripe
+          // payout — we owe the customer exactly this much credit.
+          cents: String(params.cents),
+          total_cents: String(totalCents),
+        },
+      },
+      // Generate a post-payment Stripe Invoice. Without this, payment-mode
+      // Checkout produces only a PaymentIntent + Charge — no Invoice ever
+      // appears in `stripe.invoices.list`, so the "Past Invoices" panel
+      // misses every top-up. This flag is a no-op on payment failure.
+      invoice_creation: { enabled: true },
+      // Session-level metadata is what `checkout.session.completed` carries.
+      metadata: {
+        grida_organization_id: String(org_id),
+        kind: AI_CHECKOUT_KIND.TOPUP,
+        cents: String(params.cents),
+        total_cents: String(totalCents),
+      },
+      success_url,
+      cancel_url,
+    },
+    { idempotencyKey }
+  );
+
+  if (!session.url) {
+    throw new BillingError(
+      "Stripe did not return a Checkout URL.",
+      "checkout_failed",
+      500
+    );
+  }
+  return { checkout_url: session.url };
+}
+
+/**
+ * Owner-only. Returns a Stripe Checkout URL for enabling auto-reload.
+ * The Checkout charges the recharge amount upfront (= initial top-up)
+ * AND saves the card. Post-Checkout, the webhook applies the threshold
+ * config so future drains trigger silent auto-recharges against the
+ * saved card.
+ *
+ * Used for: first-time enable AND re-enable after disable / Metronome
+ * auto-disable from a failed silent charge. Edit-in-place (already
+ * enabled, just changing threshold/amount) goes through `setAiAutoReload`.
+ */
+export async function startEnableAutoReloadCheckout(
+  org_id: number,
+  params: {
+    threshold_cents: number;
+    recharge_to_cents: number;
+    success_url: string;
+    cancel_url: string;
+  }
+): Promise<AiCheckoutResult> {
+  const user_id = await requireUserId();
+  await assertOrgOwner(user_id, org_id);
+  await assertAutoReloadAllowed(org_id);
+
+  if (
+    !Number.isFinite(params.threshold_cents) ||
+    params.threshold_cents < AUTO_RELOAD_THRESHOLD_MIN_CENTS ||
+    params.threshold_cents % 100 !== 0
+  ) {
+    throw new BillingError(
+      `Threshold must be a whole number of dollars and at least $${AUTO_RELOAD_THRESHOLD_MIN_CENTS / 100}.`,
+      "invalid_amount",
+      400
+    );
+  }
+  if (
+    !Number.isFinite(params.recharge_to_cents) ||
+    params.recharge_to_cents < AUTO_RELOAD_RECHARGE_MIN_CENTS ||
+    params.recharge_to_cents > AUTO_RELOAD_RECHARGE_MAX_CENTS ||
+    params.recharge_to_cents % 100 !== 0
+  ) {
+    throw new BillingError(
+      `Recharge target must be a whole number of dollars between $${AUTO_RELOAD_RECHARGE_MIN_CENTS / 100} and $${AUTO_RELOAD_RECHARGE_MAX_CENTS / 100}.`,
+      "invalid_amount",
+      400
+    );
+  }
+  if (params.recharge_to_cents <= params.threshold_cents) {
+    throw new BillingError(
+      "Recharge target must be greater than the threshold.",
+      "invalid_amount",
+      400
+    );
+  }
+
+  const origin = await getOrigin();
+  const success_url = assertAllowedRedirect(params.success_url, origin);
+  const cancel_url = assertAllowedRedirect(params.cancel_url, origin);
+
+  const stripeCustomerId = await resolveOrCreateStripeCustomer(org_id);
+  await provisionOrg(org_id, { stripeCustomerId });
+
+  // Markup is applied to the user-initiated initial recharge (this
+  // Checkout). Subsequent silent recharges via Metronome's
+  // prepaid_balance_threshold_configuration run at-cost. v1 mitigation
+  // is the subscription gate above; full fix is tracked as KI-BILL-001
+  // in docs/wg/platform/billing/known-issues.md.
+  const totalCents = totalChargeForCredit(params.recharge_to_cents);
+  const idempotencyKey = `ai_auto_reload:${org_id}:${params.threshold_cents}:${params.recharge_to_cents}:${Math.floor(Date.now() / 60000)}`;
+
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "payment",
+      customer: stripeCustomerId,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: totalCents,
+            product_data: {
+              name: "Grida AI Credit (auto-reload setup)",
+              description: `Initial $${(params.recharge_to_cents / 100).toFixed(2)} of credit · includes Stripe processing fee. Auto-reload will keep your balance topped up to this level when it falls below $${(params.threshold_cents / 100).toFixed(2)}.`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      payment_intent_data: {
+        setup_future_usage: "off_session",
+        metadata: {
+          grida_organization_id: String(org_id),
+          kind: AI_CHECKOUT_KIND.AUTO_RELOAD_ENABLE,
+          threshold_cents: String(params.threshold_cents),
+          // `recharge_to_cents` = credit amount landed on Metronome.
+          recharge_to_cents: String(params.recharge_to_cents),
+          total_cents: String(totalCents),
+        },
+      },
+      // Generate a post-payment Stripe Invoice (see startTopUpCheckout).
+      invoice_creation: { enabled: true },
+      metadata: {
+        grida_organization_id: String(org_id),
+        kind: AI_CHECKOUT_KIND.AUTO_RELOAD_ENABLE,
+        threshold_cents: String(params.threshold_cents),
+        recharge_to_cents: String(params.recharge_to_cents),
+        total_cents: String(totalCents),
+      },
+      success_url,
+      cancel_url,
+    },
+    { idempotencyKey }
+  );
+
+  if (!session.url) {
+    throw new BillingError(
+      "Stripe did not return a Checkout URL.",
+      "checkout_failed",
+      500
+    );
+  }
+  return { checkout_url: session.url };
 }

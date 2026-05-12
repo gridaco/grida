@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import type { FormFieldInit } from "@/grida-forms-hosted/types";
 import { LightningBoltIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { draftid } from "@/utils/id";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { generateFormFieldSchema } from "@/lib/ai/actions/forms-schema";
 
 export function FormFieldAssistant({
   onSuggestion,
@@ -14,51 +15,35 @@ export function FormFieldAssistant({
   onSuggestion?: (schema: FormFieldInit) => void;
 }) {
   const [description, setDescription] = useState("");
-  const [schema, setSchema] = useState<FormFieldInit | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const assist = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/private/editor/ai/schema", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ description }),
-      });
-
-      if (response.ok) {
-        let data: FormFieldInit = await response.json();
-
-        // process the response to match the schema
-        data = {
-          ...data,
-          options:
-            data.options?.map((option) => ({
-              ...option,
-              id: draftid(),
-            })) || [],
-        };
-
-        setSchema(data);
-        console.log("assist", data);
-      } else {
-        const error = await response.json();
-        console.error(error);
+      const env = await generateFormFieldSchema({ description });
+      if (!env.success) {
+        console.error(env);
+        return;
       }
+      const data: FormFieldInit = {
+        ...env.data,
+        readonly: false,
+        // schema returns `null` (OpenAI structured-output requirement);
+        // FormFieldInit uses `undefined` for the same "absent" meaning.
+        pattern: env.data.pattern ?? undefined,
+        options:
+          env.data.options?.map((option) => ({
+            ...option,
+            id: draftid(),
+          })) || [],
+      };
+      onSuggestion?.(data);
     } catch (error) {
       console.error("AI assistance error:", error);
     } finally {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (schema) {
-      onSuggestion?.(schema);
-    }
-  }, [schema]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && e.metaKey) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -31,7 +31,8 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
-import { useCredits, useGenerateAudio } from "@/lib/ai/hooks";
+import { generateAudio } from "@/lib/ai/actions/audio";
+import { useAiCredits } from "@/lib/ai/credits";
 import ai from "@/lib/ai";
 import { DownloadIcon, Loader2Icon, Music2Icon, Wand2Icon } from "lucide-react";
 
@@ -80,15 +81,16 @@ type ResultItem = {
 
 function Workspace() {
   const { withAuth } = useContinueWithAuth();
-  const credits = useCredits();
-  const { generate, loading, error } = useGenerateAudio();
+  const credits = useAiCredits();
+  const [loading, startGenerate] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [modelId, setModelId] =
     useState<ai.audio.AudioModelId>("google/lyria-3");
   const [results, setResults] = useState<ResultItem[]>([]);
   const card = useMemo(() => ai.audio.models[modelId], [modelId]);
 
   const handleSubmit = useCallback(
-    async (message: PromptInputMessage) => {
+    (message: PromptInputMessage) => {
       const prompt = message.text.trim();
       if (!prompt) return;
 
@@ -102,25 +104,30 @@ function Workspace() {
         }
       }
 
-      const out = await generate({
-        model: modelId,
-        prompt,
-        image_inputs: image_inputs.length > 0 ? image_inputs : undefined,
-      });
-      if (out) {
+      setError(null);
+      startGenerate(async () => {
+        const env = await generateAudio({
+          model: modelId,
+          prompt,
+          image_inputs: image_inputs.length > 0 ? image_inputs : undefined,
+        });
+        const data = credits.consume(env, { next: "/ai/music/playground" });
+        if (!data) {
+          if (env.success === false) setError(env.message);
+          return;
+        }
         setResults((prev) => [
           {
             id: Date.now(),
-            url: out.url,
-            prompt: out.prompt,
-            modelId: out.modelId,
+            url: data.url,
+            prompt,
+            modelId: data.modelId,
           },
           ...prev,
         ]);
-        credits.refresh();
-      }
+      });
     },
-    [generate, modelId, credits]
+    [modelId, credits]
   );
 
   const handleSubmitWithAuth = withAuth(handleSubmit);
@@ -174,7 +181,7 @@ function Workspace() {
           </PromptInputTools>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground font-mono">
-              {credits.remainingUSD} left
+              {credits.formatted ?? "—"} left
             </span>
             <PromptInputSubmit
               disabled={loading}

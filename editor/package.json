@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "audit:ai-seam": "tsx scripts/audit-ai-seam.ts",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
@@ -53,6 +54,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@mdx-js/loader": "^3.0.1",
     "@mdx-js/react": "^3.1.0",
+    "@metronome/sdk": "^3.5.0",
     "@monaco-editor/react": "^4.6.0",
     "@next/mdx": "^16",
     "@next/third-parties": "^16",
