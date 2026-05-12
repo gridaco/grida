@@ -1,7 +1,9 @@
-// Idempotent substrate setup for Stripe (test mode) and Metronome (sandbox).
+// Idempotent substrate setup for Stripe (test mode) and Metronome.
 // Both match-or-create by stable id; safe to re-run after `supabase db reset`.
+//
+// Env loading + the explicit confirmation prompt live in `cli.ts`. These
+// functions assume `process.env` is already populated.
 
-import "./_env";
 import { requireEnv, requireStripeTestKey } from "./_env";
 
 // ---------------------------------------------------------------------------

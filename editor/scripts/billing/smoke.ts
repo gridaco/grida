@@ -1,7 +1,9 @@
 // Sandbox smoke tests. Each is independently runnable and demonstrates one
 // flow end-to-end against your sandbox accounts. Run via `cli.ts smoke <name>`.
+//
+// Env loading + the explicit confirmation prompt live in `cli.ts`. These
+// functions assume `process.env` is already populated.
 
-import "./_env";
 import * as crypto from "node:crypto";
 import { requireEnv, requireStripeTestKey } from "./_env";
 

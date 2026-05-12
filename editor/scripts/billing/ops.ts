@@ -1,7 +1,8 @@
 // One-shot operational helpers — backfill, markup audit. Each is independently
 // runnable and idempotent.
-
-import "./_env";
+//
+// Env loading + the explicit confirmation prompt live in `cli.ts`. These
+// functions assume `process.env` is already populated.
 
 // ---------------------------------------------------------------------------
 // backfill — ensure every existing organization has a Metronome customer +
