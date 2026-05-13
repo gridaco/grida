@@ -1,0 +1,39 @@
+{
+  "name": "@grida/text-editor",
+  "version": "0.0.0",
+  "description": "Backend-agnostic text editor engine (experimental).",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./dom": {
+      "types": "./dist/dom/index.d.ts",
+      "import": "./dist/dom/index.mjs",
+      "require": "./dist/dom/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsdown": "^0.21.9",
+    "typescript": "^6",
+    "vitest": "^4"
+  }
+}
