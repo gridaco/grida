@@ -27,6 +27,7 @@ type ScenarioId =
   | "webhook"
   | "jwt-hs256"
   | "session"
+  | "cron-secret"
   | "jwt-keypair"
   | "aes-256-gcm"
   | "xchacha20-poly1305"
@@ -45,6 +46,7 @@ type Scenario = {
   defaultEncoding?: Encoding;
   envKeys?: string[];
   headerKey?: string;
+  headerValuePrefix?: string;
   jsonKey?: string;
   supportedFormats: CopyFormat[];
   panelDescription: string[];
@@ -87,6 +89,7 @@ type QuickPickId =
   | "webhook"
   | "jwt-hs256"
   | "session"
+  | "cron-secret"
   | "aes-256-gcm"
   | "xchacha20-poly1305";
 
@@ -127,6 +130,14 @@ const QUICK_PICKS: QuickPickSpec[] = [
   {
     id: "session",
     title: "Session secret",
+    count: 3,
+    layout: "list",
+    bytes: 32,
+    encoding: "base64url",
+  },
+  {
+    id: "cron-secret",
+    title: "CRON_SECRET",
     count: 3,
     layout: "list",
     bytes: 32,
@@ -271,6 +282,40 @@ const token = jwt.sign({ sub: userId }, secret, {
       "Generate a session secret for cookie signing and server side session storage.",
   },
   {
+    id: "cron-secret",
+    title: "Vercel CRON_SECRET Generator",
+    shortTitle: "CRON_SECRET",
+    whenToUse:
+      "Use to authenticate Vercel Cron, Upstash QStash, or GitHub Actions cron requests.",
+    defaultLine: "Default: 32 bytes, base64url.",
+    kind: "bytes",
+    defaultBytes: 32,
+    strongBytes: 64,
+    defaultEncoding: "base64url",
+    envKeys: ["CRON_SECRET"],
+    headerKey: "Authorization",
+    headerValuePrefix: "Bearer ",
+    jsonKey: "cronSecret",
+    supportedFormats: ["plain", "env", "header", "json"],
+    panelDescription: [
+      "Bearer token for protecting scheduled job endpoints.",
+      "Vercel Cron sends it as Authorization: Bearer <CRON_SECRET>.",
+    ],
+    safetyNote: "Anyone with this secret can trigger your cron endpoints.",
+    howToUse: `// app/api/cron/route.ts
+export async function GET(req: Request) {
+  const auth = req.headers.get("authorization");
+  if (auth !== \`Bearer \${process.env.CRON_SECRET}\`) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  // run scheduled job
+  return Response.json({ ok: true });
+}`,
+    anchorId: "vercel-cron-secret-generator",
+    seoDescription:
+      "Generate a CRON_SECRET to authenticate Vercel Cron, Upstash QStash, or GitHub Actions cron requests via the Authorization header.",
+  },
+  {
     id: "jwt-keypair",
     title: "JWT Keypair Generator (RS256 / ES256)",
     shortTitle: "JWT keypair",
@@ -403,6 +448,11 @@ const FAQ_ITEMS = [
       "AES-256-GCM and XChaCha20-Poly1305 keys: should I use 32 or 64 bytes?",
     answer:
       "Use 32 bytes. AES-256 and XChaCha20-Poly1305 require 256-bit (32-byte) keys. If you need to derive keys from longer secrets, use a KDF (like HKDF/scrypt/Argon2) instead of passing a 64-byte value directly as a cipher key.",
+  },
+  {
+    question: "What is CRON_SECRET and how do I use it with Vercel Cron?",
+    answer:
+      'CRON_SECRET is a shared bearer token that protects scheduled job endpoints from public invocation. Set it as an environment variable, and Vercel Cron will send it as "Authorization: Bearer <CRON_SECRET>" on each request. Verify the header in your route handler and reject anything that doesn\'t match. 32 random bytes (base64url) is a strong default.',
   },
   {
     question: "HS256 vs RS256 vs ES256 for JWT: which should I use?",
@@ -546,7 +596,8 @@ function buildSingleValueOutput({
 
   if (format === "header") {
     const headerKey = scenario.headerKey ?? "x-secret";
-    return `${headerKey}: ${value}`;
+    const prefix = scenario.headerValuePrefix ?? "";
+    return `${headerKey}: ${prefix}${value}`;
   }
 
   const jsonKey = scenario.jsonKey ?? "secret";
