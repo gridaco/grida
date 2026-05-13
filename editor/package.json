@@ -37,6 +37,7 @@
     "@grida/hud": "workspace:*",
     "@grida/io": "workspace:*",
     "@grida/io-figma": "workspace:*",
+    "@grida/keybinding": "workspace:*",
     "@grida/mixed-properties": "workspace:*",
     "@grida/number-input": "workspace:*",
     "@grida/pixel-grid": "workspace:*",

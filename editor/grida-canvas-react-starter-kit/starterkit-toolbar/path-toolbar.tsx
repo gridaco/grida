@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
-import { uikbdk, M } from "@/grida-canvas/keybinding";
+import { uikbdk, M } from "@grida/keybinding";
 
 export function PathToolbar() {
   const tool = useToolState();

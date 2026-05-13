@@ -23,15 +23,15 @@
  * They have keybindings defined but the actual command handlers are not yet available.
  */
 
-import { KeyCode } from "@/grida-canvas/keycode";
 import {
+  KeyCode,
   type Keybindings,
   kb,
   c,
   seq,
   M,
   platformKb,
-} from "@/grida-canvas/keybinding";
+} from "@grida/keybinding";
 
 interface UXHostAction {
   name: string;

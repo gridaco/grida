@@ -79,8 +79,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import ErrorBoundary from "./error-boundary";
-import { uikbdk, M } from "@/grida-canvas/keybinding";
-import { KeyCode } from "@/grida-canvas/keycode";
+import { uikbdk, M, KeyCode } from "@grida/keybinding";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";

@@ -19,7 +19,7 @@
  * Inspired somewhat from https://msdn.microsoft.com/en-us/library/windows/desktop/dd375731(v=vs.85).aspx
  * But these are "more general", as they should work across browsers & OS`s.
  */
-export const enum KeyCode {
+export enum KeyCode {
   DependsOnKbLayout = -1,
 
   /**
@@ -239,7 +239,7 @@ export const enum KeyCode {
 /**
  * keyboardEvent.code
  */
-export const enum ScanCode {
+export enum ScanCode {
   DependsOnKbLayout = -1,
   None,
   Hyper,
@@ -2547,7 +2547,7 @@ export namespace KeyCodeUtils {
   }
 }
 
-export const enum KeyMod {
+export enum KeyMod {
   CtrlCmd = (1 << 11) >>> 0,
   Shift = (1 << 10) >>> 0,
   Alt = (1 << 9) >>> 0,
