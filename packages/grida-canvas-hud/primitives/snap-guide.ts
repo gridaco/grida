@@ -1,5 +1,5 @@
 import type { guide } from "@grida/cmath/_snap";
-import type { HUDDraw } from "./hud";
+import type { HUDDraw } from "./types";
 
 /**
  * Convert a `guide.SnapGuide` (the output of `guide.plot()`) into a

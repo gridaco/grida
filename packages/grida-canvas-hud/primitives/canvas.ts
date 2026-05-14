@@ -1,4 +1,12 @@
 import type cmath from "@grida/cmath";
+import type {
+  HUDDraw,
+  HUDLine,
+  HUDPolyline,
+  HUDRect,
+  HUDRule,
+  HUDScreenRect,
+} from "./types";
 
 const DEFAULT_COLOR = "#f44336";
 const DEFAULT_LABEL_FG = "#ffffff";
@@ -10,87 +18,7 @@ const LABEL_PADDING_X = 4;
 const LABEL_PADDING_Y = 2;
 const LABEL_BORDER_RADIUS = 4;
 const LABEL_OFFSET = 16;
-
-// ---------------------------------------------------------------------------
-// Draw primitives — the atoms every HUD feature composes from.
-//
-// All coordinates are in **document space** unless noted otherwise.
-// The HUD canvas applies the viewport transform so callers never convert.
-// ---------------------------------------------------------------------------
-
-/**
- * A line segment in document space, extending `cmath.ui.Line` with
- * an optional `dashed` style.
- */
-export interface HUDLine extends cmath.ui.Line {
-  dashed?: boolean;
-}
-
-/**
- * A full-viewport axis-aligned line (infinite extent) at a given offset.
- *
- * `axis` indicates which axis the `offset` lives on:
- * - `"x"` → vertical line at x=offset
- * - `"y"` → horizontal line at y=offset
- *
- * Offset is in document space; the renderer projects it to screen.
- */
-export interface HUDRule {
-  axis: "x" | "y";
-  offset: number;
-}
-
-/**
- * A rectangle in document space.
- *
- * Stroke uses the canvas color by default. Fill is opt-in.
- */
-export interface HUDRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** Whether to stroke the outline (default: true). */
-  stroke?: boolean;
-  /** Whether to fill the interior (default: false). */
-  fill?: boolean;
-  /** Opacity of the fill color, 0–1 (default: 1). Ignored when `fill` is falsy. */
-  fillOpacity?: number;
-  /** Draw the outline with a dash pattern. */
-  dashed?: boolean;
-}
-
-/**
- * A polyline (or closed polygon) in document space.
- *
- * Stroke uses the canvas color by default. Fill is opt-in.
- */
-export interface HUDPolyline {
-  points: cmath.Vector2[];
-  /** Whether to stroke the path (default: true). */
-  stroke?: boolean;
-  /** Whether to fill the interior (default: false). */
-  fill?: boolean;
-  /** Opacity of the fill color, 0–1 (default: 1). Ignored when `fill` is falsy. */
-  fillOpacity?: number;
-  /** Draw the stroke with a dash pattern. */
-  dashed?: boolean;
-}
-
-/**
- * A complete set of draw commands for one frame.
- *
- * The HUD clears the canvas and draws everything in this struct each frame.
- * Callers build a `HUDDraw` from their domain data (snap result, measurement,
- * guide state, etc.) and hand it to `HUDCanvas.draw()`.
- */
-export interface HUDDraw {
-  lines?: HUDLine[];
-  rules?: HUDRule[];
-  points?: cmath.Vector2[];
-  rects?: HUDRect[];
-  polylines?: HUDPolyline[];
-}
+const SCREEN_RECT_LINE_WIDTH = 1;
 
 export interface HUDCanvasOptions {
   color?: string;
@@ -123,7 +51,7 @@ export class HUDCanvas {
     options?: HUDCanvasOptions
   ) {
     this.ctx = canvas.getContext("2d")!;
-    this.dpr = window.devicePixelRatio || 1;
+    this.dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
     this.color = options?.color ?? DEFAULT_COLOR;
   }
 
@@ -132,7 +60,8 @@ export class HUDCanvas {
   }
 
   setSize(w: number, h: number) {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr =
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
     if (this.width === w && this.height === h && this.dpr === dpr) return;
     this.dpr = dpr;
     this.width = w;
@@ -158,13 +87,15 @@ export class HUDCanvas {
 
     if (!commands) return;
 
-    const { lines, rules, points, rects, polylines } = commands;
+    const { lines, rules, points, rects, polylines, screenRects } = commands;
 
     if (rules && rules.length > 0) this.drawRules(rules);
     if (rects && rects.length > 0) this.drawRects(rects);
     if (polylines && polylines.length > 0) this.drawPolylines(polylines);
     if (lines && lines.length > 0) this.drawLines(lines);
     if (points && points.length > 0) this.drawPoints(points);
+    if (screenRects && screenRects.length > 0)
+      this.drawScreenRects(screenRects);
   }
 
   // ---------------------------------------------------------------------------
@@ -229,6 +160,8 @@ export class HUDCanvas {
     ctx.lineWidth = DEFAULT_LINE_WIDTH / zoom;
 
     let dashed = false;
+    let currentWidth = DEFAULT_LINE_WIDTH;
+    let currentColor = this.color;
     for (const line of lines) {
       if (line.dashed && !dashed) {
         ctx.setLineDash([4 / zoom, 3 / zoom]);
@@ -236,6 +169,16 @@ export class HUDCanvas {
       } else if (!line.dashed && dashed) {
         ctx.setLineDash([]);
         dashed = false;
+      }
+      const w = line.strokeWidth ?? DEFAULT_LINE_WIDTH;
+      if (w !== currentWidth) {
+        ctx.lineWidth = w / zoom;
+        currentWidth = w;
+      }
+      const c = line.color ?? this.color;
+      if (c !== currentColor) {
+        ctx.strokeStyle = c;
+        currentColor = c;
       }
       ctx.beginPath();
       ctx.moveTo(line.x1, line.y1);
@@ -269,7 +212,7 @@ export class HUDCanvas {
       const th = LABEL_FONT_HEIGHT + LABEL_PADDING_Y * 2;
 
       // background pill
-      ctx.fillStyle = this.color;
+      ctx.fillStyle = line.color ?? this.color;
       ctx.beginPath();
       ctx.roundRect(
         labelX - tw / 2,
@@ -292,10 +235,12 @@ export class HUDCanvas {
 
     this.applyViewTransform();
     ctx.lineWidth = DEFAULT_LINE_WIDTH / zoom;
+    let currentWidth = DEFAULT_LINE_WIDTH;
 
     for (const rect of rects) {
       const doStroke = rect.stroke !== false;
       const doFill = rect.fill === true;
+      const color = rect.color ?? this.color;
 
       if (rect.dashed) {
         ctx.setLineDash([4 / zoom, 3 / zoom]);
@@ -303,13 +248,18 @@ export class HUDCanvas {
 
       if (doFill) {
         ctx.globalAlpha = rect.fillOpacity ?? 1;
-        ctx.fillStyle = this.color;
+        ctx.fillStyle = color;
         ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
         ctx.globalAlpha = 1;
       }
 
       if (doStroke) {
-        ctx.strokeStyle = this.color;
+        const w = rect.strokeWidth ?? DEFAULT_LINE_WIDTH;
+        if (w !== currentWidth) {
+          ctx.lineWidth = w / zoom;
+          currentWidth = w;
+        }
+        ctx.strokeStyle = color;
         ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
       }
 
@@ -337,11 +287,12 @@ export class HUDCanvas {
 
       const doFill = poly.fill === true;
       const doStroke = poly.stroke !== false;
+      const color = poly.color ?? this.color;
 
       if (doFill) {
         ctx.closePath();
         ctx.globalAlpha = poly.fillOpacity ?? 1;
-        ctx.fillStyle = this.color;
+        ctx.fillStyle = color;
         ctx.fill("evenodd");
         ctx.globalAlpha = 1;
       }
@@ -350,7 +301,7 @@ export class HUDCanvas {
         if (poly.dashed) {
           ctx.setLineDash([4 / zoom, 3 / zoom]);
         }
-        ctx.strokeStyle = this.color;
+        ctx.strokeStyle = color;
         ctx.stroke();
         if (poly.dashed) {
           ctx.setLineDash([]);
@@ -378,5 +329,66 @@ export class HUDCanvas {
       ctx.lineTo(scrX - half, scrY + half);
     }
     ctx.stroke();
+  }
+
+  /**
+   * Draw rects whose **size is in screen-space** but whose **anchor is in
+   * document-space**. The doc-space point is projected via the current
+   * transform; the rect is then drawn at fixed CSS-pixel dimensions.
+   *
+   * This is the primitive used to draw resize / rotate handles — they must
+   * remain a constant visual size regardless of viewport zoom.
+   */
+  private drawScreenRects(rects: HUDScreenRect[]) {
+    const ctx = this.ctx;
+    const [[sx, , tx], [, sy, ty]] = this.transform;
+
+    this.applyScreenTransform();
+    ctx.lineWidth = SCREEN_RECT_LINE_WIDTH;
+
+    for (const r of rects) {
+      const scrX = sx * r.x + tx;
+      const scrY = sy * r.y + ty;
+      const w = r.width;
+      const h = r.height;
+      const anchor = r.anchor ?? "center";
+
+      let x = scrX;
+      let y = scrY;
+      switch (anchor) {
+        case "center":
+          x = scrX - w / 2;
+          y = scrY - h / 2;
+          break;
+        case "tl":
+          x = scrX;
+          y = scrY;
+          break;
+        case "tr":
+          x = scrX - w;
+          y = scrY;
+          break;
+        case "bl":
+          x = scrX;
+          y = scrY - h;
+          break;
+        case "br":
+          x = scrX - w;
+          y = scrY - h;
+          break;
+      }
+
+      const doFill = r.fill !== false;
+      const doStroke = r.stroke !== false;
+
+      if (doFill) {
+        ctx.fillStyle = r.fillColor ?? this.color;
+        ctx.fillRect(x, y, w, h);
+      }
+      if (doStroke) {
+        ctx.strokeStyle = r.strokeColor ?? this.color;
+        ctx.strokeRect(x, y, w, h);
+      }
+    }
   }
 }

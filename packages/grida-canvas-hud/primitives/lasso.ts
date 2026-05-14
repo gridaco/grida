@@ -1,5 +1,5 @@
 import type cmath from "@grida/cmath";
-import type { HUDDraw } from "./hud";
+import type { HUDDraw } from "./types";
 
 /**
  * Convert a lasso point sequence into a {@link HUDDraw} command list.
