@@ -1,7 +1,7 @@
 {
   "name": "@grida/cg",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "Grida Canvas Core Graphics",
   "keywords": [
     "canvas",

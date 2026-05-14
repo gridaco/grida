@@ -1,6 +1,6 @@
 {
   "name": "@grida/hud",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": false,
   "description": "Canvas-based heads-up display for the Grida editor viewport",
   "keywords": [
@@ -35,9 +35,13 @@
       "require": "./dist/react.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "prepack": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

@@ -1,6 +1,6 @@
 {
   "name": "@grida/keybinding",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Declarative keybinding primitives — types, modifiers, platform resolution, and event matching. Building blocks for hotkey systems; not a hotkey manager.",
   "keywords": [
     "hotkey",
@@ -24,9 +24,13 @@
       "require": "./dist/index.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "prepack": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
