@@ -1,5 +1,5 @@
 import cmath from "@grida/cmath";
-import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
+import { SVGCommand, encodeSVGPath, SVGPathData } from "@grida/svg/pathdata";
 
 type Vector2 = cmath.Vector2;
 export namespace vn {

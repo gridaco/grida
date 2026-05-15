@@ -58,7 +58,7 @@ importers:
     dependencies:
       '@next/third-parties':
         specifier: 16.2.4
-        version: 16.2.4(next@16.2.4(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
+        version: 16.2.4(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
       '@react-three/drei':
         specifier: ^10.0.7
         version: 10.7.7(@react-three/fiber@9.1.2(@types/react@19.1.3)(immer@9.0.21)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(three@0.170.0))(@types/react@19.1.3)(@types/three@0.170.0)(immer@9.0.21)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(three@0.170.0)
@@ -394,6 +394,9 @@ importers:
       '@grida/sequence':
         specifier: workspace:*
         version: link:../packages/grida-canvas-sequence
+      '@grida/svg':
+        specifier: workspace:*
+        version: link:../packages/grida-svg
       '@grida/tailwindcss-colors':
         specifier: ^4
         version: 4.0.1
@@ -435,7 +438,7 @@ importers:
         version: 16.2.4(@mdx-js/loader@3.1.1(acorn@8.16.0)(webpack@5.98.0))(@mdx-js/react@3.1.1(@types/react@19.1.3)(react@19.2.5))
       '@next/third-parties':
         specifier: 16.2.4
-        version: 16.2.4(next@16.2.4(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
+        version: 16.2.4(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
       '@number-flow/react':
         specifier: ^0.5.7
         version: 0.5.11(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -841,9 +844,6 @@ importers:
       stylis:
         specifier: ^4.3.2
         version: 4.3.6
-      svg-pathdata:
-        specifier: ^7.2.0
-        version: 7.2.0
       swr:
         specifier: ^2.2.5
         version: 2.4.0(react@19.2.5)
@@ -1248,9 +1248,9 @@ importers:
       '@grida/cmath':
         specifier: workspace:*
         version: link:../grida-cmath
-      svg-pathdata:
-        specifier: ^7.2.0
-        version: 7.2.0
+      '@grida/svg':
+        specifier: workspace:*
+        version: link:../grida-svg
 
   packages/grida-cmath: {}
 
@@ -13286,10 +13286,6 @@ packages:
   svg-parser@2.0.4:
     resolution: {integrity: sha512-e4hG1hRwoOdRb37cIMSgzNsxyzKfayW6VOflrwvR+/bzrkyxY/31WkbgnQpgtrNp1SdpJvpUAGTa/ZoiPNDuRQ==}
 
-  svg-pathdata@7.2.0:
-    resolution: {integrity: sha512-qd+AxqMpfRrRQaWb2SrNFvn69cvl6piqY8TxhYl2Li1g4/LO5F9NJb5wI4vNwRryqgSgD43gYKLm/w3ag1bKvQ==}
-    engines: {node: '>=20.11.1'}
-
   svgo@3.3.2:
     resolution: {integrity: sha512-OoohrmuUlBs8B8o6MB2Aevn+pRIH9zDALSR+6hhqVfa6fRwG/Qw9VUMSMW9VNg2CFc/MTIfabtdOVl9ODIJjpw==}
     engines: {node: '>=14.0.0'}
@@ -17717,7 +17713,7 @@ snapshots:
   '@next/swc-win32-x64-msvc@16.2.4':
     optional: true
 
-  '@next/third-parties@16.2.4(next@16.2.4(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)':
+  '@next/third-parties@16.2.4(next@16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)':
     dependencies:
       next: 16.2.4(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
@@ -28767,8 +28763,6 @@ snapshots:
     optional: true
 
   svg-parser@2.0.4: {}
-
-  svg-pathdata@7.2.0: {}
 
   svgo@3.3.2:
     dependencies:

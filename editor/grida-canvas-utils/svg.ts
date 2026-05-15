@@ -1,4 +1,4 @@
-import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
+import { SVGCommand, encodeSVGPath, SVGPathData } from "@grida/svg/pathdata";
 import type cg from "@grida/cg";
 import cmath from "@grida/cmath";
 import { v4 } from "uuid";
