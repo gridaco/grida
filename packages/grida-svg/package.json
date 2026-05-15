@@ -1,0 +1,46 @@
+{
+  "name": "@grida/svg",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Grida-owned SVG tooling for parsing, transforming, and authoring SVG data.",
+  "keywords": [
+    "encoder",
+    "grida",
+    "parser",
+    "path",
+    "svg",
+    "transformer",
+    "typescript"
+  ],
+  "homepage": "https://grida.co",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist",
+    "LICENSE",
+    "LICENSE.svg-pathdata"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./pathdata": {
+      "types": "./dist/pathdata/index.d.mts",
+      "import": "./dist/pathdata/index.mjs",
+      "require": "./dist/pathdata/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  }
+}
