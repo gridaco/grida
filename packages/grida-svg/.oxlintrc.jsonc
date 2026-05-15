@@ -1,0 +1,25 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  // Upstream-attributed code (under LICENSE.svg-pathdata) is kept intentionally
+  // close to the original svg-pathdata sources for behavior parity. Some
+  // upstream patterns (test helpers without inline expects, precision-loss
+  // tests, `any` in higher-order command transformers) trip rules that
+  // otherwise apply repo-wide. They are scoped off here, not globally.
+  "extends": ["../../.oxlintrc.jsonc"],
+  "rules": {
+    "no-loss-of-precision": "off",
+    "no-explicit-any": "off",
+    "no-import-type-side-effects": "off",
+    "unicorn/no-new-array": "off",
+  },
+  "overrides": [
+    {
+      "files": ["src/**/__tests__/**"],
+      "rules": {
+        "jest/expect-expect": "off",
+        "jest/no-conditional-expect": "off",
+        "jest/no-export": "off",
+      },
+    },
+  ],
+}
