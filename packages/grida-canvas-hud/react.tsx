@@ -4,11 +4,72 @@ import * as React from "react";
 import type cmath from "@grida/cmath";
 import { guide, type SnapResult } from "@grida/cmath/_snap";
 import type { Measurement } from "@grida/cmath/_measurement";
-import { HUDCanvas, type HUDDraw } from "./hud";
-import { snapGuideToHUDDraw } from "./snap-guide";
-import { measurementToHUDDraw } from "./measurement-guide";
-import { marqueeToHUDDraw } from "./marquee";
-import { lassoToHUDDraw } from "./lasso";
+import {
+  HUDCanvas,
+  type HUDDraw,
+  snapGuideToHUDDraw,
+  measurementToHUDDraw,
+  marqueeToHUDDraw,
+  lassoToHUDDraw,
+} from "./primitives";
+import { Surface, type SurfaceOptions } from "./surface";
+
+// ---------------------------------------------------------------------------
+// useHUDSurface — imperative Surface bound to a canvas ref
+// ---------------------------------------------------------------------------
+
+/**
+ * Instantiate a `Surface` against the given canvas element and return the
+ * imperative instance. The surface is created once and reused across renders;
+ * its providers are kept up to date via refs so the host can pass new
+ * closures freely.
+ *
+ * The hook does **not** wire pointer events — the host attaches listeners
+ * to whatever element it wants (usually the canvas's container) and calls
+ * `surface.dispatch(event)` directly. This keeps the hook framework-agnostic
+ * past React's lifecycle.
+ */
+export function useHUDSurface(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  options: SurfaceOptions
+): Surface | null {
+  const [surface, setSurface] = React.useState<Surface | null>(null);
+
+  // Keep latest provider closures in refs.
+  const pickRef = React.useRef(options.pick);
+  const shapeOfRef = React.useRef(options.shapeOf);
+  const onIntentRef = React.useRef(options.onIntent);
+  pickRef.current = options.pick;
+  shapeOfRef.current = options.shapeOf;
+  onIntentRef.current = options.onIntent;
+
+  React.useLayoutEffect(() => {
+    if (!canvasRef.current) return;
+    const s = new Surface(canvasRef.current, {
+      pick: (p) => pickRef.current(p),
+      shapeOf: (id) => shapeOfRef.current(id),
+      onIntent: (i) => onIntentRef.current(i),
+      style: options.style,
+      readonly: options.readonly,
+      color: options.color,
+    });
+    setSurface(s);
+    return () => {
+      s.dispose();
+      setSurface(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasRef]);
+
+  // Sync style/readonly on every render (cheap).
+  React.useEffect(() => {
+    if (!surface) return;
+    if (options.style) surface.setStyle(options.style);
+    if (options.readonly !== undefined) surface.setReadonly(options.readonly);
+  }, [surface, options.style, options.readonly]);
+
+  return surface;
+}
 
 // ---------------------------------------------------------------------------
 // Generic HUD overlay — thin React bridge around HUDCanvas

@@ -11,6 +11,8 @@ pub mod skia_layout;
 #[cfg(test)]
 mod session_tests;
 #[cfg(test)]
+mod shared_fixtures_tests;
+#[cfg(test)]
 mod tests;
 
 pub use history::EditKind;

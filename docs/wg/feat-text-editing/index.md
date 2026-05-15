@@ -224,6 +224,19 @@ At minimum, support:
 
 The “what is a word” rule should come from engine word-boundary queries or a shared text boundary module.
 
+#### Selection collapse on navigation
+
+When an arrow key is pressed **without the extend modifier** (no Shift held), an active selection is **collapsed to one of its endpoints**, and the caret does NOT move further past that endpoint:
+
+- `move_left` (ArrowLeft, no extend) → `cursor = selection.start`, `anchor = none`
+- `move_right` (ArrowRight, no extend) → `cursor = selection.end`, `anchor = none`
+
+This holds regardless of word/grapheme granularity: pressing Left when "an" is selected within "Click an element" lands the caret immediately before "a" (start of selection), not one grapheme further left. The granularity modifier (`grapheme` / `word`) only applies when there is no selection or the modifier is extended via Shift.
+
+With `extend = true` (Shift+Arrow), the caret moves by the requested granularity and the selection grows or shrinks accordingly — the anchor is preserved, the focus moves.
+
+This matches the standard behavior of every native text editor (cocoa, gtk, web `<input>` and `<textarea>`). It exists so that each arrow keystroke has a single, well-defined effect, and so that a selection followed by `←` puts the caret exactly where the user expects (at the visible boundary of what was highlighted).
+
 ## Editing operations surface (semantics, not UI)
 
 To avoid every host re-implementing subtly different editing behavior, define a minimal, shared operation surface:

@@ -4,7 +4,7 @@ import { KeyCode, KeyCodeUtils } from "./keycode";
  * Modifier bitmask flags
  * Use bitwise OR to combine: M.Ctrl | M.Shift
  */
-export const enum M {
+export enum M {
   Ctrl = 1 << 0,
   Shift = 1 << 1,
   Alt = 1 << 2,
@@ -59,6 +59,9 @@ export type Keybindings =
       windows?: Keybinding;
       linux?: Keybinding;
     };
+
+/** Platform identifier used by all resolution helpers. */
+export type Platform = "mac" | "windows" | "linux";
 
 /**
  * Resolved chunk structure for display/matching
@@ -118,10 +121,7 @@ export function platformKb(config: {
  * @param platform - Target platform
  * @returns Array of KeyCode values for modifiers in stable order
  */
-export function resolveMods(
-  mods: number,
-  platform: "mac" | "windows" | "linux"
-): KeyCode[] {
+export function resolveMods(mods: number, platform: Platform): KeyCode[] {
   const result: KeyCode[] = [];
 
   // Handle CtrlCmd first (resolves to Meta on mac, Ctrl on win/linux)
@@ -162,10 +162,7 @@ export function resolveMods(
  * @param platform - Target platform
  * @returns Resolved chunk with platform-specific modifiers
  */
-export function resolveChunk(
-  chunk: Chunk,
-  platform: "mac" | "windows" | "linux"
-): ResolvedChunk {
+export function resolveChunk(chunk: Chunk, platform: Platform): ResolvedChunk {
   const [mods, ...keys] = chunk;
   return {
     mods: resolveMods(mods, platform),
@@ -183,7 +180,7 @@ export function resolveChunk(
  */
 export function resolveSequence(
   sequence: Sequence,
-  platform: "mac" | "windows" | "linux"
+  platform: Platform
 ): ResolvedSequence {
   return sequence.map((chunk) => resolveChunk(chunk, platform));
 }
@@ -199,7 +196,7 @@ function isApplePlatform(): boolean {
  *
  * mostly to determine cmdctrl key (and for cases that keybindings are fundamentally different, e.g. ctrl+c being color picker on mac, but copy on windows/linux)
  */
-export function getKeyboardOS(): "mac" | "windows" | "linux" {
+export function getKeyboardOS(): Platform {
   // SSR / non-browser safety: `navigator` is not defined in Node.js environments.
   // Pick a reasonable default for headless contexts.
   if (typeof navigator === "undefined" || !navigator.platform) {
@@ -220,7 +217,7 @@ export function getKeyboardOS(): "mac" | "windows" | "linux" {
  */
 export function keybindingsToKeyCodes(
   keybindings: Keybindings,
-  platform?: "mac" | "windows" | "linux"
+  platform?: Platform
 ): ResolvedSequence[] {
   const targetPlatform = platform || getKeyboardOS();
   const result: ResolvedSequence[] = [];
@@ -314,7 +311,7 @@ const keysymbols: PlatformKeySymbols = {
     [KeyCode.Meta]: "Ctrl", // Windows uses Ctrl where macOS uses Meta
     [KeyCode.Ctrl]: "Ctrl",
     [KeyCode.Alt]: "Alt",
-    [KeyCode.Shift]: "Shift", // Windows uses text label, not symbol
+    [KeyCode.Shift]: "Shift",
     // Special keys - Windows uses text labels
     [KeyCode.Enter]: "Enter",
     [KeyCode.Backspace]: "Backspace",
@@ -335,10 +332,10 @@ const keysymbols: PlatformKeySymbols = {
   },
   linux: {
     // Modifiers - Linux uses text labels (same as Windows)
-    [KeyCode.Meta]: "Ctrl", // Linux uses Ctrl where macOS uses Meta
+    [KeyCode.Meta]: "Ctrl",
     [KeyCode.Ctrl]: "Ctrl",
     [KeyCode.Alt]: "Alt",
-    [KeyCode.Shift]: "Shift", // Linux uses text label, not symbol
+    [KeyCode.Shift]: "Shift",
     // Special keys - Linux uses text labels
     [KeyCode.Enter]: "Enter",
     [KeyCode.Backspace]: "Backspace",
@@ -367,7 +364,7 @@ const keysymbols: PlatformKeySymbols = {
  */
 export function keycodeToPlatformUILabel(
   keyCode: KeyCode,
-  platform: "mac" | "windows" | "linux" = "linux"
+  platform: Platform = "linux"
 ): string {
   const platformSymbols = keysymbols[platform];
   return platformSymbols[keyCode] || KeyCodeUtils.toString(keyCode);
@@ -384,10 +381,7 @@ export function keycodeToPlatformUILabel(
  * uikbdk(M.CtrlCmd) // "⌘" on mac, "Ctrl" on windows/linux
  * uikbdk(KeyCode.KeyI) // "I"
  */
-export function uikbdk(
-  key: M | KeyCode,
-  platform?: "mac" | "windows" | "linux"
-): string {
+export function uikbdk(key: M | KeyCode, platform?: Platform): string {
   const targetPlatform = platform || getKeyboardOS();
 
   // Only treat *single* modifier constants as modifiers.
@@ -408,99 +402,4 @@ export function uikbdk(
 
   // It's a KeyCode
   return keycodeToPlatformUILabel(key as KeyCode, targetPlatform);
-}
-
-// ---------------------------------------------------------------------------
-// react-hotkeys-hook bridge
-// ---------------------------------------------------------------------------
-
-/**
- * Map a `KeyCode` to the lowercased string expected by `react-hotkeys-hook`.
- *
- * Examples: `KeyCode.UpArrow` → `"arrowup"`, `KeyCode.KeyD` → `"d"`,
- * `KeyCode.Meta` → `"meta"`.
- */
-export function keyCodeToHotkeyStr(kc: KeyCode): string {
-  switch (kc) {
-    case KeyCode.Backspace:
-      return "backspace";
-    case KeyCode.Tab:
-      return "tab";
-    case KeyCode.Enter:
-      return "enter";
-    case KeyCode.Shift:
-      return "shift";
-    case KeyCode.Ctrl:
-      return "ctrl";
-    case KeyCode.Alt:
-      return "alt";
-    case KeyCode.Escape:
-      return "escape";
-    case KeyCode.Space:
-      return "space";
-    case KeyCode.PageUp:
-      return "pageup";
-    case KeyCode.PageDown:
-      return "pagedown";
-    case KeyCode.End:
-      return "end";
-    case KeyCode.Home:
-      return "home";
-    case KeyCode.LeftArrow:
-      return "arrowleft";
-    case KeyCode.UpArrow:
-      return "arrowup";
-    case KeyCode.RightArrow:
-      return "arrowright";
-    case KeyCode.DownArrow:
-      return "arrowdown";
-    case KeyCode.Delete:
-      return "delete";
-    case KeyCode.Meta:
-      return "meta";
-    default:
-      break;
-  }
-
-  // Digit0–Digit9 → "0"–"9"
-  if (kc >= KeyCode.Digit0 && kc <= KeyCode.Digit9) {
-    return String(kc - KeyCode.Digit0);
-  }
-  // KeyA–KeyZ → "a"–"z"
-  if (kc >= KeyCode.KeyA && kc <= KeyCode.KeyZ) {
-    return String.fromCharCode("a".charCodeAt(0) + (kc - KeyCode.KeyA));
-  }
-  // F1–F24 → "f1"–"f24"
-  if (kc >= KeyCode.F1 && kc <= KeyCode.F24) {
-    return `f${kc - KeyCode.F1 + 1}`;
-  }
-
-  // Fallback — should not be reached for the keybindings we define.
-  return "";
-}
-
-/**
- * Convert a `Keybinding` to a `react-hotkeys-hook` compatible string.
- *
- * Multiple aliases (sequences) are joined with `, ` which react-hotkeys-hook
- * interprets as alternative triggers.
- *
- * Note: multi-chunk sequences (chords like Ctrl+K, Ctrl+S) are NOT supported
- * by react-hotkeys-hook. Only the first chunk of each sequence is emitted.
- */
-export function keybindingToHotkeysString(
-  binding: Keybinding,
-  platform?: "mac" | "windows" | "linux"
-): string {
-  const resolved = keybindingsToKeyCodes(binding, platform);
-  const strs: string[] = [];
-  for (const seq of resolved) {
-    const chunk = seq[0];
-    if (!chunk) continue;
-    const parts: string[] = [];
-    for (const mod of chunk.mods) parts.push(keyCodeToHotkeyStr(mod));
-    for (const key of chunk.keys) parts.push(keyCodeToHotkeyStr(key));
-    strs.push(parts.join("+"));
-  }
-  return strs.join(", ");
 }

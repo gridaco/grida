@@ -1,7 +1,7 @@
 {
   "name": "@grida/number-input",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "Core parsing, formatting, and UI binding utilities for number inputs with multi-unit support",
   "keywords": [
     "accessibility",

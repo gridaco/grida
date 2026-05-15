@@ -5,14 +5,14 @@ import {
   InputGroupInput,
   InputGroupAddon,
 } from "@/components/ui/input-group";
-import { keycodeToPlatformUILabel } from "@/grida-canvas/keybinding";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { actions } from "./uxhost-actions";
 import {
+  keycodeToPlatformUILabel,
   keybindingsToKeyCodes,
   getKeyboardOS,
   type Keybindings,
-} from "@/grida-canvas/keybinding";
+} from "@grida/keybinding";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { actions } from "./uxhost-actions";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   Select,

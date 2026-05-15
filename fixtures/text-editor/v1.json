@@ -1,0 +1,181 @@
+{
+  "version": "1.0",
+  "description": "Shared text-editor behavior fixtures (ASCII, pure commands). Consumed by both crates/grida/src/text_edit and packages/grida-text-editor.",
+  "tests": [
+    {
+      "id": "insert_at_end",
+      "initial": { "text": "Hi", "caret": 2, "anchor": null },
+      "commands": [{ "type": "insert", "text": "!" }],
+      "final": { "text": "Hi!", "caret": 3, "anchor": null }
+    },
+    {
+      "id": "insert_at_start",
+      "initial": { "text": "world", "caret": 0, "anchor": null },
+      "commands": [{ "type": "insert", "text": "hello " }],
+      "final": { "text": "hello world", "caret": 6, "anchor": null }
+    },
+    {
+      "id": "insert_replaces_selection",
+      "initial": { "text": "hello world", "caret": 6, "anchor": 11 },
+      "commands": [{ "type": "insert", "text": "there" }],
+      "final": { "text": "hello there", "caret": 11, "anchor": null }
+    },
+    {
+      "id": "backspace_grapheme",
+      "initial": { "text": "hello", "caret": 5, "anchor": null },
+      "commands": [{ "type": "backspace", "granularity": "grapheme" }],
+      "final": { "text": "hell", "caret": 4, "anchor": null }
+    },
+    {
+      "id": "backspace_word_at_end",
+      "initial": { "text": "hello world", "caret": 11, "anchor": null },
+      "commands": [{ "type": "backspace", "granularity": "word" }],
+      "final": { "text": "hello ", "caret": 6, "anchor": null }
+    },
+    {
+      "id": "delete_grapheme",
+      "initial": { "text": "hello", "caret": 0, "anchor": null },
+      "commands": [{ "type": "delete", "granularity": "grapheme" }],
+      "final": { "text": "ello", "caret": 0, "anchor": null }
+    },
+    {
+      "id": "delete_word_at_start",
+      "initial": { "text": "hello world", "caret": 0, "anchor": null },
+      "commands": [{ "type": "delete", "granularity": "word" }],
+      "final": { "text": " world", "caret": 0, "anchor": null }
+    },
+    {
+      "id": "move_left_grapheme",
+      "initial": { "text": "abc", "caret": 3, "anchor": null },
+      "commands": [
+        { "type": "move_left", "extend": false, "granularity": "grapheme" }
+      ],
+      "final": { "text": "abc", "caret": 2, "anchor": null }
+    },
+    {
+      "id": "move_right_grapheme",
+      "initial": { "text": "abc", "caret": 0, "anchor": null },
+      "commands": [
+        { "type": "move_right", "extend": false, "granularity": "grapheme" }
+      ],
+      "final": { "text": "abc", "caret": 1, "anchor": null }
+    },
+    {
+      "id": "move_left_extend_builds_selection",
+      "initial": { "text": "hello", "caret": 3, "anchor": null },
+      "commands": [
+        { "type": "move_left", "extend": true, "granularity": "grapheme" }
+      ],
+      "final": { "text": "hello", "caret": 2, "anchor": 3 }
+    },
+    {
+      "id": "move_word_right_from_start",
+      "initial": { "text": "hello world", "caret": 0, "anchor": null },
+      "commands": [
+        { "type": "move_right", "extend": false, "granularity": "word" }
+      ],
+      "final": { "text": "hello world", "caret": 5, "anchor": null }
+    },
+    {
+      "id": "move_word_left_from_end",
+      "initial": { "text": "hello world", "caret": 11, "anchor": null },
+      "commands": [
+        { "type": "move_left", "extend": false, "granularity": "word" }
+      ],
+      "final": { "text": "hello world", "caret": 6, "anchor": null }
+    },
+    {
+      "id": "move_doc_start",
+      "initial": { "text": "hello", "caret": 5, "anchor": null },
+      "commands": [{ "type": "move_doc_start", "extend": false }],
+      "final": { "text": "hello", "caret": 0, "anchor": null }
+    },
+    {
+      "id": "move_doc_end",
+      "initial": { "text": "hello", "caret": 0, "anchor": null },
+      "commands": [{ "type": "move_doc_end", "extend": false }],
+      "final": { "text": "hello", "caret": 5, "anchor": null }
+    },
+    {
+      "id": "select_all_then_arrow_left_collapses_to_zero",
+      "initial": { "text": "hello", "caret": 0, "anchor": null },
+      "commands": [
+        { "type": "select_all" },
+        { "type": "move_left", "extend": false, "granularity": "grapheme" }
+      ],
+      "final": { "text": "hello", "caret": 0, "anchor": null }
+    },
+    {
+      "id": "select_all_then_arrow_right_collapses_to_end",
+      "initial": { "text": "hello", "caret": 0, "anchor": null },
+      "commands": [
+        { "type": "select_all" },
+        { "type": "move_right", "extend": false, "granularity": "grapheme" }
+      ],
+      "final": { "text": "hello", "caret": 5, "anchor": null }
+    },
+    {
+      "id": "set_selection_then_left_collapses_to_start",
+      "initial": { "text": "Click an element", "caret": 0, "anchor": null },
+      "commands": [
+        { "type": "set_selection", "anchor": 6, "focus": 8 },
+        { "type": "move_left", "extend": false, "granularity": "grapheme" }
+      ],
+      "final": { "text": "Click an element", "caret": 6, "anchor": null }
+    },
+    {
+      "id": "replace_range",
+      "initial": { "text": "hello world", "caret": 0, "anchor": null },
+      "commands": [
+        { "type": "replace", "start": 6, "end": 11, "text": "there" }
+      ],
+      "final": { "text": "hello there", "caret": 11, "anchor": null }
+    },
+    {
+      "id": "backspace_word_at_internal_space",
+      "description": "Word-granularity backspace right after a space. Canonical UAX-29 behavior: delete just the whitespace segment between words.",
+      "initial": { "text": "hello world", "caret": 6, "anchor": null },
+      "commands": [{ "type": "backspace", "granularity": "word" }],
+      "final": { "text": "helloworld", "caret": 5, "anchor": null }
+    },
+    {
+      "id": "delete_word_at_internal_space",
+      "description": "Word-granularity forward-delete at the whitespace position. Same UAX-29 rule: delete the space segment only.",
+      "initial": { "text": "hello world", "caret": 5, "anchor": null },
+      "commands": [{ "type": "delete", "granularity": "word" }],
+      "final": { "text": "helloworld", "caret": 5, "anchor": null }
+    },
+    {
+      "id": "move_word_right_from_internal_space",
+      "description": "From inside a run of whitespace, word-right lands at the END of the next word (macOS Opt+Right convention).",
+      "initial": { "text": "hello   world", "caret": 5, "anchor": null },
+      "commands": [
+        { "type": "move_right", "extend": false, "granularity": "word" }
+      ],
+      "final": { "text": "hello   world", "caret": 13, "anchor": null }
+    },
+    {
+      "id": "move_word_left_from_mid_word",
+      "description": "Word-left from inside the second word lands at the start of that word.",
+      "initial": { "text": "hello world", "caret": 9, "anchor": null },
+      "commands": [
+        { "type": "move_left", "extend": false, "granularity": "word" }
+      ],
+      "final": { "text": "hello world", "caret": 6, "anchor": null }
+    },
+    {
+      "id": "backspace_at_doc_start_is_noop",
+      "description": "Backspace with caret at 0 leaves text and caret unchanged.",
+      "initial": { "text": "abc", "caret": 0, "anchor": null },
+      "commands": [{ "type": "backspace", "granularity": "grapheme" }],
+      "final": { "text": "abc", "caret": 0, "anchor": null }
+    },
+    {
+      "id": "delete_at_doc_end_is_noop",
+      "description": "Delete-forward with caret at text.length is a no-op.",
+      "initial": { "text": "abc", "caret": 3, "anchor": null },
+      "commands": [{ "type": "delete", "granularity": "grapheme" }],
+      "final": { "text": "abc", "caret": 3, "anchor": null }
+    }
+  ]
+}
