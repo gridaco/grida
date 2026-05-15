@@ -2,12 +2,12 @@ pre-commit:
   parallel: true
   jobs:
     - name: oxfmt
-      glob: "*.{ts,tsx,js,jsx,json,css,md,mdx,html}"
+      glob: "*.{mts,ts,tsx,mjs,js,jsx,json,css,md,mdx,html}"
       run: pnpm oxfmt {staged_files}
       stage_fixed: true
 
     - name: oxlint
-      glob: "*.{ts,tsx,js,jsx}"
+      glob: "*.{mts,ts,tsx,mjs,js,jsx}"
       # --no-error-on-unmatched-pattern: when {staged_files} is empty
       # (glob matched nothing) or every staged file is in oxlint's ignore
       # list (e.g. generated files under lib/bin/), oxlint would otherwise

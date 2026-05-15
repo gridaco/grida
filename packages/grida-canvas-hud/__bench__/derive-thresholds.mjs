@@ -73,8 +73,16 @@ function phase(total) {
 for (const s of scenarios) {
   const total_x = s.w + EXTENSION * 2;
   const total_y = s.h + EXTENSION * 2;
-  const { corner: cx, edge: ex } = negotiateAxis(total_x, HIT_SIZE, MIN_GUARANTEED_DIM);
-  const { corner: cy, edge: ey } = negotiateAxis(total_y, HIT_SIZE, MIN_GUARANTEED_DIM);
+  const { corner: cx, edge: ex } = negotiateAxis(
+    total_x,
+    HIT_SIZE,
+    MIN_GUARANTEED_DIM
+  );
+  const { corner: cy, edge: ey } = negotiateAxis(
+    total_y,
+    HIT_SIZE,
+    MIN_GUARANTEED_DIM
+  );
   const w_violated = s.w < BODY_FLIP_THRESHOLD;
   const h_violated = s.h < BODY_FLIP_THRESHOLD;
   const small_mode = w_violated || h_violated;
@@ -106,8 +114,16 @@ console.log("  ENDPOINT(10) < ROTATE(20) < EDGE_SMALL(22) < BODY_SMALL(25)");
 console.log("         < EDGE(30) < CORNER(31) < BODY(40)");
 console.log("");
 console.log("Negotiation phases (per axis):");
-console.log(`  comfortable: total ≥ ${HIT_SIZE * 2 + MIN_GUARANTEED_DIM}  → corner=${HIT_SIZE}, edge=total-${HIT_SIZE * 2}`);
-console.log(`  squeezed:    total ≥ ${MIN_GUARANTEED_DIM}                 → edge=${MIN_GUARANTEED_DIM} (min), corner=(total-${MIN_GUARANTEED_DIM})/2`);
-console.log(`  tiny:        else                                          → edge=total, corner=0`);
+console.log(
+  `  comfortable: total ≥ ${HIT_SIZE * 2 + MIN_GUARANTEED_DIM}  → corner=${HIT_SIZE}, edge=total-${HIT_SIZE * 2}`
+);
+console.log(
+  `  squeezed:    total ≥ ${MIN_GUARANTEED_DIM}                 → edge=${MIN_GUARANTEED_DIM} (min), corner=(total-${MIN_GUARANTEED_DIM})/2`
+);
+console.log(
+  `  tiny:        else                                          → edge=total, corner=0`
+);
 console.log("");
-console.log("MIN_GUARANTEED_DIM is the single tunable; everything else derives.");
+console.log(
+  "MIN_GUARANTEED_DIM is the single tunable; everything else derives."
+);
