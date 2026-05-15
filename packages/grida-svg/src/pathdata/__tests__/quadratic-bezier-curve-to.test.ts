@@ -119,7 +119,7 @@ describe("Parsing quadratic bezier curve to commands", () => {
   });
 });
 
-describe("Encoding line to commands", () => {
+describe("Encoding quadratic Bézier curve to commands", () => {
   test("should work with one command", () => {
     expect(
       new SVGPathData(

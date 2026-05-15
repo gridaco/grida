@@ -75,7 +75,7 @@ describe("Parsing commands with different numbers", () => {
     ).toEqual(-123.456e-125);
   });
 
-  test("should work with sign separated numbers", () => {
+  test("should work with sign separated numbers (single pair)", () => {
     const commands = new SVGPathData("M-123.456e-125-1234.456e-125")
       .commands as CommandM[];
 
@@ -83,7 +83,7 @@ describe("Parsing commands with different numbers", () => {
     expect(commands[0].y).toEqual(-1234.456e-125);
   });
 
-  test("should work with sign separated numbers", () => {
+  test("should work with sign separated numbers (multiple pairs)", () => {
     const commands = new SVGPathData(
       "M-1.456e-125-12.456e-125-123.456e-125-1234.456e-125"
     ).commands as CommandM[];
@@ -94,7 +94,7 @@ describe("Parsing commands with different numbers", () => {
     expect(commands[1].y).toEqual(-1234.456e-125);
   });
 
-  test("should work with decpoint separated numbers", () => {
+  test("should work with decpoint separated numbers (single pair)", () => {
     const commands = new SVGPathData("M-123.123e-123.456e-456")
       .commands as CommandM[];
 
@@ -102,7 +102,7 @@ describe("Parsing commands with different numbers", () => {
     expect(commands[0].y).toEqual(0.456e-456);
   });
 
-  test("should work with decpoint separated numbers", () => {
+  test("should work with decpoint separated numbers (multiple pairs)", () => {
     const commands = new SVGPathData(
       "M-123.123e-123.456e-456.789e-789.123e-123"
     ).commands as CommandM[];

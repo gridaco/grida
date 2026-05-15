@@ -373,7 +373,7 @@ function SANITIZE(EPS = 0) {
       prevQuadCY = isNaN(prevQuadCY) ? prevY : 2 * prevY - prevQuadCY;
     } else if (command.type & SVGPathData.QUAD_TO) {
       prevQuadCX = command.relative ? prevX + command.x1 : command.x1;
-      prevQuadCY = command.relative ? prevY + command.y1 : command.y2;
+      prevQuadCY = command.relative ? prevY + command.y1 : command.y1;
     } else {
       prevQuadCX = NaN;
       prevQuadCY = NaN;
@@ -406,27 +406,27 @@ function SANITIZE(EPS = 0) {
         : "undefined" === typeof command.x1
           ? x1Rel
           : command.relative
-            ? command.x
+            ? command.x1
             : command.x1 - prevX;
       y1Rel = !isNaN(prevQuadCY)
         ? prevQuadCY - prevY
         : "undefined" === typeof command.y1
           ? y1Rel
           : command.relative
-            ? command.y
+            ? command.y1
             : command.y1 - prevY;
 
       const x2Rel =
         "undefined" === typeof command.x2
           ? 0
           : command.relative
-            ? command.x
+            ? command.x2
             : command.x2 - prevX;
       const y2Rel =
         "undefined" === typeof command.y2
           ? 0
           : command.relative
-            ? command.y
+            ? command.y2
             : command.y2 - prevY;
 
       if (

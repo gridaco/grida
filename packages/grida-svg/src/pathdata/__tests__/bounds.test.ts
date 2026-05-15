@@ -11,10 +11,10 @@ function testBounds(
   const path = new SVGPathData(svgString);
   const bounds = path.getBounds();
 
-  expect(bounds.minX).toBeCloseTo(minX, 1e-4);
-  expect(bounds.minY).toBeCloseTo(minY, 1e-4);
-  expect(bounds.maxX).toBeCloseTo(maxX, 1e-4);
-  expect(bounds.maxY).toBeCloseTo(maxY, 1e-4);
+  expect(bounds.minX).toBeCloseTo(minX, 4);
+  expect(bounds.minY).toBeCloseTo(minY, 4);
+  expect(bounds.maxX).toBeCloseTo(maxX, 4);
+  expect(bounds.maxY).toBeCloseTo(maxY, 4);
 }
 
 describe("Calculating bounds", () => {

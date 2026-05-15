@@ -3,7 +3,7 @@ import { SVGPathData } from "../index.js";
 import type { CommandT } from "../types.js";
 
 describe("Parsing smooth quadratic curve to commands", () => {
-  test("should fail with a with single coordinate", () => {
+  test("should fail with a single coordinate", () => {
     expect(() => new SVGPathData("T100")).toThrow(
       new SyntaxError("Unterminated command at the path end.")
     );

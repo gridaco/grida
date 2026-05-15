@@ -92,9 +92,12 @@ function createRect(
 function createPolyline(coords: number[]): SVGPathData {
   if (coords.length < 2) return new SVGPathData([]);
 
+  // Odd-length input has a dangling coordinate with no pair; drop it
+  // rather than emitting a lineTo with an undefined y.
+  const evenLen = coords.length - (coords.length % 2);
   const commands: SVGCommand[] = [moveTo(coords[0], coords[1])];
 
-  for (let i = 2; i < coords.length; i += 2) {
+  for (let i = 2; i < evenLen; i += 2) {
     commands.push(lineTo(coords[i], coords[i + 1]));
   }
 

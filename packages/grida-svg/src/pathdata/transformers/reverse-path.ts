@@ -82,7 +82,7 @@ function reverseSubpath(commands: SVGCommandXY[]): SVGCommand[] {
 
     if (curCmd.relative) {
       throw new Error(
-        "Relative command are not supported convert first with `toAbs()`"
+        "Relative commands are not supported; convert first with SVGPathDataTransformer.TO_ABS()."
       );
     }
 

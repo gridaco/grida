@@ -199,7 +199,7 @@ describe("toAbs", () => {
     expect(
       new SVGPathData("M0 0 t-100,100 t-100,100 t10,10 t10,10").toAbs().encode()
     ).toEqual(
-      new SVGPathData("M0 0 T-100,100 T-200,200 T-190,210 -180,220").encode()
+      new SVGPathData("M0 0 T-100,100 T-200,200 T-190,210 T-180,220").encode()
     );
   });
   test("should work with v commands", () => {

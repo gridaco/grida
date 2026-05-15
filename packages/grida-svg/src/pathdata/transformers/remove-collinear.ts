@@ -15,11 +15,11 @@ export function REMOVE_COLLINEAR(commands: SVGCommand[]): SVGCommand[] {
 
   const points: Point[] = commands.map(
     SVGPathDataTransformer.INFO((cmd, pXAbs, pYAbs) => {
-      // Calculate absolute coordinates and normlise HV
-      const isRelatve = "relative" in cmd && cmd.relative;
+      // Calculate absolute coordinates and normalize HV
+      const isRelative = "relative" in cmd && cmd.relative;
       return [
-        "x" in cmd ? cmd.x + (isRelatve ? pXAbs : 0) : pXAbs,
-        "y" in cmd ? cmd.y + (isRelatve ? pYAbs : 0) : pYAbs,
+        "x" in cmd ? cmd.x + (isRelative ? pXAbs : 0) : pXAbs,
+        "y" in cmd ? cmd.y + (isRelative ? pYAbs : 0) : pYAbs,
       ];
     })
   );

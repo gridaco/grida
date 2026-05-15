@@ -206,7 +206,8 @@ describe("Transforming elliptical arc commands", () => {
     delta: number
   ) {
     if (typeof x === "number" && typeof y === "number") {
-      expect(x).toBeCloseTo(y, delta);
+      // delta is an absolute tolerance, not a decimal-places count.
+      expect(Math.abs(x - y)).toBeLessThanOrEqual(delta);
     } else if (x instanceof Array && y instanceof Array) {
       expect(x.length).toEqual(y.length);
       for (let i = 0; i < x.length; i++) {

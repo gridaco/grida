@@ -140,7 +140,7 @@ describe("Reverse paths", () => {
     test("throw on relative commands", () => {
       const input = "m10,10 l10,10 l10,-10";
       expect(() => testReversePath(input)).toThrow(
-        "Relative command are not supported convert first with `toAbs()`"
+        "Relative commands are not supported; convert first with SVGPathDataTransformer.TO_ABS()."
       );
     });
 
