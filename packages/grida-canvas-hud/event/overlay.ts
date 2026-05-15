@@ -113,12 +113,20 @@ export type RenderShape =
  *   `render` — they exist only as hit regions.
  * - **Padded elements** have `hit` larger than the corresponding `render`
  *   shape (e.g. 16px hit AABB around an 8px visual knob).
- * - **Cursor hover** is driven by the element's `cursor` field when the
- *   pointer enters its hit region.
+ *
+ * TODO(rotation): when the first base-rotated overlay lands (e.g. an
+ * in-canvas rotation pip), add an `orientation: "screen" | "base"` field.
+ * Existing call sites default to `"screen"` and don't change.
  */
 export interface OverlayElement {
+  /** Stable semantic identifier. Format: `"<kind>[:<param>]"`. Examples:
+   *  `"translate"`, `"resize_handle:nw"`, `"resize_edge:n"`,
+   *  `"rotate:ne"`, `"endpoint:p1"`. Used by tests and debug tooling. */
+  label: string;
   action: OverlayAction;
   hit: HitShape;
   render?: RenderShape;
+  /** Lower wins. See `HUDHitPriority` in `selection-controls.ts`. */
+  priority: number;
   cursor?: CursorIcon;
 }

@@ -50,21 +50,27 @@ export type OverlayAction =
 /**
  * A screen-space AABB associated with an `OverlayAction`.
  *
- * Regions are added by the chrome builder each frame and consulted by the
- * surface during pointer-down to decide if the event hit chrome (e.g. a
- * handle) before falling through to the scene `pick`.
+ * Each region carries an explicit `priority` — UX priority is data, not
+ * iteration order. `HitRegions.hitTest` returns the lowest-priority value
+ * at the hit point. See `selection-controls.ts:HUDHitPriority` for the
+ * canonical priority ladder.
  */
 export interface HitRegion {
   rect: Rect; // screen-space
   action: OverlayAction;
+  /** Lower wins. Tie-break: later push wins. */
+  priority: number;
+  /** Stable semantic identifier for tests and debug overlays. */
+  label: string;
 }
 
 /**
  * Registry of overlay UI hit regions.
  *
- * Regions are appended in draw order (back-to-front). `hitTest` iterates
- * in reverse so the topmost region wins — matching how the chrome is
- * visually layered.
+ * Regions are appended in declaration order. `hitTest` resolves by
+ * **lowest priority value** at the hit point; declaration order
+ * serves as tie-break only (later push wins on equal priorities,
+ * preserving the prior "topmost wins on overlap" feel).
  */
 export class HitRegions {
   private regions: HitRegion[] = [];
@@ -78,11 +84,20 @@ export class HitRegions {
   }
 
   hitTest(point: cmath.Vector2): OverlayAction | null {
-    for (let i = this.regions.length - 1; i >= 0; i--) {
-      const r = this.regions[i];
-      if (cmath.rect.containsPoint(r.rect, point)) return r.action;
+    return this.hitTestRegion(point)?.action ?? null;
+  }
+
+  /** Returns the full region (label + priority) — used by tests and
+   *  debug tooling that want to assert on `label`. `hitTest` delegates here. */
+  hitTestRegion(point: cmath.Vector2): HitRegion | null {
+    let best: HitRegion | null = null;
+    for (const r of this.regions) {
+      if (!cmath.rect.containsPoint(r.rect, point)) continue;
+      // `<=` so a later push at the same priority wins (preserves the
+      // prior "topmost on overlap" feel; tie-break is still push order).
+      if (best === null || r.priority <= best.priority) best = r;
     }
-    return null;
+    return best;
   }
 
   isEmpty(): boolean {

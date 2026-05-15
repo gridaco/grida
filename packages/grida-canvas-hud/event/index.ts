@@ -30,17 +30,6 @@ export {
 export { ClickTracker, type ClickTrackerOptions } from "./click-tracker";
 export { HitRegions, type HitRegion, type OverlayAction } from "./hit-regions";
 export {
-  resizeHandlesAt,
-  rotationHandlesAt,
-  handlesVisible,
-  hitResizeHandle,
-  hitRotationHandle,
-  type HandleScreenPos,
-  type ResizeHandleLayout,
-  type RotationHandleLayout,
-  MIN_HANDLES_VISIBLE_SIZE,
-} from "./handles";
-export {
   type Transform,
   IDENTITY,
   screenToDoc,

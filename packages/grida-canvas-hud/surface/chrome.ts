@@ -10,14 +10,16 @@ import { HitRegions } from "../event/hit-regions";
 import { docToScreen } from "../event/transform";
 import type { NodeId, Rect } from "../event/gesture";
 import { rectFromPoints } from "../event/gesture";
-import type { ResizeDirection, RotationCorner } from "../event/cursor";
 import {
   type OverlayElement,
   type HitShape,
   MIN_HIT_SIZE,
-  MIN_CHROME_VISIBLE_SIZE,
-  ROTATION_OFFSET,
 } from "../event/overlay";
+import {
+  computeSelectionControlLayout,
+  HUDHitPriority,
+  type SelectionControlZone,
+} from "../event/selection-controls";
 import type { HUDStyle } from "./style";
 
 export interface ChromeInput {
@@ -28,10 +30,6 @@ export interface ChromeInput {
   height: number;
 }
 
-const CORNER_RESIZE_DIRECTIONS: ResizeDirection[] = ["nw", "ne", "se", "sw"];
-const EDGE_RESIZE_DIRECTIONS: ResizeDirection[] = ["n", "e", "s", "w"];
-const ROTATION_CORNERS: RotationCorner[] = ["nw", "ne", "se", "sw"];
-
 /**
  * Build the per-frame surface chrome.
  *
@@ -40,6 +38,11 @@ const ROTATION_CORNERS: RotationCorner[] = ["nw", "ne", "se", "sw"];
  *   regions). Each pairs a hit shape with an optional render shape.
  * - `decoration` — pure visual `HUDDraw` (selection outlines, hover outline,
  *   marquee, line outlines). Not interactable.
+ *
+ * Priority is data, not iteration order. Each `OverlayElement` carries its
+ * own `priority` (lower wins) and a stable `label`. The `HitRegions`
+ * registry resolves overlapping regions by priority, not push order. See
+ * `event/selection-controls.ts` for the canonical priority ladder.
  *
  * The Surface fans `overlays` into `HitRegions` (for events) and merges
  * their render shapes into `decoration` (for the canvas draw call).
@@ -85,15 +88,11 @@ export function buildChrome(input: ChromeInput): {
         strokeWidth: style.selectionOutlineWidth,
       });
 
-      // Body region — covers the group's bbox so any pointer-down inside the
-      // chrome starts a translate, even on transparent regions of the content
-      // (e.g. corners of a circle's bbox). Pushed FIRST so the corner / edge /
-      // rotation regions added below sit on top and win via reverse iteration.
-      pushBodyHandle(shape, group.ids, transform, overlays);
-
       if (shape.kind === "rect") {
-        pushRectGroupHandles(shape.rect, group.ids, transform, style, overlays);
+        pushRectChrome(shape.rect, group.ids, transform, style, overlays);
       } else if (shape.kind === "line") {
+        // Lines use endpoint knobs + a body translate zone (no resize).
+        pushLineBody(shape, group.ids, transform, overlays);
         pushLineEndpoints(group.ids[0], shape.p1, shape.p2, style, overlays);
       }
     }
@@ -142,33 +141,13 @@ function resolveGroupShape(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Body — translate handle covering the selection bbox
+// Rect chrome — body (translate) + 4 corner knobs + 4 edge strips
+//             + 4 rotation regions. The model and priorities live in
+//             `event/selection-controls.ts`; this function is a thin
+//             consumer that maps each zone to one OverlayElement.
 // ────────────────────────────────────────────────────────────────────────────
 
-function pushBodyHandle(
-  shape: SelectionShape,
-  ids: readonly NodeId[],
-  transform: cmath.Transform,
-  out: OverlayElement[]
-): void {
-  const bounds_doc = shapeBounds(shape);
-  const rect_screen = cmath.rect.transform(bounds_doc, transform);
-  // Skip near-zero bboxes (e.g. degenerate line) — endpoint knobs are the
-  // only interactable region in that case.
-  if (rect_screen.width < 1 && rect_screen.height < 1) return;
-  out.push({
-    action: { kind: "translate_handle", ids },
-    hit: { kind: "screen_aabb", rect: rect_screen },
-    cursor: "move",
-  });
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Rect chrome — 4 corner knobs (rendered) + 4 edge strips (virtual)
-//             + 4 rotation regions (virtual)
-// ────────────────────────────────────────────────────────────────────────────
-
-function pushRectGroupHandles(
+function pushRectChrome(
   rect_doc: Rect,
   ids: readonly NodeId[],
   transform: cmath.Transform,
@@ -176,165 +155,125 @@ function pushRectGroupHandles(
   out: OverlayElement[]
 ): void {
   const rect_screen = cmath.rect.transform(rect_doc, transform);
-  if (
-    rect_screen.width < MIN_CHROME_VISIBLE_SIZE &&
-    rect_screen.height < MIN_CHROME_VISIBLE_SIZE
-  ) {
-    return;
+  const layout = computeSelectionControlLayout(rect_screen, {
+    handle_size: style.handleSize,
+    show_rotation: style.showRotationHandles && ids.length === 1,
+  });
+
+  for (const zone of layout.zones) {
+    const el = zoneToOverlay(
+      zone,
+      rect_doc,
+      ids,
+      style,
+      layout.controls_visible
+    );
+    if (el) out.push(el);
   }
+}
 
-  const size = style.handleSize;
-  const hit_size = Math.max(size + 4, MIN_HIT_SIZE);
-  const anchors_doc = cornerAnchors(rect_doc);
+function zoneToOverlay(
+  zone: SelectionControlZone,
+  rect_doc: Rect,
+  ids: readonly NodeId[],
+  style: HUDStyle,
+  controls_visible: boolean
+): OverlayElement | null {
+  switch (zone.role.kind) {
+    case "translate":
+      return {
+        label: zone.label,
+        action: { kind: "translate_handle", ids },
+        hit: { kind: "screen_aabb", rect: zone.rect },
+        priority: zone.priority,
+        cursor: "move",
+      };
 
-  // 4 corner knobs — rendered + hit.
-  for (const dir of CORNER_RESIZE_DIRECTIONS) {
-    const anchor_doc = anchors_doc[dir];
-    out.push({
-      action: {
-        kind: "resize_handle",
-        direction: dir,
-        ids,
-        initial_rect: rect_doc,
-      },
-      hit: {
-        kind: "screen_rect_at_doc",
-        anchor_doc,
-        width: hit_size,
-        height: hit_size,
-        placement: "center",
-      },
-      render: {
-        kind: "screen_rect",
-        anchor_doc,
-        width: size,
-        height: size,
-        placement: "center",
-        fill: true,
-        stroke: true,
-        fillColor: style.handleFill,
-        strokeColor: style.handleStroke,
-      },
-      cursor: { kind: "resize", direction: dir },
-    });
-  }
-
-  // 4 edge strips — hit only, virtual.
-  const edge_strips = edgeStripsScreen(rect_screen, hit_size);
-  for (const dir of EDGE_RESIZE_DIRECTIONS) {
-    const strip = edge_strips[dir as "n" | "e" | "s" | "w"];
-    out.push({
-      action: {
-        kind: "resize_handle",
-        direction: dir,
-        ids,
-        initial_rect: rect_doc,
-      },
-      hit: { kind: "screen_aabb", rect: strip },
-      cursor: { kind: "resize", direction: dir },
-    });
-  }
-
-  // 4 rotation regions — hit only, virtual.
-  if (style.showRotationHandles && ids.length === 1) {
-    const rot_size = MIN_HIT_SIZE;
-    for (const corner of ROTATION_CORNERS) {
-      const anchor_doc = anchors_doc[corner];
-      // Rotation hit sits OUTSIDE the corner by ROTATION_OFFSET.
-      const offset_screen = rotationOffsetScreen(corner);
-      // Project anchor_doc to screen, add offset, register screen AABB.
-      const [ax, ay] = docToScreen(transform, anchor_doc[0], anchor_doc[1]);
-      out.push({
+    case "resize_corner": {
+      const dir = zone.role.direction;
+      const size = style.handleSize;
+      // Render the visual knob anchored to the doc-space corner so the knob
+      // tracks the artwork as the camera moves. The zone.rect is the (screen-
+      // space) hit region; the render shape is the smaller visible knob.
+      const anchor_doc = cmath.rect.getCardinalPoint(rect_doc, dir);
+      return {
+        label: zone.label,
         action: {
-          kind: "rotate_handle",
-          corner,
+          kind: "resize_handle",
+          direction: dir,
           ids,
           initial_rect: rect_doc,
         },
-        hit: {
-          kind: "screen_aabb",
-          rect: {
-            x: ax + offset_screen[0] - rot_size / 2,
-            y: ay + offset_screen[1] - rot_size / 2,
-            width: rot_size,
-            height: rot_size,
-          },
-        },
-        cursor: { kind: "rotate", corner },
-      });
+        hit: { kind: "screen_aabb", rect: zone.rect },
+        render: controls_visible
+          ? {
+              kind: "screen_rect",
+              anchor_doc,
+              width: size,
+              height: size,
+              placement: "center",
+              fill: true,
+              stroke: true,
+              fillColor: style.handleFill,
+              strokeColor: style.handleStroke,
+            }
+          : undefined,
+        priority: zone.priority,
+        cursor: { kind: "resize", direction: dir },
+      };
     }
-  }
-}
 
-function cornerAnchors(r: Rect): Record<ResizeDirection, cmath.Vector2> {
-  return {
-    nw: [r.x, r.y],
-    n: [r.x + r.width / 2, r.y],
-    ne: [r.x + r.width, r.y],
-    e: [r.x + r.width, r.y + r.height / 2],
-    se: [r.x + r.width, r.y + r.height],
-    s: [r.x + r.width / 2, r.y + r.height],
-    sw: [r.x, r.y + r.height],
-    w: [r.x, r.y + r.height / 2],
-  };
-}
+    case "resize_edge":
+      return {
+        label: zone.label,
+        action: {
+          kind: "resize_handle",
+          direction: zone.role.direction,
+          ids,
+          initial_rect: rect_doc,
+        },
+        hit: { kind: "screen_aabb", rect: zone.rect },
+        priority: zone.priority,
+        cursor: { kind: "resize", direction: zone.role.direction },
+      };
 
-/**
- * Compute the 4 screen-space AABB strips between corner knobs for virtual
- * edge resize regions. Each strip is `thickness` thick, inset from the
- * corners by half the strip thickness so it doesn't overlap corner hits.
- */
-function edgeStripsScreen(
-  rect_screen: Rect,
-  thickness: number
-): Record<"n" | "e" | "s" | "w", Rect> {
-  const { x, y, width, height } = rect_screen;
-  const inset = thickness / 2;
-  const half = thickness / 2;
-  return {
-    n: {
-      x: x + inset,
-      y: y - half,
-      width: Math.max(0, width - inset * 2),
-      height: thickness,
-    },
-    s: {
-      x: x + inset,
-      y: y + height - half,
-      width: Math.max(0, width - inset * 2),
-      height: thickness,
-    },
-    e: {
-      x: x + width - half,
-      y: y + inset,
-      width: thickness,
-      height: Math.max(0, height - inset * 2),
-    },
-    w: {
-      x: x - half,
-      y: y + inset,
-      width: thickness,
-      height: Math.max(0, height - inset * 2),
-    },
-  };
-}
-
-function rotationOffsetScreen(corner: RotationCorner): [number, number] {
-  switch (corner) {
-    case "nw":
-      return [-ROTATION_OFFSET, -ROTATION_OFFSET];
-    case "ne":
-      return [ROTATION_OFFSET, -ROTATION_OFFSET];
-    case "se":
-      return [ROTATION_OFFSET, ROTATION_OFFSET];
-    case "sw":
-      return [-ROTATION_OFFSET, ROTATION_OFFSET];
+    case "rotate":
+      return {
+        label: zone.label,
+        action: {
+          kind: "rotate_handle",
+          corner: zone.role.corner,
+          ids,
+          initial_rect: rect_doc,
+        },
+        hit: { kind: "screen_aabb", rect: zone.rect },
+        priority: zone.priority,
+        cursor: { kind: "rotate", corner: zone.role.corner },
+      };
   }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Line chrome — 2 endpoint knobs
+// Line chrome — body (translate) + 2 endpoint knobs
 // ────────────────────────────────────────────────────────────────────────────
+
+function pushLineBody(
+  shape: Extract<SelectionShape, { kind: "line" }>,
+  ids: readonly NodeId[],
+  transform: cmath.Transform,
+  out: OverlayElement[]
+): void {
+  const bounds_doc = shapeBounds(shape);
+  const rect_screen = cmath.rect.transform(bounds_doc, transform);
+  if (rect_screen.width < 1 && rect_screen.height < 1) return;
+  out.push({
+    label: "translate",
+    action: { kind: "translate_handle", ids },
+    hit: { kind: "screen_aabb", rect: rect_screen },
+    priority: HUDHitPriority.TRANSLATE_BODY,
+    cursor: "move",
+  });
+}
 
 function pushLineEndpoints(
   id: NodeId,
@@ -351,6 +290,7 @@ function pushLineEndpoints(
   ];
   for (const ep of endpoints) {
     out.push({
+      label: `endpoint:${ep.which}`,
       action: {
         kind: "endpoint_handle",
         endpoint: ep.which,
@@ -376,6 +316,7 @@ function pushLineEndpoints(
         fillColor: style.handleFill,
         strokeColor: style.handleStroke,
       },
+      priority: HUDHitPriority.ENDPOINT_HANDLE,
       cursor: "pointer",
     });
   }
@@ -420,6 +361,9 @@ function pushShapeOutline(
  * Fan a list of `OverlayElement`s into per-primitive render arrays and into
  * the hit-region registry. Returns the additional render primitives that
  * should be merged with the decoration `HUDDraw`.
+ *
+ * Priority and label are forwarded verbatim from each overlay element to
+ * the registered HitRegion — the registry resolves overlaps by priority.
  */
 export function fanOverlays(
   overlays: readonly OverlayElement[],
@@ -434,6 +378,8 @@ export function fanOverlays(
     regions.push({
       rect: projectHitAABB(el.hit, transform),
       action: el.action,
+      priority: el.priority,
+      label: el.label,
     });
 
     // Render: fan into the appropriate primitive arrays.

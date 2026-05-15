@@ -225,6 +225,8 @@ describe("SurfaceState dispatch", () => {
         ids: ["a"],
         initial_rect: SCENE.a,
       },
+      priority: 31,
+      label: "resize_handle:se",
     });
     state.dispatch(
       {

@@ -22,7 +22,7 @@ export type { HUDStyle } from "./surface/style";
 export type { SurfaceEvent, Modifiers, PointerButton } from "./event/event";
 export { NO_MODS } from "./event/event";
 export type { SurfaceGesture } from "./event/gesture";
-export type { Intent, IntentPhase } from "./event/intent";
+export type { Intent, IntentPhase, SelectMode } from "./event/intent";
 export type {
   CursorIcon,
   ResizeDirection,
@@ -31,3 +31,17 @@ export type {
 export type { SelectionShape, SelectionGroup } from "./event/shape";
 export type { OverlayElement, HitShape, RenderShape } from "./event/overlay";
 export { MIN_HIT_SIZE, MIN_CHROME_VISIBLE_SIZE } from "./event/overlay";
+
+// Selection-controls — pure-geometry model + priority ladder (UX rule).
+export {
+  HUDHitPriority,
+  MIN_GUARANTEED_INTERACTIVE_DIM,
+  BODY_FLIP_THRESHOLD,
+  computeSelectionControlLayout,
+  negotiateAxis,
+} from "./event/selection-controls";
+export type {
+  SelectionControlLayout,
+  SelectionControlZone,
+  SelectionControlRole,
+} from "./event/selection-controls";
