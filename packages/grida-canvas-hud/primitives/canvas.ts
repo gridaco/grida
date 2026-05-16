@@ -2,6 +2,7 @@ import type cmath from "@grida/cmath";
 import type {
   HUDDraw,
   HUDLine,
+  HUDPoint,
   HUDPolyline,
   HUDRect,
   HUDRule,
@@ -132,13 +133,13 @@ export class HUDCanvas {
   private drawRules(rules: HUDRule[]) {
     const ctx = this.ctx;
     this.applyScreenTransform();
-    ctx.strokeStyle = this.color;
     ctx.lineWidth = DEFAULT_LINE_WIDTH;
 
-    for (const { axis, offset } of rules) {
-      const screenOffset = this.deltaToScreen(offset, axis);
+    for (const rule of rules) {
+      const screenOffset = this.deltaToScreen(rule.offset, rule.axis);
+      ctx.strokeStyle = rule.color ?? this.color;
       ctx.beginPath();
-      if (axis === "x") {
+      if (rule.axis === "x") {
         ctx.moveTo(screenOffset, 0);
         ctx.lineTo(screenOffset, this.height);
       } else {
@@ -310,25 +311,38 @@ export class HUDCanvas {
     }
   }
 
-  private drawPoints(points: cmath.Vector2[]) {
+  private drawPoints(points: HUDPoint[]) {
     const ctx = this.ctx;
     this.applyScreenTransform();
-    ctx.strokeStyle = this.color;
     ctx.lineWidth = DEFAULT_LINE_WIDTH;
 
     const half = CROSSHAIR_SIZE / 2;
     const [[sx, , tx], [, sy, ty]] = this.transform;
 
-    ctx.beginPath();
-    for (const [px, py] of points) {
-      const scrX = sx * px + tx;
-      const scrY = sy * py + ty;
-      ctx.moveTo(scrX - half, scrY - half);
-      ctx.lineTo(scrX + half, scrY + half);
-      ctx.moveTo(scrX + half, scrY - half);
-      ctx.lineTo(scrX - half, scrY + half);
+    // Bucket by color so we can stroke each color group in a single
+    // path. With per-point color, naively setting strokeStyle inside
+    // the loop would force one stroke() per point and lose batching.
+    const buckets = new Map<string, HUDPoint[]>();
+    for (const p of points) {
+      const c = p.color ?? this.color;
+      const arr = buckets.get(c);
+      if (arr) arr.push(p);
+      else buckets.set(c, [p]);
     }
-    ctx.stroke();
+
+    for (const [color, group] of buckets) {
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      for (const p of group) {
+        const scrX = sx * p.x + tx;
+        const scrY = sy * p.y + ty;
+        ctx.moveTo(scrX - half, scrY - half);
+        ctx.lineTo(scrX + half, scrY + half);
+        ctx.moveTo(scrX + half, scrY - half);
+        ctx.lineTo(scrX - half, scrY + half);
+      }
+      ctx.stroke();
+    }
   }
 
   /**

@@ -34,6 +34,28 @@ export interface HUDLine extends cmath.ui.Line {
 export interface HUDRule {
   axis: "x" | "y";
   offset: number;
+  /**
+   * Override the canvas color for this rule's stroke. Falls back to
+   * the canvas's current color when absent.
+   */
+  color?: string;
+}
+
+/**
+ * A single document-space point rendered as a small crosshair "X" on
+ * the canvas. The size of the crosshair is fixed in CSS pixels; the
+ * anchor (x, y) is in document space.
+ *
+ * Stroke uses the canvas color by default. Per-point override is opt-in.
+ */
+export interface HUDPoint {
+  x: number;
+  y: number;
+  /**
+   * Override the canvas color for this point's crosshair stroke.
+   * Falls back to the canvas's current color when absent.
+   */
+  color?: string;
 }
 
 /**
@@ -122,7 +144,7 @@ export interface HUDScreenRect {
 export interface HUDDraw {
   lines?: HUDLine[];
   rules?: HUDRule[];
-  points?: cmath.Vector2[];
+  points?: HUDPoint[];
   rects?: HUDRect[];
   polylines?: HUDPolyline[];
   /** Screen-space-sized rects anchored to document-space points (handles). */
