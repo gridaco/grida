@@ -165,3 +165,130 @@ describe("match", () => {
     );
   });
 });
+
+describe("kb() modifier-mask semantics", () => {
+  it("default mask is exact match: kb(key) only fires with no mods", () => {
+    const b = kb(KeyCode.LeftArrow);
+    expect(match(mkEvent({ code: "ArrowLeft" }), b, "mac")).toBe(true);
+    expect(
+      match(mkEvent({ code: "ArrowLeft", shiftKey: true }), b, "mac")
+    ).toBe(false);
+    expect(match(mkEvent({ code: "ArrowLeft", altKey: true }), b, "mac")).toBe(
+      false
+    );
+  });
+
+  it("default mask is exact match: kb(key, M.Shift) requires Shift, forbids others", () => {
+    const b = kb(KeyCode.LeftArrow, M.Shift);
+    // UNCHANGED behavior — exact Shift only.
+    expect(
+      match(mkEvent({ code: "ArrowLeft", shiftKey: true }), b, "mac")
+    ).toBe(true);
+    expect(match(mkEvent({ code: "ArrowLeft" }), b, "mac")).toBe(false);
+    expect(
+      match(
+        mkEvent({ code: "ArrowLeft", shiftKey: true, altKey: true }),
+        b,
+        "mac"
+      )
+    ).toBe(false);
+  });
+
+  it("kb(key, M.Shift, M.Shift): only Shift is meaningful, others don't-care", () => {
+    const b = kb(KeyCode.LeftArrow, M.Shift, M.Shift);
+    // Shift required.
+    expect(
+      match(mkEvent({ code: "ArrowLeft", shiftKey: true }), b, "mac")
+    ).toBe(true);
+    // Other mods are don't-care: still fire when held.
+    expect(
+      match(
+        mkEvent({ code: "ArrowLeft", shiftKey: true, altKey: true }),
+        b,
+        "mac"
+      )
+    ).toBe(true);
+    expect(
+      match(
+        mkEvent({ code: "ArrowLeft", shiftKey: true, metaKey: true }),
+        b,
+        "mac"
+      )
+    ).toBe(true);
+    expect(
+      match(
+        mkEvent({
+          code: "ArrowLeft",
+          shiftKey: true,
+          altKey: true,
+          metaKey: true,
+          ctrlKey: true,
+        }),
+        b,
+        "mac"
+      )
+    ).toBe(true);
+    // But Shift is gated — without it, no match.
+    expect(match(mkEvent({ code: "ArrowLeft" }), b, "mac")).toBe(false);
+    expect(match(mkEvent({ code: "ArrowLeft", altKey: true }), b, "mac")).toBe(
+      false
+    );
+  });
+
+  it("kb(key, 0, M.Shift): Shift is meaningful and must be ABSENT, others don't-care", () => {
+    const b = kb(KeyCode.LeftArrow, 0, M.Shift);
+    expect(match(mkEvent({ code: "ArrowLeft" }), b, "mac")).toBe(true);
+    expect(match(mkEvent({ code: "ArrowLeft", altKey: true }), b, "mac")).toBe(
+      true
+    );
+    expect(match(mkEvent({ code: "ArrowLeft", metaKey: true }), b, "mac")).toBe(
+      true
+    );
+    // Shift is in mask but not required → forbidden.
+    expect(
+      match(mkEvent({ code: "ArrowLeft", shiftKey: true }), b, "mac")
+    ).toBe(false);
+  });
+
+  it("kb(key, 0, 0): empty mask = any modifier state matches", () => {
+    const b = kb(KeyCode.LeftArrow, 0, 0);
+    expect(match(mkEvent({ code: "ArrowLeft" }), b, "mac")).toBe(true);
+    expect(
+      match(mkEvent({ code: "ArrowLeft", shiftKey: true }), b, "mac")
+    ).toBe(true);
+    expect(match(mkEvent({ code: "ArrowLeft", altKey: true }), b, "mac")).toBe(
+      true
+    );
+    expect(
+      match(
+        mkEvent({
+          code: "ArrowLeft",
+          shiftKey: true,
+          altKey: true,
+          metaKey: true,
+          ctrlKey: true,
+        }),
+        b,
+        "mac"
+      )
+    ).toBe(true);
+  });
+
+  it("CtrlCmd still resolves per-platform when mask is partial", () => {
+    // Required CtrlCmd, only Shift is meaningful → Ctrl/Alt/Meta-besides-CtrlCmd don't-care.
+    // On mac, CtrlCmd resolves to Meta. With meaningful=Shift, the other 3
+    // real mods are don't-care; but CtrlCmd's resolved bit (Meta on mac)
+    // is required, so Meta MUST be held.
+    const b = kb(KeyCode.KeyZ, M.CtrlCmd, M.Shift);
+    expect(match(mkEvent({ code: "KeyZ", metaKey: true }), b, "mac")).toBe(
+      true
+    );
+    expect(
+      match(mkEvent({ code: "KeyZ", metaKey: true, altKey: true }), b, "mac")
+    ).toBe(true);
+    // Shift is meaningful but not required → forbidden.
+    expect(
+      match(mkEvent({ code: "KeyZ", metaKey: true, shiftKey: true }), b, "mac")
+    ).toBe(false);
+  });
+});

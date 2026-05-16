@@ -94,13 +94,100 @@ export function seq(...chunks: Chunk[]): Sequence {
 }
 
 /**
- * Helper function to create a keybinding with a single chunk
- * Convenience function for common case: single key with optional modifiers
- * @param key - The main key
- * @param mods - Modifier bitmask (use M enum, combine with |)
+ * All four real modifier bits. The default `meaningful` mask used by
+ * `kb()` — equivalent to "every modifier matters", i.e. exact match.
+ *
+ * `M.CtrlCmd` is intentionally NOT part of this mask: it's a virtual
+ * cross-platform alias, not a real modifier the OS reports. When present
+ * in `mods`, it's stored as-is on the chunk and resolved per-platform by
+ * `resolveMods()` downstream — the power-set expansion below only walks
+ * the four real bits.
  */
-export function kb(key: KeyCode, mods: number = 0): Sequence {
-  return [[mods, key]];
+const ALL_REAL_MODS = M.Ctrl | M.Shift | M.Alt | M.Meta;
+
+/**
+ * Build a single-chunk keybinding.
+ *
+ * # Modifier-mask model
+ *
+ * A binding declares **which modifiers are meaningful** via the optional
+ * `meaningful` mask. Modifiers outside that mask are "don't care" —
+ * the binding fires whether or not they're held. Modifiers inside the
+ * mask must match `mods` exactly: bits set in both → required held,
+ * bits in `meaningful` but not in `mods` → required NOT held.
+ *
+ * The default `meaningful` mask is every real modifier (Ctrl|Shift|Alt|
+ * Meta), which gives exact-match semantics. That is, `kb(key, mods)`
+ * with the mask omitted means "exactly these modifiers, no more, no
+ * less" — the same behavior single-arg `kb()` has always had.
+ *
+ * Inspired by X11's AnyModifier concept, inverted so the strict path
+ * (exact match) is the default and the loose path is opt-in.
+ *
+ * ```ts
+ * kb(KeyCode.LeftArrow)                       // exact: 0 mods, no others
+ * kb(KeyCode.LeftArrow, M.Shift)              // exact: Shift only (UNCHANGED)
+ * kb(KeyCode.LeftArrow, M.Shift, M.Shift)     // Shift required, others don't-care
+ * kb(KeyCode.LeftArrow, 0, M.Shift)           // Shift forbidden, others don't-care
+ * kb(KeyCode.LeftArrow, 0, 0)                 // ANY mod state matches
+ * ```
+ *
+ * Implementation: at construction we expand the "don't care" bits in
+ * `meaningful` into a power-set of alias `Chunk`s. `match()` and
+ * `chunkKey()` stay unchanged — the hot path is still O(1) bucket lookup.
+ *
+ * @param key - The main key
+ * @param mods - Required modifiers (bitmask). May include `M.CtrlCmd`.
+ * @param meaningful - Which modifiers are meaningful (bitmask over the
+ *   four real modifiers Ctrl/Shift/Alt/Meta). Bits inside this mask
+ *   enforce `mods`; bits outside are don't-care. Defaults to all four
+ *   real modifiers (exact match). `M.CtrlCmd` here is meaningless — the
+ *   virtual modifier is always meaningful (or absent) per platform.
+ * @returns A `Keybinding` (single `Sequence` when no don't-care bits, an
+ *   alias list when there are).
+ */
+// Overloads: when `meaningful` is omitted (or known-all-bits-set), return
+// the narrow `Sequence` so call-sites that compose alias lists via
+// `[kb(..), kb(..)] as Keybinding` keep type-checking. Expanded calls
+// (third arg provided) return the wider `Keybinding`.
+export function kb(key: KeyCode, mods?: number): Sequence;
+export function kb(key: KeyCode, mods: number, meaningful: number): Keybinding;
+export function kb(
+  key: KeyCode,
+  mods: number = 0,
+  meaningful: number = ALL_REAL_MODS
+): Keybinding {
+  // Bits in `meaningful` are "I care about this modifier's state".
+  // Bits outside are "don't care" — expand power-set across them.
+  const dontCare = ALL_REAL_MODS & ~meaningful;
+  // Required real-mod bits: from `mods`, masked by the meaningful set.
+  // CtrlCmd is virtual and rides along as-is on the chunk.
+  const requiredReal = mods & meaningful & ALL_REAL_MODS;
+  const virtualBits = mods & M.CtrlCmd;
+  const base = requiredReal | virtualBits;
+
+  if (dontCare === 0) {
+    // Pure exact match — single chunk. Equivalent to old `kb(key, mods)`.
+    return [[base, key]];
+  }
+
+  // Enumerate the don't-care subset (2^N entries where N = popcount(dontCare)).
+  const flags: number[] = [];
+  if (dontCare & M.Ctrl) flags.push(M.Ctrl);
+  if (dontCare & M.Shift) flags.push(M.Shift);
+  if (dontCare & M.Alt) flags.push(M.Alt);
+  if (dontCare & M.Meta) flags.push(M.Meta);
+
+  const aliases: Sequence[] = [];
+  const count = 1 << flags.length;
+  for (let i = 0; i < count; i++) {
+    let combo = base;
+    for (let b = 0; b < flags.length; b++) {
+      if (i & (1 << b)) combo |= flags[b];
+    }
+    aliases.push([[combo, key]]);
+  }
+  return aliases;
 }
 
 /**
