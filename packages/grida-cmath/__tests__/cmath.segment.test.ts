@@ -86,3 +86,41 @@ describe("cmath.segment.intersectsRect", () => {
     expect(cmath.segment.intersectsRect(p0, p1, rect)).toBe(false);
   });
 });
+
+describe("cmath.segment.point_distance", () => {
+  test("degenerate segment falls back to point distance", () => {
+    expect(cmath.segment.point_distance([3, 4], [0, 0], [0, 0])).toBeCloseTo(5);
+  });
+
+  test("returns 0 for a point exactly on the segment", () => {
+    expect(cmath.segment.point_distance([5, 0], [0, 0], [10, 0])).toBe(0);
+  });
+
+  test("perpendicular distance when foot lies inside [a, b]", () => {
+    // Horizontal segment from (0,0) to (10,0); point above mid.
+    expect(cmath.segment.point_distance([5, 4], [0, 0], [10, 0])).toBeCloseTo(
+      4
+    );
+  });
+
+  test("clamps to endpoint A when projection is before a", () => {
+    // Foot at t = -1; closest is a.
+    expect(cmath.segment.point_distance([-3, 0], [0, 0], [10, 0])).toBeCloseTo(
+      3
+    );
+  });
+
+  test("clamps to endpoint B when projection is past b", () => {
+    expect(cmath.segment.point_distance([13, 0], [0, 0], [10, 0])).toBeCloseTo(
+      3
+    );
+  });
+
+  test("diagonal segment, perpendicular foot inside", () => {
+    // Segment (0,0)->(10,10); point (0,10) — perpendicular distance is
+    // (|10 - 0| / sqrt(2)) = 5*sqrt(2) ~ 7.0710678.
+    expect(cmath.segment.point_distance([0, 10], [0, 0], [10, 10])).toBeCloseTo(
+      Math.SQRT2 * 5
+    );
+  });
+});
