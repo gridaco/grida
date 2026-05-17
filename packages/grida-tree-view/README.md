@@ -32,7 +32,7 @@ pnpm add react@>=18
 - **Headless state machine** (`TreeController`) — owns transient UI state (expand, focus, drag); delegates topology, meta, and selection to adapters.
 - **Read-only data adapter** (`TreeSource`) — implement five methods (`getRoot`, `getNode`, `getVersion`, `subscribe`, optional `isContainer` / `getLabel` / `showRoot`) to plug into any editor state.
 - **In-memory fallback** (`InMemoryTreeSource`) — for demos, tests, and standalone tools; ships `insertChild`, `move`, `remove`, `setMeta`, and `applyIntent` mutators.
-- **Pluggable selection** (`SelectionAdapter`) — drop your editor's existing selection in; standalone uses get `InMemorySelectionAdapter` by default.
+- **Pluggable selection** (`SelectionAdapter`) — drop your editor's existing selection in; standalone users get `InMemorySelectionAdapter` by default.
 - **Six subscription channels.** `rows · expanded · focus · drag · selection · intent` — fine-grained so a row component only re-renders for its own slice.
 - **Memoized flat row list.** `controller.getRows()` returns stable references keyed on `(source.version, expanded revision)`; safe to plug into virtualizers as-is.
 
