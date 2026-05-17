@@ -12,6 +12,11 @@ export {
   measurementToHUDDraw,
   marqueeToHUDDraw,
   lassoToHUDDraw,
+  drawPixelGrid,
+  DEFAULT_PIXEL_GRID_COLOR,
+  DEFAULT_PIXEL_GRID_STEPS,
+  type DrawPixelGridParams,
+  type PixelGridConfig,
 } from "./primitives";
 
 // Surface — wired state + hit-test + draw loop

@@ -8,6 +8,7 @@ import type {
   HUDRule,
   HUDScreenRect,
 } from "./types";
+import { drawPixelGrid, type PixelGridConfig } from "./pixel-grid";
 
 const DEFAULT_COLOR = "#f44336";
 const DEFAULT_LABEL_FG = "#ffffff";
@@ -46,6 +47,7 @@ export class HUDCanvas {
   private color: string;
   private width = 0;
   private height = 0;
+  private pixelGrid: PixelGridConfig | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -78,6 +80,34 @@ export class HUDCanvas {
   }
 
   /**
+   * Configure the back-most pixel-grid layer. Pass `null` to disable.
+   * Drawn before any HUD primitive, gated by `zoomThreshold`. See
+   * `PixelGridConfig.transform` for the two-transform contract.
+   */
+  setPixelGrid(config: PixelGridConfig | null) {
+    if (config === null) {
+      this.pixelGrid = null;
+      return;
+    }
+    // Preserve the last-known transform when the caller omits one — lets
+    // hosts toggle `enabled` without re-supplying the camera state.
+    this.pixelGrid = {
+      ...config,
+      transform: config.transform ?? this.pixelGrid?.transform,
+    };
+  }
+
+  /**
+   * Update only the pixel grid's transform, without replacing the rest of
+   * the config. Cheap to call per camera tick.
+   */
+  setPixelGridTransform(transform: cmath.Transform) {
+    if (this.pixelGrid) {
+      this.pixelGrid = { ...this.pixelGrid, transform };
+    }
+  }
+
+  /**
    * Clear the canvas and draw all primitives in `commands`.
    * Pass `undefined` to clear without drawing (e.g. when no overlay is active).
    */
@@ -85,6 +115,20 @@ export class HUDCanvas {
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    const pg = this.pixelGrid;
+    const pgTransform = pg?.transform ?? this.transform;
+    if (pg?.enabled && pgTransform[0][0] > pg.zoomThreshold) {
+      drawPixelGrid({
+        ctx,
+        transform: pgTransform,
+        width: this.width,
+        height: this.height,
+        dpr: this.dpr,
+        color: pg.color,
+        steps: pg.steps,
+      });
+    }
 
     if (!commands) return;
 

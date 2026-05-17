@@ -96,6 +96,7 @@ surface.setTransform(t);    // camera (screen ↔ doc)
 surface.setSelection(ids);  // read-only mirror from host
 surface.setStyle(partial);
 surface.setReadonly(v);
+surface.setPixelGrid({ enabled, zoomThreshold, color?, steps? }); // or null to disable
 surface.dispose();
 
 // Input
@@ -249,6 +250,7 @@ Handles are always drawn at a fixed screen-space size regardless of zoom. The pr
 
 Layer order within a frame (back-to-front):
 
+0. Pixel grid (when enabled and `transform[0][0] > zoomThreshold`)
 1. Hover outline
 2. Selection outline
 3. Marquee rect
@@ -323,6 +325,30 @@ packages/grida-canvas-hud/
 | `chrome.test.ts`        | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords              |
 
 Render output (visual canvas correctness) is verified in the browser, not unit-tested.
+
+## Extending the HUD
+
+The HUD intentionally exposes no generic "register a painter" or "register a
+layer" API (see Anti-goals — "Not a host of plugins"). Three paths cover real
+needs, in this order of preference:
+
+1. **Named built-in chrome.** Things every Grida editor wants — pixel grid,
+   selection, snap guides, measurement — live inside this package as
+   first-class features with their own toggles (e.g. `setPixelGrid`,
+   `setStyle`, the chrome built from `SurfaceState`). New canonical chrome
+   lands here; open a PR against `@grida/hud`.
+
+2. **Host-fed `HUDDraw` extras.** Pass extra primitives into `surface.draw(extra)`
+   per frame. Best for transient, gesture-coupled overlays the host already
+   computes (measurement lines, custom snap visualizers). Drawn on top of named
+   chrome — they're foreground, not background.
+
+3. **DOM-level escape hatch.** The host owns the container element; the surface
+   only inserts the SVG and the HUD canvas. Hosts that need a non-canvas overlay
+   (HTML toolbar, popover, debug widget) can splice their own DOM into the
+   container directly. Deliberate escape hatch — reach for it only when (1) and
+   (2) don't fit, and prefer pushing canonical needs into (1) over keeping them
+   here.
 
 ## Anti-goals
 

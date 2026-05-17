@@ -1,4 +1,5 @@
 import { HUDCanvas } from "../primitives/canvas";
+import type { PixelGridConfig } from "../primitives/pixel-grid";
 import type { HUDDraw } from "../primitives/types";
 import type {
   SurfaceEvent,
@@ -36,6 +37,12 @@ export interface SurfaceOptions {
   readonly?: boolean;
   /** Optional HUDCanvas color override. */
   color?: string;
+  /**
+   * Optional pixel-grid configuration. Drawn back-most in the HUD canvas
+   * when `enabled` and the current zoom exceeds `zoomThreshold`. Hosts can
+   * also call `surface.setPixelGrid(...)` later.
+   */
+  pixelGrid?: PixelGridConfig | null;
 }
 
 /**
@@ -64,6 +71,22 @@ export class Surface {
     if (options.readonly !== undefined) {
       this.state.setReadonly(options.readonly);
     }
+    if (options.pixelGrid) {
+      this.hudCanvas.setPixelGrid(options.pixelGrid);
+    }
+  }
+
+  /** Configure / disable the back-most pixel-grid layer. */
+  setPixelGrid(config: PixelGridConfig | null): void {
+    this.hudCanvas.setPixelGrid(config);
+  }
+
+  /**
+   * Update just the pixel grid's transform. Cheap to call per camera tick.
+   * No-op when no pixel-grid config is set.
+   */
+  setPixelGridTransform(transform: Transform): void {
+    this.hudCanvas.setPixelGridTransform(transform);
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
