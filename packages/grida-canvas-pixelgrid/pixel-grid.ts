@@ -11,6 +11,83 @@ export interface PixelGridOptions {
 
 type Transform = [[number, number, number], [number, number, number]];
 
+export const DEFAULT_PIXEL_GRID_COLOR = "rgba(150, 150, 150, 0.15)";
+export const DEFAULT_PIXEL_GRID_STEPS: [number, number] = [1, 1];
+
+export interface DrawPixelGridParams {
+  /** 2D context to paint into. Caller owns clearing & save/restore as needed. */
+  ctx: CanvasRenderingContext2D;
+  /** 2×3 transform — `[[sx, 0, tx], [0, sy, ty]]`. */
+  transform: Transform;
+  /** Viewport CSS width. */
+  width: number;
+  /** Viewport CSS height. */
+  height: number;
+  /** Device-pixel ratio of the backing store (assumed already applied to canvas.width/height). */
+  dpr: number;
+  /** Line color. Default `"rgba(150, 150, 150, 0.15)"`. */
+  color?: string;
+  /** Grid spacing in document units. Default `[1, 1]`. */
+  steps?: [number, number];
+}
+
+/**
+ * Paint a pixel grid into an existing 2D context. The function owns its own
+ * `save`/`restore` and sets the transform itself (combining `dpr` with the
+ * supplied `transform`). It does NOT clear the canvas — callers that share
+ * the context with other painters are expected to clear before/after.
+ */
+export function drawPixelGrid(p: DrawPixelGridParams): void {
+  const {
+    ctx,
+    transform,
+    width,
+    height,
+    dpr,
+    color = DEFAULT_PIXEL_GRID_COLOR,
+    steps = DEFAULT_PIXEL_GRID_STEPS,
+  } = p;
+
+  ctx.save();
+
+  const [[sx, , tx], [, sy, ty]] = transform;
+  // Combine device-pixel ratio with user transform so (sx, sy) are
+  // effectively multiplied by dpr — same for translation.
+  ctx.setTransform(sx * dpr, 0, 0, sy * dpr, tx * dpr, ty * dpr);
+
+  ctx.strokeStyle = color;
+  // Lines should be 1 device pixel thick => divide by the absolute scale.
+  ctx.lineWidth = 1 / Math.max(Math.abs(sx * dpr), Math.abs(sy * dpr));
+
+  // Device-space bounding box is [0..(width*dpr), 0..(height*dpr)];
+  // invert transform to find user-space bounding box.
+  const minUserX = (0 - tx * dpr) / (sx * dpr);
+  const maxUserX = (width * dpr - tx * dpr) / (sx * dpr);
+  const minUserY = (0 - ty * dpr) / (sy * dpr);
+  const maxUserY = (height * dpr - ty * dpr) / (sy * dpr);
+
+  const [stepX, stepY] = steps;
+
+  // Extra 2-step margins to avoid blinking in/out near edges.
+  const startX = Math.floor(minUserX / stepX) * stepX - 2 * stepX;
+  const endX = Math.ceil(maxUserX / stepX) * stepX + 2 * stepX;
+  const startY = Math.floor(minUserY / stepY) * stepY - 2 * stepY;
+  const endY = Math.ceil(maxUserY / stepY) * stepY + 2 * stepY;
+
+  ctx.beginPath();
+  for (let x = startX; x <= endX; x += stepX) {
+    ctx.moveTo(x, startY);
+    ctx.lineTo(x, endY);
+  }
+  for (let y = startY; y <= endY; y += stepY) {
+    ctx.moveTo(startX, y);
+    ctx.lineTo(endX, y);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 export class PixelGridCanvas {
   private ctx: CanvasRenderingContext2D;
   private dpr: number;
@@ -26,8 +103,8 @@ export class PixelGridCanvas {
     private canvas: HTMLCanvasElement,
     {
       transform,
-      color = "rgba(150, 150, 150, 0.15)",
-      steps = [1, 1],
+      color = DEFAULT_PIXEL_GRID_COLOR,
+      steps = DEFAULT_PIXEL_GRID_STEPS,
       unit = "px",
     }: PixelGridOptions
   ) {
@@ -59,57 +136,14 @@ export class PixelGridCanvas {
     const ctx = this.ctx;
     // Clear entire backing store
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-    ctx.save();
-
-    const [[sx, , tx], [, sy, ty]] = this.transform;
-    // Combine device-pixel ratio with user transform
-    // so (sx, sy) are effectively multiplied by dpr
-    // and same for translation
-    ctx.setTransform(
-      sx * this.dpr,
-      0,
-      0,
-      sy * this.dpr,
-      tx * this.dpr,
-      ty * this.dpr
-    );
-
-    ctx.strokeStyle = this.color;
-    // Lines should be 1 device pixel thick => divide by the absolute scale factor
-    ctx.lineWidth =
-      1 / Math.max(Math.abs(sx * this.dpr), Math.abs(sy * this.dpr));
-
-    // device-space bounding box is [0..(width*dpr), 0..(height*dpr)]
-    // invert transform to find user-space bounding box
-    const minUserX = (0 - tx * this.dpr) / (sx * this.dpr);
-    const maxUserX = (this.width * this.dpr - tx * this.dpr) / (sx * this.dpr);
-    const minUserY = (0 - ty * this.dpr) / (sy * this.dpr);
-    const maxUserY = (this.height * this.dpr - ty * this.dpr) / (sy * this.dpr);
-
-    const [stepX, stepY] = this.steps;
-
-    // Add extra 2-step margins to avoid blinking in/out
-    const startX = Math.floor(minUserX / stepX) * stepX - 2 * stepX;
-    const endX = Math.ceil(maxUserX / stepX) * stepX + 2 * stepX;
-    const startY = Math.floor(minUserY / stepY) * stepY - 2 * stepY;
-    const endY = Math.ceil(maxUserY / stepY) * stepY + 2 * stepY;
-
-    // Vertical lines
-    for (let x = startX; x <= endX; x += stepX) {
-      ctx.beginPath();
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, endY);
-      ctx.stroke();
-    }
-    // Horizontal lines
-    for (let y = startY; y <= endY; y += stepY) {
-      ctx.beginPath();
-      ctx.moveTo(startX, y);
-      ctx.lineTo(endX, y);
-      ctx.stroke();
-    }
-
-    ctx.restore();
+    drawPixelGrid({
+      ctx,
+      transform: this.transform,
+      width: this.width,
+      height: this.height,
+      dpr: this.dpr,
+      color: this.color,
+      steps: this.steps,
+    });
   }
 }
