@@ -61,13 +61,13 @@ export default function TreeViewLandingPage() {
                 <ArrowRightIcon className="size-4 ml-2" />
               </Button>
             </Link>
-            <Link href={NPM_URL} target="_blank">
+            <Link href={NPM_URL} target="_blank" rel="noopener noreferrer">
               <Button size="lg" variant="outline">
                 <NpmLogoIcon className="size-8 mr-1" />
                 npm
               </Button>
             </Link>
-            <Link href={GITHUB_URL} target="_blank">
+            <Link href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
               <Button size="lg" variant="outline">
                 <GithubIcon className="size-4 mr-2" />
                 GitHub

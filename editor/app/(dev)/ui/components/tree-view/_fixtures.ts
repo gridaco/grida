@@ -714,7 +714,8 @@ export function buildLargeFixture(total: number): {
  * so the deepest visible row sits at indent `depth × indentStep` — useful
  * for deciding what to do about horizontal overflow.
  *
- * Total node count = `groups × depth` (plus root).
+ * Visible rows = `groups × (depth + 1)` (each chain's group row plus
+ * its `depth` nodes); the root is hidden.
  *
  * @param groups  number of top-level chains
  * @param depth   chain length (= max visible row depth)
@@ -780,6 +781,6 @@ export function buildDeepFixture(opts: { groups: number; depth: number }): {
     }),
     expanded,
     maxDepth: depth,
-    total: groups * depth,
+    total: groups * (depth + 1),
   };
 }

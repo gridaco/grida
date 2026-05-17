@@ -120,7 +120,16 @@ export class InMemoryTreeSource<TMeta = unknown> implements TreeSource<TMeta> {
     const parent = this.getNode(node.parent);
     const children = parent.children.filter((c) => c !== id);
     this._nodes.set(parent.id, { ...parent, children });
-    this._nodes.delete(id);
+    // Delete the whole subtree — leaving descendants in `_nodes` orphans
+    // them (memory leak + `has()` reports them as live).
+    const stack: NodeId[] = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      const n = this._nodes.get(cur);
+      if (!n) continue;
+      stack.push(...n.children);
+      this._nodes.delete(cur);
+    }
     this.bump();
   }
 

@@ -160,6 +160,7 @@ export function DemoRow({
         <div className="absolute inset-0 rounded-sm ring-2 ring-blue-500 pointer-events-none" />
       )}
       <span
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={row.isContainer ? onChevron : undefined}
         className={
           row.isContainer

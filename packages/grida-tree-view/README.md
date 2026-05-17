@@ -22,7 +22,7 @@ pnpm add react@>=18
 - **Pure core.** No DOM imports, no React imports, no globals — runs unchanged in Node, Bun, Deno, the browser, a web worker.
 - **You own your data.** `TreeSource` is read-only — wrap your editor state, return rows; the package never mutates your store.
 - **Subscribe-only-to-what-changes.** Six independent channels (`rows`, `expanded`, `focus`, `drag`, `selection`, `intent`) and identity-stable selectors keep re-renders tight.
-- **Tested at the unit level.** ~90 Node-environment tests, no jsdom, no Playwright — every drag, constraint, and geometry edge case is reproducible in a pure unit test.
+- **Tested at the unit level.** A Node-environment suite — no jsdom, no Playwright — where every drag, constraint, and geometry edge case is reproducible in a pure unit test.
 - **Production-grown.** Driven by the same controller as the Grida layers panel; the demo gallery reproduces Figma, VS Code, and Finder layer/file panels from the same code path.
 
 ## Features
@@ -182,15 +182,15 @@ fully-passive libraries (every per-row event is a callback you wire) get
 this wrong in different ways. We split the difference by what changes
 per UI vs. per document:
 
-| State                                        | Owner                              | Why                                                                     |
-| -------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| Tree topology (parent / children / order)    | **Consumer** (`TreeSource`)        | The editor is already the source of truth; copying drifts.              |
-| Per-node meta (label, kind, locked, mask, …) | **Consumer** (`TreeSource`)        | Same.                                                                   |
-| Selection                                    | **Pluggable** (`SelectionAdapter`) | Editors with existing selection plug in; standalone uses get a default. |
-| Expanded set                                 | **Controller**                     | Pure UI state.                                                          |
-| Focus (keyboard cursor)                      | **Controller**                     | Pure UI state.                                                          |
-| Drag transaction                             | **Controller**                     | Transient.                                                              |
-| Rename, hover, scroll                        | **Consumer**                       | Out of scope; the controller emits `intent` events only.                |
+| State                                        | Owner                              | Why                                                                      |
+| -------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| Tree topology (parent / children / order)    | **Consumer** (`TreeSource`)        | The editor is already the source of truth; copying drifts.               |
+| Per-node meta (label, kind, locked, mask, …) | **Consumer** (`TreeSource`)        | Same.                                                                    |
+| Selection                                    | **Pluggable** (`SelectionAdapter`) | Editors with existing selection plug in; standalone users get a default. |
+| Expanded set                                 | **Controller**                     | Pure UI state.                                                           |
+| Focus (keyboard cursor)                      | **Controller**                     | Pure UI state.                                                           |
+| Drag transaction                             | **Controller**                     | Transient.                                                               |
+| Rename, hover, scroll                        | **Consumer**                       | Out of scope; the controller emits `intent` events only.                 |
 
 Mutations like move / rename / delete are surfaced as **intents** on the
 controller — the consumer subscribes and applies them against its own
@@ -560,7 +560,7 @@ That is all the integration is allowed to do.
 - Anything you can't express as `f(numbers, source) -> numbers` belongs
   in the consumer, not the package.
 
-The current Vitest suite (~80 tests, all node-environment, no jsdom)
+The current Vitest suite (all node-environment, no jsdom)
 covers: row flattening + memoization, selection dispatch, all constraint
 combinators + composition, drag handle (incl. mode flip, descendant
 refusal, horizontal-aware ancestor pivot with boundary validation),

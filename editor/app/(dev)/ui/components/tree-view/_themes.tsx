@@ -99,9 +99,14 @@ function selectionSubtree(
 ): ReadonlySet<NodeId> {
   const source = controller.source;
   const sel = controller.getSelection();
-  const containerAnchors = sel.filter((id) =>
-    isContainerKind(source.getNode(id).meta?.kind)
-  );
+  const containerAnchors = sel.filter((id) => {
+    try {
+      return isContainerKind(source.getNode(id).meta?.kind);
+    } catch {
+      // Selection can briefly hold ids the source already removed.
+      return false;
+    }
+  });
   const key = `${source.getVersion()}|${containerAnchors.join(",")}`;
   const cached = highlightCache.get(controller);
   if (cached && cached.selectionKey === key) return cached.selectionSet;

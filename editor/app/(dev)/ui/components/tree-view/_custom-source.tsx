@@ -64,8 +64,10 @@ class JsonSource implements TreeSource<{
   private adapted = new Map<string, AdaptedNode>();
   private version = 0;
   private listeners = new Set<Listener>();
+  private readonly rootId: NodeId;
 
   constructor(root: JsonNode) {
+    this.rootId = root.id;
     const visit = (node: JsonNode, parent: string | null) => {
       this.adapted.set(node.id, {
         id: node.id,
@@ -79,7 +81,7 @@ class JsonSource implements TreeSource<{
   }
 
   getRoot(): NodeId {
-    return "doc";
+    return this.rootId;
   }
 
   getNode(id: NodeId) {

@@ -95,6 +95,7 @@ export function lookupAction(
   const combo = keyComboOf(event);
   const direct = keymap[combo];
   if (direct) return direct;
-  if (combo !== event.key) return keymap[event.key];
+  const bare = normalizeKey(event.key);
+  if (combo !== bare) return keymap[bare];
   return undefined;
 }

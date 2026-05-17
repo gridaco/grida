@@ -47,7 +47,13 @@ export function allOf(...cs: MoveConstraint[]): MoveConstraint {
   };
 }
 
-/** Negate a constraint's `canMove`. Does not touch `resolveDropPosition`. */
+/**
+ * Negate a constraint's `canMove`. The result deliberately exposes no
+ * `resolveDropPosition`: forwarding the original's coercion into a negated
+ * predicate is incoherent — it would steer the position toward what the
+ * original *allows*, then reject it. `allOf` skips constraints without
+ * `resolveDropPosition`, so negation only ever affects the hard predicate.
+ */
 export function not(c: MoveConstraint): MoveConstraint {
   return {
     canMove(items, to, source) {

@@ -8,6 +8,7 @@ import type {
   Row,
   SelectionMode,
   TreeIntent,
+  TreeNode,
 } from "./types";
 import type { TreeSource } from "./source";
 import { ancestorsOf, isContainer, isDescendantOf } from "./source";
@@ -188,9 +189,13 @@ export class TreeController<T = unknown> {
 
   /** Expand all ancestors of `id` so the row becomes visible. */
   expandTo(id: NodeId): void {
+    const rootHidden = !(this.source.showRoot?.() ?? false);
     let changed = false;
     for (const a of ancestorsOf(this.source, id)) {
-      if (a === this.source.getRoot()) continue;
+      // The root counts as implicitly expanded only while it is hidden.
+      // With `showRoot()` on, the root row is real and must be expanded
+      // like any other ancestor or the revealed node stays invisible.
+      if (rootHidden && a === this.source.getRoot()) continue;
       if (!this._expanded.has(a)) {
         this._expanded.add(a);
         changed = true;
@@ -305,7 +310,9 @@ export class TreeController<T = unknown> {
 
   private focusParent(): void {
     if (!this._focused) return;
-    const parent = this.source.getNode(this._focused).parent;
+    const node = this._peek(this._focused);
+    if (!node) return;
+    const parent = node.parent;
     if (parent && parent !== this.source.getRoot()) {
       this.focus(parent);
     } else if (parent === this.source.getRoot() && this.source.showRoot?.()) {
@@ -484,8 +491,23 @@ export class TreeController<T = unknown> {
 
   // ─── helpers ─────────────────────────────────────────────────────────────
 
+  /**
+   * `getNode` that tolerates ids the source has already removed. The
+   * source is external and may drop the node the controller still holds
+   * as its focus cursor; keyboard paths that would otherwise throw use
+   * this and degrade to a no-op.
+   */
+  private _peek(id: NodeId): TreeNode<T> | null {
+    try {
+      return this.source.getNode(id);
+    } catch {
+      return null;
+    }
+  }
+
   private canExpand(id: NodeId): boolean {
     if (this.isExpanded(id)) return false;
+    if (!this._peek(id)) return false;
     return isContainer(this.source, id);
   }
 

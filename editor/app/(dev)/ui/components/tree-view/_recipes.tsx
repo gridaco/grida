@@ -172,6 +172,7 @@ function RenameInput({
 }) {
   const [value, setValue] = React.useState(initial);
   const ref = React.useRef<HTMLInputElement | null>(null);
+  const cancelledRef = React.useRef(false);
   React.useEffect(() => {
     ref.current?.focus();
     ref.current?.select();
@@ -186,9 +187,14 @@ function RenameInput({
         // keymap is moot but other ancestors might grab them.
         e.stopPropagation();
         if (e.key === "Enter") onCommit(value.trim() || initial);
-        else if (e.key === "Escape") onCancel();
+        else if (e.key === "Escape") {
+          cancelledRef.current = true;
+          onCancel();
+        }
       }}
-      onBlur={() => onCommit(value.trim() || initial)}
+      onBlur={() => {
+        if (!cancelledRef.current) onCommit(value.trim() || initial);
+      }}
       className="flex-1 min-w-0 h-5 px-1 text-xs bg-white border border-blue-400 rounded outline-none"
     />
   );
@@ -434,6 +440,7 @@ export function ExternalDragPanel() {
     over: NodeId;
     placement: DropPlacement;
   } | null>(null);
+  const overInfoRef = React.useRef<typeof overInfo>(null);
 
   const palette = ["New rect", "New text", "New folder"];
 
@@ -467,12 +474,14 @@ export function ExternalDragPanel() {
           break;
         }
       }
+      overInfoRef.current = hit;
       setOverInfo(hit);
     };
     const onUp = () => {
       const drag = dragRef.current;
-      const hit = overInfo;
+      const hit = overInfoRef.current;
       dragRef.current = null;
+      overInfoRef.current = null;
       setOverInfo(null);
       if (!drag || !hit) return;
       const source = controller.source as InMemoryTreeSource<DemoMeta>;
@@ -508,7 +517,7 @@ export function ExternalDragPanel() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [controller, overInfo]);
+  }, [controller]);
 
   const renderRow = React.useCallback(
     (args: RenderRowArgs) => {

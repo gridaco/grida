@@ -289,6 +289,10 @@ function PanelInner({
     const DRAG_THRESHOLD_PX = 4;
 
     const onMove = (e: PointerEvent) => {
+      // Once a drag/pending exists, ignore every other pointer (multi-touch).
+      const activePointerId = pendingRef.current?.pointerId;
+      if (activePointerId !== undefined && e.pointerId !== activePointerId)
+        return;
       const pending = pendingRef.current;
       if (pending && pending.pointerId === e.pointerId && !dragRef.current) {
         if (
@@ -328,7 +332,10 @@ function PanelInner({
       }
     };
 
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
+      const activePointerId = pendingRef.current?.pointerId;
+      if (activePointerId !== undefined && e.pointerId !== activePointerId)
+        return;
       stopAutoScroll();
       if (dragRef.current) {
         controller.commitDrag();
