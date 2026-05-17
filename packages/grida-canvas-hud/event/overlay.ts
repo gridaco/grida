@@ -1,4 +1,5 @@
 import type cmath from "@grida/cmath";
+import type { HUDSemanticGroup } from "../primitives/types";
 import type { CursorIcon } from "./cursor";
 import type { Rect } from "./gesture";
 import type { OverlayAction } from "./hit-regions";
@@ -123,6 +124,8 @@ export interface OverlayElement {
    *  `"translate"`, `"resize_handle:nw"`, `"resize_edge:n"`,
    *  `"rotate:ne"`, `"endpoint:p1"`. Used by tests and debug tooling. */
   label: string;
+  /** Semantic owner for group-level visibility policy. */
+  group?: HUDSemanticGroup;
   action: OverlayAction;
   hit: HitShape;
   render?: RenderShape;

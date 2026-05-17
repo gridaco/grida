@@ -1,5 +1,12 @@
 import type cmath from "@grida/cmath";
 
+export type HUDSemanticGroup = string;
+
+export interface HUDSemantic {
+  /** Semantic owner of this primitive, used for group-level visibility policy. */
+  group?: HUDSemanticGroup;
+}
+
 // ---------------------------------------------------------------------------
 // Draw primitives — the atoms every HUD feature composes from.
 //
@@ -11,7 +18,7 @@ import type cmath from "@grida/cmath";
  * A line segment in document space, extending `cmath.ui.Line` with
  * an optional `dashed` style.
  */
-export interface HUDLine extends cmath.ui.Line {
+export interface HUDLine extends cmath.ui.Line, HUDSemantic {
   dashed?: boolean;
   /** Stroke width in screen-space CSS px. Defaults to the canvas default. */
   strokeWidth?: number;
@@ -31,7 +38,7 @@ export interface HUDLine extends cmath.ui.Line {
  *
  * Offset is in document space; the renderer projects it to screen.
  */
-export interface HUDRule {
+export interface HUDRule extends HUDSemantic {
   axis: "x" | "y";
   offset: number;
   /**
@@ -48,7 +55,7 @@ export interface HUDRule {
  *
  * Stroke uses the canvas color by default. Per-point override is opt-in.
  */
-export interface HUDPoint {
+export interface HUDPoint extends HUDSemantic {
   x: number;
   y: number;
   /**
@@ -63,7 +70,7 @@ export interface HUDPoint {
  *
  * Stroke uses the canvas color by default. Fill is opt-in.
  */
-export interface HUDRect {
+export interface HUDRect extends HUDSemantic {
   x: number;
   y: number;
   width: number;
@@ -90,7 +97,7 @@ export interface HUDRect {
  *
  * Stroke uses the canvas color by default. Fill is opt-in.
  */
-export interface HUDPolyline {
+export interface HUDPolyline extends HUDSemantic {
   points: cmath.Vector2[];
   /** Whether to stroke the path (default: true). */
   stroke?: boolean;
@@ -117,7 +124,7 @@ export interface HUDPolyline {
  *
  * Default anchor is `"center"` (the doc-space point becomes the rect's center).
  */
-export interface HUDScreenRect {
+export interface HUDScreenRect extends HUDSemantic {
   /** Document-space anchor point. */
   x: number;
   y: number;

@@ -74,6 +74,52 @@ The `event/` layer is the testable core. It dispatches plain objects, returns pl
 
 Gesture state machine, hover indicator, modifier snapshot, cursor, click-tracker (dblclick). These have no representation outside the surface; making them surface-private is the single-source-of-truth rule.
 
+## Two backends: render and hit-testing
+
+The HUD has two backends, and they deliberately disagree.
+
+Every frame the HUD produces two outputs: a list of render primitives drawn to the canvas, and a registry of hit regions consulted on pointer events. They share no geometry. They are paired per affordance — the rotation handle's hit region is not derived from a rendered shape, and the resize knob's visual is not derived from its hit AABB. One backend is for the eye; the other is for the cursor.
+
+### Why they disagree
+
+The two outputs optimise for different things:
+
+- The renderer optimises for **legibility at any zoom** — small, crisp shapes that don't dominate the document.
+- The hit-tester optimises for **Fitts'-law reach** — fat targets, virtual regions outside the visible shape, priority ladders that resolve overlap by intent rather than topology.
+
+Collapsing them — drawing a 16 px knob just to match the 16 px hit AABB, or shrinking the hit AABB to 8 px just to match the visual — breaks one of the two. The split exists so neither has to compromise.
+
+### `OverlayElement` — the pairing primitive
+
+`OverlayElement` is the public type that holds the discipline together. Each element carries a mandatory `hit` and an _optional_ `render`. Hit is required because every overlay must be reachable; render is optional because some overlays are deliberately invisible.
+
+The renderer never reads from `hit`. The hit-tester never reads from `render`. The asymmetry is the point.
+
+### Four families of overlay
+
+The mental model the package operates under. Every overlay the HUD draws — or the next one anyone adds — falls into one of four shapes:
+
+| Family          | Visual            | Hit region                               | Example                              |
+| --------------- | ----------------- | ---------------------------------------- | ------------------------------------ |
+| **Paired**      | Drawn shape       | Same shape, padded for reach             | Corner resize knob, line endpoint    |
+| **Virtual**     | None              | Region the user can click but never sees | Rotation handles, edge-resize strips |
+| **Decorative**  | Drawn shape       | None                                     | Snap pips, measurement labels        |
+| **Body-region** | Selection outline | Inner region that triggers translate     | Selected shape body                  |
+
+Anything new the HUD learns to do should be a deliberate choice between these — not a side effect of how it happened to be drawn.
+
+### Guidance for new affordances
+
+1. **Decide hit geometry first, visual second.** The user reaches for the hit region; the visual is a hint about where it is.
+2. **If an affordance is virtual, omit `render`.** Don't draw a stand-in just because the type allows it.
+3. **If the visual is smaller than the minimum comfortable touch target, pad the hit region.** Don't pad the visual to compensate.
+
+### Guidance for tests
+
+Tests should assert against `hit` and `render` separately. A test that only checks the rendered shape silently passes when someone removes the hit padding; a test that only checks the hit region silently passes when someone drops the visual.
+
+New affordances should add at least one assertion per side, and — where the two intentionally differ — one assertion that they differ in the expected direction (e.g. `hit` strictly contains the `render` bbox).
+
 ## Public API
 
 ```ts
@@ -233,6 +279,7 @@ Skim the spec before changing the classifier or its dispatch.
 - Hit-test happens in two tiers on `pointer_down`:
   1. **UI layer (screen-space AABB)** — surface's own `HitRegions` registry, populated by chrome builder each frame. Resize handle? Rotation handle? Body region (translate)? Direct path; no host involvement.
   2. **Scene layer (doc-space point)** — if no UI hit, surface converts the point screen→doc and calls `pick(point_doc)`. Host implements this with whatever it has (`elementFromPoint`+`data-id` for SVG-DOM hosts, scene-cache R-tree for cg).
+- The UI-tier hit registry is built independently of the render path — see [Two backends: render and hit-testing](#two-backends-render-and-hit-testing).
 - `shapeOf(id)` returns a **doc-space** `SelectionShape` (`{ kind: "rect", rect }` for most nodes, `{ kind: "line", p1, p2 }` for vector lines). Surface converts to screen for handle placement and screen-space chrome.
 
 Handles are always drawn at a fixed screen-space size regardless of zoom. The primitive layer supports this via `HUDScreenRect` (see below).
@@ -271,6 +318,8 @@ Layer order within a frame (back-to-front):
 | Label pill      | screen-space at doc-space anchor                       | size meters, snap gap labels                  |
 
 `HUDDraw` is a plain command struct grouping these. Builders (`snapGuideToHUDDraw`, `measurementToHUDDraw`, …) take host state and return a `HUDDraw` — the surface uses the same mechanism internally for its chrome.
+
+Every primitive may also carry an optional semantic `group` string. The HUD package does not define the vocabulary; hosts name their own groups, assign them to surface chrome via `SurfaceOptions.groups`, and return hidden groups from `SurfaceOptions.visibility`. Groups are visibility policy, not paint order, so a host can suppress whole UI families during a gesture while leaving unrelated extras alone.
 
 ## Module layout
 

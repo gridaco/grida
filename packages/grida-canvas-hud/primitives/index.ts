@@ -13,7 +13,10 @@ export type {
   HUDRect,
   HUDRule,
   HUDScreenRect,
+  HUDSemantic,
+  HUDSemanticGroup,
 } from "./types";
+export { filterHUDDrawByGroup, type HUDGroupFilter } from "./draw";
 export { snapGuideToHUDDraw } from "./snap-guide";
 export { measurementToHUDDraw } from "./measurement-guide";
 export { marqueeToHUDDraw } from "./marquee";

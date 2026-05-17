@@ -1,6 +1,7 @@
 import { HUDCanvas } from "../primitives/canvas";
+import { filterHUDDrawByGroup } from "../primitives/draw";
 import type { PixelGridConfig } from "../primitives/pixel-grid";
-import type { HUDDraw } from "../primitives/types";
+import type { HUDDraw, HUDSemanticGroup } from "../primitives/types";
 import type {
   SurfaceEvent,
   SurfaceResponse,
@@ -14,7 +15,25 @@ import type { Intent, IntentHandler } from "../event/intent";
 import type { Transform } from "../event/transform";
 import type { SelectionShape, SelectionGroup } from "../event/shape";
 import { type HUDStyle, DEFAULT_STYLE, mergeStyle } from "./style";
-import { buildChrome, fanOverlays, mergeDraws } from "./chrome";
+import {
+  buildChrome,
+  fanOverlays,
+  mergeDraws,
+  type SurfaceChromeGroups,
+} from "./chrome";
+import type { OverlayElement } from "../event/overlay";
+
+export interface SurfaceVisibilityContext {
+  gesture: SurfaceGesture;
+}
+
+export interface SurfaceVisibility {
+  hidden?: Iterable<HUDSemanticGroup>;
+}
+
+export type SurfaceVisibilityPolicy = (
+  context: SurfaceVisibilityContext
+) => SurfaceVisibility | undefined;
 
 export interface SurfaceOptions {
   /**
@@ -43,6 +62,16 @@ export interface SurfaceOptions {
    * also call `surface.setPixelGrid(...)` later.
    */
   pixelGrid?: PixelGridConfig | null;
+  /**
+   * Optional semantic groups for surface-owned chrome. The HUD package does
+   * not define a group vocabulary; hosts pass the strings they want to use.
+   */
+  groups?: SurfaceChromeGroups;
+  /**
+   * Host-owned visibility policy. Called per frame with the current surface
+   * gesture; returned groups are filtered from surface chrome and host extras.
+   */
+  visibility?: SurfaceVisibilityPolicy;
 }
 
 /**
@@ -166,15 +195,23 @@ export class Surface {
       state: this.state,
       shapeOf: this.opts.shapeOf,
       style: this.style,
+      groups: this.opts.groups,
       width: this.width,
       height: this.height,
     });
+    const hidden = this.opts.visibility?.({
+      gesture: this.state.gesture,
+    })?.hidden;
     const { screenRects } = fanOverlays(
-      overlays,
+      filterOverlaysByGroup(overlays, hidden),
       this.state.getTransform(),
       this.state.hitRegions()
     );
-    this.hudCanvas.draw(mergeDraws(decoration, extra, screenRects));
+    this.hudCanvas.draw(
+      filterHUDDrawByGroup(mergeDraws(decoration, extra, screenRects), {
+        hidden,
+      })
+    );
   }
 
   /** Convenience: clear the canvas (e.g. when the host stops the surface). */
@@ -209,3 +246,14 @@ export type { SurfaceResponse, SurfaceEvent, PointerButton, Modifiers };
 export type { Intent, IntentHandler };
 export type { HUDStyle };
 export type { SelectionShape, SelectionGroup };
+
+function filterOverlaysByGroup(
+  overlays: readonly OverlayElement[],
+  hidden: Iterable<HUDSemanticGroup> | undefined
+): readonly OverlayElement[] {
+  const hidden_set = new Set(hidden ?? []);
+  if (hidden_set.size === 0) return overlays;
+  return overlays.filter((overlay) => {
+    return !overlay.group || !hidden_set.has(overlay.group);
+  });
+}

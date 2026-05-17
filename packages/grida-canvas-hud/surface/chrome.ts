@@ -1,5 +1,10 @@
 import cmath from "@grida/cmath";
-import type { HUDDraw, HUDRect, HUDScreenRect } from "../primitives/types";
+import type {
+  HUDDraw,
+  HUDRect,
+  HUDScreenRect,
+  HUDSemanticGroup,
+} from "../primitives/types";
 import type { SurfaceState } from "../event/state";
 import {
   type SelectionShape,
@@ -26,8 +31,17 @@ export interface ChromeInput {
   state: SurfaceState;
   shapeOf: (id: NodeId) => SelectionShape | null;
   style: HUDStyle;
+  groups?: SurfaceChromeGroups;
   width: number;
   height: number;
+}
+
+export interface SurfaceChromeGroups {
+  hover?: HUDSemanticGroup;
+  selection?: HUDSemanticGroup;
+  selectionControls?: HUDSemanticGroup;
+  marquee?: HUDSemanticGroup;
+  transformPreview?: HUDSemanticGroup;
 }
 
 /**
@@ -51,51 +65,67 @@ export function buildChrome(input: ChromeInput): {
   overlays: OverlayElement[];
   decoration: HUDDraw;
 } {
-  const { state, shapeOf, style } = input;
+  const { state, shapeOf, style, groups } = input;
   const transform = state.getTransform();
   const overlays: OverlayElement[] = [];
   const decoration_rects: HUDRect[] = [];
   const decoration_lines: HUDDraw["lines"] = [];
 
-  // While a gesture is in flight, suppress selection chrome and hover
-  // outlines so the user sees raw content under the pointer. The
-  // gesture-specific overlays below (marquee rect, resize preview) still
-  // render, since those ARE the gesture's visualization.
-  const in_gesture = state.gesture.kind !== "idle";
-
   // ── Hover outline ───────────────────────────────────────────────────────
   // Effective hover = host override (if any) ?? pointer pick.
-  const hover_id = in_gesture ? null : state.getEffectiveHover();
+  const hover_id =
+    state.gesture.kind === "idle" ? state.getEffectiveHover() : null;
   if (hover_id) {
     const shape = shapeOf(hover_id);
     if (shape) {
       pushShapeOutline(shape, decoration_rects, decoration_lines, {
         dashed: false,
         strokeWidth: style.hoverOutlineWidth,
+        group: groups?.hover,
       });
     }
   }
 
   // ── Selection chrome per group ──────────────────────────────────────────
-  if (!in_gesture)
-    for (const group of state.getSelectionGroups()) {
-      const shape = resolveGroupShape(group, shapeOf);
-      if (!shape) continue;
+  for (const group of state.getSelectionGroups()) {
+    const shape = resolveGroupShape(group, shapeOf);
+    if (!shape) continue;
 
-      // Selection outline — always rendered, never interactable.
-      pushShapeOutline(shape, decoration_rects, decoration_lines, {
-        dashed: false,
-        strokeWidth: style.selectionOutlineWidth,
-      });
+    // Selection outline — always rendered, never interactable.
+    pushShapeOutline(shape, decoration_rects, decoration_lines, {
+      dashed: false,
+      strokeWidth: style.selectionOutlineWidth,
+      group: groups?.selection,
+    });
 
-      if (shape.kind === "rect") {
-        pushRectChrome(shape.rect, group.ids, transform, style, overlays);
-      } else if (shape.kind === "line") {
-        // Lines use endpoint knobs + a body translate zone (no resize).
-        pushLineBody(shape, group.ids, transform, overlays);
-        pushLineEndpoints(group.ids[0], shape.p1, shape.p2, style, overlays);
-      }
+    if (shape.kind === "rect") {
+      pushRectChrome(
+        shape.rect,
+        group.ids,
+        transform,
+        style,
+        groups?.selectionControls,
+        overlays
+      );
+    } else if (shape.kind === "line") {
+      // Lines use endpoint knobs + a body translate zone (no resize).
+      pushLineBody(
+        shape,
+        group.ids,
+        transform,
+        groups?.selectionControls,
+        overlays
+      );
+      pushLineEndpoints(
+        group.ids[0],
+        shape.p1,
+        shape.p2,
+        style,
+        groups?.selectionControls,
+        overlays
+      );
     }
+  }
 
   // ── Marquee (gesture-driven) ────────────────────────────────────────────
   if (state.gesture.kind === "marquee") {
@@ -106,6 +136,7 @@ export function buildChrome(input: ChromeInput): {
       stroke: true,
       fill: true,
       fillOpacity: 0.15,
+      group: groups?.marquee,
     });
   }
 
@@ -116,6 +147,7 @@ export function buildChrome(input: ChromeInput): {
       stroke: true,
       fill: false,
       dashed: true,
+      group: groups?.transformPreview,
     });
   }
 
@@ -152,6 +184,7 @@ function pushRectChrome(
   ids: readonly NodeId[],
   transform: cmath.Transform,
   style: HUDStyle,
+  group: HUDSemanticGroup | undefined,
   out: OverlayElement[]
 ): void {
   const rect_screen = cmath.rect.transform(rect_doc, transform);
@@ -166,6 +199,7 @@ function pushRectChrome(
       rect_doc,
       ids,
       style,
+      group,
       layout.controls_visible
     );
     if (el) out.push(el);
@@ -177,12 +211,14 @@ function zoneToOverlay(
   rect_doc: Rect,
   ids: readonly NodeId[],
   style: HUDStyle,
+  group: HUDSemanticGroup | undefined,
   controls_visible: boolean
 ): OverlayElement | null {
   switch (zone.role.kind) {
     case "translate":
       return {
         label: zone.label,
+        group,
         action: { kind: "translate_handle", ids },
         hit: { kind: "screen_aabb", rect: zone.rect },
         priority: zone.priority,
@@ -198,6 +234,7 @@ function zoneToOverlay(
       const anchor_doc = cmath.rect.getCardinalPoint(rect_doc, dir);
       return {
         label: zone.label,
+        group,
         action: {
           kind: "resize_handle",
           direction: dir,
@@ -226,6 +263,7 @@ function zoneToOverlay(
     case "resize_edge":
       return {
         label: zone.label,
+        group,
         action: {
           kind: "resize_handle",
           direction: zone.role.direction,
@@ -240,6 +278,7 @@ function zoneToOverlay(
     case "rotate":
       return {
         label: zone.label,
+        group,
         action: {
           kind: "rotate_handle",
           corner: zone.role.corner,
@@ -261,6 +300,7 @@ function pushLineBody(
   shape: Extract<SelectionShape, { kind: "line" }>,
   ids: readonly NodeId[],
   transform: cmath.Transform,
+  group: HUDSemanticGroup | undefined,
   out: OverlayElement[]
 ): void {
   const bounds_doc = shapeBounds(shape);
@@ -268,6 +308,7 @@ function pushLineBody(
   if (rect_screen.width < 1 && rect_screen.height < 1) return;
   out.push({
     label: "translate",
+    group,
     action: { kind: "translate_handle", ids },
     hit: { kind: "screen_aabb", rect: rect_screen },
     priority: HUDHitPriority.TRANSLATE_BODY,
@@ -280,6 +321,7 @@ function pushLineEndpoints(
   p1: cmath.Vector2,
   p2: cmath.Vector2,
   style: HUDStyle,
+  group: HUDSemanticGroup | undefined,
   out: OverlayElement[]
 ): void {
   const size = style.handleSize;
@@ -291,6 +333,7 @@ function pushLineEndpoints(
   for (const ep of endpoints) {
     out.push({
       label: `endpoint:${ep.which}`,
+      group,
       action: {
         kind: "endpoint_handle",
         endpoint: ep.which,
@@ -330,7 +373,7 @@ function pushShapeOutline(
   shape: SelectionShape,
   rects: HUDRect[],
   lines: NonNullable<HUDDraw["lines"]>,
-  opts: { dashed: boolean; strokeWidth?: number }
+  opts: { dashed: boolean; strokeWidth?: number; group?: HUDRect["group"] }
 ): void {
   if (shape.kind === "rect") {
     rects.push({
@@ -339,6 +382,7 @@ function pushShapeOutline(
       fill: false,
       dashed: opts.dashed,
       strokeWidth: opts.strokeWidth,
+      group: opts.group,
     });
   } else if (shape.kind === "line") {
     lines.push({
@@ -348,6 +392,7 @@ function pushShapeOutline(
       y2: shape.p2[1],
       dashed: opts.dashed,
       strokeWidth: opts.strokeWidth,
+      group: opts.group,
     });
   }
   // "unresolved" is internal-only; chrome callers resolve before reaching here.
@@ -395,6 +440,7 @@ export function fanOverlays(
         stroke: el.render.stroke,
         fillColor: el.render.fillColor,
         strokeColor: el.render.strokeColor,
+        group: el.group,
       });
     }
     // doc_rect / doc_line are not currently emitted via overlays; the chrome

@@ -8,6 +8,9 @@ export {
   type HUDRect,
   type HUDRule,
   type HUDScreenRect,
+  type HUDSemantic,
+  type HUDSemanticGroup,
+  filterHUDDrawByGroup,
   snapGuideToHUDDraw,
   measurementToHUDDraw,
   marqueeToHUDDraw,
@@ -20,7 +23,15 @@ export {
 } from "./primitives";
 
 // Surface — wired state + hit-test + draw loop
-export { Surface, type SurfaceOptions, type SurfaceResponse } from "./surface";
+export {
+  Surface,
+  type SurfaceOptions,
+  type SurfaceResponse,
+  type SurfaceVisibility,
+  type SurfaceVisibilityContext,
+  type SurfaceVisibilityPolicy,
+} from "./surface";
+export type { SurfaceChromeGroups } from "./surface/chrome";
 export type { HUDStyle } from "./surface/style";
 
 // Event types — public for hosts that need to construct events
