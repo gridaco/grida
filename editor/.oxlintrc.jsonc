@@ -46,6 +46,8 @@
             "group": [
               "@ai-sdk/openai",
               "@ai-sdk/openai/**",
+              "@ai-sdk/openai-compatible",
+              "@ai-sdk/openai-compatible/**",
               "@ai-sdk/anthropic",
               "@ai-sdk/anthropic/**",
               "@ai-sdk/google",

@@ -199,16 +199,15 @@ Some token models return cached prompts at deeply discounted rates; total comes 
 Bug in the cost calculator returns a negative number.
 **Expected:** Refused at the storage layer. The faulty record is not persisted; ops is notified.
 
-### TC-BILLING-AI-035 — Local-dev superuser bypass
+### TC-BILLING-AI-035 — BYOK billing bypass (contributor key set)
 
-Developer flag is set. AI call goes through.
-**Expected:** Pre-flight is skipped. Usage is still logged for audit, but it does not count against allowance.
-**Niche:** Two flags must both be set (non-production AND superuser env). Test the AND.
+A contributor sets a `BYOK_*` key (e.g. `BYOK_OPENROUTER_API_KEY`). AI call goes through.
+**Expected:** Calls route through the bare BYOK provider. The credit gate and Metronome metering are skipped entirely (no allowance impact) — the contributor's own key pays the provider. Auth is still enforced: an unauthenticated request, or a user with no resolvable org, is still rejected (BYOK bypasses billing only, never auth).
 
-### TC-BILLING-AI-036 — Superuser flag accidentally set in production
+### TC-BILLING-AI-036 — BYOK key accidentally set on a hosted deploy
 
-Bug: developer env var leaks to prod.
-**Expected:** Bypass is disabled because the production check fails. The gate enforces normally.
+Bug: a `BYOK_*` secret leaks into a hosted/preview deploy.
+**Expected:** There is **no code-level production guard** (by design — same server-env trust model as `OPENAI_API_KEY` / `REPLICATE_API_TOKEN`). With the key set, every org's calls bypass billing and the org-id sanity gate (auth still holds). This is a documented residual risk (see `SECURITY.md` GRIDA-SEC-003), mitigated operationally by never setting the secret in the hosted product — not by code. There is no "production check" to fail.
 
 ### TC-BILLING-AI-037 — Disabled model attempted
 

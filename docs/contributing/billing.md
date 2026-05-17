@@ -9,6 +9,26 @@ Setup guide for contributors working on the billing surface. Two clouds to wire:
 
 ---
 
+## Just need AI to work? BYOK instead (no billing setup)
+
+If you are **not** working on the billing surface and only need AI features (canvas agent, chat) to run locally, skip the entire Metronome / Stripe / tunnel setup below. Set a contributor **BYOK** key and the AI seam routes through your own provider with the billing seam **bypassed entirely** — no credit gate, no metering, no Metronome.
+
+```bash
+# editor/.env.local  (gitignored)
+BYOK_OPENROUTER_API_KEY=sk-or-v1-...      # https://openrouter.ai/keys
+# …or, if you have one, a dedicated Vercel AI Gateway key:
+# BYOK_AI_GATEWAY_API_KEY=...
+```
+
+- Bypasses **billing only — never auth.** Still sign in (`insider@grida.co` / `password`); a resolvable org is still required (an unauthenticated request still 401s).
+- **Text/chat only** — OpenRouter exposes no image/audio models. Catalog model IDs are unchanged; use IDs your provider accepts (edit `editor/lib/ai/models.ts` locally if one 404s).
+- Precedence if both are set: OpenRouter, then AI Gateway. Fail-closed — an empty/unset key falls back to the billed path.
+- **Never set `BYOK_*` on a hosted or preview deploy.** It disables billing **and** the org-id sanity gate for every org. Contributor / self-host / local only. See [SECURITY.md](../../SECURITY.md) `GRIDA-SEC-003` (BYOK carve-out).
+
+Working on billing itself? Ignore BYOK and continue with the full setup below.
+
+---
+
 ## What you need
 
 - Local Supabase running (`supabase start`).
@@ -162,6 +182,7 @@ User-facing billing copy: [`docs/platform/billing.mdx`](../platform/billing.mdx)
 - **Tunnel returns 404** — `WEBHOOK_TUNNEL_HOSTNAME` doesn't match the routed hostname, or `cloudflared` isn't running. Re-run from `cli.ts smoke:webhook` to pinpoint which layer is broken.
 - **Customer Portal "no Stripe customer"** — org hasn't subscribed or topped up yet. Stripe customer is lazy-created on first paid action.
 - **AI credit shows "Out of credit" forever after a successful top-up** — Metronome webhook didn't reach the tunnel. Run `cli.ts smoke:webhook` to verify each layer.
+- **AI returns a 402 / credit-gate error and you're _not_ testing billing** — you don't have Metronome wired. Set `BYOK_OPENROUTER_API_KEY` (see [Just need AI to work?](#just-need-ai-to-work-byok-instead-no-billing-setup)) — it bypasses the gate entirely. If it's set and you _still_ see billing behavior, the key is empty or AI is being called before sign-in (BYOK never bypasses auth).
 
 ---
 
@@ -177,3 +198,5 @@ User-facing billing copy: [`docs/platform/billing.mdx`](../platform/billing.mdx)
 | `METRONOME_WEBHOOK_SECRET`                    | `editor/.env.test.local`       |
 | `WEBHOOK_TUNNEL_HOSTNAME`                     | `editor/.env.test.local`       |
 | `BILLING_E2E`, `BILLING_TEST_MODE`, `APP_URL` | `editor/.env.test` (committed) |
+
+**Contributor BYOK (alternative — not required):** `BYOK_OPENROUTER_API_KEY` or `BYOK_AI_GATEWAY_API_KEY` in `editor/.env.local`. When set, the AI seam bypasses billing entirely and **none** of the Metronome rows above are needed. Auth is still required. See [Just need AI to work?](#just-need-ai-to-work-byok-instead-no-billing-setup).
