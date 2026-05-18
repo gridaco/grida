@@ -59,6 +59,25 @@ import {
 } from "./_panel";
 
 // ───────────────────────────────────────────────────────────────────────────
+// Cross-surface hover. The package owns rows / selection / drag — it
+// deliberately has no "hover" channel (hover is presentational, per-frame,
+// and consumer-specific). The synced-editor showcase needs a tree row and
+// its canvas shape to light up together, so the *consumer* lifts one piece
+// of hover state and shares it. Default is a no-op: panels rendered without
+// a provider (e.g. the dev gallery) behave exactly as before.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface HoverState {
+  hovered: NodeId | null;
+  setHovered: (id: NodeId | null) => void;
+}
+export const HoverContext = React.createContext<HoverState>({
+  hovered: null,
+  setHovered: () => {},
+});
+export const useHover = (): HoverState => React.useContext(HoverContext);
+
+// ───────────────────────────────────────────────────────────────────────────
 // Grouping highlight — see the README "Grouping highlight" section.
 //
 // Two consumer-side recipes, both built on the package's pure
@@ -205,7 +224,7 @@ function rowState(s: RowStateInputs): RowState {
   return "idle";
 }
 
-function useThemeController(
+export function useThemeController(
   build: () => ReturnType<typeof buildGridaFixture>,
   opts: { expanded: NodeId[]; constraint?: MoveConstraint }
 ): TreeController<DemoMeta> {
@@ -226,7 +245,7 @@ function useThemeController(
  * demo we own the `InMemoryTreeSource` and just delegate to its
  * `applyIntent` helper.
  */
-function applyIntent(
+export function applyIntent(
   controller: TreeController<DemoMeta>,
   intent: Parameters<InMemoryTreeSource<DemoMeta>["applyIntent"]>[0]
 ): void {
@@ -239,7 +258,7 @@ function applyIntent(
  * tree/selection/drag — the demo owns "what this row's checkbox is set to".
  * In a real editor these would round-trip through the source.
  */
-function useRowFlags(
+export function useRowFlags(
   initial: (id: NodeId) => { visible: boolean; locked: boolean }
 ) {
   const [map, setMap] = React.useState<
@@ -277,7 +296,7 @@ const gridaIcon = (kind?: DemoKind, selected?: boolean) => {
   }
 };
 
-function GridaRow({
+export function GridaRow({
   args,
   flags,
 }: {
@@ -303,6 +322,7 @@ function GridaRow({
   const inSelectionGroup = useTreeSnapshot<DemoMeta, boolean>((c) =>
     selectionSubtree(c).has(row.id)
   );
+  const { hovered, setHovered } = useHover();
   const label = meta?.label ?? row.id;
   const { visible, locked } = flags.get(row.id);
   const dDepth = dropDepth ?? row.depth;
@@ -327,6 +347,7 @@ function GridaRow({
       data-state={state}
       data-dragging={isDragging || undefined}
       data-hidden={!visible || undefined}
+      data-hovered={hovered === row.id || undefined}
       role="treeitem"
       aria-selected={selected}
       tabIndex={-1}
@@ -334,11 +355,13 @@ function GridaRow({
         controller.focus(row.id);
         controller.select([row.id], modeFromEvent(e));
       }}
+      onPointerEnter={() => setHovered(row.id)}
+      onPointerLeave={() => setHovered(null)}
       onPointerDown={(e) => {
         if (e.button !== 0 || locked) return;
         onDragStart?.(row.id, e);
       }}
-      className="group/row relative flex h-7 items-center gap-1.5 px-2 text-[12px] select-none cursor-default rounded-sm transition-colors data-[state=drop-target]:bg-zinc-100 data-[state=selected]:bg-zinc-900 data-[state=selected]:text-white data-[state=in-group]:bg-zinc-100/80 data-[state=focused]:bg-zinc-100 data-[state=idle]:hover:bg-zinc-50 data-[hidden]:opacity-45 data-[state=selected]:opacity-100 data-[dragging]:opacity-40"
+      className="group/row relative flex h-7 items-center gap-1.5 px-2 text-[12px] select-none cursor-default rounded-sm transition-colors data-[state=drop-target]:bg-zinc-100 data-[state=selected]:bg-zinc-900 data-[state=selected]:text-white data-[state=in-group]:bg-zinc-100/80 data-[state=focused]:bg-zinc-100 data-[state=idle]:hover:bg-zinc-50 data-[state=idle]:data-[hovered]:bg-zinc-100 data-[hidden]:opacity-45 data-[state=selected]:opacity-100 data-[dragging]:opacity-40"
       style={{ paddingLeft: 6 + row.depth * 14 }}
     >
       {isDropTarget && dropPlacement === "before" && (
@@ -455,7 +478,7 @@ const figmaIcon = (kind?: DemoKind, selected?: boolean) => {
   }
 };
 
-function FigmaRow({
+export function FigmaRow({
   args,
   flags,
 }: {
@@ -479,6 +502,7 @@ function FigmaRow({
   const inSelectionGroup = useTreeSnapshot<DemoMeta, boolean>((c) =>
     selectionSubtree(c).has(row.id)
   );
+  const { hovered, setHovered } = useHover();
   const label = meta?.label ?? row.id;
   const { visible, locked } = flags.get(row.id);
   const isComponentish =
@@ -503,6 +527,7 @@ function FigmaRow({
       data-state={state}
       data-dragging={isDragging || undefined}
       data-hidden={!visible || undefined}
+      data-hovered={hovered === row.id || undefined}
       role="treeitem"
       aria-selected={selected}
       tabIndex={-1}
@@ -510,11 +535,13 @@ function FigmaRow({
         controller.focus(row.id);
         controller.select([row.id], modeFromEvent(e));
       }}
+      onPointerEnter={() => setHovered(row.id)}
+      onPointerLeave={() => setHovered(null)}
       onPointerDown={(e) => {
         if (e.button !== 0 || locked) return;
         onDragStart?.(row.id, e);
       }}
-      className="group/row relative flex h-6 items-center gap-1.5 px-2 text-[11px] select-none cursor-default text-neutral-200 data-[state=drop-target]:bg-[#0D99FF]/30 data-[state=drop-target]:text-neutral-100 data-[state=selected]:bg-[#0D99FF] data-[state=selected]:text-white data-[state=in-group]:bg-[#0D99FF]/15 data-[state=in-group]:text-neutral-100 data-[state=focused]:bg-white/10 data-[state=focused]:text-neutral-100 data-[state=idle]:hover:bg-white/5 data-[hidden]:opacity-50 data-[state=selected]:opacity-100 data-[dragging]:opacity-40"
+      className="group/row relative flex h-6 items-center gap-1.5 px-2 text-[11px] select-none cursor-default text-neutral-200 data-[state=drop-target]:bg-[#0D99FF]/30 data-[state=drop-target]:text-neutral-100 data-[state=selected]:bg-[#0D99FF] data-[state=selected]:text-white data-[state=in-group]:bg-[#0D99FF]/15 data-[state=in-group]:text-neutral-100 data-[state=focused]:bg-white/10 data-[state=focused]:text-neutral-100 data-[state=idle]:hover:bg-white/5 data-[state=idle]:data-[hovered]:bg-white/5 data-[hidden]:opacity-50 data-[state=selected]:opacity-100 data-[dragging]:opacity-40"
       style={{ paddingLeft: 8 + row.depth * 16 }}
     >
       {isDropTarget && dropPlacement === "before" && (
@@ -618,7 +645,9 @@ export function FigmaThemePanel() {
 
 const isFsFolder = (source: TreeSource<DemoMeta>, id: NodeId): boolean =>
   source.getNode(id).meta?.kind === "folder";
-const fsConstraint: MoveConstraint = intoNearestAncestor(isFsFolder as never);
+export const fsConstraint: MoveConstraint = intoNearestAncestor(
+  isFsFolder as never
+);
 
 // ───────────────────────────────────────────────────────────────────────────
 // VSCode — dark explorer, ext-colored file icons, indent guides
@@ -653,7 +682,7 @@ const vscodeIcon = (meta: DemoMeta | undefined, isExpanded?: boolean) => {
   }
 };
 
-function VSCodeRow({ args }: { args: RenderRowArgs }) {
+export function VSCodeRow({ args }: { args: RenderRowArgs }) {
   const { row, isDropTarget, dropPlacement, isDragActive, onDragStart } = args;
   const { controller, meta, selected, focused, isDragging } = useRowSnapshot(
     row.id
@@ -776,7 +805,7 @@ const finderIcon = (kind?: DemoKind, expanded?: boolean) => {
   }
 };
 
-function FinderRow({ args }: { args: RenderRowArgs }) {
+export function FinderRow({ args }: { args: RenderRowArgs }) {
   const { row, index, isDropTarget, dropPlacement, isDragActive, onDragStart } =
     args;
   const { controller, meta, selected, focused, isDragging } = useRowSnapshot(

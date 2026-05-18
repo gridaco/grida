@@ -46,6 +46,20 @@ export interface DemoMeta {
   size?: string;
   modifiedAt?: string;
   kindLabel?: string;
+  /**
+   * Scene geometry — only the Grida / Figma "synced editor" showcase uses
+   * these. The tree-view package itself never reads them; they live in the
+   * consumer's `meta` exactly like a real editor would carry node frames.
+   * The `<SvgStage>` paints by walking the source tree, so reordering a row
+   * (which mutates `children`) re-stacks the canvas with zero extra wiring.
+   */
+  box?: { x: number; y: number; w: number; h: number };
+  fill?: string;
+  radius?: number;
+  text?: string;
+  fontSize?: number;
+  weight?: number;
+  opacity?: number;
 }
 
 export function buildLayersFixture(): InMemoryTreeSource<DemoMeta> {
@@ -124,6 +138,147 @@ export function buildLayersFixture(): InMemoryTreeSource<DemoMeta> {
     },
   ];
 
+  return new InMemoryTreeSource<DemoMeta>({
+    root: "<root>",
+    nodes,
+    showRoot: false,
+  });
+}
+
+/**
+ * A tiny, geometry-bearing design — the layer tree of one artboard. Shared
+ * by the Grida and Figma "synced editor" showcases: the same source drives
+ * both a layers panel and an `<svg>` canvas, so selecting / hovering /
+ * reordering / deleting in the tree is reflected on the canvas (and back)
+ * with nothing more than the package's normal channels + intents.
+ *
+ * Document order is back→front; the showcases render the tree reversed
+ * (front layer on top, the layer-panel convention) while the canvas paints
+ * in document order — so a drag in the tree visibly re-stacks the canvas.
+ */
+export function buildSceneFixture(): InMemoryTreeSource<DemoMeta> {
+  const W = 360;
+  const H = 460;
+  const nodes: TreeNode<DemoMeta>[] = [
+    {
+      id: "<root>",
+      parent: null,
+      children: ["cover"],
+      meta: { kind: "frame", label: "Document" },
+    },
+    {
+      id: "cover",
+      parent: "<root>",
+      children: ["photo", "glow", "badge", "headline", "subhead", "actions"],
+      meta: {
+        kind: "frame",
+        label: "Cover",
+        box: { x: 0, y: 0, w: W, h: H },
+        fill: "#0B1020",
+        radius: 18,
+      },
+    },
+    {
+      id: "photo",
+      parent: "cover",
+      children: [],
+      meta: {
+        kind: "image",
+        label: "Photo",
+        box: { x: 0, y: 0, w: W, h: 248 },
+        fill: "#1E293B",
+      },
+    },
+    {
+      id: "glow",
+      parent: "cover",
+      children: [],
+      meta: {
+        kind: "rect",
+        label: "Glow",
+        box: { x: 176, y: 150, w: 240, h: 240 },
+        fill: "#6366F1",
+        radius: 999,
+        opacity: 0.55,
+      },
+    },
+    {
+      id: "badge",
+      parent: "cover",
+      children: [],
+      meta: {
+        kind: "rect",
+        label: "Badge",
+        box: { x: 292, y: 20, w: 56, h: 56 },
+        fill: "#F59E0B",
+        radius: 999,
+      },
+    },
+    {
+      id: "headline",
+      parent: "cover",
+      children: [],
+      meta: {
+        kind: "text",
+        label: "Headline",
+        box: { x: 28, y: 280, w: 304, h: 64 },
+        text: "Ship a tree today.",
+        fill: "#F8FAFC",
+        fontSize: 30,
+        weight: 700,
+      },
+    },
+    {
+      id: "subhead",
+      parent: "cover",
+      children: [],
+      meta: {
+        kind: "text",
+        label: "Subhead",
+        box: { x: 28, y: 332, w: 304, h: 24 },
+        text: "Headless controller · zero deps.",
+        fill: "#94A3B8",
+        fontSize: 14,
+        weight: 400,
+      },
+    },
+    {
+      id: "actions",
+      parent: "cover",
+      children: ["button", "button-label"],
+      meta: {
+        kind: "group",
+        label: "Actions",
+        box: { x: 28, y: 380, w: 188, h: 48 },
+      },
+    },
+    {
+      id: "button",
+      parent: "actions",
+      children: [],
+      meta: {
+        kind: "rect",
+        label: "Button BG",
+        box: { x: 28, y: 380, w: 188, h: 48 },
+        fill: "#6366F1",
+        radius: 12,
+      },
+    },
+    {
+      id: "button-label",
+      parent: "actions",
+      children: [],
+      meta: {
+        kind: "text",
+        label: "Get started →",
+        box: { x: 28, y: 394, w: 188, h: 20 },
+        text: "Get started →",
+        fill: "#FFFFFF",
+        fontSize: 14,
+        weight: 600,
+      },
+    },
+  ];
   return new InMemoryTreeSource<DemoMeta>({
     root: "<root>",
     nodes,

@@ -1,15 +1,14 @@
 "use client";
 
 import {
-  FigmaThemePanel,
-  FinderThemePanel,
-  GridaThemePanel,
-  VSCodeThemePanel,
-} from "@/app/(dev)/ui/components/tree-view/_themes";
+  FigmaShowcase,
+  FinderShowcase,
+  GridaShowcase,
+  VSCodeShowcase,
+} from "@/app/(dev)/ui/components/tree-view/_showcase";
 import { NpmLogoIcon } from "@/components/logos/npm";
 import { Button } from "@/components/ui/button";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
-import { BentoGrid } from "@/www/ui/bento-grid";
 import Footer from "@/www/footer";
 import Header from "@/www/header";
 import {
@@ -80,60 +79,34 @@ export default function TreeViewLandingPage() {
         </div>
       </section>
 
-      {/* Themed bento showcase */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="max-w-6xl mx-auto mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-3 max-w-xl">
-            <div className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">
-              <span className="size-1.5 rounded-full bg-zinc-900" />
-              One controller, many trees
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Same wiring. Wildly different trees.
-            </h2>
+      {/* Intro to the synced-editor showcase */}
+      <section className="container mx-auto px-4 pt-16 pb-4">
+        <div className="mx-auto max-w-6xl space-y-3">
+          <div className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
+            <span className="size-1.5 rounded-full bg-zinc-900" />
+            One controller, many trees
           </div>
-          <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-            Each panel below is <strong>identical</strong>{" "}
-            <code className="text-[13px] bg-zinc-100 px-1.5 py-0.5 rounded">
+          <h2 className="max-w-2xl text-3xl font-bold tracking-tight md:text-4xl">
+            Wire it to a real editor.
+          </h2>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Each section below is the <strong>same</strong>{" "}
+            <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-[13px]">
               TreeController
             </code>{" "}
-            wiring — different fixture, row renderer, indent geometry,
-            constraint stack. Drag rows, expand chevrons, click to select — it
-            all works.
+            wired to a working surface — a canvas, an editor pane, a desktop.
+            Select, hover, reorder, and delete flow both ways through the
+            package's channels. Different fixture, row renderer, and constraint
+            stack; identical core.
           </p>
         </div>
-
-        <BentoGrid className="max-w-6xl mx-auto grid-cols-1 md:grid-cols-2 auto-rows-fr">
-          <ShowcaseCard
-            name="Grida"
-            tagline="Monochrome zinc accent. Eye + lock per row, full reorder drag."
-            accent="bg-zinc-900"
-          >
-            <GridaThemePanel />
-          </ShowcaseCard>
-          <ShowcaseCard
-            name="Figma"
-            tagline="Dark layers panel. Components in purple, hidden layers dim, full reorder drag."
-            accent="bg-purple-500"
-          >
-            <FigmaThemePanel />
-          </ShowcaseCard>
-          <ShowcaseCard
-            name="VS Code"
-            tagline="Filesystem semantics — drop is always into the nearest folder. Target highlights in blue. No reordering."
-            accent="bg-sky-500"
-          >
-            <VSCodeThemePanel />
-          </ShowcaseCard>
-          <ShowcaseCard
-            name="Finder"
-            tagline="Multi-column grid, zebra rows, double-click to expand. Same FS drag rule as VS Code."
-            accent="bg-emerald-500"
-          >
-            <FinderThemePanel />
-          </ShowcaseCard>
-        </BentoGrid>
       </section>
+
+      {/* Themed showcases — one section each */}
+      <GridaShowcase />
+      <FigmaShowcase />
+      <VSCodeShowcase />
+      <FinderShowcase />
 
       {/* Features */}
       <section className="container mx-auto px-4 py-16 border-t border-zinc-200">
@@ -185,54 +158,6 @@ export default function TreeViewLandingPage() {
 
       <Footer />
     </main>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Bento-style card adapted from www/ui/bento-grid for interactive content.
-// The themed panel is part of normal flow (clickable, draggable) instead of
-// the original "background" slot, since adopters need to feel the interaction.
-// ───────────────────────────────────────────────────────────────────────────
-
-function ShowcaseCard({
-  name,
-  tagline,
-  accent,
-  children,
-}: {
-  name: string;
-  tagline: string;
-  accent: string;
-  children: React.ReactNode;
-}) {
-  // The descendant selectors stretch the themed panel's chrome (the
-  // outer two divs and the `[role="tree"]` element) to fill the card's
-  // remaining height, overriding the panels' fixed `h-80` so all four
-  // cards end at the same bottom padding regardless of header chrome.
-  return (
-    <div className="group relative col-span-1 flex h-full flex-col gap-3 rounded-xl bg-background p-3 [box-shadow:0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)] dark:bg-background dark:[border:1px_solid_rgba(255,255,255,.05)] dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className={`size-2 rounded-full ${accent}`} aria-hidden />
-            <h3 className="text-base font-semibold">{name}</h3>
-          </div>
-          <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
-            {tagline}
-          </p>
-        </div>
-      </div>
-      <div
-        className="
-          flex flex-1 min-h-0 justify-center
-          [&>div]:w-full [&>div]:flex [&>div]:flex-col
-          [&>div>div]:flex [&>div>div]:flex-col [&>div>div]:flex-1 [&>div>div]:min-h-0
-          [&_[role=tree]]:!h-auto [&_[role=tree]]:flex-1 [&_[role=tree]]:min-h-0
-        "
-      >
-        {children}
-      </div>
-    </div>
   );
 }
 
