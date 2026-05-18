@@ -49,6 +49,7 @@
     "@grida/tokens": "workspace:*",
     "@grida/transparency-grid": "workspace:*",
     "@grida/tree": "workspace:*",
+    "@grida/tree-view": "workspace:*",
     "@grida/vn": "workspace:*",
     "@headless-tree/core": "^1.0.1",
     "@headless-tree/react": "^1.0.1",

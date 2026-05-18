@@ -47,6 +47,22 @@ export const packages = [
     ],
   },
   {
+    name: "@grida/tree-view",
+    description:
+      "Headless, agnostic tree-view controller for editors and IDEs. Zero runtime dependencies, no DOM coupling in the core, no widget library on top. React is the only optional peer.",
+    demoPath: "/packages/@grida/tree-view",
+    npm: true,
+    features: [
+      "Zero runtime dependencies",
+      "Headless state machine (no DOM imports in the core)",
+      "Drag & drop with composable move constraints",
+      "Six subscription channels (rows, expanded, focus, drag, selection, intent)",
+      "Configurable keymap + type-ahead helpers",
+      "Virtualization-ready stable row list",
+      "Optional React peer (TreeProvider + useTreeSnapshot)",
+    ],
+  },
+  {
     name: "@grida/pixel-grid",
     description:
       "A React component for rendering pixel-perfect grids in infinite canvas applications. This package provides a flexible and performant way to display grid patterns with zoom and pan capabilities.",
