@@ -110,12 +110,19 @@ When writing or updating **user-facing docs**, prefer **universal routing** link
 
 ## Linking rules
 
-- **Never link outside `/docs`** from docs markdown files. Links like
-  `../../../crates/...` or `../../packages/...` break when docs are
-  hosted on Docusaurus (only `/docs/**` is deployed). Instead, reference
-  external paths as inline code: `` `crates/grida/examples/foo.rs` ``.
+Single source of truth: the **`links`** skill
+(`.agents/skills/links/SKILL.md`) — it covers every surface (docs,
+source, README/npm, product, GitHub, universal `/_/` routes). For docs
+pages, the short version:
+
 - Links **within `/docs`** (relative paths between docs pages) are fine.
+- **Never link outside `/docs` with a relative path** — only `/docs/**`
+  is deployed, so `../../../crates/...` 404s on the site. Use an
+  absolute GitHub URL:
+  `https://github.com/gridaco/grida/blob/main/<path>`.
 - Links to **external URLs** (`https://...`) are fine.
+- "Open in the product" → universal route `https://grida.co/_/<path>`
+  (see Universal routing above).
 
 ## Conventions
 
