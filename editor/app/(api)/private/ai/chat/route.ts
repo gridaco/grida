@@ -5,7 +5,6 @@ import {
   type UIMessage,
 } from "ai";
 import { canvasDesignAgent } from "@/grida-canvas-hosted/ai/agent/server-agent";
-import { Env } from "@/env";
 import { createClient } from "@/lib/supabase/server";
 import { modelSpecById } from "@/lib/ai/models";
 import { requireOrganizationId } from "@/lib/auth/organization";
@@ -26,25 +25,24 @@ type AgentChatRequestBody = {
 export async function POST(req: NextRequest) {
   try {
     // GRIDA-SEC-003: resolve the calling org with verified membership.
-    let organizationId: number | null = null;
-    if (!Env.web.IS_LOCALDEV_SUPERUSER) {
-      const client = await createClient();
-      const { data: userdata, error: authError } = await client.auth.getUser();
-      if (authError || !userdata.user) {
-        return aiErrorResponse({
-          code: "unauthorized",
-          status: 401,
-          message: "login required",
-        });
-      }
-      try {
-        organizationId = await requireOrganizationId({
-          user_id: userdata.user.id,
-          request: req,
-        });
-      } catch (err) {
-        return aiErrorResponse(orgErrorToAiError(err));
-      }
+    // Auth is always enforced — BYOK bypasses billing only, never auth.
+    const client = await createClient();
+    const { data: userdata, error: authError } = await client.auth.getUser();
+    if (authError || !userdata.user) {
+      return aiErrorResponse({
+        code: "unauthorized",
+        status: 401,
+        message: "login required",
+      });
+    }
+    let organizationId: number;
+    try {
+      organizationId = await requireOrganizationId({
+        user_id: userdata.user.id,
+        request: req,
+      });
+    } catch (err) {
+      return aiErrorResponse(orgErrorToAiError(err));
     }
 
     const { messages } = (await req.json()) as AgentChatRequestBody;
@@ -54,23 +52,12 @@ export async function POST(req: NextRequest) {
     let lastModelId: string | undefined;
     let lastStepUsage: LanguageModelUsage | undefined;
 
-    // organizationId is required unless we're in the local-dev superuser
-    // mode (no auth/billing). The agent's `prepareCall` injects this into
+    // The agent's `prepareCall` injects organizationId into
     // providerOptions.grida — see GRIDA-SEC-003.
-    if (organizationId === null && !Env.web.IS_LOCALDEV_SUPERUSER) {
-      return aiErrorResponse({
-        code: "no_organization",
-        status: 412,
-        message: "organizationId required",
-      });
-    }
     return createAgentUIStreamResponse({
       agent: canvasDesignAgent,
       uiMessages: messages,
-      options:
-        organizationId !== null
-          ? { organizationId, feature: "canvas/agent/chat" }
-          : ({} as { organizationId: number; feature?: string }),
+      options: { organizationId, feature: "canvas/agent/chat" },
       sendReasoning: true,
       messageMetadata: ({ part }): AgentMessageMetadata | undefined => {
         if (part.type === "finish-step") {

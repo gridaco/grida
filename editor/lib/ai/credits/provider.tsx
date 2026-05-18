@@ -49,8 +49,15 @@ export function Provider({ initial, children }: AiCreditsProviderProps) {
  *   credits.allowed           // boolean
  *   credits.formatted         // "$26.0" | null
  *   credits.formattedExact    // "$25.9921" | null
+ *   credits.byok              // a BYOK key is set server-side
  *   credits.refresh()         // pull live
  *   credits.consume(env, opts)// fold envelope; redirects auto-routed
+ *
+ * `byok` reports only that a key is configured. BYOK bypasses billing
+ * for the AI-SDK text/chat path ONLY — Replicate-backed surfaces
+ * (audio/image) still bill, so `cents`/`allowed` stay truthful and
+ * those surfaces must NOT treat `byok` as "unlimited". Only the AI
+ * chat surface acts on this flag. GRIDA-SEC-003.
  */
 export function useAiCredits() {
   const ctrl = useContext(Ctx);
@@ -72,6 +79,7 @@ export function useAiCredits() {
     allowed: state.allowed,
     formatted: format.chip(state.cents),
     formattedExact: format.exact(state.cents),
+    byok: state.byok,
     refresh: ctrl.refresh,
     consume: ctrl.consume,
   };

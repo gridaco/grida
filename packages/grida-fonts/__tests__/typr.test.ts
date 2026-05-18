@@ -119,7 +119,6 @@ describe("Typr font parsing", () => {
     const fonts = [
       "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf",
       "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
-      "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf",
       "Geist/Geist-VariableFont_wght.ttf",
     ];
 

@@ -34,7 +34,7 @@ beforeEach(() => {
 describe("AiCreditsController.consume", () => {
   it("folds balanceCents on success and returns unwrapped data", () => {
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -47,12 +47,16 @@ describe("AiCreditsController.consume", () => {
     };
     const out = ctrl.consume(env);
     expect(out).toEqual({ reply: "hi", balanceCents: 990 });
-    expect(ctrl.getSnapshot()).toEqual({ cents: 990, allowed: true });
+    expect(ctrl.getSnapshot()).toEqual({
+      cents: 990,
+      allowed: true,
+      byok: false,
+    });
   });
 
   it("notifies subscribers on success", () => {
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -71,7 +75,7 @@ describe("AiCreditsController.consume", () => {
   it("returns undefined and navigates on redirect failure", () => {
     const navigate = vi.fn<(href: string) => void>();
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -88,13 +92,17 @@ describe("AiCreditsController.consume", () => {
     expect(out).toBeUndefined();
     expect(fakeRouter).toHaveBeenCalledWith(env, { next: "/ai" });
     expect(navigate).toHaveBeenCalledWith("/sign-in");
-    expect(ctrl.getSnapshot()).toEqual({ cents: 1000, allowed: true });
+    expect(ctrl.getSnapshot()).toEqual({
+      cents: 1000,
+      allowed: true,
+      byok: false,
+    });
   });
 
   it("returns undefined and does NOT navigate on toast failure", () => {
     const navigate = vi.fn<(href: string) => void>();
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -110,7 +118,11 @@ describe("AiCreditsController.consume", () => {
     const out = ctrl.consume(env);
     expect(out).toBeUndefined();
     expect(navigate).not.toHaveBeenCalled();
-    expect(ctrl.getSnapshot()).toEqual({ cents: 1000, allowed: true });
+    expect(ctrl.getSnapshot()).toEqual({
+      cents: 1000,
+      allowed: true,
+      byok: false,
+    });
   });
 });
 
@@ -121,7 +133,7 @@ describe("AiCreditsController.refresh", () => {
       data: { balanceCents: 5000 },
     }));
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: false },
+      { cents: 1000, allowed: false, byok: false },
       {
         fetcher,
         router: fakeRouter,
@@ -130,7 +142,11 @@ describe("AiCreditsController.refresh", () => {
     );
     await ctrl.refresh();
     expect(fetcher).toHaveBeenCalledOnce();
-    expect(ctrl.getSnapshot()).toEqual({ cents: 5000, allowed: true });
+    expect(ctrl.getSnapshot()).toEqual({
+      cents: 5000,
+      allowed: true,
+      byok: false,
+    });
   });
 
   it("ignores result after dispose()", async () => {
@@ -142,7 +158,7 @@ describe("AiCreditsController.refresh", () => {
         })
     );
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher,
         router: fakeRouter,
@@ -153,14 +169,59 @@ describe("AiCreditsController.refresh", () => {
     ctrl.dispose();
     resolveFetch({ success: true, data: { balanceCents: 0 } });
     await p;
-    expect(ctrl.getSnapshot()).toEqual({ cents: 1000, allowed: true });
+    expect(ctrl.getSnapshot()).toEqual({
+      cents: 1000,
+      allowed: true,
+      byok: false,
+    });
+  });
+});
+
+describe("AiCreditsController BYOK persistence", () => {
+  // Regression: refresh()/consume() rebuild state and must not drop byok.
+  it("preserves byok across consume()", () => {
+    const ctrl = new AiCreditsController(
+      { cents: null, allowed: false, byok: true },
+      {
+        fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
+        router: fakeRouter,
+        navigate: vi.fn<(href: string) => void>(),
+      }
+    );
+    ctrl.consume({ success: true, data: { reply: "ok", balanceCents: 0 } });
+    expect(ctrl.getSnapshot()).toEqual({
+      cents: 0,
+      allowed: true,
+      byok: true,
+    });
+  });
+
+  it("preserves byok across refresh()", async () => {
+    const fetcher = vi.fn<() => Promise<AiActionResult<{}>>>(async () => ({
+      success: true as const,
+      data: { balanceCents: 0 },
+    }));
+    const ctrl = new AiCreditsController(
+      { cents: null, allowed: false, byok: true },
+      {
+        fetcher,
+        router: fakeRouter,
+        navigate: vi.fn<(href: string) => void>(),
+      }
+    );
+    await ctrl.refresh();
+    expect(ctrl.getSnapshot()).toEqual({
+      cents: 0,
+      allowed: true,
+      byok: true,
+    });
   });
 });
 
 describe("AiCreditsController subscribe / getSnapshot", () => {
   it("subscribe returns an unsubscribe fn that removes the listener", () => {
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -178,7 +239,7 @@ describe("AiCreditsController subscribe / getSnapshot", () => {
 
   it("getSnapshot returns the current state by reference identity for unchanged calls", () => {
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -194,7 +255,7 @@ describe("AiCreditsController subscribe / getSnapshot", () => {
 describe("AiCreditsController.dispose", () => {
   it("clears listeners and is idempotent", () => {
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -211,7 +272,7 @@ describe("AiCreditsController.dispose", () => {
 
   it("freezes state — consume() after dispose() does not mutate snapshot", () => {
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,
@@ -231,7 +292,7 @@ describe("AiCreditsController.dispose", () => {
   it("consume() after dispose() does not invoke router on failure envelopes", () => {
     const navigate = vi.fn<(href: string) => void>();
     const ctrl = new AiCreditsController(
-      { cents: 1000, allowed: true },
+      { cents: 1000, allowed: true, byok: false },
       {
         fetcher: vi.fn<() => Promise<AiActionResult<{}>>>(),
         router: fakeRouter,

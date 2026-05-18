@@ -14,7 +14,7 @@ import {
   type AiActionResult,
   type ProviderUsage,
 } from "@/lib/ai/server";
-import { catalog, tiers, type CatalogId } from "@/lib/ai/models";
+import { catalog, tiers } from "@/lib/ai/models";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
@@ -58,9 +58,15 @@ export type RunChatResponse = AiActionResult<RunChatData>;
 const SYSTEM_PROMPT =
   "You are a concise assistant inside the Grida editor. Reply in plain text — no markdown, no code fences. Keep answers short unless the user asks for detail.";
 
-function isCatalogId(id: string): id is CatalogId {
-  return id in catalog;
-}
+// Server-side allowlist: only the tier-backed models the picker
+// exposes. `isCatalogId` (any catalog entry) let a forged payload
+// select reserved / non-tiered models — restrict to the 4 tiers.
+const ALLOWED_CHAT_MODEL_IDS = new Set<string>([
+  catalog[tiers.nano].id,
+  catalog[tiers.mini].id,
+  catalog[tiers.pro].id,
+  catalog[tiers.max].id,
+]);
 
 /**
  * Coerce the AI SDK result.usage (whatever shape the provider returns)
@@ -96,51 +102,59 @@ export async function runChat(input: RunChatInput): Promise<RunChatResponse> {
     };
   }
 
-  return withAiAuth("ai/chat", input.organizationId, async (orgId) => {
-    const requested = input.model_id;
-    const useModelId = requested && isCatalogId(requested) ? requested : null;
-    const languageModel = useModelId ? grida(useModelId) : model("mini");
-    // Resolve the catalog id from the same source as `model("mini")` so
-    // a tier remap can't desync the billed cost card from the SDK call.
-    const resolvedId = useModelId ?? catalog[tiers.mini].id;
+  return withAiAuth(
+    "ai/chat",
+    input.organizationId,
+    async (orgId) => {
+      const requested = input.model_id;
+      const useModelId =
+        requested && ALLOWED_CHAT_MODEL_IDS.has(requested) ? requested : null;
+      const languageModel = useModelId ? grida(useModelId) : model("mini");
+      // Resolve the catalog id from the same source as `model("mini")` so
+      // a tier remap can't desync the billed cost card from the SDK call.
+      const resolvedId = useModelId ?? catalog[tiers.mini].id;
 
-    const messages: Array<{
-      role: "system" | "user" | "assistant";
-      content: string;
-    }> = [
-      { role: "system", content: SYSTEM_PROMPT },
-      ...input.history.map((t) => ({ role: t.role, content: t.content })),
-      { role: "user", content: input.message },
-    ];
+      const messages: Array<{
+        role: "system" | "user" | "assistant";
+        content: string;
+      }> = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...input.history.map((t) => ({ role: t.role, content: t.content })),
+        { role: "user", content: input.message },
+      ];
 
-    const { text, usage } = await generateText({
-      model: languageModel,
-      messages,
-      providerOptions: {
-        grida: {
-          organizationId: orgId,
-          feature: "ai/chat",
+      const { text, usage } = await generateText({
+        model: languageModel,
+        messages,
+        providerOptions: {
+          grida: {
+            organizationId: orgId,
+            feature: "ai/chat",
+          },
         },
-      },
-    });
+      });
 
-    const providerUsage = toProviderUsage(usage);
-    const realCostUsd = costUsdFromTokenUsage(resolvedId, providerUsage);
-    const costMills = costMillsFromTokenUsage(resolvedId, providerUsage);
+      const providerUsage = toProviderUsage(usage);
+      const realCostUsd = costUsdFromTokenUsage(resolvedId, providerUsage);
+      const costMills = costMillsFromTokenUsage(resolvedId, providerUsage);
 
-    return {
-      reply: text,
-      model_id: resolvedId,
-      costMills,
-      realCostUsd,
-      usage: {
-        inputTokens: providerUsage.inputTokens.total ?? 0,
-        outputTokens: providerUsage.outputTokens.total ?? 0,
-        totalTokens:
-          (providerUsage.inputTokens.total ?? 0) +
-          (providerUsage.outputTokens.total ?? 0),
-        cacheReadTokens: providerUsage.inputTokens.cacheRead,
-      },
-    } satisfies RunChatData;
-  });
+      return {
+        reply: text,
+        model_id: resolvedId,
+        costMills,
+        realCostUsd,
+        usage: {
+          inputTokens: providerUsage.inputTokens.total ?? 0,
+          outputTokens: providerUsage.outputTokens.total ?? 0,
+          totalTokens:
+            (providerUsage.inputTokens.total ?? 0) +
+            (providerUsage.outputTokens.total ?? 0),
+          cacheReadTokens: providerUsage.inputTokens.cacheRead,
+        },
+      } satisfies RunChatData;
+    },
+    // GRIDA-SEC-003: AI-SDK text path — BYOK swaps in a bare provider
+    // with no billing middleware, so under BYOK there is no Grida spend.
+    { byokBypass: true }
+  );
 }

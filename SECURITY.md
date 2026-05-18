@@ -221,11 +221,14 @@ inputOrgId })`. It resolves from: route param slug → request
    id is verified via `assertOrgMember(user_id, org_id)` before
    return. No "current org" is read from session blob / cookie.
 2. **Runtime contract in the seam** —
-   [editor/lib/ai/\_seam/core.ts](editor/lib/ai/_seam/core.ts)
+   [editor/lib/ai/server.ts](editor/lib/ai/server.ts)
    `withTransaction` (and the AI SDK middleware that wraps it) throw
    `MissingOrgIdError` if `organizationId` is missing, non-integer,
-   or non-positive. Defense-in-depth — a caller that forgets to
-   verify still cannot pass a garbage value.
+   or non-positive. This is **unconditional** on the billed path: the
+   former `NEXT_PUBLIC_GRIDA_LOCALDEV_SUPERUSER` exception (synthetic
+   `organizationId:0`, gate/ingest/auth skip) has been **removed** —
+   no code path skips this check while billing. The only intentional
+   bypass is the BYOK carve-out below, and it does not bill.
 3. **Single seam entry point** —
    [editor/lib/ai/server.ts](editor/lib/ai/server.ts) is the ONLY
    file allowed to import `replicate`, `openai`, `@ai-sdk/*`,
@@ -235,12 +238,39 @@ inputOrgId })`. It resolves from: route param slug → request
    ([editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts)).
    A new file that bypasses the seam fails at lint or CI.
 
+**BYOK carve-out (intentional).** When a contributor sets a `BYOK_*`
+key ([editor/lib/ai/models.ts](editor/lib/ai/models.ts) —
+`BYOK_OPENROUTER_API_KEY`, `BYOK_AI_GATEWAY_API_KEY`), `grida`/`model`
+return a **bare** provider so the **AI-SDK text/chat path** bypasses
+the billing seam: no gate, no Metronome ingest, **and** the
+`MissingOrgIdError` runtime contract above does not fire (a bare
+provider has no middleware). The contributor's own provider key is
+charged directly — there is no Grida balance, hence no victim to
+drain, so the billing trust boundary is moot for that path. **Scope —
+AI-SDK path only.** BYOK only swaps the AI-SDK provider; Replicate-
+backed actions (`runPrediction`/`withTransaction` — audio, image) are
+**not** bypassed and still gate + ingest under BYOK. Accordingly the
+`withAiAuth` `balanceCents:0` short-circuit is opt-gated
+(`byokBypass`, default `false`): only AI-SDK actions set it, so billed
+actions still read the real balance and cannot silently drain credit
+while reporting `0`. **BYOK bypasses billing only — never auth.** `requireOrganizationId` and
+route/action auth always run, so a logged-in user with no resolvable
+org is still rejected. Gated solely by server-only, non-`NEXT_PUBLIC_`
+env vars never set in the hosted product (same trust model as
+`OPENAI_API_KEY` / `REPLICATE_API_TOKEN`). Fail-closed: `byok` is
+`null` unless a key env var is a non-empty string, so any ambiguity
+falls back to the billed path. **Residual risk:** `byok` is resolved
+once at module load with no per-request guard — an accidental `BYOK_*`
+on a hosted/preview deploy would make every org bypass billing and the
+org-id sanity gate (auth still holds). Acceptable only because it is a
+contributor/self-host switch under the existing server-env trust model.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-003 .` to enumerate.
 Today:
 
 - [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts) — `requireOrganizationId`.
-- [editor/lib/ai/server.ts](editor/lib/ai/server.ts) — single seam entry.
-- [editor/lib/ai/\_seam/core.ts](editor/lib/ai/_seam/core.ts) — runtime gate.
+- [editor/lib/ai/server.ts](editor/lib/ai/server.ts) — single seam entry; unconditional runtime gate; BYOK layer switch.
+- [editor/lib/ai/models.ts](editor/lib/ai/models.ts) — BYOK layer (bare provider, bypasses billing).
 - [editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc) — import lint rule.
 - [editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts) — CI audit.
 
