@@ -246,15 +246,32 @@ export class HUDCanvas {
       const lx = sx * midX + tx;
       const ly = sy * midY + ty;
 
-      // offset label perpendicular to line direction
+      const angle = line.labelAngle ?? 0;
+      // Offset label perpendicular to line direction. When `labelAngle`
+      // is set, the offset is rotated by `angle` so the pill sits
+      // outside the rotated artwork's bottom edge (size meter on a
+      // rotated selection).
       const isVertical =
         Math.abs(line.x2 - line.x1) < Math.abs(line.y2 - line.y1);
-      const labelX = isVertical ? lx + LABEL_OFFSET : lx;
-      const labelY = isVertical ? ly : ly + LABEL_OFFSET;
+      const baseOffsetX = isVertical ? LABEL_OFFSET : 0;
+      const baseOffsetY = isVertical ? 0 : LABEL_OFFSET;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const labelX = lx + baseOffsetX * cos - baseOffsetY * sin;
+      const labelY = ly + baseOffsetX * sin + baseOffsetY * cos;
 
       const metrics = ctx.measureText(line.label);
       const tw = metrics.width + LABEL_PADDING_X * 2;
       const th = LABEL_FONT_HEIGHT + LABEL_PADDING_Y * 2;
+
+      // Rotate the pill + text around the label center when `labelAngle`
+      // is set. Cheap save/restore; only the pill draw is wrapped.
+      if (angle !== 0) {
+        ctx.save();
+        ctx.translate(labelX, labelY);
+        ctx.rotate(angle);
+        ctx.translate(-labelX, -labelY);
+      }
 
       // background pill
       ctx.fillStyle = line.color ?? this.color;
@@ -271,6 +288,8 @@ export class HUDCanvas {
       // text
       ctx.fillStyle = DEFAULT_LABEL_FG;
       ctx.fillText(line.label, labelX, labelY);
+
+      if (angle !== 0) ctx.restore();
     }
   }
 
@@ -438,6 +457,19 @@ export class HUDCanvas {
 
       const doFill = r.fill !== false;
       const doStroke = r.stroke !== false;
+      const angle = r.angle ?? 0;
+
+      // Rotate around the rect's screen-space center when angle is set —
+      // used to make handle knobs rotate together with a transformed
+      // selection. Skip the matrix push when angle === 0 (most rects).
+      if (angle !== 0) {
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.translate(-cx, -cy);
+      }
 
       if (doFill) {
         ctx.fillStyle = r.fillColor ?? this.color;
@@ -447,6 +479,8 @@ export class HUDCanvas {
         ctx.strokeStyle = r.strokeColor ?? this.color;
         ctx.strokeRect(x, y, w, h);
       }
+
+      if (angle !== 0) ctx.restore();
     }
   }
 }

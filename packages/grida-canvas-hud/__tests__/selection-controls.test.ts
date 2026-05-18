@@ -170,6 +170,85 @@ describe("computeSelectionControlLayout — derived per-axis priority", () => {
     expect(layout.zones).toHaveLength(0);
   });
 
+  // ── Rotation halo: no gap, no cursor overlap ────────────────────────────
+  // The old "16×16 diagonal handle" model left dead L-strips wrapping the
+  // resize corner at any zoom — the cardinal arms of the L were uncovered.
+  // The new model makes rotation a single rect that WRAPS the resize
+  // corner (extends `ROTATION_WRAP` px outward on both axes of the
+  // cardinal direction). Rotation has the highest priority value (lowest
+  // priority) so it loses to body, edges, and resize-corner on overlap.
+  // Net effect: rotation cursor only appears in the L-strip immediately
+  // outside the resize corner.
+  it("rotation halo wraps the resize corner — no gap in the perimeter L-strip", () => {
+    // Pick a low-zoom case where the old model demonstrably gapped:
+    // 30×30 squeezed, corner at (130, 100).
+    const bbox = { x: 100, y: 100, width: 30, height: 30 };
+    const layout = computeSelectionControlLayout(bbox, OPTS);
+
+    // Sample points around the NE corner that the user expects to hit
+    // SOMETHING (resize, rotate, edge, or body — anything but a dead
+    // zone). These were demonstrably dead under the old offset model.
+    const ne_samples: Array<[number, number, string]> = [
+      [135, 88, "above the corner, in the resize-corner x-range"],
+      [145, 95, "right of the corner, in the resize-corner y-range"],
+      [145, 88, "diagonally out from the corner"],
+      [128, 102, "just inside the bbox at the NE corner"],
+      [132, 95, "1 px right of the bbox NE corner, inside resize y-range"],
+    ];
+    const dead: string[] = [];
+    for (const [x, y, label] of ne_samples) {
+      const hit = layout.zones.find(
+        (z) =>
+          x >= z.rect.x &&
+          x <= z.rect.x + z.rect.width &&
+          y >= z.rect.y &&
+          y <= z.rect.y + z.rect.height
+      );
+      if (!hit) dead.push(`(${x}, ${y}): ${label}`);
+    }
+    expect(dead).toEqual([]);
+  });
+
+  it("rotation is the LOWEST-priority zone (loses to body/edges/resize)", () => {
+    // Anything above body's priority on the ladder would let rotation
+    // intrude on the resize corner, the edge strips, or the body
+    // interior — which is exactly what the wrap model relies on it NOT
+    // doing.
+    expect(HUDHitPriority.ROTATE_HANDLE).toBeGreaterThan(
+      HUDHitPriority.TRANSLATE_BODY
+    );
+    expect(HUDHitPriority.ROTATE_HANDLE).toBeGreaterThan(
+      HUDHitPriority.RESIZE_HANDLE_CORNER
+    );
+    expect(HUDHitPriority.ROTATE_HANDLE).toBeGreaterThan(
+      HUDHitPriority.RESIZE_HANDLE_EDGE
+    );
+  });
+
+  it("rotation rect fully contains the resize-corner rect (wraps it)", () => {
+    // The wrap rect overlaps the resize rect by exactly the resize rect's
+    // footprint. Priority resolution gives resize the cursor inside that
+    // overlap; outside, the rotation L is what remains.
+    for (const dim of [100, 50, 36, 24, 16]) {
+      const layout = computeSelectionControlLayout(
+        { x: 100, y: 100, width: dim, height: dim },
+        OPTS
+      );
+      const corner = findByLabel(layout, "resize_handle:ne");
+      const rotate = findByLabel(layout, "rotate:ne");
+      if (!corner || !rotate) continue;
+      // Rotation NE encloses resize NE on every axis.
+      expect(rotate.rect.x).toBeLessThanOrEqual(corner.rect.x);
+      expect(rotate.rect.y).toBeLessThanOrEqual(corner.rect.y);
+      expect(rotate.rect.x + rotate.rect.width).toBeGreaterThanOrEqual(
+        corner.rect.x + corner.rect.width
+      );
+      expect(rotate.rect.y + rotate.rect.height).toBeGreaterThanOrEqual(
+        corner.rect.y + corner.rect.height
+      );
+    }
+  });
+
   // ── Rotation opt-out ───────────────────────────────────────────────────
   it("show_rotation: false omits rotation zones only", () => {
     const layout = computeSelectionControlLayout(

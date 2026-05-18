@@ -10,7 +10,11 @@ import type {
 } from "../event/event";
 import { SurfaceState } from "../event/state";
 import type { SurfaceGesture, NodeId } from "../event/gesture";
-import type { CursorIcon } from "../event/cursor";
+import {
+  type CursorIcon,
+  type CursorRenderer,
+  cursorToCss,
+} from "../event/cursor";
 import type { Intent, IntentHandler } from "../event/intent";
 import type { Transform } from "../event/transform";
 import type { SelectionShape, SelectionGroup } from "../event/shape";
@@ -89,6 +93,11 @@ export class Surface {
   private opts: SurfaceOptions;
   private width = 0;
   private height = 0;
+  // Pluggable cursor renderer. `null` = use the built-in `cursorToCss`
+  // mapping (current behavior; backwards-compat). Hosts opt into the
+  // bundled SVG renderer via `setCursorRenderer(cursors.defaultRenderer())`
+  // from `@grida/hud/cursors`.
+  private cursor_renderer: CursorRenderer | null = null;
 
   constructor(canvas: HTMLCanvasElement, options: SurfaceOptions) {
     this.opts = options;
@@ -235,6 +244,36 @@ export class Surface {
 
   cursor(): CursorIcon {
     return this.state.cursor;
+  }
+
+  /**
+   * Resolve the current cursor to a CSS `cursor:` value. Runs the
+   * installed renderer (or the built-in `cursorToCss` if none installed).
+   *
+   * Host wires it like:
+   *
+   *     const r = surface.dispatch(event);
+   *     if (r.cursorChanged) el.style.cursor = surface.cursorCss();
+   *
+   * Saves the host from re-importing `cursorToCss` after every dispatch
+   * and gives one place to change behavior when a renderer is swapped in.
+   */
+  cursorCss(): string {
+    const fn = this.cursor_renderer ?? cursorToCss;
+    return fn(this.state.cursor);
+  }
+
+  /**
+   * Install (or clear) a custom cursor renderer.
+   *
+   * `null` restores the built-in `cursorToCss` behavior (native CSS
+   * keywords for every variant). Pass `cursors.defaultRenderer()` from
+   * `@grida/hud/cursors` for the bundled SVG cursor set.
+   *
+   * Re-callable mid-session; the next `cursorCss()` reads the new value.
+   */
+  setCursorRenderer(fn: CursorRenderer | null): void {
+    this.cursor_renderer = fn;
   }
 
   modifiers(): Modifiers {

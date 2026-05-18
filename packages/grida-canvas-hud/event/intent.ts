@@ -1,6 +1,7 @@
 import type cmath from "@grida/cmath";
 import type { ResizeDirection } from "./cursor";
 import type { NodeId, Rect } from "./gesture";
+import type { SelectionShape } from "./shape";
 
 /** "preview" is emitted on every gesture move; "commit" once on release. */
 export type IntentPhase = "preview" | "commit";
@@ -43,8 +44,19 @@ export type Intent =
       /** Member ids of the group being resized (1 or more). */
       ids: NodeId[];
       anchor: ResizeDirection;
-      /** Target rect in document-space. */
+      /**
+       * Target rect in document-space. For `transformed` selections this
+       * is the AABB of the new shape — preserved so axis-aligned hosts
+       * that ignore `shape` keep working unchanged.
+       */
       rect: Rect;
+      /**
+       * Full target shape. Present whenever the gesture produced one
+       * (which is always, post-Commit 2 of the affine-first plan).
+       * Hosts that handle rotated/sheared selections consume this
+       * directly; legacy hosts can read `rect` and ignore `shape`.
+       */
+      shape?: SelectionShape;
       phase: IntentPhase;
     }
   | {

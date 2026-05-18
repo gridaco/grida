@@ -1,6 +1,7 @@
 import cmath from "@grida/cmath";
 import type { NodeId, Rect } from "./gesture";
 import type { ResizeDirection, RotationCorner } from "./cursor";
+import type { SelectionShape } from "./shape";
 
 /**
  * Action a UI hit-region triggers when clicked.
@@ -12,9 +13,12 @@ import type { ResizeDirection, RotationCorner } from "./cursor";
  *
  * - `select_node` — user clicked on a node-representative UI region.
  * - `resize_handle` — one of 8 resize regions (4 corner knobs + 4 virtual
- *   edges). Carries the group's member ids and the group's initial rect.
+ *   edges). Carries the group's member ids and the group's initial
+ *   `SelectionShape` — `rect` for axis-aligned groups, `transformed` for
+ *   rotated/sheared groups (so resize math runs in the local frame).
  * - `rotate_handle` — one of 4 virtual rotation regions outside the group's
- *   corners. Carries the group's initial rect for center math.
+ *   corners. Carries the group's initial `SelectionShape` for center math
+ *   (pivot = center of `shapeBounds(initial_shape)`).
  * - `endpoint_handle` — endpoint of a line-shape selection. Carries the
  *   line's current p1/p2 so dragging is relative to a stable snapshot.
  * - `translate_handle` — body region covering a selection group's bbox.
@@ -29,13 +33,13 @@ export type OverlayAction =
       kind: "resize_handle";
       direction: ResizeDirection;
       ids: readonly NodeId[];
-      initial_rect: { x: number; y: number; width: number; height: number };
+      initial_shape: SelectionShape;
     }
   | {
       kind: "rotate_handle";
       corner: RotationCorner;
       ids: readonly NodeId[];
-      initial_rect: { x: number; y: number; width: number; height: number };
+      initial_shape: SelectionShape;
     }
   | {
       kind: "endpoint_handle";
@@ -56,7 +60,12 @@ export type OverlayAction =
  * canonical priority ladder.
  */
 export interface HitRegion {
-  rect: Rect; // screen-space
+  rect: Rect; // screen-space when `inverse_transform` is omitted; shadow-space otherwise
+  /** If present, the pointer is transformed by this affine before AABB
+   *  containment against `rect`. Carried for transformed-chrome zones so
+   *  hit-test stays exact at any rotation without inflating to an
+   *  AABB-of-rotated-corners. */
+  inverse_transform?: cmath.Transform;
   action: OverlayAction;
   /** Lower wins. Tie-break: later push wins. */
   priority: number;
@@ -92,7 +101,10 @@ export class HitRegions {
   hitTestRegion(point: cmath.Vector2): HitRegion | null {
     let best: HitRegion | null = null;
     for (const r of this.regions) {
-      if (!cmath.rect.containsPoint(r.rect, point)) continue;
+      const test_point = r.inverse_transform
+        ? cmath.vector2.transform(point, r.inverse_transform)
+        : point;
+      if (!cmath.rect.containsPoint(r.rect, test_point)) continue;
       // `<=` so a later push at the same priority wins (preserves the
       // prior "topmost on overlap" feel; tie-break is still push order).
       if (best === null || r.priority <= best.priority) best = r;

@@ -27,6 +27,13 @@ export interface HUDLine extends cmath.ui.Line, HUDSemantic {
    * back to the canvas's current color when absent.
    */
   color?: string;
+  /**
+   * Label rotation in radians (CCW) around the label pill's screen-space
+   * center. Defaults to `0`. Used to make the size meter pill rotate with
+   * a `SelectionShape.transformed` parent. Only affects the pill +
+   * text; the underlying line stroke is unaffected.
+   */
+  labelAngle?: number;
 }
 
 /**
@@ -139,6 +146,14 @@ export interface HUDScreenRect extends HUDSemantic {
   fillColor?: string;
   /** Override the canvas color for stroke. */
   strokeColor?: string;
+  /**
+   * Rotation in radians (CCW) around the rect's screen-space center.
+   * Defaults to `0`. Used to make handle knobs / size badges rotate
+   * together with a `SelectionShape.transformed` parent. Hit-testing is
+   * unaffected — render and hit live on independent shapes per the
+   * package's render/hit-test split (see README).
+   */
+  angle?: number;
 }
 
 /**

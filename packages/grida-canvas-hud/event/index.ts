@@ -44,5 +44,5 @@ export {
   type RenderShape,
   MIN_HIT_SIZE,
   MIN_CHROME_VISIBLE_SIZE,
-  ROTATION_OFFSET,
+  ROTATION_WRAP,
 } from "./overlay";

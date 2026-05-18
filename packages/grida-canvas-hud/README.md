@@ -203,8 +203,21 @@ type SurfaceGesture =
   | { kind: "pan"; dx: number; dy: number }
   | { kind: "marquee"; rect: Rect } // screen-space
   | { kind: "translate"; ids: NodeId[]; dx: number; dy: number }
-  | { kind: "resize"; id: NodeId; anchor: ResizeDirection; rect: Rect }
-  | { kind: "rotate"; id: NodeId; corner: RotationCorner; angle: number };
+  | {
+      kind: "resize";
+      ids: NodeId[];
+      direction: ResizeDirection;
+      initial_shape: SelectionShape;
+      current_shape: SelectionShape;
+    }
+  | {
+      kind: "rotate";
+      ids: NodeId[];
+      corner: RotationCorner;
+      anchor_angle: number;
+      current_angle: number;
+    }
+  | { kind: "endpoint"; id: NodeId; endpoint: "p1" | "p2" };
 ```
 
 ### Intents
@@ -218,12 +231,29 @@ type Intent =
   | { kind: "translate"; ids: NodeId[]; dx: number; dy: number; phase: Phase }
   | {
       kind: "resize";
-      id: NodeId;
+      ids: NodeId[];
       anchor: ResizeDirection;
+      /** AABB of the new shape (for axis-aligned hosts). */
       rect: Rect;
+      /** Full new shape — `transformed` carries the matrix so rotated
+       *  hosts can resize in the local frame. Optional for backward-compat. */
+      shape?: SelectionShape;
       phase: Phase;
     }
-  | { kind: "rotate"; id: NodeId; angle: number; phase: Phase }
+  | { kind: "rotate"; ids: NodeId[]; angle: number; phase: Phase }
+  | {
+      kind: "marquee_select";
+      rect: Rect;
+      additive: boolean;
+      phase: Phase;
+    }
+  | {
+      kind: "set_endpoint";
+      id: NodeId;
+      endpoint: "p1" | "p2";
+      pos: [number, number];
+      phase: Phase;
+    }
   | { kind: "enter_content_edit"; id: NodeId }
   | { kind: "cancel_gesture" };
 
@@ -253,6 +283,28 @@ function Viewport() {
 }
 ```
 
+## Cursors
+
+The HUD owns cursor state (`SurfaceState.setCursor` → `surface.cursor()`), but **does not own cursor pixels.** The host receives a `CursorIcon` and decides what CSS `cursor:` value to apply.
+
+For hosts that want Grida's default Figma-style rotation/resize cursors — curved double-arrows for rotate, straight double-arrows for resize, both following the selection's screen-space rotation — wire the opt-in renderer from the dedicated subpath:
+
+```ts
+import { cursors } from "@grida/hud/cursors";
+
+surface.setCursorRenderer(cursors.defaultRenderer());
+```
+
+**Tree-shake invariant.** Nothing in `surface/`, `event/`, or `primitives/` may import from `cursors/`. Hosts that don't import the subpath pay zero bundle cost. Enforced by `__tests__/cursors.test.ts`.
+
+The subpath also exposes the SVG templates and the `data:` URL encoder for hosts that want to render cursor previews in sidebar UI without going through the Surface:
+
+```ts
+import { cursors } from "@grida/hud/cursors";
+const svg = cursors.templates.rotate(45); // angle in degrees
+const url = cursors.svgDataUrl(svg);
+```
+
 ## Selection intent
 
 The full classification table — every named scenario at pointer-down, what
@@ -280,7 +332,12 @@ Skim the spec before changing the classifier or its dispatch.
   1. **UI layer (screen-space AABB)** — surface's own `HitRegions` registry, populated by chrome builder each frame. Resize handle? Rotation handle? Body region (translate)? Direct path; no host involvement.
   2. **Scene layer (doc-space point)** — if no UI hit, surface converts the point screen→doc and calls `pick(point_doc)`. Host implements this with whatever it has (`elementFromPoint`+`data-id` for SVG-DOM hosts, scene-cache R-tree for cg).
 - The UI-tier hit registry is built independently of the render path — see [Two backends: render and hit-testing](#two-backends-render-and-hit-testing).
-- `shapeOf(id)` returns a **doc-space** `SelectionShape` (`{ kind: "rect", rect }` for most nodes, `{ kind: "line", p1, p2 }` for vector lines). Surface converts to screen for handle placement and screen-space chrome.
+- `shapeOf(id)` returns a **doc-space** `SelectionShape`:
+  - `{ kind: "rect", rect }` — axis-aligned (most nodes)
+  - `{ kind: "line", p1, p2 }` — vector lines
+  - `{ kind: "transformed", local, matrix }` — anything with a non-identity 2×3 affine (rotation, skew, non-uniform scale, mirror). `local` is the artwork's local-frame AABB; `matrix` maps local → doc. Identity matrix here is byte-equivalent to `{ kind: "rect", rect: local }`.
+
+  See [Transformed selections](#transformed-selections) below for what the HUD does with the `transformed` variant.
 
 Handles are always drawn at a fixed screen-space size regardless of zoom. The primitive layer supports this via `HUDScreenRect` (see below).
 
@@ -304,6 +361,32 @@ Layer order within a frame (back-to-front):
 4. Resize/rotate handles
 5. Size meter pill
 6. Host-fed extras (always on top)
+
+## Transformed selections
+
+When a host returns `{ kind: "transformed", local, matrix }` from `shapeOf`, the HUD renders the chrome — outline, knobs, edge strips, rotation halos, size badge, dashed resize preview — in the artwork's own frame. Knobs rotate with the parent. The size badge reads `local.width × local.height`, not the AABB of the rotated rect. The cursor's `baseAngle` follows the matrix so resize/rotate arrows stay aligned with the selection's tilt.
+
+**Render** uses lazy transforms — every rotated primitive carries an optional angle field; the canvas wraps the draw call in a `translate/rotate/restore`:
+
+| Primitive       | Field                                | Effect                                                 |
+| --------------- | ------------------------------------ | ------------------------------------------------------ |
+| `HUDScreenRect` | `angle?: number` (radians, CCW)      | Rotates the rect around its screen-space center.       |
+| `HUDLine`       | `labelAngle?: number` (radians, CCW) | Rotates the label pill around its screen-space center. |
+
+**Hit-test** uses the same lazy transform via a new `HitShape` variant:
+
+```ts
+type HitShape =
+  | { kind: "screen_rect_at_doc"; anchor_doc; width; height }
+  | { kind: "screen_aabb"; rect }
+  | { kind: "screen_obb"; rect; inverse_transform }; // ← new
+```
+
+`screen_obb` carries the un-rotated zone rect (in shadow space, centered at the chrome's screen center) plus an `inverse_transform` that maps a screen-space pointer INTO shadow space. The hit-test loop applies the inverse to the pointer, then runs the usual AABB containment. **No AABB-of-rotated-corners inflation** — clicks outside the visible rotated chrome don't trigger phantom resize regions, regardless of aspect ratio or rotation. The 9-slice priority ladder operates in the same coordinate frame as the axis-aligned `rect` path, so promotion/demotion rules behave identically.
+
+The `resize` gesture operates in the local frame: `applyResize` takes a `SelectionShape` and returns a `SelectionShape`, with deltas inverse-transformed into local space for `transformed` shapes. The emitted `Intent` carries both `rect` (AABB) and `shape` (full local + matrix) so legacy axis-aligned hosts keep working while transform-aware hosts can write the new dims back into the artwork without touching the matrix.
+
+**v1 caveats.** Pure rotation is exact at every level (render, hit, gesture). Skew and non-uniform scale render correctly but use a uniform-scale fallback for handle sizing — anisotropic per-axis sizing is a follow-up.
 
 ## Primitives — what `HUDCanvas` can draw
 
@@ -345,10 +428,15 @@ packages/grida-canvas-hud/
 │   ├── intent.ts              # Intent types + builders
 │   ├── transform.ts           # screen ↔ doc helpers
 │   └── state.ts               # SurfaceState — pure dispatch entry
-└── surface/                   # the wired class
-    ├── surface.ts             # Surface class
-    ├── chrome.ts              # builds HUDDraw from SurfaceState + shapeOf
-    └── style.ts               # HUDStyle defaults + merge
+├── surface/                   # the wired class
+│   ├── surface.ts             # Surface class
+│   ├── chrome.ts              # builds HUDDraw from SurfaceState + shapeOf
+│   └── style.ts               # HUDStyle defaults + merge
+└── cursors/                   # opt-in subpath: @grida/hud/cursors
+    ├── index.ts               # cursors.defaultRenderer(), templates, encoder
+    ├── renderer.ts            # CursorIcon → CSS cursor: with rotation-aware SVGs
+    ├── templates.ts           # parameterized SVG cursor templates
+    └── encode.ts              # SVG → data: URL
 ```
 
 ## Naming conventions
@@ -362,16 +450,19 @@ packages/grida-canvas-hud/
 
 `packages/grida-canvas-hud/__tests__/` runs under vitest. No DOM, no canvas mock — the `event/` layer is pure.
 
-| File                    | Tests                                                                                             |
-| ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `transform.test.ts`     | screen ↔ doc across translate, scale, DPR                                                         |
-| `hit-regions.test.ts`   | topmost wins, reverse iteration, clear/empty, AABB containment                                    |
-| `handles.test.ts`       | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                        |
-| `click-tracker.test.ts` | single vs double within window; position threshold; multi-button isolation                        |
-| `gesture.test.ts`       | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                      |
-| `state.test.ts`         | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates |
-| `intent.test.ts`        | intent stream + `phase` correctness across a full drag (preview\*N → commit)                      |
-| `chrome.test.ts`        | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords              |
+| File                         | Tests                                                                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `transform.test.ts`          | screen ↔ doc across translate, scale, DPR                                                                              |
+| `hit-regions.test.ts`        | topmost wins, reverse iteration, clear/empty, AABB containment                                                         |
+| `handles.test.ts`            | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                             |
+| `click-tracker.test.ts`      | single vs double within window; position threshold; multi-button isolation                                             |
+| `gesture.test.ts`            | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                           |
+| `state.test.ts`              | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates                      |
+| `intent.test.ts`             | intent stream + `phase` correctness across a full drag (preview\*N → commit)                                           |
+| `chrome.test.ts`             | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                                   |
+| `chrome-transformed.test.ts` | `SelectionShape.transformed` end-to-end: outline, knob anchors, OBB hit-test exactness, identity ≡ rect equivalence    |
+| `cursors.test.ts`            | `cursors.defaultRenderer` produces rotation-aware CSS values; tree-shake invariant (subpath isolated from main bundle) |
+| `decision.test.ts`           | one test per named scenario in the selection-intent classifier                                                         |
 
 Render output (visual canvas correctness) is verified in the browser, not unit-tested.
 

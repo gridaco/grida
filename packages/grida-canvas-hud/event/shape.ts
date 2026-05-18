@@ -9,6 +9,12 @@ import type { NodeId, Rect } from "./gesture";
  *
  * - **`rect`** — standard bounding box. Renders selection outline + 4 corner
  *   knobs, with virtual edge / rotation hit regions.
+ * - **`transformed`** — an axis-aligned local bbox PLUS a 2×3 affine matrix
+ *   mapping local-frame points into doc-space. Covers rotation, skew,
+ *   non-uniform scale, and mirror with one code path. `local.width × local.height`
+ *   are the artwork's true dims (read by the size badge and by `applyResize`
+ *   in local space). Identity matrix here is byte-equivalent to
+ *   `{ kind: "rect", rect: local }`.
  * - **`line`** — two-endpoint primitive (e.g. SVG `<line>`). Renders the
  *   line segment + 2 endpoint knobs. No edge / rotation regions.
  * - **`unresolved`** — internal-only. Used inside `SelectionGroup` when the
@@ -21,6 +27,13 @@ import type { NodeId, Rect } from "./gesture";
  */
 export type SelectionShape =
   | { kind: "rect"; rect: Rect }
+  | {
+      kind: "transformed";
+      /** Local-frame AABB; width/height are artwork's true dims. */
+      local: Rect;
+      /** 2×3 affine mapping local-frame points → doc-space. */
+      matrix: cmath.Transform;
+    }
   | { kind: "line"; p1: cmath.Vector2; p2: cmath.Vector2 }
   | { kind: "unresolved"; id: string };
 
@@ -47,6 +60,8 @@ import cmathDefault from "@grida/cmath";
  */
 export function shapeBounds(shape: SelectionShape): Rect {
   if (shape.kind === "rect") return shape.rect;
+  if (shape.kind === "transformed")
+    return cmathDefault.rect.transform(shape.local, shape.matrix);
   if (shape.kind === "line")
     return cmathDefault.rect.fromPoints([shape.p1, shape.p2]);
   throw new Error(

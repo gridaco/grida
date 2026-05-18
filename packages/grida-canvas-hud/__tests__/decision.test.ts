@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import cmath from "@grida/cmath";
 import {
   Scenario,
   classifyScenario,
@@ -62,7 +63,7 @@ describe("Scenario.HandleResize", () => {
       kind: "resize_handle",
       direction: "se",
       ids: ["a"],
-      initial_rect: RECT,
+      initial_shape: { kind: "rect", rect: RECT },
     },
     selection_ids: ["a"],
   });
@@ -86,7 +87,7 @@ describe("Scenario.HandleRotate", () => {
       kind: "rotate_handle",
       corner: "ne",
       ids: ["a"],
-      initial_rect: RECT,
+      initial_shape: { kind: "rect", rect: RECT },
     },
     selection_ids: ["a"],
   });
@@ -371,19 +372,71 @@ describe("Scenario.EmptyAdditiveMarquee (shift)", () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("decideIdleCursor", () => {
-  it("resize_handle → tagged resize cursor", () => {
+  it("resize_handle on rect shape → tagged resize cursor, baseAngle 0", () => {
     expect(
       decideIdleCursor({
         ui_action: {
           kind: "resize_handle",
           direction: "ne",
           ids: ["a"],
-          initial_rect: RECT,
+          initial_shape: { kind: "rect", rect: RECT },
         },
         hovered_id: null,
         selection_ids: ["a"],
       })
-    ).toEqual({ kind: "resize", direction: "ne" });
+    ).toEqual({ kind: "resize", direction: "ne", baseAngle: 0 });
+  });
+
+  it("resize_handle on transformed shape → baseAngle = matrix screen angle", () => {
+    // 90° rotation around (50, 50): cmath.transform.angle returns 90 deg.
+    const matrix = cmath.transform.rotate(
+      cmath.transform.identity,
+      90,
+      [50, 50]
+    );
+    const cursor = decideIdleCursor({
+      ui_action: {
+        kind: "resize_handle",
+        direction: "ne",
+        ids: ["a"],
+        initial_shape: {
+          kind: "transformed",
+          local: { x: 0, y: 0, width: 100, height: 100 },
+          matrix,
+        },
+      },
+      hovered_id: null,
+      selection_ids: ["a"],
+    });
+    expect(cursor).toMatchObject({ kind: "resize", direction: "ne" });
+    if (typeof cursor === "string" || cursor.kind !== "resize") return;
+    // 90° = π/2 rad. Allow tiny floating-point slack.
+    expect(cursor.baseAngle).toBeCloseTo(Math.PI / 2, 9);
+  });
+
+  it("rotate_handle on transformed shape → baseAngle = matrix screen angle", () => {
+    const matrix = cmath.transform.rotate(
+      cmath.transform.identity,
+      30,
+      [50, 50]
+    );
+    const cursor = decideIdleCursor({
+      ui_action: {
+        kind: "rotate_handle",
+        corner: "ne",
+        ids: ["a"],
+        initial_shape: {
+          kind: "transformed",
+          local: { x: 0, y: 0, width: 100, height: 100 },
+          matrix,
+        },
+      },
+      hovered_id: null,
+      selection_ids: ["a"],
+    });
+    expect(cursor).toMatchObject({ kind: "rotate", corner: "ne" });
+    if (typeof cursor === "string" || cursor.kind !== "rotate") return;
+    expect(cursor.baseAngle).toBeCloseTo((30 * Math.PI) / 180, 9);
   });
 
   it("translate_handle → move (regardless of hover)", () => {

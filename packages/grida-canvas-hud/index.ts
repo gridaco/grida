@@ -41,9 +41,11 @@ export type { SurfaceGesture } from "./event/gesture";
 export type { Intent, IntentPhase, SelectMode } from "./event/intent";
 export type {
   CursorIcon,
+  CursorRenderer,
   ResizeDirection,
   RotationCorner,
 } from "./event/cursor";
+export { cursorToCss, cursorEquals } from "./event/cursor";
 export type { SelectionShape, SelectionGroup } from "./event/shape";
 export type { OverlayElement, HitShape, RenderShape } from "./event/overlay";
 export { MIN_HIT_SIZE, MIN_CHROME_VISIBLE_SIZE } from "./event/overlay";

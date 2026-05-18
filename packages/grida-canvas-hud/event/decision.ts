@@ -37,10 +37,11 @@
  *   https://grida.co/docs/wg/feat-editor/ux-surface/selection
  */
 
-import type cmath from "@grida/cmath";
+import cmath from "@grida/cmath";
 import type { Modifiers } from "./event";
 import type { OverlayAction } from "./hit-regions";
-import type { NodeId, Rect } from "./gesture";
+import type { NodeId } from "./gesture";
+import type { SelectionShape } from "./shape";
 import type { CursorIcon, ResizeDirection, RotationCorner } from "./cursor";
 import type { SelectMode } from "./intent";
 
@@ -153,13 +154,13 @@ export type PointerDownDecision =
       kind: "start_resize";
       ids: readonly NodeId[];
       direction: ResizeDirection;
-      initial_rect: Rect;
+      initial_shape: SelectionShape;
     }
   | {
       kind: "start_rotate";
       ids: readonly NodeId[];
       corner: RotationCorner;
-      initial_rect: Rect;
+      initial_shape: SelectionShape;
     }
   | {
       kind: "start_endpoint";
@@ -314,7 +315,7 @@ function dispatch(
         kind: "start_resize",
         ids: a.ids,
         direction: a.direction,
-        initial_rect: a.initial_rect,
+        initial_shape: a.initial_shape,
       };
     }
     case Scenario.HandleRotate: {
@@ -323,7 +324,7 @@ function dispatch(
         kind: "start_rotate",
         ids: a.ids,
         corner: a.corner,
-        initial_rect: a.initial_rect,
+        initial_shape: a.initial_shape,
       };
     }
     case Scenario.HandleEndpoint: {
@@ -453,9 +454,17 @@ export function decideIdleCursor(input: {
   if (ui_action) {
     switch (ui_action.kind) {
       case "resize_handle":
-        return { kind: "resize", direction: ui_action.direction };
+        return {
+          kind: "resize",
+          direction: ui_action.direction,
+          baseAngle: shape_screen_angle_rad(ui_action.initial_shape),
+        };
       case "rotate_handle":
-        return { kind: "rotate", corner: ui_action.corner };
+        return {
+          kind: "rotate",
+          corner: ui_action.corner,
+          baseAngle: shape_screen_angle_rad(ui_action.initial_shape),
+        };
       case "translate_handle":
         return "move";
       case "select_node":
@@ -467,6 +476,25 @@ export function decideIdleCursor(input: {
     return "move";
   }
   return "default";
+}
+
+/**
+ * Doc-space rotation of a `SelectionShape` in radians. For `transformed`
+ * shapes this is the angle baked into `matrix`; for `rect`/`line` it's 0.
+ *
+ * Used by `decideIdleCursor` and by the rotate-gesture cursor compositor
+ * so the resize / rotate cursor always tilts to match the selection's
+ * orientation — without requiring the HUD's camera to be axis-aligned
+ * for the doc-space angle to be the right thing to render (the renderer
+ * draws the cursor in screen px, and in svg-editor the camera contributes
+ * scale + translate only, so doc-space == screen-space rotation).
+ *
+ * For hosts that ROTATE the HUD camera, this should compose with the
+ * camera's angle at consume time. Not relevant for svg-editor.
+ */
+function shape_screen_angle_rad(shape: SelectionShape): number {
+  if (shape.kind !== "transformed") return 0;
+  return (cmath.transform.angle(shape.matrix) * Math.PI) / 180;
 }
 
 // Re-export cmath for downstream tests that want to construct vectors

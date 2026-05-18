@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import cmath from "@grida/cmath";
 import { SurfaceState, type StateDeps } from "../event/state";
 import type { Intent } from "../event/intent";
 import type { NodeId, Rect } from "../event/gesture";
@@ -223,7 +224,7 @@ describe("SurfaceState dispatch", () => {
         kind: "resize_handle",
         direction: "se",
         ids: ["a"],
-        initial_rect: SCENE.a,
+        initial_shape: { kind: "rect", rect: SCENE.a },
       },
       priority: 31,
       label: "resize_handle:se",
@@ -241,5 +242,148 @@ describe("SurfaceState dispatch", () => {
     // Gesture should be resize, not a select intent.
     expect(state.gesture.kind).toBe("resize");
     expect(intents.find((i) => i.kind === "select")).toBeUndefined();
+  });
+
+  // ── Rotate gesture: cursor tracks rotation (Phase A.5) ───────────────────
+  //
+  // Regression test: before A.5, the cursor was set once at `start_rotate`
+  // (no `baseAngle`) and the rotate `pointer_move` arm never touched the
+  // cursor again. The user saw the rotation arrow frozen at the
+  // gesture-start orientation while the element rotated under it.
+
+  it("rotate pointer_move updates cursor baseAngle to track rotation", () => {
+    // Set up an active rotate gesture directly — the chrome / hit-region
+    // wiring needed to drive this through `pointer_down` is more setup
+    // than this unit needs to assert.
+    state.gesture = {
+      kind: "rotate",
+      ids: ["a"],
+      corner: "ne",
+      center_doc: [50, 50],
+      anchor_angle: 0, // anchor: pointer was to the right of center
+      current_angle: 0,
+      initial_cursor_angle: 0,
+    };
+
+    // Pointer drag: from right-of-center (angle 0) to below-center
+    // (angle π/2). Delta = π/2; cursor's baseAngle = initial(0) + delta(π/2).
+    const r1 = state.dispatch(
+      { kind: "pointer_move", x: 50, y: 100, mods: NO_MODS },
+      deps
+    );
+    expect(state.cursor).toEqual({
+      kind: "rotate",
+      corner: "ne",
+      baseAngle: Math.PI / 2,
+    });
+    expect(r1.cursorChanged).toBe(true);
+  });
+
+  it("rotate sub-bucket pointer drift does NOT fire cursorChanged", () => {
+    // The `cursorEquals` bucket size (0.5° = π/360) means tiny pointer
+    // drift inside one bucket must not re-emit the cursor — otherwise
+    // the host repaints needlessly on every frame.
+    state.gesture = {
+      kind: "rotate",
+      ids: ["a"],
+      corner: "se",
+      center_doc: [50, 50],
+      anchor_angle: 0,
+      current_angle: 0,
+      initial_cursor_angle: 0,
+    };
+    state.dispatch(
+      { kind: "pointer_move", x: 50, y: 100, mods: NO_MODS },
+      deps
+    );
+    // Same pointer position again — cursor identical, no change.
+    const r2 = state.dispatch(
+      { kind: "pointer_move", x: 50, y: 100, mods: NO_MODS },
+      deps
+    );
+    expect(r2.cursorChanged).toBeFalsy();
+  });
+
+  // ── Resize on transformed shape: local-frame math ────────────────────────
+  //
+  // Drag the SE corner of a 100×100 rect rotated 90° around its center.
+  // World delta (+10, +10) maps to local delta (+10, -10) under 90° CCW
+  // (y-up math; visually CW in y-down screen). SE corner extends both x
+  // (width +) and y (height +) in local space, so after this drag:
+  //   local.width  = 100 + (+10) = 110
+  //   local.height = 100 + (-10) = 90
+  // The matrix is preserved unchanged. The emitted intent's `rect` field
+  // is the doc-space AABB of the new transformed shape (legacy hosts
+  // ignore `shape` and consume `rect`); `shape` carries the local truth.
+
+  it("resize pointer_move applies delta in the LOCAL frame for transformed shapes", () => {
+    const local: Rect = { x: 0, y: 0, width: 100, height: 100 };
+    // 90° rotation around the rect center.
+    const matrix = cmath.transform.rotate(
+      cmath.transform.identity,
+      90,
+      [50, 50]
+    );
+    const initial_shape = { kind: "transformed" as const, local, matrix };
+
+    state.gesture = {
+      kind: "resize",
+      ids: ["a"],
+      direction: "se",
+      initial_shape,
+      anchor_doc: [0, 0],
+      current_shape: initial_shape,
+    };
+
+    state.dispatch({ kind: "pointer_move", x: 10, y: 10, mods: NO_MODS }, deps);
+
+    expect(state.gesture.kind).toBe("resize");
+    if (state.gesture.kind !== "resize") return;
+    const next = state.gesture.current_shape;
+    expect(next.kind).toBe("transformed");
+    if (next.kind !== "transformed") return;
+    // World (+10, +10) → local (+10, -10) under R(90° CCW around center).
+    expect(next.local.width).toBeCloseTo(110, 6);
+    expect(next.local.height).toBeCloseTo(90, 6);
+    // Matrix preserved (rotation unchanged by resize).
+    expect(next.matrix).toEqual(matrix);
+
+    // Intent carries both AABB (`rect`) and full shape (`shape`).
+    const last = intents[intents.length - 1];
+    expect(last.kind).toBe("resize");
+    if (last.kind !== "resize") return;
+    expect(last.shape).toEqual(next);
+  });
+
+  // ── Rotate gesture: cursor composes initial + delta on transformed ──
+  //
+  // For a transformed selection at θ_initial, mid-gesture cursor should
+  // be `θ_initial + delta`, not just `delta`. Regression cover for
+  // pre-A.5 bug where the cursor snapped back to the corner's static
+  // orientation on rotated selections.
+
+  it("rotate cursor on transformed selection = initial_cursor_angle + delta", () => {
+    // Set up a rotate gesture as if the selection was already at 90°
+    // before the user grabbed the rotation handle.
+    state.gesture = {
+      kind: "rotate",
+      ids: ["a"],
+      corner: "ne",
+      center_doc: [50, 50],
+      anchor_angle: 0,
+      current_angle: 0,
+      initial_cursor_angle: Math.PI / 2, // selection was already rotated 90°
+    };
+
+    // Drag the pointer to angle π/4 from center (delta = π/4).
+    // Pointer at (75 + 50, 25 + 50) ≈ atan2(25-50, 75-50) — let's just
+    // use a clean point: (50 + 1, 50 + 1) → atan2(1, 1) = π/4.
+    state.dispatch({ kind: "pointer_move", x: 51, y: 51, mods: NO_MODS }, deps);
+
+    // Expected: baseAngle = initial (π/2) + delta (π/4) = 3π/4.
+    expect(state.cursor).toMatchObject({ kind: "rotate", corner: "ne" });
+    if (typeof state.cursor === "string" || state.cursor.kind !== "rotate")
+      return;
+    expect(state.cursor.baseAngle).toBeCloseTo((3 * Math.PI) / 4, 9);
   });
 });

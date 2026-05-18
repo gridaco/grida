@@ -15,7 +15,7 @@ import {
   rectFromPoints,
   applyResize,
 } from "./gesture";
-import type { SelectionShape, SelectionGroup } from "./shape";
+import { type SelectionShape, type SelectionGroup, shapeBounds } from "./shape";
 import { type CursorIcon, cursorEquals } from "./cursor";
 import type { IntentHandler } from "./intent";
 import { ClickTracker } from "./click-tracker";
@@ -295,13 +295,18 @@ export class SurfaceState {
         const g = this.gesture;
         const dx = point_doc[0] - g.anchor_doc[0];
         const dy = point_doc[1] - g.anchor_doc[1];
-        const next_rect = applyResize(g.initial_rect, g.direction, dx, dy);
-        this.gesture = { ...g, current_rect: next_rect };
+        const next_shape = applyResize(g.initial_shape, g.direction, dx, dy);
+        this.gesture = { ...g, current_shape: next_shape };
         deps.emitIntent({
           kind: "resize",
           ids: g.ids,
           anchor: g.direction,
-          rect: next_rect,
+          // AABB stays on the intent as the legacy axis-aligned target
+          // (hosts that ignore `shape` keep working unchanged); `shape`
+          // carries the full local-frame + matrix truth for rotated
+          // selections.
+          rect: shapeBounds(next_shape),
+          shape: next_shape,
           phase: "preview",
         });
         response.needsRedraw = true;
@@ -314,12 +319,31 @@ export class SurfaceState {
           point_doc[0] - g.center_doc[0]
         );
         this.gesture = { ...g, current_angle: angle };
+        const delta = angle - g.anchor_angle;
         deps.emitIntent({
           kind: "rotate",
           ids: g.ids,
-          angle: angle - g.anchor_angle,
+          angle: delta,
           phase: "preview",
         });
+        // Cursor MUST track the rotation visually during the gesture.
+        // Without this re-emit, the cursor was set once at `start_rotate`
+        // and stayed pointing at the corner's static orientation while
+        // the element rotated under it. `cursorEquals` buckets
+        // `baseAngle` to 0.5° so this only fires on real motion.
+        //
+        // `initial_cursor_angle` captures the selection's screen-space
+        // rotation at gesture start (non-zero for `transformed` shapes);
+        // compose with the gesture delta so the cursor stays correctly
+        // oriented through the whole rotate, not just the delta.
+        this.setCursor(
+          {
+            kind: "rotate",
+            corner: g.corner,
+            baseAngle: g.initial_cursor_angle + delta,
+          },
+          response
+        );
         response.needsRedraw = true;
         return response;
       }
@@ -384,16 +408,35 @@ export class SurfaceState {
           kind: "resize",
           ids: [...decision.ids],
           direction: decision.direction,
-          initial_rect: decision.initial_rect,
+          initial_shape: decision.initial_shape,
           anchor_doc: point_doc,
-          current_rect: decision.initial_rect,
+          current_shape: decision.initial_shape,
         };
         response.needsRedraw = true;
         return response;
 
       case "start_rotate": {
-        const [cx, cy] = cmath.rect.getCenter(decision.initial_rect);
+        // Rotation pivot = center of the shape's doc-space AABB. For
+        // `kind: "rect"` this is the rect center directly; for
+        // `kind: "transformed"` it's the center of the AABB of the
+        // 4 transformed corners — which equals the local center
+        // transformed through `matrix` whenever the matrix is a pure
+        // rotation (the headline case). Skew/non-uniform-scale make
+        // these two centers differ; flagged in the plan as a follow-up.
+        const [cx, cy] = cmath.rect.getCenter(
+          shapeBounds(decision.initial_shape)
+        );
         const angle = Math.atan2(point_doc[1] - cy, point_doc[0] - cx);
+        // Initial cursor angle = the selection's current screen-space
+        // rotation. For axis-aligned `rect` selections this is 0; for
+        // `transformed` selections it's `cmath.transform.angle(matrix)`
+        // in radians. Composed with the gesture delta in pointer_move so
+        // the cursor stays correctly oriented through the whole rotate.
+        const initial_cursor_angle =
+          decision.initial_shape.kind === "transformed"
+            ? (cmath.transform.angle(decision.initial_shape.matrix) * Math.PI) /
+              180
+            : 0;
         this.gesture = {
           kind: "rotate",
           ids: [...decision.ids],
@@ -401,7 +444,18 @@ export class SurfaceState {
           center_doc: [cx, cy],
           anchor_angle: angle,
           current_angle: angle,
+          initial_cursor_angle,
         };
+        // Seed the cursor with the selection's current orientation; the
+        // in-gesture `pointer_move` arm composes `initial + delta`.
+        this.setCursor(
+          {
+            kind: "rotate",
+            corner: decision.corner,
+            baseAngle: initial_cursor_angle,
+          },
+          response
+        );
         response.needsRedraw = true;
         return response;
       }
@@ -523,7 +577,8 @@ export class SurfaceState {
           kind: "resize",
           ids: g.ids,
           anchor: g.direction,
-          rect: g.current_rect,
+          rect: shapeBounds(g.current_shape),
+          shape: g.current_shape,
           phase: "commit",
         });
         this.gesture = IDLE;

@@ -24,7 +24,7 @@ import type { RotationCorner } from "./cursor";
 import {
   MIN_HIT_SIZE,
   MIN_CHROME_VISIBLE_SIZE,
-  ROTATION_OFFSET,
+  ROTATION_WRAP,
 } from "./overlay";
 
 // Hoisted to avoid per-frame allocations — `computeSelectionControlLayout`
@@ -65,10 +65,6 @@ export const HUDHitPriority = {
   /** Line endpoints — sole resize affordance on lines; nothing outranks them. */
   ENDPOINT_HANDLE: 10,
 
-  /** Rotation handles sit outside the bbox; rotation wins on overlap with
-   *  corner knobs (the cursor matches what's drawn under the pointer). */
-  ROTATE_HANDLE: 20,
-
   /** Edge priority when promoted (parallel axis violated). Edge strip
    *  extends into the body interior on the perpendicular axis when that
    *  axis is comfortable; in that case the edge must outrank the
@@ -90,6 +86,17 @@ export const HUDHitPriority = {
 
   /** Translate-body — default value. */
   TRANSLATE_BODY: 40,
+
+  /** Rotation halo wraps each resize corner — the rotation hit rect
+   *  overlaps body, edges, and the resize corner itself, but has the
+   *  LOWEST priority of any selection-control zone. It only "wins"
+   *  (becomes the topmost hit) where no other affordance claims the
+   *  pixel: the L-strip immediately outside the resize-corner outer
+   *  edges. This is what gives rotation a gap-free wrap around the
+   *  corner with zero pixel-overlap on the cursor, without ever
+   *  intruding on the body, the edge resize strips, or the corner
+   *  resize knob. Do not place anything below this. */
+  ROTATE_HANDLE: 50,
 } as const;
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -317,23 +324,34 @@ export function computeSelectionControlLayout(
     });
   }
 
-  // Rotation regions sit outside the bbox corners — they aren't part of
-  // the perimeter partition (they live further out diagonally).
+  // Rotation halo — one rect per corner that wraps the resize-corner
+  // zone. Extends `ROTATION_WRAP` px diagonally outward from the resize
+  // rect in the cardinal direction of the corner, so the wrap rect
+  // OVERLAPS the resize rect AND body+edge zones near the corner.
+  //
+  // Overlap is resolved by priority: rotation has the highest numeric
+  // value (== lowest priority) in `HUDHitPriority`, so it loses to
+  // resize-corner, edges, and body wherever they overlap. The net
+  // rotation hit footprint is the L-strip immediately outside the
+  // resize corner — no gaps, no overlap on the cursor, no body
+  // intrusion. This replaces the previous "16×16 diagonal handle"
+  // model, which always left dead L-strips wrapping the corner at low
+  // zoom regardless of offset.
   if (opts.show_rotation) {
-    const rot_size = MIN_HIT_SIZE;
-    for (const corner of CORNER_DIRS) {
-      const [ax, ay] = cmath.rect.getCardinalPoint(rect_screen, corner);
-      const [dx, dy] = cmath.compass.cardinal_direction_vector[corner];
+    for (const dir of CORNER_DIRS) {
+      const resize = cornerRects[dir];
+      if (resize.width <= 0 || resize.height <= 0) continue;
+      const [dx, dy] = cmath.compass.cardinal_direction_vector[dir];
       zones.push({
         rect: {
-          x: ax + dx * ROTATION_OFFSET - rot_size / 2,
-          y: ay + dy * ROTATION_OFFSET - rot_size / 2,
-          width: rot_size,
-          height: rot_size,
+          x: resize.x + (dx > 0 ? 0 : -ROTATION_WRAP),
+          y: resize.y + (dy > 0 ? 0 : -ROTATION_WRAP),
+          width: resize.width + ROTATION_WRAP,
+          height: resize.height + ROTATION_WRAP,
         },
         priority: HUDHitPriority.ROTATE_HANDLE,
-        role: { kind: "rotate", corner },
-        label: ROTATE_LABEL[corner],
+        role: { kind: "rotate", corner: dir },
+        label: ROTATE_LABEL[dir],
       });
     }
   }

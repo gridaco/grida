@@ -20,9 +20,31 @@ export const MIN_HIT_SIZE = 16;
 export const MIN_CHROME_VISIBLE_SIZE = 12;
 
 /**
- * Rotation handle hit center sits this many screen-px outside each corner.
+ * How far the rotation halo extends diagonally outward from each
+ * resize-corner zone.
+ *
+ * The rotation hit is a rect that WRAPS the resize corner — it extends
+ * `ROTATION_WRAP` px outward from the resize rect along both axes of
+ * the cardinal direction (e.g. NE rotation extends `+x` and `-y` past
+ * the resize NE rect). The resulting rotation rect overlaps the resize
+ * corner, the edge strips next to it, and the body interior near the
+ * corner — but rotation has the LOWEST priority of any selection-
+ * control zone, so it loses to all of them on overlap. The user only
+ * sees the rotate cursor where no other affordance claims the pixel:
+ * the L-strip immediately outside the resize corner's outer edges.
+ *
+ * Locked to `MIN_HIT_SIZE` so the rotation reach equals one handle
+ * size — large enough to be a Fitts'-comfortable target, small enough
+ * that the rotate cursor doesn't bleed into the middle of an edge.
+ *
+ * Note: the older single-square model used `ROTATION_OFFSET` to place
+ * a 16×16 rect diagonally from each corner. That model always left
+ * dead L-strips wrapping the corner at any zoom — the cardinal arms of
+ * the L were never covered. The wrap-and-lose-on-overlap model
+ * eliminates those gaps without introducing pixel overlap on the
+ * cursor.
  */
-export const ROTATION_OFFSET = 12;
+export const ROTATION_WRAP = MIN_HIT_SIZE;
 
 // ─── HitShape — what triggers events ──────────────────────────────────────
 
@@ -54,6 +76,24 @@ export type HitShape =
   | {
       kind: "screen_aabb";
       rect: Rect; // screen-space
+    }
+  /**
+   * Oriented bounding-box hit shape — an axis-aligned `rect` in a *shadow*
+   * coordinate space, plus the affine that maps a screen-space pointer
+   * INTO that space. The hit-test pipeline applies `inverse_transform` to
+   * the pointer and then tests against `rect` with normal AABB containment.
+   *
+   * Used by transformed-chrome zones: the 9-slice runs in an axis-aligned
+   * shadow rect centered at the chrome's screen center, and a rotation
+   * (typically around the same center) maps shadow → screen. Storing the
+   * inverse here lets hit-test stay exact at any rotation/skew without
+   * inflating to an AABB-of-rotated-corners.
+   */
+  | {
+      kind: "screen_obb";
+      rect: Rect; // shadow-space (axis-aligned)
+      /** screen → shadow. Applied to the pointer before AABB containment. */
+      inverse_transform: cmath.Transform;
     };
 
 // ─── RenderShape — what gets drawn ────────────────────────────────────────
@@ -77,6 +117,12 @@ export type RenderShape =
       stroke?: boolean;
       fillColor?: string;
       strokeColor?: string;
+      /**
+       * Rotation around the rect's screen-space center, in radians (CCW).
+       * Defaults to 0. Used for knobs/badges rendered for a transformed
+       * selection so they rotate with the parent.
+       */
+      angle?: number;
     }
   /** Doc-space rect — e.g. selection outline, marquee. */
   | {

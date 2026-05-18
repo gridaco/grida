@@ -1,6 +1,6 @@
 {
   "name": "@grida/hud",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": false,
   "description": "Canvas-based heads-up display for the Grida editor viewport",
   "keywords": [
@@ -33,6 +33,11 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.mjs",
       "require": "./dist/react.js"
+    },
+    "./cursors": {
+      "types": "./dist/cursors/index.d.ts",
+      "import": "./dist/cursors/index.mjs",
+      "require": "./dist/cursors/index.js"
     }
   },
   "publishConfig": {
