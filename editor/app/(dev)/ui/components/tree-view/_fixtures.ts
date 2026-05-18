@@ -60,6 +60,10 @@ export interface DemoMeta {
   fontSize?: number;
   weight?: number;
   opacity?: number;
+  textAnchor?: "start" | "middle" | "end";
+  // notion-style
+  /** Leading emoji shown before the label (Notion sidebar pages). */
+  emoji?: string;
 }
 
 export function buildLayersFixture(): InMemoryTreeSource<DemoMeta> {
@@ -157,8 +161,89 @@ export function buildLayersFixture(): InMemoryTreeSource<DemoMeta> {
  * in document order — so a drag in the tree visibly re-stacks the canvas.
  */
 export function buildSceneFixture(): InMemoryTreeSource<DemoMeta> {
-  const W = 360;
-  const H = 460;
+  // Modern minimal "Activity" card. White surface, single neutral accent,
+  // no gradients or glows — the canvas reads as a real product UI panel
+  // instead of a stock marketing cover. The structure intentionally nests
+  // groups (Items → 3 Item subgroups; Action group) so the layer panel
+  // has something substantial to render.
+  const W = 320;
+  const H = 440;
+  const SURFACE = "#FFFFFF";
+  const INK = "#0F172A"; // slate-900
+  const MUTED = "#94A3B8"; // slate-400
+  const FAINT = "#E2E8F0"; // slate-200
+  const ACCENT = "#6366F1"; // indigo-500
+  const AMBER = "#F59E0B";
+  const EMERALD = "#10B981";
+
+  // Three rows; each row is one group of {dot, label, value}.
+  const ROW_X = 24;
+  const ROW_W = W - 48;
+  const ROW_H = 40;
+  const rowY = (i: number) => 164 + i * 48;
+  const row = (
+    key: string,
+    i: number,
+    color: string,
+    label: string,
+    value: string
+  ): TreeNode<DemoMeta>[] => {
+    const y = rowY(i);
+    return [
+      {
+        id: `item-${key}`,
+        parent: "items",
+        children: [`dot-${key}`, `label-${key}`, `value-${key}`],
+        meta: {
+          kind: "group",
+          label,
+          box: { x: ROW_X, y, w: ROW_W, h: ROW_H },
+        },
+      },
+      {
+        id: `dot-${key}`,
+        parent: `item-${key}`,
+        children: [],
+        meta: {
+          kind: "rect",
+          label: "Dot",
+          box: { x: ROW_X + 4, y: y + 16, w: 8, h: 8 },
+          fill: color,
+          radius: 999,
+        },
+      },
+      {
+        id: `label-${key}`,
+        parent: `item-${key}`,
+        children: [],
+        meta: {
+          kind: "text",
+          label,
+          box: { x: ROW_X + 22, y: y + 8, w: 160, h: 24 },
+          text: label,
+          fill: INK,
+          fontSize: 14,
+          weight: 500,
+        },
+      },
+      {
+        id: `value-${key}`,
+        parent: `item-${key}`,
+        children: [],
+        meta: {
+          kind: "text",
+          label: value,
+          box: { x: ROW_X + ROW_W - 80, y: y + 8, w: 80, h: 24 },
+          text: value,
+          fill: INK,
+          fontSize: 14,
+          weight: 600,
+          textAnchor: "end",
+        },
+      },
+    ];
+  };
+
   const nodes: TreeNode<DemoMeta>[] = [
     {
       id: "<root>",
@@ -169,113 +254,116 @@ export function buildSceneFixture(): InMemoryTreeSource<DemoMeta> {
     {
       id: "cover",
       parent: "<root>",
-      children: ["photo", "glow", "badge", "headline", "subhead", "actions"],
+      children: ["eyebrow", "hero", "delta", "divider", "items", "action"],
       meta: {
         kind: "frame",
         label: "Cover",
         box: { x: 0, y: 0, w: W, h: H },
-        fill: "#0B1020",
-        radius: 18,
+        fill: SURFACE,
+        radius: 20,
       },
     },
     {
-      id: "photo",
-      parent: "cover",
-      children: [],
-      meta: {
-        kind: "image",
-        label: "Photo",
-        box: { x: 0, y: 0, w: W, h: 248 },
-        fill: "#1E293B",
-      },
-    },
-    {
-      id: "glow",
-      parent: "cover",
-      children: [],
-      meta: {
-        kind: "rect",
-        label: "Glow",
-        box: { x: 176, y: 150, w: 240, h: 240 },
-        fill: "#6366F1",
-        radius: 999,
-        opacity: 0.55,
-      },
-    },
-    {
-      id: "badge",
-      parent: "cover",
-      children: [],
-      meta: {
-        kind: "rect",
-        label: "Badge",
-        box: { x: 292, y: 20, w: 56, h: 56 },
-        fill: "#F59E0B",
-        radius: 999,
-      },
-    },
-    {
-      id: "headline",
+      id: "eyebrow",
       parent: "cover",
       children: [],
       meta: {
         kind: "text",
-        label: "Headline",
-        box: { x: 28, y: 280, w: 304, h: 64 },
-        text: "Ship a tree today.",
-        fill: "#F8FAFC",
-        fontSize: 30,
+        label: "Eyebrow",
+        box: { x: 24, y: 32, w: 200, h: 16 },
+        text: "ACTIVITY",
+        fill: MUTED,
+        fontSize: 11,
+        weight: 600,
+      },
+    },
+    {
+      id: "hero",
+      parent: "cover",
+      children: [],
+      meta: {
+        kind: "text",
+        label: "Hero",
+        box: { x: 24, y: 56, w: 240, h: 44 },
+        text: "1,284",
+        fill: INK,
+        fontSize: 36,
         weight: 700,
       },
     },
     {
-      id: "subhead",
+      id: "delta",
       parent: "cover",
       children: [],
       meta: {
         kind: "text",
-        label: "Subhead",
-        box: { x: 28, y: 332, w: 304, h: 24 },
-        text: "Headless controller · zero deps.",
-        fill: "#94A3B8",
-        fontSize: 14,
-        weight: 400,
+        label: "Delta",
+        box: { x: 24, y: 108, w: 240, h: 18 },
+        text: "+18% vs last week",
+        fill: EMERALD,
+        fontSize: 12,
+        weight: 500,
       },
     },
     {
-      id: "actions",
+      id: "divider",
       parent: "cover",
-      children: ["button", "button-label"],
+      children: [],
+      meta: {
+        kind: "rect",
+        label: "Divider",
+        box: { x: 24, y: 148, w: ROW_W, h: 1 },
+        fill: FAINT,
+      },
+    },
+    {
+      id: "items",
+      parent: "cover",
+      children: ["item-commits", "item-reviews", "item-releases"],
       meta: {
         kind: "group",
-        label: "Actions",
-        box: { x: 28, y: 380, w: 188, h: 48 },
+        label: "Items",
+        box: { x: ROW_X, y: 164, w: ROW_W, h: 136 },
+      },
+    },
+    ...row("commits", 0, ACCENT, "Commits", "24"),
+    ...row("reviews", 1, AMBER, "Reviews", "8"),
+    ...row("releases", 2, EMERALD, "Releases", "2"),
+    {
+      id: "action",
+      parent: "cover",
+      children: ["button-bg", "button-label"],
+      meta: {
+        kind: "group",
+        label: "Action",
+        box: { x: 24, y: 372, w: ROW_W, h: 44 },
       },
     },
     {
-      id: "button",
-      parent: "actions",
+      id: "button-bg",
+      parent: "action",
       children: [],
       meta: {
         kind: "rect",
         label: "Button BG",
-        box: { x: 28, y: 380, w: 188, h: 48 },
-        fill: "#6366F1",
-        radius: 12,
+        box: { x: 24, y: 372, w: ROW_W, h: 44 },
+        fill: INK,
+        radius: 10,
       },
     },
     {
       id: "button-label",
-      parent: "actions",
+      parent: "action",
       children: [],
       meta: {
         kind: "text",
-        label: "Get started →",
-        box: { x: 28, y: 394, w: 188, h: 20 },
-        text: "Get started →",
-        fill: "#FFFFFF",
+        label: "View report →",
+        box: { x: 24, y: 380, w: ROW_W, h: 28 },
+        text: "View report →",
+        fill: SURFACE,
         fontSize: 14,
         weight: 600,
+        textAnchor: "middle",
       },
     },
   ];
@@ -874,6 +962,142 @@ export function buildLargeFixture(total: number): {
  *
  * @param groups  number of top-level chains
  * @param depth   chain length (= max visible row depth)
+ */
+
+/**
+ * Notion-style sidebar fixture. Folders are pages with children (collapsible),
+ * files are leaf pages. Each page carries a single emoji which the Notion row
+ * renderer paints in front of the label. Drag-reorder + drag-into-page work
+ * the same as the filesystem fixtures.
+ */
+export function buildNotionFixture(): InMemoryTreeSource<DemoMeta> {
+  const nodes: TreeNode<DemoMeta>[] = [
+    {
+      id: "<root>",
+      parent: null,
+      children: ["getting-started", "personal", "team", "templates"],
+      meta: { kind: "folder", label: "Workspace" },
+    },
+    {
+      id: "getting-started",
+      parent: "<root>",
+      children: [],
+      meta: { kind: "file", label: "Getting Started", emoji: "👋" },
+    },
+    {
+      id: "personal",
+      parent: "<root>",
+      children: ["tasks", "notes", "reading-list"],
+      meta: { kind: "folder", label: "Personal", emoji: "🏡" },
+    },
+    {
+      id: "tasks",
+      parent: "personal",
+      children: [],
+      meta: { kind: "file", label: "Tasks", emoji: "✅" },
+    },
+    {
+      id: "notes",
+      parent: "personal",
+      children: [],
+      meta: { kind: "file", label: "Notes", emoji: "📝" },
+    },
+    {
+      id: "reading-list",
+      parent: "personal",
+      children: [],
+      meta: { kind: "file", label: "Reading list", emoji: "📚" },
+    },
+    {
+      id: "team",
+      parent: "<root>",
+      children: ["engineering", "design", "product"],
+      meta: { kind: "folder", label: "Team", emoji: "👥" },
+    },
+    {
+      id: "engineering",
+      parent: "team",
+      children: ["eng-sprint", "eng-oncall"],
+      meta: { kind: "folder", label: "Engineering", emoji: "🛠" },
+    },
+    {
+      id: "eng-sprint",
+      parent: "engineering",
+      children: [],
+      meta: { kind: "file", label: "Sprint planning", emoji: "🗓" },
+    },
+    {
+      id: "eng-oncall",
+      parent: "engineering",
+      children: [],
+      meta: { kind: "file", label: "On-call runbook", emoji: "🚨" },
+    },
+    {
+      id: "design",
+      parent: "team",
+      children: ["design-system", "design-reviews"],
+      meta: { kind: "folder", label: "Design", emoji: "🎨" },
+    },
+    {
+      id: "design-system",
+      parent: "design",
+      children: [],
+      meta: { kind: "file", label: "Design system", emoji: "🧩" },
+    },
+    {
+      id: "design-reviews",
+      parent: "design",
+      children: [],
+      meta: { kind: "file", label: "Design reviews", emoji: "👀" },
+    },
+    {
+      id: "product",
+      parent: "team",
+      children: ["roadmap", "specs"],
+      meta: { kind: "folder", label: "Product", emoji: "📋" },
+    },
+    {
+      id: "roadmap",
+      parent: "product",
+      children: [],
+      meta: { kind: "file", label: "Roadmap", emoji: "🗺" },
+    },
+    {
+      id: "specs",
+      parent: "product",
+      children: [],
+      meta: { kind: "file", label: "Specs", emoji: "📐" },
+    },
+    {
+      id: "templates",
+      parent: "<root>",
+      children: ["tpl-meeting", "tpl-rfc"],
+      meta: { kind: "folder", label: "Templates", emoji: "🗂" },
+    },
+    {
+      id: "tpl-meeting",
+      parent: "templates",
+      children: [],
+      meta: { kind: "file", label: "Meeting notes", emoji: "🪑" },
+    },
+    {
+      id: "tpl-rfc",
+      parent: "templates",
+      children: [],
+      meta: { kind: "file", label: "RFC", emoji: "📄" },
+    },
+  ];
+  return new InMemoryTreeSource<DemoMeta>({
+    root: "<root>",
+    nodes,
+    showRoot: false,
+  });
+}
+
+/**
+ * Build a deeply-nested fixture for stress-testing virtualization and the
+ * indent rail. Returns the source plus the helpers the consumer needs to
+ * pre-expand the chain.
  */
 export function buildDeepFixture(opts: { groups: number; depth: number }): {
   source: InMemoryTreeSource<{ label: string }>;

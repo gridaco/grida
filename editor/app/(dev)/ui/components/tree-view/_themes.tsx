@@ -46,6 +46,7 @@ import {
   buildFigmaFixture,
   buildFinderFixture,
   buildGridaFixture,
+  buildNotionFixture,
   buildVSCodeFixture,
   CONTAINER_KINDS,
   type DemoKind,
@@ -226,17 +227,26 @@ function rowState(s: RowStateInputs): RowState {
 
 export function useThemeController(
   build: () => ReturnType<typeof buildGridaFixture>,
-  opts: { expanded: NodeId[]; constraint?: MoveConstraint }
+  opts: {
+    expanded: NodeId[];
+    constraint?: MoveConstraint;
+    /** Initial selection seeded at controller construction. */
+    selection?: NodeId[];
+  }
 ): TreeController<DemoMeta> {
-  return useDemoController(
-    () =>
-      new TreeController<DemoMeta>({
-        source: build(),
-        flatten: { reverseChildren: false },
-        expanded: opts.expanded,
-        constraint: opts.constraint,
-      })
-  );
+  return useDemoController(() => {
+    const controller = new TreeController<DemoMeta>({
+      source: build(),
+      flatten: { reverseChildren: false },
+      expanded: opts.expanded,
+      constraint: opts.constraint,
+    });
+    if (opts.selection && opts.selection.length > 0) {
+      controller.select(opts.selection, "replace");
+      controller.focus(opts.selection[0]!);
+    }
+    return controller;
+  });
 }
 
 /**
@@ -1001,5 +1011,103 @@ function RowFlagButton({
     >
       {children}
     </button>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Notion — soft cream sidebar, emoji-prefixed pages, no file icons. The
+// chevron sits flush left and is a separate hit target from the row click
+// so opening a page (select) and toggling its children are independent —
+// the same split Notion's actual sidebar uses.
+// ───────────────────────────────────────────────────────────────────────────
+
+export function NotionRow({ args }: { args: RenderRowArgs }) {
+  const { row, isDropTarget, dropPlacement, isDragActive, onDragStart } = args;
+  const { controller, meta, selected, focused, isDragging } = useRowSnapshot(
+    row.id
+  );
+  const inDropGroup = useTreeSnapshot<DemoMeta, boolean>((c) =>
+    dragOverSubtree(c).has(row.id)
+  );
+  const label = meta?.label ?? row.id;
+  const isContainer = isContainerKind(meta?.kind);
+  const isDropTargetFolder =
+    isDropTarget && dropPlacement === "into" && isContainer;
+  const state = rowState({
+    isDropTargetFolder,
+    inDropGroup,
+    selected,
+    focused,
+    isDragActive,
+  });
+  return (
+    <div
+      data-tree-row-id={row.id}
+      data-row-depth={row.depth}
+      data-state={state}
+      data-dragging={isDragging || undefined}
+      role="treeitem"
+      aria-selected={selected}
+      tabIndex={-1}
+      onClick={(e) => {
+        controller.focus(row.id);
+        controller.select([row.id], modeFromEvent(e));
+      }}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        onDragStart?.(row.id, e);
+      }}
+      className="group/row relative mx-1 flex h-7 items-center gap-1 rounded-[3px] px-1 text-[14px] leading-none text-[#37352F] select-none cursor-pointer data-[state=drop-target]:bg-[#E9F1FB] data-[state=drop-target]:ring-1 data-[state=drop-target]:ring-inset data-[state=drop-target]:ring-[#A4C9F2] data-[state=in-drop-group]:bg-[#E9F1FB]/60 data-[state=selected]:bg-[#E8E8E7] data-[state=focused]:bg-[#F1F1EF] data-[state=idle]:hover:bg-[#F1F1EF] data-[dragging]:opacity-50"
+      style={{ paddingLeft: 6 + row.depth * 16 }}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isContainer) controller.toggle(row.id);
+        }}
+        className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-[#9B9A97] opacity-0 hover:bg-[#E8E8E7] group-hover/row:opacity-100 data-[expanded=true]:opacity-100"
+        data-expanded={isContainer && row.isExpanded ? "true" : undefined}
+        aria-hidden={!isContainer}
+        tabIndex={-1}
+      >
+        {isContainer ? (
+          row.isExpanded ? (
+            <ChevronDownIcon className="size-3.5" />
+          ) : (
+            <ChevronRightIcon className="size-3.5" />
+          )
+        ) : null}
+      </button>
+      <span className="inline-flex w-5 shrink-0 items-center justify-center text-[15px] leading-none">
+        {meta?.emoji ?? (isContainer ? "📁" : "📄")}
+      </span>
+      <span className="truncate flex-1 text-[14px]">{label}</span>
+    </div>
+  );
+}
+
+export function NotionThemePanel() {
+  const controller = useThemeController(buildNotionFixture, {
+    expanded: ["personal", "team", "engineering"],
+    constraint: fsConstraint,
+  });
+  return (
+    <div className="w-full">
+      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-[#FBFBFA] shadow-sm">
+        <div className="flex items-center gap-2 border-b border-zinc-200 bg-[#F7F6F3] px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+          <span>softmarshmallow's Notion</span>
+        </div>
+        <DemoPanel
+          controller={controller}
+          enableDrag
+          indentBase={4}
+          indentStep={16}
+          className="!border-0 !bg-[#FBFBFA]"
+          renderRow={(args) => <NotionRow args={args} />}
+          onIntent={(intent) => applyIntent(controller, intent)}
+        />
+      </div>
+    </div>
   );
 }

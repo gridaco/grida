@@ -24,10 +24,16 @@ import {
 } from "@grida/tree-view";
 import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
 import {
+  MacOSDesktop,
+  MacOSDock,
+  MacOSMenuBar,
+  MacOSWindow,
+} from "@/components/frames/macos-desktop";
+import { Resources } from "@/resources";
+import Image from "next/image";
+import {
   CommandIcon,
   FileCode2Icon,
-  FolderIcon,
-  ImageIcon,
   SearchIcon,
   SettingsIcon,
   TerminalIcon,
@@ -36,6 +42,7 @@ import {
 import * as React from "react";
 import {
   buildFinderFixture,
+  buildNotionFixture,
   buildSceneFixture,
   buildVSCodeFixture,
   type DemoMeta,
@@ -48,6 +55,7 @@ import {
   fsConstraint,
   GridaRow,
   HoverContext,
+  NotionRow,
   useRowFlags,
   useThemeController,
   VSCodeRow,
@@ -60,54 +68,77 @@ import {
 
 function SectionHeader({
   eyebrow,
-  accent,
-  title,
+  icon,
+  iconAlt,
   children,
 }: {
   eyebrow: string;
-  accent: string;
-  title: string;
+  /** App icon path (e.g. `Resources.assets.macos.icons.grida`). Replaces the headline. */
+  icon: string;
+  iconAlt: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-          <span className={`size-1.5 rounded-full ${accent}`} aria-hidden />
-          {eyebrow}
-        </div>
-        <h3 className="text-2xl font-bold tracking-tight md:text-3xl">
-          {title}
-        </h3>
+    <div className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+      <Image
+        src={icon}
+        alt={iconAlt}
+        width={64}
+        height={64}
+        draggable={false}
+        className="size-14 shrink-0 select-none drop-shadow-md md:size-16"
+      />
+      <div className="max-w-md space-y-1.5">
+        <div className="text-[13px] font-semibold text-zinc-900">{eyebrow}</div>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {children}
+        </p>
       </div>
-      <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-        {children}
-      </p>
     </div>
   );
 }
 
 /**
- * tree | space | editor. The tree column is fixed-ish so the panels align
- * across sections; the editor takes the rest. Both children get the same
- * height so their tops and bottoms line up.
+ * Outer 16:9 card that hosts a `[tree | demo]` split. The card itself owns
+ * the aspect ratio + the soft background; the tree and demo panes "float"
+ * inside on a small inner padding, keeping their own borders/shadows. On
+ * smaller viewports the card collapses to a stacked column with explicit
+ * heights so neither pane vanishes.
  */
 function SplitStage({
   tree,
   editor,
+  frame,
 }: {
   tree: React.ReactNode;
   editor: React.ReactNode;
+  /** Tailwind classes for the outer card background + ring. */
+  frame?: string;
 }) {
+  // Nested radius: outer rounded-2xl (16px) = inner pane rounded-lg (8px)
+  // + p-2 padding (8px), so the inner corners sit concentric with the
+  // outer card. Each showcase applies rounded-lg to its tree/demo chrome.
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-      <div className="w-full lg:w-[340px] lg:shrink-0">{tree}</div>
-      <div className="min-w-0 flex-1">{editor}</div>
+    <div
+      className={[
+        "rounded-2xl p-2 sm:aspect-[16/9]",
+        frame ?? "bg-zinc-100 ring-1 ring-zinc-200/70",
+      ].join(" ")}
+    >
+      <div className="flex h-full flex-col gap-2 sm:flex-row">
+        <div className="w-full sm:h-full sm:w-44 sm:shrink-0 md:w-56">
+          {tree}
+        </div>
+        <div className="min-w-0 flex-1 sm:h-full">{editor}</div>
+      </div>
     </div>
   );
 }
 
-const STAGE_H = "h-[300px] sm:h-[440px]";
+// Heights used on small/mid viewports where the 16:9 frame doesn't apply
+// (stacked column). On lg+ children get `h-full` from the aspect-ratio
+// parent instead.
+const STAGE_H = "h-[420px] sm:h-full";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Shared delete behaviour. The package has no "delete" — deletion is a
@@ -172,23 +203,43 @@ function radiusOf(meta: { box?: DemoMeta["box"]; radius?: number }): number {
   return r > max ? max : r;
 }
 
-function Shape({ s }: { s: FlatShape }) {
+// Hoisted to avoid allocating a fresh style object per shape per render —
+// `Shape` is called for every node every paint, and a memoized component
+// can short-circuit on `Object.is` only if the style ref is stable.
+const TEXT_HOVER_STYLE: React.CSSProperties = {
+  fontFamily: "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
+  filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.18))",
+};
+const TEXT_IDLE_STYLE: React.CSSProperties = {
+  fontFamily: "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
+};
+const RECT_HOVER_STYLE: React.CSSProperties = {
+  filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.22))",
+};
+const TEXT_ANCHOR_OFFSET = { start: 0, middle: 0.5, end: 1 } as const;
+
+const Shape = React.memo(function Shape({
+  s,
+  hovered,
+}: {
+  s: FlatShape;
+  hovered: boolean;
+}) {
   const { meta } = s;
   const b = meta.box!;
-  if (meta.kind === "group") return null; // organizational — no fill
+  if (meta.kind === "group") return null;
   if (meta.kind === "text") {
+    const ta = meta.textAnchor ?? "start";
     return (
       <text
-        x={b.x}
+        x={b.x + b.w * TEXT_ANCHOR_OFFSET[ta]}
         y={b.y + b.h / 2}
         fill={meta.fill ?? "#000"}
         fontSize={meta.fontSize ?? 14}
         fontWeight={meta.weight ?? 400}
         dominantBaseline="middle"
-        style={{
-          fontFamily:
-            "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
-        }}
+        textAnchor={ta}
+        style={hovered ? TEXT_HOVER_STYLE : TEXT_IDLE_STYLE}
       >
         {meta.text ?? meta.label}
       </text>
@@ -196,7 +247,10 @@ function Shape({ s }: { s: FlatShape }) {
   }
   const rx = radiusOf(meta);
   return (
-    <g opacity={meta.opacity ?? 1}>
+    <g
+      opacity={meta.opacity ?? 1}
+      style={hovered ? RECT_HOVER_STYLE : undefined}
+    >
       <rect
         x={b.x}
         y={b.y}
@@ -234,7 +288,146 @@ function Shape({ s }: { s: FlatShape }) {
       )}
     </g>
   );
-}
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Selection chrome — a thin accent outline plus eight handle squares pinned
+// just outside the bounding box. We render at viewport-stable widths by
+// authoring in canvas units (the artboard's SVG userspace) and letting the
+// SVG scale handle the rest; the badge font is sized in the same units so
+// it tracks zoom consistently across the two showcases.
+// ───────────────────────────────────────────────────────────────────────────
+
+const SelectionChrome = React.memo(function SelectionChrome({
+  box,
+  accent,
+  showHandles,
+}: {
+  box: { x: number; y: number; w: number; h: number };
+  accent: string;
+  showHandles: boolean;
+}) {
+  const { x, y, w, h } = box;
+  // Slight outset so the outline doesn't bisect the artwork edge.
+  const O = 0.5;
+  const handles: Array<[number, number]> = showHandles
+    ? [
+        [x, y],
+        [x + w / 2, y],
+        [x + w, y],
+        [x + w, y + h / 2],
+        [x + w, y + h],
+        [x + w / 2, y + h],
+        [x, y + h],
+        [x, y + h / 2],
+      ]
+    : [];
+  const HS = 6; // handle side, canvas units
+  return (
+    <g pointerEvents="none">
+      <rect
+        x={x - O}
+        y={y - O}
+        width={w + O * 2}
+        height={h + O * 2}
+        fill="none"
+        stroke={accent}
+        strokeWidth={1.25}
+        shapeRendering="crispEdges"
+      />
+      {handles.map(([hx, hy], i) => (
+        <rect
+          key={i}
+          x={hx - HS / 2}
+          y={hy - HS / 2}
+          width={HS}
+          height={HS}
+          fill="#fff"
+          stroke={accent}
+          strokeWidth={1.25}
+          shapeRendering="crispEdges"
+        />
+      ))}
+    </g>
+  );
+});
+
+const DimensionBadge = React.memo(function DimensionBadge({
+  box,
+  accent,
+}: {
+  box: { x: number; y: number; w: number; h: number };
+  accent: string;
+}) {
+  const { x, y, w, h } = box;
+  const label = `${Math.round(w)} × ${Math.round(h)}`;
+  // Estimate a sensible width from char count; SVG can't auto-fit.
+  const padX = 6;
+  const padY = 3;
+  const fontSize = 11;
+  const textW = label.length * (fontSize * 0.58);
+  const badgeW = textW + padX * 2;
+  const badgeH = fontSize + padY * 2;
+  const cx = x + w / 2;
+  const top = y + h + 8;
+  return (
+    <g pointerEvents="none">
+      <rect
+        x={cx - badgeW / 2}
+        y={top}
+        width={badgeW}
+        height={badgeH}
+        rx={badgeH / 2}
+        ry={badgeH / 2}
+        fill={accent}
+      />
+      <text
+        x={cx}
+        y={top + badgeH / 2 + 0.5}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={fontSize}
+        fontWeight={600}
+        fill="#fff"
+        style={{
+          fontFamily:
+            "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
+        }}
+      >
+        {label}
+      </text>
+    </g>
+  );
+});
+
+const HoverOutline = React.memo(function HoverOutline({
+  box,
+  radius,
+  accent,
+  dashed,
+}: {
+  box: { x: number; y: number; w: number; h: number };
+  radius: number;
+  accent: string;
+  dashed: boolean;
+}) {
+  return (
+    <rect
+      x={box.x}
+      y={box.y}
+      width={box.w}
+      height={box.h}
+      rx={radius}
+      ry={radius}
+      fill="none"
+      stroke={accent}
+      strokeWidth={1}
+      strokeOpacity={0.4}
+      strokeDasharray={dashed ? "3 3" : undefined}
+      pointerEvents="none"
+    />
+  );
+});
 
 function SvgStage({
   controller,
@@ -262,12 +455,14 @@ function SvgStage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [controller, artboardId, version]
   );
-  const frame = shapes.find((s) => s.id === artboardId)?.meta.box ?? {
-    x: 0,
-    y: 0,
-    w: 360,
-    h: 460,
-  };
+  // One pass to build the id→shape lookup so hover/selection/artboard
+  // probes are O(1) instead of N each per render.
+  const byId = React.useMemo(
+    () => new Map(shapes.map((s) => [s.id, s])),
+    [shapes]
+  );
+  const artboardMeta = byId.get(artboardId)?.meta;
+  const frame = artboardMeta?.box ?? { x: 0, y: 0, w: 360, h: 460 };
   const selSet = React.useMemo(() => new Set(selection), [selection]);
 
   const onPick = (id: NodeId, e: React.PointerEvent) => {
@@ -276,10 +471,16 @@ function SvgStage({
   };
 
   const dark = tone === "dark";
-  const PAD = 26;
-  const vb = `${frame.x - PAD} ${frame.y - PAD - 14} ${frame.w + PAD * 2} ${
-    frame.h + PAD * 2 + 14
-  }`;
+  // Top gutter holds the artboard label, bottom gutter holds the single-
+  // selection dimension badge — both painted in canvas userspace.
+  const PAD = 28;
+  const TOP_GUTTER = 18;
+  const BOTTOM_GUTTER = 22;
+  const vb = `${frame.x - PAD} ${frame.y - PAD - TOP_GUTTER} ${
+    frame.w + PAD * 2
+  } ${frame.h + PAD * 2 + TOP_GUTTER + BOTTOM_GUTTER}`;
+  const artboardLabel = artboardMeta?.label ?? "Cover";
+  const frameRadius = radiusOf(artboardMeta ?? { box: frame });
 
   return (
     <div
@@ -291,7 +492,7 @@ function SvgStage({
         }
       }}
       className={[
-        "relative flex flex-col overflow-hidden rounded-xl border outline-none",
+        "relative flex flex-col overflow-hidden rounded-lg border outline-none",
         STAGE_H,
         dark ? "border-neutral-800 bg-[#1B1B1F]" : "border-zinc-200 bg-zinc-50",
         "focus-visible:ring-2 focus-visible:ring-blue-400/60",
@@ -324,11 +525,7 @@ function SvgStage({
                 y={frame.y}
                 width={frame.w}
                 height={frame.h}
-                rx={radiusOf(
-                  shapes.find((s) => s.id === artboardId)?.meta ?? {
-                    box: frame,
-                  }
-                )}
+                rx={frameRadius}
               />
             </clipPath>
             <filter
@@ -348,115 +545,124 @@ function SvgStage({
             </filter>
           </defs>
 
-          {/* artboard name tab */}
+          {/* artboard name tab — Figma-style label above the frame */}
           <text
-            x={frame.x + 2}
-            y={frame.y - 12}
-            fontSize={12}
+            x={frame.x}
+            y={frame.y - 8}
+            fontSize={11}
             fontWeight={600}
-            fill={dark ? "#71717A" : "#A1A1AA"}
-            style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}
+            fill={accent}
+            opacity={0.85}
+            style={{
+              fontFamily:
+                "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
+              letterSpacing: 0.2,
+            }}
           >
-            {(() => {
-              try {
-                return controller.source.getNode(artboardId).meta?.label;
-              } catch {
-                return "Cover";
-              }
-            })()}
+            {artboardLabel}
           </text>
 
+          {/* artboard frame: fill + faint shadow + subtle 1px stroke */}
           <g filter={`url(#shadow-${artboardId})`}>
-            {/* the artboard fill (frame) sits below the clip */}
             {shapes
               .filter((s) => s.id === artboardId)
               .map((s) => (
-                <Shape key={s.id} s={s} />
+                <Shape key={s.id} s={s} hovered={false} />
               ))}
+            <rect
+              x={frame.x}
+              y={frame.y}
+              width={frame.w}
+              height={frame.h}
+              rx={frameRadius}
+              ry={frameRadius}
+              fill="none"
+              stroke={dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}
+              strokeWidth={1}
+              pointerEvents="none"
+            />
           </g>
+
           <g clipPath={`url(#clip-${artboardId})`}>
             {shapes
               .filter((s) => s.id !== artboardId)
               .map((s) => (
-                <Shape key={s.id} s={s} />
+                <Shape
+                  key={s.id}
+                  s={s}
+                  hovered={hovered === s.id && !selSet.has(s.id)}
+                />
               ))}
           </g>
 
-          {/* selection + hover overlays paint above the artwork */}
-          {shapes.map((s) => {
-            const b = s.meta.box!;
-            const isSel = selSet.has(s.id);
-            const isHov = hovered === s.id;
-            if (!isSel && !isHov) return null;
-            return (
-              <rect
-                key={`o-${s.id}`}
-                x={b.x}
-                y={b.y}
-                width={b.w}
-                height={b.h}
-                rx={radiusOf(s.meta)}
-                fill="none"
-                stroke={accent}
-                strokeWidth={isSel ? 2 : 1.5}
-                strokeDasharray={
-                  s.kind === "group" && !isSel ? "4 4" : undefined
-                }
-                opacity={isSel ? 1 : 0.7}
-                pointerEvents="none"
-              />
-            );
-          })}
-          {shapes.map(
-            (s) =>
-              selSet.has(s.id) &&
-              selection.length === 1 && (
-                <g key={`h-${s.id}`} pointerEvents="none">
-                  {(
-                    [
-                      [s.meta.box!.x, s.meta.box!.y],
-                      [s.meta.box!.x + s.meta.box!.w, s.meta.box!.y],
-                      [s.meta.box!.x, s.meta.box!.y + s.meta.box!.h],
-                      [
-                        s.meta.box!.x + s.meta.box!.w,
-                        s.meta.box!.y + s.meta.box!.h,
-                      ],
-                    ] as const
-                  ).map(([hx, hy], i) => (
-                    <rect
-                      key={i}
-                      x={hx - 3.5}
-                      y={hy - 3.5}
-                      width={7}
-                      height={7}
-                      fill="#fff"
-                      stroke={accent}
-                      strokeWidth={1.5}
-                    />
-                  ))}
-                </g>
-              )
-          )}
+          {/* Overlays paint above the artwork, in this order:
+              1. hover outline (groups dashed, leaves solid, both at 40%)
+              2. group bounds when selected (dashed)
+              3. selection chrome (outline + handles)
+              4. dimension badge for a single selection */}
 
-          {/* transparent hit targets, document order so the front-most wins */}
-          {shapes.map((s) =>
-            s.kind === "group" ? null : (
-              <rect
-                key={`hit-${s.id}`}
-                data-tree-node-id={s.id}
-                x={s.meta.box!.x}
-                y={s.meta.box!.y}
-                width={s.meta.box!.w}
-                height={s.meta.box!.h}
-                rx={radiusOf(s.meta)}
-                fill="transparent"
-                className="cursor-pointer"
-                onPointerEnter={() => setHovered(s.id)}
-                onPointerLeave={() => setHovered(null)}
-                onPointerDown={(e) => onPick(s.id, e)}
+          {/* hover outline — never for already-selected nodes */}
+          {hovered &&
+            (() => {
+              const s = byId.get(hovered);
+              if (!s || selSet.has(s.id)) return null;
+              return (
+                <HoverOutline
+                  key={`hov-${s.id}`}
+                  box={s.meta.box!}
+                  radius={radiusOf(s.meta)}
+                  accent={accent}
+                  dashed={s.kind === "group"}
+                />
+              );
+            })()}
+
+          {/* selection chrome */}
+          {shapes
+            .filter((s) => selSet.has(s.id))
+            .map((s) => (
+              <SelectionChrome
+                key={`sel-${s.id}`}
+                box={s.meta.box!}
+                accent={accent}
+                showHandles={selection.length === 1}
               />
-            )
-          )}
+            ))}
+
+          {/* dimension badge — only when exactly one node is selected */}
+          {selection.length === 1 &&
+            (() => {
+              const id = selection[0]!;
+              const s = byId.get(id);
+              if (!s) return null;
+              return (
+                <DimensionBadge
+                  key={`dim-${id}`}
+                  box={s.meta.box!}
+                  accent={accent}
+                />
+              );
+            })()}
+
+          {/* transparent hit targets, document order so the front-most wins.
+              Groups now participate so users can grab the group's bounds —
+              their hit area is the union, which matches the canvas idiom. */}
+          {shapes.map((s) => (
+            <rect
+              key={`hit-${s.id}`}
+              data-tree-node-id={s.id}
+              x={s.meta.box!.x}
+              y={s.meta.box!.y}
+              width={s.meta.box!.w}
+              height={s.meta.box!.h}
+              rx={radiusOf(s.meta)}
+              fill="transparent"
+              className="cursor-pointer"
+              onPointerEnter={() => setHovered(s.id)}
+              onPointerLeave={() => setHovered(null)}
+              onPointerDown={(e) => onPick(s.id, e)}
+            />
+          ))}
         </svg>
       </div>
 
@@ -535,7 +741,7 @@ export function GridaShowcase() {
       new TreeController<DemoMeta>({
         source: buildSceneFixture(),
         flatten: { reverseChildren: true },
-        expanded: ["cover", "actions"],
+        expanded: ["cover", "items", "action"],
         constraint: onlyIntoContainers(),
       })
   );
@@ -547,8 +753,8 @@ export function GridaShowcase() {
       <div className="mx-auto max-w-6xl px-4">
         <SectionHeader
           eyebrow="Grida"
-          accent="bg-zinc-900"
-          title="Layers, wired to a canvas."
+          icon={Resources.assets.macos.icons.grida}
+          iconAlt="Grida"
         >
           One{" "}
           <code className="rounded bg-zinc-100 px-1 text-[12px]">
@@ -560,9 +766,10 @@ export function GridaShowcase() {
         <TreeProvider controller={controller}>
           <HoverContext.Provider value={{ hovered, setHovered }}>
             <SplitStage
+              frame="bg-zinc-100 ring-1 ring-zinc-200/70"
               tree={
                 <div
-                  className={`flex ${STAGE_H} flex-col rounded-xl border border-zinc-200 bg-white p-1 shadow-sm`}
+                  className={`flex ${STAGE_H} flex-col rounded-lg border border-zinc-200 bg-white p-1 shadow-sm`}
                 >
                   <DemoPanel
                     controller={controller}
@@ -601,7 +808,7 @@ export function FigmaShowcase() {
       new TreeController<DemoMeta>({
         source: buildSceneFixture(),
         flatten: { reverseChildren: true },
-        expanded: ["cover", "actions"],
+        expanded: ["cover", "items", "action"],
         constraint: onlyIntoContainers(),
       })
   );
@@ -613,8 +820,8 @@ export function FigmaShowcase() {
       <div className="mx-auto max-w-6xl px-4">
         <SectionHeader
           eyebrow="Figma"
-          accent="bg-[#0D99FF]"
-          title="Same wiring, dark chrome."
+          icon={Resources.assets.macos.icons.figma}
+          iconAlt="Figma"
         >
           Identical controller and intent bridge — only the row renderer and the
           canvas palette changed. Reordering a layer re-stacks the design.
@@ -622,9 +829,10 @@ export function FigmaShowcase() {
         <TreeProvider controller={controller}>
           <HoverContext.Provider value={{ hovered, setHovered }}>
             <SplitStage
+              frame="bg-[#141417] ring-1 ring-white/5"
               tree={
                 <div
-                  className={`flex ${STAGE_H} flex-col overflow-hidden rounded-xl border border-neutral-700 bg-[#2C2C2C] shadow-lg`}
+                  className={`flex ${STAGE_H} flex-col overflow-hidden rounded-lg border border-neutral-700 bg-[#2C2C2C] shadow-lg`}
                 >
                   <div className="flex items-center justify-between border-b border-neutral-700/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
                     <span>Layers</span>
@@ -694,7 +902,7 @@ function VSCodeEmptyEditor() {
 
   return (
     <div
-      className={`flex ${STAGE_H} flex-col overflow-hidden rounded-xl border border-[#3C3C3C] bg-[#1E1E1E] font-mono shadow-lg`}
+      className={`flex ${STAGE_H} flex-col overflow-hidden rounded-lg border border-[#3C3C3C] bg-[#1E1E1E] font-mono shadow-lg`}
     >
       {openFile ? (
         <>
@@ -770,8 +978,8 @@ export function VSCodeShowcase() {
       <div className="mx-auto max-w-6xl px-4">
         <SectionHeader
           eyebrow="VS Code"
-          accent="bg-sky-500"
-          title="Explorer, opening files."
+          icon={Resources.assets.macos.icons.vscode}
+          iconAlt="VS Code"
         >
           Filesystem semantics: drops resolve <em>into</em> the nearest folder.
           Selecting a file opens it — selection is the only wire to the editor
@@ -779,9 +987,10 @@ export function VSCodeShowcase() {
         </SectionHeader>
         <TreeProvider controller={controller}>
           <SplitStage
+            frame="bg-[#141416] ring-1 ring-white/5"
             tree={
               <div
-                className={`flex ${STAGE_H} flex-col overflow-hidden rounded-xl border border-[#3C3C3C] bg-[#252526] font-mono shadow-lg`}
+                className={`flex ${STAGE_H} flex-col overflow-hidden rounded-lg border border-[#3C3C3C] bg-[#252526] font-mono shadow-lg`}
               >
                 <div className="flex items-center gap-2 border-b border-[#3C3C3C] bg-[#333333] px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-[#CCCCCC]">
                   <TerminalIcon className="size-3" />
@@ -810,47 +1019,158 @@ export function VSCodeShowcase() {
 // Finder — the window, open on a Mac desktop (wallpaper + dock)
 // ───────────────────────────────────────────────────────────────────────────
 
-const DOCK_APPS: {
-  name: string;
-  className: string;
-  Icon: typeof FolderIcon;
-}[] = [
-  {
-    name: "Finder",
-    className: "from-sky-300 to-sky-500",
-    Icon: FolderIcon,
-  },
-  {
-    name: "Photos",
-    className: "from-rose-300 to-orange-400",
-    Icon: ImageIcon,
-  },
-  {
-    name: "Terminal",
-    className: "from-zinc-700 to-black",
-    Icon: TerminalIcon,
-  },
-  {
-    name: "Code",
-    className: "from-sky-400 to-blue-600",
-    Icon: FileCode2Icon,
-  },
-  {
-    name: "Search",
-    className: "from-violet-300 to-violet-500",
-    Icon: SearchIcon,
-  },
-  {
-    name: "Settings",
-    className: "from-zinc-300 to-zinc-500",
-    Icon: SettingsIcon,
-  },
-  {
-    name: "Trash",
-    className: "from-zinc-200 to-zinc-400",
-    Icon: Trash2Icon,
-  },
+const DOCK_APPS = [
+  { name: "Finder", src: Resources.assets.macos.icons.finder },
+  { name: "Safari", src: Resources.assets.macos.icons.safari },
+  { name: "Messages", src: Resources.assets.macos.icons.messages },
+  { name: "Maps", src: Resources.assets.macos.icons.maps },
+  { name: "Notes", src: Resources.assets.macos.icons.notes },
+  { name: "Reminders", src: Resources.assets.macos.icons.reminders },
+  { name: "Freeform", src: Resources.assets.macos.icons.freeform },
+  { name: "Music", src: Resources.assets.macos.icons.music },
+  { name: "Logic Pro", src: Resources.assets.macos.icons.logicPro },
+  { name: "Xcode", src: Resources.assets.macos.icons.xcode },
+  { name: "VS Code", src: Resources.assets.macos.icons.vscode },
+  { name: "Grida", src: Resources.assets.macos.icons.grida },
+  { name: "Trash", src: Resources.assets.macos.icons.trashFull },
 ];
+
+// ───────────────────────────────────────────────────────────────────────────
+// Notion — workspace sidebar + a static document mock. The sidebar is the
+// tree-view; the document is the consumer's "editor pane" (no live wiring,
+// the doc is a mock — Notion's blocks aren't this package's job).
+// ───────────────────────────────────────────────────────────────────────────
+
+// One selector returning only the displayed strings, shallow-equal so the
+// document body re-renders just when the title/emoji actually change —
+// avoids the two-subscription pattern (one for selection, one to force
+// re-render on source mutation) where the second emit was a no-op for the
+// view.
+type NotionDocView = { emoji: string; label: string };
+const notionDocEq = (a: NotionDocView, b: NotionDocView) =>
+  a.emoji === b.emoji && a.label === b.label;
+
+function NotionDocument() {
+  const view = useTreeSnapshot<DemoMeta, NotionDocView>((c) => {
+    const id = c.getSelection()[0];
+    if (!id) return { emoji: "📄", label: "Untitled" };
+    try {
+      const n = c.source.getNode(id);
+      return {
+        emoji: n.meta?.emoji ?? "📄",
+        label: n.meta?.label ?? "Untitled",
+      };
+    } catch {
+      return { emoji: "📄", label: "Untitled" };
+    }
+  }, notionDocEq);
+  const { emoji, label } = view;
+  return (
+    <div
+      className={`flex ${STAGE_H} flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm`}
+    >
+      {/* page chrome */}
+      <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-1.5 text-[11px] text-zinc-500">
+        <div className="flex items-center gap-1">
+          <span>Workspace</span>
+          <span>/</span>
+          <span>{label}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span>Share</span>
+          <span>•••</span>
+        </div>
+      </div>
+      {/* page body */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6 text-[#37352F]">
+        <div className="mb-2 text-5xl leading-none select-none">{emoji}</div>
+        <h1 className="mb-4 text-3xl font-bold tracking-tight text-[#37352F]">
+          {label}
+        </h1>
+        <p className="text-[15px] leading-7 text-[#37352F]">
+          Pages live in the sidebar — selecting one opens it here. Drop a page
+          onto another to nest; drag between two pages to reorder. The sidebar
+          and this document are wired to the same{" "}
+          <code className="rounded bg-[#F1F1EF] px-1.5 py-0.5 text-[13px]">
+            TreeController
+          </code>
+          .
+        </p>
+        <div className="my-4 flex items-start gap-3 rounded-md border border-[#E9E9E7] bg-[#F7F6F3] p-3 text-[14px] leading-6 text-[#37352F]">
+          <span className="text-lg leading-none">💡</span>
+          <span>
+            The tree-view package never reads your page content. The doc you’re
+            reading is a static mock — only the selection wires through.
+          </span>
+        </div>
+        <h2 className="mt-6 mb-2 text-lg font-semibold text-[#37352F]">
+          Today
+        </h2>
+        <ul className="space-y-1.5 text-[14px] leading-6 text-[#37352F]">
+          <li>☐ Triage CodeRabbit comments on PR 719</li>
+          <li>☐ Wire F12 reversed+desiredDepth test</li>
+          <li>☑ Reverse-aware drag math (F10)</li>
+          <li>
+            ☑ Tolerant{" "}
+            <code className="rounded bg-[#F1F1EF] px-1 py-0.5 text-[13px]">
+              expandTo
+            </code>{" "}
+            (F11.1)
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+export function NotionShowcase() {
+  // `selection` seeds the controller at construction so the document pane
+  // is populated on first paint (no post-mount effect, no double-render).
+  const controller = useThemeController(buildNotionFixture, {
+    expanded: ["personal", "team", "engineering"],
+    constraint: fsConstraint,
+    selection: ["notes"],
+  });
+  return (
+    <section className="border-t border-zinc-200 py-16">
+      <div className="mx-auto max-w-6xl px-4">
+        <SectionHeader
+          eyebrow="Notion"
+          icon={Resources.assets.macos.icons.notion}
+          iconAlt="Notion"
+        >
+          Workspace sidebar with nested pages, emoji affordances, and
+          drag-into-page. Selecting a page swaps the document on the right — one
+          controller, one selection channel.
+        </SectionHeader>
+        <TreeProvider controller={controller}>
+          <SplitStage
+            frame="bg-[#F1F1EF] ring-1 ring-zinc-200/80"
+            tree={
+              <div
+                className={`flex ${STAGE_H} flex-col overflow-hidden rounded-lg border border-zinc-200 bg-[#FBFBFA] shadow-sm`}
+              >
+                <div className="flex items-center gap-2 border-b border-zinc-200 bg-[#F7F6F3] px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                  <span>softmarshmallow's Notion</span>
+                </div>
+                <DemoPanel
+                  controller={controller}
+                  enableDrag
+                  indentBase={4}
+                  indentStep={14}
+                  className="min-h-0 flex-1 !border-0 !bg-[#FBFBFA]"
+                  renderRow={(args) => <NotionRow args={args} />}
+                  onIntent={(intent) => applyIntent(controller, intent)}
+                />
+              </div>
+            }
+            editor={<NotionDocument />}
+          />
+        </TreeProvider>
+      </div>
+    </section>
+  );
+}
 
 export function FinderShowcase() {
   const controller = useThemeController(buildFinderFixture, {
@@ -863,50 +1183,34 @@ export function FinderShowcase() {
       <div className="mx-auto max-w-6xl px-4">
         <SectionHeader
           eyebrow="Finder"
-          accent="bg-emerald-500"
-          title="It just looks native."
+          icon={Resources.assets.macos.icons.finder}
+          iconAlt="Finder"
         >
           Multi-column rows, zebra striping, double-click to expand — the same
           core, dressed as macOS and dropped onto the desktop.
         </SectionHeader>
       </div>
 
-      {/* desktop */}
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl border border-black/10 px-4">
-        <div
-          className="relative flex min-h-[560px] flex-col px-6 py-10"
-          style={{
-            backgroundImage:
-              "linear-gradient(160deg,#1e3a8a 0%,#6d28d9 38%,#db2777 70%,#f59e0b 100%)",
-          }}
-        >
-          {/* menubar */}
-          <div className="absolute inset-x-0 top-0 flex h-6 items-center justify-between bg-black/20 px-4 text-[11px] font-medium text-white/90 backdrop-blur-sm">
-            <div className="flex items-center gap-4">
-              <span></span>
-              <span className="font-semibold">Finder</span>
-              <span className="hidden sm:inline">File</span>
-              <span className="hidden sm:inline">Edit</span>
-              <span className="hidden sm:inline">View</span>
-              <span className="hidden sm:inline">Go</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <SearchIcon className="size-3" />
-              <span className="tabular-nums">Mon 9:41 AM</span>
-            </div>
-          </div>
-
-          {/* finder window */}
+      {/* desktop — same outer card frame as the other showcases:
+          rounded-2xl + p-2 outside, rounded-lg + overflow-hidden inside so
+          the wallpaper clips concentric with the outer corner (16 - 8 = 8). */}
+      <div className="relative mx-auto max-w-6xl rounded-2xl bg-zinc-100 p-2 ring-1 ring-zinc-200/70">
+        <MacOSDesktop className="relative flex min-h-[560px] flex-col overflow-hidden rounded-lg px-6 py-10 sm:aspect-[16/9] sm:min-h-0">
+          <MacOSMenuBar
+            appName="Finder"
+            className="absolute inset-x-0 top-0 z-10"
+            trailing={
+              <>
+                <SearchIcon className="size-3" />
+                <span className="tabular-nums">Mon 9:41 AM</span>
+              </>
+            }
+          />
           <div className="mt-6 flex flex-1 items-start justify-center">
-            <div className="w-full max-w-[820px] overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl">
-              <div className="flex items-center gap-2 border-b border-zinc-200 bg-gradient-to-b from-zinc-100 to-zinc-50 px-3 py-2">
-                <span className="size-3 rounded-full bg-[#FF5F57]" />
-                <span className="size-3 rounded-full bg-[#FEBC2E]" />
-                <span className="size-3 rounded-full bg-[#28C840]" />
-                <span className="ml-3 text-[12px] font-medium text-zinc-700">
-                  softmarshmallow
-                </span>
-              </div>
+            <MacOSWindow
+              title="softmarshmallow"
+              className="w-full max-w-[820px]"
+            >
               <div className="grid h-7 grid-cols-[1fr] items-center border-b border-zinc-200 bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500 md:grid-cols-[1fr_90px_160px_140px]">
                 <div className="px-3">Name</div>
                 <div className="hidden pr-3 text-right md:block">Size</div>
@@ -924,24 +1228,13 @@ export function FinderShowcase() {
                 renderRow={(args) => <FinderRow args={args} />}
                 onIntent={(intent) => applyIntent(controller, intent)}
               />
-            </div>
+            </MacOSWindow>
           </div>
-
-          {/* dock */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-            <div className="pointer-events-auto flex items-end gap-3 rounded-2xl border border-white/30 bg-white/20 px-3 py-2 shadow-xl backdrop-blur-md">
-              {DOCK_APPS.map((app) => (
-                <div
-                  key={app.name}
-                  title={app.name}
-                  className={`flex size-11 items-center justify-center rounded-xl bg-gradient-to-b ${app.className} text-white shadow-md transition-transform duration-150 hover:-translate-y-1.5`}
-                >
-                  <app.Icon className="size-5" strokeWidth={2} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+          <MacOSDock
+            apps={DOCK_APPS}
+            className="pointer-events-auto absolute inset-x-0 bottom-4 z-10 mx-auto w-fit"
+          />
+        </MacOSDesktop>
       </div>
     </section>
   );

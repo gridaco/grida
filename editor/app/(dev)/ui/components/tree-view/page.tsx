@@ -27,6 +27,7 @@ import {
   FigmaThemePanel,
   FinderThemePanel,
   GridaThemePanel,
+  NotionThemePanel,
   VSCodeThemePanel,
 } from "./_themes";
 import {
@@ -428,6 +429,12 @@ function ThemedShowcase() {
           summary="Filesystem semantics — drop is always *into* the nearest folder, target highlights in blue. No reordering."
         >
           <VSCodeThemePanel />
+        </ThemeCard>
+        <ThemeCard
+          name="Notion"
+          summary="Cream sidebar, emoji-prefixed pages, chevron on hover only. Drop into a page nests it; drag between pages to reorder."
+        >
+          <NotionThemePanel />
         </ThemeCard>
         <ThemeCard
           name="Finder (macOS)"
