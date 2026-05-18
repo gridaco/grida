@@ -1738,6 +1738,29 @@ namespace cmath {
     }
 
     /**
+     * Returns the 4 corners of a rectangle in TL → TR → BR → BL order.
+     *
+     * Winding is clockwise in screen-space (y-down). The order matches the
+     * inline literal used by `rect.transform` above; callers needing to
+     * transform corners through an affine matrix should reuse this helper
+     * with `cmath.vector2.transform` to keep the corner order canonical.
+     *
+     * @example
+     * cmath.rect.toCorners({ x: 0, y: 0, width: 10, height: 5 });
+     * // [[0, 0], [10, 0], [10, 5], [0, 5]]
+     */
+    export function toCorners(
+      r: Rectangle
+    ): [cmath.Vector2, cmath.Vector2, cmath.Vector2, cmath.Vector2] {
+      return [
+        [r.x, r.y],
+        [r.x + r.width, r.y],
+        [r.x + r.width, r.y + r.height],
+        [r.x, r.y + r.height],
+      ];
+    }
+
+    /**
      * Rotates a rectangle and computes the bounding box of the rotated rectangle.
      *
      * @param rect - The rectangle to rotate.

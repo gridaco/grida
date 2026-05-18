@@ -165,6 +165,66 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("toCorners", () => {
+    it("returns corners in TL → TR → BR → BL order (clockwise, y-down)", () => {
+      const rect: cmath.Rectangle = { x: 0, y: 0, width: 10, height: 5 };
+      expect(cmath.rect.toCorners(rect)).toEqual([
+        [0, 0],
+        [10, 0],
+        [10, 5],
+        [0, 5],
+      ]);
+    });
+
+    it("handles non-origin rectangles", () => {
+      const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+      expect(cmath.rect.toCorners(rect)).toEqual([
+        [10, 20],
+        [40, 20],
+        [40, 60],
+        [10, 60],
+      ]);
+    });
+
+    it("handles negative coordinates", () => {
+      const rect: cmath.Rectangle = {
+        x: -5,
+        y: -10,
+        width: 10,
+        height: 20,
+      };
+      expect(cmath.rect.toCorners(rect)).toEqual([
+        [-5, -10],
+        [5, -10],
+        [5, 10],
+        [-5, 10],
+      ]);
+    });
+
+    it("returns 4 coincident points for a zero-size rectangle", () => {
+      const rect: cmath.Rectangle = { x: 7, y: 9, width: 0, height: 0 };
+      expect(cmath.rect.toCorners(rect)).toEqual([
+        [7, 9],
+        [7, 9],
+        [7, 9],
+        [7, 9],
+      ]);
+    });
+
+    it("agrees with rect.transform for an identity affine", () => {
+      const rect: cmath.Rectangle = { x: 1, y: 2, width: 3, height: 4 };
+      const identity: cmath.Transform = [
+        [1, 0, 0],
+        [0, 1, 0],
+      ];
+      const corners = cmath.rect.toCorners(rect);
+      const transformed = corners.map((p) =>
+        cmath.vector2.transform(p, identity)
+      );
+      expect(transformed).toEqual(corners);
+    });
+  });
+
   describe("contains", () => {
     it("should return true when rectangle A is fully contained within rectangle B", () => {
       const a: cmath.Rectangle = { x: 20, y: 20, width: 40, height: 40 };
