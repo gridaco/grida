@@ -167,7 +167,9 @@ function CreditChip({
   onRefresh: () => void;
   refreshing: boolean;
 }) {
-  if (credits.mode === "byok") {
+  // BYOK bypasses billing for this AI-SDK chat surface only — no Grida
+  // spend, so balance is moot here. GRIDA-SEC-003.
+  if (credits.byok) {
     return (
       <Badge variant="outline" className="font-mono text-xs">
         BYOK
@@ -475,7 +477,7 @@ export default function Page({ authed, context }: Props) {
         </PromptInput>
 
         {context &&
-          credits.mode === "billed" &&
+          !credits.byok &&
           !credits.allowed &&
           credits.cents !== null &&
           billingHref && (

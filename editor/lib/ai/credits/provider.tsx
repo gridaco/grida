@@ -42,45 +42,24 @@ export function Provider({ initial, children }: AiCreditsProviderProps) {
 }
 
 /**
- * Self-harnessing view returned by `useAiCredits()`.
- *
- * Discriminated on `mode`. The `byok` variant **omits** `cents` /
- * `allowed` / `formatted` on purpose: when a server-side BYOK key is
- * set the balance is meaningless, so any consumer that wants to render
- * a balance is forced by the compiler to first handle `mode === "byok"`
- * and pick its own label (the label is per-call-site — there is no
- * global glyph). `refresh`/`consume` exist in both variants so envelope
- * folding still works (under BYOK they no-op the display).
- */
-export type AiCreditsView =
-  | {
-      mode: "billed";
-      cents: number | null;
-      allowed: boolean;
-      formatted: string | null;
-      formattedExact: string | null;
-      refresh: AiCreditsController["refresh"];
-      consume: AiCreditsController["consume"];
-    }
-  | {
-      mode: "byok";
-      refresh: AiCreditsController["refresh"];
-      consume: AiCreditsController["consume"];
-    };
-
-/**
  * Hook accessor for the credits controller's reactive state.
  *
  *   const credits = useAiCredits();
- *   if (credits.mode === "byok") return <YourByokLabel />;
- *   credits.cents             // number | null   (billed only)
- *   credits.allowed           // boolean         (billed only)
- *   credits.formatted         // "$26.0" | null  (billed only)
+ *   credits.cents             // number | null
+ *   credits.allowed           // boolean
+ *   credits.formatted         // "$26.0" | null
  *   credits.formattedExact    // "$25.9921" | null
+ *   credits.byok              // a BYOK key is set server-side
  *   credits.refresh()         // pull live
  *   credits.consume(env, opts)// fold envelope; redirects auto-routed
+ *
+ * `byok` reports only that a key is configured. BYOK bypasses billing
+ * for the AI-SDK text/chat path ONLY — Replicate-backed surfaces
+ * (audio/image) still bill, so `cents`/`allowed` stay truthful and
+ * those surfaces must NOT treat `byok` as "unlimited". Only the AI
+ * chat surface acts on this flag. GRIDA-SEC-003.
  */
-export function useAiCredits(): AiCreditsView {
+export function useAiCredits() {
   const ctrl = useContext(Ctx);
   if (!ctrl) {
     throw new Error(
@@ -95,15 +74,12 @@ export function useAiCredits(): AiCreditsView {
   // `refresh` and `consume` are arrow properties on the controller
   // (see controller.ts) — pass them through unbound; identity is
   // stable across renders since they're set once in the constructor.
-  if (state.byok) {
-    return { mode: "byok", refresh: ctrl.refresh, consume: ctrl.consume };
-  }
   return {
-    mode: "billed",
     cents: state.cents,
     allowed: state.allowed,
     formatted: format.chip(state.cents),
     formattedExact: format.exact(state.cents),
+    byok: state.byok,
     refresh: ctrl.refresh,
     consume: ctrl.consume,
   };

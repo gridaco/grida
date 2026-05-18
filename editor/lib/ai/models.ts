@@ -271,13 +271,14 @@ export const gateway = createGateway({
 // billing ONLY, never auth (requireOrganizationId still runs). Gated
 // solely by server-only env vars NEVER set in the hosted product (same
 // trust model as OPENAI_API_KEY / REPLICATE_API_TOKEN). Fail-closed:
-// active only when a key env var is a non-empty string.
+// active only when a key env var is a non-empty string after trim
+// (whitespace-only secrets fall back to the billed path).
 //
 // Implementations (precedence: OpenRouter first, then AI Gateway). A
 // third BYOK key is a new branch here — no registry.
 // ---------------------------------------------------------------------------
 function resolveByokProvider() {
-  const openrouterKey = process.env.BYOK_OPENROUTER_API_KEY;
+  const openrouterKey = process.env.BYOK_OPENROUTER_API_KEY?.trim();
   if (openrouterKey) {
     return createOpenAICompatible({
       name: "openrouter",
@@ -286,7 +287,7 @@ function resolveByokProvider() {
       headers: { "HTTP-Referer": "https://grida.co", "X-Title": "Grida" },
     });
   }
-  const aiGatewayKey = process.env.BYOK_AI_GATEWAY_API_KEY;
+  const aiGatewayKey = process.env.BYOK_AI_GATEWAY_API_KEY?.trim();
   if (aiGatewayKey) {
     return createGateway({
       apiKey: aiGatewayKey,

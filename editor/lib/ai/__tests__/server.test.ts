@@ -289,14 +289,16 @@ describe("withAiAuth envelope", () => {
     expect(mockedRefreshBalance).not.toHaveBeenCalled();
   });
 
-  it("under BYOK: skips refreshBalance, returns balanceCents:0, auth still enforced", async () => {
+  it("under BYOK + byokBypass (AI-SDK path): skips refreshBalance, balanceCents:0, auth still enforced", async () => {
     mockedIsByokActive.mockReturnValue(true);
     stubAuthed(7);
 
-    const result = await withAiAuth("test/scope", undefined, async (orgId) => ({
-      reply: "byok",
-      org: orgId,
-    }));
+    const result = await withAiAuth(
+      "test/scope",
+      undefined,
+      async (orgId) => ({ reply: "byok", org: orgId }),
+      { byokBypass: true }
+    );
 
     expect(result).toEqual({
       success: true,
@@ -305,8 +307,27 @@ describe("withAiAuth envelope", () => {
     // BYOK bypasses billing only — auth + org resolution still ran.
     expect(mockedCreateLibraryClient).toHaveBeenCalled();
     expect(mockedRequireOrganizationId).toHaveBeenCalled();
-    // The Metronome balance read is skipped.
     expect(mockedRefreshBalance).not.toHaveBeenCalled();
+  });
+
+  it("under BYOK without byokBypass (Replicate-billed path): still reads the real balance", async () => {
+    // GRIDA-SEC-003: BYOK only bypasses the AI-SDK provider. A billed
+    // action must report the real balance under BYOK, never a false 0,
+    // or it silently drains credit and surprises with a 402.
+    mockedIsByokActive.mockReturnValue(true);
+    stubAuthed(7);
+    mockedRefreshBalance.mockResolvedValueOnce({ cents: 2599, live: null });
+
+    const result = await withAiAuth("test/scope", undefined, async (orgId) => ({
+      reply: "billed",
+      org: orgId,
+    }));
+
+    expect(result).toEqual({
+      success: true,
+      data: { reply: "billed", org: 7, balanceCents: 2599 },
+    });
+    expect(mockedRefreshBalance).toHaveBeenCalledWith(7);
   });
 });
 

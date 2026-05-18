@@ -1,3 +1,7 @@
+---
+format: md
+---
+
 # Contributing to Grida | Billing
 
 Setup guide for contributors working on the billing surface. Two clouds to wire:
@@ -11,7 +15,7 @@ Setup guide for contributors working on the billing surface. Two clouds to wire:
 
 ## Just need AI to work? BYOK instead (no billing setup)
 
-If you are **not** working on the billing surface and only need AI features (canvas agent, chat) to run locally, skip the entire Metronome / Stripe / tunnel setup below. Set a contributor **BYOK** key and the AI seam routes through your own provider with the billing seam **bypassed entirely** — no credit gate, no metering, no Metronome.
+If you are **not** working on the billing surface and only need the **AI chat / canvas agent** (text) to run locally, skip the entire Metronome / Stripe / tunnel setup below. Set a contributor **BYOK** key and the **AI-SDK text path** routes through your own provider with billing bypassed — no credit gate, no metering, no Metronome.
 
 ```bash
 # editor/.env.local  (gitignored)
@@ -21,9 +25,9 @@ BYOK_OPENROUTER_API_KEY=sk-or-v1-...      # https://openrouter.ai/keys
 ```
 
 - Bypasses **billing only — never auth.** Still sign in (`insider@grida.co` / `password`); a resolvable org is still required (an unauthenticated request still 401s).
-- **Text/chat only** — OpenRouter exposes no image/audio models. Catalog model IDs are unchanged; use IDs your provider accepts (edit `editor/lib/ai/models.ts` locally if one 404s).
-- Precedence if both are set: OpenRouter, then AI Gateway. Fail-closed — an empty/unset key falls back to the billed path.
-- **Never set `BYOK_*` on a hosted or preview deploy.** It disables billing **and** the org-id sanity gate for every org. Contributor / self-host / local only. See [SECURITY.md](../../SECURITY.md) `GRIDA-SEC-003` (BYOK carve-out).
+- **Text/chat only** — BYOK swaps the AI-SDK provider, so only the text path is unbilled. Image/audio go through Replicate (`withTransaction`) and **still gate + bill even under BYOK** — those features need the full billing setup. (OpenRouter also exposes no image/audio models.) Catalog model IDs are unchanged; use IDs your provider accepts (edit `editor/lib/ai/models.ts` locally if one 404s).
+- Precedence if both are set: OpenRouter, then AI Gateway. Fail-closed — an empty/unset (or whitespace-only) key falls back to the billed path.
+- **Never set `BYOK_*` on a hosted or preview deploy.** It disables billing **and** the org-id sanity gate for every org. Contributor / self-host / local only. See [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) (`GRIDA-SEC-003`, BYOK carve-out).
 
 Working on billing itself? Ignore BYOK and continue with the full setup below.
 
@@ -102,7 +106,7 @@ cloudflared tunnel create grida-webhooks
 cloudflared tunnel route dns grida-webhooks <hostname>   # e.g. metronome-dev.yourdomain.co
 ```
 
-Create `~/.cloudflared/grida-webhooks.yml` (path filter is the security boundary — see [SECURITY.md](../../SECURITY.md) `GRIDA-SEC-001`):
+Create `~/.cloudflared/grida-webhooks.yml` (path filter is the security boundary — see [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) `GRIDA-SEC-001`):
 
 ```yaml
 tunnel: grida-webhooks
@@ -168,7 +172,7 @@ See the suite's own README for the contract.
 - **Service module**: `editor/lib/billing/metronome.ts` — `provisionOrg`, `addStripeChargedCommit`, `setAutoReload`, `getEntitlement`, `ingestUsageEvent`.
 - **`grida_billing.account.provisioning_uid`**: per-account UUID composed into Metronome aliases. `supabase db reset` produces fresh aliases — any orphan Metronome customers from previous instances are inert. No manual cleanup needed.
 
-User-facing billing copy: [`docs/platform/billing.mdx`](../platform/billing.mdx). Design notes: [`docs/wg/platform/billing/`](../wg/platform/billing/) (AI credits master plan, Metronome integration, known issues). CLI guide: [`editor/scripts/billing/README.md`](../../editor/scripts/billing/README.md).
+User-facing billing copy: [`docs/platform/billing.mdx`](../platform/billing.mdx). Design notes: [`docs/wg/platform/billing/`](../wg/platform/billing/) (AI credits master plan, Metronome integration, known issues). CLI guide: [`editor/scripts/billing/README.md`](https://github.com/gridaco/grida/blob/main/editor/scripts/billing/README.md).
 
 ---
 

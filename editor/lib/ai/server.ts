@@ -727,6 +727,19 @@ export type WithAiAuthOptions = {
    * (e.g. backfill jobs, internal-only routes).
    */
   balance?: boolean;
+  /**
+   * When `true` AND a BYOK key is set, this action runs on the BYOK
+   * bare provider (AI-SDK text path) which has no billing middleware —
+   * there is genuinely no Grida spend, so the post-call balance read is
+   * skipped and `balanceCents` is reported as `0`.
+   *
+   * Safe default `false`: BYOK only swaps the AI-SDK provider, NOT the
+   * Replicate `withTransaction` path. Actions that may bill through
+   * Replicate (audio/image) must leave this unset so they still read
+   * the real balance under BYOK — otherwise they silently drain credit
+   * while reporting `0`. GRIDA-SEC-003.
+   */
+  byokBypass?: boolean;
 };
 
 /**
@@ -738,22 +751,24 @@ export type WithAiAuthOptions = {
  * Metronome read post-fn). The `withTransaction` middleware defaults to
  * `awaitIngest:true` so the post-fn read sees the reconciled value.
  *
- * BYOK (contributor-only): auth + org lookup still run — BYOK never
- * bypasses auth. `fn` executes against a bare provider so the billing
- * middleware is skipped entirely; the post-fn Metronome balance read is
- * also skipped and balance is reported as `0`. GRIDA-SEC-003.
+ * BYOK (contributor-only): auth + org lookup always run — BYOK never
+ * bypasses auth. The balance short-circuit (`balanceCents:0`, no
+ * Metronome read) fires only when the caller passes `byokBypass:true`,
+ * i.e. the action runs on the AI-SDK bare provider with no billing
+ * middleware. Replicate-billed actions omit it and still read the real
+ * balance under BYOK (they genuinely spend). GRIDA-SEC-003.
  */
 export function withAiAuth<T extends Record<string, unknown>>(
   scope: string,
   inputOrgId: number | string | undefined,
   fn: (orgId: number) => Promise<T>,
-  opts: { balance: false }
+  opts: { balance: false; byokBypass?: boolean }
 ): Promise<ActionResult<T>>;
 export function withAiAuth<T extends Record<string, unknown>>(
   scope: string,
   inputOrgId: number | string | undefined,
   fn: (orgId: number) => Promise<T>,
-  opts?: { balance?: true }
+  opts?: { balance?: true; byokBypass?: boolean }
 ): Promise<AiActionResult<T>>;
 export async function withAiAuth<T extends Record<string, unknown>>(
   scope: string,
@@ -789,8 +804,10 @@ export async function withAiAuth<T extends Record<string, unknown>>(
   if (opts.balance === false) {
     return { success: true, data };
   }
-  if (isByokActive()) {
-    // GRIDA-SEC-003 BYOK carve-out: no Grida balance to read.
+  if (isByokActive() && opts.byokBypass) {
+    // GRIDA-SEC-003 BYOK carve-out: AI-SDK path has no billing
+    // middleware, so there is no Grida balance to read. Replicate
+    // actions omit `byokBypass` and fall through to the real read.
     return {
       success: true,
       data: { ...data, balanceCents: 0 } as AiActionData<T>,

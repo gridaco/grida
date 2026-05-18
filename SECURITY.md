@@ -241,13 +241,19 @@ inputOrgId })`. It resolves from: route param slug → request
 **BYOK carve-out (intentional).** When a contributor sets a `BYOK_*`
 key ([editor/lib/ai/models.ts](editor/lib/ai/models.ts) —
 `BYOK_OPENROUTER_API_KEY`, `BYOK_AI_GATEWAY_API_KEY`), `grida`/`model`
-return a **bare** provider and the billing seam is bypassed entirely:
-no gate, no Metronome ingest, no balance read, **and** the
+return a **bare** provider so the **AI-SDK text/chat path** bypasses
+the billing seam: no gate, no Metronome ingest, **and** the
 `MissingOrgIdError` runtime contract above does not fire (a bare
 provider has no middleware). The contributor's own provider key is
 charged directly — there is no Grida balance, hence no victim to
-drain, so the billing trust boundary is moot for that path. **BYOK
-bypasses billing only — never auth.** `requireOrganizationId` and
+drain, so the billing trust boundary is moot for that path. **Scope —
+AI-SDK path only.** BYOK only swaps the AI-SDK provider; Replicate-
+backed actions (`runPrediction`/`withTransaction` — audio, image) are
+**not** bypassed and still gate + ingest under BYOK. Accordingly the
+`withAiAuth` `balanceCents:0` short-circuit is opt-gated
+(`byokBypass`, default `false`): only AI-SDK actions set it, so billed
+actions still read the real balance and cannot silently drain credit
+while reporting `0`. **BYOK bypasses billing only — never auth.** `requireOrganizationId` and
 route/action auth always run, so a logged-in user with no resolvable
 org is still rejected. Gated solely by server-only, non-`NEXT_PUBLIC_`
 env vars never set in the hosted product (same trust model as
