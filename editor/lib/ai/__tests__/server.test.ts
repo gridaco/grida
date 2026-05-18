@@ -27,6 +27,15 @@ vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
 
+// Partial passthrough: keep real `catalog`/`gateway`/`modelSpecById`/
+// `tiers`/`byok` (the cost + gate suites depend on them); only stub
+// `isByokActive` so a test can flip the BYOK carve-out without setting
+// a module-load env var.
+vi.mock("../models", async (orig) => ({
+  ...(await orig<typeof import("../models")>()),
+  isByokActive: vi.fn<() => boolean>(),
+}));
+
 import {
   getEntitlement,
   ingestUsageEvent,
@@ -35,6 +44,7 @@ import {
 } from "@/lib/billing/metronome";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { requireOrganizationId } from "@/lib/auth/organization";
+import { isByokActive } from "../models";
 import {
   withTransaction,
   withAiAuth,
@@ -48,14 +58,19 @@ const mockedIngestUsageEvent = vi.mocked(ingestUsageEvent);
 const mockedRefreshBalance = vi.mocked(refreshBalance);
 const mockedCreateLibraryClient = vi.mocked(createLibraryClient);
 const mockedRequireOrganizationId = vi.mocked(requireOrganizationId);
+const mockedIsByokActive = vi.mocked(isByokActive);
 
 beforeEach(() => {
-  delete process.env.NEXT_PUBLIC_GRIDA_LOCALDEV_SUPERUSER;
+  delete process.env.BYOK_OPENROUTER_API_KEY;
+  delete process.env.BYOK_AI_GATEWAY_API_KEY;
   mockedGetEntitlement.mockReset();
   mockedIngestUsageEvent.mockReset();
   mockedRefreshBalance.mockReset();
   mockedCreateLibraryClient.mockReset();
   mockedRequireOrganizationId.mockReset();
+  mockedIsByokActive.mockReset();
+  // Default: BYOK inactive (billed path) unless a test opts in.
+  mockedIsByokActive.mockReturnValue(false);
 });
 
 function stubAuthed(orgId = 7) {
@@ -241,31 +256,6 @@ describe("withTransaction", () => {
       expect.anything()
     );
   });
-
-  it("skips gate + ingest in superuser dev mode", async () => {
-    process.env.NEXT_PUBLIC_GRIDA_LOCALDEV_SUPERUSER = "1";
-    const op = vi.fn<
-      (
-        tx: string
-      ) => Promise<{ result: { tx: string; value: string }; costMills: number }>
-    >(async (tx: string) => ({
-      result: { tx, value: "ok" },
-      costMills: 99,
-    }));
-
-    const out = await withTransaction(
-      {
-        organizationId: 0,
-        feature: "dev",
-        model_id: "openai/gpt-5.4-mini",
-      },
-      op
-    );
-
-    expect(out).toEqual(expect.objectContaining({ value: "ok" }));
-    expect(mockedGetEntitlement).not.toHaveBeenCalled();
-    expect(mockedIngestUsageEvent).not.toHaveBeenCalled();
-  });
 });
 
 describe("withAiAuth envelope", () => {
@@ -297,6 +287,47 @@ describe("withAiAuth envelope", () => {
 
     expect(result).toEqual({ success: true, data: { reply: "silent" } });
     expect(mockedRefreshBalance).not.toHaveBeenCalled();
+  });
+
+  it("under BYOK + byokBypass (AI-SDK path): skips refreshBalance, balanceCents:0, auth still enforced", async () => {
+    mockedIsByokActive.mockReturnValue(true);
+    stubAuthed(7);
+
+    const result = await withAiAuth(
+      "test/scope",
+      undefined,
+      async (orgId) => ({ reply: "byok", org: orgId }),
+      { byokBypass: true }
+    );
+
+    expect(result).toEqual({
+      success: true,
+      data: { reply: "byok", org: 7, balanceCents: 0 },
+    });
+    // BYOK bypasses billing only — auth + org resolution still ran.
+    expect(mockedCreateLibraryClient).toHaveBeenCalled();
+    expect(mockedRequireOrganizationId).toHaveBeenCalled();
+    expect(mockedRefreshBalance).not.toHaveBeenCalled();
+  });
+
+  it("under BYOK without byokBypass (Replicate-billed path): still reads the real balance", async () => {
+    // GRIDA-SEC-003: BYOK only bypasses the AI-SDK provider. A billed
+    // action must report the real balance under BYOK, never a false 0,
+    // or it silently drains credit and surprises with a 402.
+    mockedIsByokActive.mockReturnValue(true);
+    stubAuthed(7);
+    mockedRefreshBalance.mockResolvedValueOnce({ cents: 2599, live: null });
+
+    const result = await withAiAuth("test/scope", undefined, async (orgId) => ({
+      reply: "billed",
+      org: orgId,
+    }));
+
+    expect(result).toEqual({
+      success: true,
+      data: { reply: "billed", org: 7, balanceCents: 2599 },
+    });
+    expect(mockedRefreshBalance).toHaveBeenCalledWith(7);
   });
 });
 

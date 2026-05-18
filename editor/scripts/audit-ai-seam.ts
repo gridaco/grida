@@ -50,6 +50,7 @@ const FORBIDDEN_PACKAGES = [
   "openai",
   "@anthropic-ai/sdk",
   "@ai-sdk/openai",
+  "@ai-sdk/openai-compatible",
   "@ai-sdk/anthropic",
   "@ai-sdk/google",
   "@ai-sdk/google-vertex",

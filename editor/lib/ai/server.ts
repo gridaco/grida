@@ -21,6 +21,12 @@ import "server-only";
  *
  * `organizationId` MUST come from `requireOrganizationId` —
  * see [editor/lib/auth/organization.ts](../auth/organization.ts).
+ *
+ * **BYOK carve-out (contributor-only).** When a `BYOK_*` key is set
+ * (see `editor/lib/ai/models.ts`), `grida`/`model` return a BARE
+ * provider and the billing seam is bypassed entirely — no gate, no
+ * Metronome ingest, no balance. BYOK bypasses billing ONLY: auth and
+ * `requireOrganizationId` always run. GRIDA-SEC-003 — see SECURITY.md.
  */
 
 import type {
@@ -41,8 +47,10 @@ import {
   BillingMetronomeError,
 } from "@/lib/billing/metronome";
 import {
+  byok,
   catalog,
   gateway,
+  isByokActive,
   modelSpecById,
   tiers,
   type ModelSpec,
@@ -130,15 +138,15 @@ export class MissingOrgIdError extends Error {
 }
 
 export { BillingMetronomeError };
+// GRIDA-SEC-003: re-exported through the seam so the credits module can
+// read BYOK state via `@/lib/ai/server` without reaching past the seam
+// into `./models`. Only the boolean crosses out — never the key.
+export { isByokActive };
 export type { ModelTier };
 
 // ===========================================================================
 // Core seam — gate → run → ingest
 // ===========================================================================
-
-function isSuperuserDev(): boolean {
-  return process.env.NEXT_PUBLIC_GRIDA_LOCALDEV_SUPERUSER === "1";
-}
 
 function assertOrgId(orgId: unknown): asserts orgId is number {
   if (
@@ -167,11 +175,11 @@ function logIngestFailure(
 
 /**
  * Gate-check only. Used by the streaming path where ingest is deferred
- * to the `finish` part — denial must fire up front. Superuser bypass:
- * no-op.
+ * to the `finish` part — denial must fire up front. Unconditional on
+ * the billed path; BYOK callers never reach here (bare provider, no
+ * middleware). GRIDA-SEC-003.
  */
 export async function checkGate(ctx: GridaCallContext): Promise<void> {
-  if (isSuperuserDev()) return;
   assertOrgId(ctx.organizationId);
   const e = await getEntitlement(ctx.organizationId);
   if (!e.allowed) {
@@ -196,8 +204,6 @@ export async function withTransaction<T>(
 
   const transactionId = ctx.transactionId ?? crypto.randomUUID();
   const { result, costMills } = await op(transactionId);
-
-  if (isSuperuserDev()) return result;
 
   // Default to `awaitIngest:true` — the common path is `withAiAuth`
   // which reads back the balance after `fn` resolves. Streaming
@@ -339,9 +345,6 @@ function extractContext(
         typeof g.awaitIngest === "boolean" ? g.awaitIngest : undefined,
     };
   }
-  if (isSuperuserDev()) {
-    return { organizationId: 0, feature: "dev-superuser", model_id: modelId };
-  }
   throw new MissingOrgIdError(
     `AI SDK call missing providerOptions.grida.organizationId (model=${modelId}). ` +
       `Pass { providerOptions: { grida: { organizationId, feature } } } to the SDK call.`
@@ -382,7 +385,7 @@ const languageModelMiddleware: LanguageModelMiddleware = {
           controller.enqueue(part);
         },
         flush() {
-          if (finalCostMills !== null && !isSuperuserDev()) {
+          if (finalCostMills !== null) {
             void ingestUsageEvent(ctx.organizationId, finalCostMills, {
               transactionId,
             }).catch(logIngestFailure(ctx, transactionId));
@@ -428,18 +431,26 @@ export type GridaProvider = ((modelId: string) => LanguageModel) & {
 };
 
 /**
- * Billing-wrapped Vercel AI Gateway provider. Same routing as the bare
- * `gateway` but every call is funneled through the billing middleware.
+ * The seam's public model provider. Default: the billing-wrapped Vercel
+ * AI Gateway (gate + ingest middleware). When a `BYOK_*` key is set this
+ * is a bare provider that bypasses billing — see the BYOK carve-out in
+ * this file's header / `models.ts` / SECURITY.md GRIDA-SEC-003.
  *
  *     grida("openai/gpt-5.4-mini")       // → LanguageModel (callable shorthand)
  *     grida.languageModel("openai/...")  // → LanguageModel (explicit)
  *     grida.imageModel("bfl/flux-2-pro") // → ImageModel
  */
+// GRIDA-SEC-003: BYOK is text-path-only. Only the LANGUAGE provider
+// swaps to the bare BYOK provider (no billing middleware). Image models
+// stay on the billing-wrapped provider so SDK image generation is still
+// gated + metered even under BYOK — matching SECURITY.md / billing.md.
+const activeLanguageProvider = byok ?? wrappedProvider;
+
 function gridaFn(modelId: string): LanguageModel {
-  return wrappedProvider.languageModel(modelId);
+  return activeLanguageProvider.languageModel(modelId);
 }
 gridaFn.languageModel = (modelId: string): LanguageModel =>
-  wrappedProvider.languageModel(modelId);
+  activeLanguageProvider.languageModel(modelId);
 gridaFn.imageModel = (modelId: string): ImageModel =>
   wrappedProvider.imageModel(modelId);
 
@@ -718,6 +729,19 @@ export type WithAiAuthOptions = {
    * (e.g. backfill jobs, internal-only routes).
    */
   balance?: boolean;
+  /**
+   * When `true` AND a BYOK key is set, this action runs on the BYOK
+   * bare provider (AI-SDK text path) which has no billing middleware —
+   * there is genuinely no Grida spend, so the post-call balance read is
+   * skipped and `balanceCents` is reported as `0`.
+   *
+   * Safe default `false`: BYOK only swaps the AI-SDK provider, NOT the
+   * Replicate `withTransaction` path. Actions that may bill through
+   * Replicate (audio/image) must leave this unset so they still read
+   * the real balance under BYOK — otherwise they silently drain credit
+   * while reporting `0`. GRIDA-SEC-003.
+   */
+  byokBypass?: boolean;
 };
 
 /**
@@ -729,22 +753,24 @@ export type WithAiAuthOptions = {
  * Metronome read post-fn). The `withTransaction` middleware defaults to
  * `awaitIngest:true` so the post-fn read sees the reconciled value.
  *
- * In `IS_LOCALDEV_SUPERUSER` mode the auth + org lookup is skipped and
- * `fn(0)` runs; the seam middleware (`extractContext`, `checkGate`,
- * `withTransaction`) recognises `orgId === 0` via the same flag and
- * skips gate + ingest. Balance is reported as `0`.
+ * BYOK (contributor-only): auth + org lookup always run — BYOK never
+ * bypasses auth. The balance short-circuit (`balanceCents:0`, no
+ * Metronome read) fires only when the caller passes `byokBypass:true`,
+ * i.e. the action runs on the AI-SDK bare provider with no billing
+ * middleware. Replicate-billed actions omit it and still read the real
+ * balance under BYOK (they genuinely spend). GRIDA-SEC-003.
  */
 export function withAiAuth<T extends Record<string, unknown>>(
   scope: string,
   inputOrgId: number | string | undefined,
   fn: (orgId: number) => Promise<T>,
-  opts: { balance: false }
+  opts: { balance: false; byokBypass?: boolean }
 ): Promise<ActionResult<T>>;
 export function withAiAuth<T extends Record<string, unknown>>(
   scope: string,
   inputOrgId: number | string | undefined,
   fn: (orgId: number) => Promise<T>,
-  opts?: { balance?: true }
+  opts?: { balance?: true; byokBypass?: boolean }
 ): Promise<AiActionResult<T>>;
 export async function withAiAuth<T extends Record<string, unknown>>(
   scope: string,
@@ -752,19 +778,6 @@ export async function withAiAuth<T extends Record<string, unknown>>(
   fn: (orgId: number) => Promise<T>,
   opts: WithAiAuthOptions = {}
 ): Promise<ActionResult<T> | AiActionResult<T>> {
-  if (isSuperuserDev()) {
-    let data: T;
-    try {
-      data = await fn(0);
-    } catch (err) {
-      return billingErrorToAiError(err, scope);
-    }
-    if (opts.balance === false) return { success: true, data };
-    return {
-      success: true,
-      data: { ...data, balanceCents: 0 } as AiActionData<T>,
-    };
-  }
   const client = await createLibraryClient();
   const { data: userdata } = await client.auth.getUser();
   if (!userdata.user) {
@@ -792,6 +805,15 @@ export async function withAiAuth<T extends Record<string, unknown>>(
   }
   if (opts.balance === false) {
     return { success: true, data };
+  }
+  if (isByokActive() && opts.byokBypass) {
+    // GRIDA-SEC-003 BYOK carve-out: AI-SDK path has no billing
+    // middleware, so there is no Grida balance to read. Replicate
+    // actions omit `byokBypass` and fall through to the real read.
+    return {
+      success: true,
+      data: { ...data, balanceCents: 0 } as AiActionData<T>,
+    };
   }
   // The action already succeeded — a Metronome read failure must not
   // demote the envelope to `success: false`. Surface the data and a
