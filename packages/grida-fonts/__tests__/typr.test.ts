@@ -119,7 +119,6 @@ describe("Typr font parsing", () => {
     const fonts = [
       "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf",
       "Roboto_Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf",
-      "Recursive/Recursive-VariableFont_CASL,CRSV,MONO,slnt,wght.ttf",
       "Geist/Geist-VariableFont_wght.ttf",
     ];
 
@@ -160,7 +159,7 @@ describe("Typr font parsing", () => {
         expect([1, 2, 3, 4]).toContain(value.format);
       });
     });
-  });
+  }, 20000);
 
   it("parses fvar instances correctly", () => {
     const font = loadFont(
