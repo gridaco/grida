@@ -27,6 +27,19 @@ describe("TreeController channels", () => {
     expect(ctrl.isExpanded("<root>")).toBe(false);
   });
 
+  it("expandTo/reveal tolerate an id the source hasn't snapshotted (F11.1)", () => {
+    const ctrl = new TreeController({ source: buildFixture() });
+    // A node selected the tick before its external snapshot lands (e.g.
+    // just inserted) is not yet in the source — `getNode` would throw.
+    // expandTo must skip it, not take down the panel.
+    expect(() => ctrl.expandTo("ghost")).not.toThrow();
+    expect(ctrl.isExpanded("a")).toBe(false);
+    expect(() => ctrl.reveal("ghost")).not.toThrow();
+    // A real id still works after the tolerant path.
+    ctrl.expandTo("a2");
+    expect(ctrl.isExpanded("a")).toBe(true);
+  });
+
   it("dispose stops emissions and breaks source subscription", () => {
     const ctrl = new TreeController({ source: buildFixture() });
     const rows = vi.fn<() => void>();

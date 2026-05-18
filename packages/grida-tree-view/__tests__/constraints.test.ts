@@ -132,7 +132,9 @@ describe("resolveDropPosition (insertion-index math)", () => {
     const src = buildFixture();
     // a2 is the LAST child of a (children: [a1, a2]). The pivot is
     // boundary-valid → walk up to a → 'after a' at root.
-    const pos = resolveDropPosition(src, [], "a2", "after", 0);
+    const pos = resolveDropPosition(src, [], "a2", "after", {
+      desiredDepth: 0,
+    });
     expect(pos).toEqual({
       parent: "<root>",
       index: 1, // a is index 0, after a → 1
@@ -146,7 +148,9 @@ describe("resolveDropPosition (insertion-index math)", () => {
     // a1 is NOT the last child of a. Popping out would visually drop the
     // new row inside a's parent at an unrelated position. Should fall
     // back to the over row's depth (after a1 inside a).
-    const pos = resolveDropPosition(src, [], "a1", "after", 0);
+    const pos = resolveDropPosition(src, [], "a1", "after", {
+      desiredDepth: 0,
+    });
     expect(pos).toMatchObject({ parent: "a", placement: "after" });
   });
 
@@ -157,13 +161,17 @@ describe("resolveDropPosition (insertion-index math)", () => {
     // inside the parent" — supporting a pivot here would let the same
     // cursor resolve to two different drops based on x. Only `after`
     // pivots out.
-    const pos = resolveDropPosition(src, [], "a1", "before", 0);
+    const pos = resolveDropPosition(src, [], "a1", "before", {
+      desiredDepth: 0,
+    });
     expect(pos).toMatchObject({ parent: "a", placement: "before" });
   });
 
   it("horizontal-aware: desiredDepth >= over depth is a no-op (anchor stays at over)", () => {
     const src = buildFixture();
-    const pos = resolveDropPosition(src, [], "a1", "after", 1);
+    const pos = resolveDropPosition(src, [], "a1", "after", {
+      desiredDepth: 1,
+    });
     expect(pos).toMatchObject({ parent: "a", placement: "after" });
   });
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createDrag, disallowDescendant, TreeController } from "..";
+import {
+  createDrag,
+  disallowDescendant,
+  resolveDropPosition,
+  TreeController,
+} from "..";
 import { buildFixture } from "./_helpers";
 
 describe("drag handle", () => {
@@ -81,6 +86,67 @@ describe("drag handle", () => {
     expect(h.drop()).not.toBeNull();
     h.cancel();
     expect(h.drop()).toBeNull();
+  });
+});
+
+describe("reversed-list drag (F10)", () => {
+  // <root>.children = [a, b, c] in document order. Rendered reversed
+  // (layer-panel convention), the user sees [c, b, a] top→bottom.
+
+  it("flips before/after so the document index matches the rendered order", () => {
+    const src = buildFixture();
+    // Visual "before b" (new row appears above b on screen) is, in
+    // document order, *after* b.
+    expect(
+      resolveDropPosition(src, [], "b", "before", { reversed: true })
+    ).toEqual({ parent: "<root>", index: 2, placement: "after", over: "b" });
+    // Visual "after b" → document *before* b.
+    expect(
+      resolveDropPosition(src, [], "b", "after", { reversed: true })
+    ).toEqual({ parent: "<root>", index: 1, placement: "before", over: "b" });
+  });
+
+  it("leaves `into` orientation-independent", () => {
+    const src = buildFixture();
+    expect(
+      resolveDropPosition(src, [], "a", "into", { reversed: true })
+    ).toEqual(resolveDropPosition(src, [], "a", "into"));
+  });
+
+  it("non-reversed default is unchanged", () => {
+    const src = buildFixture();
+    expect(resolveDropPosition(src, [], "b", "before")).toEqual({
+      parent: "<root>",
+      index: 1,
+      placement: "before",
+      over: "b",
+    });
+  });
+
+  it("createDrag({ reversed }) threads through over()", () => {
+    const src = buildFixture();
+    const h = createDrag({ source: src, items: ["c"], reversed: true });
+    // Dragging c (filtered out), hovering a, visual "before" → after a.
+    expect(h.over("a", "before")).toEqual({
+      parent: "<root>",
+      index: 1,
+      placement: "after",
+      over: "a",
+    });
+  });
+
+  it("TreeController passes flatten.reverseChildren into the drag", () => {
+    const ctrl = new TreeController({
+      source: buildFixture(),
+      flatten: { reverseChildren: true },
+    });
+    const handle = ctrl.startDrag(["a1"]);
+    handle.over("b", "before"); // visual before b → document after b
+    expect(ctrl.commitDrag()).toMatchObject({
+      kind: "move",
+      items: ["a1"],
+      to: { parent: "<root>", index: 2, placement: "after" },
+    });
   });
 });
 

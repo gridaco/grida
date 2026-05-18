@@ -34,6 +34,10 @@ export interface DragHandle {
     placementHint: DropPlacement,
     options?: { desiredDepth?: number }
   ): DropPosition | null;
+  // Reversed-list orientation is NOT a per-call option: it is configured
+  // once via `createDrag({ reversed })` (the `TreeController` passes its
+  // `flatten.reverseChildren` through). `placementHint` is always given
+  // in *rendered* order; the handle resolves the document index.
   /** Resolved position, suitable for rendering a drop line. */
   getPosition(): DropPosition | null;
   /** Commit the drop. Returns the final position, or `null` if invalid. */
@@ -53,23 +57,40 @@ export interface DragHandle {
  * fix the headless-tree consumer hand-rolled in
  * `starterkit-hierarchy/utils.ts`).
  *
- * `desiredDepth` (optional) makes the resolution horizontal-aware: for
- * `before`/`after`, it walks up the `over` row's ancestor chain to find
- * the ancestor at that visible depth and pivots there. Use it to let
+ * `opts.desiredDepth` (optional) makes the resolution horizontal-aware:
+ * for `before`/`after`, it walks up the `over` row's ancestor chain to
+ * find the ancestor at that visible depth and pivots there. Use it to let
  * cursor-x decide "pop out one container" vs "stay inside the container".
  * When omitted, behavior is unchanged (anchor = `over`).
+ *
+ * `opts.reversed` (optional) — set when the rows are flattened with
+ * `reverseChildren` (the layer-panel convention: visual-top = last in
+ * document order). `placement` always arrives in *rendered* order; with
+ * `reversed` the before/after sense is flipped so the resolved
+ * **document** index matches what the user sees. `into` is
+ * orientation-independent. The `TreeController` threads this through from
+ * its `flatten.reverseChildren`; pass it yourself only for direct wiring.
  */
 export function resolveDropPosition(
   source: TreeSource,
   items: readonly NodeId[],
   over: NodeId,
   placement: DropPlacement,
-  desiredDepth?: number
+  opts?: { desiredDepth?: number; reversed?: boolean }
 ): DropPosition | null {
   const overNode = source.getNode(over);
   const itemSet = new Set(items);
+  const desiredDepth = opts?.desiredDepth;
+  // Reversed display flips before/after so the document index matches the
+  // rendered order; `into` (append to children) is orientation-free.
+  const dir: DropPlacement =
+    opts?.reversed && placement !== "into"
+      ? placement === "before"
+        ? "after"
+        : "before"
+      : placement;
 
-  if (placement === "into") {
+  if (dir === "into") {
     const filtered = overNode.children.filter((c) => !itemSet.has(c));
     return {
       parent: over,
@@ -98,7 +119,7 @@ export function resolveDropPosition(
   // demo treats `before` purely as "insert before the over row at its
   // own depth"; only `after` honors the pop-out gesture.
   let anchorId: NodeId = over;
-  if (desiredDepth !== undefined && placement === "after") {
+  if (desiredDepth !== undefined && dir === "after") {
     let cursor = over;
     let depth = rowDepthOf(source, cursor);
     while (depth > desiredDepth) {
@@ -124,8 +145,8 @@ export function resolveDropPosition(
   if (anchorIndex < 0) return null;
   return {
     parent: parent.id,
-    index: placement === "before" ? anchorIndex : anchorIndex + 1,
-    placement,
+    index: dir === "before" ? anchorIndex : anchorIndex + 1,
+    placement: dir,
     over, // keep the original over so the indicator renders on the hovered row
   };
 }
@@ -135,6 +156,13 @@ interface CreateDragOpts {
   items: readonly NodeId[];
   mode?: DragMode;
   constraint?: MoveConstraint;
+  /**
+   * Rows are flattened reversed (`FlattenOptions.reverseChildren`).
+   * Flips `over()`'s before/after so the resolved document index matches
+   * what the user sees. The `TreeController` passes its
+   * `flatten.reverseChildren` here automatically.
+   */
+  reversed?: boolean;
   onChange?: (state: DragState | null) => void;
 }
 
@@ -145,6 +173,7 @@ interface CreateDragOpts {
 export function createDrag(opts: CreateDragOpts): DragHandle {
   const { source, items } = opts;
   const constraint = opts.constraint ?? allowAll;
+  const reversed = opts.reversed ?? false;
   // Cycle prevention can't run here (no target yet) — `over()` refuses any
   // position landing under a dragged item once a target is known.
   let mode: DragMode = opts.mode ?? "move";
@@ -193,13 +222,10 @@ export function createDrag(opts: CreateDragOpts): DragHandle {
     },
     over(over, placementHint, options) {
       if (cancelled) return null;
-      let resolved = resolveDropPosition(
-        source,
-        items,
-        over,
-        placementHint,
-        options?.desiredDepth
-      );
+      let resolved = resolveDropPosition(source, items, over, placementHint, {
+        desiredDepth: options?.desiredDepth,
+        reversed,
+      });
       if (!resolved) return set(null);
       // Run constraint resolution + check.
       if (constraint.resolveDropPosition) {

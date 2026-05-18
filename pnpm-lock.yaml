@@ -418,12 +418,6 @@ importers:
       '@grida/vn':
         specifier: workspace:*
         version: link:../packages/grida-canvas-vn
-      '@headless-tree/core':
-        specifier: ^1.0.1
-        version: 1.6.3
-      '@headless-tree/react':
-        specifier: ^1.0.1
-        version: 1.6.3(@headless-tree/core@1.6.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.5))
@@ -3234,16 +3228,6 @@ packages:
 
   '@hapi/topo@5.1.0':
     resolution: {integrity: sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg==}
-
-  '@headless-tree/core@1.6.3':
-    resolution: {integrity: sha512-en0EOaZfiCRF2B8DEnhGhSaUf3hVr9Bauye8G8aswPbHOKSyhJiN4bsczz1GvqF4Xb7Ga3LP0vLA6Zih7YLoyw==}
-
-  '@headless-tree/react@1.6.3':
-    resolution: {integrity: sha512-aiRwG6e2EPBSec9uLLy9GlTvAuCtSTouU30Nwcr5ZTsYjG/i7B/ouC8f8Zu4unzo/v1h5ztbemp+EH2TPTKh+g==}
-    peerDependencies:
-      '@headless-tree/core': '*'
-      react: 19.2.5
-      react-dom: 19.2.5
 
   '@hono/node-server@1.19.9':
     resolution: {integrity: sha512-vHL6w3ecZsky+8P5MD+eFfaGTyCeOHUIFYMGpQGbrBTSmNNoxv0if69rEZ5giu36weC5saFuznL411gRX7bJDw==}
@@ -17203,14 +17187,6 @@ snapshots:
   '@hapi/topo@5.1.0':
     dependencies:
       '@hapi/hoek': 9.3.0
-
-  '@headless-tree/core@1.6.3': {}
-
-  '@headless-tree/react@1.6.3(@headless-tree/core@1.6.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
-    dependencies:
-      '@headless-tree/core': 1.6.3
-      react: 19.2.5
-      react-dom: 19.2.5(react@19.2.5)
 
   '@hono/node-server@1.19.9(hono@4.11.8)':
     dependencies:

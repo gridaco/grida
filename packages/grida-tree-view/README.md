@@ -261,6 +261,24 @@ class MyTreeSource implements TreeSource<MyMeta> {
 }
 ```
 
+**Drive `refresh()` from the store's own change subscription — not a
+React effect keyed on store-state identity.** Editors this package targets
+(wasm- or Immer-backed) routinely keep `state` / `state.document` /
+`state.nodes` _referentially stable_ across mutations: a
+`useEffect(() => source.refresh(), [store.state])` (or a `useSyncExternal‑
+Store` selector on those) then **never re-fires**, and the tree silently
+shows stale rows (inserts/deletes invisible until something unrelated
+re-renders). Reference identity of host state is not a reliable change
+signal. Subscribe to the store's imperative stream instead:
+
+```tsx
+useEffect(() => {
+  source.refresh(editor.state); // initial sync
+  // Whatever your store exposes: a subscribe(), an event, a patch stream.
+  return editor.subscribe(() => source.refresh(editor.state));
+}, [editor, source]);
+```
+
 Then bridge intents back to your store's commands:
 
 ```ts
@@ -327,7 +345,7 @@ The helpers you'll wire on the consumer side:
 - **`passedDragThreshold(startX, startY, x, y, px)`** — L² drag threshold check.
 - **`autoScrollDelta(top, bottom, y)`** — per-frame scroll delta when the pointer is near a container edge.
 - **`snapToEdge(y, firstTop, lastBottom)`** — outside-aware "snap to first/last row" hit-test fallback.
-- **`resolveDropPosition(source, items, over, placement, desiredDepth?)`** — boundary-aware drop-position math, including the horizontal-aware ancestor-pivot used by depth-sensitive drag.
+- **`resolveDropPosition(source, items, over, placement, { desiredDepth?, reversed? })`** — boundary-aware drop-position math, including the horizontal-aware ancestor-pivot used by depth-sensitive drag. Pass `{ reversed: true }` for a reversed list (see below).
 
 Then drive the controller's `DragHandle`:
 
@@ -358,6 +376,18 @@ subscribing. It is the **same** intent already sent on the channel; pick
 one path, not both. (`handle.over()` only re-notifies when the resolved
 position actually changes, so a per-pointermove `getDrag()?.getPosition()`
 selector is cheap.)
+
+### Reversed lists (layer panels)
+
+Layer panels render visual-top = **last** in document order, so the
+controller flattens with `flatten: { reverseChildren: true }`. The drag
+math is reverse-aware automatically: feed `handle.over()` the placement
+in **rendered** order (what the cursor sees) and the controller resolves
+the correct _document_ index — no consumer-side flip. Drive the drop
+indicator off your visual hit (`over` + the rendered side); the resolved
+`DropPosition` is in document order (`parent` / `index` for your `move`
+intent). Only pass `{ reversed: true }` to `resolveDropPosition` yourself
+if you call it directly instead of going through the controller.
 
 ### Constraints
 

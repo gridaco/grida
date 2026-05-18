@@ -11,7 +11,7 @@ import type {
   TreeNode,
 } from "./types";
 import type { TreeSource } from "./source";
-import { ancestorsOf, isContainer, isDescendantOf } from "./source";
+import { isContainer, isDescendantOf } from "./source";
 import {
   InMemorySelectionAdapter,
   modeFromEvent,
@@ -187,19 +187,33 @@ export class TreeController<T = unknown> {
     this.emit("rows");
   }
 
-  /** Expand all ancestors of `id` so the row becomes visible. */
+  /**
+   * Expand all ancestors of `id` so the row becomes visible.
+   *
+   * Tolerant of ids the external source has not snapshotted yet — e.g. a
+   * node selected the tick *before* its source refresh lands (just
+   * inserted). Walks the parent chain via the same forgiving accessor the
+   * focus paths use; an unresolvable ancestor stops the walk instead of
+   * throwing (a mid-`reveal` throw would otherwise take down the panel).
+   */
   expandTo(id: NodeId): void {
     const rootHidden = !(this.source.showRoot?.() ?? false);
+    const root = this.source.getRoot();
     let changed = false;
-    for (const a of ancestorsOf(this.source, id)) {
+    // `ancestorsOf` would `getNode`-throw on a not-yet-known id; walk via
+    // `_peek` (returns null instead) so reveal-before-snapshot is a no-op.
+    let cursor = this._peek(id)?.parent ?? null;
+    while (cursor !== null) {
+      const node = this._peek(cursor);
+      if (!node) break; // chain broken / not snapshotted — stop, don't throw
       // The root counts as implicitly expanded only while it is hidden.
       // With `showRoot()` on, the root row is real and must be expanded
       // like any other ancestor or the revealed node stays invisible.
-      if (rootHidden && a === this.source.getRoot()) continue;
-      if (!this._expanded.has(a)) {
-        this._expanded.add(a);
+      if (!(rootHidden && cursor === root) && !this._expanded.has(cursor)) {
+        this._expanded.add(cursor);
         changed = true;
       }
+      cursor = node.parent;
     }
     if (changed) {
       this._expandedRevision++;
@@ -332,6 +346,8 @@ export class TreeController<T = unknown> {
       items,
       mode: opts?.mode,
       constraint: this.constraint,
+      // Resolve drop indices in the orientation the rows are rendered in.
+      reversed: this.flatten.reverseChildren ?? false,
       onChange: () => this.emit("drag"),
     });
     this._drag = handle;
