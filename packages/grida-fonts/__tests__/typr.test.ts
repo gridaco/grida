@@ -159,7 +159,7 @@ describe("Typr font parsing", () => {
         expect([1, 2, 3, 4]).toContain(value.format);
       });
     });
-  }, 20000);
+  });
 
   it("parses fvar instances correctly", () => {
     const font = loadFont(
