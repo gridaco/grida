@@ -440,17 +440,19 @@ export type GridaProvider = ((modelId: string) => LanguageModel) & {
  *     grida.languageModel("openai/...")  // → LanguageModel (explicit)
  *     grida.imageModel("bfl/flux-2-pro") // → ImageModel
  */
-// Resolve the active provider once: the BYOK bare provider when a
-// contributor key is set, else the billing-wrapped gateway.
-const activeProvider = byok ?? wrappedProvider;
+// GRIDA-SEC-003: BYOK is text-path-only. Only the LANGUAGE provider
+// swaps to the bare BYOK provider (no billing middleware). Image models
+// stay on the billing-wrapped provider so SDK image generation is still
+// gated + metered even under BYOK — matching SECURITY.md / billing.md.
+const activeLanguageProvider = byok ?? wrappedProvider;
 
 function gridaFn(modelId: string): LanguageModel {
-  return activeProvider.languageModel(modelId);
+  return activeLanguageProvider.languageModel(modelId);
 }
 gridaFn.languageModel = (modelId: string): LanguageModel =>
-  activeProvider.languageModel(modelId);
+  activeLanguageProvider.languageModel(modelId);
 gridaFn.imageModel = (modelId: string): ImageModel =>
-  activeProvider.imageModel(modelId);
+  wrappedProvider.imageModel(modelId);
 
 export const grida: GridaProvider = gridaFn;
 

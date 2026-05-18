@@ -14,7 +14,7 @@ import {
   type AiActionResult,
   type ProviderUsage,
 } from "@/lib/ai/server";
-import { catalog, tiers, type CatalogId } from "@/lib/ai/models";
+import { catalog, tiers } from "@/lib/ai/models";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
@@ -58,9 +58,15 @@ export type RunChatResponse = AiActionResult<RunChatData>;
 const SYSTEM_PROMPT =
   "You are a concise assistant inside the Grida editor. Reply in plain text — no markdown, no code fences. Keep answers short unless the user asks for detail.";
 
-function isCatalogId(id: string): id is CatalogId {
-  return id in catalog;
-}
+// Server-side allowlist: only the tier-backed models the picker
+// exposes. `isCatalogId` (any catalog entry) let a forged payload
+// select reserved / non-tiered models — restrict to the 4 tiers.
+const ALLOWED_CHAT_MODEL_IDS = new Set<string>([
+  catalog[tiers.nano].id,
+  catalog[tiers.mini].id,
+  catalog[tiers.pro].id,
+  catalog[tiers.max].id,
+]);
 
 /**
  * Coerce the AI SDK result.usage (whatever shape the provider returns)
@@ -101,7 +107,8 @@ export async function runChat(input: RunChatInput): Promise<RunChatResponse> {
     input.organizationId,
     async (orgId) => {
       const requested = input.model_id;
-      const useModelId = requested && isCatalogId(requested) ? requested : null;
+      const useModelId =
+        requested && ALLOWED_CHAT_MODEL_IDS.has(requested) ? requested : null;
       const languageModel = useModelId ? grida(useModelId) : model("mini");
       // Resolve the catalog id from the same source as `model("mini")` so
       // a tier remap can't desync the billed cost card from the SDK call.
