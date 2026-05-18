@@ -156,6 +156,81 @@ function useDebugFlag(): [boolean, () => void] {
   return [debug, toggle];
 }
 
+function CreditChip({
+  credits,
+  billingHref,
+  onRefresh,
+  refreshing,
+}: {
+  credits: ReturnType<typeof useAiCredits>;
+  billingHref: string | null;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
+  if (credits.mode === "byok") {
+    return (
+      <Badge variant="outline" className="font-mono text-xs">
+        BYOK
+      </Badge>
+    );
+  }
+  if (credits.cents === null || !billingHref) {
+    return (
+      <Badge variant="outline" className="font-mono text-xs">
+        no balance
+      </Badge>
+    );
+  }
+  const lowBalance = credits.cents < AI_GATE_FLOOR_CENTS;
+  return (
+    <div className="flex items-center gap-1">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              href={billingHref}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono transition-colors",
+                lowBalance
+                  ? "border-amber-500/40 text-amber-600 hover:bg-amber-500/10 dark:text-amber-400"
+                  : "text-muted-foreground hover:bg-muted"
+              )}
+            >
+              {credits.formatted ?? "—"}
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="font-mono text-xs">
+              {credits.formattedExact ?? "—"}
+            </div>
+            <div className="text-[10px] opacity-70">
+              live ·{" "}
+              {lowBalance
+                ? `below floor (${fmtUsd(AI_GATE_FLOOR_CENTS)}) — click to top up`
+                : "click to manage billing"}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-7"
+        onClick={onRefresh}
+        disabled={refreshing}
+        aria-label="Refresh balance"
+      >
+        {refreshing ? (
+          <Loader2Icon className="size-3 animate-spin" />
+        ) : (
+          <RefreshCwIcon className="size-3" />
+        )}
+      </Button>
+    </div>
+  );
+}
+
 export default function Page({ authed, context }: Props) {
   const credits = useAiCredits();
   const [history, setHistory] = useState<ChatTurn[]>([]);
@@ -174,9 +249,6 @@ export default function Page({ authed, context }: Props) {
   const billingHref = context
     ? `/organizations/${context.organizationSlug}/settings/billing`
     : null;
-  const lowBalance =
-    credits.cents !== null && credits.cents < AI_GATE_FLOOR_CENTS;
-
   const onRefresh = useCallback(() => {
     if (!organizationId) return;
     startRefresh(async () => {
@@ -252,57 +324,12 @@ export default function Page({ authed, context }: Props) {
           </div>
 
           <div className="flex items-center gap-2">
-            {credits.cents !== null && billingHref ? (
-              <div className="flex items-center gap-1">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href={billingHref}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-mono transition-colors",
-                          lowBalance
-                            ? "border-amber-500/40 text-amber-600 hover:bg-amber-500/10 dark:text-amber-400"
-                            : "text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {credits.formatted ?? "—"}
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="font-mono text-xs">
-                        {credits.formattedExact ?? "—"}
-                      </div>
-                      <div className="text-[10px] opacity-70">
-                        live ·{" "}
-                        {lowBalance
-                          ? `below floor (${fmtUsd(AI_GATE_FLOOR_CENTS)}) — click to top up`
-                          : "click to manage billing"}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7"
-                  onClick={onRefresh}
-                  disabled={refreshing}
-                  aria-label="Refresh balance"
-                >
-                  {refreshing ? (
-                    <Loader2Icon className="size-3 animate-spin" />
-                  ) : (
-                    <RefreshCwIcon className="size-3" />
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <Badge variant="outline" className="font-mono text-xs">
-                no balance
-              </Badge>
-            )}
+            <CreditChip
+              credits={credits}
+              billingHref={billingHref}
+              onRefresh={onRefresh}
+              refreshing={refreshing}
+            />
           </div>
         </div>
       </header>
@@ -448,6 +475,7 @@ export default function Page({ authed, context }: Props) {
         </PromptInput>
 
         {context &&
+          credits.mode === "billed" &&
           !credits.allowed &&
           credits.cents !== null &&
           billingHref && (

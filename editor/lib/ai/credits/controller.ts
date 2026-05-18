@@ -29,6 +29,12 @@ export type AiCreditsState = {
   cents: number | null;
   /** Gate state (cached). `true` when above floor and entitled. */
   allowed: boolean;
+  /**
+   * Server-side BYOK key is set → billing is bypassed; `cents`/`allowed`
+   * are meaningless and must not be shown as a balance. Static for the
+   * controller's lifetime (resolved server-side at module load).
+   */
+  byok: boolean;
 };
 
 export type ConsumeOptions = {
@@ -98,7 +104,12 @@ export class AiCreditsController {
         const env = await this.fetcher();
         if (this.disposed) return;
         if (env.success) {
-          this.set({ cents: env.data.balanceCents, allowed: true });
+          // set() replaces state wholesale — spread to keep byok.
+          this.set({
+            ...this.state,
+            cents: env.data.balanceCents,
+            allowed: true,
+          });
         }
       } finally {
         this.inflightRefresh = null;
@@ -131,7 +142,11 @@ export class AiCreditsController {
   ): AiActionData<T> | undefined => {
     if (this.disposed) return undefined;
     if (env.success) {
-      this.set({ cents: env.data.balanceCents, allowed: true });
+      this.set({
+        ...this.state,
+        cents: env.data.balanceCents,
+        allowed: true,
+      });
       return env.data;
     }
     const action = this.router(env, { next: opts?.next });

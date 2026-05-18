@@ -216,18 +216,23 @@ function BudgetBadge({
   credits: ReturnType<typeof useAiCredits>;
   className?: string;
 }) {
+  const shell = (content: React.ReactNode) => (
+    <div
+      className={cn(
+        "px-2 py-1 bg-secondary rounded-md flex gap-1 items-center pointer-events-auto",
+        className
+      )}
+    >
+      <span className="text-sm font-mono">{content}</span>
+    </div>
+  );
+  // BYOK: no balance to show — own key pays.
+  if (credits.mode === "byok") {
+    return shell("BYOK");
+  }
   return (
     <Tooltip>
-      <TooltipTrigger>
-        <div
-          className={cn(
-            "px-2 py-1 bg-secondary rounded-md flex gap-1 items-center pointer-events-auto",
-            className
-          )}
-        >
-          <span className="text-sm font-mono">{credits.formatted ?? "—"}</span>
-        </div>
-      </TooltipTrigger>
+      <TooltipTrigger>{shell(credits.formatted ?? "—")}</TooltipTrigger>
       <TooltipContent side="top" align="start">
         <div className="text-sm font-mono">
           {credits.formattedExact ?? "—"} balance

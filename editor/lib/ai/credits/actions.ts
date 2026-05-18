@@ -14,7 +14,7 @@
  * through `useAiCredits().refresh`.
  */
 
-import { withAiAuth, type AiActionResult } from "@/lib/ai/server";
+import { withAiAuth, isByokActive, type AiActionResult } from "@/lib/ai/server";
 import { getEntitlement } from "@/lib/billing/metronome";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSessionOrganizationId } from "@/lib/auth/organization";
@@ -22,9 +22,20 @@ import { resolveSessionOrganizationId } from "@/lib/auth/organization";
 export type AiCreditsPreload = {
   cents: number | null;
   allowed: boolean;
+  /**
+   * Server-side BYOK key is set → billing is bypassed and the balance is
+   * meaningless. Instance-global (resolved at module load), so it is
+   * surfaced even on the unauth/no-org path. Only this boolean crosses
+   * to the client — never the key (GRIDA-SEC-003).
+   */
+  byok: boolean;
 };
 
-const EMPTY: AiCreditsPreload = { cents: null, allowed: false };
+const EMPTY: AiCreditsPreload = {
+  cents: null,
+  allowed: false,
+  byok: isByokActive(),
+};
 
 /**
  * Cache-first read of balance + entitlement for an org. Called from a
@@ -52,7 +63,7 @@ export async function preloadAiCredits(
   // surface as `null` so the chip renders "—" instead of "$0.00".
   const cents =
     ent.reason === "not_provisioned" ? null : ent.cachedBalanceCents;
-  return { cents, allowed: ent.allowed };
+  return { cents, allowed: ent.allowed, byok: isByokActive() };
 }
 
 /**

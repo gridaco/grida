@@ -138,6 +138,10 @@ export class MissingOrgIdError extends Error {
 }
 
 export { BillingMetronomeError };
+// GRIDA-SEC-003: re-exported through the seam so the credits module can
+// read BYOK state via `@/lib/ai/server` without reaching past the seam
+// into `./models`. Only the boolean crosses out — never the key.
+export { isByokActive };
 export type { ModelTier };
 
 // ===========================================================================

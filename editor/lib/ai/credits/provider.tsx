@@ -42,17 +42,45 @@ export function Provider({ initial, children }: AiCreditsProviderProps) {
 }
 
 /**
+ * Self-harnessing view returned by `useAiCredits()`.
+ *
+ * Discriminated on `mode`. The `byok` variant **omits** `cents` /
+ * `allowed` / `formatted` on purpose: when a server-side BYOK key is
+ * set the balance is meaningless, so any consumer that wants to render
+ * a balance is forced by the compiler to first handle `mode === "byok"`
+ * and pick its own label (the label is per-call-site — there is no
+ * global glyph). `refresh`/`consume` exist in both variants so envelope
+ * folding still works (under BYOK they no-op the display).
+ */
+export type AiCreditsView =
+  | {
+      mode: "billed";
+      cents: number | null;
+      allowed: boolean;
+      formatted: string | null;
+      formattedExact: string | null;
+      refresh: AiCreditsController["refresh"];
+      consume: AiCreditsController["consume"];
+    }
+  | {
+      mode: "byok";
+      refresh: AiCreditsController["refresh"];
+      consume: AiCreditsController["consume"];
+    };
+
+/**
  * Hook accessor for the credits controller's reactive state.
  *
  *   const credits = useAiCredits();
- *   credits.cents             // number | null
- *   credits.allowed           // boolean
- *   credits.formatted         // "$26.0" | null
+ *   if (credits.mode === "byok") return <YourByokLabel />;
+ *   credits.cents             // number | null   (billed only)
+ *   credits.allowed           // boolean         (billed only)
+ *   credits.formatted         // "$26.0" | null  (billed only)
  *   credits.formattedExact    // "$25.9921" | null
  *   credits.refresh()         // pull live
  *   credits.consume(env, opts)// fold envelope; redirects auto-routed
  */
-export function useAiCredits() {
+export function useAiCredits(): AiCreditsView {
   const ctrl = useContext(Ctx);
   if (!ctrl) {
     throw new Error(
@@ -67,7 +95,11 @@ export function useAiCredits() {
   // `refresh` and `consume` are arrow properties on the controller
   // (see controller.ts) — pass them through unbound; identity is
   // stable across renders since they're set once in the constructor.
+  if (state.byok) {
+    return { mode: "byok", refresh: ctrl.refresh, consume: ctrl.consume };
+  }
   return {
+    mode: "billed",
     cents: state.cents,
     allowed: state.allowed,
     formatted: format.chip(state.cents),

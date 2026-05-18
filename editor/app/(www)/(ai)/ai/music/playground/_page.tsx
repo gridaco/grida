@@ -181,7 +181,9 @@ function Workspace() {
           </PromptInputTools>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground font-mono">
-              {credits.formatted ?? "—"} left
+              {credits.mode === "byok"
+                ? "BYOK"
+                : `${credits.formatted ?? "—"} left`}
             </span>
             <PromptInputSubmit
               disabled={loading}

@@ -15,7 +15,7 @@
 import * as format from "./format";
 import { Provider } from "./provider";
 
-export { useAiCredits } from "./provider";
+export { useAiCredits, type AiCreditsView } from "./provider";
 export {
   AiCreditsController,
   type AiCreditsState,

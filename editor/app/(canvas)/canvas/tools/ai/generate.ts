@@ -38,8 +38,8 @@ export async function generate({
    * shell / route param). See GRIDA-SEC-003.
    *
    * Optional only to make the dev-tool harness compile without a
-   * workspace; when omitted in non-superuser mode the seam middleware
-   * throws `MissingOrgIdError` at the first AI call.
+   * workspace; when omitted the billed-path seam middleware throws
+   * `MissingOrgIdError` at the first AI call. See GRIDA-SEC-003.
    */
   organizationId?: number;
   system?: string;
