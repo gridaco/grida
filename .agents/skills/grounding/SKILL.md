@@ -34,15 +34,15 @@ then trust:
 
 - **Canvas render/node model** → Rust engine `crates/grida/src/`
   (`node/schema.rs`). The TS mirror `editor/grida-canvas/` is
-  authoritative for *editor behavior* and can lag the engine.
+  authoritative for _editor behavior_ and can lag the engine.
 - **DB schema** → `supabase/migrations/` (applied, immutable);
   `supabase/schemas/*.sql` is a readable projection that can lag — use
   the **database** skill.
 - **Directory contract** → the nearest `AGENTS.md`/`README.md`.
 - **"I remember API X…"** → re-read current code; a memory is a claim
-  about a *past* state, verify before acting.
+  about a _past_ state, verify before acting.
 
-Disagreement → decide which wins *and why* (`git log -1` recency, what
+Disagreement → decide which wins _and why_ (`git log -1` recency, what
 the running entrypoint imports, what tests assert); don't average;
 surface a material conflict to the user. **Never authoritative even when
 they match:** `.legacy/`, `packages/.legacy/`, `docs/_history/`,

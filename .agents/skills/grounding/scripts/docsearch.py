@@ -104,12 +104,23 @@ def read_frontmatter(path: Path) -> tuple[dict | None, str]:
 
 
 def iter_docs(root: Path, subdirs: list[str]):
-    bases = [root] if not subdirs else [(root / s) for s in subdirs]
+    root_resolved = root.resolve()
+    if subdirs:
+        bases = []
+        for s in subdirs:
+            if not (root_resolved / s).resolve().is_relative_to(root_resolved):
+                sys.exit(f"docsearch: subdir escapes docs root: {s!r}")
+            bases.append(root / s)
+    else:
+        bases = [root]
+    seen: set[Path] = set()
     for base in bases:
         if not base.exists():
             sys.exit(f"docsearch: path not found: {base}")
         for path in sorted([*base.rglob("*.md"), *base.rglob("*.mdx")]):
-            yield path
+            if path not in seen:
+                seen.add(path)
+                yield path
 
 
 def as_list(v) -> list[str]:
@@ -199,7 +210,12 @@ def cmd_find(root: Path, args) -> int:
         k, v = raw.split("=", 1)
         fields.append((k.strip(), v))
     has_keys = args.has or []
-    rx = re.compile(args.match) if args.match else None
+    rx = None
+    if args.match:
+        try:
+            rx = re.compile(args.match)
+        except re.error as e:
+            sys.exit(f"docsearch: invalid --match regex: {e}")
 
     results = []
     for path in iter_docs(root, args.subdir):
