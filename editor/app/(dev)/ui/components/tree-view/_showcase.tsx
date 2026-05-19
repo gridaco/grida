@@ -1189,52 +1189,53 @@ export function FinderShowcase() {
           Multi-column rows, zebra striping, double-click to expand — the same
           core, dressed as macOS and dropped onto the desktop.
         </SectionHeader>
-      </div>
-
-      {/* desktop — same outer card frame as the other showcases:
-          rounded-2xl + p-2 outside, rounded-lg + overflow-hidden inside so
-          the wallpaper clips concentric with the outer corner (16 - 8 = 8). */}
-      <div className="relative mx-auto max-w-6xl rounded-2xl bg-zinc-100 p-2 ring-1 ring-zinc-200/70">
-        <MacOSDesktop className="relative flex min-h-[560px] flex-col overflow-hidden rounded-lg px-6 py-10 sm:aspect-[16/9] sm:min-h-0">
-          <MacOSMenuBar
-            appName="Finder"
-            className="absolute inset-x-0 top-0 z-10"
-            trailing={
-              <>
-                <SearchIcon className="size-3" />
-                <span className="tabular-nums">Mon 9:41 AM</span>
-              </>
-            }
-          />
-          <div className="mt-6 flex flex-1 items-start justify-center">
-            <MacOSWindow
-              title="softmarshmallow"
-              className="w-full max-w-[820px]"
-            >
-              <div className="grid h-7 grid-cols-[1fr] items-center border-b border-zinc-200 bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500 md:grid-cols-[1fr_90px_160px_140px]">
-                <div className="px-3">Name</div>
-                <div className="hidden pr-3 text-right md:block">Size</div>
-                <div className="hidden px-1 md:block">Kind</div>
-                <div className="hidden items-center gap-1 md:flex">
-                  Modified
+        {/* desktop — same outer card frame as the other showcases:
+            rounded-2xl + p-2 outside, rounded-lg + overflow-hidden inside so
+            the wallpaper clips concentric with the outer corner (16 - 8 = 8).
+            Same `max-w-6xl px-4` container the other showcases use so this
+            section's stage is the same width as Grida/Figma/VSCode/Notion. */}
+        <div className="relative rounded-2xl bg-zinc-100 p-2 ring-1 ring-zinc-200/70">
+          <MacOSDesktop className="relative flex min-h-[560px] flex-col overflow-hidden rounded-lg px-6 py-10 sm:aspect-[16/9] sm:min-h-0">
+            <MacOSMenuBar
+              appName="Finder"
+              className="absolute inset-x-0 top-0 z-10"
+              trailing={
+                <>
+                  <SearchIcon className="size-3" />
+                  <span className="tabular-nums">Mon 9:41 AM</span>
+                </>
+              }
+            />
+            <div className="mt-6 flex flex-1 items-start justify-center">
+              <MacOSWindow
+                title="softmarshmallow"
+                className="w-full max-w-[820px]"
+              >
+                <div className="grid h-7 grid-cols-[1fr] items-center border-b border-zinc-200 bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500 md:grid-cols-[1fr_90px_160px_140px]">
+                  <div className="px-3">Name</div>
+                  <div className="hidden pr-3 text-right md:block">Size</div>
+                  <div className="hidden px-1 md:block">Kind</div>
+                  <div className="hidden items-center gap-1 md:flex">
+                    Modified
+                  </div>
                 </div>
-              </div>
-              <DemoPanel
-                controller={controller}
-                enableDrag
-                indentBase={16}
-                indentStep={16}
-                className="h-[360px] !border-0"
-                renderRow={(args) => <FinderRow args={args} />}
-                onIntent={(intent) => applyIntent(controller, intent)}
-              />
-            </MacOSWindow>
-          </div>
-          <MacOSDock
-            apps={DOCK_APPS}
-            className="pointer-events-auto absolute inset-x-0 bottom-4 z-10 mx-auto w-fit"
-          />
-        </MacOSDesktop>
+                <DemoPanel
+                  controller={controller}
+                  enableDrag
+                  indentBase={16}
+                  indentStep={16}
+                  className="h-[360px] !border-0"
+                  renderRow={(args) => <FinderRow args={args} />}
+                  onIntent={(intent) => applyIntent(controller, intent)}
+                />
+              </MacOSWindow>
+            </div>
+            <MacOSDock
+              apps={DOCK_APPS}
+              className="pointer-events-auto absolute inset-x-0 bottom-4 z-10 mx-auto w-fit"
+            />
+          </MacOSDesktop>
+        </div>
       </div>
     </section>
   );

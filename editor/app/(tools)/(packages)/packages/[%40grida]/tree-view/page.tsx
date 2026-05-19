@@ -7,10 +7,7 @@ import {
   NotionShowcase,
   VSCodeShowcase,
 } from "@/app/(dev)/ui/components/tree-view/_showcase";
-import {
-  CodeBlock,
-  CodeBlockCopyButton,
-} from "@/components/ai-elements/code-block";
+import { RegistryExample } from "@/components/registry-example";
 import { NpmLogoIcon } from "@/components/logos/npm";
 import { Button } from "@/components/ui/button";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
@@ -86,21 +83,26 @@ export default function TreeViewLandingPage() {
       <NotionShowcase />
       <FinderShowcase />
 
-      {/* Quick start — copy + drop into a React app. The code sits beside
-          the pitch on md+, stacks below on smaller viewports. Shares the
-          same `max-w-5xl` container as the features and CTA sections so the
-          left edges align. */}
+      {/* Quick start — live Preview / Code tabs, mirroring shadcn-ui's
+          example pattern. The pitch sits beside the example on md+, stacks
+          below on smaller viewports. Shares the same `max-w-5xl` container
+          as the features and CTA sections so the left edges align. */}
       <section className="container mx-auto px-4 py-16 border-t border-zinc-200">
         <div className="max-w-5xl mx-auto grid gap-8 md:grid-cols-[1fr_1.4fr] md:items-center md:gap-12">
           <div className="space-y-4">
             <h2 className="text-3xl font-bold tracking-tight">
-              A tree in 20 lines.
+              A tree in 50 lines.
             </h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               One source, one controller, one provider. Render the rows with
               whatever markup you want — the package owns expansion and
               selection, your store owns the data.
             </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="w-full max-w-xs">
+                <CopyToClipboardInput value="npx shadcn@latest add https://grida.co/r/tree-view-row.json" />
+              </div>
+            </div>
             <Link href={NPM_URL} target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm">
                 <NpmLogoIcon className="size-6 mr-1" />
@@ -109,13 +111,10 @@ export default function TreeViewLandingPage() {
               </Button>
             </Link>
           </div>
-          <CodeBlock
-            code={QUICK_START_CODE}
-            language="tsx"
-            className="[&_code]:!text-xs [&>div>div>pre]:!p-4 [&_pre]:!text-xs"
-          >
-            <CodeBlockCopyButton />
-          </CodeBlock>
+          <RegistryExample
+            name="examples/tree-view/quick-start"
+            code={QUICK_START_SNIPPET}
+          />
         </div>
       </section>
 
@@ -183,34 +182,66 @@ export default function TreeViewLandingPage() {
   );
 }
 
-const QUICK_START_CODE = `import { InMemoryTreeSource, TreeController } from "@grida/tree-view";
-import { TreeProvider, useTreeSnapshot } from "@grida/tree-view/react";
+// Compact code shown in the marketing "Code" tab. Not the literal installed
+// source — that's `registry/examples/tree-view/quick-start.tsx`. The live
+// <Preview> tab runs the real component; this snippet shows the same shape
+// (click to select, click a folder to expand, drag to reorder) at the line
+// count promised in the section heading.
+const QUICK_START_SNIPPET = `import { disallowDescendant, InMemoryTreeSource, placementFromY, TreeController } from "@grida/tree-view";
+import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
 
-const source = new InMemoryTreeSource({
-  root: "<root>",
-  showRoot: false,
-  nodes: [
-    { id: "<root>", parent: null, children: ["a", "b"] },
-    { id: "a", parent: "<root>", children: [], meta: { label: "Apple" } },
-    { id: "b", parent: "<root>", children: [], meta: { label: "Banana" } },
-  ],
+const controller = new TreeController({
+  source: new InMemoryTreeSource({
+    root: "<root>", showRoot: false,
+    nodes: [
+      { id: "<root>", parent: null, children: ["fruits"] },
+      { id: "fruits", parent: "<root>", children: ["apple", "banana"], meta: { label: "🍎 Fruits" } },
+      { id: "apple", parent: "fruits", children: [], meta: { label: "Apple" } },
+      { id: "banana", parent: "fruits", children: [], meta: { label: "Banana" } },
+    ],
+  }),
+  expanded: ["fruits"],
+  constraint: disallowDescendant(),
 });
-const controller = new TreeController({ source });
 
-function Rows() {
-  const rows = useTreeSnapshot((c) => c.getRows());
-  return rows.map((row) => (
-    <div key={row.id} style={{ paddingLeft: row.depth * 16 }}>
-      {row.meta?.label ?? row.id}
+function Row({ id, depth }) {
+  const c = useTree();
+  const sel = useTreeSnapshot((c) => c.getSelection().includes(id));
+  const exp = useTreeSnapshot((c) => c.isExpanded(id));
+  const drop = useTreeSnapshot((c) => { const p = c.getDrag()?.getPosition(); return p?.over === id ? p.placement : "none"; });
+  const node = c.source.getNode(id);
+  const folder = node.children.length > 0;
+  const onPointerDown = (e) => {
+    const x0 = e.clientX, y0 = e.clientY; let drag = null;
+    const onMove = (ev) => {
+      if (!drag && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 4) drag = c.startDrag([id]);
+      const row = drag && document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-tree-row]");
+      if (!row) return;
+      const r = row.getBoundingClientRect();
+      drag.over(row.dataset.treeRow, placementFromY(ev.clientY - r.top, r.height));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp);
+      if (!drag) { c.select([id], "replace"); if (folder) exp ? c.collapse(id) : c.expand(id); return; }
+      const intent = c.commitDrag(); if (intent) c.source.applyIntent(intent);
+    };
+    window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp);
+  };
+  return (
+    <div data-tree-row={id} data-state={sel ? "selected" : "idle"} data-drop={drop} onPointerDown={onPointerDown}
+      style={{ paddingLeft: depth * 16 }}
+      className="relative cursor-pointer rounded py-1 hover:bg-zinc-100 data-[state=selected]:bg-blue-100 data-[drop=into]:ring-2 data-[drop=into]:ring-blue-400">
+      {folder ? (exp ? "▾ " : "▸ ") : "  "}{node.meta?.label ?? id}
     </div>
-  ));
+  );
 }
 
-export default () => (
-  <TreeProvider controller={controller}>
-    <Rows />
-  </TreeProvider>
-);
+function Tree() {
+  const rows = useTreeSnapshot((c) => c.getRows());
+  return <div>{rows.map((r) => <Row key={r.id} id={r.id} depth={r.depth} />)}</div>;
+}
+
+export default () => <TreeProvider controller={controller}><Tree /></TreeProvider>;
 `;
 
 const features: { icon: string; title: string; body: string }[] = [

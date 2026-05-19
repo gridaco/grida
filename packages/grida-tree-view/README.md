@@ -8,12 +8,23 @@ framework and stylesheet you want.
 
 Used in production by the Grida editor's layers panel and a handful of
 prototype tools (Figma-style sidebar, VS Code-style file explorer,
-Finder-style list view) — all driven by the same `TreeController`.
+Notion-style workspace sidebar, Finder-style list view) — all driven by
+the same `TreeController`.
+
+- **Live showcases**: [grida.co/packages/@grida/tree-view](https://grida.co/packages/@grida/tree-view)
+- **npm**: [`@grida/tree-view`](https://www.npmjs.com/package/@grida/tree-view)
 
 ```bash
 pnpm add @grida/tree-view
 # React bindings are an optional peer:
 pnpm add react@>=18
+```
+
+A shadcn-style row block is also published — copy it into your app and
+edit freely:
+
+```bash
+npx shadcn@latest add https://grida.co/r/tree-view-row.json
 ```
 
 ## Why this one
