@@ -91,7 +91,7 @@ export default function TreeViewLandingPage() {
         <div className="max-w-5xl mx-auto grid gap-8 md:grid-cols-[1fr_1.4fr] md:items-center md:gap-12">
           <div className="space-y-4">
             <h2 className="text-3xl font-bold tracking-tight">
-              A tree in 60 lines.
+              The whole tree, in one file.
             </h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               One source, one controller, one provider. Render the rows with
