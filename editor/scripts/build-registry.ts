@@ -21,6 +21,7 @@
  * prebuild firing reliably. The build is hooked via `pnpm prebuild`.
  *
  * Run manually: `pnpm --filter editor build-registry`
+ * Watch mode:   `pnpm --filter editor dev:registry`
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -62,6 +63,31 @@ function walkTsx(dir: string, prefix = ""): RegistryFile[] {
     }
   }
   return out;
+}
+
+/**
+ * Pull the first JSDoc block that immediately precedes `export function`
+ * or `export default` and return it as a single-line description. Used as
+ * the `description` field on the shadcn block JSON so the registry index
+ * shows something useful next to the title.
+ */
+function extractDescription(source: string): string | undefined {
+  // `(?:(?!\*\/)[\s\S])*` keeps the docblock body from absorbing the
+  // closing `*/` of an earlier comment — without it, the non-greedy
+  // span backtracks across nested JSDoc and matches the wrong block.
+  const re =
+    /\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*export\s+(?:default\s+)?(?:function|const|class)/;
+  const m = re.exec(source);
+  if (!m) return undefined;
+  const body = m[1]!;
+  // Take the first non-empty content line; strip leading ` * ` and trim.
+  for (const raw of body.split("\n")) {
+    const line = raw.replace(/^\s*\*\s?/, "").trim();
+    if (!line) continue;
+    if (line.startsWith("@")) return undefined;
+    return line.replace(/\s+/g, " ");
+  }
+  return undefined;
 }
 
 /**
@@ -153,6 +179,7 @@ interface ShadcnBlock {
 function emitShadcnBlock(f: RegistryFile): ShadcnBlock {
   const blockName = f.name.slice("ui/".length);
   const { dependencies, registryDependencies } = extractDeps(f.source);
+  const description = extractDescription(f.source);
   return {
     $schema: "https://ui.shadcn.com/schema/registry-item.json",
     name: blockName,
@@ -161,6 +188,7 @@ function emitShadcnBlock(f: RegistryFile): ShadcnBlock {
       .split("-")
       .map((s) => s[0]!.toUpperCase() + s.slice(1))
       .join(" "),
+    ...(description ? { description } : {}),
     dependencies,
     registryDependencies,
     files: [
@@ -171,6 +199,38 @@ function emitShadcnBlock(f: RegistryFile): ShadcnBlock {
       },
     ],
   };
+}
+
+/**
+ * Cheap shape check against the shadcn registry-item schema. We don't pull
+ * a Zod schema in (shadcn doesn't ship one in a stable package); this
+ * catches the failures we'd actually make: missing/empty file content,
+ * deps with whitespace, blocks named differently from their file path.
+ * Throws so a bad block can't ship.
+ */
+function validateBlock(block: ShadcnBlock): void {
+  const errs: string[] = [];
+  if (!block.name || !/^[a-z0-9][a-z0-9-]*$/.test(block.name)) {
+    errs.push(`name "${block.name}" must be kebab-case`);
+  }
+  for (const file of block.files) {
+    if (!file.content || file.content.trim().length === 0) {
+      errs.push(`file ${file.path} is empty`);
+    }
+    if (!file.path.endsWith(".tsx")) {
+      errs.push(`file ${file.path} is not a .tsx`);
+    }
+  }
+  for (const dep of [...block.dependencies, ...block.registryDependencies]) {
+    if (dep !== dep.trim() || dep.length === 0) {
+      errs.push(`dependency "${dep}" has whitespace or is empty`);
+    }
+  }
+  if (errs.length) {
+    throw new Error(
+      `[build-registry] invalid block "${block.name}":\n  - ${errs.join("\n  - ")}`
+    );
+  }
 }
 
 function emitShadcnIndex(blocks: ShadcnBlock[]) {
@@ -203,6 +263,7 @@ function main() {
   }
   const uiBlocks = files.filter((f) => f.isUiBlock).map(emitShadcnBlock);
   for (const block of uiBlocks) {
+    validateBlock(block);
     fs.writeFileSync(
       path.join(PUBLIC_R_DIR, `${block.name}.json`),
       JSON.stringify(block, null, 2) + "\n"
@@ -221,4 +282,33 @@ function main() {
   );
 }
 
-main();
+/**
+ * Re-run `main` on any `.tsx` change under `registry/`. Coalesces bursts
+ * with a 50ms debounce so multi-file saves (Find & Replace, formatter)
+ * only trigger one build. Swallows errors so a transient parse failure
+ * during typing doesn't crash the watcher.
+ */
+function watch() {
+  console.log(
+    `[build-registry] watching ${path.relative(EDITOR_ROOT, REGISTRY_DIR)}/ …`
+  );
+  main();
+  let timer: NodeJS.Timeout | null = null;
+  fs.watch(REGISTRY_DIR, { recursive: true }, (_event, filename) => {
+    if (!filename || !filename.endsWith(".tsx")) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      try {
+        main();
+      } catch (err) {
+        console.error("[build-registry] error:", err);
+      }
+    }, 50);
+  });
+}
+
+if (process.argv.includes("--watch")) {
+  watch();
+} else {
+  main();
+}

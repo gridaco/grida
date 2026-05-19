@@ -32,10 +32,18 @@ export interface RegistryExampleProps {
   /** Class for the preview pane (controls aspect ratio, padding, etc.). */
   previewClassName?: string;
   /**
-   * Override the code-tab content with a hand-tailored snippet. When
-   * omitted, the literal `.tsx` source from the registry is shown.
+   * Override the code-tab content with a hand-tailored snippet. Prefer
+   * `codeFrom` (a sibling registry entry) so the code shown stays
+   * type-checked and lint-checked. Use this only for ad-hoc strings.
    */
   code?: string;
+  /**
+   * Render the code tab from a different registry entry than `name`.
+   * Lets the Preview tab run a full reference component while the Code
+   * tab shows a compact variant — both real, lazy-bundled, type-checked
+   * files so there's no drift with a hand-coded snippet.
+   */
+  codeFrom?: string;
   /** Which tab is active on first render. Defaults to `"code"`. */
   defaultTab?: "preview" | "code";
 }
@@ -47,6 +55,7 @@ export function RegistryExample({
   className,
   previewClassName,
   code,
+  codeFrom,
   defaultTab = "code",
 }: RegistryExampleProps) {
   const entry = registry[name];
@@ -57,8 +66,16 @@ export function RegistryExample({
       </div>
     );
   }
+  const codeEntry = codeFrom ? registry[codeFrom] : entry;
+  if (codeFrom && !codeEntry) {
+    return (
+      <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+        Registry entry not found: <code className="font-mono">{codeFrom}</code>
+      </div>
+    );
+  }
   const Component = entry.component;
-  const codeSource = code ?? entry.source;
+  const codeSource = code ?? codeEntry!.source;
   // `min-w-0` cascades down from the grid item to the inner Shiki pane so
   // long code lines scroll instead of forcing the surrounding column to
   // its `max-content` width. Without this, switching from the (narrow)

@@ -91,7 +91,7 @@ export default function TreeViewLandingPage() {
         <div className="max-w-5xl mx-auto grid gap-8 md:grid-cols-[1fr_1.4fr] md:items-center md:gap-12">
           <div className="space-y-4">
             <h2 className="text-3xl font-bold tracking-tight">
-              A tree in 50 lines.
+              A tree in 60 lines.
             </h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               One source, one controller, one provider. Render the rows with
@@ -113,7 +113,7 @@ export default function TreeViewLandingPage() {
           </div>
           <RegistryExample
             name="examples/tree-view/quick-start"
-            code={QUICK_START_SNIPPET}
+            codeFrom="examples/tree-view/quick-start-lite"
           />
         </div>
       </section>
@@ -181,68 +181,6 @@ export default function TreeViewLandingPage() {
     </main>
   );
 }
-
-// Compact code shown in the marketing "Code" tab. Not the literal installed
-// source — that's `registry/examples/tree-view/quick-start.tsx`. The live
-// <Preview> tab runs the real component; this snippet shows the same shape
-// (click to select, click a folder to expand, drag to reorder) at the line
-// count promised in the section heading.
-const QUICK_START_SNIPPET = `import { disallowDescendant, InMemoryTreeSource, placementFromY, TreeController } from "@grida/tree-view";
-import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
-
-const controller = new TreeController({
-  source: new InMemoryTreeSource({
-    root: "<root>", showRoot: false,
-    nodes: [
-      { id: "<root>", parent: null, children: ["fruits"] },
-      { id: "fruits", parent: "<root>", children: ["apple", "banana"], meta: { label: "🍎 Fruits" } },
-      { id: "apple", parent: "fruits", children: [], meta: { label: "Apple" } },
-      { id: "banana", parent: "fruits", children: [], meta: { label: "Banana" } },
-    ],
-  }),
-  expanded: ["fruits"],
-  constraint: disallowDescendant(),
-});
-
-function Row({ id, depth }) {
-  const c = useTree();
-  const sel = useTreeSnapshot((c) => c.getSelection().includes(id));
-  const exp = useTreeSnapshot((c) => c.isExpanded(id));
-  const drop = useTreeSnapshot((c) => { const p = c.getDrag()?.getPosition(); return p?.over === id ? p.placement : "none"; });
-  const node = c.source.getNode(id);
-  const folder = node.children.length > 0;
-  const onPointerDown = (e) => {
-    const x0 = e.clientX, y0 = e.clientY; let drag = null;
-    const onMove = (ev) => {
-      if (!drag && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 4) drag = c.startDrag([id]);
-      const row = drag && document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-tree-row]");
-      if (!row) return;
-      const r = row.getBoundingClientRect();
-      drag.over(row.dataset.treeRow, placementFromY(ev.clientY - r.top, r.height));
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp);
-      if (!drag) { c.select([id], "replace"); if (folder) exp ? c.collapse(id) : c.expand(id); return; }
-      const intent = c.commitDrag(); if (intent) c.source.applyIntent(intent);
-    };
-    window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp);
-  };
-  return (
-    <div data-tree-row={id} data-state={sel ? "selected" : "idle"} data-drop={drop} onPointerDown={onPointerDown}
-      style={{ paddingLeft: depth * 16 }}
-      className="relative cursor-pointer rounded py-1 hover:bg-zinc-100 data-[state=selected]:bg-blue-100 data-[drop=into]:ring-2 data-[drop=into]:ring-blue-400">
-      {folder ? (exp ? "▾ " : "▸ ") : "  "}{node.meta?.label ?? id}
-    </div>
-  );
-}
-
-function Tree() {
-  const rows = useTreeSnapshot((c) => c.getRows());
-  return <div>{rows.map((r) => <Row key={r.id} id={r.id} depth={r.depth} />)}</div>;
-}
-
-export default () => <TreeProvider controller={controller}><Tree /></TreeProvider>;
-`;
 
 const features: { icon: string; title: string; body: string }[] = [
   {
