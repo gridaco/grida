@@ -173,7 +173,11 @@ export namespace downloads {
     try {
       const links = await getCachedLinks();
       return { ...links, default: pickDefault(os, links) };
-    } catch {
+    } catch (err) {
+      console.warn(
+        "[downloads] getLinks failed; falling back to static v0.0.1 links.",
+        err
+      );
       return getLinks_v001(os);
     }
   }
@@ -283,6 +287,11 @@ export namespace downloads {
     }
 
     async fetch() {
+      // Memoize: subsequent calls return the same release without re-hitting
+      // GitHub. `getLinks()` resolves 6 assets via separate `getAsset` calls;
+      // without this, a single cache miss in `getCachedLinks` would burn
+      // 6 unauthenticated requests against the 60/hr/IP limit.
+      if (this.m_assets) return this.m_assets;
       const release = await fetchrelease();
       this.m_tag = release.data.tag_name;
       this.m_assets = release.data.assets;
