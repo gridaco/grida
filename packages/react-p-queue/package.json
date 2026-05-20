@@ -1,7 +1,7 @@
 {
   "name": "react-p-queue",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "A React library for handling promise-based queue management with support for batch processing, throttling, and concurrency control using `p-queue`",
   "keywords": [
     "batch",

@@ -1,9 +1,9 @@
-import { keycodeToPlatformUILabel } from "@/grida-canvas/keybinding";
 import {
+  keycodeToPlatformUILabel,
   keybindingsToKeyCodes,
   getKeyboardOS,
   type ResolvedSequence,
-} from "@/grida-canvas/keybinding";
+} from "@grida/keybinding";
 import { actions, type UXHostActionId } from "./uxhost-actions";
 
 /**

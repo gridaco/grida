@@ -1,5 +1,5 @@
 import cmath from "@grida/cmath";
-import type { HUDDraw } from "./hud";
+import type { HUDDraw } from "./types";
 
 /**
  * Convert two marquee corner points into a {@link HUDDraw} command list.

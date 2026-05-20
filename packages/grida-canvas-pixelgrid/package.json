@@ -1,7 +1,7 @@
 {
   "name": "@grida/pixel-grid",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "Pixel Grid component for Infinite Canvas",
   "keywords": [
     "canvas",

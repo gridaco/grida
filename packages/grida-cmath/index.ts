@@ -1738,6 +1738,29 @@ namespace cmath {
     }
 
     /**
+     * Returns the 4 corners of a rectangle in TL → TR → BR → BL order.
+     *
+     * Winding is clockwise in screen-space (y-down). The order matches the
+     * inline literal used by `rect.transform` above; callers needing to
+     * transform corners through an affine matrix should reuse this helper
+     * with `cmath.vector2.transform` to keep the corner order canonical.
+     *
+     * @example
+     * cmath.rect.toCorners({ x: 0, y: 0, width: 10, height: 5 });
+     * // [[0, 0], [10, 0], [10, 5], [0, 5]]
+     */
+    export function toCorners(
+      r: Rectangle
+    ): [cmath.Vector2, cmath.Vector2, cmath.Vector2, cmath.Vector2] {
+      return [
+        [r.x, r.y],
+        [r.x + r.width, r.y],
+        [r.x + r.width, r.y + r.height],
+        [r.x, r.y + r.height],
+      ];
+    }
+
+    /**
      * Rotates a rectangle and computes the bounding box of the rotated rectangle.
      *
      * @param rect - The rectangle to rotate.
@@ -3086,6 +3109,70 @@ namespace cmath {
         if (intersects(p0, p1, e0, e1)) return true;
       }
       return false;
+    }
+
+    /**
+     * Shortest distance from point `p` to segment `ab`. The closest point
+     * on the segment is the perpendicular foot when it falls inside `[a, b]`,
+     * otherwise the nearer endpoint. For a degenerate segment (a == b) this
+     * is the point-to-point distance.
+     */
+    export function point_distance(p: Vector2, a: Vector2, b: Vector2): number {
+      const abx = b[0] - a[0];
+      const aby = b[1] - a[1];
+      const len_sq = abx * abx + aby * aby;
+      if (len_sq === 0) {
+        const dx = p[0] - a[0];
+        const dy = p[1] - a[1];
+        return Math.hypot(dx, dy);
+      }
+      const apx = p[0] - a[0];
+      const apy = p[1] - a[1];
+      let t = (apx * abx + apy * aby) / len_sq;
+      if (t < 0) t = 0;
+      else if (t > 1) t = 1;
+      const cx = a[0] + t * abx;
+      const cy = a[1] + t * aby;
+      return Math.hypot(p[0] - cx, p[1] - cy);
+    }
+  }
+
+  /**
+   * Polyline primitives — open or closed chains of points. Distinct from
+   * `polygon` (which is closed-by-definition and concerned with interior
+   * containment); these functions measure proximity to the chain itself.
+   */
+  export namespace polyline {
+    /**
+     * Shortest distance from `p` to the polyline `pts`. Each adjacent pair
+     * `pts[i], pts[i+1]` contributes a segment; when `closed` is true the
+     * last→first edge is included.
+     *
+     * For empty `pts` returns `Infinity`. For a single point returns the
+     * point-to-point distance. Note: for a closed ring, this is the
+     * distance to the *edges*, not to the interior — a point inside the
+     * ring returns the distance to the nearest edge, not 0. Use
+     * `polygon.pointInPolygon` for interior tests.
+     */
+    export function point_distance(
+      p: Vector2,
+      pts: ReadonlyArray<Vector2>,
+      closed: boolean
+    ): number {
+      if (pts.length === 0) return Infinity;
+      if (pts.length === 1) {
+        return Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]);
+      }
+      let best = Infinity;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const d = segment.point_distance(p, pts[i], pts[i + 1]);
+        if (d < best) best = d;
+      }
+      if (closed && pts.length >= 3) {
+        const d = segment.point_distance(p, pts[pts.length - 1], pts[0]);
+        if (d < best) best = d;
+      }
+      return best;
     }
   }
 

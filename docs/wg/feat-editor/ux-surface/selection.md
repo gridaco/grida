@@ -8,7 +8,18 @@ tags:
 
 # Selection
 
-This document describes the selection behavior for pointer interactions and keyboard modifiers.
+This document describes the selection behavior for pointer interactions and
+keyboard modifiers — the **UX-narrative** view, written for product and design
+review. It pairs with a formal sibling spec that catalogs every pointer-down
+into a finite set of named scenarios and defines the conformance contract for
+implementations:
+
+→ [`selection-intent`](./selection-intent.md)
+
+Read this doc to understand what selection should _feel_ like. Read the sibling
+to understand how every implementation (TypeScript HUD, main editor, future
+Rust port) classifies and enforces that feel. The scenario names referenced in
+this doc (e.g. `BodyNarrowOrDrag`) are defined there.
 
 ## Global Rules
 
@@ -91,7 +102,10 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Empty Space Click
 
-**Scenario:** User clicks on empty space (no target node) without Shift key.
+> **Scenario:** `EmptyDeselectThenMarquee` (selection exists) /
+> `EmptyMarquee` (no selection).
+
+User clicks on empty space (no target node) without Shift key.
 
 **Expected behavior:**
 
@@ -102,7 +116,7 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Single Selection - Child Hover During Drag
 
-**Scenario:**
+> **Scenario:** `BodySwapOrDrag` resolved by drag-promotion.
 
 - One container node is selected (contains a rectangle child, total 2 nodes)
 - User hovers over the inner rectangle
@@ -117,7 +131,7 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Single Selection - Child Click
 
-**Scenario:**
+> **Scenario:** `BodySwapOrDrag` resolved by click (no drag).
 
 - One container node is selected (contains a rectangle child)
 - User clicks (no drag) on the inner rectangle
@@ -131,7 +145,7 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Multi-Selection - Child Hover During Drag
 
-**Scenario:**
+> **Scenario:** `BodySwapOrDrag` resolved by drag-promotion (multi-selection variant).
 
 - Two root containers are selected (each contains a rectangle, total 4 nodes)
 - User hovers over inner rectangle of one container
@@ -146,7 +160,7 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Multi-Selection - Node Click Within Selection
 
-**Scenario:**
+> **Scenario:** `BodyNarrowOrDrag` resolved by click (no drag).
 
 - Two nodes (A and B) are selected
 - User clicks (no drag) on node A
@@ -160,7 +174,7 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Single Selection - Node Toggle (Shift+Click)
 
-**Scenario:**
+> **Scenario:** `BodyToggleOrDrag` resolved by click (no drag).
 
 - One node (A) is selected
 - User presses Shift and clicks (no drag) on node A
@@ -175,7 +189,7 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Multi-Selection - Node Toggle Within Selection
 
-**Scenario:**
+> **Scenario:** `BodyToggleOrDrag` resolved by click (no drag, multi-selection variant).
 
 - Two nodes (A and B) are selected
 - User presses Shift and clicks (no drag) on node A
@@ -190,7 +204,7 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Multi-Selection - Empty Space Drag Within Overlay
 
-**Scenario:**
+> **Scenario:** `BodyDragOnly` resolved by drag-promotion.
 
 - Two nodes (A and B) are selected, forming a selection group overlay
 - User presses pointer down on empty space within the selection overlay bounds (no node behind the pointer)
@@ -207,17 +221,25 @@ Selection changes are deferred when the target is within the current selection (
 
 ### Multi-Selection - Empty Space Click Within Overlay
 
-**Scenario:**
+> **Scenario:** `BodyDragOnly` resolved by click (no drag).
+>
+> This is a host-policy-driven UX choice expressed as a behavioural
+> artifact, not a hard router rule. A host that hands the surface a single
+> union `translate_handle` for a multi-selection produces a large body
+> region with empty interior. If the host wires this case to clear on
+> click, the behaviour below is what users see. The HUD router itself
+> defers; whether the deferred outcome is `deselect_all` or a no-op is
+> down to host configuration.
 
 - Two nodes (A and B) are selected, forming a selection group overlay
 - User clicks (no drag) on empty space within the selection overlay bounds (no node behind the pointer)
 
-**Expected behavior:**
+**Common host behaviour:**
 
 - Selection is cleared on `click` (pointerup without drag)
 - Both nodes are deselected
 
-**Rationale:** A complete click (pointerdown + pointerup without drag) on empty space is a clear intent to clear selection, even within the overlay bounds.
+**Rationale:** A complete click (pointerdown + pointerup without drag) on empty space is, by convention, intent to clear selection — even when the empty space happens to fall inside an overlay's bbox.
 
 ## Selection Change Rules
 

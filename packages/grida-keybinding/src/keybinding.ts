@@ -4,7 +4,7 @@ import { KeyCode, KeyCodeUtils } from "./keycode";
  * Modifier bitmask flags
  * Use bitwise OR to combine: M.Ctrl | M.Shift
  */
-export const enum M {
+export enum M {
   Ctrl = 1 << 0,
   Shift = 1 << 1,
   Alt = 1 << 2,
@@ -60,6 +60,9 @@ export type Keybindings =
       linux?: Keybinding;
     };
 
+/** Platform identifier used by all resolution helpers. */
+export type Platform = "mac" | "windows" | "linux";
+
 /**
  * Resolved chunk structure for display/matching
  */
@@ -91,13 +94,100 @@ export function seq(...chunks: Chunk[]): Sequence {
 }
 
 /**
- * Helper function to create a keybinding with a single chunk
- * Convenience function for common case: single key with optional modifiers
- * @param key - The main key
- * @param mods - Modifier bitmask (use M enum, combine with |)
+ * All four real modifier bits. The default `meaningful` mask used by
+ * `kb()` — equivalent to "every modifier matters", i.e. exact match.
+ *
+ * `M.CtrlCmd` is intentionally NOT part of this mask: it's a virtual
+ * cross-platform alias, not a real modifier the OS reports. When present
+ * in `mods`, it's stored as-is on the chunk and resolved per-platform by
+ * `resolveMods()` downstream — the power-set expansion below only walks
+ * the four real bits.
  */
-export function kb(key: KeyCode, mods: number = 0): Sequence {
-  return [[mods, key]];
+const ALL_REAL_MODS = M.Ctrl | M.Shift | M.Alt | M.Meta;
+
+/**
+ * Build a single-chunk keybinding.
+ *
+ * # Modifier-mask model
+ *
+ * A binding declares **which modifiers are meaningful** via the optional
+ * `meaningful` mask. Modifiers outside that mask are "don't care" —
+ * the binding fires whether or not they're held. Modifiers inside the
+ * mask must match `mods` exactly: bits set in both → required held,
+ * bits in `meaningful` but not in `mods` → required NOT held.
+ *
+ * The default `meaningful` mask is every real modifier (Ctrl|Shift|Alt|
+ * Meta), which gives exact-match semantics. That is, `kb(key, mods)`
+ * with the mask omitted means "exactly these modifiers, no more, no
+ * less" — the same behavior single-arg `kb()` has always had.
+ *
+ * Inspired by X11's AnyModifier concept, inverted so the strict path
+ * (exact match) is the default and the loose path is opt-in.
+ *
+ * ```ts
+ * kb(KeyCode.LeftArrow)                       // exact: 0 mods, no others
+ * kb(KeyCode.LeftArrow, M.Shift)              // exact: Shift only (UNCHANGED)
+ * kb(KeyCode.LeftArrow, M.Shift, M.Shift)     // Shift required, others don't-care
+ * kb(KeyCode.LeftArrow, 0, M.Shift)           // Shift forbidden, others don't-care
+ * kb(KeyCode.LeftArrow, 0, 0)                 // ANY mod state matches
+ * ```
+ *
+ * Implementation: at construction we expand the "don't care" bits in
+ * `meaningful` into a power-set of alias `Chunk`s. `match()` and
+ * `chunkKey()` stay unchanged — the hot path is still O(1) bucket lookup.
+ *
+ * @param key - The main key
+ * @param mods - Required modifiers (bitmask). May include `M.CtrlCmd`.
+ * @param meaningful - Which modifiers are meaningful (bitmask over the
+ *   four real modifiers Ctrl/Shift/Alt/Meta). Bits inside this mask
+ *   enforce `mods`; bits outside are don't-care. Defaults to all four
+ *   real modifiers (exact match). `M.CtrlCmd` here is meaningless — the
+ *   virtual modifier is always meaningful (or absent) per platform.
+ * @returns A `Keybinding` (single `Sequence` when no don't-care bits, an
+ *   alias list when there are).
+ */
+// Overloads: when `meaningful` is omitted (or known-all-bits-set), return
+// the narrow `Sequence` so call-sites that compose alias lists via
+// `[kb(..), kb(..)] as Keybinding` keep type-checking. Expanded calls
+// (third arg provided) return the wider `Keybinding`.
+export function kb(key: KeyCode, mods?: number): Sequence;
+export function kb(key: KeyCode, mods: number, meaningful: number): Keybinding;
+export function kb(
+  key: KeyCode,
+  mods: number = 0,
+  meaningful: number = ALL_REAL_MODS
+): Keybinding {
+  // Bits in `meaningful` are "I care about this modifier's state".
+  // Bits outside are "don't care" — expand power-set across them.
+  const dontCare = ALL_REAL_MODS & ~meaningful;
+  // Required real-mod bits: from `mods`, masked by the meaningful set.
+  // CtrlCmd is virtual and rides along as-is on the chunk.
+  const requiredReal = mods & meaningful & ALL_REAL_MODS;
+  const virtualBits = mods & M.CtrlCmd;
+  const base = requiredReal | virtualBits;
+
+  if (dontCare === 0) {
+    // Pure exact match — single chunk. Equivalent to old `kb(key, mods)`.
+    return [[base, key]];
+  }
+
+  // Enumerate the don't-care subset (2^N entries where N = popcount(dontCare)).
+  const flags: number[] = [];
+  if (dontCare & M.Ctrl) flags.push(M.Ctrl);
+  if (dontCare & M.Shift) flags.push(M.Shift);
+  if (dontCare & M.Alt) flags.push(M.Alt);
+  if (dontCare & M.Meta) flags.push(M.Meta);
+
+  const aliases: Sequence[] = [];
+  const count = 1 << flags.length;
+  for (let i = 0; i < count; i++) {
+    let combo = base;
+    for (let b = 0; b < flags.length; b++) {
+      if (i & (1 << b)) combo |= flags[b];
+    }
+    aliases.push([[combo, key]]);
+  }
+  return aliases;
 }
 
 /**
@@ -118,10 +208,7 @@ export function platformKb(config: {
  * @param platform - Target platform
  * @returns Array of KeyCode values for modifiers in stable order
  */
-export function resolveMods(
-  mods: number,
-  platform: "mac" | "windows" | "linux"
-): KeyCode[] {
+export function resolveMods(mods: number, platform: Platform): KeyCode[] {
   const result: KeyCode[] = [];
 
   // Handle CtrlCmd first (resolves to Meta on mac, Ctrl on win/linux)
@@ -162,10 +249,7 @@ export function resolveMods(
  * @param platform - Target platform
  * @returns Resolved chunk with platform-specific modifiers
  */
-export function resolveChunk(
-  chunk: Chunk,
-  platform: "mac" | "windows" | "linux"
-): ResolvedChunk {
+export function resolveChunk(chunk: Chunk, platform: Platform): ResolvedChunk {
   const [mods, ...keys] = chunk;
   return {
     mods: resolveMods(mods, platform),
@@ -183,7 +267,7 @@ export function resolveChunk(
  */
 export function resolveSequence(
   sequence: Sequence,
-  platform: "mac" | "windows" | "linux"
+  platform: Platform
 ): ResolvedSequence {
   return sequence.map((chunk) => resolveChunk(chunk, platform));
 }
@@ -199,7 +283,7 @@ function isApplePlatform(): boolean {
  *
  * mostly to determine cmdctrl key (and for cases that keybindings are fundamentally different, e.g. ctrl+c being color picker on mac, but copy on windows/linux)
  */
-export function getKeyboardOS(): "mac" | "windows" | "linux" {
+export function getKeyboardOS(): Platform {
   // SSR / non-browser safety: `navigator` is not defined in Node.js environments.
   // Pick a reasonable default for headless contexts.
   if (typeof navigator === "undefined" || !navigator.platform) {
@@ -220,7 +304,7 @@ export function getKeyboardOS(): "mac" | "windows" | "linux" {
  */
 export function keybindingsToKeyCodes(
   keybindings: Keybindings,
-  platform?: "mac" | "windows" | "linux"
+  platform?: Platform
 ): ResolvedSequence[] {
   const targetPlatform = platform || getKeyboardOS();
   const result: ResolvedSequence[] = [];
@@ -314,7 +398,7 @@ const keysymbols: PlatformKeySymbols = {
     [KeyCode.Meta]: "Ctrl", // Windows uses Ctrl where macOS uses Meta
     [KeyCode.Ctrl]: "Ctrl",
     [KeyCode.Alt]: "Alt",
-    [KeyCode.Shift]: "Shift", // Windows uses text label, not symbol
+    [KeyCode.Shift]: "Shift",
     // Special keys - Windows uses text labels
     [KeyCode.Enter]: "Enter",
     [KeyCode.Backspace]: "Backspace",
@@ -335,10 +419,10 @@ const keysymbols: PlatformKeySymbols = {
   },
   linux: {
     // Modifiers - Linux uses text labels (same as Windows)
-    [KeyCode.Meta]: "Ctrl", // Linux uses Ctrl where macOS uses Meta
+    [KeyCode.Meta]: "Ctrl",
     [KeyCode.Ctrl]: "Ctrl",
     [KeyCode.Alt]: "Alt",
-    [KeyCode.Shift]: "Shift", // Linux uses text label, not symbol
+    [KeyCode.Shift]: "Shift",
     // Special keys - Linux uses text labels
     [KeyCode.Enter]: "Enter",
     [KeyCode.Backspace]: "Backspace",
@@ -367,7 +451,7 @@ const keysymbols: PlatformKeySymbols = {
  */
 export function keycodeToPlatformUILabel(
   keyCode: KeyCode,
-  platform: "mac" | "windows" | "linux" = "linux"
+  platform: Platform = "linux"
 ): string {
   const platformSymbols = keysymbols[platform];
   return platformSymbols[keyCode] || KeyCodeUtils.toString(keyCode);
@@ -384,10 +468,7 @@ export function keycodeToPlatformUILabel(
  * uikbdk(M.CtrlCmd) // "⌘" on mac, "Ctrl" on windows/linux
  * uikbdk(KeyCode.KeyI) // "I"
  */
-export function uikbdk(
-  key: M | KeyCode,
-  platform?: "mac" | "windows" | "linux"
-): string {
+export function uikbdk(key: M | KeyCode, platform?: Platform): string {
   const targetPlatform = platform || getKeyboardOS();
 
   // Only treat *single* modifier constants as modifiers.
@@ -408,99 +489,4 @@ export function uikbdk(
 
   // It's a KeyCode
   return keycodeToPlatformUILabel(key as KeyCode, targetPlatform);
-}
-
-// ---------------------------------------------------------------------------
-// react-hotkeys-hook bridge
-// ---------------------------------------------------------------------------
-
-/**
- * Map a `KeyCode` to the lowercased string expected by `react-hotkeys-hook`.
- *
- * Examples: `KeyCode.UpArrow` → `"arrowup"`, `KeyCode.KeyD` → `"d"`,
- * `KeyCode.Meta` → `"meta"`.
- */
-export function keyCodeToHotkeyStr(kc: KeyCode): string {
-  switch (kc) {
-    case KeyCode.Backspace:
-      return "backspace";
-    case KeyCode.Tab:
-      return "tab";
-    case KeyCode.Enter:
-      return "enter";
-    case KeyCode.Shift:
-      return "shift";
-    case KeyCode.Ctrl:
-      return "ctrl";
-    case KeyCode.Alt:
-      return "alt";
-    case KeyCode.Escape:
-      return "escape";
-    case KeyCode.Space:
-      return "space";
-    case KeyCode.PageUp:
-      return "pageup";
-    case KeyCode.PageDown:
-      return "pagedown";
-    case KeyCode.End:
-      return "end";
-    case KeyCode.Home:
-      return "home";
-    case KeyCode.LeftArrow:
-      return "arrowleft";
-    case KeyCode.UpArrow:
-      return "arrowup";
-    case KeyCode.RightArrow:
-      return "arrowright";
-    case KeyCode.DownArrow:
-      return "arrowdown";
-    case KeyCode.Delete:
-      return "delete";
-    case KeyCode.Meta:
-      return "meta";
-    default:
-      break;
-  }
-
-  // Digit0–Digit9 → "0"–"9"
-  if (kc >= KeyCode.Digit0 && kc <= KeyCode.Digit9) {
-    return String(kc - KeyCode.Digit0);
-  }
-  // KeyA–KeyZ → "a"–"z"
-  if (kc >= KeyCode.KeyA && kc <= KeyCode.KeyZ) {
-    return String.fromCharCode("a".charCodeAt(0) + (kc - KeyCode.KeyA));
-  }
-  // F1–F24 → "f1"–"f24"
-  if (kc >= KeyCode.F1 && kc <= KeyCode.F24) {
-    return `f${kc - KeyCode.F1 + 1}`;
-  }
-
-  // Fallback — should not be reached for the keybindings we define.
-  return "";
-}
-
-/**
- * Convert a `Keybinding` to a `react-hotkeys-hook` compatible string.
- *
- * Multiple aliases (sequences) are joined with `, ` which react-hotkeys-hook
- * interprets as alternative triggers.
- *
- * Note: multi-chunk sequences (chords like Ctrl+K, Ctrl+S) are NOT supported
- * by react-hotkeys-hook. Only the first chunk of each sequence is emitted.
- */
-export function keybindingToHotkeysString(
-  binding: Keybinding,
-  platform?: "mac" | "windows" | "linux"
-): string {
-  const resolved = keybindingsToKeyCodes(binding, platform);
-  const strs: string[] = [];
-  for (const seq of resolved) {
-    const chunk = seq[0];
-    if (!chunk) continue;
-    const parts: string[] = [];
-    for (const mod of chunk.mods) parts.push(keyCodeToHotkeyStr(mod));
-    for (const key of chunk.keys) parts.push(keyCodeToHotkeyStr(key));
-    strs.push(parts.join("+"));
-  }
-  return strs.join(", ");
 }

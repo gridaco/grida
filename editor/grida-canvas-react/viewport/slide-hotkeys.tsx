@@ -8,7 +8,7 @@ import {
   slideKeybindings,
   slideKeybindingHandlers,
 } from "@/grida-canvas/modes/slide-keybindings";
-import { keybindingToHotkeysString } from "@/grida-canvas/keybinding";
+import { keybindingToHotkeysString } from "@/grida-canvas/keybinding-hotkeys";
 
 /**
  * Slides-specific keyboard shortcut registration.

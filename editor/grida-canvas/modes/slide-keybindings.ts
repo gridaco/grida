@@ -1,7 +1,6 @@
 import type { Editor } from "@/grida-canvas/editor";
 import type { editor } from "@/grida-canvas";
-import { KeyCode } from "../keycode";
-import { M, kb, type Keybinding } from "../keybinding";
+import { KeyCode, M, kb, type Keybinding } from "@grida/keybinding";
 import type { SlideEditorMode } from "./slide-mode";
 
 // ---------------------------------------------------------------------------

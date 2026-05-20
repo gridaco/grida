@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import { useCurrentEditor } from "../use-editor";
 import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
-import { getKeyboardOS } from "@/grida-canvas/keybinding";
+import { getKeyboardOS } from "@grida/keybinding";
 
 function useSingleDoublePressHotkey(
   key: string,

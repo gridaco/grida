@@ -1,7 +1,7 @@
 {
   "name": "@grida/fonts",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "files": [
     "dist"
   ],

@@ -1,6 +1,7 @@
 {
   "name": "@grida/cmath",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "private": false,
   "description": "unopinionated canvas math",
   "keywords": [
     "bezier",
@@ -62,9 +63,13 @@
       "require": "./dist/_snap.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "prepack": "tsdown",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   }

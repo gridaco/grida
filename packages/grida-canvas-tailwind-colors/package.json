@@ -30,6 +30,9 @@
     "./json/hex.json": "./json/hex.json",
     "./json/oklch.json": "./json/oklch.json"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "generate": "deno run --allow-read --allow-write --allow-net --allow-env --no-prompt scripts/generate.ts",
     "prepublishOnly": "pnpm generate"

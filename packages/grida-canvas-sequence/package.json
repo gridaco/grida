@@ -1,6 +1,7 @@
 {
   "name": "@grida/sequence",
   "version": "0.0.0",
+  "private": true,
   "description": "Fractional indexing implementation for CRDT-based ordered lists",
   "keywords": [
     "canvas",
