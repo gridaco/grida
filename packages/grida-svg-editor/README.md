@@ -45,6 +45,14 @@ The defaults are inverted from how most editor SDKs grow. Default is **core, not
 
 The consumer is expected to bring their own UI for everything outside the canvas: toolbar, property panel, layer list, inspector, contextual menus, modals. The editor's job is to be a legible source of state and a legible sink for commands — not to render those surfaces.
 
+### Element IR (internal)
+
+Internally, the editor wraps the parsed SVG in a **typed element IR**: a per-node typed view with element-typed capabilities (`is_resizable`, `is_rotatable`, `accepts_paint`, …), typed geometry mutators, and an explicit `RefusalReason` enum for unsupported operations. Commands dispatch on capability, not on element tag. Round-trip invariants the bytes alone cannot enforce — for example, "an editor-authored `rotate(θ cx cy)` recomposes its pivot when the local box changes" — are IR invariants enforced inside the mutator methods.
+
+The IR is a **typed view, not alternative storage**. The parsed AST remains the in-memory store; file bytes remain the source of truth; the parse-side source-position trivia store carries whitespace, attribute order, and unknown-namespace content. The IR is rebuilt from the AST on every load and discarded on `dispose`. P1 round-trip stands.
+
+This is consistent with the "Not a private IR" anti-goal below — that anti-goal rejects alternative on-disk format and bytes-projected-from-IR storage, neither of which this is. Design: `docs/wg/feat-svg-editor/element-ir.md`. Migration sketch: `docs/wg/feat-svg-editor/element-ir-migration.md`.
+
 ## Principles
 
 These are decision rules, not aspirations. Each one points to a verdict when "is this core, customizable, or its own layer?" comes up in review.
@@ -94,6 +102,8 @@ These are the design principles guiding the implementation.
 - Per-element-type capability modules (rect, circle, path, text, group, use, ...) contribute intent handlers, inspector controls, and direct-manipulation overlays into a shared editor shell — internally. The shared shell is what's public.
 - Edit intents are dispatched per `(element type, gesture, mode)`, so each mutation chooses the cleanest in-place representation: rewrite native attributes when the gesture allows it, fall back to `transform=` otherwise.
 - A separate, explicit **Tidy** command performs structural cleanup — deduplicate defs, strip dead resources, normalize generated class and id names, recognize geometric patterns. Never silent, never automatic.
+
+The per-element-module and `(element type, gesture, mode)` bullets above describe today's code. The proposed model groups by edit-shape and dispatches on capability — see [Paradigm § Element IR (internal)](#element-ir-internal) and `docs/wg/feat-svg-editor/element-ir.md`. These bullets will be revised when that model lands.
 
 ## Examples
 
@@ -162,9 +172,9 @@ The editor core is **headless**. It parses the SVG, owns the document IR, accept
 A `Surface` is the host-provided rendering and input boundary. The editor pushes paint instructions and HUD descriptors to the surface; the surface pushes normalized input events back. Non-DOM hosts (React Native, worker-side renderer, headless test harness) implement the `Surface` interface themselves. The shipped `domSurface` is the reference implementation used by the React layer.
 
 ```ts
-import { domSurface } from "@grida/svg-editor/dom";
+import { attach_dom_surface } from "@grida/svg-editor/dom";
 
-const handle = editor.attach(domSurface(container));
+const handle = attach_dom_surface(editor, { container });
 // later:
 handle.detach();
 ```
@@ -179,9 +189,6 @@ interface Surface {
   // surface → editor: hit-test on screen pixel
   hit_test(x: number, y: number): NodeId | null;
 
-  // geometry queries (bbox, screen ↔ local projection)
-  readonly geometry: SurfaceGeometry;
-
   // surface → editor: subscribe to normalized input
   on_input(listener: (event: SurfaceInputEvent) => void): Unsubscribe;
 
@@ -189,7 +196,11 @@ interface Surface {
 }
 ```
 
-`@grida/svg-editor/dom` exports `domSurface(container: HTMLElement, opts?)` as the default DOM implementation. It mounts the SVG into the container, wires pointer / keyboard listeners scoped to that container, and uses native `getBBox` / `getScreenCTM` for geometry. It is the only place in this package that imports DOM types.
+Geometry (world-space bboxes, screen ↔ local projection) is exposed via `editor.geometry`, not the `Surface` itself — the DOM surface registers a `MemoizedGeometryProvider` with the editor on attach so headless callers can query bounds without going through the surface.
+
+`@grida/svg-editor/dom` exports `attach_dom_surface(editor, { container, ... })` as the default DOM implementation, plus the surface-scoped types (`Camera`, `Gestures`, `SnapOptions`, `MemoizedGeometryProvider`, `DomComputedResolver`) that callers writing alternative surfaces or advanced integrations may need. It mounts the SVG into the container, wires pointer / keyboard listeners scoped to that container, and uses native `getBBox` / `getScreenCTM` for geometry. It is the only place in this package that imports DOM types.
+
+The container is **exclusively owned** by the surface. Render toolbars, layer lists, inspectors, and any other interactive chrome as **siblings** of the container, not children. Children of the container interfere with pointer routing (capture redirects, hit-test ordering) and produce silent click breakage. The shipped `SvgEditorCanvas` React component enforces this by creating its own internal div; hosts using `domSurface` / `keynote.attach` directly are responsible for the same discipline. In development, the surface emits a `console.warn` at attach time when the container is non-empty.
 
 ### Lifecycle
 
@@ -215,20 +226,26 @@ editor.reset(): void; // back to last load() input, clears history
 editor.state: {
   readonly selection: ReadonlyArray<NodeId>;
   readonly scope: NodeId | null;             // active isolation (group entered via dblclick)
-  readonly mode: Mode;                       // "select" | "insert-rect" | "edit-content" | ...
+  readonly mode: Mode;                       // "select" | "edit-content"
+  readonly tool: Tool;                       // { type: "cursor" } | { type: "insert", tag } — orthogonal to mode
   readonly dirty: boolean;                   // unsaved changes since load() / serialize()
-  readonly canUndo: boolean;
-  readonly canRedo: boolean;
-  readonly version: number;                  // monotonically increments on any mutation
+  readonly can_undo: boolean;
+  readonly can_redo: boolean;
+  readonly version: number;                  // bumps on any emission — drag, history, mutation
+  readonly structure_version: number;        // bumps only when tree shape or display-label inputs change
+  readonly geometry_version: number;         // bumps only when something that could shift world bounds changes
+  readonly load_version: number;             // bumps once per `editor.load()` call (constructor doesn't count)
 };
 
 editor.subscribe(fn: (state: EditorState) => void): Unsubscribe;
-editor.subscribeWithSelector<T>(
+editor.subscribe_with_selector<T>(
   selector: (state: EditorState) => T,
   fn: (value: T, prev: T) => void,
   equals?: (a: T, b: T) => boolean,
 ): Unsubscribe;
 ```
+
+`version` fires on every emission and is the right key for "anything could have changed" reads. Use the narrower companions (`structure_version`, `geometry_version`, `load_version`) as cache keys when the data only depends on the corresponding slice — e.g. a hierarchy panel snapshots once per `structure_version` so a drag doesn't invalidate the tree view.
 
 `state` is a frozen snapshot. Consumers never destructure into internals; if a view they need isn't here or in the purpose-built views below, that's an API gap.
 
@@ -442,13 +459,13 @@ const id = editor.defs.gradients.upsert({
     { offset: 1, color: "#7fb8e0" },
   ],
 });
-editor.commands.setPaint("fill", { kind: "ref", id });
+editor.commands.set_paint("fill", { kind: "ref", id });
 ```
 
 For the very common "set fill from picker that just produced a gradient" path, a sugar command exists:
 
 ```ts
-editor.commands.setPaintFromGradient(
+editor.commands.set_paint_from_gradient(
   channel: "fill" | "stroke",
   definition: GradientDefinition,
   opts?: { reuse_existing?: boolean }, // dedupe by definition equality
@@ -489,7 +506,7 @@ Modes are the editor's internal state machine for "what does a click do." Consum
 editor.modes: ReadonlyArray<Mode>; // discoverable, frozen after construction
 // e.g. ["select", "insert-rect", "insert-ellipse", "insert-line", "insert-text", "edit-content"]
 
-editor.commands.setMode(mode: Mode): void;
+editor.commands.set_mode(mode: Mode): void;
 ```
 
 When a mode-driven gesture completes (rect drawn, text inserted), the editor returns to `select` automatically. Modifier keys can override this (Shift to stay in insert mode); that behavior is bundled, not customizable.
@@ -506,8 +523,10 @@ editor.commands.{
   enter_scope(group: NodeId): void;
   exit_scope(): void;
 
-  // mode
+  // mode + tool
   set_mode(mode: Mode): void;
+  // `set_tool` is also accessible as `editor.set_tool(...)`; the command form
+  // is provided so keymap bindings (V/R/O/L) can dispatch via the registry.
 
   // generic property (any SVG/CSS attribute)
   set_property(name: string, value: string | null): void;
@@ -524,12 +543,24 @@ editor.commands.{
 
   // transforms (atomic — the bundled HUD drives drag-resize-rotate internally)
   translate(delta: { dx: number; dy: number }): void;
+  nudge(direction: "left" | "right" | "up" | "down", step?: number): void;
   resize(target: { width?: number; height?: number; anchor?: ResizeAnchor }): void;
+  resize_to(target: { width: number; height: number; anchor?: ResizeAnchor }): void;
   rotate(args: { angle: number; pivot?: { x: number; y: number } }): void;
+  rotate_to(args: { angle: number; pivot?: { x: number; y: number } }): void;
+  flatten_transform(): void;          // bake `transform=` into native attrs where possible
+
+  // alignment (operates on selection of ≥2 nodes against their union bbox)
+  align(direction: AlignDirection): void;
 
   // structure
   reorder(direction: "bring_forward" | "send_backward" | "bring_to_front" | "send_to_back"): void;
+  group(): void;                      // wrap selection in a new <g>
   remove(): void;
+
+  // insertion
+  insert(tag: InsertableTag, attrs?: Readonly<Record<string, string>>): NodeId;
+  insert_preview(tag: InsertableTag, initial?: Readonly<Record<string, string>>): InsertPreviewSession;
 
   // content
   set_text(value: string): void;
@@ -596,7 +627,9 @@ editor.set_style(partial: Partial<EditorStyle>): void;
 
 ### React API (thin wrapper)
 
-The React layer is intentionally thin. We ship a provider, a canvas component, and the **minimum set of hooks needed to bridge React's subscription model to the editor's API**. Hooks for specific observation patterns (per-node properties, gradients list, document tree, etc.) are not exported — they're 5-line recipes consumers write against the editor's own API, tailored to their re-render needs.
+The React layer is intentionally thin. We ship a provider, a canvas component, two core subscription primitives (`useEditorState` + `useCommands`), and a small set of bundled hooks for the patterns that turned out the same across every consumer. Hooks for **per-node** observation patterns (paint, properties, gradients list, document tree) are not exported — those are 5-line recipes consumers write against the editor's own API, tailored to their re-render needs.
+
+#### Core (the primitives)
 
 ```tsx
 import {
@@ -608,13 +641,42 @@ import {
 } from "@grida/svg-editor/react";
 ```
 
-That's the whole public surface.
-
 - `SvgEditorProvider` — owns the headless editor, puts it in context.
-- `SvgEditorCanvas` — the only UI component we ship; internally calls `editor.attach(domSurface(div))` on mount and `detach()` on unmount.
+- `SvgEditorCanvas` — the only UI component we ship; internally calls `attach_dom_surface(editor, { container })` on mount and `handle.detach()` on unmount. Receives the `DomSurfaceHandle` via an `onAttach` callback so consumers can thread `handle.camera` / `handle.gestures` into surrounding chrome.
 - `useSvgEditor()` — returns the editor instance from context.
 - `useEditorState(selector, equals?)` — subscribes to a slice of `editor.state` and re-renders on change. The subscription primitive.
 - `useCommands()` — sugar for `useSvgEditor().commands`.
+
+#### Bundled hooks (state-slice convenience + lifecycle-aware sessions)
+
+These are not internals to be replaced — they're documented sugar over `useEditorState` and the imperative APIs, with stable contracts. They exist because every consumer wrote the same recipe; per P6, they earned promotion.
+
+```tsx
+import {
+  // state slices (one-line wrappers over useEditorState)
+  useSelection, // → readonly NodeId[]
+  useTool, // → Tool
+  useMode, // → Mode
+  useCanUndo, // → boolean
+  useCanRedo, // → boolean
+
+  // lifecycle-aware preview sessions — unmount = discard (never commit)
+  usePaintPreview, // (channel) → PaintPreviewSession
+  usePropertyPreview, // (name) → PreviewSession
+
+  // bound imperative actions, stable identity across renders
+  useEditorLoad, // → (svg: string) => void
+  useEditorSerialize, // → () => string
+
+  // RAII hover override (clears on unmount if this hook set the override)
+  useHoverOverride, // → (id: NodeId | null) => void
+
+  // camera bridge (subscribe to a slice of handle.camera without bumping state.version)
+  useCameraSnapshot, // (handle, selector, fallback) → T
+} from "@grida/svg-editor/react";
+```
+
+The preview hooks (`usePaintPreview` / `usePropertyPreview`) wrap `commands.preview_*` with a React-lifecycle-aware shell whose contract is: **unmount discards, the host commits**. The session returned is reference-stable across renders within one key — `picker open → commit → reopen` works without remounting.
 
 Top-level wiring:
 
@@ -752,7 +814,7 @@ What this editor will never be. Each one is a defensive perimeter for the princi
 - **Not a plugin host.** No public registry for tools, capabilities, gestures, HUD overlays, or serializers. (P1, P6.)
 - **Not a Figma-style multiplayer canvas.** State is local. Sync is the consumer's problem.
 - **Not customizable in HUD layout.** Style spec only — no overlay slots, no handle replacement, no custom chrome components.
-- **Not a private IR.** SVG is the source of truth; there is no canonical Grida representation behind it.
+- **Not a private IR.** SVG is the source of truth. The editor does not maintain an alternative on-disk format, and the bytes are not projected from any in-memory canonical store. (The internal typed element IR described under [Paradigm § Element IR (internal)](#element-ir-internal) is a typed view over the parsed AST, not a store the file is derived from — the AST and the file are the source of truth, and the IR is rebuilt from them on each load.)
 - **Not a serializer playground.** Round-trip rules are fixed (P1). No "compact mode," no "Prettier mode," no consumer-supplied formatter.
 
 If a consumer needs any of the above, the right answer is "this is the wrong tool." Saying yes to any one is the path that turned the Grida main editor into a 6,800-line god-class.
