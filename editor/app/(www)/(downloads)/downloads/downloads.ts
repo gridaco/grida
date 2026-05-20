@@ -7,9 +7,7 @@ export namespace downloads {
   type GithubReleaseAsset = GithubReleaseAssets[number];
 
   export interface DownloadLinks {
-    mac_dmg_x64: string;
     mac_dmg_arm64: string;
-    mac_dmg_universal: string;
     linux_deb_x64: string;
     linux_rpm_x64: string;
     linux_deb_arm64: string;
@@ -18,7 +16,7 @@ export namespace downloads {
   }
 
   export type Platform = "mac" | "windows" | "linux";
-  export type Arch = "x64" | "arm64" | "universal";
+  export type Arch = "x64" | "arm64";
   export type Maker = "dmg" | "squirrel.windows" | "deb" | "rpm";
 
   type Distro = {
@@ -27,7 +25,6 @@ export namespace downloads {
     ext: "dmg" | "exe" | "deb" | "rpm";
     arch: {
       arm64?: string | undefined;
-      universal?: string | undefined;
       x64?: string | undefined;
     };
   };
@@ -45,8 +42,6 @@ export namespace downloads {
         ext: "dmg",
         arch: {
           arm64: "arm64",
-          universal: "universal",
-          x64: "x64",
         },
       },
     ],
@@ -97,9 +92,7 @@ export namespace downloads {
   export async function getLinks(): Promise<DownloadLinks> {
     const f = new Fetcher();
 
-    const mac_dmg_x64 = await f.getAsset("mac", "dmg", "x64");
     const mac_dmg_arm64 = await f.getAsset("mac", "dmg", "arm64");
-    const mac_dmg_universal = await f.getAsset("mac", "dmg", "universal");
     const linux_deb_x64 = await f.getAsset("linux", "deb", "x64");
     const linux_rpm_x64 = await f.getAsset("linux", "rpm", "x64");
     const linux_deb_arm64 = await f.getAsset("linux", "deb", "arm64");
@@ -107,9 +100,7 @@ export namespace downloads {
     const windows_x64 = await f.getAsset("windows", "squirrel.windows", "x64");
 
     return {
-      mac_dmg_x64: mac_dmg_x64.browser_download_url,
       mac_dmg_arm64: mac_dmg_arm64.browser_download_url,
-      mac_dmg_universal: mac_dmg_universal.browser_download_url,
       linux_deb_x64: linux_deb_x64.browser_download_url,
       linux_rpm_x64: linux_rpm_x64.browser_download_url,
       linux_deb_arm64: linux_deb_arm64.browser_download_url,
@@ -134,12 +125,8 @@ export namespace downloads {
     } | null;
   } {
     const links: DownloadLinks = {
-      mac_dmg_x64:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-x64.dmg",
       mac_dmg_arm64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-arm64.dmg",
-      mac_dmg_universal:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-universal.dmg",
       linux_deb_x64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/grida_0.0.1_amd64.deb",
       linux_rpm_x64:
@@ -163,8 +150,8 @@ export namespace downloads {
         d = {
           platform: "mac",
           maker: "dmg",
-          arch: "universal",
-          url: links.mac_dmg_universal,
+          arch: "arm64",
+          url: links.mac_dmg_arm64,
         };
         break;
       }
@@ -189,12 +176,8 @@ export namespace downloads {
 
     return {
       default: d,
-      mac_dmg_x64:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-x64.dmg",
       mac_dmg_arm64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-arm64.dmg",
-      mac_dmg_universal:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-universal.dmg",
       linux_deb_x64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/grida_0.0.1_amd64.deb",
       linux_rpm_x64:

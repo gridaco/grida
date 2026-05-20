@@ -100,3 +100,16 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: pnpm run publish:prerelease --arch="arm64"
+
+      - name: Update release notes from template
+        # Runs once (only on the macOS row) after the release tag has been
+        # created by the publisher. Template at .github/release-notes/desktop.md.
+        if: ${{ matrix.os.name == 'macos-apple-silicon' && env.HAS_SIGNING == 'true' && env.HAS_NOTARIZE == 'true' }}
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./desktop/package.json').version")
+          TAG="v${VERSION}"
+          BODY=$(sed "s|{{version}}|${VERSION}|g" .github/release-notes/desktop.md)
+          gh release edit "$TAG" --notes "$BODY" --repo gridaco/grida
