@@ -24,7 +24,7 @@ export default async function DownloadsPage() {
   const userAgent = headersList.get("user-agent");
 
   const os = downloads.getDesktopOS(userAgent || "");
-  const links = await downloads.getLinks_v001(os);
+  const links = await downloads.getLinksForPage(os);
 
   return (
     <main className="min-h-screen flex flex-col">

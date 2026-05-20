@@ -1,4 +1,5 @@
 import { Octokit, type RestEndpointMethodTypes } from "@octokit/rest";
+import { unstable_cache } from "next/cache";
 import assert from "assert";
 
 export namespace downloads {
@@ -109,9 +110,78 @@ export namespace downloads {
     };
   }
 
+  export interface DownloadLinksForPage extends DownloadLinks {
+    default: {
+      platform: Platform;
+      maker: Maker;
+      arch: Arch;
+      url: string;
+    } | null;
+  }
+
+  function pickDefault(
+    os: Platform | null,
+    links: DownloadLinks
+  ): DownloadLinksForPage["default"] {
+    switch (os) {
+      case "mac":
+        return {
+          platform: "mac",
+          maker: "dmg",
+          arch: "arm64",
+          url: links.mac_dmg_arm64,
+        };
+      case "windows":
+        return {
+          platform: "windows",
+          maker: "squirrel.windows",
+          arch: "x64",
+          url: links.windows_exe_x64,
+        };
+      case "linux":
+        return {
+          platform: "linux",
+          maker: "deb",
+          arch: "x64",
+          url: links.linux_deb_x64,
+        };
+      default:
+        return null;
+    }
+  }
+
+  // Cached wrapper around getLinks() — hits GitHub's unauthenticated
+  // releases endpoint at most ~once per hour per region, keeping the
+  // page out of trouble with the 60 req/hr/IP rate limit.
+  // `unstable_cache` only memoizes successful resolutions; on throw,
+  // the next render re-attempts (so transient API blips self-heal).
+  const getCachedLinks = unstable_cache(
+    () => getLinks(),
+    ["downloads:getLinks"],
+    {
+      revalidate: 3600,
+    }
+  );
+
+  /**
+   * Page-bound helper: latest-release links + OS-aware default, cached.
+   * Falls back to the static v0.0.1 URLs if the GitHub API is unreachable.
+   */
+  export async function getLinksForPage(
+    os: Platform | null
+  ): Promise<DownloadLinksForPage> {
+    try {
+      const links = await getCachedLinks();
+      return { ...links, default: pickDefault(os, links) };
+    } catch {
+      return getLinks_v001(os);
+    }
+  }
+
   /**
    * @deprecated
-   * temporary static version of getLinks, until we find a reliable way to fetch release without rate limiting
+   * Static fallback used only when the GitHub API is unreachable.
+   * Prefer `getLinksForPage()`, which calls this internally on failure.
    */
   export function getLinks_v001(
     platform: Platform | null,
