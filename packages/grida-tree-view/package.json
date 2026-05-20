@@ -1,0 +1,74 @@
+{
+  "name": "@grida/tree-view",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Headless, agnostic tree-view controller for the Grida editor.",
+  "keywords": [
+    "dnd",
+    "drag-and-drop",
+    "file-explorer",
+    "headless",
+    "keyboard-navigation",
+    "layers-panel",
+    "outliner",
+    "react",
+    "selection",
+    "state-machine",
+    "tree",
+    "tree-state",
+    "tree-view",
+    "treeview",
+    "typescript",
+    "virtualized"
+  ],
+  "homepage": "https://grida.co/packages/@grida/tree-view",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "bench": "vitest bench --run",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "prepack": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "react": "^19.0.0",
+    "tsdown": "^0.21.9",
+    "typescript": "^6",
+    "vitest": "^4"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}

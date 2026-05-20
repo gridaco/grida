@@ -36,9 +36,10 @@ export default function UIComponentsIndexPage() {
       description: "Timeline component for animation sequences",
     },
     {
-      name: "Tree",
-      href: "/ui/components/tree",
-      description: "Hierarchical tree view with drag-and-drop and multi-select",
+      name: "Tree View (@grida/tree-view)",
+      href: "/ui/components/tree-view",
+      description:
+        "Headless tree-view controller — selection, constraints, drag, virtualization",
     },
     {
       name: "Property Controls",
