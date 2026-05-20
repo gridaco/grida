@@ -1,4 +1,4 @@
-import assert from "assert";
+import { assert } from "./_assert";
 import cmath from "./index";
 
 export namespace layout {
