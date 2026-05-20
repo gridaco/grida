@@ -52,6 +52,9 @@ export function useHUDSurface(
       style: options.style,
       readonly: options.readonly,
       color: options.color,
+      pixelGrid: options.pixelGrid,
+      groups: options.groups,
+      visibility: options.visibility,
     });
     setSurface(s);
     return () => {
@@ -61,12 +64,13 @@ export function useHUDSurface(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasRef]);
 
-  // Sync style/readonly on every render (cheap).
+  // Sync style/readonly/color on every render (cheap).
   React.useEffect(() => {
     if (!surface) return;
     if (options.style) surface.setStyle(options.style);
     if (options.readonly !== undefined) surface.setReadonly(options.readonly);
-  }, [surface, options.style, options.readonly]);
+    surface.setColor(options.color ?? null);
+  }, [surface, options.style, options.readonly, options.color]);
 
   return surface;
 }

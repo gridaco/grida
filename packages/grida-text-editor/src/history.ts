@@ -93,7 +93,6 @@ export class HistoryStack {
     if (this.entries.length > MAX_ENTRIES) {
       const drop = this.entries.length - MAX_ENTRIES;
       this.entries.splice(0, drop);
-      this.cursor = Math.max(0, this.cursor - drop);
     }
     this.cursor = this.entries.length;
   }

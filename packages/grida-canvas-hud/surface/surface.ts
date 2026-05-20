@@ -91,6 +91,9 @@ export class Surface {
   private state: SurfaceState;
   private style: HUDStyle;
   private opts: SurfaceOptions;
+  // Explicit host color override; when set, beats `style.chromeColor` in
+  // every paint until cleared via `setColor(null)`.
+  private colorOverride: string | undefined;
   private width = 0;
   private height = 0;
   // Pluggable cursor renderer. `null` = use the built-in `cursorToCss`
@@ -102,8 +105,9 @@ export class Surface {
   constructor(canvas: HTMLCanvasElement, options: SurfaceOptions) {
     this.opts = options;
     this.style = mergeStyle(DEFAULT_STYLE, options.style);
+    this.colorOverride = options.color;
     this.hudCanvas = new HUDCanvas(canvas, {
-      color: options.color ?? this.style.chromeColor,
+      color: this.colorOverride ?? this.style.chromeColor,
     });
     this.state = new SurfaceState();
     if (options.readonly !== undefined) {
@@ -156,7 +160,16 @@ export class Surface {
 
   setStyle(partial: Partial<HUDStyle>): void {
     this.style = mergeStyle(this.style, partial);
-    this.hudCanvas.setColor(this.style.chromeColor);
+    this.hudCanvas.setColor(this.colorOverride ?? this.style.chromeColor);
+  }
+
+  /**
+   * Set or clear the host color override. `null` clears the override and
+   * lets `style.chromeColor` win on the next paint.
+   */
+  setColor(color: string | null): void {
+    this.colorOverride = color ?? undefined;
+    this.hudCanvas.setColor(this.colorOverride ?? this.style.chromeColor);
   }
 
   setReadonly(v: boolean): void {

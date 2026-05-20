@@ -522,11 +522,21 @@ function pushLineBody(
   const bounds_doc = shapeBounds(shape);
   const rect_screen = cmath.rect.transform(bounds_doc, transform);
   if (rect_screen.width < 1 && rect_screen.height < 1) return;
+  // Axis-aligned lines collapse to zero in one dim; inflate the AABB to at
+  // least MIN_HIT_SIZE on each axis so the body is grabbable.
+  const hitW = Math.max(rect_screen.width, MIN_HIT_SIZE);
+  const hitH = Math.max(rect_screen.height, MIN_HIT_SIZE);
+  const hitRect = {
+    x: rect_screen.x - (hitW - rect_screen.width) / 2,
+    y: rect_screen.y - (hitH - rect_screen.height) / 2,
+    width: hitW,
+    height: hitH,
+  };
   out.push({
     label: "translate",
     group,
     action: { kind: "translate_handle", ids },
-    hit: { kind: "screen_aabb", rect: rect_screen },
+    hit: { kind: "screen_aabb", rect: hitRect },
     priority: HUDHitPriority.TRANSLATE_BODY,
     cursor: "move",
   });
