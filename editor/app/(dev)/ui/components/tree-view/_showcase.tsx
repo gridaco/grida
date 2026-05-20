@@ -141,6 +141,46 @@ function SplitStage({
 const STAGE_H = "h-[420px] sm:h-full";
 
 // ───────────────────────────────────────────────────────────────────────────
+// Auto-reveal: when selection changes (typically because the user clicked a
+// shape in the SVG canvas), expand ancestors of the new focus and scroll its
+// row into view. `block: "nearest"` is a no-op when the row is already
+// on-screen, so it stays calm during normal tree-side clicks.
+// ───────────────────────────────────────────────────────────────────────────
+
+function AutoRevealSelection() {
+  const controller = useTree<DemoMeta>();
+  const focused = useTreeSnapshot<DemoMeta, NodeId | null>((c) =>
+    c.getFocused()
+  );
+  // Same-id short-circuit defends against Strict Mode's effect double-
+  // invoke (deps don't change between the pair, so the second run would
+  // otherwise re-call `reveal()` and schedule a second scroll).
+  const lastRevealed = React.useRef<NodeId | null>(null);
+  // Anchor used to scope the row lookup to this showcase's `<section>`.
+  // Both Grida and Figma showcases share a fixture id namespace, so a
+  // document-wide `querySelector` would scroll the first matching row
+  // anywhere on the page.
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
+  React.useEffect(() => {
+    if (focused === null || focused === lastRevealed.current) return;
+    lastRevealed.current = focused;
+    controller.reveal(focused);
+    const scope = anchorRef.current?.closest("section") ?? document;
+    // Wait one frame so the rows newly mounted by `reveal()` are in the DOM
+    // before we ask the browser to scroll to them.
+    const raf = requestAnimationFrame(() => {
+      scope
+        .querySelector<HTMLElement>(
+          `[data-tree-row-id="${CSS.escape(focused)}"]`
+        )
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [controller, focused]);
+  return <span ref={anchorRef} hidden aria-hidden="true" />;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // Shared delete behaviour. The package has no "delete" — deletion is a
 // source mutation the consumer owns. This is the entire recipe: pick the
 // next focus from the *pre-mutation* rows, drop the subtrees, reconcile
@@ -764,6 +804,7 @@ export function GridaShowcase() {
           delete on either side — the other follows.
         </SectionHeader>
         <TreeProvider controller={controller}>
+          <AutoRevealSelection />
           <HoverContext.Provider value={{ hovered, setHovered }}>
             <SplitStage
               frame="bg-zinc-100 ring-1 ring-zinc-200/70"
@@ -827,6 +868,7 @@ export function FigmaShowcase() {
           canvas palette changed. Reordering a layer re-stacks the design.
         </SectionHeader>
         <TreeProvider controller={controller}>
+          <AutoRevealSelection />
           <HoverContext.Provider value={{ hovered, setHovered }}>
             <SplitStage
               frame="bg-[#141417] ring-1 ring-white/5"

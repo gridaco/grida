@@ -100,10 +100,16 @@ export function RegistryExample({
             shift the page. The inner Shiki pre and the demo container
             each `overflow-auto` inside that fixed box. */}
         <TabsContent value="code" className="mt-0 min-w-0">
+          {/* `CodeBlock`'s inner `<div class="relative">` and its two
+              theme-paired `overflow-auto` panes have no height of their
+              own, so the outer `h-[360px] overflow-hidden` clips long
+              snippets instead of scrolling them. Stretch both inner
+              levels to fill the box so the existing `overflow-auto`
+              panes become real scroll containers. */}
           <CodeBlock
             code={codeSource}
             language={language}
-            className="h-[360px] min-w-0 [&_code]:!text-xs [&_pre]:!text-xs [&_pre]:h-full [&_pre]:overflow-auto [&_pre]:overscroll-contain"
+            className="h-[360px] min-w-0 [&>div]:h-full [&>div>div]:h-full [&>div>div]:overscroll-contain [&_code]:!text-xs [&_pre]:!text-xs"
           >
             <CodeBlockCopyButton />
           </CodeBlock>

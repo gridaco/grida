@@ -115,6 +115,21 @@ function PanelInner({
     (c) => c.getDrag()?.getPosition() ?? null
   );
   const isDragActive = useTreeSnapshot((c) => c.getDrag() !== null);
+  // `resolveDropPosition` returns the **document-direction** placement so
+  // the resolved `index` matches document order. For rendering the drop
+  // indicator, we want the **visual** placement — i.e. paint on the half
+  // of the row the cursor is actually on. With `flatten.reverseChildren`,
+  // document and visual `before` / `after` are inverted, so flip back for
+  // display. `into` is orientation-independent.
+  const reversed = controller.flatten.reverseChildren ?? false;
+  const visualPlacement: DropPlacement | null =
+    dragPosition === null
+      ? null
+      : !reversed || dragPosition.placement === "into"
+        ? dragPosition.placement
+        : dragPosition.placement === "before"
+          ? "after"
+          : "before";
 
   const dragRef = React.useRef<DragHandle | null>(null);
   const pendingRef = React.useRef<{
@@ -416,7 +431,7 @@ function PanelInner({
             index,
             isDropTarget: isTarget,
             dropPlacement:
-              dragPosition?.over === row.id ? dragPosition.placement : null,
+              dragPosition?.over === row.id ? visualPlacement : null,
             dropDepth,
             isDropParent: !!dragPosition && dragPosition.parent === row.id,
             indentBase,
