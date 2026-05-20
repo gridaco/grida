@@ -1,6 +1,4 @@
-# Grida Desktop — Technical Preview
-
-This is a nightly release of Grida `{{version}}`.
+# Grida Desktop `{{version}}`
 
 - macOS (signed, notarized)
   - darwin arm64 — Apple Silicon
