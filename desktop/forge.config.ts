@@ -11,6 +11,7 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
+import path from "node:path";
 
 // cli flags
 const IS_INSIDERS = process.argv.includes("--insiders");
@@ -27,6 +28,36 @@ const productName = IS_INSIDERS ? "Grida Insiders" : "Grida";
 const appBundleId = IS_INSIDERS ? "co.grida.insiders" : "co.grida.desktop";
 const icon = IS_INSIDERS ? "./images/insiders/icon" : "./images/icon";
 
+const signingIdentity = process.env.APPLE_SIGNING_IDENTITY;
+const entitlementsPath = path.join(
+  __dirname,
+  "build",
+  "entitlements.mac.plist"
+);
+
+const osxSign = signingIdentity
+  ? {
+      identity: signingIdentity,
+      optionsForFile: () => ({
+        hardenedRuntime: true,
+        entitlements: entitlementsPath,
+        "entitlements-inherit": entitlementsPath,
+        "gatekeeper-assess": false,
+      }),
+    }
+  : undefined;
+
+const osxNotarize =
+  process.env.APPLE_API_KEY &&
+  process.env.APPLE_API_KEY_ID &&
+  process.env.APPLE_API_ISSUER
+    ? {
+        appleApiKey: process.env.APPLE_API_KEY,
+        appleApiKeyId: process.env.APPLE_API_KEY_ID,
+        appleApiIssuer: process.env.APPLE_API_ISSUER,
+      }
+    : undefined;
+
 const config: ForgeConfig = {
   packagerConfig: {
     extraResource: [
@@ -38,12 +69,8 @@ const config: ForgeConfig = {
     asar: true,
     appBundleId: appBundleId,
     icon: icon,
-    osxSign: {},
-    osxNotarize: {
-      appleId: process.env.APPLE_ID ?? "",
-      appleIdPassword: process.env.APPLE_PASSWORD ?? "",
-      teamId: process.env.APPLE_TEAM_ID ?? "",
-    },
+    osxSign,
+    osxNotarize,
     win32metadata: {
       CompanyName: "Grida Inc.",
     },
@@ -148,7 +175,7 @@ const config: ForgeConfig = {
           owner: "gridaco",
           name: "grida",
         },
-        prerelease: true,
+        prerelease: process.env.PRERELEASE === "true",
       },
     },
   ],
