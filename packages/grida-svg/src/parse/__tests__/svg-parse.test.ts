@@ -121,6 +121,14 @@ describe("parse_path_first_move", () => {
   it("returns null when the M is followed by non-numeric junk", () => {
     expect(parse_path_first_move("M abc def")).toBeNull();
   });
+
+  it("parses sign-delimited compact form (M10-20)", () => {
+    // Minified path data packs pairs using the sign of the second
+    // number as the delimiter. Per SVG path syntax this is valid.
+    expect(parse_path_first_move("M10-20L30,40")).toEqual({ x: 10, y: -20 });
+    expect(parse_path_first_move("M-1.5-2.5")).toEqual({ x: -1.5, y: -2.5 });
+    expect(parse_path_first_move("M10+20")).toEqual({ x: 10, y: 20 });
+  });
 });
 
 describe("parse_leading_translate", () => {
@@ -169,6 +177,21 @@ describe("parse_leading_translate", () => {
       tx: -15,
       ty: 0.5,
       rest: "",
+    });
+  });
+
+  it("parses single-argument translate (implicit ty=0)", () => {
+    // Per SVG transform syntax, translate(tx) is valid and means
+    // translate(tx, 0). Common in minified output.
+    expect(parse_leading_translate("translate(10)")).toEqual({
+      tx: 10,
+      ty: 0,
+      rest: "",
+    });
+    expect(parse_leading_translate("translate(-3.5) rotate(45)")).toEqual({
+      tx: -3.5,
+      ty: 0,
+      rest: "rotate(45)",
     });
   });
 });

@@ -23,17 +23,22 @@
  *  number wholly; consumers anchor / chain as needed. */
 const SVG_NUMBER = "[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?";
 
-/** Leading `translate(tx ty)` (whitespace- or comma-separated). Captures
- *  tx, ty, and the trailing rest-of-transform string. */
+/** Leading `translate(tx[, ty])` (whitespace- or comma-separated). Captures
+ *  tx, optionally ty, and the trailing rest-of-transform string. Per SVG
+ *  transform syntax, the single-argument form `translate(tx)` is valid
+ *  and implies `ty = 0`. */
 const LEADING_TRANSLATE_RE = new RegExp(
-  `^\\s*translate\\(\\s*(${SVG_NUMBER})(?:\\s*,\\s*|\\s+)(${SVG_NUMBER})\\s*\\)\\s*(.*)$`
+  `^\\s*translate\\(\\s*(${SVG_NUMBER})(?:(?:\\s*,\\s*|\\s+)(${SVG_NUMBER}))?\\s*\\)\\s*(.*)$`
 );
 
 /** First `M`/`m` move in a path-`d` string: command letter + first coord
  *  pair. (We don't decode subsequent commands here — that's the path-data
- *  layer's job; this is only for "where does this path start?".) */
+ *  layer's job; this is only for "where does this path start?".)
+ *  The separator between x and y is comma, whitespace, OR an implicit
+ *  sign-delimiter: in minified path data, `M10-20` packs the pair with
+ *  the leading sign of `-20` acting as the delimiter. */
 const PATH_FIRST_MOVE_RE = new RegExp(
-  `^\\s*[Mm]\\s*(${SVG_NUMBER})(?:\\s*,\\s*|\\s+)(${SVG_NUMBER})`
+  `^\\s*[Mm]\\s*(${SVG_NUMBER})(?:\\s*,\\s*|\\s+|(?=[+-]))(${SVG_NUMBER})`
 );
 
 /** All numeric tokens in a string. Reused across `parse_points`. */
@@ -101,11 +106,13 @@ export namespace svg_parse {
   }
 
   /**
-   * Parse a leading `translate(tx, ty)` from a transform attribute.
+   * Parse a leading `translate(tx[, ty])` from a transform attribute.
    *
    * Returns the parsed `tx`, `ty`, and the trailing transform string
    * (everything after the closing paren, trimmed). Returns `null` if
-   * the transform doesn't begin with a `translate(...)` function.
+   * the transform doesn't begin with a `translate(...)` function. Per
+   * SVG transform syntax, a single-argument `translate(tx)` is valid
+   * and resolves to `ty = 0`.
    *
    * Used by `compose_leading_translate` to coalesce repeated drag
    * deltas into a single leading translate term, keeping the
@@ -118,7 +125,7 @@ export namespace svg_parse {
     const m = transform.match(LEADING_TRANSLATE_RE);
     if (!m) return null;
     const tx = parseFloat(m[1]);
-    const ty = parseFloat(m[2]);
+    const ty = m[2] === undefined ? 0 : parseFloat(m[2]);
     if (!Number.isFinite(tx) || !Number.isFinite(ty)) return null;
     return { tx, ty, rest: m[3].trim() };
   }

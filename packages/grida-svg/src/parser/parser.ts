@@ -236,18 +236,23 @@ export function parse_svg(src: string): ParseResult {
       if (src[i + 1] === "/") {
         const end = src.indexOf(">", i + 2);
         if (end === -1) throw new Error("unterminated end tag");
-        // We don't validate matching tag name strictly — just pop.
-        const open = open_stack.pop();
+        const body = src.slice(i + 2, end);
+        const m = body.match(/^(\s*)([^\s]+)(\s*)$/);
+        if (!m) throw new Error("malformed end tag at " + i);
+        const closing_raw_tag = m[2];
+        const open = open_stack[open_stack.length - 1];
         if (!open) throw new Error("unexpected end tag at " + i);
+        if (open.raw_tag !== closing_raw_tag) {
+          throw new Error(
+            `mismatched end tag: expected </${open.raw_tag}> but found </${closing_raw_tag}>`
+          );
+        }
+        open_stack.pop();
         ns_stack.pop();
         default_ns_stack.pop();
         // Preserve the leading/trailing trivia in the close tag.
-        const body = src.slice(i + 2, end);
-        const m = body.match(/^(\s*)([^\s]+)(\s*)$/);
-        if (m) {
-          open.close_tag_leading = m[1];
-          open.close_tag_trailing = m[3];
-        }
+        open.close_tag_leading = m[1];
+        open.close_tag_trailing = m[3];
         i = end + 1;
         continue;
       }
