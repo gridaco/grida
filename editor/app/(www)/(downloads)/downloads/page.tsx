@@ -24,7 +24,7 @@ export default async function DownloadsPage() {
   const userAgent = headersList.get("user-agent");
 
   const os = downloads.getDesktopOS(userAgent || "");
-  const links = await downloads.getLinks_v001(os);
+  const links = await downloads.getLinksForPage(os);
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -96,24 +96,10 @@ export default async function DownloadsPage() {
 function DownloadButtons({ links }: { links: downloads.DownloadLinks }) {
   return (
     <div className="container max-w-3xl flex flex-wrap justify-center gap-3 mx-auto">
-      {/* macOS Universal */}
-      <Link href={links.mac_dmg_universal} download>
-        <Button size="lg" variant="outline">
-          <Apple className="size-4" /> Download for macOS (Universal)
-        </Button>
-      </Link>
-
       {/* macOS Apple Silicon */}
       <Link href={links.mac_dmg_arm64} download>
         <Button size="lg" variant="outline">
           <Apple className="size-4" /> Download for macOS (Apple Silicon)
-        </Button>
-      </Link>
-
-      {/* macOS Intel */}
-      <Link href={links.mac_dmg_x64} download>
-        <Button size="lg" variant="outline">
-          <Apple className="size-4" /> Download for macOS (Intel-based Macs)
         </Button>
       </Link>
 

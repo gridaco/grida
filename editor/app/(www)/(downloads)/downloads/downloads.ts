@@ -1,4 +1,5 @@
 import { Octokit, type RestEndpointMethodTypes } from "@octokit/rest";
+import { unstable_cache } from "next/cache";
 import assert from "assert";
 
 export namespace downloads {
@@ -7,9 +8,7 @@ export namespace downloads {
   type GithubReleaseAsset = GithubReleaseAssets[number];
 
   export interface DownloadLinks {
-    mac_dmg_x64: string;
     mac_dmg_arm64: string;
-    mac_dmg_universal: string;
     linux_deb_x64: string;
     linux_rpm_x64: string;
     linux_deb_arm64: string;
@@ -18,7 +17,7 @@ export namespace downloads {
   }
 
   export type Platform = "mac" | "windows" | "linux";
-  export type Arch = "x64" | "arm64" | "universal";
+  export type Arch = "x64" | "arm64";
   export type Maker = "dmg" | "squirrel.windows" | "deb" | "rpm";
 
   type Distro = {
@@ -27,7 +26,6 @@ export namespace downloads {
     ext: "dmg" | "exe" | "deb" | "rpm";
     arch: {
       arm64?: string | undefined;
-      universal?: string | undefined;
       x64?: string | undefined;
     };
   };
@@ -45,8 +43,6 @@ export namespace downloads {
         ext: "dmg",
         arch: {
           arm64: "arm64",
-          universal: "universal",
-          x64: "x64",
         },
       },
     ],
@@ -97,9 +93,7 @@ export namespace downloads {
   export async function getLinks(): Promise<DownloadLinks> {
     const f = new Fetcher();
 
-    const mac_dmg_x64 = await f.getAsset("mac", "dmg", "x64");
     const mac_dmg_arm64 = await f.getAsset("mac", "dmg", "arm64");
-    const mac_dmg_universal = await f.getAsset("mac", "dmg", "universal");
     const linux_deb_x64 = await f.getAsset("linux", "deb", "x64");
     const linux_rpm_x64 = await f.getAsset("linux", "rpm", "x64");
     const linux_deb_arm64 = await f.getAsset("linux", "deb", "arm64");
@@ -107,9 +101,7 @@ export namespace downloads {
     const windows_x64 = await f.getAsset("windows", "squirrel.windows", "x64");
 
     return {
-      mac_dmg_x64: mac_dmg_x64.browser_download_url,
       mac_dmg_arm64: mac_dmg_arm64.browser_download_url,
-      mac_dmg_universal: mac_dmg_universal.browser_download_url,
       linux_deb_x64: linux_deb_x64.browser_download_url,
       linux_rpm_x64: linux_rpm_x64.browser_download_url,
       linux_deb_arm64: linux_deb_arm64.browser_download_url,
@@ -118,9 +110,82 @@ export namespace downloads {
     };
   }
 
+  export interface DownloadLinksForPage extends DownloadLinks {
+    default: {
+      platform: Platform;
+      maker: Maker;
+      arch: Arch;
+      url: string;
+    } | null;
+  }
+
+  function pickDefault(
+    os: Platform | null,
+    links: DownloadLinks
+  ): DownloadLinksForPage["default"] {
+    switch (os) {
+      case "mac":
+        return {
+          platform: "mac",
+          maker: "dmg",
+          arch: "arm64",
+          url: links.mac_dmg_arm64,
+        };
+      case "windows":
+        return {
+          platform: "windows",
+          maker: "squirrel.windows",
+          arch: "x64",
+          url: links.windows_exe_x64,
+        };
+      case "linux":
+        return {
+          platform: "linux",
+          maker: "deb",
+          arch: "x64",
+          url: links.linux_deb_x64,
+        };
+      default:
+        return null;
+    }
+  }
+
+  // Cached wrapper around getLinks() — hits GitHub's unauthenticated
+  // releases endpoint at most ~once per hour per region, keeping the
+  // page out of trouble with the 60 req/hr/IP rate limit.
+  // `unstable_cache` only memoizes successful resolutions; on throw,
+  // the next render re-attempts (so transient API blips self-heal).
+  const getCachedLinks = unstable_cache(
+    () => getLinks(),
+    ["downloads:getLinks"],
+    {
+      revalidate: 3600,
+    }
+  );
+
+  /**
+   * Page-bound helper: latest-release links + OS-aware default, cached.
+   * Falls back to the static v0.0.1 URLs if the GitHub API is unreachable.
+   */
+  export async function getLinksForPage(
+    os: Platform | null
+  ): Promise<DownloadLinksForPage> {
+    try {
+      const links = await getCachedLinks();
+      return { ...links, default: pickDefault(os, links) };
+    } catch (err) {
+      console.warn(
+        "[downloads] getLinks failed; falling back to static v0.0.1 links.",
+        err
+      );
+      return getLinks_v001(os);
+    }
+  }
+
   /**
    * @deprecated
-   * temporary static version of getLinks, until we find a reliable way to fetch release without rate limiting
+   * Static fallback used only when the GitHub API is unreachable.
+   * Prefer `getLinksForPage()`, which calls this internally on failure.
    */
   export function getLinks_v001(
     platform: Platform | null,
@@ -134,12 +199,8 @@ export namespace downloads {
     } | null;
   } {
     const links: DownloadLinks = {
-      mac_dmg_x64:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-x64.dmg",
       mac_dmg_arm64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-arm64.dmg",
-      mac_dmg_universal:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-universal.dmg",
       linux_deb_x64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/grida_0.0.1_amd64.deb",
       linux_rpm_x64:
@@ -163,8 +224,8 @@ export namespace downloads {
         d = {
           platform: "mac",
           maker: "dmg",
-          arch: "universal",
-          url: links.mac_dmg_universal,
+          arch: "arm64",
+          url: links.mac_dmg_arm64,
         };
         break;
       }
@@ -189,12 +250,8 @@ export namespace downloads {
 
     return {
       default: d,
-      mac_dmg_x64:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-x64.dmg",
       mac_dmg_arm64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-arm64.dmg",
-      mac_dmg_universal:
-        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-universal.dmg",
       linux_deb_x64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/grida_0.0.1_amd64.deb",
       linux_rpm_x64:
@@ -230,9 +287,25 @@ export namespace downloads {
     }
 
     async fetch() {
-      const release = await fetchrelease();
-      this.m_tag = release.data.tag_name;
-      this.m_assets = release.data.assets;
+      // Memoize: subsequent calls return the same release without re-hitting
+      // GitHub. `getLinks()` resolves 6 assets via separate `getAsset` calls;
+      // without this, a single cache miss in `getCachedLinks` would burn
+      // 6 unauthenticated requests against the 60/hr/IP limit.
+      //
+      // Failures are memoized as `[]` so the same cap applies on the error
+      // path — otherwise `m_assets` stays null and each of the 6 sequential
+      // getAsset calls retries the API. `getAsset` already handles the
+      // empty-asset case gracefully via its assert+catch, returning null.
+      // A fresh Fetcher is created per render, so the error cache is
+      // per-render and transient failures self-heal on the next request.
+      if (this.m_assets) return this.m_assets;
+      try {
+        const release = await fetchrelease();
+        this.m_tag = release.data.tag_name;
+        this.m_assets = release.data.assets;
+      } catch {
+        this.m_assets = [];
+      }
       return this.m_assets;
     }
 
