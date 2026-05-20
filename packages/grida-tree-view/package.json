@@ -1,6 +1,6 @@
 {
   "name": "@grida/tree-view",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "description": "Headless, agnostic tree-view controller for the Grida editor.",
   "keywords": [

@@ -76,6 +76,7 @@ npx shadcn@latest add https://grida.co/r/tree-view-row.json
 ### React bindings (`@grida/tree-view/react`)
 
 - **One provider, one snapshot hook.** `<TreeProvider controller={…}>` plus `useTree()` and `useTreeSnapshot(selector, equals?)` — the `useEditorState` pattern.
+- **Typed-context factory.** `createTreeContext<TMeta>()` returns a provider/hook trio that preserves `TMeta` end-to-end — no `as` casts at the call site. The un-typed exports stay available for the quickstart path.
 - **Identity-stable selectors.** `Object.is` short-circuit prevents re-renders when the selected slice is unchanged.
 - **`useSyncExternalStore`-backed.** Concurrent-mode safe.
 - **Optional peer.** React 18+ only loaded if you import `/react`; the core is React-free.
@@ -186,6 +187,36 @@ import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
 React surface — there are no per-row hooks shipped. The intended pattern
 is `useEditorState`-style: one provider, one subscription hook,
 consumers select whatever slice they want.
+
+### Typed React context (recommended for typed apps)
+
+The top-level `useTree<T>()` / `useTreeSnapshot<T, R>()` accept a meta
+parameter, but it has to be re-supplied at every call site — forgetting
+silently widens to `unknown` and the meta type quietly disappears from
+the call site. For real applications with a known meta shape, use the
+typed-context factory instead. It returns its own provider plus hook
+trio bound to your meta:
+
+```ts
+import { createTreeContext } from "@grida/tree-view/react";
+
+const { TreeProvider, useTree, useTreeSnapshot } =
+  createTreeContext<SvgNodeMeta>();
+
+// Inside a component:
+const ctrl = useTree(); // TreeController<SvgNodeMeta>
+const label = useTreeSnapshot(
+  (
+    c // c: TreeController<SvgNodeMeta>
+  ) => c.getSource().getNode(id).meta?.name ?? "untitled"
+);
+```
+
+Each `createTreeContext` call creates its own React context — typed and
+un-typed providers are independent (a `useTree()` from one will not see
+a controller mounted under the other). Pick one per tree. The factory
+adds no runtime overhead beyond a single `createContext` call; it runs
+through the same `useSyncExternalStore` path as the un-typed hook.
 
 ## State ownership
 
@@ -307,6 +338,65 @@ version/identity policy — what counts as "changed", when to bump — is
 yours; only you know your store's change semantics (the same reason
 `InMemoryTreeSource.applyIntent` declines to auto-handle `copy`). The ~30
 lines above are the whole pattern.
+
+#### Coarser subscribe than version
+
+If your store's `subscribe` fires more often than your tree-view-relevant
+version bumps (per-tick attribute writes, animation ticks, drag-time
+transform updates, etc.), gate the listener at the source layer —
+otherwise the controller invalidates `rows` on every emit and your panel
+re-renders at store-tick frequency. Track the last-seen structural
+version inside `subscribe` and only forward the call when it actually
+advances:
+
+```ts
+subscribe(listener: () => void) {
+  let last = store.structure_version;
+  return store.subscribe(() => {
+    const next = store.structure_version;
+    if (next !== last) {
+      last = next;
+      listener();
+    }
+  });
+}
+```
+
+The principle is the same as `getNode` reference stability: the
+controller trusts `subscribe` to notify _only_ when something the tree
+view cares about changed. Editors that maintain a separate "structural"
+version counter (Grida's SVG editor, most Immer-backed stores) get this
+for free with the snippet above; if your store has no such counter,
+either add one at the store layer or diff the tree shape inside the
+listener.
+
+#### WeakMap on a reference-stable host node
+
+The snapshot example above keys the adapter cache on the host's
+`(meta, childIds)` pair. That works for any source. But if your host
+store already returns a reference-stable per-node object across version
+bumps (the common case for wasm- or Immer-backed editors), you can key a
+WeakMap directly on that object instead — no per-tick map rebuild, no
+`prev === next` triple-check:
+
+```ts
+const cache = new WeakMap<HostNode, TreeNode<MyMeta>>();
+getNode(id) {
+  const hn = this.host.nodeOf(id);                 // already stable per host
+  let n = cache.get(hn);
+  if (!n) {
+    n = adapt(hn);
+    cache.set(hn, n);
+  }
+  return n;
+}
+```
+
+If your store already gives you reference-stable per-node objects across
+version bumps, key the cache on the underlying node — the adapter object
+stays stable as long as the source does. The WeakMap also collects
+entries automatically as the host drops its nodes, so there's no
+explicit invalidation step on the consumer side.
 
 ### External selection adapter
 

@@ -1,4 +1,4 @@
-import assert from "assert";
+import { assert } from "./_assert";
 
 /**
  * cmath, a 2D canvas math module.
