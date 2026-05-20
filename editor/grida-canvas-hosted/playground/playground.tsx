@@ -111,6 +111,7 @@ import { WithSize } from "@/grida-canvas-react/viewport/size";
 import { useDPR } from "@/grida-canvas-react/viewport/hooks/use-dpr";
 import { AgentPanel } from "@/grida-canvas-hosted/ai/scaffold";
 import { AgentChatProvider } from "@/grida-canvas-hosted/ai/scaffold/chat-provider";
+import { StarterKitOrgIdProvider } from "@/grida-canvas-react-starter-kit/starterkit-host/org-id-provider";
 import { PlaygroundMenuContent } from "./uxhost-menu";
 import { Library } from "../library/library";
 import { io } from "@grida/io";
@@ -320,6 +321,14 @@ export type CanvasPlaygroundProps = {
    * so this is intentionally off by default.
    */
   warnOnUnsavedChanges?: boolean;
+  /**
+   * Verified organization id from the host's workspace context. Threaded
+   * to AI seam server actions (e.g. image upscale / remove-background) via
+   * `<StarterKitOrgIdProvider />` (GRIDA-SEC-003). Pass `null`/`undefined`
+   * for workspace-less playgrounds; AI tools will surface a "sign in"
+   * message instead of erroring.
+   */
+  organizationId?: number | null;
 } & Partial<UserCustomTemplatesProps>;
 
 export default function CanvasPlayground({
@@ -330,6 +339,7 @@ export default function CanvasPlayground({
   room_id,
   filekey,
   warnOnUnsavedChanges = false,
+  organizationId,
 }: CanvasPlaygroundProps) {
   // Determine filekey: explicit prop > auto-generated from src > default "current"
   const resolvedFilekey = useMemo(() => {
@@ -553,12 +563,14 @@ export default function CanvasPlayground({
                   <main className="w-full h-full select-none relative">
                     <WindowGlobalCurrentEditorProvider />
                     <UserCustomTemplatesProvider templates={templates}>
-                      <Consumer
-                        backend={backend}
-                        canvasRef={handleCanvasRef}
-                        onSaved={markSaved}
-                        filekey={resolvedFilekey}
-                      />
+                      <StarterKitOrgIdProvider organizationId={organizationId}>
+                        <Consumer
+                          backend={backend}
+                          canvasRef={handleCanvasRef}
+                          onSaved={markSaved}
+                          filekey={resolvedFilekey}
+                        />
+                      </StarterKitOrgIdProvider>
                     </UserCustomTemplatesProvider>
                   </main>
                 </SidebarProvider>

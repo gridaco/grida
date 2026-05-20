@@ -2,7 +2,7 @@ pre-commit:
   parallel: true
   jobs:
     - name: oxfmt
-      glob: "*.{mts,ts,tsx,mjs,js,jsx,json,css,md,mdx,html}"
+      glob: "*.{mts,ts,tsx,mjs,js,jsx,json,jsonc,css,md,mdx,html}"
       run: pnpm oxfmt {staged_files}
       stage_fixed: true
 

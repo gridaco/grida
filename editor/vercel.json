@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "bash skip-build.sh"
+  "ignoreCommand": "bash skip-build.sh",
+  "crons": [
+    {
+      "path": "/internal/cron/billing-reconcile",
+      "schedule": "0 * * * *"
+    }
+  ]
 }

@@ -97,6 +97,12 @@ const __create_service_role_client = <
  * Service-role Supabase clients (RLS-bypassing). Per-schema namespace —
  * pick the one matching the table you're querying.
  *
+ * Construction is **lazy and memoized per schema**: importing this module
+ * is free (does not touch env), and each `service_role.<schema>` is built
+ * on first access then cached. Eager top-level construction was a latent
+ * landmine for any test or build phase that loads the module without
+ * `SUPABASE_SECRET_KEY` set — the import itself would throw.
+ *
  * Usage rule: **always reference `service_role.<schema>` inline at every
  * call site.** Do not alias it to a local variable (`const db = service_role.workspace`)
  * or re-export it. The point of the long, explicit name is that any reviewer
@@ -109,25 +115,80 @@ const __create_service_role_client = <
  *
  * @deprecated - deprecation warning for extra security (not actually deprecated)
  */
-export namespace service_role {
-  export const workspace = __create_service_role_client<"public">("public");
-  export const ciam =
-    __create_service_role_client<"grida_ciam_public">("grida_ciam_public");
-  export const library =
-    __create_service_role_client<"grida_library">("grida_library");
-  export const forms =
-    __create_service_role_client<"grida_forms">("grida_forms");
-  export const storage =
-    __create_service_role_client<"grida_storage">("grida_storage");
-  export const canvas =
-    __create_service_role_client<"grida_canvas">("grida_canvas");
-  export const sites =
-    __create_service_role_client<"grida_sites">("grida_sites");
-  export const commerce =
-    __create_service_role_client<"grida_commerce">("grida_commerce");
-  export const west_referral =
-    __create_service_role_client<"grida_west_referral">("grida_west_referral");
-  export const xsb =
-    __create_service_role_client<"grida_x_supabase">("grida_x_supabase");
-  export const www = __create_service_role_client<"grida_www">("grida_www");
+function memo<T>(factory: () => T): () => T {
+  let value: T | undefined;
+  let initialized = false;
+  return () => {
+    if (!initialized) {
+      value = factory();
+      initialized = true;
+    }
+    return value as T;
+  };
 }
+
+const _workspace = memo(() => __create_service_role_client<"public">("public"));
+const _ciam = memo(() =>
+  __create_service_role_client<"grida_ciam_public">("grida_ciam_public")
+);
+const _library = memo(() =>
+  __create_service_role_client<"grida_library">("grida_library")
+);
+const _forms = memo(() =>
+  __create_service_role_client<"grida_forms">("grida_forms")
+);
+const _storage = memo(() =>
+  __create_service_role_client<"grida_storage">("grida_storage")
+);
+const _canvas = memo(() =>
+  __create_service_role_client<"grida_canvas">("grida_canvas")
+);
+const _sites = memo(() =>
+  __create_service_role_client<"grida_sites">("grida_sites")
+);
+const _commerce = memo(() =>
+  __create_service_role_client<"grida_commerce">("grida_commerce")
+);
+const _west_referral = memo(() =>
+  __create_service_role_client<"grida_west_referral">("grida_west_referral")
+);
+const _xsb = memo(() =>
+  __create_service_role_client<"grida_x_supabase">("grida_x_supabase")
+);
+const _www = memo(() => __create_service_role_client<"grida_www">("grida_www"));
+
+export const service_role = {
+  get workspace() {
+    return _workspace();
+  },
+  get ciam() {
+    return _ciam();
+  },
+  get library() {
+    return _library();
+  },
+  get forms() {
+    return _forms();
+  },
+  get storage() {
+    return _storage();
+  },
+  get canvas() {
+    return _canvas();
+  },
+  get sites() {
+    return _sites();
+  },
+  get commerce() {
+    return _commerce();
+  },
+  get west_referral() {
+    return _west_referral();
+  },
+  get xsb() {
+    return _xsb();
+  },
+  get www() {
+    return _www();
+  },
+};

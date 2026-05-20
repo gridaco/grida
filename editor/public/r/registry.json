@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "grida",
+  "homepage": "https://grida.co",
+  "items": [
+    {
+      "name": "tree-view-row",
+      "type": "registry:component",
+      "title": "Tree View Row",
+      "files": [
+        {
+          "path": "components/tree-view-row.tsx",
+          "type": "registry:component"
+        }
+      ]
+    }
+  ]
+}

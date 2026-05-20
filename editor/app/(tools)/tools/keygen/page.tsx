@@ -6,14 +6,14 @@ import ServerSecretGeneratorTool from "./_page";
 export const metadata: Metadata = {
   title: "Keygen (Server Secret Generator)",
   description:
-    "Generate secure server secrets locally: S2S API keys, webhook signing secrets, JWT keys, session secrets, encryption keys, and PKCE.",
+    "Generate secure server secrets locally: S2S API keys, webhook secrets, JWT, session, CRON_SECRET, encryption keys, and PKCE.",
   keywords:
-    "keygen, server secret generator, s2s api key, webhook signing secret, jwt secret, session secret, aes-256-gcm key, xchacha20-poly1305 key, pkce",
+    "keygen, server secret generator, s2s api key, webhook signing secret, jwt secret, session secret, cron_secret, vercel cron secret, aes-256-gcm key, xchacha20-poly1305 key, pkce",
   category: "Developer Tools",
   openGraph: {
     title: "Keygen (Server Secret Generator)",
     description:
-      "Generate secure server secrets locally: S2S API keys, webhook signing secrets, JWT keys, session secrets, encryption keys, and PKCE.",
+      "Generate secure server secrets locally: S2S API keys, webhook secrets, JWT, session, CRON_SECRET, encryption keys, and PKCE.",
     type: "website",
     url: "https://grida.co/tools/keygen",
   },

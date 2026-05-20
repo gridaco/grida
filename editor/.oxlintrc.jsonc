@@ -21,6 +21,74 @@
             "message": "Use editor/lib/billing instead.",
             "allowTypeImports": true,
           },
+          {
+            "name": "replicate",
+            "message": "Use editor/lib/ai/server (grida, runPrediction) instead. GRIDA-SEC-003.",
+            "allowTypeImports": true,
+          },
+          {
+            "name": "openai",
+            "message": "Use editor/lib/ai/server instead. GRIDA-SEC-003.",
+            "allowTypeImports": true,
+          },
+          {
+            "name": "@anthropic-ai/sdk",
+            "message": "Use editor/lib/ai/server instead. GRIDA-SEC-003.",
+            "allowTypeImports": true,
+          },
+        ],
+        "patterns": [
+          {
+            // Provider-specific AI SDK packages. Excludes `@ai-sdk/rsc`
+            // (server-component streaming utilities) and `@ai-sdk/react`
+            // (client hooks) — neither makes billed provider calls.
+            // Patterns also cover subpath imports (e.g. `@ai-sdk/openai/internal`).
+            "group": [
+              "@ai-sdk/openai",
+              "@ai-sdk/openai/**",
+              "@ai-sdk/openai-compatible",
+              "@ai-sdk/openai-compatible/**",
+              "@ai-sdk/anthropic",
+              "@ai-sdk/anthropic/**",
+              "@ai-sdk/google",
+              "@ai-sdk/google/**",
+              "@ai-sdk/google-vertex",
+              "@ai-sdk/google-vertex/**",
+              "@ai-sdk/amazon-bedrock",
+              "@ai-sdk/amazon-bedrock/**",
+              "@ai-sdk/azure",
+              "@ai-sdk/azure/**",
+              "@ai-sdk/cohere",
+              "@ai-sdk/cohere/**",
+              "@ai-sdk/groq",
+              "@ai-sdk/groq/**",
+              "@ai-sdk/mistral",
+              "@ai-sdk/mistral/**",
+              "@ai-sdk/perplexity",
+              "@ai-sdk/perplexity/**",
+              "@ai-sdk/replicate",
+              "@ai-sdk/replicate/**",
+              "@ai-sdk/xai",
+              "@ai-sdk/xai/**",
+            ],
+            "message": "Use editor/lib/ai/server (grida) instead. GRIDA-SEC-003.",
+            "allowTypeImports": true,
+          },
+          {
+            // Block subpath imports of provider SDKs (e.g. `openai/resources`,
+            // `@anthropic-ai/sdk/foo`, `replicate/lib/...`). The bare-name
+            // imports are already blocked above via `paths`.
+            "group": ["openai/**", "replicate/**", "@anthropic-ai/sdk/**"],
+            "message": "Use editor/lib/ai/server instead. GRIDA-SEC-003.",
+            "allowTypeImports": true,
+          },
+          {
+            // Block subpath imports of the Stripe SDK (e.g. `stripe/lib/...`).
+            // The bare-name import is already blocked above via `paths`.
+            "group": ["stripe/**"],
+            "message": "Use editor/lib/billing instead.",
+            "allowTypeImports": true,
+          },
         ],
       },
     ],
@@ -35,6 +103,24 @@
     {
       // The single Stripe seam.
       "files": ["lib/billing/index.ts"],
+      "rules": {
+        "no-restricted-imports": "off",
+      },
+    },
+    {
+      // The AI provider seam — GRIDA-SEC-003.
+      // Only these files may import provider SDKs directly.
+      "files": [
+        "lib/ai/server.ts",
+        "lib/ai/models.ts",
+        // The canvas agent constructs an OpenAI `tools.webSearch` factory
+        // (not a billed provider call). Keeping it inside the allowlist
+        // avoids a special-case eslint comment per tool.
+        "grida-canvas-hosted/ai/agent/server-agent.ts",
+        // Metadata endpoint — lists OpenAI's available models for the
+        // model selector UI. Not a billed inference call.
+        "app/(api)/private/ai/models/openai/route.ts",
+      ],
       "rules": {
         "no-restricted-imports": "off",
       },

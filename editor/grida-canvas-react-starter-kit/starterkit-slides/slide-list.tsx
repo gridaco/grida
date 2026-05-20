@@ -1,13 +1,25 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import {
-  dragAndDropFeature,
-  selectionFeature,
-  syncDataLoaderFeature,
-} from "@headless-tree/core";
-import { useTree } from "@headless-tree/react";
+  TreeController,
+  passedDragThreshold,
+  placementFromY,
+  type DragHandle,
+  type DropPlacement,
+  type NodeId,
+  type TreeNode,
+  type TreeSource,
+} from "@grida/tree-view";
+import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -294,7 +306,95 @@ const SlideRow = React.forwardRef<
 SlideRow.displayName = "SlideRow";
 
 // ---------------------------------------------------------------------------
-// SlideList — D&D reorderable list via @headless-tree
+// SlideTreeSource — read-only @grida/tree-view adapter over editor slide state
+// ---------------------------------------------------------------------------
+//
+// The editor owns slide order; this is a thin live *view*, never a copy.
+// `@grida/tree-view` never mutates the source — reorders come back out as a
+// `move` intent which we apply via `editor.doc.mv` (see SlideList).
+
+const SLIDE_ROOT = "<document>";
+const NO_CHILDREN: readonly NodeId[] = Object.freeze([]);
+
+class SlideTreeSource implements TreeSource<grida.program.nodes.TrayNode> {
+  private _version = 0;
+  private _listeners = new Set<() => void>();
+  private _root: TreeNode<grida.program.nodes.TrayNode>;
+  private _nodes = new Map<NodeId, TreeNode<grida.program.nodes.TrayNode>>();
+
+  constructor(
+    trayIds: readonly string[],
+    traysmap: Record<string, grida.program.nodes.TrayNode>
+  ) {
+    this._root = { id: SLIDE_ROOT, parent: null, children: [] };
+    this._snapshot(trayIds, traysmap);
+  }
+
+  /**
+   * Re-snapshot from the editor's current slide order. Node identities are
+   * reused when unchanged on purpose: `useTreeSnapshot` treats a fresh
+   * `getNode()` reference as a store change, so churning them defeats the
+   * package's memoization (and can loop). See FEEDBACKS.md.
+   */
+  refresh(
+    trayIds: readonly string[],
+    traysmap: Record<string, grida.program.nodes.TrayNode>
+  ): void {
+    this._snapshot(trayIds, traysmap);
+    this._version++;
+    for (const l of this._listeners) l();
+  }
+
+  private _snapshot(
+    trayIds: readonly string[],
+    traysmap: Record<string, grida.program.nodes.TrayNode>
+  ): void {
+    const next = new Map<NodeId, TreeNode<grida.program.nodes.TrayNode>>();
+    for (const id of trayIds) {
+      const prev = this._nodes.get(id);
+      const meta = traysmap[id];
+      next.set(
+        id,
+        prev && prev.meta === meta
+          ? prev
+          : { id, parent: SLIDE_ROOT, children: NO_CHILDREN, meta }
+      );
+    }
+    this._nodes = next;
+    this._root = { id: SLIDE_ROOT, parent: null, children: [...trayIds] };
+  }
+
+  getRoot(): NodeId {
+    return SLIDE_ROOT;
+  }
+  getNode(id: NodeId): TreeNode<grida.program.nodes.TrayNode> {
+    if (id === SLIDE_ROOT) return this._root;
+    const n = this._nodes.get(id);
+    if (!n) throw new Error(`[slide-list] unknown tray: ${id}`);
+    return n;
+  }
+  getVersion(): number {
+    return this._version;
+  }
+  subscribe(listener: () => void): () => void {
+    this._listeners.add(listener);
+    return () => {
+      this._listeners.delete(listener);
+    };
+  }
+  getLabel(id: NodeId): string {
+    return this._nodes.get(id)?.meta?.name ?? id;
+  }
+  isContainer(): boolean {
+    return false;
+  }
+  showRoot(): boolean {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SlideList — D&D reorderable list via @grida/tree-view
 // ---------------------------------------------------------------------------
 
 export function SlideList() {
@@ -311,132 +411,261 @@ export function SlideList() {
   }, [slides]);
 
   const active_tray_id = current?.id ?? slides[0]?.id ?? null;
-  const selectedItems = active_tray_id ? [active_tray_id] : [];
   const sceneId = mode.sceneId;
 
-  const tree = useTree<grida.program.nodes.TrayNode>({
-    rootItemId: "<document>",
-    canReorder: true,
-    initialState: {
-      selectedItems,
-    },
-    state: {
-      selectedItems,
-    },
-    setSelectedItems: (items) => {
-      const [id] = items as string[];
-      if (id) {
-        mode.goToSlide(id);
-      }
-    },
-    getItemName: (item) => {
-      if (item.getId() === "<document>") return "<document>";
-      return item.getItemData().name;
-    },
-    isItemFolder: () => false,
-    onDrop(items, target) {
-      if (!sceneId) return;
+  const source = useMemo(
+    () => new SlideTreeSource(tray_ids, traysmap),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  const controller = useMemo(
+    () => new TreeController<grida.program.nodes.TrayNode>({ source }),
+    [source]
+  );
+  useEffect(() => () => controller.dispose(), [controller]);
 
-      const ids = items.map((item) => item.getId());
-      if (
-        target.item.getId() !== "<document>" ||
-        ids.some((id) => !tray_ids.includes(id))
-      ) {
-        return;
-      }
-
-      const draggedSet = new Set(ids);
-      const remaining = tray_ids.filter((id) => !draggedSet.has(id));
-      const insertionIndex =
-        "insertionIndex" in target && typeof target.insertionIndex === "number"
-          ? Math.max(0, Math.min(target.insertionIndex, remaining.length))
-          : 0;
-
-      // Reorder by moving each dragged tray to its new absolute index, in
-      // order. `editor.doc.mv` appends/inserts at the given index under the
-      // same parent (the scene).
-      ids.forEach((id, i) => {
-        editor.doc.mv([id], sceneId, insertionIndex + i);
-      });
-    },
-    dataLoader: {
-      getItem(itemId) {
-        const item = traysmap[itemId];
-        if (item) return item;
-        if (itemId === "<document>") {
-          return {
-            id: "<document>",
-            name: "<document>",
-          } as grida.program.nodes.TrayNode;
-        }
-        return { id: itemId, name: "" } as grida.program.nodes.TrayNode;
-      },
-      getChildren: (itemId) => {
-        if (itemId === "<document>") return tray_ids;
-        return [];
-      },
-    },
-    features: [syncDataLoaderFeature, selectionFeature, dragAndDropFeature],
-  });
-
-  // Scroll the active slide into view
+  // Push editor slide-order changes into the read-only source.
   useEffect(() => {
-    if (!active_tray_id) return;
-    const item = tree.getItems().find((i) => i.getId() === active_tray_id);
-    if (item) {
-      item.setFocused();
-      item.scrollTo({
+    source.refresh(tray_ids, traysmap);
+  }, [source, tray_ids, traysmap]);
+
+  // Reorder bridge: the package never mutates — `commitDrag()` emits a
+  // `move` intent and we apply it. `to.index` is already the post-removal
+  // insertion index (consecutive items step forward), so `to.index + i`
+  // reproduces the previous hand-rolled reorder exactly.
+  useEffect(() => {
+    return controller.subscribe("intent", (intent) => {
+      if (intent.kind !== "move" || !sceneId) return;
+      const ids = intent.items.filter((id) => id in traysmap);
+      ids.forEach((id, i) => {
+        editor.doc.mv([id], sceneId, intent.to.index + i);
+      });
+    });
+  }, [controller, editor, sceneId, traysmap]);
+
+  return (
+    <TreeProvider controller={controller}>
+      <SlideListInner
+        activeTrayId={active_tray_id}
+        trayIds={tray_ids}
+        traysmap={traysmap}
+        isLastSlide={slides.length <= 1}
+        aspectRatio={slideAspectRatio(mode.config)}
+        onGoToSlide={mode.goToSlide}
+      />
+    </TreeProvider>
+  );
+}
+
+function SlideListInner({
+  activeTrayId,
+  trayIds,
+  traysmap,
+  isLastSlide,
+  aspectRatio,
+  onGoToSlide,
+}: {
+  activeTrayId: string | null;
+  trayIds: string[];
+  traysmap: Record<string, grida.program.nodes.TrayNode>;
+  isLastSlide: boolean;
+  aspectRatio: string;
+  onGoToSlide: (id: string) => void;
+}) {
+  const controller = useTree<grida.program.nodes.TrayNode>();
+  const rows = useTreeSnapshot((c) => c.getRows());
+  const dropPosition = useTreeSnapshot(
+    (c) => c.getDrag()?.getPosition() ?? null
+  );
+  const isDragging = useTreeSnapshot((c) => c.getDrag() !== null);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<DragHandle | null>(null);
+  const pendingRef = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    pointerId: number;
+  } | null>(null);
+  const [dragLineTop, setDragLineTop] = useState<number | null>(null);
+
+  // Flat hit-test: slides aren't containers — `placementFromY` with
+  // `{ into: false }` gives the 2-way before/after split (F4).
+  const hitTest = useCallback(
+    (y: number): { id: string; placement: DropPlacement } | null => {
+      const container = containerRef.current;
+      if (!container) return null;
+      const els = Array.from(
+        container.querySelectorAll<HTMLElement>("[data-tray-id]")
+      );
+      if (els.length === 0) return null;
+      const first = els[0].getBoundingClientRect();
+      const last = els[els.length - 1].getBoundingClientRect();
+      if (y < first.top)
+        return { id: els[0].dataset.trayId!, placement: "before" };
+      if (y > last.bottom)
+        return {
+          id: els[els.length - 1].dataset.trayId!,
+          placement: "after",
+        };
+      for (const el of els) {
+        const r = el.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom) {
+          return {
+            id: el.dataset.trayId!,
+            placement: placementFromY(y - r.top, r.height, { into: false }),
+          };
+        }
+      }
+      return null;
+    },
+    []
+  );
+
+  // Drag wiring — the package is DOM-free by design; the consumer owns
+  // pointer→`over()`, the click/drag threshold, and listener lifecycle.
+  useEffect(() => {
+    const THRESHOLD_PX = 4;
+    const onMove = (e: PointerEvent) => {
+      const pending = pendingRef.current;
+      if (pending && pending.pointerId === e.pointerId && !dragRef.current) {
+        if (
+          !passedDragThreshold(
+            pending.x,
+            pending.y,
+            e.clientX,
+            e.clientY,
+            THRESHOLD_PX
+          )
+        )
+          return;
+        dragRef.current = controller.startDrag([pending.id]);
+      }
+      const handle = dragRef.current;
+      if (!handle) return;
+      const hit = hitTest(e.clientY);
+      if (hit) handle.over(hit.id, hit.placement);
+    };
+    const onUp = () => {
+      if (dragRef.current) {
+        controller.commitDrag();
+        dragRef.current = null;
+      }
+      pendingRef.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [controller, hitTest]);
+
+  const onRowPointerDown = useCallback((id: string, e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    pendingRef.current = {
+      id,
+      x: e.clientX,
+      y: e.clientY,
+      pointerId: e.pointerId,
+    };
+  }, []);
+
+  // Scroll the active slide into view. The package owns no DOM/scroll (by
+  // design) — this is the documented consumer-side `reveal` pattern.
+  useEffect(() => {
+    if (!activeTrayId) return;
+    containerRef.current
+      ?.querySelector<HTMLElement>(
+        `[data-tray-id="${CSS.escape(activeTrayId)}"]`
+      )
+      ?.scrollIntoView({
         behavior: "instant",
         block: "nearest",
         inline: "nearest",
       });
+  }, [activeTrayId]);
+
+  // Position the insertion line from the resolved drop position.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || !dropPosition) {
+      setDragLineTop(null);
+      return;
     }
-  }, [active_tray_id, tree]);
+    const el = container.querySelector<HTMLElement>(
+      `[data-tray-id="${CSS.escape(dropPosition.over)}"]`
+    );
+    if (!el) {
+      setDragLineTop(null);
+      return;
+    }
+    setDragLineTop(
+      el.offsetTop + (dropPosition.placement === "after" ? el.offsetHeight : 0)
+    );
+  }, [dropPosition]);
 
-  useEffect(() => {
-    tree.rebuildTree();
-  }, [tray_ids, tree]);
-
-  const dragLineStyle = tree.getDragLineStyle();
-  const isLastSlide = slides.length <= 1;
-  const aspect = slideAspectRatio(mode.config);
+  // Arrow keys move the viewed slide. Selection lives in the editor (not a
+  // package SelectionAdapter), so this bypasses the package keymap — see
+  // FEEDBACKS.md.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    if (!activeTrayId) return;
+    const idx = rows.findIndex((r) => r.id === activeTrayId);
+    if (idx < 0) return;
+    const next = rows[e.key === "ArrowUp" ? idx - 1 : idx + 1];
+    if (next) {
+      e.preventDefault();
+      onGoToSlide(next.id);
+    }
+  };
 
   return (
     <div
-      className="flex flex-col relative"
-      {...tree.getContainerProps()}
+      ref={containerRef}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      className="flex flex-col relative outline-none"
       data-slide-list
       data-slide-list-group={SLIDE_LIST_GROUP}
+      data-dragging={isDragging ? "" : undefined}
     >
-      {tree.getItems().map((item, index) => {
-        const tray = item.getItemData();
-        if (!tray || !traysmap[tray.id]) return null;
-
+      {rows.map((row, index) => {
+        const tray = traysmap[row.id];
+        if (!tray) return null;
         return (
           <SlideItemContextMenu
             trayId={tray.id}
             isLastSlide={isLastSlide}
-            trayIds={tray_ids}
+            trayIds={trayIds}
             key={tray.id}
           >
             <SlideRow
               trayId={tray.id}
               index={index}
-              isViewing={active_tray_id === tray.id}
-              isDragTarget={item.isDragTarget()}
-              onClick={() => mode.goToSlide(tray.id)}
-              aspectRatio={aspect}
-              itemProps={item.getProps()}
+              isViewing={activeTrayId === tray.id}
+              isDragTarget={dropPosition?.over === tray.id}
+              onClick={() => onGoToSlide(tray.id)}
+              aspectRatio={aspectRatio}
+              itemProps={{
+                tabIndex: -1,
+                onPointerDown: (e: React.PointerEvent) =>
+                  onRowPointerDown(tray.id, e),
+              }}
             />
           </SlideItemContextMenu>
         );
       })}
 
       {/* D&D insertion indicator */}
-      <div
-        style={dragLineStyle}
-        className="absolute z-30 -mt-px h-0.5 bg-workbench-accent-sky pointer-events-none"
-      />
+      {dragLineTop != null && (
+        <div
+          style={{ top: dragLineTop }}
+          className="absolute inset-x-0 z-30 -mt-px h-0.5 bg-workbench-accent-sky pointer-events-none"
+        />
+      )}
     </div>
   );
 }

@@ -24,6 +24,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/components/lib/utils";
 import { PlaygroundToolbar } from "@/grida-canvas-hosted/playground/uxhost-toolbar";
 import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
+import { StarterKitOrgIdProvider } from "@/grida-canvas-react-starter-kit/starterkit-host/org-id-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -81,29 +82,31 @@ export default function SlidesPlaygroundPage() {
       <FontFamilyListProvider fonts={fonts}>
         <StandaloneDocumentEditor editor={instance}>
           <SlideEditorModeProvider mode={slideMode}>
-            <SidebarProvider className="w-screen h-screen overflow-hidden">
-              <main className="w-full h-full select-none relative">
-                <WindowGlobalCurrentEditorProvider />
-                <PreviewProvider>
-                  <SlidesHotkeys slideMode={slideMode} />
-                  <div className="flex w-full h-full">
-                    <SlidesSidebar slideMode={slideMode} />
-                    <SlideSurface>
-                      <ToolbarPosition>
-                        <PlaygroundToolbar />
-                      </ToolbarPosition>
-                    </SlideSurface>
-                    <SidebarRight onPresent={onPresent} />
-                  </div>
-                </PreviewProvider>
-                {presentationData && (
-                  <PresentationOverlay
-                    {...presentationData}
-                    onExit={onExitPresentation}
-                  />
-                )}
-              </main>
-            </SidebarProvider>
+            <StarterKitOrgIdProvider organizationId={null}>
+              <SidebarProvider className="w-screen h-screen overflow-hidden">
+                <main className="w-full h-full select-none relative">
+                  <WindowGlobalCurrentEditorProvider />
+                  <PreviewProvider>
+                    <SlidesHotkeys slideMode={slideMode} />
+                    <div className="flex w-full h-full">
+                      <SlidesSidebar slideMode={slideMode} />
+                      <SlideSurface>
+                        <ToolbarPosition>
+                          <PlaygroundToolbar />
+                        </ToolbarPosition>
+                      </SlideSurface>
+                      <SidebarRight onPresent={onPresent} />
+                    </div>
+                  </PreviewProvider>
+                  {presentationData && (
+                    <PresentationOverlay
+                      {...presentationData}
+                      onExit={onExitPresentation}
+                    />
+                  )}
+                </main>
+              </SidebarProvider>
+            </StarterKitOrgIdProvider>
           </SlideEditorModeProvider>
         </StandaloneDocumentEditor>
       </FontFamilyListProvider>

@@ -4,14 +4,25 @@ import { streamText, Output } from "ai";
 import { createStreamableValue } from "@ai-sdk/rsc";
 import { GENzJSONForm } from "@/grida-forms/schema/zod";
 import { service_role } from "@/lib/supabase/server";
-import { model } from "@/lib/ai/models";
+import { model } from "@/lib/ai/server";
 
-export async function generate(input: string, gist?: string) {
+export async function generate(
+  /**
+   * Verified org id; threaded from the workspace shell. Optional only
+   * so the dev-mode playground compiles without a workspace context.
+   */
+  organizationId: number | undefined,
+  input: string,
+  gist?: string
+) {
   const stream = createStreamableValue({});
 
   (async () => {
     const { partialOutputStream } = streamText({
       model: model("mini"),
+      providerOptions: {
+        grida: { organizationId, feature: "playground/forms/generate" },
+      },
       prompt: input,
       output: Output.object({ schema: GENzJSONForm }),
     });

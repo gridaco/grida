@@ -1,6 +1,7 @@
-import type { ImageModel } from "ai";
-import Replicate from "replicate";
-import { gateway } from "./models";
+// Client-safe: model catalogs (cost cards), types, and pure helpers.
+// Anything seam-dependent lives in `./methods.ts` (server-only) so
+// client component bundles that import cost-card data don't drag in
+// `next/headers` via the billing transitive chain.
 
 export namespace ai {
   /**
@@ -31,56 +32,6 @@ export namespace ai {
     | "stability-ai";
 
   export namespace server {
-    export namespace providers {
-      export namespace replicate {
-        /**
-         * Run a Replicate model and return the output URL
-         *
-         * Note: Replicate can return either URLs or FileOutput objects depending on configuration.
-         * We configure the client to return URLs (useFileOutput: false) to ensure consistent behavior.
-         */
-        export async function run(
-          modelId: `${string}/${string}`,
-          input: Record<string, unknown>
-        ): Promise<string> {
-          if (!process.env.REPLICATE_API_TOKEN) {
-            throw new Error("REPLICATE_API_TOKEN is not set");
-          }
-
-          const replicate = new Replicate({
-            auth: process.env.REPLICATE_API_TOKEN,
-            useFileOutput: false, // Always return URLs instead of FileOutput objects
-          });
-
-          const output = await replicate.run(modelId, {
-            input,
-          });
-
-          // With useFileOutput: false, output is always a string URL or array of URL strings
-          if (typeof output === "string") {
-            return output;
-          }
-          if (Array.isArray(output) && output.length > 0) {
-            const firstOutput = output[0];
-            // Handle both string URLs and FileOutput objects (defensive check)
-            if (typeof firstOutput === "string") {
-              return firstOutput;
-            }
-            // If FileOutput is returned despite useFileOutput: false, extract URL
-            if (
-              firstOutput &&
-              typeof firstOutput === "object" &&
-              "url" in firstOutput
-            ) {
-              return (firstOutput as { url: () => string }).url();
-            }
-          }
-
-          throw new Error("Unexpected output format from Replicate");
-        }
-      }
-    }
-
     export namespace methods {
       export type ImageData =
         | { kind: "base64"; base64: string }
@@ -126,12 +77,6 @@ export namespace ai {
         "recraft-ai/recraft-remove-background";
 
       /**
-       * real model identifier - for replicate api call
-       */
-      const MODEL_ID_851_LABS_BACKGROUND_REMOVER_IDENTIFIER =
-        "851-labs/background-remover:a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc";
-
-      /**
        * Background remover model ID type
        */
       export type RemoveBackgroundModelId =
@@ -166,43 +111,6 @@ export namespace ai {
         image: ImageData; // returns URL
       };
 
-      function normalizeImageUrl(image: ImageData): string {
-        if (image.kind === "url") {
-          return image.url;
-        }
-        // base64 kind
-        if (image.base64.startsWith("data:")) {
-          return image.base64;
-        }
-        // Assume it's base64 without prefix, add data URL prefix
-        return `data:image/png;base64,${image.base64}`;
-      }
-
-      export async function upscale(
-        options: RealEsrganOptions
-      ): Promise<RealEsrganResult> {
-        const imageUrl = normalizeImageUrl(options.image);
-
-        const outputUrl = await ai.server.providers.replicate.run(
-          "nightmareai/real-esrgan",
-          {
-            image: imageUrl,
-            scale: options.scale ?? 4,
-          }
-        );
-
-        // Return URL directly - client will fetch it
-        return {
-          image: { kind: "url", url: outputUrl },
-        };
-      }
-
-      /**
-       * Remove background using specified model
-       * @see https://replicate.com/bria/remove-background/api/schema
-       * @see https://replicate.com/851-labs/background-remover/api/schema
-       * @see https://replicate.com/recraft-ai/recraft-remove-background/api/schema
-       */
       /**
        * Lyria audio model ID constants (Replicate)
        * @see https://replicate.com/google/lyria-3
@@ -239,103 +147,6 @@ export namespace ai {
         /** Public URL to the generated audio (mp3). */
         url: string;
       };
-
-      /**
-       * Generate audio from a prompt using a Lyria model on Replicate.
-       */
-      export async function generateAudio(
-        model_id: AudioGenerationModelId,
-        options: LyriaAudioOptions
-      ): Promise<AudioGenerationResult> {
-        const input: Record<string, unknown> = {
-          prompt: options.prompt,
-        };
-        if (options.image_inputs && options.image_inputs.length > 0) {
-          input.image_inputs = options.image_inputs;
-        }
-        if (options.language) input.language = options.language;
-        if (options.negative_prompt) {
-          input.negative_prompt = options.negative_prompt;
-        }
-        if (typeof options.seed === "number") input.seed = options.seed;
-
-        const outputUrl = await ai.server.providers.replicate.run(
-          model_id,
-          input
-        );
-        return { url: outputUrl };
-      }
-
-      export async function removeBackground<
-        TModel extends RemoveBackgroundModelId,
-      >(
-        image: string | ImageData,
-        model_id: TModel,
-        options?: BackgroundRemoverModelOptions[TModel]
-      ): Promise<BackgroundRemoverResult> {
-        const imageData = toImageData(image);
-        const imageUrl = normalizeImageUrl(imageData);
-
-        switch (model_id) {
-          case MODEL_ID_BRIA_REMOVE_BACKGROUND: {
-            const __options =
-              (options as BackgroundRemoverModelOptions[typeof MODEL_ID_BRIA_REMOVE_BACKGROUND]) ??
-              {};
-            const outputUrl = await ai.server.providers.replicate.run(
-              MODEL_ID_BRIA_REMOVE_BACKGROUND,
-              {
-                image: imageUrl,
-                ...(__options.preserve_partial_alpha !== undefined && {
-                  preserve_partial_alpha: __options.preserve_partial_alpha,
-                }),
-                ...(__options.content_moderation !== undefined && {
-                  content_moderation: __options.content_moderation,
-                }),
-              }
-            );
-
-            return {
-              image: { kind: "url", url: outputUrl },
-            };
-          }
-
-          case MODEL_ID_851_LABS_BACKGROUND_REMOVER: {
-            const __options =
-              (options as BackgroundRemoverModelOptions[typeof MODEL_ID_851_LABS_BACKGROUND_REMOVER]) ??
-              {};
-            const outputUrl = await ai.server.providers.replicate.run(
-              MODEL_ID_851_LABS_BACKGROUND_REMOVER_IDENTIFIER,
-              {
-                image: imageUrl,
-                format: __options.format ?? "png",
-                background_type: __options.background_type ?? "rgba",
-              }
-            );
-
-            return {
-              image: { kind: "url", url: outputUrl },
-            };
-          }
-
-          case MODEL_ID_RECRAFT_REMOVE_BACKGROUND: {
-            const outputUrl = await ai.server.providers.replicate.run(
-              MODEL_ID_RECRAFT_REMOVE_BACKGROUND,
-              {
-                image: imageUrl,
-              }
-            );
-
-            return {
-              image: { kind: "url", url: outputUrl },
-            };
-          }
-
-          default: {
-            const _exhaustive: never = model_id;
-            throw new Error(`Unknown model: ${_exhaustive}`);
-          }
-        }
-      }
     }
   }
 
@@ -1033,40 +844,23 @@ export namespace ai {
     export const image_model_ids = Object.keys(models) as ImageModelId[];
 
     /**
-     * Resolve a model identifier to an AI SDK `ImageModel` routed through
-     * the Vercel AI Gateway.
-     *
-     * @param model - gateway model ID string (e.g. `"openai/gpt-image-1.5"`)
-     *   or a legacy `ProviderModel` object.
-     * @returns `{ card, model }` or `null` when the ID is unknown.
+     * Resolve a model identifier to its cost card (data only). Use
+     * `getSDKImageModel` in `lib/ai/methods.ts` if you also need the
+     * billing-wrapped AI SDK model instance.
      */
-    export function getSDKImageModel(
+    export function findImageModelCard(
       model: ai.image.ProviderModel | ai.image.ImageModelId | string
-    ): {
-      card: ai.image.ImageModelCard;
-      model: ImageModel;
-    } | null {
+    ): ai.image.ImageModelCard | null {
       if (!model) return null;
-
       const modelId = typeof model === "string" ? model : model.modelId;
-
-      let card: ai.image.ImageModelCard | null = null;
-
       if (modelId.includes("/")) {
-        card = ai.image.models[modelId] ?? null;
-      } else {
-        // bare name lookup — search for a card whose ID ends with the input
-        const searches = Object.values(ai.image.models).filter((c) =>
-          c!.id.includes(modelId)
-        );
-        if (searches.length === 1) {
-          card = searches[0]!;
-        }
+        return ai.image.models[modelId] ?? null;
       }
-
-      if (!card) return null;
-
-      return { model: gateway.image(card.id), card };
+      // bare name lookup — search for a card whose ID ends with the input
+      const searches = Object.values(ai.image.models).filter((c) =>
+        c!.id.includes(modelId)
+      );
+      return searches.length === 1 ? searches[0]! : null;
     }
   }
 }

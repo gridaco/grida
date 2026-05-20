@@ -4,8 +4,7 @@ import cg from "@grida/cg";
 import cmath from "@grida/cmath";
 import { tool } from "ai";
 import { z } from "zod";
-import type { GenerateImageApiResponse } from "@/app/(api)/private/ai/generate/image/route";
-import { Env } from "@/env";
+import { generateAiImage } from "@/lib/ai/actions/image-generate";
 import artboard_data from "@/grida-canvas-react-starter-kit/data/artboards.json";
 
 export namespace canvas_use {
@@ -97,6 +96,14 @@ export namespace canvas_use {
           .describe("The text prompt describing the image to generate"),
         aspect_ratio: z
           .string()
+          // Constrain to `<int>:<int>` so the AI SDK rejects malformed
+          // values at validation time with a clear error the LLM can
+          // self-correct, instead of forwarding a bad string to the
+          // image provider and surfacing an opaque downstream failure.
+          .regex(
+            /^\d+:\d+$/,
+            "aspect_ratio must be `<int>:<int>` (e.g. '16:9' or '1:1')"
+          )
           .optional()
           .describe(
             "Aspect ratio as string like '16:9' or '1:1' (default: 1:1)"
@@ -132,35 +139,19 @@ export namespace canvas_use {
         model_id = "openai/gpt-image-1-mini",
       }) => {
         try {
-          // TODO: dev only - this will only work on local dev
-          // POST to the unified API route so auth/ratelimit/storage are centralized
-          const response = await fetch(
-            `${Env.web.HOST}/private/ai/generate/image`,
-            {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-              },
-              body: JSON.stringify({
-                prompt,
-                width,
-                height,
-                aspect_ratio: (aspect_ratio || "1:1") as `${number}:${number}`,
-                model: model_id,
-              }),
-            }
-          );
-
-          if (!response.ok) {
-            const text = await response.text().catch(() => "");
+          const env = await generateAiImage({
+            prompt,
+            width,
+            height,
+            aspect_ratio: (aspect_ratio || "1:1") as `${number}:${number}`,
+            model: model_id,
+          });
+          if (!env.success) {
             throw new Error(
-              `Image generation failed (${response.status}): ${text || "Unknown error"}`
+              `Image generation failed (${env.status}): ${env.message}`
             );
           }
-
-          const { data } = (await response.json()) as GenerateImageApiResponse;
-
-          return data;
+          return env.data;
         } catch (error) {
           console.error("Error generating image:", error);
           throw new Error(
@@ -168,17 +159,6 @@ export namespace canvas_use {
           );
         }
       },
-      // toModelOutput(result) {
-      //   return {
-      //     type: "content",
-      //     value: [
-      //       {
-      //         type: "image-url",
-      //         url: result.publicUrl,
-      //       },
-      //     ],
-      //   };
-      // },
     });
 
     export const man = tool({

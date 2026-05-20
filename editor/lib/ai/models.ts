@@ -29,6 +29,7 @@
  */
 
 import { createGateway } from "ai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 // ---------------------------------------------------------------------------
 // Tier definitions
@@ -228,37 +229,82 @@ export function modelSpecById(modelId: string): ModelSpec | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * Attributed AI Gateway instance.
- *
- * Use this instead of the bare `gateway` from `"ai"` so all requests carry
- * the app attribution headers. This is the **only** gateway instance that
- * should be used across the codebase.
+ * Vercel AI Gateway app-attribution headers — lowercase per the `ai`
+ * SDK convention. Shared by the billed `gateway` and the BYOK
+ * AI-Gateway branch. (OpenRouter uses its own `HTTP-Referer`/`X-Title`
+ * casing — see `resolveByokProvider`.)
  */
-export const gateway = createGateway({
-  headers: {
-    "http-referer": "https://grida.co",
-    "x-title": "Grida",
-  },
-});
+const GATEWAY_ATTRIBUTION_HEADERS = {
+  "http-referer": "https://grida.co",
+  "x-title": "Grida",
+} as const;
 
 /**
- * Return a `LanguageModelV3` instance for the given tier, ready to pass into
- * `streamText()`, `generateText()`, `streamObject()`, etc.
+ * Attributed AI Gateway instance.
  *
- * Uses the Vercel AI Gateway provider so the same code works across OpenAI,
- * Anthropic, and any other supported backend.
+ * **Internal — seam consumers only.** This is the raw Vercel AI Gateway
+ * provider; it does NOT go through the billing seam. Any code outside
+ * `editor/lib/ai/_seam/**` should import `grida` from
+ * [editor/lib/ai/server.ts](./server.ts) instead, which wraps every model
+ * with gate + ingest middleware.
  *
- * @example
- * ```ts
- * import { streamText } from "ai";
- * import { model } from "@/lib/ai/models";
- *
- * const result = streamText({
- *   model: model("mini"),
- *   prompt: "Hello",
- * });
- * ```
+ * Lint blocks direct imports of this export from non-seam files (see
+ * [editor/.oxlintrc.jsonc](../../.oxlintrc.jsonc)).
  */
-export function model(tier: ModelTier) {
-  return gateway(specs[tier].id);
+export const gateway = createGateway({
+  headers: GATEWAY_ATTRIBUTION_HEADERS,
+});
+
+// ---------------------------------------------------------------------------
+// BYOK layer — GRIDA-SEC-003 carve-out (see /SECURITY.md).
+//
+// **Internal — seam consumers only.** `byok` holds a live provider API
+// key; like `gateway`, consume only from `lib/ai/server.ts`. (No lint
+// rule enforces this for the named export — `.oxlintrc.jsonc` restricts
+// SDK *packages*, not `gateway`/`byok` imports — convention only,
+// mirroring `gateway`.)
+//
+// When a contributor sets a BYOK key, calls route through a BARE
+// provider that bypasses the billing seam entirely (no gate, no
+// Metronome ingest, no balance). The key is charged by the upstream
+// provider directly — no Grida balance to meter/drain. BYOK bypasses
+// billing ONLY, never auth (requireOrganizationId still runs). Gated
+// solely by server-only env vars NEVER set in the hosted product (same
+// trust model as OPENAI_API_KEY / REPLICATE_API_TOKEN). Fail-closed:
+// active only when a key env var is a non-empty string after trim
+// (whitespace-only secrets fall back to the billed path).
+//
+// Implementations (precedence: OpenRouter first, then AI Gateway). A
+// third BYOK key is a new branch here — no registry.
+// ---------------------------------------------------------------------------
+function resolveByokProvider() {
+  const openrouterKey = process.env.BYOK_OPENROUTER_API_KEY?.trim();
+  if (openrouterKey) {
+    return createOpenAICompatible({
+      name: "openrouter",
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: openrouterKey,
+      headers: { "HTTP-Referer": "https://grida.co", "X-Title": "Grida" },
+    });
+  }
+  const aiGatewayKey = process.env.BYOK_AI_GATEWAY_API_KEY?.trim();
+  if (aiGatewayKey) {
+    return createGateway({
+      apiKey: aiGatewayKey,
+      headers: GATEWAY_ATTRIBUTION_HEADERS,
+    });
+  }
+  return null;
 }
+
+/** The active BYOK provider, or `null` when no BYOK key is set. */
+export const byok = resolveByokProvider();
+
+/** True when the BYOK layer is active (billing layer is bypassed). */
+export function isByokActive(): boolean {
+  return byok !== null;
+}
+
+// `model(tier)` lives in `editor/lib/ai/server.ts` so the seam owns the
+// public surface. Importing `model` from `@/lib/ai/models` is no longer
+// supported.

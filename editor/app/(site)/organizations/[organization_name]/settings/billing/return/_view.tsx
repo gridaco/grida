@@ -19,28 +19,65 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { getBillingSummary, type BillingSummary } from "../_actions";
+import {
+  getAiCreditsSummary,
+  getBillingSummary,
+  type AiCreditsSummary,
+  type BillingSummary,
+} from "../_actions";
 
-type Intent = "subscribe" | "payment_method" | "generic";
+type Intent =
+  | "subscribe"
+  | "payment_method"
+  | "topup"
+  | "auto_reload_enable"
+  | "generic";
 
 const POLL_INTERVAL_MS = 3_000;
 const MAX_ATTEMPTS = 10; // ~30s total
 
-function isSettled(summary: BillingSummary, intent: Intent): boolean {
+type Snapshot = {
+  billing: BillingSummary | null;
+  ai: AiCreditsSummary | null;
+};
+
+function isSettled(snap: Snapshot, intent: Intent): boolean {
   switch (intent) {
-    case "subscribe":
+    case "subscribe": {
+      const s = snap.billing;
+      if (!s) return false;
       // Paid plan visible AND not in a "first-invoice broken" state.
       return (
-        (summary.plan === "pro" || summary.plan === "team") &&
-        summary.status !== "incomplete" &&
-        summary.status !== "incomplete_expired"
+        (s.plan === "pro" || s.plan === "team") &&
+        s.status !== "incomplete" &&
+        s.status !== "incomplete_expired"
       );
-    case "payment_method":
+    }
+    case "payment_method": {
+      const s = snap.billing;
+      if (!s) return false;
       // The interesting transition is past_due/unpaid → active. If we already
       // see a healthy status, the update has been applied.
-      return summary.status === "active" || summary.status === "trialing";
+      return s.status === "active" || s.status === "trialing";
+    }
+    case "topup": {
+      const a = snap.ai;
+      if (!a) return false;
+      // Settle on entitlement, not a delta vs baseline. Delta races the
+      // webhook: if the webhook lands BEFORE this page mounts, baseline
+      // already reflects the new credit and the delta condition never
+      // fires. Entitlement is also the user-facing question — "can I
+      // use AI now?" — and is what the post-Checkout handler reconciles
+      // inline before this page even loads.
+      return a.entitled === true;
+    }
+    case "auto_reload_enable": {
+      const a = snap.ai;
+      if (!a) return false;
+      // Auto-reload config visible AND gate is open.
+      return a.auto_reload !== null && a.entitled === true;
+    }
     case "generic":
-      // No predicate — just exhaust the poll window.
       return false;
   }
 }
@@ -77,13 +114,19 @@ export default function BillingReturnView({
       router.replace(billingHref);
     };
 
+    const isAiIntent = intent === "topup" || intent === "auto_reload_enable";
+
     const tick = async () => {
       if (cancelled || doneRef.current) return;
       attempts += 1;
       try {
-        const summary = await getBillingSummary(orgId);
+        const [billing, ai] = await Promise.all([
+          isAiIntent ? Promise.resolve(null) : getBillingSummary(orgId),
+          isAiIntent ? getAiCreditsSummary(orgId) : Promise.resolve(null),
+        ]);
+        const snap: Snapshot = { billing, ai };
         if (cancelled || doneRef.current) return;
-        if (isSettled(summary, intent)) {
+        if (isSettled(snap, intent)) {
           finish(true);
           return;
         }

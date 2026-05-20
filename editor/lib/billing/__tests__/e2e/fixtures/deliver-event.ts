@@ -64,7 +64,7 @@ export async function deliverEvent<T extends { id: string }>(
     ? sig.replace(/v1=[a-f0-9]+/, "v1=" + "0".repeat(64))
     : sig;
 
-  const res = await fetch(`${appUrl()}/private/webhooks/stripe`, {
+  const res = await fetch(`${appUrl()}/webhooks/stripe`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

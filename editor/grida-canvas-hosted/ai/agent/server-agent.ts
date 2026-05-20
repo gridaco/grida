@@ -6,7 +6,7 @@ import {
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { canvas_use } from "../tools/canvas-use";
-import { model } from "@/lib/ai/models";
+import { model } from "@/lib/ai/server";
 
 const tools = {
   [canvas_use.tools_spec.name_platform_sys_tool_ai_fetch_preflight]:
@@ -35,6 +35,18 @@ const tools = {
 } satisfies ToolSet;
 
 /**
+ * Per-call options for the canvas design agent. The chat route resolves
+ * `organizationId` from the request (GRIDA-SEC-003) and threads it via
+ * `createAgentUIStreamResponse({ ..., options })`. `prepareCall` reads
+ * the options and injects `providerOptions.grida` so the seam middleware
+ * can gate + bill the call.
+ */
+export type CanvasDesignAgentCallOptions = {
+  organizationId: number;
+  feature?: string;
+};
+
+/**
  * Canvas Design Agent using AI SDK 6 ToolLoopAgent
  *
  * Features:
@@ -48,19 +60,29 @@ const tools = {
  * @see https://vercel.com/docs/ai-gateway/capabilities/reasoning/openai
  * @see https://vercel.com/docs/ai-gateway/capabilities/reasoning/anthropic
  */
-export const canvasDesignAgent = new ToolLoopAgent({
+export const canvasDesignAgent = new ToolLoopAgent<
+  CanvasDesignAgentCallOptions,
+  typeof tools
+>({
   model: model("mini"),
   instructions: canvas_use.llm.instructions,
   tools: tools,
-  prepareCall: (settings) => ({
+  prepareCall: ({ options, ...settings }) => ({
     ...settings,
     providerOptions: {
+      ...settings.providerOptions,
+      grida: {
+        organizationId: options.organizationId,
+        feature: options.feature ?? "canvas/agent/chat",
+      },
       openai: {
+        ...settings.providerOptions?.openai,
         reasoningEffort: "medium",
         reasoningSummary: "detailed",
       },
       // Claude 4.6: adaptive thinking (model decides when/how much to think)
       anthropic: {
+        ...settings.providerOptions?.anthropic,
         thinking: { type: "adaptive" },
       },
     },

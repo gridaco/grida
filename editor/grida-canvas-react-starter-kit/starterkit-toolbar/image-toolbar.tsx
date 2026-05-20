@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
+import { type AiErrorResponse, resolveAiError } from "@/lib/ai/error";
 import { dq } from "@/grida-canvas/query";
 import cg from "@grida/cg";
 import type grida from "@grida/schema";
@@ -18,11 +19,9 @@ import type { editor } from "@/grida-canvas";
 import { editor as editorUtils } from "@/grida-canvas/editor.i";
 import { ImageUpscale } from "lucide-react";
 import { RemoveBackgroundIcon } from "../starterkit-icons/remove-background";
-import {
-  upscaleImage,
-  removeBackgroundImage,
-} from "@/app/(api)/private/ai/image/actions";
+import { upscaleImage, removeBackgroundImage } from "@/lib/ai/actions/image";
 import type { Editor } from "@/grida-canvas/editor";
+import { useStarterKitOrgId } from "../starterkit-host/org-id-provider";
 
 type ImageSelectionInfo = {
   node_id: string;
@@ -131,17 +130,18 @@ async function extractImageBase64(
 }
 
 /**
- * Handles API error responses with appropriate toast messages
+ * Walk the AI seam's 2-step UX gate: redirect on auth / onboarding,
+ * toast otherwise. Hard-navigation (not Next router) so we land
+ * outside the canvas runtime cleanly.
  */
-function handleApiError(
-  result: { success: false; status: number; message: string },
-  defaultMessage: string
-): void {
-  if (result.status === 401) {
-    toast.error("Login required");
-  } else {
-    toast.error(result.message || defaultMessage);
+function handleApiError(result: AiErrorResponse): void {
+  const action = resolveAiError(result);
+  if (action.kind === "redirect") {
+    window.location.href = action.href;
+    return;
   }
+  if (action.tone === "warning") toast.warning(action.message);
+  else toast.error(action.message);
 }
 
 /**
@@ -259,6 +259,7 @@ export function ImageToolbar() {
   const editor = useCurrentEditor();
   const { selection } = useSelectionState();
   const document_ctx = useEditorState(editor, (state) => state.document_ctx);
+  const organizationId = useStarterKitOrgId();
 
   // Only re-render when selection or document_ctx changes, not when node properties change
   // Get node from snapshot inside useMemo to avoid subscribing to all node changes
@@ -305,15 +306,21 @@ export function ImageToolbar() {
         return;
       }
 
+      if (organizationId == null) {
+        toast.error("Sign in to use AI tools");
+        return;
+      }
+
       const base64 = await extractImageBase64(editor, imageRef);
 
       const result = await upscaleImage({
+        organizationId,
         image: { kind: "base64", base64 },
         scale: 4,
       });
 
       if (!result.success) {
-        handleApiError(result, "Failed to upscale image");
+        handleApiError(result);
         return;
       }
 
@@ -366,16 +373,22 @@ export function ImageToolbar() {
         return;
       }
 
+      if (organizationId == null) {
+        toast.error("Sign in to use AI tools");
+        return;
+      }
+
       const base64 = await extractImageBase64(editor, imageRef);
 
       const result = await removeBackgroundImage({
+        organizationId,
         image: { kind: "base64", base64 },
         format: "png",
         background_type: "rgba",
       });
 
       if (!result.success) {
-        handleApiError(result, "Failed to remove background");
+        handleApiError(result);
         return;
       }
 
