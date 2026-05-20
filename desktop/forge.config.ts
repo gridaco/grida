@@ -84,7 +84,18 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
-  hooks: {},
+  hooks: {
+    // Workaround for `hdiutil: convert failed - Resource temporarily unavailable`
+    // on GitHub macOS runners. Flushing pending writes from the package step
+    // before the DMG maker reads the source image reduces the I/O race window.
+    // See: https://discourse.cmake.org/t/macos-hdiutil-packaging-on-github-actions-can-fail-if-prepackage-scripts-are-used/14990
+    preMake: async () => {
+      if (process.platform !== "darwin") return;
+      const { execFileSync } = await import("node:child_process");
+      execFileSync("sync");
+      await new Promise((r) => setTimeout(r, 2000));
+    },
+  },
   makers: [
     new MakerSquirrel((arch) => {
       const version = process.env.npm_package_version;
