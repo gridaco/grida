@@ -24,7 +24,7 @@ jobs:
           - name: windows
             image: windows-latest
           - name: macos-apple-silicon
-            image: macos-15
+            image: macos-26
     runs-on: ${{ matrix.os.image }}
     env:
       HAS_SIGNING: ${{ secrets.APPLE_CERTIFICATE_P12 != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != '' }}
