@@ -291,10 +291,21 @@ export namespace downloads {
       // GitHub. `getLinks()` resolves 6 assets via separate `getAsset` calls;
       // without this, a single cache miss in `getCachedLinks` would burn
       // 6 unauthenticated requests against the 60/hr/IP limit.
+      //
+      // Failures are memoized as `[]` so the same cap applies on the error
+      // path — otherwise `m_assets` stays null and each of the 6 sequential
+      // getAsset calls retries the API. `getAsset` already handles the
+      // empty-asset case gracefully via its assert+catch, returning null.
+      // A fresh Fetcher is created per render, so the error cache is
+      // per-render and transient failures self-heal on the next request.
       if (this.m_assets) return this.m_assets;
-      const release = await fetchrelease();
-      this.m_tag = release.data.tag_name;
-      this.m_assets = release.data.assets;
+      try {
+        const release = await fetchrelease();
+        this.m_tag = release.data.tag_name;
+        this.m_assets = release.data.assets;
+      } catch {
+        this.m_assets = [];
+      }
       return this.m_assets;
     }
 
