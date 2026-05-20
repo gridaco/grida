@@ -58,7 +58,7 @@ To promote a prerelease to stable: edit the GitHub Release in the UI and uncheck
 
 Secrets (all 6 env-scoped, not repo-wide):
 
-```
+```text
 APPLE_CERTIFICATE_P12         base64 of the .p12
 APPLE_CERTIFICATE_PASSWORD    .p12 export password
 APPLE_SIGNING_IDENTITY        "Developer ID Application: <Name> (TEAMID)" (no quotes)

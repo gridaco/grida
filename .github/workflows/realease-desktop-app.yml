@@ -27,8 +27,8 @@ jobs:
             image: macos-15
     runs-on: ${{ matrix.os.image }}
     env:
-      HAS_SIGNING: ${{ secrets.APPLE_CERTIFICATE_P12 != '' }}
-      HAS_NOTARIZE: ${{ secrets.APPLE_API_KEY_P8 != '' }}
+      HAS_SIGNING: ${{ secrets.APPLE_CERTIFICATE_P12 != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != '' }}
+      HAS_NOTARIZE: ${{ secrets.APPLE_API_KEY_P8 != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
     defaults:
       run:
         working-directory: ./desktop
@@ -94,7 +94,7 @@ jobs:
         run: pnpm run publish:prerelease --arch="x64,arm64"
 
       - name: Publish App (MacOS)
-        if: ${{ matrix.os.name == 'macos-apple-silicon' }}
+        if: ${{ matrix.os.name == 'macos-apple-silicon' && env.HAS_SIGNING == 'true' && env.HAS_NOTARIZE == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PRERELEASE: ${{ inputs.prerelease }}
