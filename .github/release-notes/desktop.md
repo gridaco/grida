@@ -15,14 +15,14 @@ This is a nightly release of Grida `{{version}}`.
 
 ## Supported builds
 
-| Name    | Platform | x64 | arm64 | makers           | signed | notes                                                              |
-| ------- | -------- | --- | ----- | ---------------- | ------ | ------------------------------------------------------------------ |
-| `Grida` | `darwin` |     | ✓     | `zip`, `dmg`     | ✓      | Apple Silicon only. Rosetta 2 cannot run arm64 binaries on Intel.  |
-| `Grida` | `win32`  | ✓   |       | `exe (squirrel)` |        | x64 only / not signed                                              |
-| `Grida` | `linux`  | ✓   | ✓     | `deb`, `rpm`     |        |                                                                    |
+| Name    | Platform | x64 | arm64 | makers           | signed | notes                                                             |
+| ------- | -------- | --- | ----- | ---------------- | ------ | ----------------------------------------------------------------- |
+| `Grida` | `darwin` |     | ✓     | `zip`, `dmg`     | ✓      | Apple Silicon only. Rosetta 2 cannot run arm64 binaries on Intel. |
+| `Grida` | `win32`  | ✓   |       | `exe (squirrel)` |        | x64 only / not signed                                             |
+| `Grida` | `linux`  | ✓   | ✓     | `deb`, `rpm`     |        |                                                                   |
 
 ## Auto-update
 
 macOS installs receive updates automatically via [`update.electronjs.org`](https://github.com/electron/update.electronjs.org). The running app polls every 6 hours; when a newer release is available, a "Restart to update" prompt appears.
 
-Releases marked **pre-release** on this page are *not* served to existing installs — they're for manual download / testing only.
+Releases marked **pre-release** on this page are _not_ served to existing installs — they're for manual download / testing only.

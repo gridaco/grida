@@ -102,9 +102,11 @@ jobs:
         run: pnpm run publish:prerelease --arch="arm64"
 
       - name: Update release notes from template
-        # Runs once (only on the macOS row) after the release tag has been
-        # created by the publisher. Template at .github/release-notes/desktop.md.
-        if: ${{ matrix.os.name == 'macos-apple-silicon' && env.HAS_SIGNING == 'true' && env.HAS_NOTARIZE == 'true' }}
+        # Runs once (gated to the linux row, which has no signing-secret
+        # dependency and therefore always runs). The release tag will exist
+        # by this point since linux's publish step ran just above.
+        # Template at .github/release-notes/desktop.md.
+        if: ${{ matrix.os.name == 'linux' }}
         working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
