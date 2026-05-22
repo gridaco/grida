@@ -23,9 +23,25 @@ export class NodeFsBackend implements AgentFs.Backend {
     if (!p.startsWith("/")) {
       throw new Error(`agent-fs path must start with "/": ${p}`);
     }
-    // Normalize to disk path. `path.join` handles the rest; the leading
-    // slash is stripped because join treats it as part of the segment.
-    return path.join(this.baseDir, ...p.slice(1).split("/"));
+    // Reject traversal segments up front so a logical path like
+    // `/../etc/passwd` can't escape `baseDir`. Agent paths are POSIX —
+    // backslashes are not directory separators and must be rejected too.
+    const segments = p.slice(1).split("/");
+    if (segments.some((s) => s === ".." || s === "." || s.includes("\\"))) {
+      throw new Error(`agent-fs path escapes baseDir: ${p}`);
+    }
+    const base = path.resolve(this.baseDir);
+    const full = path.resolve(base, ...segments);
+    // Belt-and-suspenders: confirm the resolved path is inside baseDir.
+    const rel = path.relative(base, full);
+    if (
+      rel === ".." ||
+      rel.startsWith(".." + path.sep) ||
+      path.isAbsolute(rel)
+    ) {
+      throw new Error(`agent-fs path escapes baseDir: ${p}`);
+    }
+    return full;
   }
 
   async list(): Promise<string[]> {

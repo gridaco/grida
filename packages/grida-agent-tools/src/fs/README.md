@@ -1,4 +1,4 @@
-# `@/lib/agent-fs`
+# `@grida/agent-tools/fs`
 
 A real-fs-shaped facade for AI agents to read, edit, write, and list
 files — either against live state (editors, doc models) or pure storage
@@ -171,8 +171,8 @@ Implementation: `findMatches()` in `internal/match.ts` (not part of the public s
 All three implement `AgentFs.Backend`. `OpfsBackend` and `NodeFsBackend` live behind subpath imports so a bare `import "@grida/agent-tools/fs"` doesn't pull `window.navigator.storage` or `node:fs`.
 
 ```ts
-import { OpfsBackend } from "@/lib/agent-fs/backends/opfs"; // browser
-import { NodeFsBackend } from "@/lib/agent-fs/backends/node"; // server / tests
+import { OpfsBackend } from "@grida/agent-tools/fs/backends/opfs"; // browser
+import { NodeFsBackend } from "@grida/agent-tools/fs/backends/node"; // server / tests
 ```
 
 Backends are pure I/O — no caching, no debouncing, no version tracking.
@@ -198,10 +198,10 @@ Pure logic, runs in Node:
 - `backends/opfs.ts` has no test — browser-only. Verify via the `/svg`
   demo.
 
-Run from the editor root:
+Run from the repo root:
 
 ```sh
-pnpm vitest run lib/agent-fs
+pnpm --filter @grida/agent-tools test
 ```
 
 ## What this module deliberately is not

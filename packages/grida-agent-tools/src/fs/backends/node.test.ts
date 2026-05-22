@@ -26,6 +26,31 @@ describe("NodeFsBackend (real tmp fs)", () => {
     await expect(b.read("canvas.svg")).rejects.toThrow(/must start/);
   });
 
+  it("rejects path-traversal segments (no escape from baseDir)", async () => {
+    // Write a sentinel *outside* the sandbox so a successful escape would
+    // surface as a real read.
+    const sentinelDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "agent-fs-out-")
+    );
+    const sentinel = path.join(sentinelDir, "secret.txt");
+    await fs.writeFile(sentinel, "TOPSECRET", "utf8");
+    try {
+      const escape =
+        "/" + path.relative(tmp, sentinel).split(path.sep).join("/");
+      await expect(b.read(escape)).rejects.toThrow(/escapes baseDir/);
+      await expect(b.write(escape, "x")).rejects.toThrow(/escapes baseDir/);
+      await expect(b.delete(escape)).rejects.toThrow(/escapes baseDir/);
+      await expect(b.read("/../secret.txt")).rejects.toThrow(/escapes baseDir/);
+      await expect(b.read("/notes/../../secret.txt")).rejects.toThrow(
+        /escapes baseDir/
+      );
+      // Sentinel must still be intact.
+      expect(await fs.readFile(sentinel, "utf8")).toBe("TOPSECRET");
+    } finally {
+      await fs.rm(sentinelDir, { recursive: true, force: true });
+    }
+  });
+
   it("starts empty: list returns [] and read returns null", async () => {
     expect(await b.list()).toEqual([]);
     expect(await b.read("/canvas.svg")).toBeNull();

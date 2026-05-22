@@ -1,5 +1,8 @@
 ---
 title: Canvas Tools (for AI)
+description: Canvas-specific AI toolset for editing Grida design documents — scene-graph operations, specialized inserts, canvas exec/lint/format, and resource lookup.
+keywords: [ai, canvas, tools, editor, grida, scene-graph]
+format: md
 tags:
   - internal
   - wg
@@ -214,7 +217,7 @@ This is useful for wireframing
 
 ### `::unsafe_js_eval`
 
-This calls eval() with the givven code string. needs explicit user approval.
+This calls eval() with the given code string. Needs explicit user approval.
 
 ---
 

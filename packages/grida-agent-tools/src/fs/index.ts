@@ -126,8 +126,24 @@ export class AgentFs {
     if (this.disposed) return;
     this.unmount(path);
     this.bindings.set(path, binding);
-    // If a pure-file entry shadowed this path, drop it — the binding wins.
+    // If a pure-file entry shadowed this path (typically because
+    // `hydrate()` ran before `mount()` and parked persisted bytes in
+    // the file map), hand that snapshot to the binding before dropping
+    // it. Without this, attaching a binding after async init would
+    // silently discard the persisted document.
+    const existing = this.files.get(path);
     this.files.delete(path);
+    if (existing) {
+      try {
+        binding.load(existing.content);
+        this.last_flushed.set(path, existing.content);
+      } catch (err) {
+        console.warn(
+          `[agent-fs] binding.load(${path}) failed during mount:`,
+          err
+        );
+      }
+    }
     if (binding.subscribe) {
       const unsub = binding.subscribe(() => this.queueFlush(path));
       this.binding_unsubs.set(path, unsub);
@@ -550,6 +566,10 @@ export class AgentFs {
         if (!this.disposed) this.last_flushed.set(path, entry.content);
       } catch (err) {
         console.warn(`[agent-fs] backend.write(${path}) failed:`, err);
+        // Re-queue on transient failure so eventual persistence still
+        // holds; otherwise a single failed flush would silently drop
+        // the path until its content changes again.
+        if (!this.disposed) this.queueFlush(path);
       }
     }
   }

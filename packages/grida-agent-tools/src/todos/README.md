@@ -1,4 +1,4 @@
-# `@/lib/agent-todos`
+# `@grida/agent-tools/todos`
 
 A tiny live store + AI-SDK tool for the agent's plan. Mirrors Claude
 Code's `TodoWrite`.
@@ -19,7 +19,7 @@ visible plan. The plan should be:
 - **Tiny** — three statuses, no metadata, no due-dates.
 
 If you want long-lived TODOs (across sessions, across users), write a
-markdown file with `@/lib/agent-fs` instead. That's the right tool for
+markdown file with `@grida/agent-tools/fs` instead. That's the right tool for
 that job.
 
 ## API
@@ -81,7 +81,7 @@ todo_write({
 });
 ```
 
-Resolve via `resolveAgentTodosToolCall(store, toolCall)` in
+Resolve via `AgentTodos.resolveToolCall(store, toolCall)` in
 `chat.onToolCall`.
 
 ## Mirror of Claude Code's `TodoWrite`
@@ -100,7 +100,7 @@ If you've used Claude Code, you already know how this works.
 Pure logic, no React, no LLM:
 
 ```sh
-pnpm vitest run lib/agent-todos
+pnpm --filter @grida/agent-tools test
 ```
 
 ## What this module deliberately is not

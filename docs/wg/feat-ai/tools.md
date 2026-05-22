@@ -1,5 +1,8 @@
 ---
 title: Fundamental Tools (for AI)
+description: Fundamental AI toolset — agent-host capabilities (filesystem, planning, tool discovery) that apply to any Grida agent regardless of surface or domain.
+keywords: [ai, tools, agent, filesystem, planning, grida]
+format: md
 tags:
   - internal
   - wg
@@ -80,7 +83,7 @@ needs. The signatures are storage-agnostic — `read_file("/canvas.svg")`
 makes the same sense whether the path resolves to an in-memory map, an
 OPFS file, a real `node:fs` file under a tmp dir, or a future remote
 document store. The implementation lives in
-[`packages/grida-agent-tools/src/fs/`](../../../packages/grida-agent-tools/src/fs/); the README there
+[`packages/grida-agent-tools/src/fs/`](https://github.com/gridaco/grida/tree/main/packages/grida-agent-tools/src/fs); the README there
 carries the full contract (mounts, bindings, backends, safety contract).
 
 The fs is content-agnostic and multi-file. A path can be **bound** to
@@ -170,7 +173,7 @@ Use it when the work is non-trivial (multiple edits, exploration,
 anything you'd break into steps). Skip it for one-shot edits.
 
 Implementation:
-[`packages/grida-agent-tools/src/todos/`](../../../packages/grida-agent-tools/src/todos/).
+[`packages/grida-agent-tools/src/todos/`](https://github.com/gridaco/grida/tree/main/packages/grida-agent-tools/src/todos).
 
 ---
 
@@ -248,9 +251,9 @@ the first MCP integration, this becomes the next thing to ship.
 ## What lives where
 
 - `packages/grida-agent-tools/src/fs/` — filesystem fundamentals
-  ([README](../../../packages/grida-agent-tools/src/fs/README.md))
+  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-agent-tools/src/fs/README.md))
 - `packages/grida-agent-tools/src/todos/` — planning fundamentals
-  ([README](../../../packages/grida-agent-tools/src/todos/README.md))
+  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-agent-tools/src/todos/README.md))
 - `packages/grida-agent-tools/src/tool-search/` — _not yet created; see proposal above_
 - `editor/grida-canvas-hosted/ai/tools/` — canvas tools (the existing
   `canvas-use` collection); see
