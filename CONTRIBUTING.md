@@ -78,6 +78,10 @@ just build canvas wasm
   - [docker desktop](https://docker.com) required
 - for Grida-specific Supabase setup (migrations, env, signing keys), see `supabase/README.md`.
 
+### Signing in locally
+
+After `supabase db reset --local` runs, `supabase/seed.sql` creates three test users you can sign in as via the `/sign-in` route. The default for normal flows is **`insider@grida.co` / `password`** (owner of the `local` org). See [`supabase/seed.md`](./supabase/seed.md) for the other personas (`alice@acme.com` for multi-tenant testing, `random@example.com` for no-org access checks). All three share the password `password`.
+
 ## Support
 
 If you have any problem running the project locally or for any further information, please contact us via Slack.

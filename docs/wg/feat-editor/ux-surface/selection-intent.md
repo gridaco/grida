@@ -264,6 +264,79 @@ the multi-select-on-shift-hover bug.
 | `EmptyDeselectThenMarquee` | `null`              | off   | non-empty            | Commit `deselect_all` on-down; drag → non-additive marquee.             |
 | `EmptyAdditiveMarquee`     | `null`              | on    | any                  | No mutation; drag → additive marquee.                                   |
 
+### Tier-1 sub-selection scenarios
+
+The routing rule for control overlays inside a path-edit's sub-selection
+(vertex / tangent / segment) is the **same** asymmetry as Tier-2 content,
+applied per sub-selection axis. The implementation shares the
+`classifyAgainstAxisSet(in_set, shift)` helper across all three axes;
+only the membership probe (which `axis_set` to test against) differs.
+
+For each axis × variant combination, drag-promotion has a uniform rule:
+
+- **∉ Replace / ∉ Add (singleton)** — commit `select_<axis>` on-down. On
+  drag, translate the newly-singleton (vertex/tangent) or the implied
+  endpoints (segment carries `[a_idx, b_idx]` so the host's expansion
+  picks them up before the select intent has echoed through the mirror).
+- **∈ NarrowOrDrag / ∈ ToggleOrDrag (ambiguous)** — defer the
+  `select_<axis>` intent. On-up commit it (narrow / toggle). On drag,
+  **cancel the deferred select** and promote to the unifying delta
+  gesture `translate_vector_selection`, which translates the host's
+  authoritative sub-selection (vertices + segment endpoints + selected
+  tangents whose parent vertex isn't moving). The multi-element
+  sub-selection is preserved.
+
+| Scenario                    | `target` membership  | shift | Outcome                                                                                                                                 |
+| --------------------------- | -------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `HandleVertexReplace`       | index ∉ `vertices`   | off   | Commit `select_vertex(replace)` on-down; drag → translate singleton-vertex.                                                             |
+| `HandleVertexAdd`           | index ∉ `vertices`   | on    | Commit `select_vertex(toggle)` on-down; drag → translate combined.                                                                      |
+| `HandleVertexNarrowOrDrag`  | index ∈ `vertices`   | off   | Defer; on-up commit `select_vertex(replace)`; on-drag translate existing sub-selection.                                                 |
+| `HandleVertexToggleOrDrag`  | index ∈ `vertices`   | on    | Defer; on-up commit `select_vertex(toggle)`; on-drag translate existing sub-selection.                                                  |
+| `HandleTangentReplace`      | ref ∉ `tangents`     | off   | Commit `select_tangent(replace)` on-down; drag → singleton `set_tangent` (curve gesture).                                               |
+| `HandleTangentAdd`          | ref ∉ `tangents`     | on    | Commit `select_tangent(toggle)` on-down; drag → singleton `set_tangent`.                                                                |
+| `HandleTangentNarrowOrDrag` | ref ∈ `tangents`     | off   | Defer; on-up commit `select_tangent(replace)`; on-drag: singleton-this → `set_tangent`; multi/mixed → translate existing sub-selection. |
+| `HandleTangentToggleOrDrag` | ref ∈ `tangents`     | on    | Defer; on-up commit `select_tangent(toggle)`; on-drag: same as NarrowOrDrag.                                                            |
+| `HandleSegmentReplace`      | segment ∉ `segments` | off   | Commit `select_segment(replace)` on-down; drag → translate endpoints (`[a_idx, b_idx]`).                                                |
+| `HandleSegmentAdd`          | segment ∉ `segments` | on    | Commit `select_segment(toggle)` on-down; drag → translate combined endpoints.                                                           |
+| `HandleSegmentNarrowOrDrag` | segment ∈ `segments` | off   | Defer; on-up commit `select_segment(replace)`; on-drag translate existing sub-selection.                                                |
+| `HandleSegmentToggleOrDrag` | segment ∈ `segments` | on    | Defer; on-up commit `select_segment(toggle)`; on-drag translate existing.                                                               |
+
+**Meta + segment drag** is a per-axis dispatch quirk. Meta promotes to
+`bend_segment` (re-shape the cubic by pulling its projected pivot)
+**only** when the sub-selection is exactly `{ segments: [this one] }`
+(singleton-this). Multi or mixed selections (e.g. "point A, B and line
+AB") translate; Meta is ignored. Mirrors main editor's
+`use-sub-vector-network-editor.ts:141-149` branch.
+
+**Singleton-this tangent + drag** routes to the absolute `set_tangent`
+("curve") gesture so mirror modifiers (Alt = break, etc.) remain
+applicable. Multi or mixed tangent selection drag routes through the
+same unified `translate_vector_selection` as vertex/segment, with the
+host applying delta to selected tangents (excluding tangents whose
+parent vertex is already moving as a vertex — main editor's `vector.ts:39-42` exclusion). Mirror is pinned to `"none"` in
+multi-translate.
+
+**Absolute-gesture click-no-drag invariant.** `start_translate_tangent`
+opens an absolute-position gesture on-down (the commit writes
+`set_tangent(pos = cursor_doc)`). When the pointer never moves between
+down and up, the surface MUST NOT emit the commit — the select intent
+at pointer-down already covers the user's "select-only" intent, and an
+absolute commit would snap the control point to the cursor's down
+position (which lands within the knob's Fitts'-tolerant hit area, not
+pixel-perfect on the control point). Delta-based gestures (e.g.
+`translate_vertex` with dx=dy=0) are naturally safe and require no
+special handling; the invariant applies only to absolute-position
+commits (`set_tangent`, `bend_segment`).
+
+### Ghost-handle (eager) scenario
+
+| Scenario           | Trigger                                                 | Outcome                                                                                                                                        |
+| ------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HandleGhostSplit` | Pointer on a ghost insertion knob (half-point preview). | Eager: `split_segment` fires on-down; the new vertex is selected; the same press opens a translate-vertex gesture (insert + grab single pass). |
+
+The ghost is unrelated to the "would-deselect → defer" rule — the
+ghost vertex doesn't exist pre-split, so membership doesn't apply.
+
 ### Suppressed
 
 | Scenario | Trigger                                                                 |
@@ -417,6 +490,10 @@ selection, shift)`, every implementation MUST route the same way.
 6. **Promotion cancels deferred select.** When a pending state promotes to
    a gesture, any deferred select MUST be cancelled. No other cancellation
    path exists.
+   6a. **Absolute-gesture click-no-drag is mute.** Gestures whose commit
+   writes an absolute position (`set_tangent`, `bend_segment`) MUST NOT
+   emit their commit intent when the pointer never moved between down
+   and up. The on-down select intent is the only mutation in that case.
 7. **Hover and cursor are computed every move.** Hover reflects `pick`;
    cursor reflects the same routing logic as pointer-down. Neither is
    suppressed by overlays.
@@ -439,6 +516,10 @@ Each implementation MUST have at least one test per named scenario:
 - `BodyDragOnly`
 - `BodyNarrowOrDrag`, `BodyToggleOrDrag`
 - `BodySwapOrDrag`, `BodyAddOrDrag`
+- `HandleVertexReplace`, `HandleVertexAdd`, `HandleVertexNarrowOrDrag`, `HandleVertexToggleOrDrag`
+- `HandleTangentReplace`, `HandleTangentAdd`, `HandleTangentNarrowOrDrag`, `HandleTangentToggleOrDrag`
+- `HandleSegmentReplace`, `HandleSegmentAdd`, `HandleSegmentNarrowOrDrag`, `HandleSegmentToggleOrDrag`
+- `HandleGhostSplit`
 - `EmptyMarquee`, `EmptyDeselectThenMarquee`, `EmptyAdditiveMarquee`
 - `Noop`
 
