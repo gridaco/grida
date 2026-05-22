@@ -51,7 +51,15 @@ Internally, the editor wraps the parsed SVG in a **typed element IR**: a per-nod
 
 The IR is a **typed view, not alternative storage**. The parsed AST remains the in-memory store; file bytes remain the source of truth; the parse-side source-position trivia store carries whitespace, attribute order, and unknown-namespace content. The IR is rebuilt from the AST on every load and discarded on `dispose`. P1 round-trip stands.
 
-This is consistent with the "Not a private IR" anti-goal below — that anti-goal rejects alternative on-disk format and bytes-projected-from-IR storage, neither of which this is. Design: `docs/wg/feat-svg-editor/element-ir.md`. Migration sketch: `docs/wg/feat-svg-editor/element-ir-migration.md`.
+This is consistent with the "Not a private IR" anti-goal below — that anti-goal rejects alternative on-disk format and bytes-projected-from-IR storage, neither of which this is. Design: [`docs/wg/feat-svg-editor/element-ir.md`](https://grida.co/docs/wg/feat-svg-editor/element-ir). The phased migration sketch lands with the implementation slice.
+
+### Defined terms
+
+The editor's design docs use capitalised terms with precise meanings. The one most often referenced in everyday review:
+
+- **[Policy Class](../../docs/wg/feat-svg-editor/glossary/policy-class.md)** — the minimal partition of editable elements such that every editing intent admits the same set of legal solutions within a class. `<circle>` and `<ellipse>` are different Policy Classes because their resize solution spaces fork differently, even though both are conics. The unit at which a host's policy decision (refuse / native / promote / via-transform) maps onto. When a design discussion asks "should X and Y be treated the same?" — apply the Policy Class fork test, not authoring intuition.
+
+Full glossary: [`docs/wg/feat-svg-editor/glossary/`](../../docs/wg/feat-svg-editor/glossary/).
 
 ## Principles
 
