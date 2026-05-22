@@ -5,6 +5,12 @@ on:
     branches:
       - main
   pull_request:
+    paths-ignore:
+      - ".agents/**"
+      - "docs/**"
+      - "**/*.md"
+      - "**/*.mdx"
+      - "branding/**"
 
 jobs:
   test:
