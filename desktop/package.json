@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Grida Desktop App",
   "keywords": [],
@@ -25,7 +25,7 @@
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "tailwind-merge": "^3.5.0",
-    "update-electron-app": "^3.1.2"
+    "update-electron-app": "^3.2.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.1",
@@ -44,13 +44,13 @@
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react": "^6.0.2",
     "dotenv": "^17.4.2",
-    "electron": "^41.2.1",
+    "electron": "^42.2.0",
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.0.0",
     "typescript": "^6",
-    "vite": "^8.0.8"
+    "vite": "^8.0.13"
   },
-  "packageManager": "pnpm@10.10.0"
+  "packageManager": "pnpm@10.24.0"
 }

@@ -1,2 +1,7 @@
 packages:
   - .
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+  - fs-xattr
+  - macos-alias

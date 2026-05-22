@@ -29,7 +29,7 @@ app.commandLine.appendSwitch("disable-async-dns");
 app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
-updateElectronApp();
+updateElectronApp({ notifyUser: true });
 
 app.setName("Grida");
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
