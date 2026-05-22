@@ -118,9 +118,11 @@ async function walk(
   prefix: string,
   out: string[]
 ): Promise<void> {
-  // `values()` is async-iterable in spec-compliant browsers.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const entries = (dir as unknown as { values(): AsyncIterable<any> }).values();
+  // `values()` is async-iterable in spec-compliant browsers — the typing
+  // for it isn't in the default lib yet.
+  const entries = (
+    dir as unknown as { values(): AsyncIterable<FileSystemHandle> }
+  ).values();
   for await (const entry of entries) {
     const path = `${prefix}/${entry.name}`;
     if (entry.kind === "directory") {

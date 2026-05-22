@@ -132,12 +132,16 @@ describe("@grida/agent-tools public API", () => {
       // `findMatches` etc. live in `./internal/match` and are NOT
       // public-facing. Catching a leak here = catching it before it
       // turns into accidental contract.
-      expectTypeOf<keyof typeof AgentFs>().not.toEqualTypeOf<
-        | "findMatches"
-        | "collapseWhitespace"
-        | "applyReplacements"
-        | keyof typeof AgentFs
-      >();
+      //
+      // We assert that the *intersection* of public keys with the
+      // internal names is `never`, so any single leaked name trips
+      // the guard (a `not.toEqualTypeOf<A | B | C>` check would only
+      // fail if all three leaked simultaneously).
+      type LeakedInternalKeys = Extract<
+        keyof typeof AgentFs,
+        "findMatches" | "collapseWhitespace" | "applyReplacements"
+      >;
+      expectTypeOf<LeakedInternalKeys>().toEqualTypeOf<never>();
     });
   });
 
