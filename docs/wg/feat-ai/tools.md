@@ -1,5 +1,8 @@
 ---
 title: Fundamental Tools (for AI)
+description: Fundamental AI toolset — agent-host capabilities (filesystem, planning, tool discovery) that apply to any Grida agent regardless of surface or domain.
+keywords: [ai, tools, agent, filesystem, planning, grida]
+format: md
 tags:
   - internal
   - wg
@@ -9,204 +12,265 @@ tags:
 
 # Fundamental Tools (for AI)
 
-This document proposes the philosophical basis for the fundamental toolset, enabling machines to design like humans.
+This document specifies the **fundamental** AI toolset — tools that
+apply to any agent we ship, regardless of where it runs (chat, canvas,
+server, desktop) or what domain it works in.
 
-## Key Principles
+For canvas-specific tools (scene-graph search, specialized inserts,
+canvas exec / lint / format, resource lookup), see
+[`tools-canvas.md`](./tools-canvas.md).
 
-- Versioning, Sandboxing, and Rolling Back
+## Key principles
+
+- **Always available.** Fundamentals are the baseline every agent
+  surface ships with. A bare chat that has nothing else still has these.
+- **Zero or near-zero cost.** No sandbox, no provisioned environment,
+  no remote LLM-side spend. The host owns the implementation; the model
+  just calls the tool.
+- **Backend-agnostic by signature.** The same `read_file({ path })`
+  call works whether the underlying storage is in-memory (`MemoryBackend`),
+  OPFS in the browser (`OpfsBackend`), real disk in Node
+  (`NodeFsBackend`), or a future remote document store. What changes
+  across environments is the **backend** under the fs, not the tool
+  schema the model sees.
+- **Shell, when available, is additive — not a replacement.** A
+  desktop or sandbox agent that ships a `bash` tool still keeps the
+  structured fs tools. They aren't redundant: `edit_file`'s match-and-
+  replace contract is safer than `sed -i`; `grep_files`' structured
+  `{path, line, text}` output is cheaper than parsing `grep`'s pipe
+  format; the model can be granted `edit_file` without granting
+  arbitrary shell. This mirrors Claude Code's design, which exposes
+  `Read` / `Edit` / `Write` / `Glob` / `Grep` _alongside_ `Bash`.
+- **Mirror something proven.** Unix command surface where possible
+  (`grep`, `ls`), established IDE surface where unix doesn't apply
+  ("Find in Files"). The model already knows these shapes — naming with
+  them buys instant calibration. Constraint: agent tools can query but
+  can't pipe, so we mirror the **query** form, not the full shell
+  composition.
+
+## Categories
+
+| Category       | Tools                                                                  | Where it lives                          |
+| -------------- | ---------------------------------------------------------------------- | --------------------------------------- |
+| Filesystem     | `read_file` / `edit_file` / `write_file` / `list_files` / `grep_files` | `packages/grida-agent-tools/src/fs/`    |
+| Planning       | `todo_write`                                                           | `packages/grida-agent-tools/src/todos/` |
+| Tool discovery | `tool_search` _(proposed)_                                             | TBD                                     |
+| Shell          | `bash` _(future, env-specific)_                                        | host-supplied when sandbox/desktop      |
+
+## Mirror of Claude Code's tool surface
+
+The shapes track Claude Code closely, since the patterns are proven:
+
+| Claude Code  | Grida (fundamental)        | Notes                                                             |
+| ------------ | -------------------------- | ----------------------------------------------------------------- |
+| `Read`       | `read_file`                | Same shape.                                                       |
+| `Edit`       | `edit_file`                | Same shape, plus our version-checked staleness guard.             |
+| `Write`      | `write_file`               | Same shape, plus optional `version` for stale-check on overwrite. |
+| `Glob`       | (~`list_files`)            | We have a simpler enumerate; can promote to Glob-shape later.     |
+| `Grep`       | `grep_files`               | Same shape — literal/regex content search.                        |
+| `TodoWrite`  | `todo_write`               | Same shape, same semantics, snake-cased.                          |
+| `ToolSearch` | `tool_search` _(proposed)_ | Same shape, two-level (literal + semantic) proposed.              |
+| `Bash`       | — _(future)_               | Additive, not a replacement for the fs tools when we ship it.     |
 
 ## Tools
 
 ---
 
-> **Search** Tools
+> **Filesystem** tools (fundamental)
 
-### `::man`
+These tools cover the standard fs operations every code-aware agent
+needs. The signatures are storage-agnostic — `read_file("/canvas.svg")`
+makes the same sense whether the path resolves to an in-memory map, an
+OPFS file, a real `node:fs` file under a tmp dir, or a future remote
+document store. The implementation lives in
+[`packages/grida-agent-tools/src/fs/`](https://github.com/gridaco/grida/tree/main/packages/grida-agent-tools/src/fs); the README there
+carries the full contract (mounts, bindings, backends, safety contract).
 
-This tool serves as the documentation and self-discovery interface for all other tools, inspired by the Unix `man` command. It displays structured, human-readable manual pages for any tool, including syntax, description, and examples, and acts as the primary entry point for understanding system capabilities.
+The fs is content-agnostic and multi-file. A path can be **bound** to
+live state (an editor, a doc model) or **pure** in-memory storage
+(notes, scratch). Both shapes share the API.
 
-### `::tree`
+These tools stay even when the agent gains shell access. Structured
+file ops coexist with `bash` rather than being replaced by it —
+`edit_file`'s match-and-replace contract is safer than `sed`, and the
+structured outputs are cheaper to consume than shell stdout.
 
-Similar to the [`tree`](<https://en.wikipedia.org/wiki/Tree_(command)>) command, this tool returns the tree structure of the node.
+### `::read_file`
 
-It enables hierarchical understanding of design components for structured processing.
+Read a file's content + a freshness token. Always call before any edit;
+re-read on `stale`. Same shape as Claude Code's `Read`.
 
-Example:
+### `::edit_file`
 
-```
-└─ ⛶  Document (nodes=4, scenes=1, entry=scene)
-   └─ ⛶  Frame HeroSection  (type=container, id=frame)  [1280×720]  fill=#111111  opacity=0.9
-      ├─ ✎  Text Title  (type=text, id=text)  "Welcome to Grida"  font=Inter  size=32  weight=700
-      └─ ◼  Rect Button  (type=rectangle, id=button)  [160×48]  fill=#3B82F6  radius=8
-```
+Match-and-replace edit. The default write path — cheap, safe, must
+locate the change.
 
-### `::snapshot`
+Matching: literal substring first, then a whitespace-normalized
+fallback. Ambiguous matches reject unless `replace_all: true`. The
+strategy is conservative on purpose — closer to Claude Code's `Edit`
+than to aider's diff fuzzing. Mirrors the find-and-replace shape every
+editor agent has settled on.
 
-This takes a snapshot of the current canvas state.
+### `::write_file`
 
-### `::search`
+Full-file upsert. `version` optional: include it (from the last read)
+for an explicit wholesale rewrite with staleness safety; omit it for a
+permissive write that bypasses the freshness check (use for fresh-start
+writes). Same shape as Claude Code's `Write`, plus the optional version
+for stale-check.
 
-Searches the scene graph for nodes by **semantics**, **geometry**, and **structure**. Returns a stable, ordered list of node IDs (plus brief metadata) without dumping full nodes.
+### `::list_files`
 
-- **Semantics**: type, role, name text, style tokens (fill/stroke/font), accessibility labels.
-- **Geometry**: point/region queries (contains, intersects, overlaps), relations (near, aligned_to, left_of, above), size/ratio ranges.
-- **Structure**: ancestry/descendancy (within, has_child, sibling_of), component/instance links.
-- **Ordering**: by z-index, document order, reading order, distance to point, or score.
+Enumerate every known file. Sorted absolute paths. Today this is a flat
+enumeration; if we need filename pattern matching later we'll promote
+to a Glob-shape (Claude Code's `Glob`).
 
-**Notes**
+### `::grep_files`
 
-- Read-only; pairs with `::select` and `::exec` for actions.
-- Supports boolean logic and filters (e.g., `type:Text AND near:(200,480,32)`), and pagination/cursors for large results.
-- Returns compact briefs `{id, type, name?, bbox?, z?}` to minimize token cost.
+Literal substring search across every known file. Returns one entry per
+matching line with a 1-indexed line number and the full line text.
+Mirrors `grep -n -F` (case-sensitive, fixed-string by default; pass
+`case_sensitive: false` for `-i`). Same shape as Claude Code's `Grep`.
+Does NOT count as a `read_file` — search is for finding things, not for
+claiming you've read them.
 
-This tool enables efficient retrieval of nodes based on complex criteria for precise design queries.
+Roadmap:
 
-### `::text_content`
-
-Similar to [DOM's textContent](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent), this tool extracts the node as plain text.
-
-Unlike the DOM, the design is likely unordered; this tool accepts an optional argument for sorting, aligning with geometric layout so that the output follows the reading direction.
-
-This tool provides a clean textual representation of design elements to facilitate analysis and manipulation.
-
-### `::html`
-
-This exports a canvas subtree as HTML.
-
-It allows integration and reuse of design elements in web environments.
-
-### `::peek_pixels`
-
-This peeks at pixels at a specific point in the canvas or node.
-
-It provides precise visual inspection for pixel-level verification.
-
-### `::image`
-
-This exports a canvas subtree as an image.
-
-### `::diff`
-
-This diffs the nodes between the current canvas and the target canvas.
-
-It supports change detection and version comparison within designs.
+- **Level 1 (shipped):** literal substring search. Cheap, deterministic,
+  works offline.
+- **Level 2 (future):** semantic / RAG search. Higher cost, requires
+  embeddings infrastructure. Will ship as a separate tool name (e.g.
+  `semantic_search`) rather than overloading `grep_files`, so the model
+  picks the cost tier explicitly.
 
 ---
 
-> **Awareness** tools
+> **Planning** tools (fundamental)
 
-### `::select`
+### `::todo_write`
 
-This selects nodes at a specific point in the canvas.
+Plan and track work. Pass the complete list of todos every call — the
+prior list is replaced wholesale. Mirrors Claude Code's `TodoWrite`.
 
-It facilitates targeted interaction and editing of design elements.
-
----
-
-> **Run** tools
-
-### `::exec`
-
-This executes a command on the canvas scripting api sandbox.
-
-It enables dynamic manipulation of the canvas through scripted instructions.
-
-### `::lint`
-
-This generates a visual linting report for the current state of the canvas subtree.
-
-It helps identify and enforce design consistency and best practices.
-
-### `::format`
-
-Formats design elements for consistent presentation and output.
-
----
-
-> **Specialized Insert** tools
-
-### `::make_from_grida`
-
-Insert a .grida compat partial or full packed subtree.
-
-This should support json and kdl format.
-
-```kdl
-clipboard {
-  container "page" {
-    container "header" {
-      text "Logo" {
-        font "Inter"
-        size 16
-        weight 700
-      }
+```json
+{
+  "todos": [
+    {
+      "content": "Add a star", // imperative
+      "activeForm": "Adding a star", // present continuous
+      "status": "in_progress" // pending | in_progress | completed
     }
-  }
+  ]
 }
 ```
 
-### `::make_from_svg`
+- **Exactly one `in_progress` at a time.** Enforced socially by the
+  prompt; the visible list makes drift obvious.
+- **No batched updates.** The model should update as it works.
+- **Replace-all.** No per-item ops; the whole list is the input.
 
-Insert a node from an SVG string.
+Use it when the work is non-trivial (multiple edits, exploration,
+anything you'd break into steps). Skip it for one-shot edits.
 
-### `::make_from_image`
+Implementation:
+[`packages/grida-agent-tools/src/todos/`](https://github.com/gridaco/grida/tree/main/packages/grida-agent-tools/src/todos).
 
-Insert a node from an image URL/Data. (Non SVG)
+---
 
-| image  | support                   |
-| ------ | ------------------------- |
-| `png`  | default                   |
-| `jpg`  | default                   |
-| `webp` | with webp feature enabled |
-| `gif`  | planned                   |
-| `svg`  | reject                    |
+> **Tool discovery** tools (fundamental) — _PROPOSED, not yet implemented_
 
-### `::make_from_markdown`
+### `::tool_search` _(proposed)_
 
-Insert a node from a markdown (or plain txt) string.
+As the toolkit grows — more fundamentals, per-env tools (canvas, future
+text-editor, future video timeline), custom MCP servers — the model
+can't reasonably hold every tool's full schema in its working context.
+We need a discovery mechanism that lets the model find tools by intent.
 
-### `::make_from_csv`
+Mirrors Claude Code's `ToolSearch`: deferred tool schemas live in a
+catalog; the model queries the catalog by name or by keyword, and the
+host returns the matching tools' full schemas inline. The model then
+calls those tools normally.
 
-Insert a table from a CSV string.
+**Two-level design:**
 
-### `::make_from_mermaid`
+| Level   | Search type          | Cost            | When                                                                           |
+| ------- | -------------------- | --------------- | ------------------------------------------------------------------------------ |
+| Level 1 | Text / token match   | Zero            | Default. Substring + ranked keyword match on tool name + description.          |
+| Level 2 | Semantic / embedding | Cheap, non-zero | Optional fallback when text match is empty. Embeddings over tool descriptions. |
 
-Insert a diagram from a mermaid string.
+The model picks the level via a hint (`mode: "literal" | "semantic"`),
+default `literal`. Level 2 is invoked only on miss, keeping the typical
+path zero-cost.
 
-### `::make_from_html`
+**Sketch of the surface:**
 
-Insert a node from an HTML string as wireframe (minimal styling).
-This exceptionally accepts interactive elements (e.g. inputs, buttons, etc.)
-
-### `::make_from_widget`
-
-Insert a subtree from a shortcode widget token (similar to flutter)
-This is useful for wireframing
-
-```xml
-<column width="1000" height="1000">
-  <button>
-    <text size="20" weight="bold">Click me</text>
-  </button>
-</column>
+```ts
+tool_search({
+  // Pick one shape:
+  query: "send slack message",         // free-text intent
+  // or
+  select: ["Read", "Edit", "Grep"],    // exact tool names
+  max_results?: 5,
+})
+→ {
+  tools: [
+    { name: "slack_post_message", description: "...", schema: {...} },
+    ...
+  ]
+}
 ```
 
+**Why we want this:**
+
+- Tool surface is going to grow fast: agent-fs (5) + agent-todos (1) +
+  canvas tools (15+) + future env tools + user-installed MCP servers.
+  Sending every schema with every request burns context for no reason.
+- Deferred schemas keep the system prompt small. Only tool _names_
+  ship in the always-present catalog; full schemas materialize on
+  demand.
+- Aligns with how Claude Code itself handles MCP discovery — the model
+  already knows this pattern.
+
+**Open questions** (decide before implementing):
+
+- Where does the tool catalog live? Static manifest per host (cheap,
+  rebuild on tool changes) vs. a runtime registry (live updates).
+- Who decides which tools are "always on" vs. "deferred"? Probably:
+  fundamentals always on, env tools always on for their env, MCP tools
+  deferred by default.
+- Level 2 embeddings — on-device (transformers.js) vs. a cheap remote
+  endpoint? Latency vs. infra cost tradeoff.
+
+Tracked status: **proposed**. No implementation yet; the four other
+fundamentals + canvas tools are enough that we haven't felt the pinch.
+When we add a second env (e.g. agent surface for the form builder) or
+the first MCP integration, this becomes the next thing to ship.
+
 ---
 
-> **Unsafe** tools
+## What lives where
 
-### `::unsafe_js_eval`
+- `packages/grida-agent-tools/src/fs/` — filesystem fundamentals
+  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-agent-tools/src/fs/README.md))
+- `packages/grida-agent-tools/src/todos/` — planning fundamentals
+  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-agent-tools/src/todos/README.md))
+- `packages/grida-agent-tools/src/tool-search/` — _not yet created; see proposal above_
+- `editor/grida-canvas-hosted/ai/tools/` — canvas tools (the existing
+  `canvas-use` collection); see
+  [`tools-canvas.md`](./tools-canvas.md) for the catalog.
 
-This calls eval() with the givven code string. needs explicit user approval.
+## Adding a new fundamental tool
 
----
+Bar: would every agent want this, regardless of env? If yes, it's
+fundamental. Examples that pass the bar: filesystem, planning, tool
+discovery, time/clock, env metadata. Examples that fail: anything
+canvas-specific, anything network-bound (those are MCP or per-env).
 
-> **Resource** tools
+Process:
 
-### `::resource` / `::asset`
-
-Manages external resources and assets linked to the design for streamlined usage.
-
-- search fonts
-- search icons
-- search photos
+1. Drop it in `packages/grida-agent-tools/src/<name>/` with its own README, class,
+   AI-SDK tool schema, and pure-logic tests.
+2. Add a row to the Categories table above.
+3. Add a `::<name>` section under the right category.
+4. If it's vfs-only (only needed because we lack shell), mark it so —
+   the host can then drop it when shell is available.
