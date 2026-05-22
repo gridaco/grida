@@ -1,10 +1,18 @@
 ---
 title: "SVG Element Model — Geometry, Presentation, Frames, Round-Trip Hazards"
+description: "Spec-grounded reference for the SVG element surface a graphical editor IR must expose: per-element geometry, presentation hooks, local frames, and round-trip hazards."
+keywords:
+  - svg
+  - element-model
+  - geometry
+  - presentation
+  - round-trip
+  - svg-editor
 tags:
   - internal
   - research
   - svg
-  - svg-editor
+format: md
 ---
 
 # SVG Element Model

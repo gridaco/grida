@@ -1,3 +1,22 @@
+---
+title: "Hit-testing — design notes for v2"
+description: "Investigation, bugs, and architectural lessons from a v1 hit-test implementation in @grida/svg-editor — input to the v2 hit-test architecture."
+keywords:
+  - svg
+  - svg-editor
+  - hit-test
+  - picking
+  - dom
+  - cmath
+tags:
+  - internal
+  - svg
+  - wg
+doc_tasks:
+  - update
+format: md
+---
+
 # Hit-testing — design notes for v2
 
 > Lessons from a v1 hit-test implementation that lives on a private branch and is **not yet on `main`**. Source paths under `packages/grida-svg-editor/src/` referenced below describe that in-flight slice; the architectural lessons stand independently and feed the v2 design.

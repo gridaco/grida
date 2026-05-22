@@ -82,7 +82,7 @@ fielding a feature request from any other consumer.
 
 ### The flow
 
-```
+```text
 ┌─────────────────────┐                  ┌──────────────────────┐
 │  Main agent         │                  │  Subagent            │
 │  (consumer side)    │                  │  ("you are the       │

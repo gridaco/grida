@@ -1,10 +1,19 @@
 ---
 title: "svg-editor Intent × Element Matrix — Current State"
-tags:
-  - internal
-  - research
+description: "Current-state inventory of what @grida/svg-editor's public commands do today on each SVG element type — input to the IR redesign."
+keywords:
+  - svg
   - svg-editor
   - intents
+  - matrix
+  - ir
+tags:
+  - internal
+  - svg
+  - research
+doc_tasks:
+  - update
+format: md
 ---
 
 # svg-editor Intent × Element Matrix
@@ -309,7 +318,7 @@ not repeated.
 - **`align`** — `core/align.ts` + `editor.ts` align path
   computes per-member deltas and uses the same `apply_translate`
   intent, so cell verdict equals the row's `translate` verdict.
-  Refuses on <2 members or no surface (essential — undefined
+  Refuses on `<2` members or no surface (essential — undefined
   geometry).
 
 ### 5.2 Property / paint / content cells

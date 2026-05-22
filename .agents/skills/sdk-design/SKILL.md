@@ -114,7 +114,7 @@ guessing internal state.
 
 One-directional dependency, layered:
 
-```
+```text
 primitives / math  ←  logic core  ←  adapter shell  ←  host
 ```
 

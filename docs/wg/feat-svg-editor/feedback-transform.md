@@ -1,3 +1,22 @@
+---
+title: "Transform / Rotation — Feedback for svg-editor"
+description: "Context dump on the transform pipeline in @grida/svg-editor — what's done, what's broken, what's load-bearing for the IR redesign."
+keywords:
+  - svg
+  - svg-editor
+  - transform
+  - rotation
+  - hud
+  - feedback
+tags:
+  - internal
+  - svg
+  - wg
+doc_tasks:
+  - update
+format: md
+---
+
 # Transform / Rotation — Feedback for svg-editor
 
 > Reviews an in-flight `@grida/svg-editor` implementation that is **not yet on `main`**. Source paths under `packages/grida-svg-editor/src/` referenced below describe the forthcoming implementation slice, not code reachable from this commit. The design questions stand independently of the referenced code.

@@ -1,11 +1,18 @@
 ---
 title: "usvg Tree Notes — A Comparative Read for the svg-editor IR"
+description: "What resvg's usvg IR normalises away and what an editor IR must refuse — comparative read informing the @grida/svg-editor IR proposal."
+keywords:
+  - svg
+  - svg-editor
+  - usvg
+  - resvg
+  - ir
+  - research
 tags:
   - internal
   - research
   - svg
-  - svg-editor
-  - usvg
+format: md
 ---
 
 # usvg Tree Notes

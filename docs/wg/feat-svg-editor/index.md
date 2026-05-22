@@ -1,10 +1,17 @@
 ---
 title: "SVG Editor (TS SDK) — Design"
-tags:
-  - internal
+description: "Index of design notes for the @grida/svg-editor TypeScript SDK — element IR proposal, hit-test architecture, transform pipeline critique, Policy Class glossary."
+keywords:
   - svg
   - svg-editor
   - design
+  - sdk
+  - ir
+tags:
+  - internal
+  - svg
+  - wg
+format: md
 ---
 
 # SVG Editor (TS SDK) — Design
@@ -67,9 +74,9 @@ This directory used to also hold spec-reference, research, and
 package-internal docs. Those have moved to their canonical homes:
 
 - **SVG spec reference** —
-  [`reference/svg/element-model.md`](https://grida.co/docs/reference/svg/element-model)
+  [`reference/svg/element-model.md`](../../reference/svg/element-model.md)
   (per-element geometry, presentation, round-trip hazards) and
-  [`reference/svg/transform-and-frame.md`](https://grida.co/docs/reference/svg/transform-and-frame)
+  [`reference/svg/transform-and-frame.md`](../../reference/svg/transform-and-frame.md)
   (`transform=` syntax, viewport / viewBox, `<use>` instancing).
   Useful to both this package and the Rust importer in `feat-svg/`.
 - **Comparative research** —

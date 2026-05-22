@@ -1,11 +1,20 @@
 ---
 title: "Element IR — Typed In-Memory Model for svg-editor"
+description: "Proposal for a typed per-node element IR that replaces tag-switch intent dispatch in @grida/svg-editor with capability-gated records, centralising round-trip invariants."
+keywords:
+  - svg
+  - svg-editor
+  - element-ir
+  - ir
+  - capabilities
+  - round-trip
 tags:
   - internal
-  - design
-  - svg-editor
-  - ir
-status: draft
+  - svg
+  - wg
+doc_tasks:
+  - update
+format: md
 ---
 
 # Element IR

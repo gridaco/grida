@@ -1,11 +1,18 @@
 ---
 title: "SVG Transforms and Coordinate Frames"
+description: "Reference for SVG transform-attribute syntax, viewport / viewBox, and use-instance coordinate frames — feeds an IR redesign that must refuse-vs-normalize rotation and pivot."
+keywords:
+  - svg
+  - transforms
+  - coordinate-frames
+  - viewbox
+  - use
+  - svg-editor
 tags:
   - internal
   - research
   - svg
-  - svg-editor
-  - transforms
+format: md
 ---
 
 # SVG Transforms and Coordinate Frames

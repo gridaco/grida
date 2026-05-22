@@ -1,12 +1,18 @@
 ---
 title: "Policy Class"
-tags:
-  - internal
-  - design
+description: "Defined term — the minimal partition of editable SVG elements such that every editing intent admits the same set of legal solutions within a class."
+keywords:
+  - svg
   - svg-editor
+  - policy-class
   - glossary
   - ir
-status: draft
+  - editor
+tags:
+  - internal
+  - svg
+  - reference
+format: md
 ---
 
 # Policy Class
