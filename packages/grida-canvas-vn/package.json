@@ -1,7 +1,7 @@
 {
   "name": "@grida/vn",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "description": "Vector Network Spec",
   "files": [
     "dist"
