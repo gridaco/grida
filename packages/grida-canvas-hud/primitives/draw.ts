@@ -26,6 +26,8 @@ export function filterHUDDrawByGroup(
   out.rects = keepVisible(draw.rects, hidden);
   out.polylines = keepVisible(draw.polylines, hidden);
   out.screenRects = keepVisible(draw.screenRects, hidden);
+  out.topRects = keepVisible(draw.topRects, hidden);
+  out.topPolylines = keepVisible(draw.topPolylines, hidden);
 
   return hasAny(out) ? out : undefined;
 }
@@ -46,6 +48,8 @@ function hasAny(draw: HUDDraw): boolean {
     (draw.points?.length ?? 0) > 0 ||
     (draw.rects?.length ?? 0) > 0 ||
     (draw.polylines?.length ?? 0) > 0 ||
-    (draw.screenRects?.length ?? 0) > 0
+    (draw.screenRects?.length ?? 0) > 0 ||
+    (draw.topRects?.length ?? 0) > 0 ||
+    (draw.topPolylines?.length ?? 0) > 0
   );
 }

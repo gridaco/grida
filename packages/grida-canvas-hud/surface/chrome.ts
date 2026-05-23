@@ -1,6 +1,7 @@
 import cmath from "@grida/cmath";
 import type {
   HUDDraw,
+  HUDLine,
   HUDPolyline,
   HUDRect,
   HUDScreenRect,
@@ -42,6 +43,8 @@ export interface SurfaceChromeGroups {
   selection?: HUDSemanticGroup;
   selectionControls?: HUDSemanticGroup;
   marquee?: HUDSemanticGroup;
+  /** Lasso polygon (sibling of `marquee`). */
+  lasso?: HUDSemanticGroup;
   transformPreview?: HUDSemanticGroup;
 }
 
@@ -72,6 +75,11 @@ export function buildChrome(input: ChromeInput): {
   const decoration_rects: HUDRect[] = [];
   const decoration_lines: HUDDraw["lines"] = [];
   const decoration_polylines: HUDPolyline[] = [];
+  // Top layer — painted LAST by `HUDCanvas`. Gesture preview chrome
+  // (marquee, lasso) lives here so it always dominates knobs / handles
+  // beneath it. See `HUDDraw.topRects` / `HUDDraw.topPolylines`.
+  const top_rects: HUDRect[] = [];
+  const top_polylines: HUDPolyline[] = [];
 
   // ── Hover outline ───────────────────────────────────────────────────────
   // Effective hover = host override (if any) ?? pointer pick.
@@ -152,16 +160,37 @@ export function buildChrome(input: ChromeInput): {
   }
 
   // ── Marquee (gesture-driven) ────────────────────────────────────────────
+  // Routed to the TOP layer — painted after every knob, handle, outline,
+  // and selection control so the user always sees the live marquee region
+  // they are drawing, no matter what it overlaps.
   if (state.gesture.kind === "marquee") {
     const g = state.gesture;
     const mr = rectFromPoints(g.anchor_doc, g.current_doc);
-    decoration_rects.push({
+    top_rects.push({
       ...mr,
       stroke: true,
       fill: true,
       fillOpacity: 0.15,
       group: groups?.marquee,
     });
+  }
+
+  // ── Lasso (gesture-driven) ──────────────────────────────────────────────
+  // Sibling of marquee — same top-layer guarantee, drawn as a dashed
+  // polyline closing implicitly back to the first point. Matches the
+  // styling of the standalone `<Lasso/>` overlay.
+  if (state.gesture.kind === "lasso") {
+    const g = state.gesture;
+    if (g.points.length >= 2) {
+      top_polylines.push({
+        points: g.points.slice(),
+        stroke: true,
+        fill: true,
+        fillOpacity: 0.15,
+        dashed: true,
+        group: groups?.lasso,
+      });
+    }
   }
 
   // ── Resize gesture preview ─────────────────────────────────────────────
@@ -201,6 +230,8 @@ export function buildChrome(input: ChromeInput): {
       lines: decoration_lines.length > 0 ? decoration_lines : undefined,
       polylines:
         decoration_polylines.length > 0 ? decoration_polylines : undefined,
+      topRects: top_rects.length > 0 ? top_rects : undefined,
+      topPolylines: top_polylines.length > 0 ? top_polylines : undefined,
     },
   };
 }
@@ -655,20 +686,30 @@ export function fanOverlays(
   overlays: readonly OverlayElement[],
   transform: cmath.Transform,
   regions: HitRegions
-): { screenRects: HUDScreenRect[] } {
+): {
+  screenRects: HUDScreenRect[];
+  lines: HUDLine[];
+  polylines: HUDPolyline[];
+} {
   regions.clear();
   const screenRects: HUDScreenRect[] = [];
+  const lines: HUDLine[] = [];
+  const polylines: HUDPolyline[] = [];
 
   for (const el of overlays) {
-    // Hit-region: project to a screen AABB and push.
+    // Hit-region: project to a screen AABB and push. Skip if the overlay
+    // is purely decorative (zero-area hit).
     const projected = projectHit(el.hit, transform);
-    regions.push({
-      rect: projected.rect,
-      inverse_transform: projected.inverse_transform,
-      action: el.action,
-      priority: el.priority,
-      label: el.label,
-    });
+    if (projected.rect.width > 0 && projected.rect.height > 0) {
+      regions.push({
+        rect: projected.rect,
+        inverse_transform: projected.inverse_transform,
+        action: el.action,
+        priority: el.priority,
+        label: el.label,
+        customHitTest: el.customHitTest,
+      });
+    }
 
     // Render: fan into the appropriate primitive arrays.
     if (!el.render) continue;
@@ -684,16 +725,38 @@ export function fanOverlays(
         fillColor: el.render.fillColor,
         strokeColor: el.render.strokeColor,
         angle: el.render.angle,
+        shape: el.render.shape,
+        group: el.group,
+      });
+    } else if (el.render.kind === "doc_line") {
+      lines.push({
+        x1: el.render.x1,
+        y1: el.render.y1,
+        x2: el.render.x2,
+        y2: el.render.y2,
+        dashed: el.render.dashed,
+        strokeWidth: el.render.strokeWidth,
+        color: el.render.color,
+        group: el.group,
+      });
+    } else if (el.render.kind === "doc_polyline") {
+      polylines.push({
+        points: el.render.points.map((p) => [p[0], p[1]]),
+        stroke: el.render.stroke,
+        fill: el.render.fill,
+        fillOpacity: el.render.fillOpacity,
+        strokeOpacity: el.render.strokeOpacity,
+        strokeWidth: el.render.strokeWidth,
+        dashed: el.render.dashed,
+        color: el.render.color,
         group: el.group,
       });
     }
-    // doc_rect / doc_line are not currently emitted via overlays; the chrome
-    // builder pushes those into the decoration `HUDDraw` directly. If a
-    // future feature needs them as interactable elements, add fan logic
-    // here.
+    // doc_rect not currently emitted via overlays; add a branch here when
+    // a feature needs it.
   }
 
-  return { screenRects };
+  return { screenRects, lines, polylines };
 }
 
 function projectHit(
@@ -753,6 +816,8 @@ export function mergeDraws(
     rects: cat(base.rects, extra?.rects),
     polylines: cat(base.polylines, extra?.polylines),
     screenRects: cat(cat(base.screenRects, extra?.screenRects), screenRects),
+    topRects: cat(base.topRects, extra?.topRects),
+    topPolylines: cat(base.topPolylines, extra?.topPolylines),
   };
   return out;
 }

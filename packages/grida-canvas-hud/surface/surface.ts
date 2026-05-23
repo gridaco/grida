@@ -25,7 +25,9 @@ import {
   mergeDraws,
   type SurfaceChromeGroups,
 } from "./chrome";
+import { buildVectorChrome, type VectorOverlay } from "./vector-chrome";
 import type { OverlayElement } from "../event/overlay";
+import type { VectorSubSelection } from "../event/state";
 
 export interface SurfaceVisibilityContext {
   gesture: SurfaceGesture;
@@ -52,6 +54,15 @@ export interface SurfaceOptions {
    * `{ kind: "line", p1, p2 }`.
    */
   shapeOf: (id: NodeId) => SelectionShape | null;
+  /**
+   * Optional — vector geometry for a node under content-edit. When set
+   * AND `setVectorSelection` has been called with a non-null mirror, the
+   * surface renders vertex chrome (knobs, hit regions) for the named node.
+   *
+   * Hosts that never enter vector-edit mode (or that don't have path-aware
+   * content-edit) can omit this. The chrome simply won't render.
+   */
+  vectorOf?: (id: NodeId) => VectorOverlay | null;
   /** Surface emits intents the host commits. */
   onIntent: IntentHandler;
   /** Initial style (partial; merged with defaults). */
@@ -76,7 +87,59 @@ export interface SurfaceOptions {
    * gesture; returned groups are filtered from surface chrome and host extras.
    */
   visibility?: SurfaceVisibilityPolicy;
+  /**
+   * Where a click on a segment inserts the new vertex.
+   *
+   * - `"midpoint"` (default) — always at `t=0.5`. The ghost preview appears
+   *   at the segment's geometric midpoint on hover; the position is
+   *   independent of where on the segment the cursor lands. Predictable
+   *   and matches the "owning segment hovers → midpoint becomes visible"
+   *   mental model.
+   * - `"projected"` — at the nearest point on the curve to the cursor
+   *   (`cmath.bezier.project`). Mirrors the main editor's
+   *   `snapped_segment_p` model — the ghost tracks the cursor along the
+   *   curve. More expressive but adds a "where exactly will this land?"
+   *   cognitive step.
+   *
+   * Both modes share the same hit-test, chrome rendering, and intent
+   * vocabulary — only the projected `t` differs. Hosts that don't set
+   * this get `"midpoint"` (the predictable default).
+   */
+  vectorInsertionMode?: VectorInsertionMode;
+  /**
+   * Which gesture an empty-space drag promotes to:
+   * - `"marquee"` (default) — axis-aligned rect selection.
+   * - `"lasso"` — freeform polygon selection.
+   *
+   * Pushed by the host alongside its own tool toggle (e.g. Q key in the
+   * svg-editor swaps cursor ↔ lasso tools and calls
+   * `setVectorSelectionMode`). The HUD reads it only at empty-space drag
+   * promotion; no other branch consults it. Symmetric with
+   * `vectorInsertionMode`.
+   */
+  vectorSelectionMode?: VectorSelectionMode;
+  /**
+   * Sticky-bend toggle for segment-body drag:
+   * - `"auto"` (default) — Meta-modifier gates the bend gesture.
+   *   No Meta → translate; Meta-held → bend.
+   * - `"always"` — segment drag bends regardless of Meta. The host's
+   *   bend tool sets this. Released by setting back to `"auto"`.
+   *
+   * Same host-pushed pattern as `vectorSelectionMode`. Affects only the
+   * NEXT segment-drag promotion; in-flight gestures keep their committed
+   * mode.
+   */
+  vectorBendMode?: VectorBendMode;
 }
+
+/** See {@link SurfaceOptions.vectorInsertionMode}. */
+export type VectorInsertionMode = "midpoint" | "projected";
+
+/** See {@link SurfaceOptions.vectorSelectionMode}. */
+export type VectorSelectionMode = "marquee" | "lasso";
+
+/** See {@link SurfaceOptions.vectorBendMode}. */
+export type VectorBendMode = "auto" | "always";
 
 /**
  * Top-level wired surface.
@@ -113,9 +176,41 @@ export class Surface {
     if (options.readonly !== undefined) {
       this.state.setReadonly(options.readonly);
     }
+    if (options.vectorInsertionMode) {
+      this.state.setVectorInsertionMode(options.vectorInsertionMode);
+    }
+    if (options.vectorSelectionMode) {
+      this.state.setVectorSelectionMode(options.vectorSelectionMode);
+    }
+    if (options.vectorBendMode) {
+      this.state.setVectorBendMode(options.vectorBendMode);
+    }
     if (options.pixelGrid) {
       this.hudCanvas.setPixelGrid(options.pixelGrid);
     }
+  }
+
+  /** Switch the vector insertion mode at runtime. Affects both the
+   *  hover preview position and the split/bend `t` for the NEXT
+   *  pointer event. See {@link SurfaceOptions.vectorInsertionMode}. */
+  setVectorInsertionMode(mode: VectorInsertionMode): void {
+    this.state.setVectorInsertionMode(mode);
+  }
+
+  /** Switch the empty-space-drag selection gesture at runtime
+   *  (`marquee` vs `lasso`). Affects only the NEXT pending → drag
+   *  promotion; any in-flight gesture keeps running. See
+   *  {@link SurfaceOptions.vectorSelectionMode}. */
+  setVectorSelectionMode(mode: VectorSelectionMode): void {
+    this.state.setVectorSelectionMode(mode);
+  }
+
+  /** Switch the sticky-bend toggle at runtime (`auto` vs `always`).
+   *  `"always"` is the host's bend tool talking — every segment-drag
+   *  bends as if Meta were held. Affects only the NEXT segment-drag
+   *  promotion. See {@link SurfaceOptions.vectorBendMode}. */
+  setVectorBendMode(mode: VectorBendMode): void {
+    this.state.setVectorBendMode(mode);
   }
 
   /** Configure / disable the back-most pixel-grid layer. */
@@ -156,6 +251,21 @@ export class Surface {
    */
   setSelection(input: readonly NodeId[] | readonly SelectionGroup[]): void {
     this.state.setSelection(input);
+  }
+
+  /**
+   * Push a vector-edit sub-selection. Pass `null` to exit vector chrome.
+   *
+   * Non-null: the surface renders vertex knobs for the named path on every
+   * subsequent `draw()`, with selected vertices highlighted. Requires the
+   * host to have wired `vectorOf` in `SurfaceOptions` — otherwise the
+   * chrome silently skips.
+   *
+   * Host calls this on enter / exit of content-edit AND on every sub-
+   * selection change (click, marquee, etc.). Cheap — just swaps a field.
+   */
+  setVectorSelection(input: VectorSubSelection | null): void {
+    this.state.setVectorSelection(input);
   }
 
   setStyle(partial: Partial<HUDStyle>): void {
@@ -221,18 +331,67 @@ export class Surface {
       width: this.width,
       height: this.height,
     });
+
+    // Merge in vector chrome (vertex knobs etc.) when a path is under
+    // content-edit and the host wired `vectorOf`. Chrome stays decoupled —
+    // the main `buildChrome` doesn't know about vector edit.
+    const vector_selection = this.state.getVectorSelection();
+    if (vector_selection && this.opts.vectorOf) {
+      const vector_overlay = this.opts.vectorOf(vector_selection.node_id);
+      if (vector_overlay) {
+        const vector_chrome = buildVectorChrome({
+          vector_selection,
+          vector_overlay,
+          style: this.style,
+          // Hover is HUD-owned (mirrors the README rule). The chrome reads
+          // it each frame to apply state-driven affordances.
+          vector_hover: this.state.getVectorHover(),
+          // Transform feeds the projection-based segment hit-test so its
+          // distance threshold stays at the right screen-px at any zoom.
+          transform: this.state.getTransform(),
+          // Suppresses preview-only affordances (currently the ghost
+          // insertion knob) once the user has touched the surface. See
+          // `SurfaceState.isInteracting()` for the semantic.
+          is_interacting: this.state.isInteracting(),
+          group: this.opts.groups?.selectionControls,
+        });
+        // Vector overlays are appended AFTER selection-control overlays so
+        // their hit regions win on overlap (same logical layer; higher
+        // priority value via the priority field, not push order).
+        for (const o of vector_chrome.overlays) overlays.push(o);
+      }
+    }
+
     const hidden = this.opts.visibility?.({
       gesture: this.state.gesture,
     })?.hidden;
-    const { screenRects } = fanOverlays(
+    const { screenRects, lines, polylines } = fanOverlays(
       filterOverlaysByGroup(overlays, hidden),
       this.state.getTransform(),
       this.state.hitRegions()
     );
+    // Merge overlay-fanned lines + polylines into the decoration so they're
+    // drawn in the same pass as everything else. Polylines carry the
+    // path-edit segment outlines; lines carry tangent handle lines.
+    const has_extras = lines.length > 0 || polylines.length > 0;
+    const decoration_with_extras: HUDDraw = has_extras
+      ? {
+          ...decoration,
+          lines:
+            lines.length > 0
+              ? [...(decoration.lines ?? []), ...lines]
+              : decoration.lines,
+          polylines:
+            polylines.length > 0
+              ? [...(decoration.polylines ?? []), ...polylines]
+              : decoration.polylines,
+        }
+      : decoration;
     this.hudCanvas.draw(
-      filterHUDDrawByGroup(mergeDraws(decoration, extra, screenRects), {
-        hidden,
-      })
+      filterHUDDrawByGroup(
+        mergeDraws(decoration_with_extras, extra, screenRects),
+        { hidden }
+      )
     );
   }
 

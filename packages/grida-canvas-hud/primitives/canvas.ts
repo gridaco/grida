@@ -132,7 +132,16 @@ export class HUDCanvas {
 
     if (!commands) return;
 
-    const { lines, rules, points, rects, polylines, screenRects } = commands;
+    const {
+      lines,
+      rules,
+      points,
+      rects,
+      polylines,
+      screenRects,
+      topRects,
+      topPolylines,
+    } = commands;
 
     if (rules && rules.length > 0) this.drawRules(rules);
     if (rects && rects.length > 0) this.drawRects(rects);
@@ -141,6 +150,13 @@ export class HUDCanvas {
     if (points && points.length > 0) this.drawPoints(points);
     if (screenRects && screenRects.length > 0)
       this.drawScreenRects(screenRects);
+
+    // Top layer — painted last so marquee / lasso always dominate the knobs,
+    // handles, and outlines beneath them. See `HUDDraw.topRects` /
+    // `HUDDraw.topPolylines`.
+    if (topRects && topRects.length > 0) this.drawRects(topRects);
+    if (topPolylines && topPolylines.length > 0)
+      this.drawPolylines(topPolylines);
   }
 
   // ---------------------------------------------------------------------------
@@ -338,10 +354,15 @@ export class HUDCanvas {
     const zoom = this.transform[0][0];
 
     this.applyViewTransform();
-    ctx.lineWidth = DEFAULT_LINE_WIDTH / zoom;
 
     for (const poly of polylines) {
       if (poly.points.length < 2) continue;
+
+      // Per-polyline strokeWidth (screen-px). Divided by zoom so doc-space
+      // rendering produces the requested screen-px thickness. Falls back to
+      // the canvas default (1px) when absent.
+      const sw = poly.strokeWidth ?? DEFAULT_LINE_WIDTH;
+      ctx.lineWidth = sw / zoom;
 
       ctx.beginPath();
       ctx.moveTo(poly.points[0][0], poly.points[0][1]);
@@ -365,8 +386,11 @@ export class HUDCanvas {
         if (poly.dashed) {
           ctx.setLineDash([4 / zoom, 3 / zoom]);
         }
+        const stroke_alpha = poly.strokeOpacity ?? 1;
+        if (stroke_alpha !== 1) ctx.globalAlpha = stroke_alpha;
         ctx.strokeStyle = color;
         ctx.stroke();
+        if (stroke_alpha !== 1) ctx.globalAlpha = 1;
         if (poly.dashed) {
           ctx.setLineDash([]);
         }
@@ -471,13 +495,35 @@ export class HUDCanvas {
         ctx.translate(-cx, -cy);
       }
 
-      if (doFill) {
-        ctx.fillStyle = r.fillColor ?? this.color;
-        ctx.fillRect(x, y, w, h);
-      }
-      if (doStroke) {
-        ctx.strokeStyle = r.strokeColor ?? this.color;
-        ctx.strokeRect(x, y, w, h);
+      const shape = r.shape ?? "rect";
+      if (shape === "circle") {
+        // Ellipse inscribed in the same bbox. Hit AABB on the host side
+        // remains the square — render/hit disagree by design (legibility
+        // vs Fitts'). `ctx.ellipse(cx, cy, rx, ry, ...)` is widely
+        // supported; no roundRect fallback needed.
+        const ecx = x + w / 2;
+        const ecy = y + h / 2;
+        const rx = w / 2;
+        const ry = h / 2;
+        ctx.beginPath();
+        ctx.ellipse(ecx, ecy, rx, ry, 0, 0, Math.PI * 2);
+        if (doFill) {
+          ctx.fillStyle = r.fillColor ?? this.color;
+          ctx.fill();
+        }
+        if (doStroke) {
+          ctx.strokeStyle = r.strokeColor ?? this.color;
+          ctx.stroke();
+        }
+      } else {
+        if (doFill) {
+          ctx.fillStyle = r.fillColor ?? this.color;
+          ctx.fillRect(x, y, w, h);
+        }
+        if (doStroke) {
+          ctx.strokeStyle = r.strokeColor ?? this.color;
+          ctx.strokeRect(x, y, w, h);
+        }
       }
 
       if (angle !== 0) ctx.restore();
