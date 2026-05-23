@@ -50,6 +50,20 @@ describe("formatSvg", () => {
     expect(formatSvg(once)).toBe(once);
   });
 
+  it("preserves whitespace between tspans inside <text> (semantic — renders a space)", () => {
+    // Regression: an earlier `>\s+<` pre-collapse pass was eating the
+    // space between `</tspan>` and `<tspan>`, turning "A B" into "AB" and
+    // silently corrupting user content via the AI edit_file pipeline.
+    const input = `<svg><text><tspan>A</tspan> <tspan>B</tspan></text></svg>`;
+    expect(formatSvg(input)).toBe(
+      [
+        `<svg>`,
+        `  <text><tspan>A</tspan> <tspan>B</tspan></text>`,
+        `</svg>`,
+      ].join("\n")
+    );
+  });
+
   it("preserves XML / DOCTYPE metadata tags at depth 0", () => {
     const input = `<?xml version="1.0"?><svg><rect/></svg>`;
     expect(formatSvg(input)).toBe(

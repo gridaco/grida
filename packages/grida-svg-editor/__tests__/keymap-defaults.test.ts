@@ -5,8 +5,13 @@
 // through `editor.keymap.dispatch()` → assert the observable state change.
 
 import { describe, expect, it } from "vitest";
+import { getKeyboardOS } from "@grida/keybinding";
 import { createSvgEditor } from "../src/index";
 import { createSvgEditorWithInternals } from "./_helpers";
+
+// "Mod" is Meta on Mac, Ctrl elsewhere — match the keymap's platform
+// resolution so these tests pass under both local macOS and Linux CI.
+const MOD_IS_META = getKeyboardOS() === "mac";
 
 const NESTED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <g id="outer">
@@ -195,7 +200,12 @@ describe("default keymap — reorder ([ / ] / Mod+[ / Mod+])", () => {
     const a = findByElementId(editor, "a");
     editor.commands.select(a);
     expect(
-      editor.keymap.dispatch(mkEvent({ code: "BracketRight", metaKey: true }))
+      editor.keymap.dispatch(
+        mkEvent({
+          code: "BracketRight",
+          ...(MOD_IS_META ? { metaKey: true } : { ctrlKey: true }),
+        })
+      )
     ).toBe(true);
     expect(childOrder(editor, "inner")).toEqual(["b", "a", "c"]);
   });
@@ -205,7 +215,12 @@ describe("default keymap — reorder ([ / ] / Mod+[ / Mod+])", () => {
     const c = findByElementId(editor, "c");
     editor.commands.select(c);
     expect(
-      editor.keymap.dispatch(mkEvent({ code: "BracketLeft", metaKey: true }))
+      editor.keymap.dispatch(
+        mkEvent({
+          code: "BracketLeft",
+          ...(MOD_IS_META ? { metaKey: true } : { ctrlKey: true }),
+        })
+      )
     ).toBe(true);
     expect(childOrder(editor, "inner")).toEqual(["a", "c", "b"]);
   });
@@ -230,7 +245,10 @@ describe("default keymap — claim vs consume (preventDefault contract)", () => 
   it("Cmd+G claims even with no selection (no find bar fall-through)", () => {
     const editor = createSvgEditorWithInternals({ svg: NESTED });
     expect(editor.state.selection).toEqual([]);
-    const e = mkEvent({ code: "KeyG", metaKey: true });
+    const e = mkEvent({
+      code: "KeyG",
+      ...(MOD_IS_META ? { metaKey: true } : { ctrlKey: true }),
+    });
     expect(editor.keymap.claims(e)).toBe(true);
     expect(editor.keymap.dispatch(e)).toBe(false);
   });
@@ -240,7 +258,10 @@ describe("default keymap — claim vs consume (preventDefault contract)", () => 
     const a = findByElementId(editor, "a");
     const b = findByElementId(editor, "b");
     editor.commands.select([a, b]);
-    const e = mkEvent({ code: "KeyG", metaKey: true });
+    const e = mkEvent({
+      code: "KeyG",
+      ...(MOD_IS_META ? { metaKey: true } : { ctrlKey: true }),
+    });
     expect(editor.keymap.claims(e)).toBe(true);
     expect(editor.keymap.dispatch(e)).toBe(true);
   });
@@ -253,7 +274,10 @@ describe("default keymap — claim vs consume (preventDefault contract)", () => 
     const a = findByElementId(editor, "a"); // inside #inner
     const outer = findByElementId(editor, "outer"); // parent of #inner
     editor.commands.select([a, outer]); // cross-parent → policy reject
-    const e = mkEvent({ code: "KeyG", metaKey: true });
+    const e = mkEvent({
+      code: "KeyG",
+      ...(MOD_IS_META ? { metaKey: true } : { ctrlKey: true }),
+    });
     expect(editor.keymap.claims(e)).toBe(true);
     expect(editor.keymap.dispatch(e)).toBe(false);
   });
