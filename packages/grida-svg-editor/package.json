@@ -1,0 +1,73 @@
+{
+  "name": "@grida/svg-editor",
+  "version": "1.0.0-alpha.13",
+  "description": "Headless SVG editor (experimental).",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./dom": {
+      "types": "./dist/dom.d.ts",
+      "import": "./dist/dom.mjs",
+      "require": "./dist/dom.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js"
+    },
+    "./presets": {
+      "types": "./dist/presets.d.ts",
+      "import": "./dist/presets.mjs",
+      "require": "./dist/presets.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "scripts": {
+    "bench": "vitest bench --run",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "prepack": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grida/cmath": "workspace:*",
+    "@grida/history": "workspace:*",
+    "@grida/hud": "workspace:*",
+    "@grida/keybinding": "workspace:*",
+    "@grida/svg": "workspace:*",
+    "@grida/text-editor": "workspace:*",
+    "@grida/vn": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "react": "^19",
+    "tsdown": "^0.21.9",
+    "typescript": "^6",
+    "vitest": "^4"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}

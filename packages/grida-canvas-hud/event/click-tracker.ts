@@ -5,9 +5,38 @@
  * Matches the behavior of native dblclick but is driven by the surface's
  * own dispatch loop — so it survives DOM-identity changes that would break
  * the browser's native handler.
+ *
+ * ## Why we override the OS default (500 ms → 250 ms)
+ *
+ * Win32 `GetDoubleClickTime`, `NSEvent.doubleClickInterval`, and Chromium's
+ * `kDoubleClickTimeMS` all default to **500 ms**. That number is calibrated
+ * for *general computing* (file managers, hyperlinks) where a stray
+ * double-click is mildly costly and accessibility matters more than peak
+ * responsiveness.
+ *
+ * A direct-manipulation canvas inverts that calculus:
+ *
+ * - Single-click and double-click are both intentional, frequent, and on
+ *   the same surface.
+ * - 500 ms means *every* single-click waits half a second before downstream
+ *   commits "can be sure" it wasn't a dblclick. Users feel the lag as
+ *   "the canvas hesitates."
+ * - Measured human double-click intervals cluster at **200–300 ms**.
+ * - The mobile web's 300 ms tap-delay was famously judged laggy enough to
+ *   warrant removal across browsers. That puts 300 ms at the *upper bound*
+ *   of "feels responsive" on a direct-manipulation surface.
+ *
+ * **250 ms** sits below the human-average ceiling, safely above the
+ * realistic fast-double-click floor (~150 ms), and reads as snappy rather
+ * than "barely above the line." This is canvas-tuned, not OS-bound — and
+ * intentionally not configurable (per the "Default is core, not
+ * customizable" doctrine).
  */
 export interface ClickTrackerOptions {
-  /** Max gap between clicks in ms. Default 500. */
+  /**
+   * Max gap between clicks in ms. Default **250** (canvas-tuned, faster
+   * than the OS-wide 500 ms). See file header for rationale.
+   */
   windowMs?: number;
   /** Max distance between clicks in screen px. Default 5. */
   distancePx?: number;
@@ -22,7 +51,7 @@ export class ClickTracker {
   private count = 0;
 
   constructor(opts: ClickTrackerOptions = {}) {
-    this.window_ms = opts.windowMs ?? 500;
+    this.window_ms = opts.windowMs ?? 250;
     this.distance_px = opts.distancePx ?? 5;
   }
 

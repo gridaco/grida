@@ -123,6 +123,12 @@ export type RenderShape =
        * selection so they rotate with the parent.
        */
       angle?: number;
+      /**
+       * Render shape — `"rect"` (default) or `"circle"` (ellipse inscribed
+       * in the same bbox). Hit shape is unaffected; this only changes what
+       * the canvas paints. Used by vector chrome for round vertex knobs.
+       */
+      shape?: "rect" | "circle";
     }
   /** Doc-space rect — e.g. selection outline, marquee. */
   | {
@@ -144,6 +150,25 @@ export type RenderShape =
       x2: number;
       y2: number;
       dashed?: boolean;
+      /** Stroke width in screen-space CSS px. */
+      strokeWidth?: number;
+      /** Override the canvas color for this line. */
+      color?: string;
+    }
+  /** Doc-space polyline — used to draw an open curve as a sequence of
+   *  flattened samples. Stroke width is in screen-px (the renderer
+   *  divides by zoom). Used by vector chrome to outline each segment of
+   *  a path under content-edit. */
+  | {
+      kind: "doc_polyline";
+      points: ReadonlyArray<readonly [number, number]>;
+      stroke?: boolean;
+      fill?: boolean;
+      fillOpacity?: number;
+      strokeOpacity?: number;
+      strokeWidth?: number;
+      dashed?: boolean;
+      color?: string;
     };
 
 // ─── OverlayElement — the unit of overlay UI ──────────────────────────────
@@ -178,4 +203,15 @@ export interface OverlayElement {
   /** Lower wins. See `HUDHitPriority` in `selection-controls.ts`. */
   priority: number;
   cursor?: CursorIcon;
+  /**
+   * Optional refinement layered on top of the AABB hit check. Receives the
+   * screen-space pointer (or shadow-space, when `hit.kind === "screen_obb"`
+   * and the registry has applied `inverse_transform`). Returns false to
+   * reject the hit even though the AABB matched.
+   *
+   * Used by curve-shaped hit regions (e.g. path segments) — the AABB is
+   * the bezier's bbox, the refinement asks "are you actually near the
+   * curve in screen-px?"
+   */
+  customHitTest?: (point: cmath.Vector2) => boolean;
 }

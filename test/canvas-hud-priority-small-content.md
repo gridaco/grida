@@ -86,7 +86,7 @@ comfortable.
 
 ## Steps
 
-Run against `http://localhost:3000/canvas/svg` (free-form SVG editor).
+Run against `http://localhost:3000/svg` (free-form SVG editor).
 
 1. **Setup.** Load any SVG with at least one rectangle and one text node.
    Select one node.

@@ -42,6 +42,27 @@ export type SurfaceGesture =
       current_doc: cmath.Vector2;
     }
   | {
+      /**
+       * Freeform polygon selection. Sibling to `marquee` — empty-space drag
+       * promotes here when the host has set the surface's
+       * `vectorSelectionMode` to `"lasso"`. The HUD doesn't decide which
+       * gesture to use; the host pushes the mode in alongside its tool
+       * toggle. See `Surface.setVectorSelectionMode`.
+       */
+      kind: "lasso";
+      /** First sample (pointer-down position in document-space). */
+      anchor_doc: cmath.Vector2;
+      /**
+       * Polyline samples in document-space, oldest-first.
+       * `points[0] === anchor_doc`. Per pointer_move samples are appended
+       * only when the rounded screen-pixel differs from the last sample,
+       * keeping growth bounded on slow drags. The host's hit-test closes
+       * the polygon implicitly (last → first) — matches
+       * `cmath.polygon.pointInPolygon`'s ray-cast.
+       */
+      points: cmath.Vector2[];
+    }
+  | {
       kind: "translate";
       /** Selected ids at the start of the gesture. */
       ids: NodeId[];
@@ -92,6 +113,79 @@ export type SurfaceGesture =
       endpoint: "p1" | "p2";
       /** Current endpoint position in document-space. */
       pos_doc: cmath.Vector2;
+    }
+  | {
+      /**
+       * Dragging one or more vertices of a path under content-edit. The
+       * `indices` are captured at gesture start; intra-gesture selection
+       * mirror changes do not affect what the gesture moves.
+       */
+      kind: "translate_vertex";
+      /** Path node id under content-edit. */
+      node_id: NodeId;
+      /** Vertex indices being moved. */
+      indices: number[];
+      /** Anchor (pointer-down) in document-space. */
+      anchor_doc: cmath.Vector2;
+      /** Last reported pointer in document-space. */
+      last_doc: cmath.Vector2;
+    }
+  | {
+      /**
+       * Dragging the path-edit sub-selection. Triggered by segment-body
+       * drag (the default — Meta switches to `bend_segment` instead) and
+       * any future drag origin that targets the whole sub-selection
+       * (multi-vertex drag is the planned follow-up).
+       *
+       * The HUD doesn't know which vertices are in the sub-selection
+       * (host owns it). It DOES know "this gesture additionally targets
+       * these vertex indices" — e.g. the endpoints of the segment that
+       * initiated the drag, when that segment isn't yet in the
+       * sub-selection. The host UNIONs `additional_vertex_indices` with
+       * its authoritative sub-selection on each preview frame.
+       */
+      kind: "translate_vector_selection";
+      node_id: NodeId;
+      additional_vertex_indices: readonly number[];
+      anchor_doc: cmath.Vector2;
+      last_doc: cmath.Vector2;
+    }
+  | {
+      /**
+       * Dragging a tangent control point. The host applies the mirror
+       * policy (`auto` by default — infer smooth-vs-broken). The chrome
+       * builder owned the anchor; this gesture only tracks the moving
+       * end of the handle line.
+       */
+      kind: "translate_tangent";
+      node_id: NodeId;
+      tangent: readonly [number, 0 | 1];
+      /** Tangent control point's doc-space position at gesture start
+       *  (carried from chrome via `decision.pos`). */
+      anchor_doc: cmath.Vector2;
+      last_doc: cmath.Vector2;
+      /** Pointer's doc-space position at gesture start. Distinct from
+       *  `anchor_doc` because the cursor lands within the knob's Fitts'-
+       *  tolerant hit area, not pixel-perfect on the control point.
+       *  Used to detect "click-no-drag": commit is skipped when
+       *  `last_doc === down_doc`, otherwise the absolute set_tangent
+       *  would snap the control point to the cursor's down position. */
+      down_doc: cmath.Vector2;
+    }
+  | {
+      /**
+       * Bending a segment. Press-down sampled a point on the curve at
+       * parameter `ca`; drag moves that point toward `last_doc`. The
+       * host re-solves tangents on every frame. Endpoints (a, b) stay
+       * fixed for the duration of the gesture.
+       */
+      kind: "bend_segment";
+      node_id: NodeId;
+      segment: number;
+      /** Frozen parametric position of the sampled point. */
+      ca: number;
+      anchor_doc: cmath.Vector2;
+      last_doc: cmath.Vector2;
     };
 
 export const IDLE: SurfaceGesture = { kind: "idle" };

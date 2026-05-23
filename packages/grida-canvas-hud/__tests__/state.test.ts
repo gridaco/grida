@@ -86,6 +86,35 @@ describe("SurfaceState dispatch", () => {
     expect(intents[0]).toEqual({ kind: "deselect_all" });
   });
 
+  // UX spec: empty-space single-click while in content-edit emits
+  // `clear_vector_selection` (NOT `deselect_all`). Without this
+  // discrimination, the only way to drop a vertex sub-selection would be
+  // to exit content-edit entirely — same drop, but loses the editing
+  // context. Mirrors the dblclick `exit_content_edit` gesture: same
+  // "click outside" interaction, one fewer step, with the more granular
+  // outcome.
+  it("click empty space WHILE in content-edit emits clear_vector_selection (NOT deselect_all)", () => {
+    state.setSelection(["editing-path"]);
+    state.setVectorSelection({
+      node_id: "editing-path",
+      vertices: [0, 1],
+      segments: [],
+      tangents: [],
+    });
+    state.dispatch(
+      {
+        kind: "pointer_down",
+        x: 500,
+        y: 500,
+        button: "primary",
+        mods: NO_MODS,
+      },
+      deps
+    );
+    expect(intents.length).toBe(1);
+    expect(intents[0]).toEqual({ kind: "clear_vector_selection" });
+  });
+
   it("shift-click toggles selection", () => {
     state.setSelection(["a"]);
     state.dispatch(
@@ -166,7 +195,103 @@ describe("SurfaceState dispatch", () => {
     expect(intents.find((i) => i.kind === "enter_content_edit")).toBeTruthy();
   });
 
-  it("drag empty space → marquee commit intent on up", () => {
+  // ── UX spec: "dblclick to exit content-edit" ──────────────────────────────
+  //
+  // While a vector sub-selection is mirrored on the surface (set by the host
+  // via `setVectorSelection`), a dblclick on anything OTHER than a vector
+  // control (vertex / tangent / segment-strip) emits `exit_content_edit`.
+  // This is the symmetric exit to `enter_content_edit`. The HUD's mirror
+  // stays in lockstep with the host — the surface itself does NOT clear
+  // the mirror on the exit signal; the host pushes `setVectorSelection(null)`
+  // as its commit of the exit.
+  it("dblclick on empty space WHILE in content-edit emits exit_content_edit", () => {
+    state.setVectorSelection({
+      node_id: "editing",
+      vertices: [],
+      segments: [],
+      tangents: [],
+    });
+    // Empty space → 500,500 is outside every scene rect, no overlay.
+    state.dispatch(
+      {
+        kind: "pointer_down",
+        x: 500,
+        y: 500,
+        button: "primary",
+        mods: NO_MODS,
+      },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_up", x: 500, y: 500, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch(
+      {
+        kind: "pointer_down",
+        x: 500,
+        y: 500,
+        button: "primary",
+        mods: NO_MODS,
+      },
+      deps
+    );
+    expect(intents.find((i) => i.kind === "exit_content_edit")).toBeTruthy();
+    // Must NOT also fire enter_content_edit — exit and enter are mutually
+    // exclusive on the same dblclick.
+    expect(
+      intents.find((i) => i.kind === "enter_content_edit")
+    ).toBeUndefined();
+  });
+
+  it("dblclick on a different node WHILE in content-edit emits exit_content_edit (not enter)", () => {
+    state.setVectorSelection({
+      node_id: "editing",
+      vertices: [],
+      segments: [],
+      tangents: [],
+    });
+    // Dblclick on scene node "a" (50,50). Without content-edit this would
+    // fire enter_content_edit on "a"; with content-edit on it exits the
+    // current edit and lets the host decide what to do next.
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_up", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(intents.find((i) => i.kind === "exit_content_edit")).toBeTruthy();
+    expect(
+      intents.find((i) => i.kind === "enter_content_edit")
+    ).toBeUndefined();
+  });
+
+  it("dblclick OUTSIDE content-edit still emits enter_content_edit (the gate works both ways)", () => {
+    // No setVectorSelection call → in_content_edit defaults to false →
+    // dblclick on content classifies as EnterEdit. Pins the gate.
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_up", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(intents.find((i) => i.kind === "enter_content_edit")).toBeTruthy();
+    expect(intents.find((i) => i.kind === "exit_content_edit")).toBeUndefined();
+  });
+
+  it("drag empty space → marquee preview intents on move, commit on up", () => {
     state.dispatch(
       {
         kind: "pointer_down",
@@ -191,14 +316,23 @@ describe("SurfaceState dispatch", () => {
       },
       deps
     );
-    const marq = intents.find(
+    // Every pointer_move emits a preview-phase `marquee_select` so the
+    // host can run its hit-test live (cheap for vector content-edit where
+    // geometry is already resolved). pointer_up emits the final commit.
+    // Both carry the same rect.
+    const marqs = intents.filter(
       (i): i is Extract<Intent, { kind: "marquee_select" }> =>
         i.kind === "marquee_select"
     );
-    expect(marq).toBeTruthy();
-    expect(marq!.rect.width).toBe(50);
-    expect(marq!.rect.height).toBe(50);
-    expect(marq!.phase).toBe("commit");
+    const preview = marqs.find((i) => i.phase === "preview");
+    const commit = marqs[marqs.length - 1];
+    expect(preview).toBeTruthy();
+    expect(preview!.rect.width).toBe(50);
+    expect(preview!.rect.height).toBe(50);
+    expect(commit).toBeTruthy();
+    expect(commit.rect.width).toBe(50);
+    expect(commit.rect.height).toBe(50);
+    expect(commit.phase).toBe("commit");
   });
 
   it("hover updates on pointer_move over a node", () => {
@@ -385,5 +519,54 @@ describe("SurfaceState dispatch", () => {
     if (typeof state.cursor === "string" || state.cursor.kind !== "rotate")
       return;
     expect(state.cursor.baseAngle).toBeCloseTo((3 * Math.PI) / 4, 9);
+  });
+});
+
+// UX spec: SurfaceState.isInteracting() captures the "interaction phase"
+// — the seam chrome uses to gate preview-only affordances. Preview
+// overlays (ghost insertion knob today; any future hover-derived
+// preview tomorrow) appear in `false` and vanish in `true`. The flag
+// flips on the FIRST pointer event of an interaction (not on the
+// drag-threshold crossing) — the user has expressed intent the moment
+// they press the mouse.
+describe("SurfaceState.isInteracting() (interaction phase)", () => {
+  it("is false in pristine idle state", () => {
+    const s = new SurfaceState();
+    expect(s.isInteracting()).toBe(false);
+  });
+
+  it("flips true on pointer_down that defers (pending pointer-down)", () => {
+    const s = makeState(["a"]);
+    const { deps } = makeDeps();
+    // Pointer-down on a selected node defers (drag-vs-toggle ambiguous).
+    s.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(s.isInteracting()).toBe(true);
+  });
+
+  it("flips back to false on pointer_up (click-no-drag)", () => {
+    const s = makeState(["a"]);
+    const { deps } = makeDeps();
+    s.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    s.dispatch(
+      { kind: "pointer_up", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(s.isInteracting()).toBe(false);
+  });
+
+  it("requests a redraw on the idle → active transition (chrome must re-render to hide previews)", () => {
+    const s = makeState(["a"]);
+    const { deps } = makeDeps();
+    const r = s.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(r.needsRedraw).toBe(true);
   });
 });

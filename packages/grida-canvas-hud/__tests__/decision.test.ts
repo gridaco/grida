@@ -117,6 +117,383 @@ describe("Scenario.HandleEndpoint", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Sub-selection scenarios (3 axes × 4 variants — mirrors Tier-2 Content*)
+// ────────────────────────────────────────────────────────────────────────────
+// Doctrine: `docs/wg/feat-editor/ux-surface/selection-intent.md` —
+// "would-deselect → always defer; would-select → singleton, on-down."
+// Same rule, applied per sub-selection axis. Each scenario name embedded
+// verbatim per doctrine § Test coverage grep contract.
+// ════════════════════════════════════════════════════════════════════════════
+
+const VERTEX_A: OverlayAction = {
+  kind: "vertex_handle",
+  node_id: "p1",
+  index: 0,
+  pos: [10, 10],
+};
+const TANGENT_A: OverlayAction = {
+  kind: "tangent_handle",
+  node_id: "p1",
+  tangent: [0, 0],
+  pos: [12, 10],
+};
+const SEGMENT_A: OverlayAction = {
+  kind: "segment_strip",
+  node_id: "p1",
+  segment: 3,
+  a_idx: 0,
+  b_idx: 1,
+  a: [0, 0],
+  b: [10, 0],
+  a_control: [0, 0],
+  b_control: [10, 0],
+};
+
+// ── Vertex axis ────────────────────────────────────────────────────────────
+
+describe("Scenario.HandleVertexReplace (singleton: would-select, no shift)", () => {
+  it("classifies — empty sub-selection", () => {
+    const i = input({
+      ui_action: VERTEX_A,
+      in_content_edit: true,
+      sub_selection: { vertices: [], segments: [], tangents: [] },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleVertexReplace);
+  });
+
+  it("classifies — vertex NOT in sub-selection", () => {
+    const i = input({
+      ui_action: VERTEX_A,
+      in_content_edit: true,
+      sub_selection: { vertices: [5, 6], segments: [], tangents: [] },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleVertexReplace);
+  });
+
+  it("dispatches start_translate_vertex with select: replace", () => {
+    const i = input({ ui_action: VERTEX_A });
+    const d = expectKind(decidePointerDown(i), "start_translate_vertex");
+    expect(d.select).toEqual({ mode: "replace" });
+    expect(d.index).toBe(0);
+  });
+});
+
+describe("Scenario.HandleVertexAdd (singleton: would-select, shift)", () => {
+  it("classifies — vertex ∉ sub-selection, shift", () => {
+    const i = input({
+      ui_action: VERTEX_A,
+      modifiers: SHIFT,
+      sub_selection: { vertices: [5], segments: [], tangents: [] },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleVertexAdd);
+  });
+
+  it("dispatches start_translate_vertex with select: toggle", () => {
+    const i = input({ ui_action: VERTEX_A, modifiers: SHIFT });
+    const d = expectKind(decidePointerDown(i), "start_translate_vertex");
+    expect(d.select).toEqual({ mode: "toggle" });
+  });
+});
+
+describe("Scenario.HandleVertexNarrowOrDrag (ambiguous: would-deselect, no shift)", () => {
+  const i = input({
+    ui_action: VERTEX_A,
+    sub_selection: { vertices: [0, 5, 6], segments: [], tangents: [] },
+  });
+
+  it("classifies", () => {
+    expect(classifyScenario(i)).toBe(Scenario.HandleVertexNarrowOrDrag);
+  });
+
+  it("dispatches pend with deferred select_vertex + translate_vector_selection promote", () => {
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.deferred).toEqual({
+      kind: "select_vertex",
+      node_id: "p1",
+      index: 0,
+      shift: false,
+    });
+    expect(d.pending.promote_to).toEqual({
+      kind: "translate_vector_selection",
+      node_id: "p1",
+      additional_vertex_indices: [],
+    });
+  });
+});
+
+describe("Scenario.HandleVertexToggleOrDrag (ambiguous: would-deselect, shift)", () => {
+  const i = input({
+    ui_action: VERTEX_A,
+    modifiers: SHIFT,
+    sub_selection: { vertices: [0, 5], segments: [], tangents: [] },
+  });
+
+  it("classifies", () => {
+    expect(classifyScenario(i)).toBe(Scenario.HandleVertexToggleOrDrag);
+  });
+
+  it("dispatches pend with deferred select_vertex (shift=true)", () => {
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.deferred).toEqual({
+      kind: "select_vertex",
+      node_id: "p1",
+      index: 0,
+      shift: true,
+    });
+  });
+});
+
+// ── Tangent axis ───────────────────────────────────────────────────────────
+
+describe("Scenario.HandleTangentReplace (singleton: would-select, no shift)", () => {
+  it("classifies — tangent ∉ sub-selection", () => {
+    const i = input({
+      ui_action: TANGENT_A,
+      sub_selection: { vertices: [], segments: [], tangents: [[5, 0]] },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleTangentReplace);
+  });
+
+  it("dispatches start_translate_tangent with select: replace", () => {
+    const i = input({ ui_action: TANGENT_A });
+    const d = expectKind(decidePointerDown(i), "start_translate_tangent");
+    expect(d.select).toEqual({ mode: "replace" });
+  });
+});
+
+describe("Scenario.HandleTangentAdd (singleton: would-select, shift)", () => {
+  it("classifies — tangent ∉ sub-selection, shift", () => {
+    const i = input({
+      ui_action: TANGENT_A,
+      modifiers: SHIFT,
+      sub_selection: { vertices: [], segments: [], tangents: [[5, 1]] },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleTangentAdd);
+  });
+
+  it("dispatches start_translate_tangent with select: toggle", () => {
+    const i = input({ ui_action: TANGENT_A, modifiers: SHIFT });
+    const d = expectKind(decidePointerDown(i), "start_translate_tangent");
+    expect(d.select).toEqual({ mode: "toggle" });
+  });
+});
+
+describe("Scenario.HandleTangentNarrowOrDrag (ambiguous: would-deselect, no shift)", () => {
+  it("classifies — tangent ∈ sub-selection (multi)", () => {
+    const i = input({
+      ui_action: TANGENT_A,
+      sub_selection: {
+        vertices: [],
+        segments: [],
+        tangents: [
+          [0, 0],
+          [5, 0],
+        ],
+      },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleTangentNarrowOrDrag);
+  });
+
+  it("dispatches pend with deferred select_tangent; multi → translate_vector_selection promote", () => {
+    const i = input({
+      ui_action: TANGENT_A,
+      sub_selection: {
+        vertices: [],
+        segments: [],
+        tangents: [
+          [0, 0],
+          [5, 0],
+        ],
+      },
+    });
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.deferred).toEqual({
+      kind: "select_tangent",
+      node_id: "p1",
+      tangent: [0, 0],
+      shift: false,
+    });
+    expect(d.pending.promote_to?.kind).toBe("translate_vector_selection");
+  });
+
+  it("singleton-this tangent → translate_tangent_singleton promote (curve gesture)", () => {
+    const i = input({
+      ui_action: TANGENT_A,
+      sub_selection: { vertices: [], segments: [], tangents: [[0, 0]] },
+    });
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.promote_to?.kind).toBe("translate_tangent_singleton");
+  });
+});
+
+describe("Scenario.HandleTangentToggleOrDrag (ambiguous: would-deselect, shift)", () => {
+  const i = input({
+    ui_action: TANGENT_A,
+    modifiers: SHIFT,
+    sub_selection: { vertices: [], segments: [], tangents: [[0, 0]] },
+  });
+
+  it("classifies", () => {
+    expect(classifyScenario(i)).toBe(Scenario.HandleTangentToggleOrDrag);
+  });
+
+  it("dispatches pend with deferred select_tangent (shift=true)", () => {
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.deferred).toMatchObject({
+      kind: "select_tangent",
+      shift: true,
+    });
+  });
+});
+
+// ── Segment axis ───────────────────────────────────────────────────────────
+
+describe("Scenario.HandleSegmentReplace (singleton: would-select, no shift)", () => {
+  it("classifies — segment ∉ sub-selection", () => {
+    const i = input({
+      ui_action: SEGMENT_A,
+      sub_selection: { vertices: [], segments: [99], tangents: [] },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleSegmentReplace);
+  });
+
+  it("dispatches immediate_select_segment carrying [a_idx, b_idx]", () => {
+    const i = input({ ui_action: SEGMENT_A });
+    const d = expectKind(decidePointerDown(i), "immediate_select_segment");
+    expect(d.mode).toBe("replace");
+    expect(d.pending.promote_to).toMatchObject({
+      kind: "translate_vector_selection",
+      additional_vertex_indices: [0, 1],
+    });
+  });
+
+  it("Meta + ∉ → bend_segment promote", () => {
+    const i = input({
+      ui_action: SEGMENT_A,
+      modifiers: { ...NO_MODS, meta: true },
+    });
+    const d = expectKind(decidePointerDown(i), "immediate_select_segment");
+    expect(d.pending.promote_to?.kind).toBe("bend_segment");
+  });
+
+  // Sticky bend tool (host pushes `bend_mode: "always"`). Equivalent to
+  // Meta-held; segment-drag bends regardless of physical key state.
+  it("bend_mode 'always' + no Meta + ∉ → bend_segment promote", () => {
+    const i = input({ ui_action: SEGMENT_A, bend_mode: "always" });
+    const d = expectKind(decidePointerDown(i), "immediate_select_segment");
+    expect(d.pending.promote_to?.kind).toBe("bend_segment");
+  });
+
+  it("bend_mode 'auto' (default) + no Meta + ∉ → translate (locks the gate)", () => {
+    const i = input({ ui_action: SEGMENT_A });
+    const d = expectKind(decidePointerDown(i), "immediate_select_segment");
+    expect(d.pending.promote_to?.kind).toBe("translate_vector_selection");
+  });
+});
+
+describe("Scenario.HandleSegmentAdd (singleton: would-select, shift)", () => {
+  const i = input({
+    ui_action: SEGMENT_A,
+    modifiers: SHIFT,
+    sub_selection: { vertices: [], segments: [99], tangents: [] },
+  });
+
+  it("classifies", () => {
+    expect(classifyScenario(i)).toBe(Scenario.HandleSegmentAdd);
+  });
+
+  it("dispatches immediate_select_segment with mode: toggle", () => {
+    const d = expectKind(decidePointerDown(i), "immediate_select_segment");
+    expect(d.mode).toBe("toggle");
+  });
+});
+
+describe("Scenario.HandleSegmentNarrowOrDrag (ambiguous: would-deselect, no shift)", () => {
+  it("classifies — segment ∈ sub-selection", () => {
+    const i = input({
+      ui_action: SEGMENT_A,
+      sub_selection: { vertices: [], segments: [3], tangents: [] },
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleSegmentNarrowOrDrag);
+  });
+
+  it("dispatches pend with deferred select_segment + translate_vector_selection promote", () => {
+    const i = input({
+      ui_action: SEGMENT_A,
+      sub_selection: { vertices: [], segments: [3], tangents: [] },
+    });
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.deferred).toEqual({
+      kind: "select_segment",
+      node_id: "p1",
+      segment: 3,
+      shift: false,
+    });
+    expect(d.pending.promote_to).toMatchObject({
+      kind: "translate_vector_selection",
+      additional_vertex_indices: [],
+    });
+  });
+
+  // Per user direction: "when point A, B and line AB is selected (3 in
+  // total) or similar (A + AB), the intent is always to translate, not
+  // bend." Bend is reserved for the strictly-singleton-segment case.
+  it("singleton-this segment + Meta → bend_segment promote", () => {
+    const i = input({
+      ui_action: SEGMENT_A,
+      modifiers: { ...NO_MODS, meta: true },
+      sub_selection: { vertices: [], segments: [3], tangents: [] },
+    });
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.promote_to?.kind).toBe("bend_segment");
+  });
+
+  it("multi/mixed sub-selection + Meta → translate_vector_selection (Meta IGNORED)", () => {
+    // "point A, B and line AB" — vertex + segment co-selected. Per user
+    // direction, intent is translate, not bend.
+    const i = input({
+      ui_action: SEGMENT_A,
+      modifiers: { ...NO_MODS, meta: true },
+      sub_selection: { vertices: [0, 1], segments: [3], tangents: [] },
+    });
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.promote_to?.kind).toBe("translate_vector_selection");
+  });
+
+  it("multi-segment + Meta → translate_vector_selection (Meta IGNORED)", () => {
+    const i = input({
+      ui_action: SEGMENT_A,
+      modifiers: { ...NO_MODS, meta: true },
+      sub_selection: { vertices: [], segments: [3, 4], tangents: [] },
+    });
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.promote_to?.kind).toBe("translate_vector_selection");
+  });
+});
+
+describe("Scenario.HandleSegmentToggleOrDrag (ambiguous: would-deselect, shift)", () => {
+  const i = input({
+    ui_action: SEGMENT_A,
+    modifiers: SHIFT,
+    sub_selection: { vertices: [], segments: [3], tangents: [] },
+  });
+
+  it("classifies", () => {
+    expect(classifyScenario(i)).toBe(Scenario.HandleSegmentToggleOrDrag);
+  });
+
+  it("dispatches pend with deferred select_segment (shift=true)", () => {
+    const d = expectKind(decidePointerDown(i), "pend");
+    expect(d.pending.deferred).toEqual({
+      kind: "select_segment",
+      node_id: "p1",
+      segment: 3,
+      shift: true,
+    });
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Content scenarios (Tier 2 — no body region)
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -164,7 +541,11 @@ describe("Scenario.ContentNarrowOrDrag (ambiguous: would-deselect, no shift)", (
 
   it("dispatches pend with deferred replace-narrow", () => {
     const d = expectKind(decidePointerDown(i), "pend");
-    expect(d.pending.deferred).toEqual({ node_id: "a", shift: false });
+    expect(d.pending.deferred).toEqual({
+      kind: "select",
+      node_id: "a",
+      shift: false,
+    });
     expect(d.pending.ids_at_down).toEqual(["a", "b", "c"]);
   });
 });
@@ -182,7 +563,11 @@ describe("Scenario.ContentToggleOrDrag (ambiguous: would-deselect, shift)", () =
 
   it("dispatches pend with deferred toggle-off", () => {
     const d = expectKind(decidePointerDown(i), "pend");
-    expect(d.pending.deferred).toEqual({ node_id: "b", shift: true });
+    expect(d.pending.deferred).toEqual({
+      kind: "select",
+      node_id: "b",
+      shift: true,
+    });
     expect(d.pending.ids_at_down).toEqual(["a", "b"]);
   });
 });
@@ -220,7 +605,11 @@ describe("Scenario.BodyNarrowOrDrag (hover ∈ sel, no shift)", () => {
 
   it("dispatches pend with deferred narrow-to-self", () => {
     const d = expectKind(decidePointerDown(i), "pend");
-    expect(d.pending.deferred).toEqual({ node_id: "a", shift: false });
+    expect(d.pending.deferred).toEqual({
+      kind: "select",
+      node_id: "a",
+      shift: false,
+    });
   });
 });
 
@@ -238,7 +627,11 @@ describe("Scenario.BodyToggleOrDrag (hover ∈ sel, shift)", () => {
 
   it("dispatches pend with deferred toggle-off", () => {
     const d = expectKind(decidePointerDown(i), "pend");
-    expect(d.pending.deferred).toEqual({ node_id: "a", shift: true });
+    expect(d.pending.deferred).toEqual({
+      kind: "select",
+      node_id: "a",
+      shift: true,
+    });
   });
 });
 
@@ -251,7 +644,11 @@ describe("Scenario.BodySwapOrDrag (hover ∉ sel, no shift)", () => {
 
   it("dispatches pend with deferred swap-to-hovered", () => {
     const d = expectKind(decidePointerDown(i), "pend");
-    expect(d.pending.deferred).toEqual({ node_id: "b", shift: false });
+    expect(d.pending.deferred).toEqual({
+      kind: "select",
+      node_id: "b",
+      shift: false,
+    });
     expect(d.pending.ids_at_down).toEqual(["a"]);
   });
 });
@@ -279,7 +676,11 @@ describe("Scenario.BodyAddOrDrag (hover ∉ sel, shift) — must DEFER", () => {
 
   it("dispatches pend with deferred toggle-add (NOT immediate)", () => {
     const d = expectKind(decidePointerDown(i), "pend");
-    expect(d.pending.deferred).toEqual({ node_id: "circle", shift: true });
+    expect(d.pending.deferred).toEqual({
+      kind: "select",
+      node_id: "circle",
+      shift: true,
+    });
     // Drag (if it happens) translates the EXISTING selection only — the
     // hovered circle hasn't been added yet, so ids_at_down stays at the
     // chrome's set.
@@ -319,6 +720,127 @@ describe("Scenario.EnterEdit", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Exit-edit (UX spec — "dblclick away" while in content-edit)
+//
+// Default behavior, locked: while the surface mirrors a vector sub-selection
+// (`in_content_edit === true`), a dblclick that does NOT land on a vector
+// control (vertex / tangent / segment-strip) classifies as `ExitEdit`. A
+// dblclick that lands on a vector control runs its normal handler — exit
+// must not steal an intra-edit gesture.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("Scenario.ExitEdit", () => {
+  it("classifies dblclick on EMPTY space while in content-edit as ExitEdit", () => {
+    // No overlay, no hovered scene id, just a dblclick on canvas background.
+    // Without in_content_edit this would be EmptyMarquee — the active
+    // sub-selection is what flips it to exit.
+    const i = input({ click_count: 2, in_content_edit: true });
+    expect(classifyScenario(i)).toBe(Scenario.ExitEdit);
+    expect(decidePointerDown(i)).toEqual({ kind: "exit_edit" });
+  });
+
+  it("classifies dblclick on a DIFFERENT NODE while in content-edit as ExitEdit (NOT EnterEdit)", () => {
+    // Dblclick on another node while editing — user wants out, not to
+    // re-enter on this one. The HUD signals exit and lets the host decide
+    // whether to select / enter-edit the new node next.
+    const i = input({
+      hovered_id: "other-node",
+      click_count: 2,
+      in_content_edit: true,
+    });
+    expect(classifyScenario(i)).toBe(Scenario.ExitEdit);
+    expect(decidePointerDown(i)).toEqual({ kind: "exit_edit" });
+  });
+
+  it("classifies dblclick on the editing node's BODY (translate_handle) while in content-edit as ExitEdit", () => {
+    // The body region's normal dblclick rule is EnterEdit. In-content-edit
+    // overrides — exit takes precedence.
+    const BODY: OverlayAction = {
+      kind: "translate_handle",
+      ids: ["editing-node"],
+    };
+    const i = input({
+      ui_action: BODY,
+      hovered_id: null,
+      click_count: 2,
+      in_content_edit: true,
+    });
+    expect(classifyScenario(i)).toBe(Scenario.ExitEdit);
+  });
+
+  it("does NOT exit on dblclick on a VERTEX handle — that's an intra-edit gesture", () => {
+    const VERTEX: OverlayAction = {
+      kind: "vertex_handle",
+      node_id: "editing-node",
+      index: 0,
+      pos: [0, 0],
+    };
+    const i = input({
+      ui_action: VERTEX,
+      click_count: 2,
+      in_content_edit: true,
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleVertexReplace);
+  });
+
+  it("does NOT exit on dblclick on a TANGENT handle", () => {
+    const TANGENT: OverlayAction = {
+      kind: "tangent_handle",
+      node_id: "editing-node",
+      tangent: [0, 0],
+      pos: [0, 0],
+    };
+    const i = input({
+      ui_action: TANGENT,
+      click_count: 2,
+      in_content_edit: true,
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleTangentReplace);
+  });
+
+  it("does NOT exit on dblclick on a SEGMENT_STRIP (select / drag-mode dispatch wins)", () => {
+    const STRIP: OverlayAction = {
+      kind: "segment_strip",
+      node_id: "editing-node",
+      segment: 0,
+      a_idx: 0,
+      b_idx: 1,
+      a: [0, 0],
+      b: [10, 0],
+      a_control: [0, 0],
+      b_control: [10, 0],
+    };
+    const i = input({
+      ui_action: STRIP,
+      click_count: 2,
+      in_content_edit: true,
+    });
+    expect(classifyScenario(i)).toBe(Scenario.HandleSegmentReplace);
+  });
+
+  it("preserves EnterEdit when NOT in content-edit — the rule is gated by in_content_edit", () => {
+    // Same input as the "different node" case, but with in_content_edit
+    // off → must classify as EnterEdit, NOT ExitEdit. This pins the gate.
+    const i = input({
+      hovered_id: "other-node",
+      click_count: 2,
+      in_content_edit: false,
+    });
+    expect(classifyScenario(i)).toBe(Scenario.EnterEdit);
+  });
+
+  it("single-click on empty space while in content-edit does NOT exit — it routes to EmptyClearSubSelectionThenMarquee", () => {
+    // Single click on empty while in vector edit must NOT exit. It routes
+    // through the in-content-edit empty-space scenario, which clears the
+    // sub-selection eagerly and starts a vector marquee on drag.
+    const i = input({ click_count: 1, in_content_edit: true });
+    expect(classifyScenario(i)).toBe(
+      Scenario.EmptyClearSubSelectionThenMarquee
+    );
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Empty-space scenarios
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -329,11 +851,45 @@ describe("Scenario.EmptyDeselectThenMarquee", () => {
     expect(classifyScenario(i)).toBe(Scenario.EmptyDeselectThenMarquee);
   });
 
-  it("dispatches marquee_pend with emit_deselect_all", () => {
+  it("dispatches marquee_pend with emit_on_down = 'deselect_all'", () => {
     expect(decidePointerDown(i)).toEqual({
       kind: "start_marquee_pend",
-      emit_deselect_all: true,
+      emit_on_down: "deselect_all",
     });
+  });
+});
+
+// UX spec: empty-space single-click while in content-edit clears the
+// path-edit sub-selection without exiting content-edit. Mirrors the
+// dblclick ExitEdit rule — same "click outside" gesture, one fewer
+// step. Pairs with EmptyDeselectThenMarquee outside content-edit.
+describe("Scenario.EmptyClearSubSelectionThenMarquee (empty click in content-edit)", () => {
+  const i = input({ selection_ids: ["editing-node"], in_content_edit: true });
+
+  it("classifies", () => {
+    expect(classifyScenario(i)).toBe(
+      Scenario.EmptyClearSubSelectionThenMarquee
+    );
+  });
+
+  it("dispatches marquee_pend with emit_on_down = 'clear_vector_selection'", () => {
+    expect(decidePointerDown(i)).toEqual({
+      kind: "start_marquee_pend",
+      emit_on_down: "clear_vector_selection",
+    });
+  });
+
+  // UX spec: shift-empty-click in content-edit still classifies as
+  // additive marquee (no clear). Shift is "extend, don't replace" — it
+  // would be wrong to clear the existing sub-selection just because
+  // shift was held.
+  it("shift still routes to EmptyAdditiveMarquee — additive does NOT clear", () => {
+    const sh = input({
+      selection_ids: ["editing-node"],
+      in_content_edit: true,
+      modifiers: SHIFT,
+    });
+    expect(classifyScenario(sh)).toBe(Scenario.EmptyAdditiveMarquee);
   });
 });
 
@@ -347,7 +903,7 @@ describe("Scenario.EmptyMarquee (no shift, no selection)", () => {
   it("dispatches marquee_pend, no deselect", () => {
     expect(decidePointerDown(i)).toEqual({
       kind: "start_marquee_pend",
-      emit_deselect_all: false,
+      emit_on_down: "none",
     });
   });
 });
@@ -362,7 +918,7 @@ describe("Scenario.EmptyAdditiveMarquee (shift)", () => {
   it("dispatches marquee_pend, selection preserved", () => {
     expect(decidePointerDown(i)).toEqual({
       kind: "start_marquee_pend",
-      emit_deselect_all: false,
+      emit_on_down: "none",
     });
   });
 });

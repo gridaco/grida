@@ -446,25 +446,151 @@ packages/grida-canvas-hud/
 - Public method names on `Surface` and `HUDCanvas` are **camelCase** (`setSize`, `setTransform`, `setSelection`) — matches the existing primitive renderer API.
 - The top-level class is **`Surface`**, not `HUDSurface`. The package name already says "hud".
 
-## Testing
+## UX Testing
 
-`packages/grida-canvas-hud/__tests__/` runs under vitest. No DOM, no canvas mock — the `event/` layer is pure.
+`packages/grida-canvas-hud/__tests__/` runs under vitest. No DOM, no canvas
+mock, no real pointer events — the `event/` layer is pure and the tests are
+plain function calls.
 
-| File                         | Tests                                                                                                                  |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `transform.test.ts`          | screen ↔ doc across translate, scale, DPR                                                                              |
-| `hit-regions.test.ts`        | topmost wins, reverse iteration, clear/empty, AABB containment                                                         |
-| `handles.test.ts`            | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                             |
-| `click-tracker.test.ts`      | single vs double within window; position threshold; multi-button isolation                                             |
-| `gesture.test.ts`            | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                           |
-| `state.test.ts`              | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates                      |
-| `intent.test.ts`             | intent stream + `phase` correctness across a full drag (preview\*N → commit)                                           |
-| `chrome.test.ts`             | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                                   |
-| `chrome-transformed.test.ts` | `SelectionShape.transformed` end-to-end: outline, knob anchors, OBB hit-test exactness, identity ≡ rect equivalence    |
-| `cursors.test.ts`            | `cursors.defaultRenderer` produces rotation-aware CSS values; tree-shake invariant (subpath isolated from main bundle) |
-| `decision.test.ts`           | one test per named scenario in the selection-intent classifier                                                         |
+### Why UX testing is a first-class concern here
 
-Render output (visual canvas correctness) is verified in the browser, not unit-tested.
+The HUD is small in code volume but dense in UX _semantics_. A single
+`if (click_count >= 2) return Scenario.EnterEdit` is one line, but it encodes
+a rule a user expects to work everywhere ("double-click enters edit"). The
+code can't explain the _why_: why dblclick on a vertex doesn't exit, why
+single-click on a body region defers, why a shift-click on an already-
+selected node doesn't immediately add — these are UX choices, not
+implementation details.
+
+That creates a maintenance hazard. The HUD is **configurable** — hosts pass
+styles, intent handlers, scene callbacks; small refactors land all the
+time. With no visible behaviour to inspect (we draw to canvas; we synthesize
+events), a UX rule can be silently dropped without anyone noticing until a
+user complains. There is no browser test guarding us; there is no human in
+the loop on every PR.
+
+The fix is **doctrine: every default UX behaviour is locked by a unit test
+that describes the behaviour in plain English.** The test name is the
+spec. The body proves the code obeys it. Together they form a
+machine-checked contract that says: "this is what the HUD does by default,
+and if you change it you must change the test on purpose."
+
+These tests are pure, headless, and fast. They are _not_ end-to-end browser
+tests. They run on the `event/` and `surface/` modules directly because the
+HUD was deliberately built so that every UX decision is computable from
+inputs alone — `classifyScenario(input) → Scenario`, `decidePointerDown(input) → Decision`,
+`SurfaceState.dispatch(event, deps) → response + intents`. Anything the user
+will observe in a browser is the deterministic image of one of those
+functions; if the function returns the wrong thing in a unit test, the
+browser would show the wrong thing.
+
+### What counts as a UX spec test
+
+A UX spec test is a plain unit test with three properties:
+
+1. **The `it("…")` description names the UX rule in natural language.** Not
+   "returns the right value" — "dblclick on empty space while in
+   content-edit emits exit_content_edit." Read in isolation, the test name
+   should describe what the user sees.
+2. **The body checks behaviour, not implementation.** Assert on the
+   emitted intents, the returned `Decision`, the resulting `HUDDraw`
+   primitive set — not on private state shape.
+3. **A comment above explains _why_ — the design intent.** This is the
+   piece the code can't carry. "Exit takes precedence over enter when
+   in-content-edit; the user clicking outside the edit clearly wants out,
+   not to re-enter on a different node." Future readers (humans, agents,
+   reviewers) need to know what we were defending against, not just the
+   green checkmark.
+
+A test that satisfies all three is the smallest unit of UX truth we have
+about the HUD's defaults.
+
+### When to add one
+
+Add a UX spec test for every default behaviour that a host could
+silently break by editing the code. In practice: every named branch in
+`classifyScenario`, every kind in `PointerDownDecision`, every emitted
+intent shape, every chrome primitive count tied to a state. If the
+behaviour is configurable (e.g. style tokens), the test pins the _default_
+— the rule under `DEFAULT_STYLE` or under no overrides. Configurability
+doesn't excuse the absence of a default spec; it raises the bar for
+having one.
+
+When you change UX on purpose, you update the test at the same time. A
+PR that touches a UX rule without touching the matching test is a smell;
+a PR that flips a test's assertion without changing the test name is a
+near-certain regression.
+
+### How to structure a UX spec
+
+Match the style already in use across `__tests__/`:
+
+```ts
+// UX spec: dblclick away while editing exits content-edit.
+//
+// While a vector sub-selection is mirrored on the surface, a dblclick
+// that does NOT land on a vector control (vertex / tangent / segment-
+// strip) classifies as ExitEdit. Without this the user has no way out
+// of edit mode except keyboard or the host's own UI, which surveys say
+// is the #1 confusion in vector editors.
+it("classifies dblclick on empty space WHILE in content-edit as ExitEdit", () => {
+  const i = input({ click_count: 2, in_content_edit: true });
+  expect(classifyScenario(i)).toBe(Scenario.ExitEdit);
+  expect(decidePointerDown(i)).toEqual({ kind: "exit_edit" });
+});
+```
+
+Top comment explains design intent. Test name names the UX rule. Assertion
+locks the behaviour. Three layers, all required.
+
+### Default UX behaviours locked by tests
+
+Non-exhaustive index — open the test files for the full surface.
+
+| Behaviour                                                                                     | Pinned in                              |
+| --------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Single-click on unselected node → immediate select                                            | `decision.test.ts`                     |
+| Single-click on already-selected node → defer (drag is a live candidate)                      | `decision.test.ts`, `state.test.ts`    |
+| Shift-click on selected node → defer (toggle-remove vs drag is ambiguous)                     | `decision.test.ts`                     |
+| Click in body region with selection → always defer (drag claim)                               | `decision.test.ts`                     |
+| Dblclick on content → emits `enter_content_edit`                                              | `decision.test.ts`, `state.test.ts`    |
+| Dblclick on empty space / other node / body WHILE in content-edit → emits `exit_content_edit` | `decision.test.ts`, `state.test.ts`    |
+| Dblclick on vertex / tangent / segment-strip WHILE in content-edit → handler runs (no exit)   | `decision.test.ts`                     |
+| Marquee starts from empty-space pointer-down                                                  | `state.test.ts`                        |
+| Drag past threshold cancels a deferred select (drag-vs-click discriminator)                   | `state.test.ts`                        |
+| Tangent knob renders as a 45°-rotated square ("diamond"), smaller than vertex                 | `vector-chrome-extended.test.ts`       |
+| Vertex knob renders as a circle, selected fills with chrome color                             | `vector-chrome-extended.test.ts`       |
+| Selected tangent line is thicker than idle                                                    | `vector-chrome-extended.test.ts`       |
+| Segment outline: idle gray → hover @ 50% accent → selected solid accent                       | `vector-chrome-segment-render.test.ts` |
+| Segment strip emits N inner samples per cubic, t ∈ (0, 1)                                     | `vector-chrome-extended.test.ts`       |
+| Priority ladder: tangent (4) < vertex (5) < segment (8)                                       | `vector-chrome-extended.test.ts`       |
+| Rotation-aware cursor CSS via `cursors.defaultRenderer`                                       | `cursors.test.ts`                      |
+| Click-tracker: single vs double within window + position threshold                            | `click-tracker.test.ts`                |
+
+### Test file index
+
+| File                                   | Domain pinned by tests                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `transform.test.ts`                    | screen ↔ doc across translate, scale, DPR                                                                    |
+| `hit-regions.test.ts`                  | topmost wins, reverse iteration, clear/empty, AABB containment                                               |
+| `handles.test.ts`                      | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                   |
+| `click-tracker.test.ts`                | single vs double within window; position threshold; multi-button isolation                                   |
+| `gesture.test.ts`                      | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                 |
+| `state.test.ts`                        | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates, exit-edit |
+| `intent.test.ts`                       | intent stream + `phase` correctness across a full drag (preview·N → commit)                                  |
+| `decision.test.ts`                     | one test per named scenario in the selection-intent classifier, including ExitEdit gating                    |
+| `chrome.test.ts`                       | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                         |
+| `chrome-transformed.test.ts`           | `SelectionShape.transformed` end-to-end                                                                      |
+| `chrome-priority.test.ts`              | overlay priority ladder over scenarios                                                                       |
+| `cursors.test.ts`                      | `cursors.defaultRenderer` produces rotation-aware CSS values; tree-shake invariant                           |
+| `vector-chrome.test.ts`                | vector chrome baseline: vertex emission, neighbouring filter, hit-region pad                                 |
+| `vector-chrome-extended.test.ts`       | vector chrome UX: tangent diamond shape + size, selection highlight, priority ladder                         |
+| `vector-chrome-segment-render.test.ts` | segment outline state machine: idle / hover / selected styling                                               |
+| `vector-gesture.test.ts`               | vector-specific gesture state machine: tangent drag, segment-strip click→split, drag→bend                    |
+
+Render output (visual canvas correctness — paint order, anti-aliasing, the
+actual pixel result) is verified in the browser, not unit-tested. Every UX
+_behaviour_ is.
 
 ## Extending the HUD
 

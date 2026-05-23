@@ -30,6 +30,9 @@ export {
   type SurfaceVisibility,
   type SurfaceVisibilityContext,
   type SurfaceVisibilityPolicy,
+  type VectorInsertionMode,
+  type VectorSelectionMode,
+  type VectorBendMode,
 } from "./surface";
 export type { SurfaceChromeGroups } from "./surface/chrome";
 export type { HUDStyle } from "./surface/style";
@@ -49,6 +52,8 @@ export { cursorToCss, cursorEquals } from "./event/cursor";
 export type { SelectionShape, SelectionGroup } from "./event/shape";
 export type { OverlayElement, HitShape, RenderShape } from "./event/overlay";
 export { MIN_HIT_SIZE, MIN_CHROME_VISIBLE_SIZE } from "./event/overlay";
+export type { VectorSubSelection, VectorHover } from "./event/state";
+export type { VectorOverlay } from "./surface/vector-chrome";
 
 // Selection-controls — pure-geometry model + priority ladder (UX rule).
 export {

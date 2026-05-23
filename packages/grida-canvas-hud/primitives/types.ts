@@ -112,6 +112,13 @@ export interface HUDPolyline extends HUDSemantic {
   fill?: boolean;
   /** Opacity of the fill color, 0–1 (default: 1). Ignored when `fill` is falsy. */
   fillOpacity?: number;
+  /** Stroke opacity, 0–1 (default: 1). Used for hovered-but-not-selected
+   *  affordances (the main editor's "50% opacity" segment hover state). */
+  strokeOpacity?: number;
+  /** Stroke width in screen-space CSS px. Falls back to the canvas default
+   *  (1px / zoom) when absent. Required for the path-edit chrome's
+   *  state-driven segment outline (idle 1px, hovered/selected 3px). */
+  strokeWidth?: number;
   /** Draw the stroke with a dash pattern. */
   dashed?: boolean;
   /**
@@ -154,6 +161,16 @@ export interface HUDScreenRect extends HUDSemantic {
    * package's render/hit-test split (see README).
    */
   angle?: number;
+  /**
+   * Rendered shape. `"rect"` (default) draws an axis-aligned (or rotated)
+   * rectangle of `width × height`. `"circle"` draws an ellipse inscribed
+   * in that same box — so the hit AABB stays a square at `MIN_HIT_SIZE`
+   * for Fitts' reach while the visible knob is round. Width = height is
+   * expected for circular knobs; non-square sizes degrade gracefully to
+   * an ellipse. Anchor / angle / fill / stroke / colors all apply
+   * identically; only the path drawn changes.
+   */
+  shape?: "rect" | "circle";
 }
 
 /**
@@ -171,4 +188,16 @@ export interface HUDDraw {
   polylines?: HUDPolyline[];
   /** Screen-space-sized rects anchored to document-space points (handles). */
   screenRects?: HUDScreenRect[];
+
+  // ── Top layer ──────────────────────────────────────────────────────────
+  // Painted LAST, after `screenRects`. Reserved for gesture-preview chrome
+  // that must visually dominate every other surface element — knobs,
+  // handles, outlines — so the user always sees the live region they are
+  // drawing. Currently used by marquee (rect) and lasso (polyline).
+  // Hosts that inline gesture preview into the same canvas as the surface
+  // chrome should route those primitives here; hosts that stack a separate
+  // overlay canvas (e.g. `<Lasso/>` on top of `<HUD/>`) get the same effect
+  // through DOM ordering and can ignore these fields.
+  topRects?: HUDRect[];
+  topPolylines?: HUDPolyline[];
 }
