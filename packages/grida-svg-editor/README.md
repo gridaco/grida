@@ -177,7 +177,7 @@ The editor core is **headless**. It parses the SVG, owns the document IR, accept
 
 ### Surface
 
-A `Surface` is the host-provided rendering and input boundary. The editor pushes paint instructions and HUD descriptors to the surface; the surface pushes normalized input events back. Non-DOM hosts (React Native, worker-side renderer, headless test harness) implement the `Surface` interface themselves. The shipped `domSurface` is the reference implementation used by the React layer.
+A `Surface` is the host-provided rendering and input boundary. The shipped `domSurface` is the reference implementation used by the React layer; non-DOM hosts (React Native, worker-side renderer, headless test harness) would implement the same interface — though only one implementation exists today (P6: public only after dogfooding).
 
 ```ts
 import { attach_dom_surface } from "@grida/svg-editor/dom";
@@ -187,22 +187,23 @@ const handle = attach_dom_surface(editor, { container });
 handle.detach();
 ```
 
-The contract (full surface contract documented separately — out of scope for this README):
+The v0 contract is pure lifecycle:
 
 ```ts
 interface Surface {
-  // editor → surface: paint the document + HUD overlay
-  paint(snapshot: SurfacePaintSnapshot): void;
-
-  // surface → editor: hit-test on screen pixel
-  hit_test(x: number, y: number): NodeId | null;
-
-  // surface → editor: subscribe to normalized input
-  on_input(listener: (event: SurfaceInputEvent) => void): Unsubscribe;
-
+  /** Teardown: detach listeners, drop retained refs. Called from
+   *  `editor.detach()` and `editor.dispose()`. */
   dispose(): void;
 }
 ```
+
+What's deliberately **not** part of the contract yet:
+
+- **Paint push.** There is no `paint(snapshot)` channel. The surface re-serializes the document by subscribing to the editor and writing to its own rendering target.
+- **Normalized input events.** Input routing is surface-private — the DOM surface attaches pointer/keyboard listeners on its own container and reaches the editor through the in-package `_internal` channel.
+- **Hit-testing.** Picking is surface-private: the DOM surface owns its own pointer → node-id resolver against its rendered scene. World-space geometry queries (`bounds_of`, `node_at_point` for non-pointer callers) route through `editor.geometry` instead. A cross-surface `hit_test` contract is deferred until a second surface needs one — its shape (screen vs. world units, z-order tie-breaks, hit-record vs. id) isn't pinned.
+
+Each will become a public seam when a second surface implementation arrives and pins its shape. Until then, exporting `paint(snapshot: unknown)` / `on_input(event: unknown)` / `hit_test(x, y)` would be contracts a foreign implementer cannot honestly satisfy (P6 — public only after dogfooding).
 
 Geometry (world-space bboxes, screen ↔ local projection) is exposed via `editor.geometry`, not the `Surface` itself — the DOM surface registers a `MemoizedGeometryProvider` with the editor on attach so headless callers can query bounds without going through the surface.
 
@@ -832,6 +833,10 @@ If a consumer needs any of the above, the right answer is "this is the wrong too
 - `v0.0.0` — selection only, no mutation.
 
 The shape of the API, the mental model, the file-format guarantees, and the scope are all unsettled. Nothing here is stable. Do not depend on it from production code.
+
+## Contributing
+
+- [`TODO.md`](./TODO.md) — open questions and deferred work, grouped by area.
 
 ## License
 
