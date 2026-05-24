@@ -377,6 +377,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       can_undo: history.stack.canUndo,
       can_redo: history.stack.canRedo,
       version,
+      content_version: doc_version,
       structure_version: doc.structure_version,
       geometry_version: doc.geometry_version,
       load_version,
