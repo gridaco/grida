@@ -128,6 +128,102 @@ export type OverlayAction =
       b: readonly [number, number];
       a_control: readonly [number, number];
       b_control: readonly [number, number];
+    }
+  | {
+      /**
+       * Corner-radius handle — the built-in chrome promoted from labs to
+       * `surface.setCornerRadius(input)`. One action variant covers all
+       * three intent flavors the gesture emits (`corner_radius`,
+       * `corner_radius_explicit`, `corner_radius_uniform`); the surface
+       * branches on `geometry` + modifiers to pick the intent kind at
+       * preview/commit time.
+       *
+       * - `geometry: "rect"`, `anchor: "nw"|"ne"|"se"|"sw"` — one of four
+       *   per-corner knobs. Carries the corner being acted on directly;
+       *   alt-held drag emits `corner_radius_explicit`, otherwise
+       *   `corner_radius`.
+       * - `geometry: "rect"`, `anchor: null` — the singleton center
+       *   handle on an all-equal-radii rect. The surface resolves the
+       *   pulled-toward corner after the drag-threshold and emits
+       *   `corner_radius` / `corner_radius_explicit` from there. Alt
+       *   semantics still apply (after the resolution).
+       * - `geometry: "line"`, `anchor: null` — single uniform handle on
+       *   the line's `a → b` axis. Emits `corner_radius_uniform`. Alt
+       *   has no effect (no anchor to pin).
+       *
+       * The action stores the original `pos` (doc-space anchor of the
+       * handle at chrome build time). The gesture computes the new
+       * radius from the cursor's projection onto the corresponding
+       * geometry axis each frame.
+       */
+      kind: "corner_radius_handle";
+      node_id: NodeId;
+      geometry: "rect" | "line";
+      /** Doc-space position of the handle at chrome build time. */
+      pos: readonly [number, number];
+      /**
+       * RECT geometry only — the rect in LOCAL space (axis-aligned).
+       * The gesture re-derives per-anchor corner positions from
+       * this on every projection. When the input carries a
+       * `transform`, this rect is the local AABB and `transform`
+       * maps it to doc space; otherwise the rect IS in doc space.
+       */
+      rect?: { x: number; y: number; width: number; height: number };
+      /**
+       * RECT geometry only — optional local → doc affine transform.
+       * Present when the host's selection is a rotated / sheared
+       * rect; absent when axis-aligned. The state machine applies
+       * this when projecting the cursor onto each anchor's
+       * diagonal so a knob on a rotated rect tracks the rotated
+       * axis, not the doc-space one.
+       */
+      transform?: cmath.Transform;
+      /**
+       * RECT geometry only — the corner anchors this hit region
+       * stands in for. Length 1 for a single-corner knob (sub-max
+       * radii); length 2 for an oblong-max pair (TL/BL or TR/BR);
+       * length 4 for square-max (all four collapsed to one). When
+       * the length is > 1, the state machine resolves the user's
+       * intended anchor from drag direction after a small
+       * threshold, picking AMONG these candidates only.
+       */
+      candidates?: readonly ("nw" | "ne" | "se" | "sw")[];
+      /**
+       * LINE geometry only — the line endpoints. `a` is the radius-
+       * zero end; `b` is saturation. The gesture projects the cursor
+       * onto a → b.
+       */
+      a?: readonly [number, number];
+      b?: readonly [number, number];
+    }
+  | {
+      /**
+       * Parametric handle knob — the user-facing element of a
+       * `surface.setParametricHandles(...)` input. ONE region per
+       * coincidence group (per `parametricHandleLayoutGroups`); when
+       * the group has 2+ members the state machine resolves which
+       * handle the pointer meant from drag direction.
+       *
+       * Carries everything the gesture needs to project the cursor
+       * each frame without consulting the input table again:
+       *
+       * - `pos` — doc-space anchor of the knob at chrome build time.
+       *   Used as the screen-space hit anchor too (the gesture
+       *   computes a fresh `value` from `point_doc → track`).
+       * - `candidates` — the layout entries this region stands in
+       *   for. Single-handle regions have one entry; coincident
+       *   regions have N. Each entry carries its handle id, doc-space
+       *   track (curve OR point set), and effective domain so the
+       *   gesture doesn't need to re-derive them.
+       */
+      kind: "parametric_knob";
+      node_id: NodeId;
+      pos: readonly [number, number];
+      candidates: readonly {
+        handle_id: string;
+        track_doc: cmath.ui.Curve | cmath.ui.PointSet;
+        domain: { min: number; max: number; step?: number };
+      }[];
     };
 
 /**

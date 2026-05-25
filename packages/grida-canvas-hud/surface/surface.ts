@@ -1,6 +1,20 @@
 import { HUDCanvas } from "../primitives/canvas";
 import { filterHUDDrawByGroup } from "../primitives/draw";
 import type { PixelGridConfig } from "../primitives/pixel-grid";
+import type { RulerConfig } from "../primitives/ruler";
+import {
+  computeCornerRadiusLayout,
+  cornerRadiusLayoutGroups,
+  type CornerRadiusInput,
+  type CornerRadiusHandleLayout,
+  type CornerRadiusAnchor,
+} from "../primitives/corner-radius";
+import {
+  computeParametricHandleLayout,
+  parametricHandleLayoutGroups,
+  type ParametricHandleInput,
+  type ParametricHandleLayout,
+} from "../primitives/parametric-handle";
 import type { HUDDraw, HUDSemanticGroup } from "../primitives/types";
 import type {
   SurfaceEvent,
@@ -78,6 +92,13 @@ export interface SurfaceOptions {
    */
   pixelGrid?: PixelGridConfig | null;
   /**
+   * Optional ruler configuration. Paints a top + left ruler strip (L-shape)
+   * in screen-space, behind every other HUD primitive. Same two-transform
+   * contract as `pixelGrid`. Hosts can also call `surface.setRuler(...)`
+   * later. The corner square is deliberately left blank.
+   */
+  ruler?: RulerConfig | null;
+  /**
    * Optional semantic groups for surface-owned chrome. The HUD package does
    * not define a group vocabulary; hosts pass the strings they want to use.
    */
@@ -154,6 +175,18 @@ export class Surface {
   private state: SurfaceState;
   private style: HUDStyle;
   private opts: SurfaceOptions;
+  /**
+   * Current corner-radius input, or `null`. Owned here (not in
+   * `SurfaceState`) because the chrome builder needs it AND the
+   * pointer_down handler needs it AND the registry rebuild needs
+   * it — placing it on `SurfaceState` would pull a primitive type
+   * into the event-layer's dependencies, which the README's
+   * dependency arrow forbids. Surface is the wired class; the
+   * setter passes the input to both the canvas (for paint) and
+   * the state (via hit-region overlays each frame).
+   */
+  private cornerRadius: readonly CornerRadiusInput[] = [];
+  private parametricHandles: readonly ParametricHandleInput[] = [];
   // Explicit host color override; when set, beats `style.chromeColor` in
   // every paint until cleared via `setColor(null)`.
   private colorOverride: string | undefined;
@@ -187,6 +220,9 @@ export class Surface {
     }
     if (options.pixelGrid) {
       this.hudCanvas.setPixelGrid(options.pixelGrid);
+    }
+    if (options.ruler) {
+      this.hudCanvas.setRuler(options.ruler);
     }
   }
 
@@ -224,6 +260,88 @@ export class Surface {
    */
   setPixelGridTransform(transform: Transform): void {
     this.hudCanvas.setPixelGridTransform(transform);
+  }
+
+  /** Configure / disable the back-most ruler chrome (top + left strips). */
+  setRuler(config: RulerConfig | null): void {
+    this.hudCanvas.setRuler(config);
+  }
+
+  /**
+   * Configure or clear the built-in corner-radius chrome.
+   *
+   * Accepts a single input (one node's corner-radius chrome) OR an
+   * array of inputs (multiple nodes editable at once — typical for
+   * a multi-selection of rect-bearing nodes, or for demos that
+   * compare axis-aligned vs rotated rects in the same viewport).
+   * Pass `null` to remove everything. The chrome for each input is
+   * independent: each input's handles, hit regions, and emitted
+   * intents carry the input's own `node_id`. The host distinguishes
+   * by `node_id` when applying the intent.
+   *
+   * The HUD paints handles along the corner→arc-center diagonal
+   * (rect geometry) or the a→b axis (line geometry); on pointer_down
+   * it owns the hit-test; on drag it emits one of `corner_radius` /
+   * `corner_radius_explicit` / `corner_radius_uniform` per the
+   * geometry + modifier table.
+   *
+   * The handle layout is recomputed every frame from the inputs —
+   * camera changes and radius changes both reflect on the next
+   * `draw()` without a host-side `setCornerRadius` round-trip.
+   *
+   * See `@grida/hud/primitives/corner-radius` for the input shape.
+   */
+  setCornerRadius(
+    input: CornerRadiusInput | readonly CornerRadiusInput[] | null
+  ): void {
+    if (input === null) {
+      this.cornerRadius = [];
+      return;
+    }
+    this.cornerRadius = Array.isArray(input)
+      ? (input as readonly CornerRadiusInput[])
+      : [input as CornerRadiusInput];
+  }
+
+  /**
+   * Push one or more parametric-handle inputs — the universal
+   * "scalar value on a 1D manifold" affordance. Each input declares
+   * a node_id, one or more handles (each with curve + value +
+   * optional domain + optional snap-back inset), optional coincidence
+   * groups, and an optional local→doc transform.
+   *
+   * The HUD paints handles along their curves on every `draw()`, owns
+   * the hit-test for the knobs, and emits `parametric_handle` intents
+   * on drag with `{ node_id, handle_id, value, modifiers, phase }`.
+   * Modifier semantics (alt → explicit, etc.) are host-decided —
+   * the producer reports flags only.
+   *
+   * Pass `null` (or `[]`) to remove all parametric chrome. Single
+   * input or array; arrays let one viewport edit multiple nodes
+   * simultaneously. Intents carry their input's `node_id` so the
+   * host routes per-node.
+   *
+   * See `cmath.parametric.cornerRadiusHandles` and any future
+   * composers for the conventional way to build inputs.
+   */
+  setParametricHandles(
+    input: ParametricHandleInput | readonly ParametricHandleInput[] | null
+  ): void {
+    if (input === null) {
+      this.parametricHandles = [];
+      return;
+    }
+    this.parametricHandles = Array.isArray(input)
+      ? (input as readonly ParametricHandleInput[])
+      : [input as ParametricHandleInput];
+  }
+
+  /**
+   * Update just the ruler's transform. Cheap to call per camera tick.
+   * No-op when no ruler config is set.
+   */
+  setRulerTransform(transform: Transform): void {
+    this.hudCanvas.setRulerTransform(transform);
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -370,6 +488,49 @@ export class Surface {
       this.state.getTransform(),
       this.state.hitRegions()
     );
+
+    // ── Corner-radius handles ────────────────────────────────────────────
+    // Computed every frame so radius changes / camera moves reflect
+    // without a setCornerRadius round-trip. Painted by `HUDCanvas`
+    // ABOVE chrome and BELOW the ruler (see canvas.ts paint order);
+    // hit regions pushed AFTER `fanOverlays` so they survive its
+    // `regions.clear()`. Priority sits ABOVE corner resize knobs in
+    // the ladder so the corner-radius knob always wins overlap
+    // with the resize-corner zone immediately beneath it.
+    if (this.cornerRadius.length > 0) {
+      // One layout pass per input — concat for the painter (so a single
+      // pass paints them all in z-order), but register hit regions per
+      // input so each region carries its own `node_id` + `transform`.
+      const all_handles: CornerRadiusHandleLayout[] = [];
+      for (const input of this.cornerRadius) {
+        const handles = this.buildCornerRadiusHandles(input);
+        if (handles.length === 0) continue;
+        for (const h of handles) all_handles.push(h);
+        this.registerCornerRadiusHitRegions(input, handles);
+      }
+      this.hudCanvas.setCornerRadiusHandles(all_handles);
+    } else {
+      this.hudCanvas.setCornerRadiusHandles(null);
+    }
+
+    // ── Parametric handles ───────────────────────────────────────────────
+    // The universal "scalar value on a 1D manifold" primitive. Same z-
+    // band as corner-radius (knob, not frame); painter is independent.
+    // Hit regions are pushed AFTER `fanOverlays` for the same reason
+    // corner-radius's are — to survive the per-frame `regions.clear()`
+    // inside `fanOverlays`.
+    if (this.parametricHandles.length > 0) {
+      const all_parametric: ParametricHandleLayout[] = [];
+      for (const input of this.parametricHandles) {
+        const handles = this.buildParametricHandleLayout(input);
+        if (handles.length === 0) continue;
+        for (const h of handles) all_parametric.push(h);
+        this.registerParametricHandleHitRegions(input, handles);
+      }
+      this.hudCanvas.setParametricHandles(all_parametric);
+    } else {
+      this.hudCanvas.setParametricHandles(null);
+    }
     // Merge overlay-fanned lines + polylines into the decoration so they're
     // drawn in the same pass as everything else. Polylines carry the
     // path-edit segment outlines; lines carry tangent handle lines.
@@ -451,6 +612,222 @@ export class Surface {
   modifiers(): Modifiers {
     return this.state.modifiers;
   }
+
+  // ── Corner-radius internals ────────────────────────────────────────────
+
+  /**
+   * Resolve the current corner-radius layout against `shapeOf` (for
+   * the rect-fallback) and the camera. Always returns an array;
+   * empty when the input is null or when the rect can't be
+   * resolved.
+   */
+  private buildCornerRadiusHandles(
+    input: CornerRadiusInput
+  ): CornerRadiusHandleLayout[] {
+    const fallback =
+      input.geometry.kind === "rect" && !input.geometry.rect
+        ? selectionRectFromShape(this.opts.shapeOf(input.node_id))
+        : null;
+    const zoom = this.state.getTransform()[0][0];
+    // Lift the padded-floor while the user is actively dragging THIS
+    // input's corner-radius handle. The gesture identifies its input
+    // by `node_id` — only that input's handles paint at raw radius;
+    // every other input keeps the padded floor (so handles for the
+    // axis-aligned rect don't "snap" while the user drags handles
+    // on the rotated one in the same canvas).
+    const g = this.state.gesture;
+    const during_gesture =
+      g.kind === "corner_radius" && g.node_id === input.node_id;
+    return computeCornerRadiusLayout(input, fallback, zoom, {
+      during_gesture,
+    });
+  }
+
+  /**
+   * Push one hit region per handle onto the state's registry. Called
+   * AFTER `fanOverlays` so the regions survive the per-frame clear.
+   */
+  private registerCornerRadiusHitRegions(
+    input: CornerRadiusInput,
+    handles: readonly CornerRadiusHandleLayout[]
+  ): void {
+    if (handles.length === 0) return;
+    const regions = this.state.hitRegions();
+    const transform = this.state.getTransform();
+
+    // Line geometry — one region, anchor-less, projects onto a → b.
+    if (input.geometry.kind === "line") {
+      const h = handles[0];
+      const [sx, sy] = [
+        transform[0][0] * h.pos[0] + transform[0][2],
+        transform[1][1] * h.pos[1] + transform[1][2],
+      ];
+      regions.push({
+        rect: {
+          x: sx - h.hit_size / 2,
+          y: sy - h.hit_size / 2,
+          width: h.hit_size,
+          height: h.hit_size,
+        },
+        priority: CORNER_RADIUS_PRIORITY,
+        label: h.label,
+        action: {
+          kind: "corner_radius_handle",
+          node_id: input.node_id,
+          geometry: "line",
+          pos: [h.pos[0], h.pos[1]],
+          a: input.geometry.a,
+          b: input.geometry.b,
+        },
+      });
+      return;
+    }
+
+    // Rect geometry — register one region per coincidence group. The
+    // group's anchor list becomes the gesture's `candidates`:
+    //   - length 1: single-corner knob, anchor locked at pointer_down
+    //   - length 2: oblong-max pair (TL/BL share a position; TR/BR
+    //     share a position), anchor resolved by direction
+    //   - length 4: square-max quadruple (all four at the center),
+    //     anchor resolved by direction
+    // The hit rect is anchored at the GROUP's coincidence position
+    // (= the first member's `pos`, all coincident by construction).
+    const rect_for_anchors =
+      input.geometry.rect ??
+      selectionRectFromShape(this.opts.shapeOf(input.node_id));
+    if (!rect_for_anchors) return;
+
+    const groups = cornerRadiusLayoutGroups(handles);
+    if (groups.length === 0) return;
+
+    // Build an anchor → layout lookup so we can find each group's
+    // doc-space position (all members share it within ε).
+    const by_anchor = new Map<CornerRadiusAnchor, CornerRadiusHandleLayout>();
+    for (const h of handles) {
+      if (h.anchor === "line") continue;
+      by_anchor.set(h.anchor as CornerRadiusAnchor, h);
+    }
+
+    for (const group of groups) {
+      const lead = by_anchor.get(group[0]);
+      if (!lead) continue;
+      const [sx, sy] = [
+        transform[0][0] * lead.pos[0] + transform[0][2],
+        transform[1][1] * lead.pos[1] + transform[1][2],
+      ];
+      const label =
+        group.length === 1
+          ? `corner_radius:${group[0]}`
+          : `corner_radius:${group.join("+")}`;
+      regions.push({
+        rect: {
+          x: sx - lead.hit_size / 2,
+          y: sy - lead.hit_size / 2,
+          width: lead.hit_size,
+          height: lead.hit_size,
+        },
+        priority: CORNER_RADIUS_PRIORITY,
+        label,
+        action: {
+          kind: "corner_radius_handle",
+          node_id: input.node_id,
+          geometry: "rect",
+          pos: [lead.pos[0], lead.pos[1]],
+          rect: rect_for_anchors,
+          transform: input.geometry.transform,
+          candidates: group,
+        },
+      });
+    }
+  }
+
+  /**
+   * Resolve the current parametric-handle layout for one input. The
+   * snap-back floor is lifted while this specific input is being
+   * dragged — match by `node_id` so other inputs in the same canvas
+   * keep their resting positions.
+   */
+  private buildParametricHandleLayout(
+    input: ParametricHandleInput
+  ): ParametricHandleLayout[] {
+    const zoom = this.state.getTransform()[0][0];
+    const g = this.state.gesture;
+    const during_gesture =
+      g.kind === "parametric_handle" && g.node_id === input.node_id;
+    return computeParametricHandleLayout(input, zoom, { during_gesture });
+  }
+
+  /**
+   * Push one hit region per coincidence group onto the state's
+   * registry. Coincidence is geometric — a declared group only
+   * collapses when its members actually overlap in doc-space. Open
+   * groups produce one region per handle.
+   */
+  private registerParametricHandleHitRegions(
+    input: ParametricHandleInput,
+    layout: readonly ParametricHandleLayout[]
+  ): void {
+    if (layout.length === 0) return;
+    const regions = this.state.hitRegions();
+    const transform = this.state.getTransform();
+    const groups = parametricHandleLayoutGroups(input, layout);
+    for (const group of groups) {
+      const lead = group[0];
+      const [sx, sy] = [
+        transform[0][0] * lead.pos[0] + transform[0][2],
+        transform[1][1] * lead.pos[1] + transform[1][2],
+      ];
+      const label =
+        group.length === 1
+          ? lead.label
+          : `parametric:${input.node_id}:${group.map((g) => g.handle_id).join("+")}`;
+      regions.push({
+        rect: {
+          x: sx - lead.hit_size / 2,
+          y: sy - lead.hit_size / 2,
+          width: lead.hit_size,
+          height: lead.hit_size,
+        },
+        priority: CORNER_RADIUS_PRIORITY,
+        label,
+        action: {
+          kind: "parametric_knob",
+          node_id: input.node_id,
+          pos: [lead.pos[0], lead.pos[1]],
+          candidates: group.map((g) => ({
+            handle_id: g.handle_id,
+            track_doc: g.track_doc,
+            domain: g.domain,
+          })),
+        },
+      });
+    }
+  }
+}
+
+/**
+ * Priority for corner-radius handles in the hit-test ladder.
+ *
+ * Sits ABOVE every selection-control zone (resize corner / edge /
+ * body / rotate) so the corner-radius knob ALWAYS wins overlap with
+ * the resize-corner knob beneath it — the user is reaching for the
+ * inner ring, not the corner. Below `ENDPOINT_HANDLE` (10) because
+ * endpoints are the sole resize affordance on lines and outrank
+ * everything else by doctrine.
+ *
+ * Hard-coded here (not in `selection-controls.ts`) because corner-
+ * radius is its own affordance family — not part of the
+ * selection-control 9-slice negotiation.
+ */
+const CORNER_RADIUS_PRIORITY = 15;
+
+function selectionRectFromShape(
+  shape: SelectionShape | null
+): { x: number; y: number; width: number; height: number } | null {
+  if (!shape) return null;
+  if (shape.kind === "rect") return shape.rect;
+  if (shape.kind === "transformed") return shape.local;
+  return null;
 }
 
 export type { SurfaceResponse, SurfaceEvent, PointerButton, Modifiers };

@@ -17,7 +17,7 @@ import {
 } from "./gesture";
 import { type SelectionShape, type SelectionGroup, shapeBounds } from "./shape";
 import { type CursorIcon, cursorEquals } from "./cursor";
-import type { IntentHandler } from "./intent";
+import type { Intent, IntentHandler, IntentPhase } from "./intent";
 import { ClickTracker } from "./click-tracker";
 import { HitRegions } from "./hit-regions";
 import {
@@ -461,7 +461,11 @@ export class SurfaceState {
             this.gesture = {
               kind: "marquee",
               anchor_doc: this.pending.anchor_doc,
-              current_doc: point_doc,
+              // Seed with the anchor so the same-dispatch fall-through into
+              // `case "marquee"` sees a non-trivial delta against the move
+              // point and emits the first preview. The dedupe in that case
+              // compares against `current_doc` in rounded screen-px.
+              current_doc: this.pending.anchor_doc,
             };
           }
         }
@@ -540,6 +544,25 @@ export class SurfaceState {
       }
       case "marquee": {
         const g = this.gesture;
+        // Dedupe in rounded screen-px so an idle cursor — or sub-pixel
+        // jitter — doesn't re-emit the same preview rect and force the
+        // host through a full O(nodes) hit-test on every move.
+        const [last_sx, last_sy] = docToScreen(
+          this.transform,
+          g.current_doc[0],
+          g.current_doc[1]
+        );
+        const [new_sx, new_sy] = docToScreen(
+          this.transform,
+          point_doc[0],
+          point_doc[1]
+        );
+        if (
+          Math.round(new_sx) === Math.round(last_sx) &&
+          Math.round(new_sy) === Math.round(last_sy)
+        ) {
+          return response;
+        }
         this.gesture = { ...g, current_doc: point_doc };
         // Emit a preview-phase `marquee_select` every move so hosts can run
         // their hit-test live. Mirrors `resize` / `translate` / `bend_segment`
@@ -754,6 +777,103 @@ export class SurfaceState {
         response.needsRedraw = true;
         return response;
       }
+      case "corner_radius": {
+        let g = this.gesture;
+        // Multi-candidate resolution. While `g.anchor` is `null` on a
+        // RECT gesture (it was opened from a coincidence group with
+        // 2+ candidates), wait for the cursor to cross the drag
+        // threshold, then resolve the corner by direction — picking
+        // among `g.candidates` only. The single-candidate case
+        // never enters this branch (`anchor` is set at pointer_down).
+        // Line geometry also keeps `anchor === null` permanently;
+        // resolution is a rect-only concern.
+        if (
+          g.geometry === "rect" &&
+          g.anchor === null &&
+          g.candidates.length > 1
+        ) {
+          const dx = sx - g.anchor_screen[0];
+          const dy = sy - g.anchor_screen[1];
+          if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+            // Pre-threshold: don't emit; the handle stays painted
+            // at its coincidence position (the dedup-paint slot in
+            // `drawCornerRadius`).
+            this.gesture = { ...g, last_doc: point_doc };
+            response.needsRedraw = true;
+            return response;
+          }
+          const resolved = resolveCornerDragAnchor(dx, dy, g.candidates);
+          g = { ...g, anchor: resolved };
+          this.gesture = g;
+        }
+        const value = Math.max(0, projectRadiusFromGesture(g, point_doc));
+        this.gesture = { ...g, last_doc: point_doc, value };
+        deps.emitIntent(buildCornerRadiusIntent(g, value, "preview"));
+        response.needsRedraw = true;
+        return response;
+      }
+      case "parametric_handle": {
+        let g = this.gesture;
+        // Multi-candidate resolution: when the gesture was opened from
+        // a coincident group, wait for the cursor to cross the drag
+        // threshold, then pick the handle whose curve tangent is most
+        // opposite the drag delta. Pre-threshold: don't emit; the
+        // knob stays at its painted coincident position.
+        if (g.handle_id === null && g.candidates.length > 1) {
+          const dx = sx - g.anchor_screen[0];
+          const dy = sy - g.anchor_screen[1];
+          if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+            this.gesture = { ...g, last_doc: point_doc };
+            response.needsRedraw = true;
+            return response;
+          }
+          let best = g.candidates[0];
+          let best_dot = -Infinity;
+          for (const c of g.candidates) {
+            const [tx, ty] = trackTangent01(c.track_doc);
+            const dot = tx * -dx + ty * -dy;
+            if (dot > best_dot) {
+              best_dot = dot;
+              best = c;
+            }
+          }
+          g = { ...g, handle_id: best.handle_id };
+          this.gesture = g;
+        }
+        // Project + quantize. Dispatch on track kind: continuous
+        // curves use the parametric projector; point sets snap to
+        // the nearest point.
+        const active =
+          g.candidates.find((c) => c.handle_id === g.handle_id) ??
+          g.candidates[0];
+        const proj =
+          active.track_doc.kind === "points"
+            ? cmath.ui.projectPointOnSet(active.track_doc, point_doc)
+            : cmath.ui.projectPointOnCurve(active.track_doc, point_doc);
+        const span = active.domain.max - active.domain.min;
+        let value = active.domain.min + proj.t * span;
+        if (active.domain.step && active.domain.step > 0) {
+          const k = Math.round(
+            (value - active.domain.min) / active.domain.step
+          );
+          value = active.domain.min + k * active.domain.step;
+        }
+        if (value < active.domain.min) value = active.domain.min;
+        else if (value > active.domain.max) value = active.domain.max;
+        this.gesture = { ...g, last_doc: point_doc, value };
+        if (g.handle_id !== null) {
+          deps.emitIntent({
+            kind: "parametric_handle",
+            node_id: g.node_id,
+            handle_id: g.handle_id,
+            value,
+            modifiers: g.modifiers,
+            phase: "preview",
+          });
+        }
+        response.needsRedraw = true;
+        return response;
+      }
       case "pan": {
         this.gesture = { kind: "pan", prev_screen: [sx, sy] };
         return response;
@@ -783,6 +903,115 @@ export class SurfaceState {
     const ui_action = this.hit_regions.hitTest(screen);
     const hovered_id = deps.pick(point_doc);
     const click_count = this.click_tracker.register(sx, sy);
+
+    // Corner-radius handle intercept — its own affordance family,
+    // not part of the selection-intent classifier in decision.ts.
+    // The action carries everything the gesture needs (geometry,
+    // anchor, corner, center); we open the gesture eagerly and
+    // wait for pointer_move to emit the first preview intent.
+    // Alt is latched here, not on every frame — the intent kind
+    // (`corner_radius` vs `corner_radius_explicit`) is decided once
+    // at gesture start so toggling alt mid-drag doesn't switch the
+    // host's commit pipe between branches.
+    if (ui_action && ui_action.kind === "corner_radius_handle") {
+      const explicit = this.modifiers.alt;
+      // Build the gesture variant matching the action's geometry.
+      // Single-candidate rect: anchor is locked at start (no
+      // resolution needed). Multi-candidate rect: anchor is `null`
+      // and the move handler resolves it after the drag threshold.
+      // Line: anchor is permanently `null`; no resolution.
+      if (ui_action.geometry === "rect") {
+        const candidates = ui_action.candidates ?? [];
+        const initial_anchor = candidates.length === 1 ? candidates[0] : null;
+        this.gesture = {
+          kind: "corner_radius",
+          node_id: ui_action.node_id,
+          geometry: "rect",
+          rect: ui_action.rect,
+          transform: ui_action.transform,
+          candidates,
+          anchor: initial_anchor,
+          anchor_screen: [sx, sy],
+          explicit,
+          last_doc: point_doc,
+          // Radius at pointer_down — if the anchor is already
+          // locked, project the handle's current rendered position
+          // onto its (sign_x, sign_y) axis to recover the radius the
+          // host configured. Otherwise we start at 0 and let the
+          // first post-threshold frame compute the real value.
+          value:
+            initial_anchor !== null && ui_action.rect
+              ? Math.max(
+                  0,
+                  projectRadiusOnRectAnchor(
+                    ui_action.pos,
+                    ui_action.rect,
+                    initial_anchor,
+                    ui_action.transform
+                  )
+                )
+              : 0,
+        };
+      } else {
+        // line geometry
+        const a = ui_action.a ?? ([0, 0] as const);
+        const b = ui_action.b ?? ([0, 0] as const);
+        this.gesture = {
+          kind: "corner_radius",
+          node_id: ui_action.node_id,
+          geometry: "line",
+          candidates: [],
+          anchor: null,
+          a: [a[0], a[1]],
+          b: [b[0], b[1]],
+          anchor_screen: [sx, sy],
+          explicit,
+          last_doc: point_doc,
+          value: Math.max(0, projectRadiusOnAxis(ui_action.pos, a, b)),
+        };
+      }
+      response.needsRedraw = true;
+      return response;
+    }
+
+    // Parametric handle knob intercept — the universal value-on-curve
+    // affordance. Opens a `parametric_handle` gesture; the gesture
+    // emits `parametric_handle` intents on every move and on commit.
+    // Coincident groups (length > 1 candidates) wait for the drag
+    // threshold before resolving which handle the pointer meant by
+    // direction. Modifier state (alt/shift) is latched at pointer_down
+    // and carried unchanged on every intent payload — host interprets.
+    if (ui_action && ui_action.kind === "parametric_knob") {
+      const candidates = ui_action.candidates;
+      const initial_handle =
+        candidates.length === 1 ? candidates[0].handle_id : null;
+      let initial_value = 0;
+      if (initial_handle !== null) {
+        const c = candidates[0];
+        const seed: cmath.Vector2 = [ui_action.pos[0], ui_action.pos[1]];
+        const r =
+          c.track_doc.kind === "points"
+            ? cmath.ui.projectPointOnSet(c.track_doc, seed)
+            : cmath.ui.projectPointOnCurve(c.track_doc, seed);
+        const span = c.domain.max - c.domain.min;
+        initial_value = c.domain.min + r.t * span;
+      }
+      this.gesture = {
+        kind: "parametric_handle",
+        node_id: ui_action.node_id,
+        candidates,
+        handle_id: initial_handle,
+        anchor_screen: [sx, sy],
+        modifiers: {
+          alt: this.modifiers.alt,
+          shift: this.modifiers.shift,
+        },
+        last_doc: point_doc,
+        value: initial_value,
+      };
+      response.needsRedraw = true;
+      return response;
+    }
 
     // For segment_strip hits, resolve `t` per `vector_insertion_mode` and
     // pass it to the decision module. Used by BOTH:
@@ -1334,6 +1563,45 @@ export class SurfaceState {
         response.needsRedraw = true;
         break;
       }
+      case "corner_radius": {
+        const g = this.gesture;
+        // Click-no-drag on a per-corner handle is a no-op (no
+        // commit). For the center handle, no commit either —
+        // there's no anchor to act on. The handle's rendered
+        // position will return to the padded start on the next
+        // frame because `value` was never persisted to the host.
+        if (g.geometry === "rect" && g.anchor === null) {
+          this.gesture = IDLE;
+          response.needsRedraw = true;
+          break;
+        }
+        deps.emitIntent(buildCornerRadiusIntent(g, g.value, "commit"));
+        this.gesture = IDLE;
+        response.needsRedraw = true;
+        break;
+      }
+      case "parametric_handle": {
+        const g = this.gesture;
+        // Click-no-drag on a coincident group: no commit. The knob
+        // returns to its painted coincident position on the next
+        // frame because `value` was never persisted upstream.
+        if (g.handle_id === null) {
+          this.gesture = IDLE;
+          response.needsRedraw = true;
+          break;
+        }
+        deps.emitIntent({
+          kind: "parametric_handle",
+          node_id: g.node_id,
+          handle_id: g.handle_id,
+          value: g.value,
+          modifiers: g.modifiers,
+          phase: "commit",
+        });
+        this.gesture = IDLE;
+        response.needsRedraw = true;
+        break;
+      }
     }
     return response;
   }
@@ -1510,6 +1778,222 @@ function vectorHoversEqual(
         (b as Extract<VectorHover, { kind: "ghost" }>).segment === a.segment
       );
   }
+}
+
+// ─── Corner-radius helpers ────────────────────────────────────────────────
+
+/**
+ * Project a doc-space point onto the `corner → center` axis and return
+ * its scalar distance from `corner`. Used to derive the new radius
+ * value during a drag — clamped to `>= 0` by the caller; clamped to
+ * the segment length implicitly (a cursor past `center` yields a
+ * value greater than the full distance, which the host clamps if it
+ * cares — the HUD reports geometry, not policy).
+ */
+function projectRadiusOnAxis(
+  point: cmath.Vector2 | readonly [number, number],
+  corner: cmath.Vector2 | readonly [number, number],
+  center: cmath.Vector2 | readonly [number, number]
+): number {
+  const dx = center[0] - corner[0];
+  const dy = center[1] - corner[1];
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return 0;
+  const px = point[0] - corner[0];
+  const py = point[1] - corner[1];
+  const t = (px * dx + py * dy) / len2;
+  // `t * len` = projected distance along the axis (in doc-px). For
+  // `rect`, `len` is the corner→center distance; for `line`,
+  // `len` is the a→b distance.
+  const len = Math.sqrt(len2);
+  return t * len;
+}
+
+/**
+ * Resolve a coincidence-group drag direction to one of the supplied
+ * candidates. Picks the anchor whose intercardinal direction (sign_x,
+ * sign_y) best matches the NEGATED drag delta — the user pulls the
+ * handle TOWARD a corner, so the delta is `-(sign_x, sign_y)`. Used
+ * for both the 2-candidate oblong-max case and the 4-candidate
+ * square-max case; `candidates` constrains the choice so we never
+ * resolve to a corner that isn't part of the group the user grabbed.
+ */
+function resolveCornerDragAnchor(
+  dx: number,
+  dy: number,
+  candidates: readonly ("nw" | "ne" | "se" | "sw")[]
+): "nw" | "ne" | "se" | "sw" {
+  const dirs: Record<"nw" | "ne" | "se" | "sw", [number, number]> = {
+    nw: [1, 1],
+    ne: [-1, 1],
+    se: [-1, -1],
+    sw: [1, -1],
+  };
+  let best: "nw" | "ne" | "se" | "sw" = candidates[0];
+  let best_dot = -Infinity;
+  for (const anchor of candidates) {
+    const [vx, vy] = dirs[anchor];
+    const dot = vx * -dx + vy * -dy;
+    if (dot > best_dot) {
+      best_dot = dot;
+      best = anchor;
+    }
+  }
+  return best;
+}
+
+/**
+ * Project a doc-space cursor onto the (sign_x, sign_y) diagonal axis
+ * of a rect corner — the projection axis for the arc-center handle.
+ *
+ * Axis-aligned case (no transform):
+ *
+ *   handle_doc = corner_local + (sign_x · r, sign_y · r)
+ *   r          = ((cursor - corner) · (sign_x, sign_y)) / 2
+ *
+ * Rotated case (transform applied):
+ *
+ *   handle_doc = T · (corner_local + r · sign_local)
+ *              = T · corner_local + r · (T.linear · sign_local)
+ *              = corner_doc + r · sign_doc
+ *
+ * where `sign_doc = T.linear · sign_local`. For orthonormal `T`
+ * (pure rotation), |sign_doc|² = 2, and the projection formula
+ * collapses to:
+ *
+ *   r = ((cursor - corner_doc) · sign_doc) / 2
+ *
+ * For non-orthonormal transforms the magnitude term would change;
+ * we use `|sign_doc|²` as the divisor so the math stays correct
+ * under uniform scale and degrades predictably under shear.
+ */
+function projectRadiusOnRectAnchor(
+  point: cmath.Vector2 | readonly [number, number],
+  rect: { x: number; y: number; width: number; height: number },
+  anchor: "nw" | "ne" | "se" | "sw",
+  transform?: cmath.Transform
+): number {
+  const corners: Record<"nw" | "ne" | "se" | "sw", readonly [number, number]> =
+    {
+      nw: [rect.x, rect.y],
+      ne: [rect.x + rect.width, rect.y],
+      se: [rect.x + rect.width, rect.y + rect.height],
+      sw: [rect.x, rect.y + rect.height],
+    };
+  const signs: Record<"nw" | "ne" | "se" | "sw", readonly [-1 | 1, -1 | 1]> = {
+    nw: [1, 1],
+    ne: [-1, 1],
+    se: [-1, -1],
+    sw: [1, -1],
+  };
+  const [cx, cy] = corners[anchor];
+  const [sx, sy] = signs[anchor];
+
+  if (!transform) {
+    return ((point[0] - cx) * sx + (point[1] - cy) * sy) / 2;
+  }
+
+  const [[a, b, tx], [c, d, ty]] = transform;
+  // corner_doc = T · corner_local
+  const corner_dx = a * cx + b * cy + tx;
+  const corner_dy = c * cx + d * cy + ty;
+  // sign_doc = T.linear · sign_local
+  const dirx = a * sx + b * sy;
+  const diry = c * sx + d * sy;
+  const len2 = dirx * dirx + diry * diry;
+  if (len2 === 0) return 0;
+  return ((point[0] - corner_dx) * dirx + (point[1] - corner_dy) * diry) / len2;
+}
+
+/**
+ * Pick the right projection for a corner-radius gesture frame. RECT
+ * geometry projects onto the resolved anchor's (sign_x, sign_y)
+ * diagonal; LINE projects onto `a → b`. Pre-resolution rect frames
+ * never reach this — the move handler returns early when
+ * `g.anchor === null` and the threshold hasn't been crossed.
+ */
+function projectRadiusFromGesture(
+  g: Extract<SurfaceGesture, { kind: "corner_radius" }>,
+  point: cmath.Vector2
+): number {
+  if (g.geometry === "line" && g.a && g.b) {
+    return projectRadiusOnAxis(point, g.a, g.b);
+  }
+  if (g.geometry === "rect" && g.rect && g.anchor) {
+    return projectRadiusOnRectAnchor(point, g.rect, g.anchor, g.transform);
+  }
+  return 0;
+}
+
+/**
+ * Build the per-frame corner-radius intent payload from the active
+ * gesture. The intent kind is decided by:
+ *
+ * - `geometry === "line"` → `corner_radius_uniform`
+ * - `geometry === "rect"` + `explicit` → `corner_radius_explicit`
+ * - `geometry === "rect"` + !`explicit` → `corner_radius`
+ *
+ * The gesture's `anchor` is null only on a pre-resolution center
+ * drag, which the caller filters out by checking `phase === "preview"`
+ * before emit. At commit time (or for any non-center variant)
+ * `anchor` is always populated for `rect`.
+ */
+function buildCornerRadiusIntent(
+  g: Extract<SurfaceGesture, { kind: "corner_radius" }>,
+  value: number,
+  phase: IntentPhase
+): Intent {
+  if (g.geometry === "line") {
+    return {
+      kind: "corner_radius_uniform",
+      node_id: g.node_id,
+      value,
+      phase,
+    };
+  }
+  // rect — `anchor` is non-null after pre-threshold resolution. The
+  // preview branch can be called with `anchor = null` for a center
+  // drag that hasn't crossed the threshold yet; we never reach this
+  // function in that case (the move handler returns early).
+  const anchor = g.anchor ?? "nw";
+  return {
+    kind: g.explicit ? "corner_radius_explicit" : "corner_radius",
+    node_id: g.node_id,
+    anchor,
+    value,
+    phase,
+  };
+}
+
+/**
+ * Unit tangent at a track's `t = 0` end, pointing toward `t = 1`.
+ * Mirror of `trackTangent` in `primitives/parametric-handle.ts` —
+ * kept local to keep the state machine free of producer imports.
+ * Continuous curves return the geometric tangent; point sets return
+ * the unit vector from the first to the second point (the "next
+ * step direction"). Degenerate tracks return `[1, 0]`.
+ */
+function trackTangent01(
+  track: cmath.ui.Curve | cmath.ui.PointSet
+): cmath.Vector2 {
+  if (track.kind === "segment") {
+    const dx = track.b[0] - track.a[0];
+    const dy = track.b[1] - track.a[1];
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return [1, 0];
+    return [dx / len, dy / len];
+  }
+  if (track.kind === "points") {
+    if (track.points.length < 2) return [1, 0];
+    const dx = track.points[1][0] - track.points[0][0];
+    const dy = track.points[1][1] - track.points[0][1];
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return [1, 0];
+    return [dx / len, dy / len];
+  }
+  if (track.radius === 0) return [1, 0];
+  const dir = track.to >= track.from ? 1 : -1;
+  return [-Math.sin(track.from) * dir, Math.cos(track.from) * dir];
 }
 
 /** Re-exports for convenience. */
