@@ -7758,13 +7758,9 @@ namespace cmath {
   }
 
   /**
-   * Parametric handle shape — a scalar `value` constrained to a 1D
-   * track (a {@link cmath.ui.Curve} or {@link cmath.ui.PointSet}).
-   *
-   * This namespace owns the data shapes (`ParametricHandle`,
-   * `ParametricHandleInput`, `ParametricHandleGroup`) and pure
-   * composers that build them from concrete inputs
-   * (e.g. {@link cornerRadiusHandles}). It is rendering-agnostic.
+   * Parametric handle — a scalar `value` constrained to a 1D track
+   * (a {@link cmath.ui.Curve} or {@link cmath.ui.PointSet}), and the
+   * collection / grouping primitives that compose them.
    *
    * Conventions:
    *
@@ -7790,7 +7786,7 @@ namespace cmath {
      * leaking out.
      */
     export interface ParametricHandle {
-      /** Stable identifier within the input. */
+      /** Stable identifier within the set this handle belongs to. */
       id: string;
       /** The 1D track the handle rides — a continuous curve OR a
        *  discrete point set. */
@@ -7805,9 +7801,14 @@ namespace cmath {
         max?: number;
         step?: number;
       };
-      /** Optional floor, in screen-px measured along the track, for
-       *  the rendered position when no gesture is in flight (a
-       *  "snap-back" minimum). Omit to disable. */
+      /** Optional minimum distance from `t = 0` along the track, in
+       *  the track's own units (the same units as `track.a` / `track.b`
+       *  for a segment, `track.radius` for an arc). When `value` would
+       *  place the handle inside this neighborhood of `t = 0`, the
+       *  rendered position is floored to the inset. Consumers
+       *  expressing the floor in another unit system (e.g. screen-px)
+       *  convert to track-units before populating this field. Omit to
+       *  disable. */
       inset?: number;
     }
 
@@ -7819,7 +7820,7 @@ namespace cmath {
      *
      * `direction-resolved` — pick the handle whose track tangent at
      * the coincident position is most aligned with the disambiguating
-     * direction (the drag direction, in interactive consumers).
+     * direction.
      */
     export interface ParametricHandleGroup {
       ids: readonly string[];
@@ -7827,103 +7828,15 @@ namespace cmath {
     }
 
     /**
-     * A set of parametric handles plus optional groupings and an
+     * A set of parametric handles, optional groupings, and an
      * optional `transform`. When `transform` is set, handle tracks are
-     * expressed in local coordinates and consumers apply the transform
-     * to obtain positions in the outer frame.
-     *
-     * `node_id` is an opaque tag carried through unchanged — useful
-     * for consumers that route per-handle results back to a specific
-     * source.
+     * expressed in local coordinates; consumers apply the transform to
+     * obtain positions in the outer frame.
      */
-    export interface ParametricHandleInput {
-      node_id: string;
+    export interface ParametricHandleSet {
       handles: readonly ParametricHandle[];
       groups?: readonly ParametricHandleGroup[];
       transform?: cmath.Transform;
-    }
-
-    /**
-     * Compose corner-radius parameters of a rectangle into the
-     * parametric-handle shape: four `segment` tracks (one per corner),
-     * declared as one direction-resolved coincidence group.
-     *
-     * Each handle:
-     * - `id` is `"nw" / "ne" / "se" / "sw"` (intercardinal corners).
-     * - `track` is the segment from the corner along the corner's
-     *   inward intercardinal direction, length `min(w, h) / 2`
-     *   (the maximum radius for which the rounded corners do not
-     *   overlap).
-     * - `value` is the per-corner radius (`tl` / `tr` / `br` / `bl`).
-     * - `domain` is `{ min: 0, max: min(w, h) / 2 }`.
-     * - `inset` is `16 · √2` (see comment below).
-     *
-     * `transform` (optional) is threaded through to the input
-     * unchanged.
-     *
-     * Pure geometry.
-     */
-    export function cornerRadiusHandles(
-      node_id: string,
-      rect: cmath.Rectangle,
-      radii: { tl: number; tr: number; br: number; bl: number },
-      transform?: cmath.Transform
-    ): ParametricHandleInput {
-      const max = Math.min(rect.width, rect.height) / 2;
-      type Spec = {
-        id: "nw" | "ne" | "se" | "sw";
-        corner: cmath.Vector2;
-        sign: cmath.Vector2;
-        value: number;
-      };
-      const specs: Spec[] = [
-        { id: "nw", corner: [rect.x, rect.y], sign: [1, 1], value: radii.tl },
-        {
-          id: "ne",
-          corner: [rect.x + rect.width, rect.y],
-          sign: [-1, 1],
-          value: radii.tr,
-        },
-        {
-          id: "se",
-          corner: [rect.x + rect.width, rect.y + rect.height],
-          sign: [-1, -1],
-          value: radii.br,
-        },
-        {
-          id: "sw",
-          corner: [rect.x, rect.y + rect.height],
-          sign: [1, -1],
-          value: radii.bl,
-        },
-      ];
-      // `inset` is measured along the track. The track is the
-      // corner-to-interior diagonal, so an axis-aligned offset of d
-      // along either axis corresponds to d · √2 along the track. The
-      // 16 here is the canonical axis-aligned offset for the snap-back
-      // floor.
-      const INSET_ALONG_CURVE = 16 * Math.SQRT2;
-      const handles: ParametricHandle[] = specs.map(
-        ({ id, corner, sign, value }) => ({
-          id,
-          track: {
-            kind: "segment",
-            a: corner,
-            b: [corner[0] + sign[0] * max, corner[1] + sign[1] * max],
-          },
-          value,
-          domain: { min: 0, max },
-          inset: INSET_ALONG_CURVE,
-        })
-      );
-      return {
-        node_id,
-        handles,
-        groups: [
-          { ids: ["nw", "ne", "se", "sw"], policy: "direction-resolved" },
-        ],
-        transform,
-      };
     }
   }
 

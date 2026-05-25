@@ -1,13 +1,12 @@
 // The universal "parametric handle" primitive — a knob that rides a 1D
 // constraint manifold (segment or arc) and reports a scalar value on
-// drag. This is the producer-side complement to
-// `cmath.parametric.ParametricHandle`: cmath owns the data shapes,
-// hud owns the layout / coincidence / projection math that turns
-// those shapes into pixels and gestures.
+// drag. cmath owns the geometric data shapes
+// (`cmath.parametric.{ParametricHandle, ParametricHandleGroup,
+// ParametricHandleSet}`); hud adds the routing tag (`node_id`), the
+// layout / coincidence / projection math, and the painter.
 //
-// Design — see the package README's "Parametric handles" section and
-// the `/sdk-design` decision banner at the head of the corner-radius
-// migration plan. Headline invariants:
+// Headline invariants — see the package README's "Parametric handles"
+// section:
 //
 // 1. Strictly 1D output on a 1D manifold (segment, arc). 2D handles
 //    are not this primitive — vector-edit's tangent / vertex knobs
@@ -32,19 +31,43 @@
 import cmath from "@grida/cmath";
 import type { NodeId } from "../event/gesture";
 
-// ─── Public re-exports of the data shapes from cmath ─────────────────────
+// ─── Geometric shapes — re-exports from cmath ───────────────────────────
 
 export type ParametricHandle = cmath.parametric.ParametricHandle;
 export type ParametricHandleGroup = cmath.parametric.ParametricHandleGroup;
-export type ParametricHandleInput = cmath.parametric.ParametricHandleInput;
+
+/**
+ * Hud-local protocol record: one node's `ParametricHandleSet` plus
+ * the `node_id` the surface uses to route per-handle intents back to
+ * the host. The math content (handles / groups / transform) carries
+ * the same semantics as `cmath.parametric.ParametricHandleSet`; the
+ * `node_id` is the hud-side routing tag.
+ *
+ * `inset` on each handle is in **track-units** (cmath contract).
+ * Hud's convention for translating its 16-screen-px snap-back to
+ * track-units lives in the corner-radius primitive (see
+ * `primitives/corner-radius.ts`); other producers that want the same
+ * convention compute `inset = screen_px / zoom · k` for whatever
+ * geometric factor `k` their track demands.
+ */
+export interface ParametricHandleInput {
+  node_id: NodeId;
+  handles: readonly ParametricHandle[];
+  groups?: readonly ParametricHandleGroup[];
+  transform?: cmath.Transform;
+}
 
 // ─── Defaults — locked, not configurable per `/sdk-design` ────────────────
 
 /**
- * Screen-px floor of the knob's resting position from the curve's
- * `t = 0` endpoint. The corner-radius affordance uses this so a knob
- * at value=0 doesn't collide with the resize-corner knob beneath it;
- * other affordances inherit the same convention.
+ * Hud's screen-px convention for the knob's resting floor from the
+ * curve's `t = 0` endpoint, used so a knob at value=0 doesn't collide
+ * with the resize-corner knob beneath it.
+ *
+ * This is hud's UX choice, NOT the unit the math layer reads.
+ * `ParametricHandle.inset` (in cmath) is documented in track-units;
+ * each producer translates this screen-px value through `zoom` (and
+ * any track-geometry factor) before populating the field.
  */
 export const DEFAULT_PARAMETRIC_HANDLE_INSET = 16;
 
@@ -102,16 +125,16 @@ export interface ParametricHandleLayout {
  * result.
  *
  * `during_gesture` lifts the snap-back floor: at rest, a handle whose
- * `value` lands closer to `t = 0` than the input's `inset` (in screen
- * px) is floored to `t_inset`; during a drag the knob follows the
- * cursor down to `t = 0` so the gesture feels honest.
+ * `value` lands closer to `t = 0` than the input's `inset` (in
+ * track-units) is floored to `t_inset`; during a drag the knob
+ * follows the cursor down to `t = 0` so the gesture feels honest.
  *
- * `zoom` is the camera's uniform scale (`transform[0][0]`). Pass `1`
- * for unit tests against doc-space math.
+ * Pure geometry; no zoom dependence — callers express `inset` in
+ * track-units, so screen-px → track-units conversion (if any) has
+ * already happened before this call.
  */
 export function computeParametricHandleLayout(
   input: ParametricHandleInput,
-  zoom: number,
   opts: {
     size?: number;
     hit_size?: number;
@@ -129,7 +152,7 @@ export function computeParametricHandleLayout(
       max: h.domain?.max ?? 1,
       step: h.domain?.step,
     };
-    const t = renderT(h.value, domain, h.track, h.inset, zoom, during_gesture);
+    const t = renderT(h.value, domain, h.track, h.inset, during_gesture);
     const local_pos = evaluateTrack(h.track, t);
     const pos = local_transform
       ? cmath.vector2.transform(local_pos, local_transform)
@@ -164,7 +187,8 @@ function evaluateTrack(
  *
  * - The domain mapping `t = (value - min) / (max - min)`.
  * - The snap-back floor (when `during_gesture` is false and `inset`
- *   is set): `t = max(t, inset_screen / curveLength / zoom)`.
+ *   is set): `t = max(t, inset / curveLength)`. `inset` is in
+ *   track-units, the same as `curveLength`.
  *
  * Clamps the result to `[0, 1]`. The `step` quantizer is NOT applied
  * here — it only affects EMITTED values, not the rendered position
@@ -175,13 +199,12 @@ function renderT(
   domain: { min: number; max: number },
   track: cmath.ui.Curve | cmath.ui.PointSet,
   inset: number | undefined,
-  zoom: number,
   during_gesture: boolean
 ): number {
   const span = domain.max - domain.min;
   let t = span === 0 ? 0 : (value - domain.min) / span;
   // `inset` is a continuous-curve concept (snap back along the curve
-  // by some doc-space distance). Point sets have no continuous "start
+  // by some track-unit distance). Point sets have no continuous "start
   // neighborhood" to snap back to, so we skip the floor for them.
   if (
     !during_gesture &&
@@ -191,8 +214,7 @@ function renderT(
   ) {
     const len = curveLength(track);
     if (len > 0) {
-      const inset_doc = inset / Math.max(zoom, 1e-6);
-      const t_floor = Math.min(inset_doc / len, 1);
+      const t_floor = Math.min(inset / len, 1);
       if (t < t_floor) t = t_floor;
     }
   }

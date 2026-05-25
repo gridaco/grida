@@ -30,7 +30,7 @@ describe("computeParametricHandleLayout — single segment handle", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     expect(layout).toHaveLength(1);
     expect(layout[0].pos[0]).toBeCloseTo(25);
     expect(layout[0].pos[1]).toBeCloseTo(0);
@@ -50,13 +50,13 @@ describe("computeParametricHandleLayout — single segment handle", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     expect(layout[0].pos[0]).toBeCloseTo(10);
   });
 
-  it("inset floors the resting position by inset_screen / zoom doc-px", () => {
-    // value=0 with inset=16 at zoom=1: floor pushes t=0 up to
-    // t=16/100=0.16, knob lands at x=16.
+  it("inset floors the resting position to a distance along the track", () => {
+    // value=0 with inset=16 (track-units): floor pushes t=0 up to
+    // t = 16 / 100 = 0.16, knob lands at x=16 along the segment.
     const input: ParametricHandleInput = {
       node_id: "n",
       handles: [
@@ -69,7 +69,7 @@ describe("computeParametricHandleLayout — single segment handle", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     expect(layout[0].pos[0]).toBeCloseTo(16);
   });
 
@@ -86,13 +86,17 @@ describe("computeParametricHandleLayout — single segment handle", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 1, {
+    const layout = computeParametricHandleLayout(input, {
       during_gesture: true,
     });
     expect(layout[0].pos[0]).toBeCloseTo(0);
   });
 
-  it("inset scales with zoom — at zoom=2 the doc-px floor halves", () => {
+  it("inset is in track-units — independent of any external zoom", () => {
+    // The painter does NOT convert from screen-px; whatever number the
+    // caller put in `inset` is the floor distance along the track.
+    // A caller that wants a screen-px floor converts itself before
+    // populating the field (see corner-radius.ts).
     const input: ParametricHandleInput = {
       node_id: "n",
       handles: [
@@ -105,8 +109,8 @@ describe("computeParametricHandleLayout — single segment handle", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 2);
-    expect(layout[0].pos[0]).toBeCloseTo(8); // 16 / 2
+    const layout = computeParametricHandleLayout(input);
+    expect(layout[0].pos[0]).toBeCloseTo(16);
   });
 
   it("default domain is [0, 1] when omitted", () => {
@@ -120,7 +124,7 @@ describe("computeParametricHandleLayout — single segment handle", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     expect(layout[0].pos[0]).toBeCloseTo(5);
   });
 });
@@ -144,7 +148,7 @@ describe("computeParametricHandleLayout — arc handle", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     expect(layout[0].pos[0]).toBeCloseTo(10 * Math.SQRT1_2);
     expect(layout[0].pos[1]).toBeCloseTo(10 * Math.SQRT1_2);
   });
@@ -168,7 +172,7 @@ describe("computeParametricHandleLayout — arc handle", () => {
         },
       ],
     };
-    const [layout] = computeParametricHandleLayout(input, 1);
+    const [layout] = computeParametricHandleLayout(input);
     // Project a point that maps to t=0.55 → value=3 + 0.55*9 = 7.95 → snap to 8.
     const angle = 0 + 0.55 * (Math.PI * 2);
     const point: cmath.Vector2 = [10 * Math.cos(angle), 10 * Math.sin(angle)];
@@ -196,7 +200,7 @@ describe("computeParametricHandleLayout — transform", () => {
       ],
       transform: t,
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     expect(layout[0].pos[0]).toBeCloseTo(35);
     expect(layout[0].pos[1]).toBeCloseTo(20);
     // track_doc is the segment translated into doc-space.
@@ -226,7 +230,7 @@ describe("parametricHandleLayoutGroups", () => {
         },
       ],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     const groups = parametricHandleLayoutGroups(input, layout);
     expect(groups).toHaveLength(2);
     expect(groups[0]).toHaveLength(1);
@@ -253,7 +257,7 @@ describe("parametricHandleLayoutGroups", () => {
       ],
       groups: [{ ids: ["a", "b"], policy: "direction-resolved" }],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     const groups = parametricHandleLayoutGroups(input, layout);
     expect(groups).toHaveLength(1);
     expect(groups[0].map((g) => g.handle_id).sort()).toEqual(["a", "b"]);
@@ -278,7 +282,7 @@ describe("parametricHandleLayoutGroups", () => {
       ],
       groups: [{ ids: ["a", "b"], policy: "direction-resolved" }],
     };
-    const layout = computeParametricHandleLayout(input, 1);
+    const layout = computeParametricHandleLayout(input);
     const groups = parametricHandleLayoutGroups(input, layout);
     expect(groups).toHaveLength(2);
     expect(groups[0]).toHaveLength(1);
@@ -315,39 +319,33 @@ describe("resolveParametricHandleByDirection", () => {
 
 describe("projectParametricHandleValue", () => {
   it("denormalizes t back into the host's domain units", () => {
-    const layout = computeParametricHandleLayout(
-      {
-        node_id: "n",
-        handles: [
-          {
-            id: "h",
-            track: { kind: "segment", a: [0, 0], b: [10, 0] },
-            value: 0,
-            domain: { min: 0, max: 100 },
-          },
-        ],
-      },
-      1
-    );
+    const layout = computeParametricHandleLayout({
+      node_id: "n",
+      handles: [
+        {
+          id: "h",
+          track: { kind: "segment", a: [0, 0], b: [10, 0] },
+          value: 0,
+          domain: { min: 0, max: 100 },
+        },
+      ],
+    });
     const { value } = projectParametricHandleValue(layout[0], [5, 0]);
     expect(value).toBeCloseTo(50);
   });
 
   it("snaps to step on emit, not just at integer boundaries", () => {
-    const layout = computeParametricHandleLayout(
-      {
-        node_id: "n",
-        handles: [
-          {
-            id: "h",
-            track: { kind: "segment", a: [0, 0], b: [10, 0] },
-            value: 0,
-            domain: { min: 0, max: 1, step: 0.25 },
-          },
-        ],
-      },
-      1
-    );
+    const layout = computeParametricHandleLayout({
+      node_id: "n",
+      handles: [
+        {
+          id: "h",
+          track: { kind: "segment", a: [0, 0], b: [10, 0] },
+          value: 0,
+          domain: { min: 0, max: 1, step: 0.25 },
+        },
+      ],
+    });
     // Cursor at x=2.7 → t=0.27 → value=0.27 → snap to 0.25.
     expect(projectParametricHandleValue(layout[0], [2.7, 0]).value).toBeCloseTo(
       0.25

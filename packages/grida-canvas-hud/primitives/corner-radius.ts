@@ -223,12 +223,12 @@ export function cornerRadiusHandlePosRect(
     transform?: cmath.Transform;
   } = {}
 ): cmath.Vector2 {
-  // Delegated to the universal parametric primitive: build a single-
-  // handle input matching THIS anchor's segment and run it through
-  // `computeParametricHandleLayout`. The per-axis inset convention
-  // (16 screen-px) becomes √2 · 16 along the curve — same arithmetic
-  // the `cmath.parametric.cornerRadiusHandles` composer applies for
-  // the four-handle case.
+  // Build a single-handle input matching THIS anchor's segment and run
+  // it through `computeParametricHandleLayout`. The per-axis pad (in
+  // screen-px) becomes `pad · √2 / zoom` along the curve — the
+  // diagonal track at 45° turns one axis-aligned pixel into √2 along
+  // the segment, and zoom converts screen-px to doc-units (= the
+  // track's units).
   const pad = opts.pad ?? DEFAULT_CORNER_RADIUS_HANDLE_INSET;
   const max = Math.min(rect.width, rect.height) / 2;
   const corners: Record<CornerRadiusAnchor, cmath.Vector2> = {
@@ -251,12 +251,12 @@ export function cornerRadiusHandlePosRect(
         },
         value: radius,
         domain: { min: 0, max },
-        inset: pad * Math.SQRT2,
+        inset: (pad * Math.SQRT2) / Math.max(zoom, 1e-6),
       },
     ],
     transform: opts.transform,
   };
-  const layout = computeParametricHandleLayout(input, zoom, {
+  const layout = computeParametricHandleLayout(input, {
     during_gesture: opts.during_gesture,
   });
   return layout[0]?.pos ?? [cx, cy];
@@ -267,11 +267,9 @@ export function cornerRadiusHandlePosRect(
  * handle for `line` geometry; same gesture-aware padding rule as the
  * rect case. The saturation cap is `dist(a, b)`.
  *
- * Delegated to the universal parametric primitive — the segment curve
- * runs from `a` to `b`, the value is the radius, and the inset is the
- * pad (since for a straight a→b segment the parametric "along-curve"
- * inset semantic matches the corner-radius "screen-px from a" one
- * one-to-one).
+ * The track here is the a→b segment of arbitrary direction, so the
+ * per-axis convention used by the rect case doesn't apply — `pad`
+ * converts to track-units as `pad / zoom`.
  */
 export function cornerRadiusHandlePosLine(
   a: cmath.Vector2,
@@ -291,14 +289,81 @@ export function cornerRadiusHandlePosLine(
         track: { kind: "segment", a: [a[0], a[1]], b: [b[0], b[1]] },
         value: radius,
         domain: { min: 0, max: dist },
-        inset: pad,
+        inset: pad / Math.max(zoom, 1e-6),
       },
     ],
   };
-  const layout = computeParametricHandleLayout(input, zoom, {
+  const layout = computeParametricHandleLayout(input, {
     during_gesture: opts.during_gesture,
   });
   return layout[0]?.pos ?? [a[0], a[1]];
+}
+
+/**
+ * Compose a rect's four corner-radius parameters into a hud-side
+ * `ParametricHandleInput`: four `segment` tracks (one per corner,
+ * inward intercardinal direction, length `min(w, h) / 2`), declared
+ * as one direction-resolved coincidence group.
+ *
+ * `inset` is the snap-back floor measured ALONG the track, in
+ * track-units. The caller converts its preferred screen-px convention
+ * to track-units (`pad · √2 / zoom` for the diagonal track).
+ *
+ * Local helper. Math layer (`cmath.parametric`) holds the primitives
+ * (`ParametricHandle`, `ParametricHandleSet`); use-case composers
+ * like this one live next to their caller.
+ */
+function cornerRadiusHandles(
+  node_id: NodeId,
+  rect: Rect,
+  radii: { tl: number; tr: number; br: number; bl: number },
+  inset: number,
+  transform?: cmath.Transform
+): ParametricHandleInput {
+  const max = Math.min(rect.width, rect.height) / 2;
+  type Spec = {
+    id: CornerRadiusAnchor;
+    corner: cmath.Vector2;
+    value: number;
+  };
+  const specs: Spec[] = [
+    { id: "nw", corner: [rect.x, rect.y], value: radii.tl },
+    {
+      id: "ne",
+      corner: [rect.x + rect.width, rect.y],
+      value: radii.tr,
+    },
+    {
+      id: "se",
+      corner: [rect.x + rect.width, rect.y + rect.height],
+      value: radii.br,
+    },
+    {
+      id: "sw",
+      corner: [rect.x, rect.y + rect.height],
+      value: radii.bl,
+    },
+  ];
+  const handles = specs.map(({ id, corner, value }) => {
+    const [sx, sy] = cornerRadiusAnchorSign(id);
+    return {
+      id,
+      track: {
+        kind: "segment" as const,
+        a: corner,
+        b: [corner[0] + sx * max, corner[1] + sy * max] as cmath.Vector2,
+      },
+      value,
+      domain: { min: 0, max },
+      inset,
+    };
+  });
+  return {
+    node_id,
+    handles,
+    groups: [{ ids: ["nw", "ne", "se", "sw"], policy: "direction-resolved" }],
+    transform,
+  };
 }
 
 /**
@@ -330,17 +395,21 @@ export function computeCornerRadiusLayout(
     during_gesture?: boolean;
   } = {}
 ): CornerRadiusHandleLayout[] {
-  // Internally re-rooted on the universal parametric primitive
-  // (`cmath.parametric.cornerRadiusHandles` for the rect case;
-  // inline single-segment construction for the line case). The
-  // public types — `CornerRadiusInput`, `CornerRadiusHandleLayout`,
-  // and the four anchor labels — stay unchanged so the 43 corner-
-  // radius behavior tests (the migration's oracle) and all existing
-  // host call sites see no semantic delta.
+  // Composes onto the universal parametric primitive: the local
+  // `cornerRadiusHandles` helper builds the 4-handle input for the
+  // rect case; the line case constructs a single-segment input
+  // inline. The public types — `CornerRadiusInput`,
+  // `CornerRadiusHandleLayout`, the four anchor labels — are
+  // unchanged.
   const size = opts.size ?? DEFAULT_CORNER_RADIUS_HANDLE_SIZE;
   const hit_size = opts.hit_size ?? DEFAULT_CORNER_RADIUS_HIT_SIZE;
   const pad = opts.pad ?? DEFAULT_CORNER_RADIUS_HANDLE_INSET;
   const during_gesture = opts.during_gesture ?? false;
+
+  // Convert the screen-px `pad` to track-units once per call. The
+  // rect case rides 45° diagonals (`pad · √2 / zoom`); the line case
+  // rides an arbitrary-direction segment (`pad / zoom`).
+  const zoom_safe = Math.max(zoom, 1e-6);
 
   if (input.geometry.kind === "line") {
     const a = input.geometry.a;
@@ -354,11 +423,11 @@ export function computeCornerRadiusLayout(
           track: { kind: "segment", a: [a[0], a[1]], b: [b[0], b[1]] },
           value: (input.radius as { value: number }).value,
           domain: { min: 0, max: dist },
-          inset: pad,
+          inset: pad / zoom_safe,
         },
       ],
     };
-    const layout = computeParametricHandleLayout(parametric_input, zoom, {
+    const layout = computeParametricHandleLayout(parametric_input, {
       size,
       hit_size,
       during_gesture,
@@ -379,31 +448,15 @@ export function computeCornerRadiusLayout(
   if (!rect) return [];
 
   const r = input.radius as CornerRadiusRectangular;
-  // `cmath.parametric.cornerRadiusHandles` builds the 4-handle input
-  // with the √2-translated inset and the standard direction-resolved
-  // group. We override `inset` only when the caller customizes `pad`
-  // — the default path hits the composer's standard convention.
-  const parametric_input = cmath.parametric.cornerRadiusHandles(
+  const inset_track = (pad * Math.SQRT2) / zoom_safe;
+  const parametric_input = cornerRadiusHandles(
     "_",
     rect,
     { tl: r.tl, tr: r.tr, br: r.br, bl: r.bl },
+    inset_track,
     input.geometry.transform
   );
-  // Honor custom `pad` by overwriting each handle's `inset` post-
-  // compose. The composer's default is 16 · √2 — when the caller
-  // passes a non-default `pad`, scale to `pad · √2`.
-  const inset_along_curve = pad * Math.SQRT2;
-  const effective_input: ParametricHandleInput =
-    pad === DEFAULT_CORNER_RADIUS_HANDLE_INSET
-      ? parametric_input
-      : {
-          ...parametric_input,
-          handles: parametric_input.handles.map((h) => ({
-            ...h,
-            inset: inset_along_curve,
-          })),
-        };
-  const layout = computeParametricHandleLayout(effective_input, zoom, {
+  const layout = computeParametricHandleLayout(parametric_input, {
     size,
     hit_size,
     during_gesture,

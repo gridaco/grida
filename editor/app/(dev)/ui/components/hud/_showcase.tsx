@@ -2155,11 +2155,11 @@ export function CornerRadiusSection() {
         position <em>is</em> the radius value, and the rotated rect&apos;s knobs
         ride the rotated diagonals via the input&apos;s{" "}
         <code className="rounded bg-zinc-100 px-1 text-[12px]">transform</code>.
-        Internally this API is now an adapter over the universal primitive ({" "}
+        Internally this API is an adapter over the universal primitive (a local{" "}
         <code className="rounded bg-zinc-100 px-1 text-[12px]">
-          cmath.parametric.cornerRadiusHandles
+          cornerRadiusHandles
         </code>{" "}
-        +{" "}
+        composer +{" "}
         <code className="rounded bg-zinc-100 px-1 text-[12px]">
           surface.setParametricHandles
         </code>
@@ -2191,10 +2191,10 @@ export function CornerRadiusSection() {
                   — one or more handles, each a scalar <code>value</code>{" "}
                   constrained to a 1D <code>curve</code>. Two curve kinds today:{" "}
                   <code>segment</code> (corner-radius, ratio) and{" "}
-                  <code>arc</code> (count). Composers in{" "}
-                  <code>cmath.parametric.*</code> build the input from
-                  shape-specific schemas; the producer never knows what shape
-                  the host is editing.
+                  <code>arc</code> (count). Use-case composers (like the
+                  corner-radius one) live next to their callers and build the
+                  input from shape-specific schemas; the producer never knows
+                  what shape the host is editing.
                 </>
               ),
             },
@@ -2205,11 +2205,12 @@ export function CornerRadiusSection() {
                   <code>surface.setCornerRadius</code> remains as a thin adapter
                   — its public types and the three <code>corner_radius*</code>{" "}
                   intent kinds are unchanged from pre-migration. Internally,
-                  every input is composed via{" "}
-                  <code>cmath.parametric.cornerRadiusHandles</code> and routed
-                  through the universal primitive. The 43-test corner-radius
-                  behavior pin (<code>__tests__/corner-radius.test.ts</code>) is
-                  the equivalence proof.
+                  every input is composed by a local{" "}
+                  <code>cornerRadiusHandles</code> helper next to the primitive
+                  and routed through the universal parametric handle. The
+                  43-test corner-radius behavior pin (
+                  <code>__tests__/corner-radius.test.ts</code>) is the
+                  equivalence proof.
                 </>
               ),
             },
@@ -2244,12 +2245,14 @@ export function CornerRadiusSection() {
               name: "Snap-back inset",
               rule: (
                 <>
-                  Producer-side floor: at rest, the knob is floored to a
-                  screen-space inset along the curve. During a gesture the floor
-                  is lifted. Corner-radius&apos;s "16 px per axis" convention
-                  translates to <code>inset = 16 · √2</code> along the diagonal
-                  — the composer handles the conversion so the rendered position
-                  is identical to the pre-migration primitive.
+                  Producer-side floor: at rest, the knob is floored to{" "}
+                  <code>inset</code> in the track&apos;s own units. During a
+                  gesture the floor is lifted. Corner-radius&apos;s "16 px per
+                  axis" UX convention is the caller&apos;s concern — the
+                  corner-radius primitive computes{" "}
+                  <code>inset = 16 · √2 / zoom</code> per frame (the diagonal
+                  track at 45° turns a per-axis pixel into <code>√2</code> along
+                  the track) before populating the field.
                 </>
               ),
             },

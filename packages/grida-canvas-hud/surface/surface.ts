@@ -321,8 +321,10 @@ export class Surface {
    * simultaneously. Intents carry their input's `node_id` so the
    * host routes per-node.
    *
-   * See `cmath.parametric.cornerRadiusHandles` and any future
-   * composers for the conventional way to build inputs.
+   * Hosts typically build inputs through use-case-specific composers
+   * (e.g. the corner-radius primitive builds a 4-handle input over a
+   * rect). The shape itself is generic — anything that can be
+   * expressed as scalars on 1D tracks fits.
    */
   setParametricHandles(
     input: ParametricHandleInput | readonly ParametricHandleInput[] | null
@@ -750,11 +752,10 @@ export class Surface {
   private buildParametricHandleLayout(
     input: ParametricHandleInput
   ): ParametricHandleLayout[] {
-    const zoom = this.state.getTransform()[0][0];
     const g = this.state.gesture;
     const during_gesture =
       g.kind === "parametric_handle" && g.node_id === input.node_id;
-    return computeParametricHandleLayout(input, zoom, { during_gesture });
+    return computeParametricHandleLayout(input, { during_gesture });
   }
 
   /**
