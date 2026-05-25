@@ -3112,6 +3112,42 @@ namespace cmath {
     }
 
     /**
+     * Project point `p` onto segment `[a, b]`. Returns the clamped
+     * parameter `t ∈ [0, 1]` (0 at `a`, 1 at `b`) and the resulting
+     * position on the segment — the perpendicular foot when it falls
+     * inside `[a, b]`, otherwise the nearer endpoint.
+     *
+     * Degenerate segment (`a == b`) returns `{ t: 0, position: a }`;
+     * the `t` is conventional (there's no parameter to recover) but the
+     * `position` is honest.
+     *
+     * Companion to {@link point_distance}; the two share the same
+     * clamped-foot algorithm — `point_distance` returns only the
+     * Euclidean distance, this one returns the foot and `t`.
+     */
+    export function project_point(
+      a: Vector2,
+      b: Vector2,
+      p: Vector2
+    ): { t: number; position: Vector2 } {
+      const abx = b[0] - a[0];
+      const aby = b[1] - a[1];
+      const len_sq = abx * abx + aby * aby;
+      if (len_sq === 0) {
+        return { t: 0, position: [a[0], a[1]] };
+      }
+      const apx = p[0] - a[0];
+      const apy = p[1] - a[1];
+      let t = (apx * abx + apy * aby) / len_sq;
+      if (t < 0) t = 0;
+      else if (t > 1) t = 1;
+      return {
+        t,
+        position: [a[0] + t * abx, a[1] + t * aby],
+      };
+    }
+
+    /**
      * Shortest distance from point `p` to segment `ab`. The closest point
      * on the segment is the perpendicular foot when it falls inside `[a, b]`,
      * otherwise the nearer endpoint. For a degenerate segment (a == b) this
@@ -7247,6 +7283,257 @@ namespace cmath {
     }
 
     /**
+     * Continuous parameterized 1D curve — a continuous map from
+     * `t ∈ [0, 1]` to `R²`. Two kinds today:
+     *
+     * - `segment` — straight line between two points.
+     * - `arc` — circular arc parameterized by `from` → `to` angles in
+     *   radians.
+     *
+     * Each carries one scalar parameter `t ∈ [0, 1]` — 0 at the
+     * curve's start, 1 at its end. Position recovery: {@link
+     * evaluateCurve}; inverse projection: {@link projectPointOnCurve}.
+     *
+     * For DISCRETE constraint sets — a finite set of valid positions
+     * with no interpolation between them, technically NOT a curve —
+     * see {@link PointSet}.
+     */
+    export type Curve =
+      | { kind: "segment"; a: cmath.Vector2; b: cmath.Vector2 }
+      | {
+          kind: "arc";
+          center: cmath.Vector2;
+          radius: number;
+          /** Start angle in radians (CCW from +x). `t = 0` lands here. */
+          from: number;
+          /** End angle in radians. `t = 1` lands here. Sweep is linear
+           *  in `(to - from)`; for a well-formed arc supply `to >= from`
+           *  so the parameterization runs counter-clockwise. A negative
+           *  sweep returns the start position from
+           *  {@link projectPointOnCurve} (degenerate). */
+          to: number;
+        };
+
+    /**
+     * Finite, ORDERED set of points — the discrete sibling of
+     * {@link Curve}. NOT a curve: a point set has no continuous
+     * parameterization, no tangent, no length in the geometric sense.
+     *
+     * Conceptually `t ∈ [0, 1]` maps to a point by index:
+     * `points[round(t · (n − 1))]`. The semantic is "index", not
+     * "fraction along the curve". Projection snaps to the nearest
+     * point by Euclidean distance.
+     */
+    export type PointSet = {
+      kind: "points";
+      points: readonly cmath.Vector2[];
+    };
+
+    /**
+     * Evaluate a curve at `t ∈ [0, 1]`. Out-of-range `t` is clamped —
+     * `t = 1.5` returns the curve's endpoint, not an extrapolation.
+     *
+     * - segment: linear interpolation between `a` and `b`.
+     * - arc: angle is `from + t · (to - from)`, position on the circle
+     *   of radius `radius` around `center`.
+     *
+     * Pure. Pair with {@link projectPointOnCurve} for the inverse.
+     */
+    export function evaluateCurve(
+      curve: cmath.ui.Curve,
+      t: number
+    ): cmath.Vector2 {
+      const u = t < 0 ? 0 : t > 1 ? 1 : t;
+      if (curve.kind === "segment") {
+        return [
+          curve.a[0] + (curve.b[0] - curve.a[0]) * u,
+          curve.a[1] + (curve.b[1] - curve.a[1]) * u,
+        ];
+      }
+      const angle = curve.from + (curve.to - curve.from) * u;
+      return [
+        curve.center[0] + curve.radius * Math.cos(angle),
+        curve.center[1] + curve.radius * Math.sin(angle),
+      ];
+    }
+
+    /**
+     * Evaluate a point set at `t ∈ [0, 1]` — round to the nearest
+     * index and return that point. `t` is clamped before rounding.
+     * Empty set returns `[0, 0]` (degenerate convention).
+     */
+    export function evaluatePointSet(
+      set: cmath.ui.PointSet,
+      t: number
+    ): cmath.Vector2 {
+      const n = set.points.length;
+      if (n === 0) return [0, 0];
+      if (n === 1) return [set.points[0][0], set.points[0][1]];
+      const u = t < 0 ? 0 : t > 1 ? 1 : t;
+      const idx = Math.min(n - 1, Math.max(0, Math.round(u * (n - 1))));
+      return [set.points[idx][0], set.points[idx][1]];
+    }
+
+    /**
+     * Project a doc-space point onto a curve. Returns the closest
+     * parametric position `t ∈ [0, 1]` and the corresponding `position`
+     * on the curve. A point past either endpoint clamps to that
+     * endpoint — no extrapolation.
+     *
+     * - segment: delegates to {@link cmath.segment.project_point}
+     *   (perpendicular foot clamped to `[a, b]`).
+     * - arc: angle of `point` relative to `center`, normalized into
+     *   `[from, from + 2π)`, then clamped to `[from, to]` so points
+     *   outside the arc's sweep clamp to the nearer endpoint.
+     *
+     * Degenerate curves (zero-length segment, zero-radius arc,
+     * non-positive arc sweep) return `{ t: 0, position: <curve start> }`.
+     */
+    export function projectPointOnCurve(
+      curve: cmath.ui.Curve,
+      point: cmath.Vector2
+    ): { t: number; position: cmath.Vector2 } {
+      if (curve.kind === "segment") {
+        return cmath.segment.project_point(curve.a, curve.b, point);
+      }
+      const span = curve.to - curve.from;
+      if (curve.radius === 0 || span <= 0) {
+        return {
+          t: 0,
+          position: [
+            curve.center[0] + curve.radius * Math.cos(curve.from),
+            curve.center[1] + curve.radius * Math.sin(curve.from),
+          ],
+        };
+      }
+      const dx = point[0] - curve.center[0];
+      const dy = point[1] - curve.center[1];
+      let theta = Math.atan2(dy, dx);
+      // Normalize theta into [from, from + 2π) — the contiguous range
+      // that contains the arc's CCW sweep regardless of how `from` was
+      // given.
+      const TWO_PI = Math.PI * 2;
+      while (theta < curve.from) theta += TWO_PI;
+      while (theta >= curve.from + TWO_PI) theta -= TWO_PI;
+      let t = (theta - curve.from) / span;
+      if (t < 0) t = 0;
+      else if (t > 1) t = 1;
+      const angle = curve.from + t * span;
+      return {
+        t,
+        position: [
+          curve.center[0] + curve.radius * Math.cos(angle),
+          curve.center[1] + curve.radius * Math.sin(angle),
+        ],
+      };
+    }
+
+    /**
+     * Project a point onto a {@link PointSet} — find the nearest
+     * point by Euclidean distance. Returns the snapped position and a
+     * normalized index `t = i / (n − 1)`, matching the `t ∈ [0, 1]`
+     * convention of {@link evaluatePointSet}.
+     *
+     * Linear scan; n is assumed small (no spatial index).
+     */
+    export function projectPointOnSet(
+      set: cmath.ui.PointSet,
+      point: cmath.Vector2
+    ): { t: number; position: cmath.Vector2 } {
+      const n = set.points.length;
+      if (n === 0) return { t: 0, position: [0, 0] };
+      if (n === 1) {
+        return { t: 0, position: [set.points[0][0], set.points[0][1]] };
+      }
+      let best_idx = 0;
+      let best_sq = Infinity;
+      for (let i = 0; i < n; i++) {
+        const dx = point[0] - set.points[i][0];
+        const dy = point[1] - set.points[i][1];
+        const sq = dx * dx + dy * dy;
+        if (sq < best_sq) {
+          best_sq = sq;
+          best_idx = i;
+        }
+      }
+      return {
+        t: best_idx / (n - 1),
+        position: [set.points[best_idx][0], set.points[best_idx][1]],
+      };
+    }
+
+    /**
+     * Returns one of `rect`'s two diagonals, selected by `direction`.
+     *
+     * For corner directions the diagonal runs from the *opposite* corner
+     * to the named corner (the named corner is the line's `(x2, y2)`):
+     *
+     * - `"ne"` → BL → TR
+     * - `"se"` → TL → BR
+     * - `"nw"` → BR → TL
+     * - `"sw"` → TR → BL
+     *
+     * Edge directions canonicalize to the diagonal of an adjacent corner-pair:
+     *
+     * - `"n"` → BL → TR (the `"ne"` diagonal)
+     * - `"s"` → TL → BR (the `"se"` diagonal)
+     * - `"e"` → TL → BR (the `"se"` diagonal)
+     * - `"w"` → TR → BL (the `"sw"` diagonal)
+     *
+     * Axis-aligned. For a rotated rect, apply the rect's transform to the
+     * returned line.
+     *
+     * @param rect - the rectangle
+     * @param direction - which corner / edge selects the diagonal
+     * @returns the diagonal as a `ui.Line` (no label)
+     */
+    export function diagonalForDirection(
+      rect: cmath.Rectangle,
+      direction: cmath.CardinalDirection
+    ): cmath.ui.Line {
+      const [TL, TR, BR, BL] = cmath.rect.toCorners(rect);
+
+      // (from, to) — `to` is the named corner for corner directions.
+      let from: cmath.Vector2;
+      let to: cmath.Vector2;
+      switch (direction) {
+        case "ne":
+          from = BL;
+          to = TR;
+          break;
+        case "se":
+          from = TL;
+          to = BR;
+          break;
+        case "nw":
+          from = BR;
+          to = TL;
+          break;
+        case "sw":
+          from = TR;
+          to = BL;
+          break;
+        case "n":
+          from = BL;
+          to = TR;
+          break;
+        case "s":
+          from = TL;
+          to = BR;
+          break;
+        case "e":
+          from = TL;
+          to = BR;
+          break;
+        case "w":
+          from = TR;
+          to = BL;
+          break;
+      }
+      return { x1: from[0], y1: from[1], x2: to[0], y2: to[1] };
+    }
+
+    /**
      * Ensures that (x1, y1) <= (x2, y2) in a canonical way.
      *
      * - If `line.x1 > line.x2`, swaps the endpoints.
@@ -7467,6 +7754,176 @@ namespace cmath {
         const TR = cmath.transform.multiply(R, Tneg);
         return cmath.transform.multiply(Tpos, TR);
       }
+    }
+  }
+
+  /**
+   * Parametric handle shape — a scalar `value` constrained to a 1D
+   * track (a {@link cmath.ui.Curve} or {@link cmath.ui.PointSet}).
+   *
+   * This namespace owns the data shapes (`ParametricHandle`,
+   * `ParametricHandleInput`, `ParametricHandleGroup`) and pure
+   * composers that build them from concrete inputs
+   * (e.g. {@link cornerRadiusHandles}). It is rendering-agnostic.
+   *
+   * Conventions:
+   *
+   * - Strictly 1D `value` on a 1D track. Multi-axis affordances
+   *   (Bezier tangents, gradient stops) are a different shape.
+   * - Coincidence groups are opt-in via {@link ParametricHandleGroup}.
+   *   No built-in collapsing.
+   * - Discretization (stepped values) is `domain.step`, not a separate
+   *   primitive.
+   */
+  export namespace parametric {
+    /**
+     * A scalar `value` constrained to a 1D `track`, optionally bounded
+     * and quantized by `domain`, optionally floored away from `t = 0`
+     * by `inset`.
+     *
+     * The mapping is `value → t ∈ [0, 1]` via `domain`, and `t →
+     * position` via {@link cmath.ui.evaluateCurve} (continuous tracks)
+     * or {@link cmath.ui.evaluatePointSet} (discrete tracks). The
+     * inverse direction projects an external point back to `t`, then
+     * back to `value`, so the stored scalar stays in its own units
+     * (radii, angles, counts, …) without the track's parameterization
+     * leaking out.
+     */
+    export interface ParametricHandle {
+      /** Stable identifier within the input. */
+      id: string;
+      /** The 1D track the handle rides — a continuous curve OR a
+       *  discrete point set. */
+      track: cmath.ui.Curve | cmath.ui.PointSet;
+      /** Current scalar value. Mapped to `t ∈ [0, 1]` via `domain`. */
+      value: number;
+      /** Optional value bounds + quantization. Defaults: `min = 0`,
+       *  `max = 1`. `step` quantizes the emitted value (`step: 1`
+       *  snaps to integers, etc.). */
+      domain?: {
+        min?: number;
+        max?: number;
+        step?: number;
+      };
+      /** Optional floor, in screen-px measured along the track, for
+       *  the rendered position when no gesture is in flight (a
+       *  "snap-back" minimum). Omit to disable. */
+      inset?: number;
+    }
+
+    /**
+     * Optional grouping declaration. When two or more handles in the
+     * same group coincide in track-space (the segments / arcs collapse
+     * to one point), a consumer may treat them as one hit target and
+     * disambiguate the intended handle by `policy`.
+     *
+     * `direction-resolved` — pick the handle whose track tangent at
+     * the coincident position is most aligned with the disambiguating
+     * direction (the drag direction, in interactive consumers).
+     */
+    export interface ParametricHandleGroup {
+      ids: readonly string[];
+      policy: "direction-resolved";
+    }
+
+    /**
+     * A set of parametric handles plus optional groupings and an
+     * optional `transform`. When `transform` is set, handle tracks are
+     * expressed in local coordinates and consumers apply the transform
+     * to obtain positions in the outer frame.
+     *
+     * `node_id` is an opaque tag carried through unchanged — useful
+     * for consumers that route per-handle results back to a specific
+     * source.
+     */
+    export interface ParametricHandleInput {
+      node_id: string;
+      handles: readonly ParametricHandle[];
+      groups?: readonly ParametricHandleGroup[];
+      transform?: cmath.Transform;
+    }
+
+    /**
+     * Compose corner-radius parameters of a rectangle into the
+     * parametric-handle shape: four `segment` tracks (one per corner),
+     * declared as one direction-resolved coincidence group.
+     *
+     * Each handle:
+     * - `id` is `"nw" / "ne" / "se" / "sw"` (intercardinal corners).
+     * - `track` is the segment from the corner along the corner's
+     *   inward intercardinal direction, length `min(w, h) / 2`
+     *   (the maximum radius for which the rounded corners do not
+     *   overlap).
+     * - `value` is the per-corner radius (`tl` / `tr` / `br` / `bl`).
+     * - `domain` is `{ min: 0, max: min(w, h) / 2 }`.
+     * - `inset` is `16 · √2` (see comment below).
+     *
+     * `transform` (optional) is threaded through to the input
+     * unchanged.
+     *
+     * Pure geometry.
+     */
+    export function cornerRadiusHandles(
+      node_id: string,
+      rect: cmath.Rectangle,
+      radii: { tl: number; tr: number; br: number; bl: number },
+      transform?: cmath.Transform
+    ): ParametricHandleInput {
+      const max = Math.min(rect.width, rect.height) / 2;
+      type Spec = {
+        id: "nw" | "ne" | "se" | "sw";
+        corner: cmath.Vector2;
+        sign: cmath.Vector2;
+        value: number;
+      };
+      const specs: Spec[] = [
+        { id: "nw", corner: [rect.x, rect.y], sign: [1, 1], value: radii.tl },
+        {
+          id: "ne",
+          corner: [rect.x + rect.width, rect.y],
+          sign: [-1, 1],
+          value: radii.tr,
+        },
+        {
+          id: "se",
+          corner: [rect.x + rect.width, rect.y + rect.height],
+          sign: [-1, -1],
+          value: radii.br,
+        },
+        {
+          id: "sw",
+          corner: [rect.x, rect.y + rect.height],
+          sign: [1, -1],
+          value: radii.bl,
+        },
+      ];
+      // `inset` is measured along the track. The track is the
+      // corner-to-interior diagonal, so an axis-aligned offset of d
+      // along either axis corresponds to d · √2 along the track. The
+      // 16 here is the canonical axis-aligned offset for the snap-back
+      // floor.
+      const INSET_ALONG_CURVE = 16 * Math.SQRT2;
+      const handles: ParametricHandle[] = specs.map(
+        ({ id, corner, sign, value }) => ({
+          id,
+          track: {
+            kind: "segment",
+            a: corner,
+            b: [corner[0] + sign[0] * max, corner[1] + sign[1] * max],
+          },
+          value,
+          domain: { min: 0, max },
+          inset: INSET_ALONG_CURVE,
+        })
+      );
+      return {
+        node_id,
+        handles,
+        groups: [
+          { ids: ["nw", "ne", "se", "sw"], policy: "direction-resolved" },
+        ],
+        transform,
+      };
     }
   }
 
