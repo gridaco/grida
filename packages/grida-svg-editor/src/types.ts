@@ -262,8 +262,24 @@ export type EditorState = {
    * any change — selection, history, mutation. NOT a good cache key for
    * tree-shape views because it fires on attribute writes too (e.g. x/y
    * during a drag).
+   *
+   * NOT a content fingerprint either: this bumps on UI-state emissions
+   * (selection, scope, mode, tool) that leave the serialized SVG
+   * unchanged. For "did the document content change?" use
+   * {@link content_version}.
    */
   readonly version: number;
+  /**
+   * Bumps on every document mutation — insert, remove, reorder, attribute
+   * write, style write, undo, redo, load. Stable across pure UI-state
+   * emissions (selection, scope, mode, tool).
+   *
+   * The honest fingerprint for serialized content: if `content_version`
+   * is unchanged, `editor.serialize()` returns the same bytes. Use this
+   * — not `version` — as the freshness token when persisting, diffing,
+   * or hashing the document.
+   */
+  readonly content_version: number;
   /**
    * Bumps only when the document's tree shape or display-label-affecting
    * data changes — node added/removed/reordered, text content, or the
