@@ -310,37 +310,64 @@ export namespace vn {
   }
 
   /**
-   * creates a vector network from a polyline points
-   * @param points points in the polyline
-   * @returns
+   * Open chain of `n` vertices joined by `n - 1` zero-tangent segments.
+   *
+   * Constructor used by `<polyline points="…">` and `<line x1 y1 x2 y2>` —
+   * a line is a degenerate polyline with `n = 2`. Vertices are kept in
+   * input order; coordinates are not deduped, so callers wanting unique
+   * vertices should clean inputs first.
    */
-  export function polyline(points: Vector2[]): VectorNetwork {
-    // TODO: this does not validate the duplicate points
-    const vertices = points.map((p) => p);
-    const segments = vertices.slice(0, -1).map((_, i) => ({
-      a: i,
-      b: i + 1,
-      ta: cmath.vector2.zero,
-      tb: cmath.vector2.zero,
-    }));
+  export function fromPolyline(points: ReadonlyArray<Vector2>): VectorNetwork {
+    const vertices: Vector2[] = points.map((p) => [p[0], p[1]]);
+    const segments: VectorNetworkSegment[] = [];
+    for (let i = 0; i < vertices.length - 1; i++) {
+      segments.push({
+        a: i,
+        b: i + 1,
+        ta: cmath.vector2.zero,
+        tb: cmath.vector2.zero,
+      });
+    }
     return { vertices, segments };
   }
 
   /**
-   * creates a closed polygon vector network from given points
+   * Closed chain of `n` vertices joined by `n` zero-tangent segments — the
+   * `n`-th segment closes the loop (`last → 0`).
+   *
+   * Constructor used by `<polygon points="…">`. The closing segment is a
+   * regular `VectorNetworkSegment`; callers that need to round-trip back to
+   * `points="…"` (where the close is implicit, not enumerated) tag it
+   * outside this layer (see `path-edit/model.ts` `SegmentMeta.is_close_segment`).
    */
-  export function polygon(points: Vector2[]): VectorNetwork {
-    const vn = polyline(points);
-    if (vn.vertices.length > 1) {
-      const last = vn.vertices.length - 1;
-      vn.segments.push({
+  export function fromPolygon(points: ReadonlyArray<Vector2>): VectorNetwork {
+    const net = fromPolyline(points);
+    if (net.vertices.length > 1) {
+      const last = net.vertices.length - 1;
+      net.segments.push({
         a: last,
         b: 0,
         ta: cmath.vector2.zero,
         tb: cmath.vector2.zero,
       });
     }
-    return vn;
+    return net;
+  }
+
+  /**
+   * @deprecated Use {@link fromPolyline}. Kept as an alias for existing
+   * call sites; remove once they migrate.
+   */
+  export function polyline(points: Vector2[]): VectorNetwork {
+    return fromPolyline(points);
+  }
+
+  /**
+   * @deprecated Use {@link fromPolygon}. Kept as an alias for existing
+   * call sites; remove once they migrate.
+   */
+  export function polygon(points: Vector2[]): VectorNetwork {
+    return fromPolygon(points);
   }
 
   export class VectorNetworkEditor {
@@ -2522,8 +2549,6 @@ export namespace vn {
 
     return { vertices, segments };
   }
-
-  // export function fromLine(shape) {}
 
   export function fromRegularPolygon(
     shape: cmath.Rectangle & {
