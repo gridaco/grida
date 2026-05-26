@@ -104,6 +104,11 @@ export class SvgDocument implements DocumentEvents {
   private _geometry_version = 0;
 
   constructor(svg: string) {
+    if (typeof svg !== "string") {
+      throw new TypeError(
+        `new SvgDocument(svg) requires a string source, got ${svg === null ? "null" : typeof svg}`
+      );
+    }
     this.source = svg;
     const parsed = parse_svg(svg);
     this.original = parsed;
@@ -132,6 +137,11 @@ export class SvgDocument implements DocumentEvents {
 
   /** Replace document with new svg source (clears edits + history-owned state). */
   load(svg: string): void {
+    if (typeof svg !== "string") {
+      throw new TypeError(
+        `SvgDocument.load(svg) requires a string source, got ${svg === null ? "null" : typeof svg}`
+      );
+    }
     this.source = svg;
     const parsed = parse_svg(svg);
     this.original = parsed;

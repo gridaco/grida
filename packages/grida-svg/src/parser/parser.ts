@@ -133,6 +133,15 @@ export function reset_id_counter(): void {
 }
 
 export function parse_svg(src: string): ParseResult {
+  // Boundary type-check: callers from JS lose the `src: string` annotation,
+  // and a hot-reload race or stale state can leak `undefined` past it. Without
+  // this guard the parser crashes at `src.length` with a stack frame pointing
+  // at internal parser code, which reads as a parser defect.
+  if (typeof src !== "string") {
+    throw new TypeError(
+      `parse_svg requires a string source, got ${src === null ? "null" : typeof src}`
+    );
+  }
   reset_id_counter();
   const nodes = new Map<NodeId, AnyNode>();
   const prolog: AnyNode[] = [];
