@@ -16,9 +16,9 @@ describe("Original Direction Scaling Challenge", () => {
   // This requires advanced matrix manipulation that goes beyond simple
   // decompose/compose operations.
 
-  it("should acknowledge the mathematical complexity", () => {
-    expect(true).toBe(true); // Acknowledge the limitation
-  });
+  it.todo(
+    "scales side drags in original (unrotated) axis for rotated transforms"
+  );
 });
 
 describe("Transform Box Editor", () => {

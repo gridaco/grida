@@ -10,24 +10,29 @@ import type { Rect } from "../event/gesture";
 import { docToScreen } from "../event/transform";
 
 /**
- * Project a doc-space rect's two diagonal corners through the camera
- * and return an axis-aligned screen-space rect. The output is normalised
- * (non-negative `width` / `height`) regardless of transform orientation.
+ * Project all four doc-space rect corners through the camera and return
+ * the screen-space AABB that covers them. Projecting all four (not just
+ * two diagonals) is required for rotated / sheared transforms — the
+ * diagonal pair would shrink the AABB and miss valid hover/hit pixels.
  */
 export function docRectToScreenAABB(
   rect: Rect,
   transform: cmath.Transform
 ): Rect {
-  const [sx0, sy0] = docToScreen(transform, rect.x, rect.y);
-  const [sx1, sy1] = docToScreen(
-    transform,
-    rect.x + rect.width,
-    rect.y + rect.height
-  );
+  const x1 = rect.x + rect.width;
+  const y1 = rect.y + rect.height;
+  const [s0x, s0y] = docToScreen(transform, rect.x, rect.y);
+  const [s1x, s1y] = docToScreen(transform, x1, rect.y);
+  const [s2x, s2y] = docToScreen(transform, x1, y1);
+  const [s3x, s3y] = docToScreen(transform, rect.x, y1);
+  const minX = Math.min(s0x, s1x, s2x, s3x);
+  const minY = Math.min(s0y, s1y, s2y, s3y);
+  const maxX = Math.max(s0x, s1x, s2x, s3x);
+  const maxY = Math.max(s0y, s1y, s2y, s3y);
   return {
-    x: Math.min(sx0, sx1),
-    y: Math.min(sy0, sy1),
-    width: Math.abs(sx1 - sx0),
-    height: Math.abs(sy1 - sy0),
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
   };
 }

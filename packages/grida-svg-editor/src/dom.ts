@@ -2308,16 +2308,19 @@ class DomSurface implements Surface {
     // swallow the preview cancel.
     if (e.code === "Escape") {
       const canceled = this.cancel_in_flight();
+      // Escape only routes into the keymap/preventDefault path AND
+      // exits the vector-edit session when the surface is attended —
+      // otherwise gesture-cancel ran above and we leave the platform
+      // default (and the editor's own mode) alone. An unattended Escape
+      // belongs to whatever host UI the user is interacting with (modal
+      // close, page-level dialog, etc.).
+      if (!this.attention.is_attended()) return;
       // If nothing in-flight got canceled AND we're in vector-edit mode,
       // Esc exits the vector-edit session entirely (matches text-edit's
-      // "Esc to leave the mode" UX, and main-editor's vector mode).
+      // "Esc to leave the mode" UX).
       if (!canceled && this.vector_edit) {
         this.exit_vector_edit();
       }
-      // Escape only routes into the keymap/preventDefault path when the
-      // surface is attended — otherwise gesture-cancel ran above and we
-      // leave the platform default alone.
-      if (!this.attention.is_attended()) return;
     }
 
     // A non-Escape key fired mid-gesture would land its history step

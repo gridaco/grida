@@ -285,6 +285,13 @@ export interface PointerDownInput {
     vertices: readonly number[];
     segments: readonly number[];
     tangents: readonly (readonly [number, 0 | 1])[];
+    /**
+     * Selected region indices. Optional for back-compat with callers that
+     * pre-date the vector-path `regions` axis; future region-axis
+     * scenarios (narrow/toggle/drag, mirroring the other sub-selection
+     * axes) will read this slot. Treat absent as empty.
+     */
+    regions?: readonly number[];
   };
   /**
    * Sticky-bend override (default `"auto"`). When `"always"`, the

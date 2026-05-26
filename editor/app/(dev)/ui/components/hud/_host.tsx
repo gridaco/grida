@@ -732,7 +732,9 @@ export function HUDStage(props: HUDStageProps) {
         intent.kind === "deselect_all" ||
         intent.kind === "marquee_select" ||
         intent.kind === "translate" ||
-        intent.kind === "set_endpoint")
+        intent.kind === "set_endpoint" ||
+        intent.kind === "padding_handle" ||
+        intent.kind === "transform_box")
     ) {
       return;
     }

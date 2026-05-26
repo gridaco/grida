@@ -177,19 +177,26 @@ export function compose(
   ];
 }
 
+// Degenerate-size guard. Translation is normalised by `size`, so a 0-axis
+// would produce Infinity/NaN and corrupt the host's bound transform.
+// Scale-side projects onto a corner-derived axis whose length collapses
+// to ~0 in the same degenerate case. EPSILON is a pixel-scale floor —
+// any size smaller than this is treated as a no-op axis.
+const SIZE_EPSILON = 1e-8;
+
 function applyTranslation(
   base: AffineTransform,
   pixelDelta: cmath.Vector2,
   size: cmath.Vector2
 ): AffineTransform {
-  const boxDelta: cmath.Vector2 = [
-    pixelDelta[0] / size[0],
-    pixelDelta[1] / size[1],
-  ];
-
+  const sx = Math.abs(size[0]) > SIZE_EPSILON ? size[0] : 0;
+  const sy = Math.abs(size[1]) > SIZE_EPSILON ? size[1] : 0;
+  if (sx === 0 && sy === 0) return base;
+  const dx = sx === 0 ? 0 : pixelDelta[0] / sx;
+  const dy = sy === 0 ? 0 : pixelDelta[1] / sy;
   return [
-    [base[0][0], base[0][1], base[0][2] + boxDelta[0]],
-    [base[1][0], base[1][1], base[1][2] + boxDelta[1]],
+    [base[0][0], base[0][1], base[0][2] + dx],
+    [base[1][0], base[1][1], base[1][2] + dy],
   ];
 }
 
@@ -214,6 +221,10 @@ function applyScaling(
     side === "left" || side === "right"
       ? cmath.vector2.sub(corners.ne, corners.nw)
       : cmath.vector2.sub(corners.sw, corners.nw);
+
+  // Degenerate axis → projection denominator is 0; bail rather than emit
+  // a transform full of NaN.
+  if (Math.hypot(axis[0], axis[1]) < SIZE_EPSILON) return base;
 
   const projected = cmath.vector2.project(pixelDelta, axis);
 

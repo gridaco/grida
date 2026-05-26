@@ -1354,6 +1354,7 @@ export class SurfaceState {
             vertices: this.vector_selection.vertices,
             segments: this.vector_selection.segments,
             tangents: this.vector_selection.tangents,
+            regions: this.vector_selection.regions ?? [],
           }
         : undefined,
       // Sticky-bend override. `"always"` is the host's bend tool talking

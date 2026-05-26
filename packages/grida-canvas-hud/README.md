@@ -822,25 +822,25 @@ locks the behaviour. Three layers, all required.
 
 Non-exhaustive index — open the test files for the full surface.
 
-| Behaviour                                                                                     | Pinned in                                      |
-| --------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Single-click on unselected node → immediate select                                            | `decision.test.ts`                             |
-| Single-click on already-selected node → defer (drag is a live candidate)                      | `decision.test.ts`, `state.test.ts`            |
-| Shift-click on selected node → defer (toggle-remove vs drag is ambiguous)                     | `decision.test.ts`                             |
-| Click in body region with selection → always defer (drag claim)                               | `decision.test.ts`                             |
-| Dblclick on content → emits `enter_content_edit`                                              | `decision.test.ts`, `state.test.ts`            |
-| Dblclick on empty space / other node / body WHILE in content-edit → emits `exit_content_edit` | `decision.test.ts`, `state.test.ts`            |
-| Dblclick on vertex / tangent / segment-strip WHILE in content-edit → handler runs (no exit)   | `decision.test.ts`                             |
-| Marquee starts from empty-space pointer-down                                                  | `state.test.ts`                                |
-| Drag past threshold cancels a deferred select (drag-vs-click discriminator)                   | `state.test.ts`                                |
-| Tangent knob renders as a 45°-rotated square ("diamond"), smaller than vertex                 | `classes/vector-path/surface-extended.test.ts` |
-| Vertex knob renders as a circle, selected fills with chrome color                             | `classes/vector-path/surface-extended.test.ts` |
-| Selected tangent line is thicker than idle                                                    | `classes/vector-path/surface-extended.test.ts` |
-| Segment outline: idle gray → hover @ 50% accent → selected solid accent                       | `classes/vector-path/segment-render.test.ts`   |
-| Segment strip emits N inner samples per cubic, t ∈ (0, 1)                                     | `classes/vector-path/surface-extended.test.ts` |
-| Priority ladder: tangent (4) < vertex (5) < segment (8)                                       | `classes/vector-path/surface-extended.test.ts` |
-| Rotation-aware cursor CSS via `cursors.defaultRenderer`                                       | `cursors.test.ts`                              |
-| Click-tracker: single vs double within window + position threshold                            | `click-tracker.test.ts`                        |
+| Behaviour                                                                                   | Pinned in                                      |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Single-click on unselected node → immediate select                                          | `decision.test.ts`                             |
+| Single-click on already-selected node → defer (drag is a live candidate)                    | `decision.test.ts`, `state.test.ts`            |
+| Shift-click on selected node → defer (toggle-remove vs drag is ambiguous)                   | `decision.test.ts`                             |
+| Click in body region with selection → always defer (drag claim)                             | `decision.test.ts`                             |
+| Dblclick on content → emits `enter_content_edit`                                            | `decision.test.ts`, `state.test.ts`            |
+| Dblclick on empty space / other node WHILE in content-edit → emits `exit_content_edit`      | `decision.test.ts`, `state.test.ts`            |
+| Dblclick on vertex / tangent / segment-strip WHILE in content-edit → handler runs (no exit) | `decision.test.ts`                             |
+| Marquee starts from empty-space pointer-down                                                | `state.test.ts`                                |
+| Drag past threshold cancels a deferred select (drag-vs-click discriminator)                 | `state.test.ts`                                |
+| Tangent knob renders as a 45°-rotated square ("diamond"), smaller than vertex               | `classes/vector-path/surface-extended.test.ts` |
+| Vertex knob renders as a circle, selected fills with chrome color                           | `classes/vector-path/surface-extended.test.ts` |
+| Selected tangent line is thicker than idle                                                  | `classes/vector-path/surface-extended.test.ts` |
+| Segment outline: idle gray → hover @ 50% accent → selected solid accent                     | `classes/vector-path/segment-render.test.ts`   |
+| Segment strip emits N inner samples per cubic, t ∈ (0, 1)                                   | `classes/vector-path/surface-extended.test.ts` |
+| Priority ladder: tangent (4) < vertex (5) < segment (8)                                     | `classes/vector-path/surface-extended.test.ts` |
+| Rotation-aware cursor CSS via `cursors.defaultRenderer`                                     | `cursors.test.ts`                              |
+| Click-tracker: single vs double within window + position threshold                          | `click-tracker.test.ts`                        |
 
 ### Test file index
 

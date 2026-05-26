@@ -167,11 +167,20 @@ export function buildStripesTile(
   // (drawn at y = size - half, just above the seam). After `repeat`
   // tiling, the two halves merge into a single band straddling each
   // tile boundary — no clip artifact, no doubling.
+  //
+  // Edge case: when `thicknessPx >= size`, the two halves would meet (or
+  // overlap) in the middle but the gap geometry above paints only the
+  // outer two strips, leaving the centre transparent. Fill the whole
+  // tile in that case so a full-thickness band renders as solid.
   const half = Math.min(thicknessPx / 2, size / 2);
   if (half > 0) {
-    ctx.fillRect(0, 0, 1, half);
-    if (size - half > half) {
-      ctx.fillRect(0, size - half, 1, half);
+    if (thicknessPx >= size) {
+      ctx.fillRect(0, 0, 1, size);
+    } else {
+      ctx.fillRect(0, 0, 1, half);
+      if (size - half > half) {
+        ctx.fillRect(0, size - half, 1, half);
+      }
     }
   }
 

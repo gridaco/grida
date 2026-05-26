@@ -19,7 +19,7 @@ Pending:
 
 Each promoted class lives in its own subfolder. The shape is fixed — every reader knows where to look.
 
-```
+```text
 classes/<name>/
 ├── surface.ts      # the chrome — build function that returns OverlayElement[]
 │                   # carries the anti-goals header (what this class is NOT)

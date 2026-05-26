@@ -55,7 +55,7 @@ A matrix-row test for a **flicker probe** (diagonal cell, multi-instance of the 
 
 ## Test layout
 
-```
+```text
 __tests__/composition/
 ├── README.md           # this file
 ├── co-target.test.ts   # the matrix — lands with the first per-class migration into classes/
