@@ -734,37 +734,47 @@ class DomSurface implements Surface {
           this.pending_insert = null;
         }
       }
-      // ─── Vector-edit: reconcile against external `d` mutations.
+      // ─── Vector-edit: reconcile against external geometry mutations.
       //
-      // The session keeps `last_seen_d` = the `d` produced by our most
-      // recent gesture commit. If the live `d` now disagrees AND no
-      // preview is in flight, someone else wrote it — undo / redo /
-      // programmatic `set_attr` / collab. Geometry rendering already
-      // self-heals because `vector_of` derives from the live `d` on
-      // every draw. What we owe here is sub-selection invalidation:
-      // selection indices reference vertices/segments by position, and
-      // an external mutation may have shifted or removed them. The safe,
-      // honest behaviour is to drop sub-selection; the user can re-pick.
+      // The session keeps `last_seen_d` = the session-d produced by our
+      // most recent gesture commit. If the live geometry now disagrees
+      // AND no preview is in flight, someone else wrote it — undo /
+      // redo / programmatic `set_attr` / collab. Geometry rendering
+      // already self-heals because `vector_of` derives from the live
+      // attrs on every draw. What we owe here is sub-selection
+      // invalidation: selection indices reference vertices / segments
+      // by position, and an external mutation may have shifted or
+      // removed them. The safe, honest behaviour is to drop sub-
+      // selection; the user can re-pick.
+      //
+      // Tag-aware read: <path> lives in `d`, <polyline> / <polygon>
+      // live in `points`. `is_vector_edit_target` rebuilds the live
+      // `VectorEditSource` (which is what `source_to_session_d` needs)
+      // by reading whichever native attr the source tag actually uses.
       if (this.vector_edit && !this.active_preview) {
-        // External-mutation detection only runs for <path> sources in
-        // v1. For <polyline>/<polygon> the document holds native attrs
-        // (points=), so this `d` watcher would need a tag-aware read.
-        // Rare in practice; the session stays stale until the next user
-        // interaction.
-        if (this.vector_edit.source.kind === "path") {
-          const cur_d =
-            this.editor_internal().doc.get_attr(
-              this.vector_edit.node_id,
-              "d"
-            ) ?? null;
-          if (cur_d !== null && cur_d !== this.vector_edit.last_seen_d) {
-            const had_selection =
-              this.vector_edit.selected_vertices.length > 0 ||
-              this.vector_edit.selected_segments.length > 0 ||
-              this.vector_edit.selected_tangents.length > 0;
+        const ses = this.vector_edit;
+        const live_source = this.editor_internal().doc.is_vector_edit_target(
+          ses.node_id
+        );
+        const had_selection =
+          ses.selected_vertices.length > 0 ||
+          ses.selected_segments.length > 0 ||
+          ses.selected_tangents.length > 0;
+        if (live_source === null || live_source.kind !== ses.source.kind) {
+          // Element became ineligible (deleted, attrs stripped) or
+          // changed tag under us. No live session-d to reconcile
+          // against; just drop sub-selection so the user re-picks
+          // (or exits) on the next interaction.
+          if (had_selection) {
+            ses.clear_selection();
+            this.sync_selection_mirror();
+          }
+        } else {
+          const live_d = source_to_session_d(live_source);
+          if (live_d !== ses.last_seen_d) {
             // Atomic: advances last_seen_d AND clears sub-selection.
             // See `vector-edit/session.ts:reconcile_after_external_mutation`.
-            this.vector_edit.reconcile_after_external_mutation(cur_d);
+            ses.reconcile_after_external_mutation(live_d);
             if (had_selection) this.sync_selection_mirror();
           }
         }

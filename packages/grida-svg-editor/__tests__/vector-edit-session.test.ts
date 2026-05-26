@@ -16,8 +16,10 @@
 import { describe, expect, it } from "vitest";
 import {
   VectorEditSession,
+  source_to_session_d,
   sub_selection_equal,
 } from "../src/core/vector-edit";
+import { SvgDocument } from "../src/core/document";
 
 const D = "M0,0 L10,0 L10,10 Z";
 const D2 = "M0,0 L20,0 L20,20 Z";
@@ -176,5 +178,86 @@ describe("VectorEditSession — snapshot / restore for history wiring", () => {
 
     s.set_selection({ vertices: [], segments: [], tangents: [[2, 0]] });
     expect(sub_selection_equal(a, s.snapshot_selection())).toBe(false);
+  });
+});
+
+describe("external-mutation reconciliation contract — tag-aware", () => {
+  // The host watcher in `dom.ts` reconciles vector-edit sessions when
+  // external writes hit the source-tag's native attr. v1 v1 watcher was
+  // gated to <path>, which left <polyline>/<polygon> stale across undo,
+  // redo, programmatic `set_attr`, or collab. These tests pin the
+  // tag-aware reconciliation contract by exercising the same pipeline the
+  // watcher uses: `doc.is_vector_edit_target` → `source_to_session_d` →
+  // compare with `last_seen_d`.
+
+  function find_first(doc: SvgDocument, tag: string): string {
+    for (const id of doc.all_elements()) {
+      if (doc.tag_of(id) === tag) return id;
+    }
+    throw new Error(`no <${tag}> in document`);
+  }
+
+  it("detects an external points= mutation on <polyline> and clears sub-selection", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><polyline points="0,0 10,0 10,10"/></svg>`;
+    const doc = new SvgDocument(svg);
+    const id = find_first(doc, "polyline");
+
+    const source0 = doc.is_vector_edit_target(id)!;
+    const ses = new VectorEditSession(
+      id,
+      source0,
+      source_to_session_d(source0)
+    );
+    ses.set_selection({ vertices: [1, 2], segments: [], tangents: [] });
+
+    // External mutation (undo / redo / programmatic / collab analogue):
+    // some other code path writes `points=` directly on the document.
+    doc.set_attr(id, "points", "0,0 20,0 20,20 0,20");
+
+    // Watcher-equivalent read: rebuild the live source tag-aware, derive
+    // the live session-d, compare against the session's last_seen mark.
+    const live_source = doc.is_vector_edit_target(id)!;
+    const live_d = source_to_session_d(live_source);
+    expect(live_d).not.toBe(ses.last_seen_d);
+
+    ses.reconcile_after_external_mutation(live_d);
+    expect(ses.selected_vertices).toEqual([]);
+    expect(ses.last_seen_d).toBe(live_d);
+  });
+
+  it("detects an external points= mutation on <polygon>", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="0,0 10,0 10,10 0,10"/></svg>`;
+    const doc = new SvgDocument(svg);
+    const id = find_first(doc, "polygon");
+
+    const source0 = doc.is_vector_edit_target(id)!;
+    const ses = new VectorEditSession(
+      id,
+      source0,
+      source_to_session_d(source0)
+    );
+
+    doc.set_attr(id, "points", "0,0 5,0 5,5");
+
+    const live_source = doc.is_vector_edit_target(id)!;
+    const live_d = source_to_session_d(live_source);
+    expect(live_d).not.toBe(ses.last_seen_d);
+  });
+
+  it("is a no-op when points= is unchanged", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><polyline points="0,0 10,0 10,10"/></svg>`;
+    const doc = new SvgDocument(svg);
+    const id = find_first(doc, "polyline");
+
+    const source0 = doc.is_vector_edit_target(id)!;
+    const ses = new VectorEditSession(
+      id,
+      source0,
+      source_to_session_d(source0)
+    );
+
+    const live_source = doc.is_vector_edit_target(id)!;
+    const live_d = source_to_session_d(live_source);
+    expect(live_d).toBe(ses.last_seen_d);
   });
 });
