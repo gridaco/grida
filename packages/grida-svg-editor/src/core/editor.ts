@@ -1517,9 +1517,12 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   function enter_content_edit(target?: NodeId): boolean {
     const id = target ?? (selection.length === 1 ? selection[0] : null);
     if (!id) return false;
-    // Accept text (`<text>`/`<tspan>` leaf) OR path (`<path>` with a `d`).
-    // The driver (DOM surface) routes by tag.
-    if (!doc.is_text_edit_target(id) && !doc.is_path_edit_target(id))
+    // Accept text (`<text>`/`<tspan>` leaf) OR vector (`<path>`/`<line>`/
+    // `<polyline>`/`<polygon>`). The vector predicate widens what was
+    // previously a path-only gate (see core/document.ts
+    // `is_vector_edit_target`). The driver (DOM surface) routes by tag
+    // inside `dom.ts:enter_content_edit`.
+    if (!doc.is_text_edit_target(id) && doc.is_vector_edit_target(id) === null)
       return false;
     if (!content_edit_driver) return false;
     return content_edit_driver(id);

@@ -1,7 +1,7 @@
-// PathModel — the path-editing IR for @grida/svg-editor.
+// PathModel — the vector-editing IR for @grida/svg-editor.
 //
 // This is the ONLY file in svg-editor allowed to import from `@grida/vn`.
-// All other path-edit code (session, reducer, commit, etc.) talks to
+// All other vector-edit code (session, reducer, commit, etc.) talks to
 // PathModel through its public methods. If vn's API ever changes, the
 // blast radius stops here.
 //
@@ -28,6 +28,7 @@ import {
   encodeSVGPath,
   type SVGCommand,
 } from "@grida/svg/pathdata";
+import type { VectorEditSource } from "../document";
 
 // ─── Public types (svg-editor-owned POJOs) ─────────────────────────────────
 
@@ -180,6 +181,80 @@ export class PathModel {
 
   segmentCount(): number {
     return this._network.segments.length;
+  }
+
+  /**
+   * If the model's current geometry is still expressible in the source
+   * SVG tag's native attribute form, return the equivalent
+   * `VectorEditSource` (which is also the writeable shape) — else `null`.
+   *
+   * This is the decider that gates per-gesture native-attrs writeback in
+   * `VectorEditSession.apply_d`. `null` means "the user's edit cannot be
+   * faithfully written back to the source tag" — in v1 with no
+   * promotion, the gesture is refused; in v1.1+ with promotion, the
+   * element is rewritten to `<path d="…">`.
+   *
+   * v1 expressibility (all source kinds require every segment's `ta` and
+   * `tb` to be exactly zero — any tangent edit forces promotion):
+   *
+   * - **path** — always `null` (no native fallback; the canonical form
+   *   IS `<path d>`, so callers should just write `d` directly).
+   * - **polyline** — segments form the canonical open chain
+   *   `0→1, 1→2, …, (n-2)→(n-1)`. (Topology after `vn.fromPolyline` and
+   *   any sequence of vertex translates.)
+   * - **polygon** — segments form the canonical closed chain
+   *   `0→1, 1→2, …, (n-1)→0`. (Topology after `vn.fromPolygon` and any
+   *   sequence of vertex translates.)
+   *
+   * Anything that changes segment topology (insert-vertex, delete-vertex,
+   * close/open shape) leaves the canonical chain and returns `null` here;
+   * the higher layer is responsible for routing those to tag-promotion
+   * (intra-Vertex or to-path).
+   */
+  toNativeAttrs(
+    source_tag: VectorEditSource["kind"]
+  ): Exclude<VectorEditSource, { kind: "path" }> | null {
+    if (source_tag === "path") return null;
+
+    const { vertices, segments } = this._network;
+
+    // All-zero-tangent gate. Any non-zero tangent means the user has
+    // promoted a straight segment to a curve — not expressible in
+    // <polyline>/<polygon> native attrs.
+    for (const s of segments) {
+      if (s.ta[0] !== 0 || s.ta[1] !== 0) return null;
+      if (s.tb[0] !== 0 || s.tb[1] !== 0) return null;
+    }
+
+    const n = vertices.length;
+
+    if (source_tag === "polyline") {
+      if (segments.length !== n - 1 || n < 2) return null;
+      for (let i = 0; i < segments.length; i++) {
+        const s = segments[i];
+        if (s.a !== i || s.b !== i + 1) return null;
+      }
+      return {
+        kind: "polyline",
+        points: vertices.map((v) => [v[0], v[1]] as readonly [number, number]),
+      };
+    }
+
+    if (source_tag === "polygon") {
+      if (segments.length !== n || n < 2) return null;
+      for (let i = 0; i < segments.length - 1; i++) {
+        const s = segments[i];
+        if (s.a !== i || s.b !== i + 1) return null;
+      }
+      const closer = segments[segments.length - 1];
+      if (closer.a !== n - 1 || closer.b !== 0) return null;
+      return {
+        kind: "polygon",
+        points: vertices.map((v) => [v[0], v[1]] as readonly [number, number]),
+      };
+    }
+
+    return null;
   }
 
   // ─── Mutations (each returns a new PathModel) ────────────────────────────
@@ -534,7 +609,7 @@ export class PathModel {
   //
   // These are package-internal helpers; they expose the raw network for
   // future reducer/session use. They are NOT part of the documented public
-  // surface and should not be relied on by callers outside path-edit/.
+  // surface and should not be relied on by callers outside vector-edit/.
 
   /** @internal */
   _rawNetwork(): vn.VectorNetwork {

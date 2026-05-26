@@ -11,7 +11,7 @@
 // were only kept alive by their own tests.
 
 import { describe, it, expect } from "vitest";
-import { PathModel } from "../src/core/path-edit";
+import { PathModel } from "../src/core/vector-edit";
 
 describe("PathModel tangent reads + setTangent (chunk A)", () => {
   // Square-with-curved-top fixture: M0,0 C0,-5 10,-5 10,0 L10,10 L0,10 Z

@@ -23,7 +23,36 @@ import {
   XMLNS_NS,
   XML_NS,
 } from "@grida/svg/parser";
+import { svg_parse } from "@grida/svg/parse";
 import type { NodeId } from "../types";
+
+/**
+ * What `is_vector_edit_target` returns when a node is eligible for
+ * vector (vertex) editing — a tag-discriminated snapshot of the authored
+ * geometry attributes at enter time.
+ *
+ * Consumed by `VectorEditSession` (which holds it as `source_attrs`) and by
+ * `PathModel` (whose `toNativeAttrs(source_tag)` decides on each commit
+ * whether the post-edit form is still expressible in the source tag, or
+ * whether the element must promote to `<path d="…">`).
+ *
+ * Geometry conventions:
+ *   - All coordinates are in the element's own local space, exactly as
+ *     authored. No `transform=` resolution, no parent CTM, no viewport
+ *     remap.
+ *   - `polyline` / `polygon` points are `[x, y]` tuples so the consumer
+ *     can hand them straight to `vn.fromPolyline` / `vn.fromPolygon`.
+ */
+export type VectorEditSource =
+  | { kind: "path"; d: string }
+  | {
+      kind: "polyline";
+      points: ReadonlyArray<readonly [number, number]>;
+    }
+  | {
+      kind: "polygon";
+      points: ReadonlyArray<readonly [number, number]>;
+    };
 
 export interface DocumentEvents {
   /** Fires after any structural mutation. */
@@ -434,17 +463,48 @@ export class SvgDocument implements DocumentEvents {
   }
 
   /**
-   * True iff this node is a `<path>` with a non-empty `d` attribute — the
-   * shape PathEditSession can parse. Vertex-edit mode opens against this
-   * predicate; other vector shapes (`<polyline>`, `<polygon>`, etc.) are
-   * out of scope for v1.
+   * Returns a tag-discriminated snapshot of the authored geometry attrs
+   * if this node is eligible for vector (vertex) editing — else `null`.
+   *
+   * v1 eligibility:
+   *   - `<path>`     — requires non-empty `d`.
+   *   - `<polyline>` — requires `points` parseable to ≥ 2 vertices.
+   *   - `<polygon>`  — same as polyline.
+   *
+   * Deliberately rejects `<line>` in v1: the only useful vertex-edit
+   * gestures on a `<line>` are (a) introducing a new vertex (which would
+   * have to promote it to `<polyline>`) and (b) bending it with a tangent
+   * (which would have to promote it to `<path>`). Both promotions are
+   * out of scope for v1, so opening a `<line>` in vector-edit mode would
+   * advertise capabilities that don't work.
+   *
+   * Also rejects `<rect>`, `<circle>`, `<ellipse>`, `<image>`, `<use>` —
+   * those would force the same promotion-to-`<path>` machinery (trivia
+   * transfer, cross-cutting attr carry, DOM-element swap, history-bracket
+   * changes) that v1 keeps out of scope.
    */
-  is_path_edit_target(id: NodeId): boolean {
+  is_vector_edit_target(id: NodeId): VectorEditSource | null {
     const n = this.nodes.get(id);
-    if (!n || n.kind !== "element") return false;
-    if (n.local !== "path") return false;
-    const d = this.get_attr(id, "d");
-    return d !== null && d.trim().length > 0;
+    if (!n || n.kind !== "element") return null;
+    switch (n.local) {
+      case "path": {
+        const d = this.get_attr(id, "d");
+        if (d === null || d.trim().length === 0) return null;
+        return { kind: "path", d };
+      }
+      case "polyline":
+      case "polygon": {
+        const raw = this.get_attr(id, "points") ?? "";
+        const parsed = svg_parse.parse_points(raw);
+        if (parsed.length < 2) return null;
+        const points: [number, number][] = parsed.map((p) => [p.x, p.y]);
+        return n.local === "polyline"
+          ? { kind: "polyline", points }
+          : { kind: "polygon", points };
+      }
+      default:
+        return null;
+    }
   }
 
   // Structural-fact predicates — atomic yes/no queries about authored

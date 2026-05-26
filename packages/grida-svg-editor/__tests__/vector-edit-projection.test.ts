@@ -1,4 +1,4 @@
-// Headless tests for the path-edit coordinate-projection helpers.
+// Headless tests for the vector-edit coordinate-projection helpers.
 //
 // **Repros the bug class found during browser smoke-testing**: vertex knobs
 // at the wrong screen position, not tracking camera pan/zoom. Root cause was

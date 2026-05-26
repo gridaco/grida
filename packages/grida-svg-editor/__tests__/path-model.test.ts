@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import { SVGPathData, encodeSVGPath } from "@grida/svg/pathdata";
-import { PathModel } from "../src/core/path-edit/model";
+import { PathModel } from "../src/core/vector-edit/model";
 
 /** Normalize a `d` string through svg-pathdata's encoder. Any equality check
  *  in this file is against the normalized form, since PathModel emits via

@@ -199,10 +199,10 @@ export function registerDefaultCommands(
   //   - `lasso` / `bend` — path content-edit only. Refuse outside it.
   //   - `cursor` (V) — valid in EVERY mode. V doubles as "exit current tool
   //     back to cursor" — works during content-edit (to leave lasso/bend
-  //     mid-session without exiting path-edit) and during select.
+  //     mid-session without exiting vector-edit) and during select.
   // The dom-side tool subscriber pushes the matching HUD-side mode setters
   // (selection mode for lasso, bend mode for bend) on every change, and
-  // `exit_path_edit` reverts non-cursor → cursor, so tool/mode stays
+  // `exit_vector_edit` reverts non-cursor → cursor, so tool/mode stays
   // internally consistent.
   reg.register(TOOL_SET, (args) => {
     const next = args as Tool;

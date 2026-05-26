@@ -1,6 +1,6 @@
-// Headless tests for the path-edit region-selection layers.
+// Headless tests for the vector-edit region-selection layers.
 //
-// The two layers under test (see `core/path-edit/marquee.ts`):
+// The two layers under test (see `core/vector-edit/marquee.ts`):
 //
 //   1. Data provider (`subpath_select_candidates`) — STATE-OWNED, UX-AWARE.
 //      Decides what the user can currently claim. The visibility rules
@@ -13,7 +13,7 @@
 // Together they replace the older monolithic `vector_marquee_predicate`.
 
 import { describe, it, expect } from "vitest";
-import { PathModel, marquee } from "../src/core/path-edit";
+import { PathModel, marquee } from "../src/core/vector-edit";
 
 const identity = (p: readonly [number, number]) => p;
 

@@ -253,7 +253,7 @@ export function useMode(): Mode {
  *
  * Symmetric with `useMode()` but at a finer grain — resolves whether the
  * single selected node is a path or a text node so consumers (e.g. the
- * path-edit toolbar) can render the right affordances. Mirrors the
+ * vector-edit toolbar) can render the right affordances. Mirrors the
  * dispatch logic in the host's `enter_content_edit` router which checks
  * `tag_of(id) === "path"` vs `"text" / "tspan"`.
  *

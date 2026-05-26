@@ -1,4 +1,4 @@
-// Headless tests for the path-edit lasso path.
+// Headless tests for the vector-edit lasso path.
 //
 // Lasso shares the same data-provider / merge layers as marquee — only
 // the math layer changes:
@@ -13,7 +13,7 @@
 // behaviour (vertex / tangent claim; segments dropped).
 
 import { describe, it, expect } from "vitest";
-import { PathModel, marquee } from "../src/core/path-edit";
+import { PathModel, marquee } from "../src/core/vector-edit";
 
 describe("points_in_polygon — math layer", () => {
   it("is generic over key type — works for any positioned items", () => {

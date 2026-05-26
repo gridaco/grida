@@ -45,7 +45,7 @@ export interface SurfaceBridge {
   notify_translate_commit(): void;
 
   /** editor → surface: register the driver that mounts inline content
-   *  editing (text-edit, path-edit) on a target node. The editor calls
+   *  editing (text-edit, vector-edit) on a target node. The editor calls
    *  `editor.enter_content_edit(id)` and routes here. Pass `null` to
    *  unregister on detach. */
   set_content_edit_driver(fn: ((target: NodeId) => boolean) | null): void;
