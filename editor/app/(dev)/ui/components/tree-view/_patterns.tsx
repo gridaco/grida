@@ -226,23 +226,25 @@ function FigmaDeepRow({ row, meta }: { row: Row; meta: DemoMeta | undefined }) {
     >
       <span aria-hidden style={{ width: indentPx, flexShrink: 0 }} />
       <span className="sticky right-0 inline-flex items-center gap-1 pr-2 pl-1">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (row.isContainer) controller.toggle(row.id);
-          }}
-          aria-hidden={!row.isContainer}
-          className="inline-flex size-4 items-center justify-center text-zinc-400 hover:text-zinc-700"
-        >
-          {row.isContainer ? (
-            row.isExpanded ? (
+        {row.isContainer ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              controller.toggle(row.id);
+            }}
+            aria-label={row.isExpanded ? "Collapse row" : "Expand row"}
+            className="inline-flex size-4 items-center justify-center text-zinc-400 hover:text-zinc-700"
+          >
+            {row.isExpanded ? (
               <ChevronDownIcon className="size-3" />
             ) : (
               <ChevronRightIcon className="size-3" />
-            )
-          ) : null}
-        </button>
+            )}
+          </button>
+        ) : (
+          <span aria-hidden className="inline-flex size-4" />
+        )}
         <BoxIcon className="size-3.5 text-zinc-500" />
         <span className="truncate whitespace-nowrap">{label}</span>
       </span>

@@ -374,23 +374,25 @@ function SvgRow({ args, tone }: { args: RenderRowArgs; tone: SvgRowTone }) {
       className={`${tone.outer} ${tone.height}`}
       style={{ paddingLeft: tone.indentBase + row.depth * tone.indentStep }}
     >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (row.isContainer) controller.toggle(row.id);
-        }}
-        aria-hidden={!row.isContainer}
-        className={`${tone.chevronContainer} ${tone.chevron(selected)}`}
-      >
-        {row.isContainer ? (
-          row.isExpanded ? (
+      {row.isContainer ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            controller.toggle(row.id);
+          }}
+          aria-label={row.isExpanded ? "Collapse row" : "Expand row"}
+          className={`${tone.chevronContainer} ${tone.chevron(selected)}`}
+        >
+          {row.isExpanded ? (
             <ChevronDownIcon className="size-3" />
           ) : (
             <ChevronRightIcon className="size-3" />
-          )
-        ) : null}
-      </button>
+          )}
+        </button>
+      ) : (
+        <span aria-hidden className={tone.chevronContainer} />
+      )}
       <Icon className={`${tone.iconSize} ${tone.iconColor(selected)}`} />
       <span className="truncate flex-1">{label}</span>
     </div>

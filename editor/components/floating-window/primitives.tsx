@@ -13,6 +13,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { useDrag } from "@use-gesture/react";
+import { cn } from "@/components/lib/utils";
 
 export type ErrorBoundaryFallbackProps = {
   error: unknown;
@@ -164,7 +165,7 @@ export function FloatingWindowBounds({
   return (
     <div
       ref={setBoundary}
-      className={className}
+      className={cn("w-full h-full", className)}
       style={{
         position: "relative",
         overflow: "hidden",
