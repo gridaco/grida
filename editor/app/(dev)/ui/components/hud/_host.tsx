@@ -723,18 +723,16 @@ export function HUDStage(props: HUDStageProps) {
   handleIntentRef.current = (intent) => {
     lastIntentRef.current = intent;
     // When the host has locked interaction to corner-radius only, drop
-    // every intent kind that would mutate selection or position. The hud
-    // still emits these (it doesn't know about the lock) — the host
-    // refuses them. `corner_radius*` intents fall through untouched.
+    // every intent kind that isn't a corner-radius mutation. The hud
+    // still emits everything (it doesn't know about the lock); the host
+    // is the gate. Allowlist on purpose — a future intent kind defaults
+    // to "blocked while locked," which is the safer default for a
+    // "corner-radius only" stage.
     if (
       interactionLockedRef.current &&
-      (intent.kind === "select" ||
-        intent.kind === "deselect_all" ||
-        intent.kind === "marquee_select" ||
-        intent.kind === "translate" ||
-        intent.kind === "set_endpoint" ||
-        intent.kind === "padding_handle" ||
-        intent.kind === "transform_box")
+      intent.kind !== "corner_radius" &&
+      intent.kind !== "corner_radius_explicit" &&
+      intent.kind !== "corner_radius_uniform"
     ) {
       return;
     }

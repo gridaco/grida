@@ -209,6 +209,44 @@ function applyTranslation(
  * follows the current rotated axes. This was inherited from the
  * editor's image-paint editor and ships as-is.
  */
+// Direction-of-axis fallback for `applyScaling`. The base transform's
+// 2×2 linear part encodes rotation × scale; when one scale collapses,
+// the corresponding column of [[a, b], [c, d]] is the zero vector and
+// the corner-derived axis collapses with it. We recover the local-axis
+// direction from the other column (perpendicular rotated ±90°), then
+// scale it by `size` so the projection magnitude is comparable to the
+// non-degenerate case. Returns the zero vector iff both columns and
+// `size` are fully collapsed — caller handles that as a true no-op.
+function degenerateAxisFallback(
+  base: AffineTransform,
+  side: cmath.RectangleSide,
+  size: cmath.Vector2
+): cmath.Vector2 {
+  const a = base[0][0];
+  const b = base[0][1];
+  const c = base[1][0];
+  const d = base[1][1];
+  const sx = Math.hypot(a, c);
+  const sy = Math.hypot(b, d);
+  let ux: cmath.Vector2;
+  let uy: cmath.Vector2;
+  if (sx > SIZE_EPSILON) {
+    ux = [a / sx, c / sx];
+    uy = [-c / sx, a / sx];
+  } else if (sy > SIZE_EPSILON) {
+    uy = [b / sy, d / sy];
+    ux = [d / sy, -b / sy];
+  } else {
+    ux = [1, 0];
+    uy = [0, 1];
+  }
+  const w = Math.abs(size[0]) > SIZE_EPSILON ? size[0] : 0;
+  const h = Math.abs(size[1]) > SIZE_EPSILON ? size[1] : 0;
+  return side === "left" || side === "right"
+    ? [ux[0] * w, ux[1] * w]
+    : [uy[0] * h, uy[1] * h];
+}
+
 function applyScaling(
   base: AffineTransform,
   side: cmath.RectangleSide,
@@ -217,14 +255,25 @@ function applyScaling(
 ): AffineTransform {
   const corners = getTransformBoxCorners(base, size);
 
-  const axis =
+  let axis =
     side === "left" || side === "right"
       ? cmath.vector2.sub(corners.ne, corners.nw)
       : cmath.vector2.sub(corners.sw, corners.nw);
 
-  // Degenerate axis → projection denominator is 0; bail rather than emit
-  // a transform full of NaN.
-  if (Math.hypot(axis[0], axis[1]) < SIZE_EPSILON) return base;
+  // Recovery from a collapsed side: once a drag has driven the box's
+  // width or height to ~0, the corner-derived axis is the zero vector
+  // and projecting `pixelDelta` onto it would yield NaN. Bailing out
+  // here would also strand the user — the box could never re-expand
+  // because every subsequent drag on that axis would no-op. Fall back
+  // to the box's local axis direction, derived from whichever column
+  // of the base's linear part is still non-degenerate (one collapse
+  // axis at a time is the common case; full collapse is the exception
+  // and we keep the bail-out for that).
+  if (Math.hypot(axis[0], axis[1]) < SIZE_EPSILON) {
+    const fallback = degenerateAxisFallback(base, side, size);
+    if (Math.hypot(fallback[0], fallback[1]) < SIZE_EPSILON) return base;
+    axis = fallback;
+  }
 
   const projected = cmath.vector2.project(pixelDelta, axis);
 
