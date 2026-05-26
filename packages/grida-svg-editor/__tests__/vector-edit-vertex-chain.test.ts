@@ -195,8 +195,16 @@ describe("apply_session_d writes native attrs for vertex-chain sources", () => {
 
     const ok = apply_session_d(d, id, source!, new_d);
     expect(ok).toBe(true);
-    // points= updated.
-    expect(d.get_attr(id, "points")).toContain("15");
+    // points= updated to the translated geometry (structural compare —
+    // a substring match would let a wrong payload pass).
+    expect(d.is_vector_edit_target(id)).toEqual({
+      kind: "polyline",
+      points: [
+        [0, 0],
+        [15, 0],
+        [10, 10],
+      ],
+    });
     // No `d` attribute ever appears on a <polyline>.
     expect(d.get_attr(id, "d")).toBeNull();
   });

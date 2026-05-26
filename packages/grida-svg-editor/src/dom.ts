@@ -3315,6 +3315,38 @@ class DomSurface implements Surface {
   }
 
   /**
+   * Replay the session-side effects of a committed vector-edit delta onto
+   * the LIVE `this.vector_edit` session — but only if it is still aimed at
+   * the same node. Geometry restoration is the closure's `commit(d)` job
+   * (document-level, always safe); this method handles the bits the
+   * geometry write cannot reach on its own: advancing `last_seen_d` so
+   * the external-mutation watcher doesn't pounce, and re-installing the
+   * captured sub-selection.
+   *
+   * Closures used to call `session.mark_seen(...)` / `session.restore_selection(...)`
+   * on a `const session = this.vector_edit` captured at gesture start.
+   * After exit + undo-exit + undo-geometry, that capture pointed at the
+   * disposed session while the live session was a fresh one — geometry
+   * still restored correctly (via `commit`), but sub-selection didn't,
+   * and the live session's stale `last_seen_d` would then cause the
+   * watcher to clear the new session's selection on its next tick.
+   *
+   * Pass `d = null` for selection-only deltas (no geometry change → no
+   * watermark advance).
+   */
+  private replay_vector_session_state(
+    target_node_id: NodeId,
+    d: string | null,
+    selection: SubSelectionSnapshot
+  ): void {
+    const cur = this.vector_edit;
+    if (!cur || cur.node_id !== target_node_id) return;
+    if (d !== null) cur.mark_seen(d);
+    cur.restore_selection(selection);
+    this.sync_selection_mirror();
+  }
+
+  /**
    * Push a standalone vector sub-selection change as one history entry.
    *
    * Called by selection-only handlers (vertex / segment / tangent click,
@@ -3339,9 +3371,7 @@ class DomSurface implements Surface {
     if (!this.vector_edit) return;
     const after = this.vector_edit.snapshot_selection();
     if (sub_selection_equal(before, after)) return;
-    const session = this.vector_edit;
-    const sync = () => this.sync_selection_mirror();
-    const redraw = () => this.redraw();
+    const target_node_id = this.vector_edit.node_id;
     // The surface↔editor seam exposes `preview()` only — not `atomic()`.
     // Compose a single committed delta via preview+set+commit (the same
     // shape `handle_split_segment` uses for its one-shot edit). The
@@ -3353,14 +3383,12 @@ class DomSurface implements Surface {
       providerId: "svg-editor",
       descriptor: { kind: "vector-selection" },
       apply: () => {
-        session.restore_selection(after);
-        sync();
-        redraw();
+        this.replay_vector_session_state(target_node_id, null, after);
+        this.redraw();
       },
       revert: () => {
-        session.restore_selection(before);
-        sync();
-        redraw();
+        this.replay_vector_session_state(target_node_id, null, before);
+        this.redraw();
       },
     });
     preview.commit();
@@ -3525,22 +3553,20 @@ class DomSurface implements Surface {
       // keep each gesture handler readable in isolation.
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      const session = this.vector_edit;
-      const sync = () => this.sync_selection_mirror();
       this.active_preview.session.set({
         providerId: "svg-editor",
         apply: () => {
           commit(target_d);
-          session.mark_seen(target_d);
-          session.restore_selection(after_selection);
-          sync();
+          this.replay_vector_session_state(node_id, target_d, after_selection);
           emit();
         },
         revert: () => {
           commit(baseline_d);
-          session.mark_seen(baseline_d);
-          session.restore_selection(before_selection);
-          sync();
+          this.replay_vector_session_state(
+            node_id,
+            baseline_d,
+            before_selection
+          );
           emit();
         },
       });
@@ -3727,22 +3753,20 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") {
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      const session = this.vector_edit;
-      const sync = () => this.sync_selection_mirror();
       this.active_preview.session.set({
         providerId: "svg-editor",
         apply: () => {
           commit(target_d);
-          session.mark_seen(target_d);
-          session.restore_selection(after_selection);
-          sync();
+          this.replay_vector_session_state(node_id, target_d, after_selection);
           emit();
         },
         revert: () => {
           commit(baseline_d);
-          session.mark_seen(baseline_d);
-          session.restore_selection(before_selection);
-          sync();
+          this.replay_vector_session_state(
+            node_id,
+            baseline_d,
+            before_selection
+          );
           emit();
         },
       });
@@ -3858,22 +3882,20 @@ class DomSurface implements Surface {
       // closure, then write the captured selection back.
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      const session = this.vector_edit;
-      const sync = () => this.sync_selection_mirror();
       this.active_preview.session.set({
         providerId: "svg-editor",
         apply: () => {
           commit(target_d);
-          session.mark_seen(target_d);
-          session.restore_selection(after_selection);
-          sync();
+          this.replay_vector_session_state(node_id, target_d, after_selection);
           emit();
         },
         revert: () => {
           commit(baseline_d);
-          session.mark_seen(baseline_d);
-          session.restore_selection(before_selection);
-          sync();
+          this.replay_vector_session_state(
+            node_id,
+            baseline_d,
+            before_selection
+          );
           emit();
         },
       });
@@ -3930,29 +3952,23 @@ class DomSurface implements Surface {
     // the post-split selection in the delta, so undo restores what the
     // user had selected before the click AND redo re-installs the new
     // vertex selection.
-    const session = this.vector_edit;
-    const before_selection = session.snapshot_selection();
+    const before_selection = this.vector_edit.snapshot_selection();
     const after_selection: SubSelectionSnapshot = Object.freeze({
       vertices: Object.freeze([new_vertex]),
       segments: Object.freeze([] as number[]),
       tangents: Object.freeze([] as ReadonlyArray<readonly [number, 0 | 1]>),
     });
-    const sync = () => this.sync_selection_mirror();
     const split_session = internal.history.preview("vector/split-segment");
     split_session.set({
       providerId: "svg-editor",
       apply: () => {
         commit(target_d);
-        session.mark_seen(target_d);
-        session.restore_selection(after_selection);
-        sync();
+        this.replay_vector_session_state(node_id, target_d, after_selection);
         emit();
       },
       revert: () => {
         commit(baseline_d);
-        session.mark_seen(baseline_d);
-        session.restore_selection(before_selection);
-        sync();
+        this.replay_vector_session_state(node_id, baseline_d, before_selection);
         emit();
       },
     });
@@ -4037,22 +4053,20 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") {
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      const session = this.vector_edit;
-      const sync = () => this.sync_selection_mirror();
       this.active_preview.session.set({
         providerId: "svg-editor",
         apply: () => {
           commit(target_d);
-          session.mark_seen(target_d);
-          session.restore_selection(after_selection);
-          sync();
+          this.replay_vector_session_state(node_id, target_d, after_selection);
           emit();
         },
         revert: () => {
           commit(baseline_d);
-          session.mark_seen(baseline_d);
-          session.restore_selection(before_selection);
-          sync();
+          this.replay_vector_session_state(
+            node_id,
+            baseline_d,
+            before_selection
+          );
           emit();
         },
       });
