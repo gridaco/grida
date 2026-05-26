@@ -3,6 +3,7 @@
 import React, {
   CSSProperties,
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -106,6 +107,7 @@ export class ErrorBoundary extends React.Component<
 
 export type BoundsRenderProps = {
   boundaryRef: React.RefObject<HTMLDivElement | null>;
+  boundaryEl: HTMLDivElement | null;
 };
 
 export type FloatingWindowBoundsProps = {
@@ -145,23 +147,27 @@ export function FloatingWindowBounds({
   children,
 }: FloatingWindowBoundsProps) {
   const boundaryRef = useRef<HTMLDivElement | null>(null);
+  const [boundaryEl, setBoundaryEl] = useState<HTMLDivElement | null>(null);
+  const setBoundary = useCallback((el: HTMLDivElement | null) => {
+    boundaryRef.current = el;
+    setBoundaryEl(el);
+  }, []);
 
   const rendered =
     typeof children === "function"
       ? (children as (props: BoundsRenderProps) => React.ReactNode)({
           boundaryRef,
+          boundaryEl,
         })
       : children;
 
   return (
     <div
-      ref={boundaryRef}
+      ref={setBoundary}
       className={className}
       style={{
         position: "relative",
         overflow: "hidden",
-        width: "100%",
-        height: "100%",
         ...style,
       }}
     >
@@ -219,7 +225,14 @@ export function FloatingWindowHost({ children }: React.PropsWithChildren) {
 
 export type FloatingWindowRootProps = {
   windowId: string;
-  boundaryRef: React.RefObject<HTMLDivElement | null>;
+  /**
+   * The boundary element windows are clamped within.
+   * Prefer `boundaryEl` (state-tracked element from `FloatingWindowBounds`).
+   * `boundaryRef` is supported for backwards compatibility but may not
+   * pick up late ref attachments.
+   */
+  boundaryEl?: HTMLDivElement | null;
+  boundaryRef?: React.RefObject<HTMLDivElement | null>;
   initialX?: number;
   initialY?: number;
   width?: number | string;
@@ -243,7 +256,8 @@ export type FloatingWindowRootProps = {
 
 export function FloatingWindowRoot({
   windowId,
-  boundaryRef,
+  boundaryEl: boundaryElProp,
+  boundaryRef: boundaryRefProp,
   initialX = 0,
   initialY = 0,
   width,
@@ -262,7 +276,12 @@ export function FloatingWindowRoot({
   portal = true,
   portalContainer,
 }: FloatingWindowRootProps) {
+  const [windowEl, setWindowEl] = useState<HTMLDivElement | null>(null);
   const windowRef = useRef<HTMLDivElement | null>(null);
+  const setWindowRef = useCallback((el: HTMLDivElement | null) => {
+    windowRef.current = el;
+    setWindowEl(el);
+  }, []);
   const registry = useContext(FloatingWindowRegistryContext);
   const localControls = useFloatingWindowControls({
     open,
@@ -270,9 +289,10 @@ export function FloatingWindowRoot({
     onOpenChange,
   });
   const controls = providedControls ?? localControls;
-  const boundarySize = useElementSize(boundaryRef);
-  const boundaryRect = useElementRect(boundaryRef);
-  const windowSize = useElementSize(windowRef);
+  const boundaryEl = useResolvedBoundaryEl(boundaryElProp, boundaryRefProp);
+  const boundarySize = useElementSize(boundaryEl);
+  const boundaryRect = useElementRect(boundaryEl);
+  const windowSize = useElementSize(windowEl);
   const [dragging, setDragging] = useState(false);
   const positionRef = useRef<{ x: number; y: number }>({
     x: initialX,
@@ -341,6 +361,8 @@ export function FloatingWindowRoot({
   }, [
     boundarySize?.width,
     boundarySize?.height,
+    boundaryRect?.left,
+    boundaryRect?.top,
     windowSize?.width,
     windowSize?.height,
   ]);
@@ -407,7 +429,7 @@ export function FloatingWindowRoot({
 
   const content = (
     <div
-      ref={windowRef}
+      ref={setWindowRef}
       data-floating-window
       className={className}
       style={
@@ -625,57 +647,88 @@ export function FloatingWindowBody({
   );
 }
 
-function useElementSize(
-  ref: React.RefObject<HTMLElement | null>
-): ElementSize | null {
+/**
+ * If `el` is provided (callers using the recommended `boundaryEl` API), pass it
+ * through. Otherwise, poll the given ref via rAF until `.current` populates —
+ * supports legacy `boundaryRef` callers where the boundary div mounts in a
+ * different commit than the consumer (e.g. portaled windows). Polling stops
+ * as soon as the ref resolves; rAF doesn't run for the component's lifetime.
+ */
+function useResolvedBoundaryEl(
+  el: HTMLDivElement | null | undefined,
+  ref: React.RefObject<HTMLDivElement | null> | undefined
+): HTMLDivElement | null {
+  const [resolved, setResolved] = useState<HTMLDivElement | null>(el ?? null);
+
+  useEffect(() => {
+    if (el !== undefined) {
+      setResolved(el ?? null);
+      return;
+    }
+    if (!ref) {
+      setResolved(null);
+      return;
+    }
+    if (ref.current) {
+      setResolved(ref.current);
+      return;
+    }
+    let rafId: number | null = null;
+    const poll = () => {
+      const current = ref.current ?? null;
+      if (current) {
+        setResolved(current);
+        rafId = null;
+        return;
+      }
+      rafId = requestAnimationFrame(poll);
+    };
+    rafId = requestAnimationFrame(poll);
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [el, ref]);
+
+  return resolved;
+}
+
+function useElementSize(el: HTMLElement | null): ElementSize | null {
   const [size, setSize] = useState<ElementSize | null>(null);
 
   useEffect(() => {
-    const el = ref.current;
     if (!el) return;
-
+    const rect = el.getBoundingClientRect();
+    setSize({ width: rect.width, height: rect.height });
     const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      const { width, height } = entry.contentRect;
+      const { width, height } = entries[0].contentRect;
       setSize({ width, height });
     });
-
     observer.observe(el);
     return () => observer.disconnect();
-  }, [ref]);
+  }, [el]);
 
   return size;
 }
 
-function useElementRect(
-  ref: React.RefObject<HTMLElement | null>
-): DOMRect | null {
+function useElementRect(el: HTMLElement | null): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
-
     const update = () => {
-      const next = el.getBoundingClientRect();
-      setRect(next);
+      setRect(el.getBoundingClientRect());
     };
-
     update();
-
     const observer = new ResizeObserver(update);
     observer.observe(el);
-
-    const onScrollOrResize = () => update();
-    window.addEventListener("resize", onScrollOrResize);
-    window.addEventListener("scroll", onScrollOrResize, true);
-
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", onScrollOrResize);
-      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
     };
-  }, [ref]);
+  }, [el]);
 
   return rect;
 }

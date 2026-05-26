@@ -1,173 +1,49 @@
 import Link from "next/link";
-import { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "UI Components | Grida",
-  description:
-    "Explore our collection of UI components with interactive demos and documentation.",
-};
 
 export default function UIComponentsIndexPage() {
-  const components = [
-    {
-      name: "Degree Control",
-      href: "/ui/components/degree",
-      description:
-        "A rotary control for selecting angles with keyboard and mouse support",
-    },
-    {
-      name: "Spinner",
-      href: "/ui/components/spinner",
-      description: "Loading indicator for displaying loading states",
-    },
-    {
-      name: "Progress",
-      href: "/ui/components/progress",
-      description: "Progress bars for task completion and loading states",
-    },
-    {
-      name: "Rich Text Editor",
-      href: "/ui/components/rich-text-editor",
-      description: "Powerful WYSIWYG editor for creating rich content",
-    },
-    {
-      name: "Timeline",
-      href: "/ui/components/timeline",
-      description: "Timeline component for animation sequences",
-    },
-    {
-      name: "Tree View (@grida/tree-view)",
-      href: "/ui/components/tree-view",
-      description:
-        "Headless tree-view controller — selection, constraints, drag, virtualization",
-    },
-    {
-      name: "Property Controls",
-      href: "/ui/components/property",
-      description:
-        "PropertyEnumV2 — combobox-based select with onValueSeeked for live-preview",
-    },
-  ];
-
-  const forms = [
-    {
-      name: "Email Challenge",
-      href: "/ui/components/email-challenge",
-      description:
-        "Email input with embedded challenge UI (send code + verify OTP)",
-    },
-    {
-      name: "Tag Input",
-      href: "/ui/components/tags",
-      description: "Tag input with autocomplete for managing multiple values",
-    },
-    {
-      name: "Phone Input",
-      href: "/ui/components/phone-input",
-      description: "International phone number input with country selection",
-    },
-  ];
-
-  const showcases = [
-    {
-      name: "Multiplayer",
-      href: "/ui/multiplayer",
-      description:
-        "Real-time collaborative features with live cursors and presence",
-    },
-    {
-      name: "Gradient Editor",
-      href: "/ui/gradient-editor",
-      description:
-        "Professional gradient editor with linear, radial, and sweep gradients",
-    },
-    {
-      name: "Media Player",
-      href: "/ui/media-player",
-      description: "Audio and video player with custom controls and artwork",
-    },
-    {
-      name: "Lasso",
-      href: "/ui/lasso",
-      description: "Freeform polygon selection tool for interactive canvas",
-    },
-    {
-      name: "Frames",
-      href: "/ui/frames",
-      description: "Browser frames and device mockups for content presentation",
-    },
-  ];
-
   return (
-    <main className="container max-w-screen-lg mx-auto py-10">
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">UI Components</h1>
-          <p className="text-gray-600">
-            Explore our collection of UI components with interactive demos and
-            documentation.
-          </p>
-        </div>
+    <main className="mx-auto w-full max-w-2xl px-6 py-20">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Internal
+      </p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+        Grida UI Workbench
+      </h1>
+      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+        A working space for the components, primitives, and showcases that make
+        up the Grida editor. Each entry is a live demo paired with the source
+        that ships into production — used here for design review, cross-browser
+        checks, and quick reproductions.
+      </p>
+      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+        Pick a component from the sidebar to get started.
+      </p>
 
-        <hr />
+      <hr className="my-8" />
 
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Component Library</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {components.map((component) => (
-              <Link
-                key={component.href}
-                href={component.href}
-                className="p-6 border rounded-lg hover:border-blue-500 hover:shadow-md transition-all group"
-              >
-                <h3 className="font-semibold text-lg mb-2 group-hover:text-blue-500 transition-colors">
-                  {component.name}
-                </h3>
-                <p className="text-sm text-gray-600">{component.description}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <hr />
-
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Forms</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {forms.map((form) => (
-              <Link
-                key={form.href}
-                href={form.href}
-                className="p-6 border rounded-lg hover:border-green-500 hover:shadow-md transition-all group"
-              >
-                <h3 className="font-semibold text-lg mb-2 group-hover:text-green-500 transition-colors">
-                  {form.name}
-                </h3>
-                <p className="text-sm text-gray-600">{form.description}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <hr />
-
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Showcases</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {showcases.map((showcase) => (
-              <Link
-                key={showcase.href}
-                href={showcase.href}
-                className="p-6 border rounded-lg hover:border-purple-500 hover:shadow-md transition-all group"
-              >
-                <h3 className="font-semibold text-lg mb-2 group-hover:text-purple-500 transition-colors">
-                  {showcase.name}
-                </h3>
-                <p className="text-sm text-gray-600">{showcase.description}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Grida is open source. This page isn&apos;t a published component
+        registry, but the source for everything here lives in the repo — feel
+        free to copy what you need.
+      </p>
+      <div className="mt-4">
+        <Link
+          href="https://github.com/gridaco/grida/tree/main/editor/app/(dev)/ui"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+          </svg>
+          View source on GitHub
+        </Link>
       </div>
     </main>
   );

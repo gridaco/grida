@@ -1,28 +1,22 @@
 "use client";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Synced-editor showcase. Each section is one full-width demo, laid out as
-//
-//     [ tree view ]   ·space·   [ demo editor ]
-//
-// proving the same `TreeController` that drives the layers panel also drives
-// a real editor surface — selecting, hovering, reordering, and deleting in
-// the tree is reflected on the canvas (and back) using only the package's
-// public channels + a one-line `applyIntent` bridge. No new package APIs:
-// the canvas paints by walking the read-only `TreeSource`, so a reorder
-// (which mutates `children`) re-stacks it for free.
+// Synced-editor showcase. Each section is `[ tree view ]   ·space·   [ editor ]`.
+// Grida and Figma sections mount the real `@grida/svg-editor`; the layers
+// panel is a tree-view bound to the editor's tree via `useSvgTreeController`.
+// VS Code, Notion, and Finder use an in-memory `TreeSource` with the
+// `applyIntent` bridge — the tree mutates its own source and a mock editor
+// pane reflects selection.
 // ───────────────────────────────────────────────────────────────────────────
 
-import {
-  InMemoryTreeSource,
-  modeFromEvent,
-  nextFocusAfterRemove,
-  onlyIntoContainers,
-  sameSelection,
-  TreeController,
-  type NodeId,
-} from "@grida/tree-view";
+import { modeFromEvent, TreeController, type NodeId } from "@grida/tree-view";
 import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
+import {
+  SvgEditorCanvas,
+  SvgEditorProvider,
+  useEditorState,
+  useHoverOverride,
+} from "@grida/svg-editor/react";
 import {
   MacOSDesktop,
   MacOSDock,
@@ -32,34 +26,36 @@ import {
 import { Resources } from "@/resources";
 import Image from "next/image";
 import {
+  ChevronDownIcon,
+  ChevronRightIcon,
   CommandIcon,
   FileCode2Icon,
   SearchIcon,
   SettingsIcon,
   TerminalIcon,
-  Trash2Icon,
 } from "lucide-react";
 import * as React from "react";
 import {
   buildFinderFixture,
   buildNotionFixture,
-  buildSceneFixture,
   buildVSCodeFixture,
   type DemoMeta,
 } from "./_fixtures";
-import { DemoPanel, useDemoController } from "./_panel";
+import { DemoPanel, type RenderRowArgs } from "./_panel";
 import {
   applyIntent,
-  FigmaRow,
   FinderRow,
   fsConstraint,
-  GridaRow,
-  HoverContext,
   NotionRow,
-  useRowFlags,
   useThemeController,
   VSCodeRow,
 } from "./_themes";
+import {
+  useSvgTreeController,
+  type SvgNodeMeta,
+} from "@/app/(canvas)/svg/_components/use-svg-tree";
+import { useSurfaceHover } from "@/app/(canvas)/svg/_components/use-surface-hover";
+import { tagInfo } from "@/app/(canvas)/svg/_components/node-type-map";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Section scaffold — one consistent header + a tree | gap | editor grid so
@@ -141,401 +137,338 @@ function SplitStage({
 const STAGE_H = "h-[420px] sm:h-full";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Auto-reveal: when selection changes (typically because the user clicked a
-// shape in the SVG canvas), expand ancestors of the new focus and scroll its
-// row into view. `block: "nearest"` is a no-op when the row is already
-// on-screen, so it stays calm during normal tree-side clicks.
+// Activity card SVG opened by `SvgEditorProvider` for the Grida and Figma
+// showcases.
 // ───────────────────────────────────────────────────────────────────────────
 
-function AutoRevealSelection() {
-  const controller = useTree<DemoMeta>();
-  const focused = useTreeSnapshot<DemoMeta, NodeId | null>((c) =>
-    c.getFocused()
-  );
-  // Same-id short-circuit defends against Strict Mode's effect double-
-  // invoke (deps don't change between the pair, so the second run would
-  // otherwise re-call `reveal()` and schedule a second scroll).
+const ACTIVITY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="440" viewBox="0 0 320 440" font-family="ui-sans-serif, system-ui, -apple-system, Inter, sans-serif">
+  <g id="cover">
+    <rect id="cover-bg" x="0" y="0" width="320" height="440" rx="20" fill="#FFFFFF"/>
+    <text id="eyebrow" x="24" y="40" font-size="11" font-weight="600" fill="#94A3B8" letter-spacing="0.2">ACTIVITY</text>
+    <text id="hero" x="24" y="94" font-size="36" font-weight="700" fill="#0F172A">1,284</text>
+    <text id="delta" x="24" y="124" font-size="12" font-weight="500" fill="#10B981">+18% vs last week</text>
+    <rect id="divider" x="24" y="148" width="272" height="1" fill="#E2E8F0"/>
+    <g id="items">
+      <g id="item-commits">
+        <circle id="dot-commits" cx="32" cy="184" r="4" fill="#6366F1"/>
+        <text id="label-commits" x="46" y="188" font-size="14" font-weight="500" fill="#0F172A">Commits</text>
+        <text id="value-commits" x="296" y="188" font-size="14" font-weight="600" fill="#0F172A" text-anchor="end">24</text>
+      </g>
+      <g id="item-reviews">
+        <circle id="dot-reviews" cx="32" cy="232" r="4" fill="#F59E0B"/>
+        <text id="label-reviews" x="46" y="236" font-size="14" font-weight="500" fill="#0F172A">Reviews</text>
+        <text id="value-reviews" x="296" y="236" font-size="14" font-weight="600" fill="#0F172A" text-anchor="end">8</text>
+      </g>
+      <g id="item-releases">
+        <circle id="dot-releases" cx="32" cy="280" r="4" fill="#10B981"/>
+        <text id="label-releases" x="46" y="284" font-size="14" font-weight="500" fill="#0F172A">Releases</text>
+        <text id="value-releases" x="296" y="284" font-size="14" font-weight="600" fill="#0F172A" text-anchor="end">2</text>
+      </g>
+    </g>
+    <g id="action">
+      <rect id="button-bg" x="24" y="372" width="272" height="44" rx="10" fill="#0F172A"/>
+      <text id="button-label" x="160" y="400" font-size="14" font-weight="600" fill="#FFFFFF" text-anchor="middle">View report →</text>
+    </g>
+  </g>
+</svg>`;
+
+// ───────────────────────────────────────────────────────────────────────────
+// Tone bundles — everything that forks between the Grida and Figma showcases
+// lives here. The shell, row, auto-reveal, and canvas pane are all shared.
+// ───────────────────────────────────────────────────────────────────────────
+
+type SvgRowTone = {
+  /** Outer row className — colors, text size, data-state variants. */
+  outer: string;
+  /** Row height utility (`h-7`, `h-6`, …). */
+  height: string;
+  /** Chevron button container className. */
+  chevronContainer: string;
+  /** `(selected) => className` for the chevron arrow. */
+  chevron: (selected: boolean) => string;
+  /** Leading icon size utility. */
+  iconSize: string;
+  /** `(selected) => className` for the leading icon color. */
+  iconColor: (selected: boolean) => string;
+  indentBase: number;
+  indentStep: number;
+};
+
+type ShowcaseTone = {
+  eyebrow: string;
+  icon: string;
+  iconAlt: string;
+  intro: React.ReactNode;
+  providerStyle: { chrome_color: string; handle_stroke: string };
+  /** Outer SplitStage card background. */
+  frame: string;
+  /** Layers panel container chrome. */
+  treeChrome: string;
+  /** Optional header above the rows (Figma's "Layers / Cover" bar). */
+  treeHeader?: React.ReactNode;
+  /** DemoPanel className overrides (background tint, ...). */
+  panelClass: string;
+  /** Canvas backdrop tone. */
+  stageTone: "light" | "dark";
+  row: SvgRowTone;
+};
+
+const GRIDA_TONE: ShowcaseTone = {
+  eyebrow: "Grida",
+  icon: Resources.assets.macos.icons.grida,
+  iconAlt: "Grida",
+  intro: (
+    <>
+      The real{" "}
+      <code className="rounded bg-zinc-100 px-1 text-[12px]">
+        @grida/svg-editor
+      </code>{" "}
+      drives the canvas. The layers panel is a tree-view bound to that editor's
+      tree — select or hover on either side and the other follows.
+    </>
+  ),
+  providerStyle: { chrome_color: "#18181B", handle_stroke: "#18181B" },
+  frame: "bg-zinc-100 ring-1 ring-zinc-200/70",
+  treeChrome: "rounded-lg border border-zinc-200 bg-white p-1 shadow-sm",
+  panelClass: "min-h-0 flex-1 !border-0",
+  stageTone: "light",
+  row: {
+    outer:
+      "group/row relative flex items-center gap-1.5 px-2 text-[12px] select-none cursor-default rounded-sm transition-colors data-[state=selected]:bg-zinc-900 data-[state=selected]:text-white data-[state=focused]:bg-zinc-100 data-[state=hovered]:bg-zinc-100 data-[state=idle]:hover:bg-zinc-50",
+    height: "h-7",
+    chevronContainer: "inline-flex size-4 items-center justify-center",
+    chevron: (selected) =>
+      selected ? "text-white/80" : "text-zinc-400 hover:text-zinc-700",
+    iconSize: "size-3.5",
+    iconColor: (selected) => (selected ? "text-white" : "text-zinc-500"),
+    indentBase: 6,
+    indentStep: 14,
+  },
+};
+
+const FIGMA_TONE: ShowcaseTone = {
+  eyebrow: "Figma",
+  icon: Resources.assets.macos.icons.figma,
+  iconAlt: "Figma",
+  intro: (
+    <>
+      Same editor, same bridge — only the panel chrome and the editor's chrome
+      color change. The layers panel still walks the editor's tree.
+    </>
+  ),
+  providerStyle: { chrome_color: "#0D99FF", handle_stroke: "#0D99FF" },
+  frame: "bg-[#141417] ring-1 ring-white/5",
+  treeChrome:
+    "overflow-hidden rounded-lg border border-neutral-700 bg-[#2C2C2C] shadow-lg",
+  treeHeader: (
+    <div className="flex items-center justify-between border-b border-neutral-700/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
+      <span>Layers</span>
+      <span className="text-neutral-500">Cover</span>
+    </div>
+  ),
+  panelClass: "min-h-0 flex-1 !border-0 !bg-[#2C2C2C]",
+  stageTone: "dark",
+  row: {
+    outer:
+      "group/row relative flex items-center gap-1.5 px-2 text-[11px] select-none cursor-default text-neutral-200 data-[state=selected]:bg-[#0D99FF] data-[state=selected]:text-white data-[state=focused]:bg-white/10 data-[state=focused]:text-neutral-100 data-[state=hovered]:bg-white/5 data-[state=idle]:hover:bg-white/5",
+    height: "h-6",
+    chevronContainer: "inline-flex size-3 items-center justify-center",
+    chevron: (selected) =>
+      selected ? "text-white/90" : "text-neutral-400 hover:text-neutral-100",
+    iconSize: "size-3.5",
+    iconColor: (selected) => (selected ? "text-white" : "text-neutral-300"),
+    indentBase: 8,
+    indentStep: 16,
+  },
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// Auto-reveal — expand ancestors and scroll the row for the canvas's first
+// selection. Scoped via `closest("section")` because Grida and Figma share
+// node ids and a document-wide query would scroll the wrong panel.
+// ───────────────────────────────────────────────────────────────────────────
+
+function useAutoRevealSelection(
+  controller: TreeController<SvgNodeMeta>,
+  scopeRef: React.RefObject<HTMLElement | null>
+): void {
+  const firstSelected = useEditorState((s) => s.selection[0] ?? null);
   const lastRevealed = React.useRef<NodeId | null>(null);
-  // Anchor used to scope the row lookup to this showcase's `<section>`.
-  // Both Grida and Figma showcases share a fixture id namespace, so a
-  // document-wide `querySelector` would scroll the first matching row
-  // anywhere on the page.
-  const anchorRef = React.useRef<HTMLSpanElement>(null);
   React.useEffect(() => {
-    if (focused === null || focused === lastRevealed.current) return;
-    lastRevealed.current = focused;
-    controller.reveal(focused);
-    const scope = anchorRef.current?.closest("section") ?? document;
-    // Wait one frame so the rows newly mounted by `reveal()` are in the DOM
-    // before we ask the browser to scroll to them.
+    if (firstSelected === null || firstSelected === lastRevealed.current)
+      return;
+    lastRevealed.current = firstSelected;
+    controller.expandTo(firstSelected);
+    const scope = scopeRef.current?.closest("section") ?? document;
     const raf = requestAnimationFrame(() => {
       scope
         .querySelector<HTMLElement>(
-          `[data-tree-row-id="${CSS.escape(focused)}"]`
+          `[data-tree-row-id="${CSS.escape(firstSelected)}"]`
         )
         ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
     return () => cancelAnimationFrame(raf);
-  }, [controller, focused]);
-  return <span ref={anchorRef} hidden aria-hidden="true" />;
+  }, [firstSelected, controller, scopeRef]);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Shared delete behaviour. The package has no "delete" — deletion is a
-// source mutation the consumer owns. This is the entire recipe: pick the
-// next focus from the *pre-mutation* rows, drop the subtrees, reconcile
-// selection/focus. Same three lines a real editor writes.
+// Row renderer — reads SVG meta from the bridged source, paints the icon
+// from `tagInfo`, and bridges hover via the editor's surface-hover channel
+// so hovering a row highlights the shape (and vice versa). Drag-reorder and
+// visibility/lock flags are intentionally out: the demo proves canvas↔panel
+// sync, not a tree-driven SVG editor.
 // ───────────────────────────────────────────────────────────────────────────
 
-function deleteSelection(controller: TreeController<DemoMeta>): void {
-  const source = controller.source;
-  if (!(source instanceof InMemoryTreeSource)) return;
-  const root = source.getRoot();
-  // Keep the artboard itself — deleting it would empty the canvas and make
-  // the demo meaningless. Everything else (incl. groups) is fair game.
-  const sel = controller
-    .getSelection()
-    .filter((id) => source.has(id) && source.getNode(id).parent !== root);
-  if (sel.length === 0) return;
-  const next = nextFocusAfterRemove(controller.getRows(), sel);
-  for (const id of sel) source.remove(id);
-  controller.select(next ? [next] : [], "replace");
-  controller.focus(next);
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// SVG canvas — the "demo editor" for Grida + Figma. Paints by walking the
-// read-only source in document order (back → front); the tree renders the
-// same source reversed (front layer on top, the layer-panel convention).
-// ───────────────────────────────────────────────────────────────────────────
-
-interface FlatShape {
-  id: NodeId;
-  meta: DemoMeta;
-  kind: DemoMeta["kind"];
-}
-
-/** DFS the source from the artboard, document order = paint order. */
-function flattenScene(
-  controller: TreeController<DemoMeta>,
-  artboardId: NodeId
-): FlatShape[] {
-  const source = controller.source;
-  const out: FlatShape[] = [];
-  const walk = (id: NodeId) => {
-    let node;
-    try {
-      node = source.getNode(id);
-    } catch {
-      return;
-    }
-    if (node.meta?.box) out.push({ id, meta: node.meta, kind: node.meta.kind });
-    for (const c of node.children) walk(c);
-  };
-  walk(artboardId);
-  return out;
-}
-
-function radiusOf(meta: { box?: DemoMeta["box"]; radius?: number }): number {
-  if (!meta.box) return 0;
-  const max = Math.min(meta.box.w, meta.box.h) / 2;
-  const r = meta.radius ?? 0;
-  return r > max ? max : r;
-}
-
-// Hoisted to avoid allocating a fresh style object per shape per render —
-// `Shape` is called for every node every paint, and a memoized component
-// can short-circuit on `Object.is` only if the style ref is stable.
-const TEXT_HOVER_STYLE: React.CSSProperties = {
-  fontFamily: "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
-  filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.18))",
+type RowSnapshot = {
+  meta: SvgNodeMeta | undefined;
+  selected: boolean;
+  focused: boolean;
+  label: string;
 };
-const TEXT_IDLE_STYLE: React.CSSProperties = {
-  fontFamily: "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
-};
-const RECT_HOVER_STYLE: React.CSSProperties = {
-  filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.22))",
-};
-const TEXT_ANCHOR_OFFSET = { start: 0, middle: 0.5, end: 1 } as const;
 
-const Shape = React.memo(function Shape({
-  s,
-  hovered,
-}: {
-  s: FlatShape;
-  hovered: boolean;
-}) {
-  const { meta } = s;
-  const b = meta.box!;
-  if (meta.kind === "group") return null;
-  if (meta.kind === "text") {
-    const ta = meta.textAnchor ?? "start";
-    return (
-      <text
-        x={b.x + b.w * TEXT_ANCHOR_OFFSET[ta]}
-        y={b.y + b.h / 2}
-        fill={meta.fill ?? "#000"}
-        fontSize={meta.fontSize ?? 14}
-        fontWeight={meta.weight ?? 400}
-        dominantBaseline="middle"
-        textAnchor={ta}
-        style={hovered ? TEXT_HOVER_STYLE : TEXT_IDLE_STYLE}
-      >
-        {meta.text ?? meta.label}
-      </text>
-    );
-  }
-  const rx = radiusOf(meta);
-  return (
-    <g
-      opacity={meta.opacity ?? 1}
-      style={hovered ? RECT_HOVER_STYLE : undefined}
-    >
-      <rect
-        x={b.x}
-        y={b.y}
-        width={b.w}
-        height={b.h}
-        rx={rx}
-        ry={rx}
-        fill={meta.fill ?? "#E5E7EB"}
-      />
-      {meta.kind === "image" && (
-        <g
-          stroke="rgba(255,255,255,0.4)"
-          strokeWidth={2.5}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle
-            cx={b.x + b.w * 0.32}
-            cy={b.y + b.h * 0.34}
-            r={14}
-            fill="rgba(255,255,255,0.35)"
-            stroke="none"
-          />
-          <path
-            d={`M ${b.x + b.w * 0.12} ${b.y + b.h * 0.82} L ${
-              b.x + b.w * 0.42
-            } ${b.y + b.h * 0.52} L ${b.x + b.w * 0.62} ${
-              b.y + b.h * 0.7
-            } L ${b.x + b.w * 0.8} ${b.y + b.h * 0.46} L ${
-              b.x + b.w * 0.95
-            } ${b.y + b.h * 0.82}`}
-          />
-        </g>
-      )}
-    </g>
-  );
-});
+const rowSnapshotEq = (a: RowSnapshot, b: RowSnapshot): boolean =>
+  a.meta === b.meta &&
+  a.selected === b.selected &&
+  a.focused === b.focused &&
+  a.label === b.label;
 
-// ───────────────────────────────────────────────────────────────────────────
-// Selection chrome — a thin accent outline plus eight handle squares pinned
-// just outside the bounding box. We render at viewport-stable widths by
-// authoring in canvas units (the artboard's SVG userspace) and letting the
-// SVG scale handle the rest; the badge font is sized in the same units so
-// it tracks zoom consistently across the two showcases.
-// ───────────────────────────────────────────────────────────────────────────
+function SvgRow({ args, tone }: { args: RenderRowArgs; tone: SvgRowTone }) {
+  const { row } = args;
+  const controller = useTree<SvgNodeMeta>();
+  const { meta, selected, focused, label } = useTreeSnapshot<
+    SvgNodeMeta,
+    RowSnapshot
+  >((c) => {
+    const node = c.source.getNode(row.id);
+    return {
+      meta: node.meta,
+      selected: c.getSelection().includes(row.id),
+      focused: c.getFocused() === row.id,
+      label: c.source.getLabel?.(row.id) ?? row.id,
+    };
+  }, rowSnapshotEq);
+  const hoverId = useSurfaceHover();
+  const setHover = useHoverOverride();
+  const hovered = hoverId === row.id;
+  const Icon = tagInfo(meta?.tag ?? "").Icon;
 
-const SelectionChrome = React.memo(function SelectionChrome({
-  box,
-  accent,
-  showHandles,
-}: {
-  box: { x: number; y: number; w: number; h: number };
-  accent: string;
-  showHandles: boolean;
-}) {
-  const { x, y, w, h } = box;
-  // Slight outset so the outline doesn't bisect the artwork edge.
-  const O = 0.5;
-  const handles: Array<[number, number]> = showHandles
-    ? [
-        [x, y],
-        [x + w / 2, y],
-        [x + w, y],
-        [x + w, y + h / 2],
-        [x + w, y + h],
-        [x + w / 2, y + h],
-        [x, y + h],
-        [x, y + h / 2],
-      ]
-    : [];
-  const HS = 6; // handle side, canvas units
-  return (
-    <g pointerEvents="none">
-      <rect
-        x={x - O}
-        y={y - O}
-        width={w + O * 2}
-        height={h + O * 2}
-        fill="none"
-        stroke={accent}
-        strokeWidth={1.25}
-        shapeRendering="crispEdges"
-      />
-      {handles.map(([hx, hy], i) => (
-        <rect
-          key={i}
-          x={hx - HS / 2}
-          y={hy - HS / 2}
-          width={HS}
-          height={HS}
-          fill="#fff"
-          stroke={accent}
-          strokeWidth={1.25}
-          shapeRendering="crispEdges"
-        />
-      ))}
-    </g>
-  );
-});
-
-const DimensionBadge = React.memo(function DimensionBadge({
-  box,
-  accent,
-}: {
-  box: { x: number; y: number; w: number; h: number };
-  accent: string;
-}) {
-  const { x, y, w, h } = box;
-  const label = `${Math.round(w)} × ${Math.round(h)}`;
-  // Estimate a sensible width from char count; SVG can't auto-fit.
-  const padX = 6;
-  const padY = 3;
-  const fontSize = 11;
-  const textW = label.length * (fontSize * 0.58);
-  const badgeW = textW + padX * 2;
-  const badgeH = fontSize + padY * 2;
-  const cx = x + w / 2;
-  const top = y + h + 8;
-  return (
-    <g pointerEvents="none">
-      <rect
-        x={cx - badgeW / 2}
-        y={top}
-        width={badgeW}
-        height={badgeH}
-        rx={badgeH / 2}
-        ry={badgeH / 2}
-        fill={accent}
-      />
-      <text
-        x={cx}
-        y={top + badgeH / 2 + 0.5}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize={fontSize}
-        fontWeight={600}
-        fill="#fff"
-        style={{
-          fontFamily:
-            "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
-        }}
-      >
-        {label}
-      </text>
-    </g>
-  );
-});
-
-const HoverOutline = React.memo(function HoverOutline({
-  box,
-  radius,
-  accent,
-  dashed,
-}: {
-  box: { x: number; y: number; w: number; h: number };
-  radius: number;
-  accent: string;
-  dashed: boolean;
-}) {
-  return (
-    <rect
-      x={box.x}
-      y={box.y}
-      width={box.w}
-      height={box.h}
-      rx={radius}
-      ry={radius}
-      fill="none"
-      stroke={accent}
-      strokeWidth={1}
-      strokeOpacity={0.4}
-      strokeDasharray={dashed ? "3 3" : undefined}
-      pointerEvents="none"
-    />
-  );
-});
-
-function SvgStage({
-  controller,
-  artboardId,
-  tone,
-  accent,
-}: {
-  controller: TreeController<DemoMeta>;
-  artboardId: NodeId;
-  tone: "light" | "dark";
-  accent: string;
-}) {
-  const version = useTreeSnapshot<DemoMeta, number>((c) =>
-    c.source.getVersion()
-  );
-  const selection = useTreeSnapshot<DemoMeta, readonly NodeId[]>(
-    (c) => c.getSelection(),
-    sameSelection
-  );
-  const { hovered, setHovered } = React.useContext(HoverContext);
-
-  // version is the dependency: a move/remove bumps it and re-walks.
-  const shapes = React.useMemo(
-    () => flattenScene(controller, artboardId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [controller, artboardId, version]
-  );
-  // One pass to build the id→shape lookup so hover/selection/artboard
-  // probes are O(1) instead of N each per render.
-  const byId = React.useMemo(
-    () => new Map(shapes.map((s) => [s.id, s])),
-    [shapes]
-  );
-  const artboardMeta = byId.get(artboardId)?.meta;
-  const frame = artboardMeta?.box ?? { x: 0, y: 0, w: 360, h: 460 };
-  const selSet = React.useMemo(() => new Set(selection), [selection]);
-
-  const onPick = (id: NodeId, e: React.PointerEvent) => {
-    controller.focus(id);
-    controller.select([id], modeFromEvent(e));
-  };
-
-  const dark = tone === "dark";
-  // Top gutter holds the artboard label, bottom gutter holds the single-
-  // selection dimension badge — both painted in canvas userspace.
-  const PAD = 28;
-  const TOP_GUTTER = 18;
-  const BOTTOM_GUTTER = 22;
-  const vb = `${frame.x - PAD} ${frame.y - PAD - TOP_GUTTER} ${
-    frame.w + PAD * 2
-  } ${frame.h + PAD * 2 + TOP_GUTTER + BOTTOM_GUTTER}`;
-  const artboardLabel = artboardMeta?.label ?? "Cover";
-  const frameRadius = radiusOf(artboardMeta ?? { box: frame });
+  let state: "selected" | "focused" | "hovered" | "idle" = "idle";
+  if (selected) state = "selected";
+  else if (focused) state = "focused";
+  else if (hovered) state = "hovered";
 
   return (
     <div
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Backspace" || e.key === "Delete") {
-          e.preventDefault();
-          deleteSelection(controller);
-        }
+      data-tree-row-id={row.id}
+      data-row-depth={row.depth}
+      data-state={state}
+      role="treeitem"
+      aria-selected={selected}
+      tabIndex={-1}
+      onClick={(e) => {
+        controller.focus(row.id);
+        controller.select([row.id], modeFromEvent(e));
       }}
+      onPointerEnter={() => setHover(row.id)}
+      onPointerLeave={() => setHover(null)}
+      className={`${tone.outer} ${tone.height}`}
+      style={{ paddingLeft: tone.indentBase + row.depth * tone.indentStep }}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (row.isContainer) controller.toggle(row.id);
+        }}
+        aria-hidden={!row.isContainer}
+        className={`${tone.chevronContainer} ${tone.chevron(selected)}`}
+      >
+        {row.isContainer ? (
+          row.isExpanded ? (
+            <ChevronDownIcon className="size-3" />
+          ) : (
+            <ChevronRightIcon className="size-3" />
+          )
+        ) : null}
+      </button>
+      <Icon className={`${tone.iconSize} ${tone.iconColor(selected)}`} />
+      <span className="truncate flex-1">{label}</span>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// One showcase shell, two themes. Adding a third (e.g. Sketch) is a new
+// `ShowcaseTone` and a `<SvgShowcase tone={...} />` call.
+// ───────────────────────────────────────────────────────────────────────────
+
+function SvgShowcase({ tone }: { tone: ShowcaseTone }) {
+  return (
+    <section className="border-t border-zinc-200 py-16">
+      <div className="mx-auto max-w-6xl px-4">
+        <SectionHeader
+          eyebrow={tone.eyebrow}
+          icon={tone.icon}
+          iconAlt={tone.iconAlt}
+        >
+          {tone.intro}
+        </SectionHeader>
+        <SvgEditorProvider initialSvg={ACTIVITY_SVG} style={tone.providerStyle}>
+          <SvgShowcaseBody tone={tone} />
+        </SvgEditorProvider>
+      </div>
+    </section>
+  );
+}
+
+function SvgShowcaseBody({ tone }: { tone: ShowcaseTone }) {
+  const controller = useSvgTreeController();
+  const scopeRef = React.useRef<HTMLDivElement>(null);
+  useAutoRevealSelection(controller, scopeRef);
+  return (
+    <div ref={scopeRef}>
+      <SplitStage
+        frame={tone.frame}
+        tree={
+          <div className={`flex ${STAGE_H} flex-col ${tone.treeChrome}`}>
+            {tone.treeHeader}
+            <DemoPanel
+              controller={controller as unknown as TreeController<DemoMeta>}
+              indentBase={tone.row.indentBase}
+              indentStep={tone.row.indentStep}
+              className={tone.panelClass}
+              renderRow={(args) => <SvgRow args={args} tone={tone.row} />}
+            />
+          </div>
+        }
+        editor={<SvgStage tone={tone.stageTone} />}
+      />
+    </div>
+  );
+}
+
+export function GridaShowcase() {
+  return <SvgShowcase tone={GRIDA_TONE} />;
+}
+
+export function FigmaShowcase() {
+  return <SvgShowcase tone={FIGMA_TONE} />;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Canvas pane — dotted-grid backdrop + footer tip around `<SvgEditorCanvas>`.
+// The container is exclusively owned by the surface (per editor docs); the
+// backdrop and footer are siblings, not children of the canvas div.
+// ───────────────────────────────────────────────────────────────────────────
+
+function SvgStage({ tone }: { tone: "light" | "dark" }) {
+  const dark = tone === "dark";
+  return (
+    <div
       className={[
-        "relative flex flex-col overflow-hidden rounded-lg border outline-none",
+        "relative flex flex-col overflow-hidden rounded-lg border",
         STAGE_H,
         dark ? "border-neutral-800 bg-[#1B1B1F]" : "border-zinc-200 bg-zinc-50",
-        "focus-visible:ring-2 focus-visible:ring-blue-400/60",
       ].join(" ")}
       style={{
         backgroundImage: `radial-gradient(${
@@ -544,366 +477,18 @@ function SvgStage({
         backgroundSize: "16px 16px",
       }}
     >
-      <StageToolbar controller={controller} dark={dark} />
-
-      <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-        <svg
-          viewBox={vb}
-          className="max-h-full"
-          style={{
-            height: "100%",
-            width: "auto",
-            aspectRatio: `${frame.w} / ${frame.h}`,
-          }}
-          role="img"
-          aria-label="Design canvas synced to the tree"
-        >
-          <defs>
-            <clipPath id={`clip-${artboardId}`}>
-              <rect
-                x={frame.x}
-                y={frame.y}
-                width={frame.w}
-                height={frame.h}
-                rx={frameRadius}
-              />
-            </clipPath>
-            <filter
-              id={`shadow-${artboardId}`}
-              x="-20%"
-              y="-20%"
-              width="140%"
-              height="140%"
-            >
-              <feDropShadow
-                dx="0"
-                dy="18"
-                stdDeviation="22"
-                floodColor="#000"
-                floodOpacity={dark ? 0.5 : 0.18}
-              />
-            </filter>
-          </defs>
-
-          {/* artboard name tab — Figma-style label above the frame */}
-          <text
-            x={frame.x}
-            y={frame.y - 8}
-            fontSize={11}
-            fontWeight={600}
-            fill={accent}
-            opacity={0.85}
-            style={{
-              fontFamily:
-                "ui-sans-serif, system-ui, -apple-system, Inter, sans-serif",
-              letterSpacing: 0.2,
-            }}
-          >
-            {artboardLabel}
-          </text>
-
-          {/* artboard frame: fill + faint shadow + subtle 1px stroke */}
-          <g filter={`url(#shadow-${artboardId})`}>
-            {shapes
-              .filter((s) => s.id === artboardId)
-              .map((s) => (
-                <Shape key={s.id} s={s} hovered={false} />
-              ))}
-            <rect
-              x={frame.x}
-              y={frame.y}
-              width={frame.w}
-              height={frame.h}
-              rx={frameRadius}
-              ry={frameRadius}
-              fill="none"
-              stroke={dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}
-              strokeWidth={1}
-              pointerEvents="none"
-            />
-          </g>
-
-          <g clipPath={`url(#clip-${artboardId})`}>
-            {shapes
-              .filter((s) => s.id !== artboardId)
-              .map((s) => (
-                <Shape
-                  key={s.id}
-                  s={s}
-                  hovered={hovered === s.id && !selSet.has(s.id)}
-                />
-              ))}
-          </g>
-
-          {/* Overlays paint above the artwork, in this order:
-              1. hover outline (groups dashed, leaves solid, both at 40%)
-              2. group bounds when selected (dashed)
-              3. selection chrome (outline + handles)
-              4. dimension badge for a single selection */}
-
-          {/* hover outline — never for already-selected nodes */}
-          {hovered &&
-            (() => {
-              const s = byId.get(hovered);
-              if (!s || selSet.has(s.id)) return null;
-              return (
-                <HoverOutline
-                  key={`hov-${s.id}`}
-                  box={s.meta.box!}
-                  radius={radiusOf(s.meta)}
-                  accent={accent}
-                  dashed={s.kind === "group"}
-                />
-              );
-            })()}
-
-          {/* selection chrome */}
-          {shapes
-            .filter((s) => selSet.has(s.id))
-            .map((s) => (
-              <SelectionChrome
-                key={`sel-${s.id}`}
-                box={s.meta.box!}
-                accent={accent}
-                showHandles={selection.length === 1}
-              />
-            ))}
-
-          {/* dimension badge — only when exactly one node is selected */}
-          {selection.length === 1 &&
-            (() => {
-              const id = selection[0]!;
-              const s = byId.get(id);
-              if (!s) return null;
-              return (
-                <DimensionBadge
-                  key={`dim-${id}`}
-                  box={s.meta.box!}
-                  accent={accent}
-                />
-              );
-            })()}
-
-          {/* transparent hit targets, document order so the front-most wins.
-              Groups now participate so users can grab the group's bounds —
-              their hit area is the union, which matches the canvas idiom. */}
-          {shapes.map((s) => (
-            <rect
-              key={`hit-${s.id}`}
-              data-tree-node-id={s.id}
-              x={s.meta.box!.x}
-              y={s.meta.box!.y}
-              width={s.meta.box!.w}
-              height={s.meta.box!.h}
-              rx={radiusOf(s.meta)}
-              fill="transparent"
-              className="cursor-pointer"
-              onPointerEnter={() => setHovered(s.id)}
-              onPointerLeave={() => setHovered(null)}
-              onPointerDown={(e) => onPick(s.id, e)}
-            />
-          ))}
-        </svg>
-      </div>
-
+      <SvgEditorCanvas fit className="absolute inset-0" />
       <p
         className={[
-          "shrink-0 border-t px-3 py-2 text-center text-[11px]",
+          "pointer-events-none absolute inset-x-0 bottom-0 border-t px-3 py-2 text-center text-[11px] backdrop-blur-sm",
           dark
-            ? "border-neutral-800 text-neutral-500"
-            : "border-zinc-200/70 text-zinc-400",
+            ? "border-neutral-800 bg-[#1B1B1F]/70 text-neutral-500"
+            : "border-zinc-200/70 bg-white/60 text-zinc-500",
         ].join(" ")}
       >
-        Drag rows to reorder · click a shape to select · ⌫ to delete
+        Click a shape · drag handles · ⌫ to delete
       </p>
     </div>
-  );
-}
-
-function StageToolbar({
-  controller,
-  dark,
-}: {
-  controller: TreeController<DemoMeta>;
-  dark: boolean;
-}) {
-  const selection = useTreeSnapshot<DemoMeta, readonly NodeId[]>(
-    (c) => c.getSelection(),
-    sameSelection
-  );
-  const source = controller.source as InMemoryTreeSource<DemoMeta>;
-  const root = source.getRoot();
-  const deletable = selection.filter((id) => {
-    try {
-      return source.getNode(id).parent !== root;
-    } catch {
-      return false;
-    }
-  });
-  return (
-    <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
-      <span
-        className={[
-          "rounded-md px-2 py-1 text-[11px] font-medium tabular-nums",
-          dark
-            ? "bg-white/10 text-neutral-300"
-            : "bg-white text-zinc-500 shadow-sm ring-1 ring-zinc-200",
-        ].join(" ")}
-      >
-        {selection.length ? `${selection.length} selected` : "Nothing selected"}
-      </span>
-      <button
-        type="button"
-        disabled={deletable.length === 0}
-        onClick={() => deleteSelection(controller)}
-        title="Delete selection (⌫)"
-        aria-label="Delete selection"
-        className={[
-          "inline-flex size-7 items-center justify-center rounded-md transition-colors disabled:opacity-30",
-          dark
-            ? "bg-white/10 text-neutral-300 enabled:hover:bg-red-500/20 enabled:hover:text-red-300"
-            : "bg-white text-zinc-500 shadow-sm ring-1 ring-zinc-200 enabled:hover:bg-red-50 enabled:hover:text-red-600",
-        ].join(" ")}
-      >
-        <Trash2Icon className="size-3.5" />
-      </button>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Grida — light layers panel + light canvas
-// ───────────────────────────────────────────────────────────────────────────
-
-export function GridaShowcase() {
-  const controller = useDemoController(
-    () =>
-      new TreeController<DemoMeta>({
-        source: buildSceneFixture(),
-        flatten: { reverseChildren: true },
-        expanded: ["cover", "items", "action"],
-        constraint: onlyIntoContainers(),
-      })
-  );
-  const flags = useRowFlags(() => ({ visible: true, locked: false }));
-  const [hovered, setHovered] = React.useState<NodeId | null>(null);
-
-  return (
-    <section className="border-t border-zinc-200 py-16">
-      <div className="mx-auto max-w-6xl px-4">
-        <SectionHeader
-          eyebrow="Grida"
-          icon={Resources.assets.macos.icons.grida}
-          iconAlt="Grida"
-        >
-          One{" "}
-          <code className="rounded bg-zinc-100 px-1 text-[12px]">
-            TreeController
-          </code>{" "}
-          drives the panel <em>and</em> the artboard. Select, hover, reorder,
-          delete on either side — the other follows.
-        </SectionHeader>
-        <TreeProvider controller={controller}>
-          <AutoRevealSelection />
-          <HoverContext.Provider value={{ hovered, setHovered }}>
-            <SplitStage
-              frame="bg-zinc-100 ring-1 ring-zinc-200/70"
-              tree={
-                <div
-                  className={`flex ${STAGE_H} flex-col rounded-lg border border-zinc-200 bg-white p-1 shadow-sm`}
-                >
-                  <DemoPanel
-                    controller={controller}
-                    enableDrag
-                    indentBase={6}
-                    indentStep={14}
-                    className="min-h-0 flex-1 !border-0"
-                    renderRow={(args) => <GridaRow args={args} flags={flags} />}
-                    onIntent={(intent) => applyIntent(controller, intent)}
-                  />
-                </div>
-              }
-              editor={
-                <SvgStage
-                  controller={controller}
-                  artboardId="cover"
-                  tone="light"
-                  accent="#18181B"
-                />
-              }
-            />
-          </HoverContext.Provider>
-        </TreeProvider>
-      </div>
-    </section>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Figma — dark layers panel + dark canvas
-// ───────────────────────────────────────────────────────────────────────────
-
-export function FigmaShowcase() {
-  const controller = useDemoController(
-    () =>
-      new TreeController<DemoMeta>({
-        source: buildSceneFixture(),
-        flatten: { reverseChildren: true },
-        expanded: ["cover", "items", "action"],
-        constraint: onlyIntoContainers(),
-      })
-  );
-  const flags = useRowFlags(() => ({ visible: true, locked: false }));
-  const [hovered, setHovered] = React.useState<NodeId | null>(null);
-
-  return (
-    <section className="border-t border-zinc-200 py-16">
-      <div className="mx-auto max-w-6xl px-4">
-        <SectionHeader
-          eyebrow="Figma"
-          icon={Resources.assets.macos.icons.figma}
-          iconAlt="Figma"
-        >
-          Identical controller and intent bridge — only the row renderer and the
-          canvas palette changed. Reordering a layer re-stacks the design.
-        </SectionHeader>
-        <TreeProvider controller={controller}>
-          <AutoRevealSelection />
-          <HoverContext.Provider value={{ hovered, setHovered }}>
-            <SplitStage
-              frame="bg-[#141417] ring-1 ring-white/5"
-              tree={
-                <div
-                  className={`flex ${STAGE_H} flex-col overflow-hidden rounded-lg border border-neutral-700 bg-[#2C2C2C] shadow-lg`}
-                >
-                  <div className="flex items-center justify-between border-b border-neutral-700/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
-                    <span>Layers</span>
-                    <span className="text-neutral-500">Cover</span>
-                  </div>
-                  <DemoPanel
-                    controller={controller}
-                    enableDrag
-                    indentBase={8}
-                    indentStep={16}
-                    className="min-h-0 flex-1 !border-0 !bg-[#2C2C2C]"
-                    renderRow={(args) => <FigmaRow args={args} flags={flags} />}
-                    onIntent={(intent) => applyIntent(controller, intent)}
-                  />
-                </div>
-              }
-              editor={
-                <SvgStage
-                  controller={controller}
-                  artboardId="cover"
-                  tone="dark"
-                  accent="#0D99FF"
-                />
-              }
-            />
-          </HoverContext.Provider>
-        </TreeProvider>
-      </div>
-    </section>
   );
 }
 

@@ -11,6 +11,13 @@ import {
   EmailFrameSender,
   EmailFrameBody,
 } from "@/components/frames/email-frame";
+import {
+  MacOSDesktop,
+  MacOSMenuBar,
+  MacOSDock,
+  MacOSWindow,
+} from "@/components/frames/macos-desktop";
+import { Resources } from "@/resources";
 
 export default function FramesPage() {
   return (
@@ -95,6 +102,97 @@ export default function FramesPage() {
                 Documentation page
               </p>
             </div>
+          </div>
+        </section>
+
+        <hr />
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold mb-1">macOS Desktop Frame</h2>
+            <p className="text-sm text-gray-600">
+              Composable macOS primitives — desktop wallpaper, menu bar, window
+              chrome, and dock. Each piece is layout-agnostic; the callsite
+              decides positioning.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-zinc-100 p-2 ring-1 ring-zinc-200/70">
+            <MacOSDesktop className="relative flex aspect-[16/10] w-full flex-col overflow-hidden rounded-lg">
+              <MacOSMenuBar
+                appName="Finder"
+                className="absolute inset-x-0 top-0 z-10"
+              />
+              <div className="flex flex-1 items-center justify-center px-6 pt-10 pb-24">
+                <MacOSWindow
+                  title="softmarshmallow"
+                  className="w-full max-w-[640px]"
+                >
+                  <div className="grid h-[260px] place-items-center bg-gradient-to-br from-white to-zinc-50 p-8">
+                    <div className="space-y-2 text-center">
+                      <h3 className="text-lg font-semibold text-zinc-800">
+                        Drop content here
+                      </h3>
+                      <p className="text-sm text-zinc-500">
+                        MacOSWindow is just chrome — fill the body with
+                        anything.
+                      </p>
+                    </div>
+                  </div>
+                </MacOSWindow>
+              </div>
+              <MacOSDock
+                apps={[
+                  {
+                    name: "Finder",
+                    src: Resources.assets.macos.icons.finder,
+                  },
+                  {
+                    name: "Safari",
+                    src: Resources.assets.macos.icons.safari,
+                  },
+                  { name: "Notes", src: Resources.assets.macos.icons.notes },
+                  {
+                    name: "Messages",
+                    src: Resources.assets.macos.icons.messages,
+                  },
+                  { name: "Music", src: Resources.assets.macos.icons.music },
+                  { name: "Xcode", src: Resources.assets.macos.icons.xcode },
+                  { name: "VS Code", src: Resources.assets.macos.icons.vscode },
+                  { name: "Figma", src: Resources.assets.macos.icons.figma },
+                  { name: "Notion", src: Resources.assets.macos.icons.notion },
+                  { name: "Grida", src: Resources.assets.macos.icons.grida },
+                  {
+                    name: "Trash",
+                    src: Resources.assets.macos.icons.trashEmpty,
+                  },
+                ]}
+                className="pointer-events-auto absolute inset-x-0 bottom-4 z-10 mx-auto w-fit"
+              />
+            </MacOSDesktop>
+          </div>
+        </section>
+
+        <hr />
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold mb-1">
+              macOS Window (standalone)
+            </h2>
+            <p className="text-sm text-gray-600">
+              Just the window chrome — traffic lights and an optional title
+              strip
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <MacOSWindow title="Untitled.txt">
+              <div className="h-48 bg-white p-4 font-mono text-sm text-zinc-700">
+                Hello, world.
+              </div>
+            </MacOSWindow>
+            <MacOSWindow>
+              <div className="h-48 bg-gradient-to-br from-indigo-50 to-pink-50" />
+            </MacOSWindow>
           </div>
         </section>
 
@@ -268,6 +366,47 @@ export default function FramesPage() {
                     </EmailFrameBody>
                   </EmailFrame>
                 </div>
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">macOS Desktop</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Composable macOS primitives: desktop, menu bar, window, dock
+              </p>
+              <div className="rounded-lg bg-zinc-100 p-1 ring-1 ring-zinc-200/70">
+                <MacOSDesktop className="relative flex aspect-[16/10] w-full max-w-2xl flex-col overflow-hidden rounded-md">
+                  <MacOSMenuBar
+                    appName="Finder"
+                    className="absolute inset-x-0 top-0 z-10"
+                  />
+                  <div className="flex flex-1 items-center justify-center pt-8 pb-16">
+                    <MacOSWindow title="Window" className="w-3/4">
+                      <div className="h-32 bg-white" />
+                    </MacOSWindow>
+                  </div>
+                  <MacOSDock
+                    apps={[
+                      {
+                        name: "Finder",
+                        src: Resources.assets.macos.icons.finder,
+                      },
+                      {
+                        name: "Safari",
+                        src: Resources.assets.macos.icons.safari,
+                      },
+                      {
+                        name: "Notes",
+                        src: Resources.assets.macos.icons.notes,
+                      },
+                      {
+                        name: "Music",
+                        src: Resources.assets.macos.icons.music,
+                      },
+                    ]}
+                    iconClassName="size-8"
+                    className="pointer-events-auto absolute inset-x-0 bottom-2 z-10 mx-auto w-fit"
+                  />
+                </MacOSDesktop>
               </div>
             </div>
             <div className="p-4 border rounded-lg">
