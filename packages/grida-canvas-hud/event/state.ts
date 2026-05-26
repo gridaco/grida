@@ -807,7 +807,7 @@ export class SurfaceState {
           this.gesture = g;
         }
         const value = Math.max(0, projectRadiusFromGesture(g, point_doc));
-        this.gesture = { ...g, last_doc: point_doc, value };
+        this.gesture = { ...g, last_doc: point_doc, value, dragged: true };
         deps.emitIntent(buildCornerRadiusIntent(g, value, "preview"));
         response.needsRedraw = true;
         return response;
@@ -860,7 +860,7 @@ export class SurfaceState {
         }
         if (value < active.domain.min) value = active.domain.min;
         else if (value > active.domain.max) value = active.domain.max;
-        this.gesture = { ...g, last_doc: point_doc, value };
+        this.gesture = { ...g, last_doc: point_doc, value, dragged: true };
         if (g.handle_id !== null) {
           deps.emitIntent({
             kind: "parametric_handle",
@@ -914,6 +914,11 @@ export class SurfaceState {
     // at gesture start so toggling alt mid-drag doesn't switch the
     // host's commit pipe between branches.
     if (ui_action && ui_action.kind === "corner_radius_handle") {
+      // Readonly mode forbids mutating gestures across the board —
+      // these early-return branches bypass `decidePointerDown` (which
+      // enforces it for the regular intent classifier), so the gate
+      // is re-applied here.
+      if (this.readonly) return response;
       const explicit = this.modifiers.alt;
       // Build the gesture variant matching the action's geometry.
       // Single-candidate rect: anchor is locked at start (no
@@ -951,6 +956,7 @@ export class SurfaceState {
                   )
                 )
               : 0,
+          dragged: false,
         };
       } else {
         // line geometry
@@ -968,6 +974,7 @@ export class SurfaceState {
           explicit,
           last_doc: point_doc,
           value: Math.max(0, projectRadiusOnAxis(ui_action.pos, a, b)),
+          dragged: false,
         };
       }
       response.needsRedraw = true;
@@ -982,6 +989,8 @@ export class SurfaceState {
     // direction. Modifier state (alt/shift) is latched at pointer_down
     // and carried unchanged on every intent payload — host interprets.
     if (ui_action && ui_action.kind === "parametric_knob") {
+      // Same readonly gate as the corner-radius intercept above.
+      if (this.readonly) return response;
       const candidates = ui_action.candidates;
       const initial_handle =
         candidates.length === 1 ? candidates[0].handle_id : null;
@@ -1008,6 +1017,7 @@ export class SurfaceState {
         },
         last_doc: point_doc,
         value: initial_value,
+        dragged: false,
       };
       response.needsRedraw = true;
       return response;
@@ -1575,6 +1585,15 @@ export class SurfaceState {
           response.needsRedraw = true;
           break;
         }
+        // Skip commit on click-only (no pointer_move advanced the
+        // gesture). `g.value` was seeded from the inset-padded knob
+        // position at pointer_down, so committing on a pure click
+        // would mutate the host's radius to that padded value.
+        if (!g.dragged) {
+          this.gesture = IDLE;
+          response.needsRedraw = true;
+          break;
+        }
         deps.emitIntent(buildCornerRadiusIntent(g, g.value, "commit"));
         this.gesture = IDLE;
         response.needsRedraw = true;
@@ -1586,6 +1605,14 @@ export class SurfaceState {
         // returns to its painted coincident position on the next
         // frame because `value` was never persisted upstream.
         if (g.handle_id === null) {
+          this.gesture = IDLE;
+          response.needsRedraw = true;
+          break;
+        }
+        // Same click-only guard as corner-radius: the seed value is
+        // the inset-padded projection at pointer_down, not a real
+        // host commit.
+        if (!g.dragged) {
           this.gesture = IDLE;
           response.needsRedraw = true;
           break;

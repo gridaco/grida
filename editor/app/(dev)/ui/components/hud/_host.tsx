@@ -547,7 +547,9 @@ export function HUDStage(props: HUDStageProps) {
     () => selectionProp ?? fixture.initialSelection ?? []
   );
   React.useEffect(() => {
-    if (selectionProp) setSelection(selectionProp);
+    // Truthy check would drop `selection={[]}` (a deliberate "clear");
+    // explicit-undefined keeps the field truly optional.
+    if (selectionProp !== undefined) setSelection(selectionProp);
   }, [selectionProp]);
 
   // Live fixture — starts from the prop, mutates on translate commit.

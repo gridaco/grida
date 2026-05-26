@@ -7408,13 +7408,13 @@ namespace cmath {
       }
       const dx = point[0] - curve.center[0];
       const dy = point[1] - curve.center[1];
-      let theta = Math.atan2(dy, dx);
-      // Normalize theta into [from, from + 2π) — the contiguous range
-      // that contains the arc's CCW sweep regardless of how `from` was
-      // given.
+      const theta0 = Math.atan2(dy, dx);
+      // Normalize into [from, from + 2π) in O(1) regardless of the
+      // magnitude of `from` — `(((x % 2π) + 2π) % 2π)` lands in
+      // `[0, 2π)` for any real `x`.
       const TWO_PI = Math.PI * 2;
-      while (theta < curve.from) theta += TWO_PI;
-      while (theta >= curve.from + TWO_PI) theta -= TWO_PI;
+      const theta =
+        curve.from + ((((theta0 - curve.from) % TWO_PI) + TWO_PI) % TWO_PI);
       let t = (theta - curve.from) / span;
       if (t < 0) t = 0;
       else if (t > 1) t = 1;

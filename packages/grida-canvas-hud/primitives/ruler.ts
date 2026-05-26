@@ -218,8 +218,14 @@ interface DrawAxisParams {
 
 function getStepSize(steps: readonly number[], zoom: number): number {
   const minPxPerTick = 50;
-  for (const s of steps) if (s * zoom >= minPxPerTick) return s;
-  return steps[steps.length - 1];
+  // Filter non-positive / non-finite entries — they'd produce
+  // step = 0 and hang the tick loops in `paintAxis`. Fall back to the
+  // shipped defaults if the caller's series carries nothing usable.
+  const valid = steps.filter((s) => Number.isFinite(s) && s > 0);
+  const series = valid.length > 0 ? valid : DEFAULT_RULER_STEPS;
+  const z = Math.abs(zoom);
+  for (const s of series) if (s * z >= minPxPerTick) return s;
+  return series[series.length - 1];
 }
 
 function resolveSubticks(
@@ -506,6 +512,17 @@ function drawAxis(p: DrawAxisParams): void {
   }
 
   const step = getStepSize(steps, zoom);
+  // Belt-and-braces: a non-positive step (e.g. an all-zero `steps`
+  // array slipping past the filter) or a zero/NaN zoom would make
+  // `endUnit` infinite and the tick loops below would not terminate.
+  if (
+    !Number.isFinite(step) ||
+    step <= 0 ||
+    !Number.isFinite(zoom) ||
+    zoom === 0
+  ) {
+    return;
+  }
   const startUnit = -offset / zoom;
   const endUnit = startUnit + length / zoom;
   const firstTick = Math.floor(startUnit / step) * step;

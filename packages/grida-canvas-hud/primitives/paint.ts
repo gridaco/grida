@@ -59,12 +59,26 @@ export function computeStripesTileGeometry(
   thicknessPx: number;
   angleRad: number;
 } {
-  const spacing = paint.spacing ?? DEFAULT_STRIPES_SPACING_PX;
-  const thickness = paint.thickness ?? DEFAULT_STRIPES_THICKNESS_PX;
+  // Guard non-positive / non-finite inputs — `spacingPx` is used as
+  // the step of a `for (offset += spacingPx)` loop in `buildStripesTile`
+  // and would loop forever at zero or negative values. Fall back to
+  // the documented defaults rather than silently producing an empty
+  // pattern, so a misconfigured paint still renders something.
+  const spacingRaw = paint.spacing ?? DEFAULT_STRIPES_SPACING_PX;
+  const thicknessRaw = paint.thickness ?? DEFAULT_STRIPES_THICKNESS_PX;
+  const spacing =
+    Number.isFinite(spacingRaw) && spacingRaw > 0
+      ? spacingRaw
+      : DEFAULT_STRIPES_SPACING_PX;
+  const thickness =
+    Number.isFinite(thicknessRaw) && thicknessRaw > 0
+      ? thicknessRaw
+      : DEFAULT_STRIPES_THICKNESS_PX;
+  const safeDpr = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
   const angleDeg = paint.angle ?? DEFAULT_STRIPES_ANGLE_DEG;
 
-  const spacingPx = spacing * dpr;
-  const thicknessPx = thickness * dpr;
+  const spacingPx = spacing * safeDpr;
+  const thicknessPx = thickness * safeDpr;
   const angleRad = (angleDeg * Math.PI) / 180;
 
   // The tile is a square sized to one stripe period, expanded enough that

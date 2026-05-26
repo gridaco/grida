@@ -62,9 +62,11 @@ export interface HUDPaintStripes {
   opacity?: number;
   /** Stripe angle in degrees (default: 45). */
   angle?: number;
-  /** Distance between stripe centers in device px (default: 8). */
+  /** Distance between stripe centers in CSS (logical) px (default: 8).
+   *  The paint resolver scales by `devicePixelRatio` at runtime. */
   spacing?: number;
-  /** Stripe thickness in device px (default: 1.5). */
+  /** Stripe thickness in CSS (logical) px (default: 1.5).
+   *  The paint resolver scales by `devicePixelRatio` at runtime. */
   thickness?: number;
 }
 

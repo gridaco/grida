@@ -228,7 +228,9 @@ function curveLength(c: cmath.ui.Curve): number {
   if (c.kind === "segment") {
     return Math.hypot(c.b[0] - c.a[0], c.b[1] - c.a[1]);
   }
-  return c.radius * Math.max(0, c.to - c.from);
+  // Absolute sweep — clockwise arcs (`to < from`) have the same arc
+  // length as their counter-clockwise mirror.
+  return c.radius * Math.abs(c.to - c.from);
 }
 
 /**

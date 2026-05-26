@@ -63,10 +63,17 @@ export function useScrollSpy(
 
     const update = () => {
       raf = 0;
-      let current: string | null = sectionIds[0] ?? null;
+      // Track the last id that actually resolves to a DOM element so
+      // the initial-fallback and atBottom branches never report a
+      // section id whose element doesn't exist (the hook's contract
+      // is "only return IDs with mounted nodes").
+      let current: string | null = null;
+      let lastResolved: string | null = null;
       for (const id of sectionIds) {
         const el = document.getElementById(id);
         if (!el) continue;
+        if (current === null) current = id;
+        lastResolved = id;
         // Position of the section's top relative to the activation line.
         // For window-scroll, `getBoundingClientRect` already gives
         // viewport-relative coords. For a custom container, subtract
@@ -84,8 +91,9 @@ export function useScrollSpy(
         }
       }
 
-      // Bottom-of-scroll: force the last section active even if its top
-      // never crosses the line (short pages / a tiny tail section).
+      // Bottom-of-scroll: force the last resolved section active even
+      // if its top never crosses the line (short pages / a tiny tail
+      // section).
       let atBottom: boolean;
       if (container) {
         atBottom =
@@ -96,8 +104,8 @@ export function useScrollSpy(
           window.innerHeight + window.scrollY >=
           document.documentElement.scrollHeight - 2;
       }
-      if (atBottom) {
-        current = sectionIds[sectionIds.length - 1];
+      if (atBottom && lastResolved !== null) {
+        current = lastResolved;
       }
 
       setActive(current);

@@ -222,6 +222,8 @@ function Toolbar() {
         disabled={!canUndo}
         onClick={() => cmd.undo()}
         className="h-7 px-2"
+        aria-label="Undo"
+        title="Undo"
       >
         <UndoIcon className="size-3.5" />
       </Button>
@@ -231,6 +233,8 @@ function Toolbar() {
         disabled={!canRedo}
         onClick={() => cmd.redo()}
         className="h-7 px-2"
+        aria-label="Redo"
+        title="Redo"
       >
         <RedoIcon className="size-3.5" />
       </Button>
@@ -243,6 +247,7 @@ function Toolbar() {
         disabled={sel.length === 0}
         onClick={() => cmd.remove()}
         className="h-7 px-2"
+        aria-label="Delete selection"
         title="Delete (⌫)"
       >
         <Trash2Icon className="size-3.5" />

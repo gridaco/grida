@@ -243,6 +243,13 @@ export type SurfaceGesture =
       last_doc: cmath.Vector2;
       /** Most-recent computed radius value (doc-space units). */
       value: number;
+      /** Flips to `true` the first time `pointer_move` advances the
+       *  gesture state (resolves the anchor or updates `value`).
+       *  Pointer-up consults this to skip the commit on click-only
+       *  interactions — `value` is seeded from the inset-padded knob
+       *  position at pointer-down, so a pure click would otherwise
+       *  commit a non-zero radius the user never intended. */
+      dragged: boolean;
     }
   | {
       /**
@@ -272,6 +279,12 @@ export type SurfaceGesture =
       last_doc: cmath.Vector2;
       /** Last computed value in host units (post-step-quantization). */
       value: number;
+      /** Flips to `true` the first time `pointer_move` advances the
+       *  gesture state (resolves the handle or updates `value`).
+       *  Pointer-up skips commit on click-only interactions because
+       *  `value` is seeded from the inset-padded knob position at
+       *  pointer-down. */
+      dragged: boolean;
     };
 
 export const IDLE: SurfaceGesture = { kind: "idle" };
