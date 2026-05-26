@@ -1,5 +1,5 @@
 import type cmath from "@grida/cmath";
-import type { HUDSemanticGroup } from "../primitives/types";
+import type { HUDPaint, HUDSemanticGroup } from "../primitives/types";
 import type { CursorIcon } from "./cursor";
 import type { Rect } from "./gesture";
 import type { OverlayAction } from "./hit-regions";
@@ -156,9 +156,10 @@ export type RenderShape =
       color?: string;
     }
   /** Doc-space polyline — used to draw an open curve as a sequence of
-   *  flattened samples. Stroke width is in screen-px (the renderer
-   *  divides by zoom). Used by vector chrome to outline each segment of
-   *  a path under content-edit. */
+   *  flattened samples, or a closed polygon when `points[last] === points[0]`.
+   *  Stroke width is in screen-px (the renderer divides by zoom). Used by
+   *  vector chrome to outline each segment of a path under content-edit,
+   *  and to fill closed-loop regions with `HUDPaint` (stripes / solid). */
   | {
       kind: "doc_polyline";
       points: ReadonlyArray<readonly [number, number]>;
@@ -169,6 +170,15 @@ export type RenderShape =
       strokeWidth?: number;
       dashed?: boolean;
       color?: string;
+      /**
+       * Paint applied to the fill. When set, takes precedence over
+       * `color` + `fillOpacity` for the fill. Used by closed-loop
+       * region overlays to apply `HUDPaintStripes` for hover / selected
+       * affordance.
+       *
+       * @unstable
+       */
+      fillPaint?: HUDPaint;
     };
 
 // ─── OverlayElement — the unit of overlay UI ──────────────────────────────

@@ -16,9 +16,9 @@ export interface PixelGridConfig {
    * Optional camera transform used to space the grid. Hosts that drive the
    * HUD canvas's own `setTransform` can omit this — the pixel grid falls
    * back to the canvas's chrome transform. Hosts that keep the HUD at
-   * identity (e.g. `@grida/svg-editor`, which applies the camera as a CSS
-   * transform on the `<svg>` element) must supply this explicitly and
-   * update it on every camera change via `setPixelGridTransform`.
+   * identity (applying the camera elsewhere — e.g. as a CSS transform on
+   * an outer element) must supply this explicitly and update it on every
+   * camera change via `setPixelGridTransform`.
    */
   transform?: cmath.Transform;
   color?: string;

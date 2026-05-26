@@ -110,7 +110,43 @@ export type { SelectionShape, SelectionGroup } from "./event/shape";
 export type { OverlayElement, HitShape, RenderShape } from "./event/overlay";
 export { MIN_HIT_SIZE, MIN_CHROME_VISIBLE_SIZE } from "./event/overlay";
 export type { VectorSubSelection, VectorHover } from "./event/state";
-export type { VectorOverlay } from "./surface/vector-chrome";
+export type { VectorOverlay } from "./classes/vector-path";
+export {
+  buildPaddingOverlay,
+  PADDING_HANDLE_PRIORITY,
+  PADDING_REGION_PRIORITY,
+  PADDING_HANDLE_LENGTH,
+  PADDING_HANDLE_THICKNESS,
+  type PaddingOverlayInput,
+  type PaddingHover,
+} from "./classes/padding";
+
+// Transform-box (named class).
+export {
+  buildTransformBox,
+  TRANSFORM_BOX_CORNER_PRIORITY,
+  TRANSFORM_BOX_SIDE_PRIORITY,
+  TRANSFORM_BOX_BODY_PRIORITY,
+  TRANSFORM_BOX_CORNER_HIT_SIZE,
+  TRANSFORM_BOX_SIDE_HIT_THICKNESS,
+  type TransformBoxInput,
+  type TransformBoxHover,
+  type TransformBoxActiveOp,
+} from "./classes/transform-box";
+// Transform-box math primitive — class-bound math reducer factored out
+// for testability. Lives in `primitives/` for code organization; the
+// chrome that consumes it lives in `classes/transform-box/`.
+export {
+  reduceTransformBox,
+  getTransformBoxCorners,
+  cornersToBoxTransform,
+  decompose as decomposeTransformBox,
+  compose as composeTransformBox,
+  type AffineTransform,
+  type TransformBoxAction,
+  type TransformBoxOptions,
+  type TransformBoxCorners,
+} from "./primitives/transform-box";
 
 // Selection-controls — pure-geometry model + priority ladder (UX rule).
 export {

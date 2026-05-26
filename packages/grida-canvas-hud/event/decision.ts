@@ -141,6 +141,21 @@ export const enum Scenario {
   HandleSegmentNarrowOrDrag = "HandleSegmentNarrowOrDrag",
   HandleSegmentToggleOrDrag = "HandleSegmentToggleOrDrag",
   /**
+   * Closed-loop "region" pointer-down. Eager `select_region` at down-time
+   * (parity with segment / vertex / tangent on the "not yet in axis-set"
+   * branch); drag-promotes to `translate_vector_selection` with the
+   * loop's endpoint vertices seeded into `additional_vertex_indices`.
+   *
+   * Region selection has no axis-set "narrow/toggle" branch — regions
+   * are derived data (loops are recomputed when geometry changes), so
+   * the host's region-selection state is not the source of truth the way
+   * a vertex/segment id set is. The HUD reports "user clicked region N";
+   * the host decides whether to keep it, narrow to it, or toggle. Shift
+   * still flows through as `mode: "toggle"` for the host's discretion.
+   */
+  HandleRegionReplace = "HandleRegionReplace",
+  HandleRegionAdd = "HandleRegionAdd",
+  /**
    * Ghost-handle pointer-down — cursor is on the half-point insertion knob.
    *
    * EAGER: the press immediately splits the segment AND grabs the inserted
@@ -154,6 +169,23 @@ export const enum Scenario {
    * singleton-this segment-body case.
    */
   HandleGhostSplit = "HandleGhostSplit",
+  /**
+   * Pointer-down on a padding-overlay drag handle. Opens a
+   * `padding_handle` gesture eagerly in `state.ts` BEFORE the
+   * classifier runs — this scenario exists for classification
+   * inspection only (tests / docs). Dispatch returns `noop`
+   * because the eager intercept already handled the state
+   * transition.
+   */
+  HandlePaddingDrag = "HandlePaddingDrag",
+  /**
+   * Pointer-down on a transform-box hit region (body/side/corner).
+   * Opens a `transform_box` gesture eagerly in `state.ts` BEFORE the
+   * classifier runs — this scenario exists for classification
+   * inspection only (tests / docs). Dispatch returns `noop` because
+   * the eager intercept already handled the state transition.
+   */
+  HandleTransformBoxDrag = "HandleTransformBoxDrag",
 
   // ── Empty space ─────────────────────────────────────────────────────────
   EmptyDeselectThenMarquee = "EmptyDeselectThenMarquee",
@@ -221,9 +253,8 @@ export interface PointerDownInput {
   /**
    * Parametric `t` for the bend gesture's pivot `ca` — **always** the
    * cursor's geometry-aware projection onto the cubic at pointer-down,
-   * mode-INDEPENDENT. Mirrors the main editor's
-   * `t0Ref = cmath.bezier.project(point)` in
-   * `surface-vector-editor.tsx:337`.
+   * mode-INDEPENDENT. The pivot follows the cursor regardless of
+   * insertion mode.
    *
    * Kept separate from `segment_split_t` because the two `t`s answer
    * different questions: split-`t` is "where will the new vertex go?"
@@ -314,8 +345,7 @@ export type PendingPromote =
        * `start_translate_tangent` gesture (absolute "curve" semantics,
        * mirror modifiers applicable at gesture level). Used only when
        * the tangent ∈ sub-selection AND the sub-selection is exactly
-       * this one tangent (singleton-this). Mirrors main editor's
-       * "curve" gesture (`use-sub-vector-network-editor.ts:141-149`).
+       * this one tangent (singleton-this).
        *
        * The deferred `select_tangent` is cancelled at drag-promote per
        * the standard rule — no select intent fires.
@@ -451,6 +481,23 @@ export type PointerDownDecision =
       mode: SelectMode;
       pending: PendingPlan;
     }
+  | {
+      /**
+       * Eagerly emit a `select_region` intent AND open a pending pointer-down
+       * for drag-promotion. Mirrors `immediate_select_segment` for closed-loop
+       * region picks: the region is selected at pointer-down; a drag promotes
+       * to `translate_vector_selection` over the loop's endpoint vertices.
+       *
+       * Click-no-drag leaves the region selected (the host's commit policy
+       * decides whether that also promotes the loop's segments into the
+       * sub-selection mirror — the HUD doesn't presume).
+       */
+      kind: "immediate_select_region";
+      node_id: NodeId;
+      region: number;
+      mode: SelectMode;
+      pending: PendingPlan;
+    }
   | { kind: "pend"; pending: PendingPlan }
   | {
       kind: "start_marquee_pend";
@@ -504,7 +551,8 @@ export function classifyScenario(input: PointerDownInput): Scenario {
       (ui_action.kind === "vertex_handle" ||
         ui_action.kind === "tangent_handle" ||
         ui_action.kind === "segment_strip" ||
-        ui_action.kind === "ghost_handle");
+        ui_action.kind === "ghost_handle" ||
+        ui_action.kind === "region");
     if (!is_vector_control) return Scenario.ExitEdit;
   }
 
@@ -541,6 +589,34 @@ export function classifyScenario(input: PointerDownInput): Scenario {
       }
       case "ghost_handle":
         return readonly ? Scenario.Noop : Scenario.HandleGhostSplit;
+      case "padding_handle":
+        // The padding-handle gesture is opened eagerly in state.ts
+        // (before classifyScenario runs). This case is reached only
+        // when classification is exercised directly (tests / inspectors).
+        return readonly ? Scenario.Noop : Scenario.HandlePaddingDrag;
+      case "transform_box_body":
+      case "transform_box_side":
+      case "transform_box_corner":
+        // Transform-box gestures are opened eagerly in state.ts (before
+        // classifyScenario runs) for all 3 hit kinds. This case is
+        // reached only when classification is exercised directly
+        // (tests / inspectors).
+        return readonly ? Scenario.Noop : Scenario.HandleTransformBoxDrag;
+      case "padding_region":
+        // Body of a padding-overlay side is **event-transparent**: it
+        // wins the hit-test only to drive the hover stripe paint, NOT
+        // to intercept clicks. Fall out of the switch and let Tier-2 /
+        // empty-space classification fire as if there were no UI hit
+        // — clicks on the body translate the underlying selection (or
+        // marquee, etc.), exactly like clicks on the rest of the
+        // container's body. The handle (at higher priority) is the
+        // sole interactive padding overlay.
+        break;
+      case "region":
+        if (readonly) return Scenario.Noop;
+        return modifiers.shift
+          ? Scenario.HandleRegionAdd
+          : Scenario.HandleRegionReplace;
 
       case "select_node": {
         // Treated like Tier-2 content: it's a content-representative click.
@@ -657,9 +733,8 @@ const SEGMENT_VARIANT_TO_SCENARIO: Record<AxisVariant, Scenario> = {
  * bend." Singleton-this is therefore a strict equality, not a
  * cardinality check.
  *
- * Mirrors main editor's `use-sub-vector-network-editor.ts:141-149`
- * branch: `multi > 1` (mixed or multiple) → translate-vector-controls;
- * else → curve/bend gesture.
+ * The branching rule: `multi > 1` (mixed or multiple) → delta-translate
+ * the whole selection; else → curve/bend gesture for this single target.
  */
 function isSingletonThisSegment(
   segment: number,
@@ -826,8 +901,7 @@ function dispatch(
     //     `start_translate_tangent` (curve/set_tangent gesture).
     //   - else (multi/mixed) → `translate_vector_selection` (delta-translate
     //     the whole sub-selection; host applies delta to selected tangents
-    //     too, with parent-vertex exclusion — see svg-editor's
-    //     `handle_translate_vector_selection`).
+    //     too, with parent-vertex exclusion).
     case Scenario.HandleTangentReplace:
     case Scenario.HandleTangentAdd: {
       const a = ui_action as Extract<OverlayAction, { kind: "tangent_handle" }>;
@@ -955,6 +1029,42 @@ function dispatch(
         },
       };
     }
+    case Scenario.HandleRegionReplace:
+    case Scenario.HandleRegionAdd: {
+      const a = ui_action as Extract<OverlayAction, { kind: "region" }>;
+      return {
+        kind: "immediate_select_region",
+        node_id: a.node_id,
+        region: a.region,
+        mode: modifiers.shift ? "toggle" : "replace",
+        pending: {
+          ids_at_down: [],
+          // Drag from a region body translates the loop's segments and
+          // their endpoint vertices. The HUD seeds the additional
+          // vertex indices from the action so the host can translate
+          // the loop even before its `setVectorSelection` echoes the
+          // region select back into the sub-selection mirror.
+          promote_to: {
+            kind: "translate_vector_selection",
+            node_id: a.node_id,
+            additional_vertex_indices: a.vertices,
+          },
+        },
+      };
+    }
+    case Scenario.HandlePaddingDrag:
+      // The eager intercept in `state.ts:onPointerDown` handles this
+      // scenario; the classifier reaches here only when invoked
+      // directly (tests / inspectors). Returning `noop` here keeps the
+      // dispatch table total without duplicating gesture-open logic.
+      return { kind: "noop" };
+
+    case Scenario.HandleTransformBoxDrag:
+      // Same pattern as HandlePaddingDrag — the gesture is opened
+      // eagerly in `state.ts:onPointerDown` for all 3 hit kinds. This
+      // dispatch arm is reached only by direct classifier invocation.
+      return { kind: "noop" };
+
     case Scenario.HandleGhostSplit: {
       const a = ui_action as Extract<OverlayAction, { kind: "ghost_handle" }>;
       // Cursor is ON the ghost insertion knob — eager dispatch. The
@@ -1122,6 +1232,47 @@ export function decideIdleCursor(input: {
       case "ghost_handle":
         // On the half-point insertion knob: click splits, drag bends.
         return "pointer";
+      case "region":
+        // Hovering a closed-loop body — click selects the region,
+        // drag translates the loop. `pointer` reads like every other
+        // vector control's idle cursor; switching to `move` would
+        // suggest "drag-only," which isn't the contract here.
+        return "pointer";
+      case "padding_region":
+        // Body is event-transparent. Defer to the underlying scene's
+        // cursor — falls through to the post-switch logic below.
+        break;
+      case "padding_handle":
+        // Mid-edge drag knob on a padding-overlay side. Axis-aligned:
+        // top/bottom → vertical resize cursor; left/right → horizontal.
+        return ui_action.side === "top" || ui_action.side === "bottom"
+          ? { kind: "resize", direction: "n" }
+          : { kind: "resize", direction: "w" };
+      case "transform_box_body":
+        // Body of a transform-box: translate. Same `move` cursor as
+        // translate_handle. (Visually consistent with the rest of the
+        // "drag the body to translate" affordance.)
+        return "move";
+      case "transform_box_side":
+        // Side of a transform-box: scale on that axis. `base_angle`
+        // tilts the resize arrow to match the visible box rotation —
+        // mirrors `resize_handle.baseAngle` so the cursor never drifts
+        // off-axis when the box rotates.
+        return {
+          kind: "resize",
+          direction:
+            ui_action.side === "top" || ui_action.side === "bottom" ? "n" : "w",
+          baseAngle: ui_action.base_angle,
+        };
+      case "transform_box_corner":
+        // Corner of a transform-box: rotate. Use the rotate-arc cursor
+        // (the gesture IS a rotate) tilted by `base_angle`. Mirrors
+        // `rotate_handle.baseAngle`.
+        return {
+          kind: "rotate",
+          corner: ui_action.corner,
+          baseAngle: ui_action.base_angle,
+        };
     }
   }
   if (hovered_id && selection_ids.includes(hovered_id)) {
@@ -1136,13 +1287,12 @@ export function decideIdleCursor(input: {
  *
  * Used by `decideIdleCursor` and by the rotate-gesture cursor compositor
  * so the resize / rotate cursor always tilts to match the selection's
- * orientation — without requiring the HUD's camera to be axis-aligned
- * for the doc-space angle to be the right thing to render (the renderer
- * draws the cursor in screen px, and in svg-editor the camera contributes
- * scale + translate only, so doc-space == screen-space rotation).
+ * orientation — without requiring the HUD's camera to be axis-aligned.
+ * Hosts whose camera contributes scale + translate only get
+ * doc-space == screen-space rotation here.
  *
  * For hosts that ROTATE the HUD camera, this should compose with the
- * camera's angle at consume time. Not relevant for svg-editor.
+ * camera's angle at consume time.
  */
 function shape_screen_angle_rad(shape: SelectionShape): number {
   if (shape.kind !== "transformed") return 0;

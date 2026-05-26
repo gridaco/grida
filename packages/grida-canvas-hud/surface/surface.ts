@@ -39,7 +39,15 @@ import {
   mergeDraws,
   type SurfaceChromeGroups,
 } from "./chrome";
-import { buildVectorChrome, type VectorOverlay } from "./vector-chrome";
+import { buildVectorChrome, type VectorOverlay } from "../classes/vector-path";
+import {
+  buildPaddingOverlay,
+  type PaddingOverlayInput,
+} from "../classes/padding";
+import {
+  buildTransformBox,
+  type TransformBoxInput,
+} from "../classes/transform-box";
 import type { OverlayElement } from "../event/overlay";
 import type { VectorSubSelection } from "../event/state";
 
@@ -117,8 +125,7 @@ export interface SurfaceOptions {
    *   and matches the "owning segment hovers → midpoint becomes visible"
    *   mental model.
    * - `"projected"` — at the nearest point on the curve to the cursor
-   *   (`cmath.bezier.project`). Mirrors the main editor's
-   *   `snapped_segment_p` model — the ghost tracks the cursor along the
+   *   (`cmath.bezier.project`). The ghost tracks the cursor along the
    *   curve. More expressive but adds a "where exactly will this land?"
    *   cognitive step.
    *
@@ -132,11 +139,10 @@ export interface SurfaceOptions {
    * - `"marquee"` (default) — axis-aligned rect selection.
    * - `"lasso"` — freeform polygon selection.
    *
-   * Pushed by the host alongside its own tool toggle (e.g. Q key in the
-   * svg-editor swaps cursor ↔ lasso tools and calls
-   * `setVectorSelectionMode`). The HUD reads it only at empty-space drag
-   * promotion; no other branch consults it. Symmetric with
-   * `vectorInsertionMode`.
+   * Pushed by the host alongside its own tool toggle (e.g. when the host
+   * swaps cursor ↔ lasso tools) via `setVectorSelectionMode`. The HUD reads
+   * it only at empty-space drag promotion; no other branch consults it.
+   * Symmetric with `vectorInsertionMode`.
    */
   vectorSelectionMode?: VectorSelectionMode;
   /**
@@ -187,6 +193,12 @@ export class Surface {
    */
   private cornerRadius: readonly CornerRadiusInput[] = [];
   private parametricHandles: readonly ParametricHandleInput[] = [];
+  /**
+   * Padding-overlay input. `null` = no chrome drawn. Hosts push on
+   * flex-parent selection; clear on deselect / mode exit. See
+   * `setPaddingOverlay`.
+   */
+  private paddingOverlay: PaddingOverlayInput | null = null;
   // Explicit host color override; when set, beats `style.chromeColor` in
   // every paint until cleared via `setColor(null)`.
   private colorOverride: string | undefined;
@@ -339,6 +351,53 @@ export class Surface {
   }
 
   /**
+   * Configure or clear the built-in padding-overlay chrome — the
+   * `padding` named class for flex-parent container padding editing.
+   *
+   * Pass an input to enable the chrome (four inset side rects with
+   * diagonal-stripe hover/selected paint + four mid-edge drag handles).
+   * Pass `null` to disable. Schema-level feature flag — absence is the
+   * off-state, no separate boolean to drift.
+   *
+   * The HUD owns hover (including alt-held axis-mirror visual), reads
+   * the `alt` modifier directly for the intent's `mirror` flag, and
+   * emits `padding_handle` intents on drag (preview-stream + commit).
+   * The host applies the value to its node's `layout_padding_{side}`
+   * field and pushes a re-rendered input back via `setPaddingOverlay`
+   * so the chrome reflects the new value.
+   *
+   * Mid-gesture state mirror: hosts SHOULD push `active_side` while a
+   * `padding_handle` gesture is in flight so the dragged side paints
+   * with the "selected" stripe variant (and the opposite side too,
+   * when alt is held). Clear `active_side` on commit.
+   *
+   * See `@grida/hud/classes/padding` for the input shape and
+   * paint/hit/priority details.
+   */
+  setPaddingOverlay(input: PaddingOverlayInput | null): void {
+    this.paddingOverlay = input;
+  }
+
+  /**
+   * Push a transform-box input — the `transform-box` named class for
+   * a 2×3 affine transform manipulated via quad outline + 4 corners +
+   * 4 sides + body. `null` = no chrome drawn (schema-level feature
+   * flag).
+   *
+   * Hosts re-push input whenever the bound transform / size / origin
+   * / rotation changes (driven by the host's reducer applying the
+   * `transform_box` intent). The chrome rebuilds every draw.
+   *
+   * See `@grida/hud/classes/transform-box` for the input shape and
+   * hit/priority/anti-goals details.
+   *
+   * @unstable
+   */
+  setTransformBox(input: TransformBoxInput | null): void {
+    this.state.setTransformBox(input);
+  }
+
+  /**
    * Update just the ruler's transform. Cheap to call per camera tick.
    * No-op when no ruler config is set.
    */
@@ -480,6 +539,49 @@ export class Surface {
         // priority value via the priority field, not push order).
         for (const o of vector_chrome.overlays) overlays.push(o);
       }
+    }
+
+    // Padding overlay. Emitted ABOVE selection chrome (it's a content
+    // control set) and BELOW resize handles via the priority ladder
+    // (`PADDING_REGION_PRIORITY` loses to resize; the handle wins). The
+    // HUD owns the active-drag visual: when the gesture state is
+    // `padding_handle`, that side's stripe paints with the `selected`
+    // token — no host-pushed `active_side` shadow.
+    if (this.paddingOverlay) {
+      const g = this.state.gesture;
+      const active_side =
+        g.kind === "padding_handle" && g.node_id === this.paddingOverlay.node_id
+          ? g.side
+          : undefined;
+      const padding_overlays = buildPaddingOverlay({
+        overlay: this.paddingOverlay,
+        style: this.style,
+        hover: this.state.getPaddingHover(),
+        alt_held: this.state.modifiers.alt,
+        transform: this.state.getTransform(),
+        active_side,
+      });
+      for (const o of padding_overlays) overlays.push(o);
+    }
+
+    // Transform-box overlay. Same z-band as padding (only one of these
+    // classes is active at a time in practice — image-fit content-edit
+    // doesn't co-exist with flex-parent overlay). Hit-priority ordering
+    // (corner=13, side=14, body=38) does the real arbitration, push
+    // order is just visual.
+    const tb_input = this.state.getTransformBox();
+    if (tb_input) {
+      const g = this.state.gesture;
+      const active_op =
+        g.kind === "transform_box" && g.id === tb_input.id ? g.op : undefined;
+      const tb_overlays = buildTransformBox({
+        overlay: tb_input,
+        style: this.style,
+        hover: this.state.getTransformBoxHover(),
+        transform: this.state.getTransform(),
+        active_op,
+      });
+      for (const o of tb_overlays) overlays.push(o);
     }
 
     const hidden = this.opts.visibility?.({

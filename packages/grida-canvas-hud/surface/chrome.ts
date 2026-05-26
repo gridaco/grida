@@ -749,6 +749,7 @@ export function fanOverlays(
         strokeWidth: el.render.strokeWidth,
         dashed: el.render.dashed,
         color: el.render.color,
+        fillPaint: el.render.fillPaint,
         group: el.group,
       });
     }

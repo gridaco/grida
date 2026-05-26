@@ -10,6 +10,104 @@ The HUD is the non-content visual chrome drawn on top of the viewport: selection
 
 In industry terms: Blender calls this "Overlays", Unity calls it "Gizmos", game engines call it "HUD". We use HUD.
 
+## What this package is — two tiers
+
+The package ships **two tiers** of API with different audiences. They are not a hierarchy — they are two products shipped from one package.
+
+### Tier 1 — Named classes (the inhouse vocabulary)
+
+A **named class** is a composed, opinionated interaction model that represents one coherent editable concept. Each class encapsulates:
+
+- A model — the math it edits, the gesture grammar that mutates it, the intent contract it commits to
+- HUD-owned hover, cursor, hit priority, modifier interpretation
+- A bounded feature surface — _capability_ toggles only (does this instance have padding? does it support corner radius?), not visual variants (colors, thicknesses — those are style tokens)
+
+Named classes are the vocabulary the Grida editor uses by default. The host writes a compact binding class around `@grida/hud` that calls one setter per active named class per logical "thing" being edited. HUD does not try to _be_ the binding class — that's the god-class trap.
+
+The hard rule that prevents god classes: **a named class is defined by its model, not its chrome.** Padding (4 side numerics), corner-radius (4 corner radii), resize-box (rect mutation), size-meter (display-only) all share "a rect" as their target — they are four classes, not features of one. If two candidates share a model and only differ visually, they are one class with a style/feature axis.
+
+### Tier 2 — Primitives (the open building blocks)
+
+Two kinds of code live in `primitives/`, with different audiences:
+
+- **Genuinely-Tier-2 atoms** — un-opinionated, externally-consumable building blocks. The draw vocabulary (`HUDRect`, `HUDPaint`, `HUDPolyline`, `HUDScreenRect`, `HUDMarker`, paint primitives), the hit-priority infrastructure, the cursor renderer protocol. External consumers building editors that don't fit any named class compose against these.
+
+- **Class-bound math factored out of a class** — `reduceTransformBox`, corner-radius geometry, parametric-handle math. These live in `primitives/` for code organization (one file per math domain, pure-function tests without mounting the chrome), but their closure of valid actions IS the chrome's gesture grammar. An external consumer cannot use `reduceTransformBox` without re-implementing the transform-box chrome around it. They are not Tier 2 in the audience sense — they are class-bound implementation details that happen to live alongside Tier 2 atoms.
+
+When auditing whether a new module belongs in `primitives/` vs. `classes/<name>/`, the question is _consumability_: would an external consumer building an unrelated editor use this directly? If yes, Tier 2. If no but the code is pure and reusable by tests, `primitives/` is still its home — but flag it in the module header as class-bound, and don't claim Tier 2 in docs.
+
+### Composition contract
+
+The central guarantee that makes the inhouse pattern work — multiple setters from a compact host binding class targeting the same logical thing via a shared `id` — and the part this package treats as _tested_ (not emergent):
+
+1. Multiple setters may target the same logical thing via a shared `id`. The `id` is an opaque string the host chooses — it is the _composition-time matching key_, not a typed contract. Classes that target different concepts use different field names by convention (`node_id` for scene-node-bound classes; bare `id` for affine-bound classes like transform-box, which can edit non-node things like image fills), but two classes co-target the same logical thing iff the host hands them the same string.
+2. `HUDSemanticGroup` + the host's visibility policy gate which classes are active.
+3. The SDK owns the priority ladder. It is internal, deterministic, and stable across releases.
+4. Any combination of active classes × visibility config × id-sharing pattern produces:
+   - A deterministic hover state (highest-priority hit wins, ties broken by declaration order)
+   - A deterministic cursor (resolved from hover)
+   - Independent intents per class (each class commits to its own field; no shared intent payloads, no implicit coordination)
+   - No phantom hits, no flickering hover, no stuck cursor
+5. A **co-target test matrix** under [`__tests__/composition/`](./__tests__/composition/) enforces (4). The matrix exists today with the first cell (`padding × transform-box`, 5 assertions); each subsequent class migration adds one row + one column. The full matrix is planned out in [`__tests__/composition/README.md`](./__tests__/composition/README.md); today's coverage is one pair, growing per-migration.
+
+#### Priority overrides — deferred
+
+Per-instance priority bias is currently **unspecified**. `HUDSemanticGroup` + the host's visibility policy is the only host-facing knob for "what shows when." If a real consumer needs to override priority under a specific circumstance, file an issue with the concrete use case; the API choice (closed enum, numeric bias, group-driven) follows the consumer. Until then: no API. This is consistent with the promotion-bar's "two consumers shape the contract" rule.
+
+### Named-class conventions
+
+- **Schema-level feature flags.** Absence of the host's `setX(...)` input is the off-state. No `SurfaceOptions.features.X` booleans to drift.
+- **HUD-owned hover and modifier reading.** Hosts push state; HUD owns the live affordance.
+- **Host-owned commit.** Intents stream `phase: "preview"` and a final `phase: "commit"`.
+- **Anti-goals header per class.** Each named class's surface module enumerates what it deliberately is NOT, in plain English.
+
+### What justifies a new named class
+
+The promotion bar — first match wins, top down. Apply this to every candidate that wants to land as a class (new model, or split-out of an existing module):
+
+1. **Model audit.** Does the candidate share a model (math + gestures + intent payload shape) with an existing class? If yes, **fold** — it is a feature toggle, a style axis, or a binding-target on the existing class, not a new one.
+2. **Closed gesture grammar.** Can every interaction be enumerated as a finite (target × gesture × modifier) → intent table, with no open-ended customization slot? If no, it is **host code over primitives**, not a named class.
+3. **Two consumers (or one + adversarial demo).** Is the model exercised by ≥2 distinct internal consumers, or by 1 real consumer plus a demo whose binding target differs enough to falsify accidental coupling? If no, **wait** — the contract is not yet shaped; keep it private inside the consumer.
+4. **Feature flags are capability flags.** Every flag must name a _capability_ (has padding? supports corner radius?), never a _visual variant_ (color, thickness, dash pattern — those are style tokens). Shape-of-model toggles count as capability (`single radius` vs `4 per-corner radii` is a model-shape difference, so it's a capability — but the class then commits to handling both shapes coherently in one gesture grammar; if it can't, see rule #1).
+5. **Stable identity.** One noun. `VectorPath`, not `Path-with-vertices-and-segments-and-regions`. If naming requires a phrase, the model is not yet crisp.
+
+A candidate failing any rule routes to: fold (1), host code (2), wait (3), style token (4), or naming work (5).
+
+### Promotion contract
+
+Every promoted class ships with:
+
+- Public input type declared `@unstable` until rule #3 is satisfied for real.
+- Anti-goals header in the class's `surface.ts`.
+- Tests under [`__tests__/classes/<name>/`](./__tests__/) covering: feature-flag null-state, hit asymmetry (visible chrome strictly contained in hit region — Fitts'-reach), every gesture in the grammar, every intent variant, hover + cursor mapping, decision-module wiring, equality + snapshot of public types.
+- One row in the [co-target test matrix](./__tests__/composition/) per (this-class, other-class) pair that may share an `id`.
+- Demo section in `editor/app/(dev)/ui/components/hud/_showcase.tsx` — fixture, host adapter, intent log, every feature toggled, verified off-state.
+- One row in the **Named classes** table below.
+
+### Named classes
+
+The table below lists every promoted named class. The package ships them; the host's binding class consumes them.
+
+| Class           | Model                                                                                            | Source                                               | Demo                                               |
+| --------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------- |
+| `padding`       | 4 side numerics (top/right/bottom/left) committed by side-handle drag, optional alt-mirror       | [`classes/padding/`](./classes/padding/)             | `editor/app/(dev)/ui/components/hud/_showcase.tsx` |
+| `transform-box` | 2×3 affine on a unit box, mutated by 4 corners (rotate) / 4 sides (scale) / body (translate)     | [`classes/transform-box/`](./classes/transform-box/) | `editor/app/(dev)/ui/components/hud/_showcase.tsx` |
+| `vector-path`   | Path (vertices + segments + tangents + optional regions) under 10 intent variants over one model | [`classes/vector-path/`](./classes/vector-path/)     | `editor/app/(dev)/ui/components/hud/_showcase.tsx` |
+
+**Co-target coverage gap.** The promotion contract above requires one matrix row per `(this-class, other-class)` pair. Today's matrix covers `padding × transform-box` only; `vector-path`'s rows are pending (`vector-path × padding` and `vector-path × transform-box` are both `N/A` per the matrix plan since vector-path cannot share an `id` with rect-bound classes, but the N/A cells should still be marked in the matrix — see `__tests__/composition/README.md`). Tracked as a follow-up; does not block further migrations.
+
+#### Pending migrations
+
+Modules below predate the doctrine and are **candidates** for promotion under the rules above. Each migration is one PR.
+
+| Existing module                                                                                                                | Target                                                                             | Audit status                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `primitives/corner-radius.ts` (chrome path) + `setCornerRadius`                                                                | `classes/corner-radius/`                                                           | pending — chrome currently inline in `surface/surface.ts:778–927`; needs extraction before relocation |
+| `primitives/parametric-handle.ts` (chrome path) + `setParametricHandles`                                                       | `classes/parametric-handle/`                                                       | pending — same situation as corner-radius (inline in surface.ts)                                      |
+| Selection chrome inside `surface/chrome.ts` (resize handles, rotate handles, selection outline, hover overlay, marquee, lasso) | split per audit into `classes/{resize-box, selection-outline, marquee, lasso, …}/` | deferred — largest single migration; lands last after smaller migrations settle the contract          |
+
+See [`classes/README.md`](./classes/README.md) for the folder convention each migration adopts and the per-module promotion-bar dry-run.
+
 ## Why a canvas-based surface
 
 The DOM approach — positioned `<div>` handles, `data-grida-id` for hit-test, native dblclick — works until it doesn't. Concrete failures we hit before this package existed:
@@ -500,6 +598,59 @@ The `resize` gesture operates in the local frame: `applyResize` takes a `Selecti
 
 **v1 caveats.** Pure rotation is exact at every level (render, hit, gesture). Skew and non-uniform scale render correctly but use a uniform-scale fallback for handle sizing — anisotropic per-axis sizing is a follow-up.
 
+## Vector regions
+
+A **region** is a closed loop of segments — a "face" of the vector network — that the user can click on to select. The interior fills with a diagonal-stripe pattern on hover; on commit, the same paint at higher opacity reads as the selected affordance. Drag from the interior translates the loop's segments and endpoint vertices.
+
+Region picking is part of the core interaction model for path content-edit on closed sub-paths (without it, the user can't get from "hovering the artwork" to "editing this loop" without aiming at a thin segment outline). But the data — closed-loop enumeration — varies by backend: some hosts derive faces via planar-graph traversal (e.g. `vn.VectorNetworkEditor.getLoops()`); others can't.
+
+**The feature flag is the schema.** Hosts that can enumerate loops populate `VectorOverlay.regions`; hosts that can't omit the field. Absence is the off-state. No separate boolean to keep in sync with the data, no runtime `if (regionsEnabled)` branches — the shape of what the host hands the HUD IS the flag.
+
+```ts
+type VectorOverlay = {
+  vertices: ReadonlyArray<readonly [number, number]>;
+  segments?: ReadonlyArray<{ a; b; a_control; b_control }>;
+  neighbours?: ReadonlyArray<number>;
+  /** Schema-level feature flag — omit if not supported. */
+  regions?: ReadonlyArray<{ segments: ReadonlyArray<number> }>;
+  origin?: readonly [number, number];
+};
+```
+
+Each region names the segment indices forming one closed loop, in traversal order. The HUD reconstructs the cubic path at chrome build time from `vertices + segments[region.segments[i]]` — regions carry no own geometry, so "region equals closed loop of segments" stays a structural truth.
+
+### Selection mirror
+
+Hosts push the host-authoritative region selection through `setVectorSelection({ ..., regions: [N] })`. The field is optional for backward compat — `undefined` is treated as `[]`. The chrome reads it each frame to apply the `selected` paint.
+
+### Hit-test
+
+Region hit-test is **polygon-in-screen-space**: the chrome builder rasterises the cubic loop to N samples per segment and registers a screen-space AABB paired with a `customHitTest` closure that runs `cmath.polygon.pointInPolygon`. Same AABB-plus-refinement model the segment-strip uses — no new geometry primitive in `HitRegions`, no separate doc-space path-hit infrastructure.
+
+### Priority
+
+`REGION_PRIORITY = 9` — strictly above `SEGMENT_STRIP_PRIORITY (8)`, so any vertex / tangent / ghost / segment-strip control within the loop wins on overlap; strictly below the implicit "no overlay → empty-space miss" so an interior click selects the region instead of falling through to the marquee.
+
+### Paint states
+
+| State    | Render                                                                                                                                       |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| idle     | No fill — render omitted entirely. The hit region is registered, but the body is visually transparent.                                       |
+| hover    | `doc_polyline` with `fillPaint = style.vectorRegionHoverPaint` (default: `HUDPaintStripes` at 45° / 8px / 1.5px, accent color, 50% opacity). |
+| selected | Same shape, `fillPaint = style.vectorRegionSelectedPaint` (default: same stripes at 70% opacity).                                            |
+
+Hover wins over selected — matches the precedence on every other vector overlay (vertex / tangent / segment / ghost knobs).
+
+### Intent
+
+```ts
+| { kind: "select_region"; node_id: NodeId; region: number; mode: SelectMode }
+```
+
+Eager at pointer-down (parity with `select_segment` on the "not yet in axis-set" branch). Shift toggles, no-shift replaces — the host's commit policy decides whether to also propagate the loop's segments into the sub-selection mirror.
+
+Drag from the region body promotes to the existing `translate_vector_selection` intent (no new translate kind). The HUD seeds `additional_vertex_indices` with the loop's endpoint vertices so the gesture works even before the host echoes the region select back into the sub-selection mirror.
+
 ## Primitives — what `HUDCanvas` can draw
 
 | Primitive       | Coordinate space                                       | Used by                                       |
@@ -523,7 +674,7 @@ packages/grida-canvas-hud/
 ├── README.md
 ├── index.ts                   # Surface, HUDCanvas, public types
 ├── react.tsx                  # useHUDSurface hook
-├── primitives/                # UI — dumb render shapes
+├── primitives/                # Tier 2 — un-opinionated draw + math atoms
 │   ├── canvas.ts              # HUDCanvas
 │   ├── types.ts               # HUDDraw, HUDLine, HUDRect, HUDPolyline, HUDRule, HUDScreenRect
 │   ├── pixel-grid.ts          # inlined pure draw routine (sibling: @grida/pixel-grid)
@@ -532,26 +683,36 @@ packages/grida-canvas-hud/
 │   ├── measurement-guide.ts   # HUDDraw builder
 │   ├── marquee.ts             # legacy HUDDraw builder (surface emits its own marquee)
 │   └── lasso.ts               # HUDDraw builder
-├── event/                     # the math core
+├── event/                     # the math core (shared dispatch, cross-class)
 │   ├── event.ts               # SurfaceEvent, Modifiers, PointerButton
 │   ├── gesture.ts             # SurfaceGesture + transitions
 │   ├── hit-regions.ts         # screen-space AABB region registry
 │   ├── handles.ts             # 8 resize + 4 rotate geometry & hit-test
 │   ├── click-tracker.ts       # dblclick / multi-click detection
 │   ├── cursor.ts              # CursorIcon, ResizeDirection, RotationCorner
-│   ├── intent.ts              # Intent types + builders
+│   ├── intent.ts              # Intent types + builders (unions across all classes)
 │   ├── transform.ts           # screen ↔ doc helpers
 │   └── state.ts               # SurfaceState — pure dispatch entry
-├── surface/                   # the wired class
-│   ├── surface.ts             # Surface class
-│   ├── chrome.ts              # builds HUDDraw from SurfaceState + shapeOf
+├── classes/                   # Tier 1 — promoted named classes (see classes/README.md)
+│   ├── README.md              # folder convention + per-class file layout + promotion-bar dry-run
+│   ├── padding/               # migrated from surface/padding-overlay.ts
+│   ├── transform-box/         # migrated from surface/transform-box.ts
+│   └── vector-path/           # migrated from surface/vector-chrome.ts
+├── surface/                   # orchestration only
+│   ├── surface.ts             # Surface class — still hosts inline chrome for corner-radius + parametric-handle (pending extraction)
+│   ├── chrome.ts              # builds HUDDraw from SurfaceState + shapeOf (pre-migration host of selection chrome — split deferred)
 │   └── style.ts               # HUDStyle defaults + merge
-└── cursors/                   # opt-in subpath: @grida/hud/cursors
-    ├── index.ts               # cursors.defaultRenderer(), templates, encoder
-    ├── renderer.ts            # CursorIcon → CSS cursor: with rotation-aware SVGs
-    ├── templates.ts           # parameterized SVG cursor templates
-    └── encode.ts              # SVG → data: URL
+├── cursors/                   # opt-in subpath: @grida/hud/cursors
+│   ├── index.ts               # cursors.defaultRenderer(), templates, encoder
+│   ├── renderer.ts            # CursorIcon → CSS cursor: with rotation-aware SVGs
+│   ├── templates.ts           # parameterized SVG cursor templates
+│   └── encode.ts              # SVG → data: URL
+└── __tests__/
+    ├── composition/           # NEW — co-target matrix (see __tests__/composition/README.md)
+    └── …                      # per-class tests relocate under __tests__/classes/<name>/ as migrations land
 ```
+
+The shared dispatcher (`event/state.ts` and friends) stays unified across all classes — hover, hit-test, cursor resolution are _across_ classes. Per-class folders contribute their intent variant + priority constants, which `event/intent.ts` unions over.
 
 ## Naming conventions
 
@@ -661,47 +822,50 @@ locks the behaviour. Three layers, all required.
 
 Non-exhaustive index — open the test files for the full surface.
 
-| Behaviour                                                                                     | Pinned in                              |
-| --------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Single-click on unselected node → immediate select                                            | `decision.test.ts`                     |
-| Single-click on already-selected node → defer (drag is a live candidate)                      | `decision.test.ts`, `state.test.ts`    |
-| Shift-click on selected node → defer (toggle-remove vs drag is ambiguous)                     | `decision.test.ts`                     |
-| Click in body region with selection → always defer (drag claim)                               | `decision.test.ts`                     |
-| Dblclick on content → emits `enter_content_edit`                                              | `decision.test.ts`, `state.test.ts`    |
-| Dblclick on empty space / other node / body WHILE in content-edit → emits `exit_content_edit` | `decision.test.ts`, `state.test.ts`    |
-| Dblclick on vertex / tangent / segment-strip WHILE in content-edit → handler runs (no exit)   | `decision.test.ts`                     |
-| Marquee starts from empty-space pointer-down                                                  | `state.test.ts`                        |
-| Drag past threshold cancels a deferred select (drag-vs-click discriminator)                   | `state.test.ts`                        |
-| Tangent knob renders as a 45°-rotated square ("diamond"), smaller than vertex                 | `vector-chrome-extended.test.ts`       |
-| Vertex knob renders as a circle, selected fills with chrome color                             | `vector-chrome-extended.test.ts`       |
-| Selected tangent line is thicker than idle                                                    | `vector-chrome-extended.test.ts`       |
-| Segment outline: idle gray → hover @ 50% accent → selected solid accent                       | `vector-chrome-segment-render.test.ts` |
-| Segment strip emits N inner samples per cubic, t ∈ (0, 1)                                     | `vector-chrome-extended.test.ts`       |
-| Priority ladder: tangent (4) < vertex (5) < segment (8)                                       | `vector-chrome-extended.test.ts`       |
-| Rotation-aware cursor CSS via `cursors.defaultRenderer`                                       | `cursors.test.ts`                      |
-| Click-tracker: single vs double within window + position threshold                            | `click-tracker.test.ts`                |
+| Behaviour                                                                                     | Pinned in                                      |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Single-click on unselected node → immediate select                                            | `decision.test.ts`                             |
+| Single-click on already-selected node → defer (drag is a live candidate)                      | `decision.test.ts`, `state.test.ts`            |
+| Shift-click on selected node → defer (toggle-remove vs drag is ambiguous)                     | `decision.test.ts`                             |
+| Click in body region with selection → always defer (drag claim)                               | `decision.test.ts`                             |
+| Dblclick on content → emits `enter_content_edit`                                              | `decision.test.ts`, `state.test.ts`            |
+| Dblclick on empty space / other node / body WHILE in content-edit → emits `exit_content_edit` | `decision.test.ts`, `state.test.ts`            |
+| Dblclick on vertex / tangent / segment-strip WHILE in content-edit → handler runs (no exit)   | `decision.test.ts`                             |
+| Marquee starts from empty-space pointer-down                                                  | `state.test.ts`                                |
+| Drag past threshold cancels a deferred select (drag-vs-click discriminator)                   | `state.test.ts`                                |
+| Tangent knob renders as a 45°-rotated square ("diamond"), smaller than vertex                 | `classes/vector-path/surface-extended.test.ts` |
+| Vertex knob renders as a circle, selected fills with chrome color                             | `classes/vector-path/surface-extended.test.ts` |
+| Selected tangent line is thicker than idle                                                    | `classes/vector-path/surface-extended.test.ts` |
+| Segment outline: idle gray → hover @ 50% accent → selected solid accent                       | `classes/vector-path/segment-render.test.ts`   |
+| Segment strip emits N inner samples per cubic, t ∈ (0, 1)                                     | `classes/vector-path/surface-extended.test.ts` |
+| Priority ladder: tangent (4) < vertex (5) < segment (8)                                       | `classes/vector-path/surface-extended.test.ts` |
+| Rotation-aware cursor CSS via `cursors.defaultRenderer`                                       | `cursors.test.ts`                              |
+| Click-tracker: single vs double within window + position threshold                            | `click-tracker.test.ts`                        |
 
 ### Test file index
 
-| File                                   | Domain pinned by tests                                                                                                                                                                                                                         |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `transform.test.ts`                    | screen ↔ doc across translate, scale, DPR                                                                                                                                                                                                      |
-| `hit-regions.test.ts`                  | topmost wins, reverse iteration, clear/empty, AABB containment                                                                                                                                                                                 |
-| `handles.test.ts`                      | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                                                                                                                                                     |
-| `click-tracker.test.ts`                | single vs double within window; position threshold; multi-button isolation                                                                                                                                                                     |
-| `gesture.test.ts`                      | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                                                                                                                                                   |
-| `state.test.ts`                        | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates, exit-edit                                                                                                                                   |
-| `intent.test.ts`                       | intent stream + `phase` correctness across a full drag (preview·N → commit)                                                                                                                                                                    |
-| `decision.test.ts`                     | one test per named scenario in the selection-intent classifier, including ExitEdit gating                                                                                                                                                      |
-| `chrome.test.ts`                       | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                                                                                                                                                           |
-| `chrome-transformed.test.ts`           | `SelectionShape.transformed` end-to-end                                                                                                                                                                                                        |
-| `chrome-priority.test.ts`              | overlay priority ladder over scenarios                                                                                                                                                                                                         |
-| `cursors.test.ts`                      | `cursors.defaultRenderer` produces rotation-aware CSS values; tree-shake invariant                                                                                                                                                             |
-| `vector-chrome.test.ts`                | vector chrome baseline: vertex emission, neighbouring filter, hit-region pad                                                                                                                                                                   |
-| `vector-chrome-extended.test.ts`       | vector chrome UX: tangent diamond shape + size, selection highlight, priority ladder                                                                                                                                                           |
-| `vector-chrome-segment-render.test.ts` | segment outline state machine: idle / hover / selected styling                                                                                                                                                                                 |
-| `vector-gesture.test.ts`               | vector-specific gesture state machine: tangent drag, segment-strip click→split, drag→bend                                                                                                                                                      |
-| `ruler.test.ts`                        | inlined ruler draw routine: layout helpers (step / subtick / range-merge), drawRuler call sequence, HUDCanvas wiring (setRuler/setRulerTransform, substrate-vs-frame paint-order: ruler top-most over chrome and extras, pixel-grid back-most) |
+| File                                           | Domain pinned by tests                                                                                                                                                                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transform.test.ts`                            | screen ↔ doc across translate, scale, DPR                                                                                                                                                                                                      |
+| `hit-regions.test.ts`                          | topmost wins, reverse iteration, clear/empty, AABB containment                                                                                                                                                                                 |
+| `handles.test.ts`                              | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                                                                                                                                                     |
+| `click-tracker.test.ts`                        | single vs double within window; position threshold; multi-button isolation                                                                                                                                                                     |
+| `gesture.test.ts`                              | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                                                                                                                                                   |
+| `state.test.ts`                                | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates, exit-edit                                                                                                                                   |
+| `intent.test.ts`                               | intent stream + `phase` correctness across a full drag (preview·N → commit)                                                                                                                                                                    |
+| `decision.test.ts`                             | one test per named scenario in the selection-intent classifier, including ExitEdit gating                                                                                                                                                      |
+| `chrome.test.ts`                               | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                                                                                                                                                           |
+| `chrome-transformed.test.ts`                   | `SelectionShape.transformed` end-to-end                                                                                                                                                                                                        |
+| `chrome-priority.test.ts`                      | overlay priority ladder over scenarios                                                                                                                                                                                                         |
+| `cursors.test.ts`                              | `cursors.defaultRenderer` produces rotation-aware CSS values; tree-shake invariant                                                                                                                                                             |
+| `classes/vector-path/surface.test.ts`          | vector chrome baseline: vertex emission, neighbouring filter, hit-region pad                                                                                                                                                                   |
+| `classes/vector-path/surface-extended.test.ts` | vector chrome UX: tangent diamond shape + size, selection highlight, priority ladder                                                                                                                                                           |
+| `classes/vector-path/segment-render.test.ts`   | segment outline state machine: idle / hover / selected styling                                                                                                                                                                                 |
+| `classes/vector-path/region.test.ts`           | vector regions: closed-loop fill (idle / hover / selected), polygon hit-test, REGION_PRIORITY ladder                                                                                                                                           |
+| `classes/vector-path/gesture.test.ts`          | vector-specific gesture state machine: tangent drag, segment-strip click→split, drag→bend                                                                                                                                                      |
+| `classes/padding/surface.test.ts`              | padding overlay: per-side rect geometry, mirror handles, hover stripe / drag outline, priority ladder                                                                                                                                          |
+| `classes/transform-box/surface.test.ts`        | transform-box chrome: quad corners, side strips, body translate, cursor rotation, container-rotation de-rotation                                                                                                                               |
+| `ruler.test.ts`                                | inlined ruler draw routine: layout helpers (step / subtick / range-merge), drawRuler call sequence, HUDCanvas wiring (setRuler/setRulerTransform, substrate-vs-frame paint-order: ruler top-most over chrome and extras, pixel-grid back-most) |
 
 Render output (visual canvas correctness — paint order, anti-aliasing, the
 actual pixel result) is verified in the browser, not unit-tested. Every UX

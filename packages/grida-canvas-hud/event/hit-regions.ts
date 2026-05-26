@@ -84,12 +84,12 @@ export type OverlayAction =
        * t (cursor → nearest point on curve). Drag → start a bend gesture
        * with `ca` frozen to that same projected t.
        *
-       * Mirrors the main editor's `snapped_segment_p` model: at any cursor
-       * position there is EXACTLY ONE candidate insertion point per
-       * segment — the point on the cubic closest to the cursor. The action
-       * carries the segment's four doc-space control points; the consumer
-       * (`event/state.ts`) computes `t` on demand via `cmath.bezier.project`
-       * at the cursor's current doc-space position. No pre-sampled grid.
+       * Single-candidate insertion model: at any cursor position there is
+       * EXACTLY ONE candidate insertion point per segment — the point on
+       * the cubic closest to the cursor. The action carries the segment's
+       * four doc-space control points; `event/state.ts` computes `t` on
+       * demand via `cmath.bezier.project` at the cursor's current doc-space
+       * position. No pre-sampled grid.
        */
       kind: "segment_strip";
       node_id: NodeId;
@@ -195,6 +195,114 @@ export type OverlayAction =
        */
       a?: readonly [number, number];
       b?: readonly [number, number];
+    }
+  | {
+      /**
+       * Closed-loop "region" body within a path under content-edit. The
+       * user can click the interior of a closed sub-path to select that
+       * region. Drag from the region body promotes to
+       * `translate_vector_selection` over the loop's segments.
+       *
+       * Hit detection is **polygon-in-screen-space**: the chrome
+       * builder rasterises the cubic loop to N samples per segment,
+       * registers the screen-space AABB of the rasterised polygon,
+       * and pairs it with a `customHitTest` closure that runs
+       * `pointInPolygon`. Mirrors the segment-strip's AABB-plus-
+       * refinement model — see `surface/vector-chrome.ts`.
+       *
+       * Hit-priority (`REGION_PRIORITY = 9` in vector-chrome.ts):
+       * sits just below `SEGMENT_STRIP_PRIORITY` (8), so any vertex /
+       * tangent / ghost / segment-strip control within the loop wins.
+       * The region claims only the "empty body" of the loop.
+       */
+      kind: "region";
+      node_id: NodeId;
+      /** Region index within `VectorOverlay.regions`. */
+      region: number;
+      /** Segment indices forming the closed loop (carried so the host
+       *  can route a region select intent to its segment-aware
+       *  selection state without a separate lookup). */
+      segments: readonly number[];
+      /** Union of the loop's endpoint vertex indices. Used by drag
+       *  promotion to seed `translate_vector_selection.additional_vertex_indices`
+       *  so the gesture can translate the whole loop even before the
+       *  host has echoed the select_region back into the sub-selection
+       *  mirror. */
+      vertices: readonly number[];
+    }
+  | {
+      /**
+       * Body of a padding-overlay side on a flex-parent container. The
+       * user can hover the inset rect to see the diagonal-stripe affordance
+       * (HUD-owned hover paint). Click without drag is a no-op; drag is
+       * claimed by the paired `padding_handle` action at higher priority.
+       *
+       * The region itself emits no intent; only the handle does.
+       */
+      kind: "padding_region";
+      node_id: NodeId;
+      side: cmath.RectangleSide;
+    }
+  | {
+      /**
+       * Mid-edge drag knob on a padding-overlay side. Pointer-down opens
+       * a `padding_handle` gesture; drag emits `padding_handle` intents
+       * with the current `value` (clamped at 0) and `mirror` flag (alt
+       * latched per frame). Click-no-drag is a no-op (no commit).
+       *
+       * Carries the container `rect` and the dragged `side` so the gesture
+       * can project the cursor onto the axis and derive `value` without
+       * an extra round-trip through the chrome builder.
+       */
+      kind: "padding_handle";
+      node_id: NodeId;
+      side: cmath.RectangleSide;
+      /** Container rect at chrome build time (doc-space). */
+      rect: Rect;
+      /** Initial padding value at chrome build time (doc-space units). */
+      initial_value: number;
+    }
+  | {
+      /**
+       * Body interior of a transform-box. Click + drag emits the
+       * `translate` op for the bound transform; pointer-down without
+       * drag is a no-op (no commit).
+       *
+       * `id` is host-defined and echoes back on the intent — see
+       * `TransformBoxInput.id`.
+       */
+      kind: "transform_box_body";
+      id: string;
+    }
+  | {
+      /**
+       * Side mid-edge of a transform-box. Drag emits the `scale_side`
+       * op. Hit AABB is 12px-thick × side-length, Fitts'-
+       * reach over the visible 1px stroke (D3 — asymmetric outputs).
+       *
+       * `base_angle` is the box's effective screen-space rotation in
+       * RADIANS (CCW positive), i.e. `container.rotation +
+       * decompose(transform).rotation`. The cursor branch in
+       * `decideIdleCursor` passes it through to the `resize` cursor so
+       * the arrow tilts with the visual axis instead of staying
+       * axis-aligned. Mirrors `resize_handle.initial_shape` → cursor
+       * baseAngle.
+       */
+      kind: "transform_box_side";
+      id: string;
+      side: cmath.RectangleSide;
+      base_angle: number;
+    }
+  | {
+      /**
+       * Corner knob of a transform-box. Drag emits the `rotate` op.
+       * Hit AABB is 16×16 screen-px, Fitts'-reach over the invisible
+       * corner point. `base_angle` — see `transform_box_side`.
+       */
+      kind: "transform_box_corner";
+      id: string;
+      corner: cmath.IntercardinalDirection;
+      base_angle: number;
     }
   | {
       /**

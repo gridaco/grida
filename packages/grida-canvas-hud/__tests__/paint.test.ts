@@ -234,7 +234,7 @@ describe("HUDPaint resolver", () => {
     // Stripes branch must build a tile and call ctx.createPattern with
     // repeat="repeat". The returned style is the CanvasPattern, not a
     // color string. Counter-CTM contract: setTransform is invoked with
-    // the inverse of the ctx's current transform.
+    // a composed pattern transform.
     const { ctx, patternCalls, setTransformArgs } = mockResolveCtx();
     const paint: HUDPaintStripes = { kind: "stripes", color: "#0a6" };
     const out = resolvePaint(ctx, paint, 1);
@@ -243,6 +243,67 @@ describe("HUDPaint resolver", () => {
       patternCalls.find((c) => c.op === "ctx:createPattern")?.args[1]
     ).toBe("repeat");
     expect(setTransformArgs.length).toBe(1);
+  });
+
+  it("stripes pattern transform composes rotate(-angle) · inverse(CTM)", () => {
+    // The tile is axis-aligned horizontal stripes (rotation is NOT
+    // baked in — that's the previous bug). resolvePaint applies the
+    // rotation in the pattern transform so the visible stripes appear
+    // at the configured angle in canvas space.
+    //
+    // For identity CTM and the default 45°, the expected matrix is just
+    // rotate(-45°): [a=cos45°, b=-sin45°, c=sin45°, d=cos45°, e=0, f=0].
+    // Numerically: a=d≈0.7071, b≈-0.7071, c≈0.7071, e=f=0.
+    const { ctx, setTransformArgs } = mockResolveCtx();
+    resolvePaint(ctx, { kind: "stripes", color: "#0a6" }, 1);
+    const m = setTransformArgs[0][0] as {
+      a: number;
+      b: number;
+      c: number;
+      d: number;
+      e: number;
+      f: number;
+    };
+    const SQRT2OVER2 = Math.SQRT2 / 2;
+    expect(m.a).toBeCloseTo(SQRT2OVER2, 6);
+    expect(m.b).toBeCloseTo(-SQRT2OVER2, 6);
+    expect(m.c).toBeCloseTo(SQRT2OVER2, 6);
+    expect(m.d).toBeCloseTo(SQRT2OVER2, 6);
+    expect(m.e).toBe(0);
+    expect(m.f).toBe(0);
+  });
+
+  it("stripes pattern transform is identity at angle=0 (axis-aligned)", () => {
+    // At 0°, no rotation should be applied; the pattern transform
+    // collapses to the inverse-CTM (here identity).
+    const { ctx, setTransformArgs } = mockResolveCtx();
+    resolvePaint(ctx, { kind: "stripes", color: "x", angle: 0 }, 1);
+    const m = setTransformArgs[0][0] as {
+      a: number;
+      b: number;
+      c: number;
+      d: number;
+      e: number;
+      f: number;
+    };
+    expect(m.a).toBeCloseTo(1, 9);
+    expect(m.b).toBeCloseTo(0, 9);
+    expect(m.c).toBeCloseTo(0, 9);
+    expect(m.d).toBeCloseTo(1, 9);
+    expect(m.e).toBe(0);
+    expect(m.f).toBe(0);
+  });
+
+  it("stripes tile is built unrotated, 1 × period (axis-aligned)", () => {
+    // The tile must be axis-aligned so `repeat` tiles it without lattice
+    // mismatch. Rotation lives in the pattern transform, not the tile.
+    // Concretely: no `tile:rotate` call, and the tile dimensions are
+    // `(1, ceil-rounded spacingPx)`.
+    const { tileCalls } = installOffscreenCanvasMock();
+    buildStripesTile({ kind: "stripes", color: "x" }, 1);
+    const construct = tileCalls.find((c) => c.op === "tile:new");
+    expect(construct?.args).toEqual([1, 8]);
+    expect(tileCalls.find((c) => c.op === "tile:rotate")).toBeUndefined();
   });
 
   it("stripes defaults pin the canonical design language (45° / 8px / 1.5px)", () => {

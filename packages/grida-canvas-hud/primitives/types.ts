@@ -228,7 +228,7 @@ export interface HUDPolyline extends HUDSemantic {
   /** Opacity of the fill color, 0–1 (default: 1). Ignored when `fill` is falsy. */
   fillOpacity?: number;
   /** Stroke opacity, 0–1 (default: 1). Used for hovered-but-not-selected
-   *  affordances (the main editor's "50% opacity" segment hover state). */
+   *  affordances (e.g. segment hover at 50% opacity). */
   strokeOpacity?: number;
   /** Stroke width in screen-space CSS px. Falls back to the canvas default
    *  (1px / zoom) when absent. Required for the path-edit chrome's
