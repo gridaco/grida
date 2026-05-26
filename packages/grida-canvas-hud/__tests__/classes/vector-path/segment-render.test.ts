@@ -4,9 +4,9 @@
 // variants.
 
 import { describe, it, expect } from "vitest";
-import { buildVectorChrome } from "../surface/vector-chrome";
-import { DEFAULT_STYLE } from "../surface/style";
-import type { VectorOverlay } from "../surface/vector-chrome";
+import { buildVectorChrome } from "../../../classes/vector-path";
+import { DEFAULT_STYLE } from "../../../surface/style";
+import type { VectorOverlay } from "../../../classes/vector-path";
 
 const SEG_OVERLAY: VectorOverlay = {
   vertices: [

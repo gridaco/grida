@@ -5,10 +5,10 @@
 // hit region strictly contains the render rect on each axis (Fitts').
 
 import { describe, it, expect } from "vitest";
-import { buildVectorChrome } from "../surface/vector-chrome";
-import { DEFAULT_STYLE } from "../surface/style";
-import { MIN_HIT_SIZE } from "../event/overlay";
-import type { VectorOverlay } from "../surface/vector-chrome";
+import { buildVectorChrome } from "../../../classes/vector-path";
+import { DEFAULT_STYLE } from "../../../surface/style";
+import { MIN_HIT_SIZE } from "../../../event/overlay";
+import type { VectorOverlay } from "../../../classes/vector-path";
 
 function rectFromHit(
   hit: ReturnType<typeof buildVectorChrome>["overlays"][number]["hit"]
