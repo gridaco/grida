@@ -5,10 +5,10 @@
 // in vector-chrome-extended.test.ts.
 
 import { describe, it, expect } from "vitest";
-import { SurfaceState, type StateDeps } from "../event/state";
-import type { Intent } from "../event/intent";
-import { NO_MODS } from "../event/event";
-import { HitRegions } from "../event/hit-regions";
+import { SurfaceState, type StateDeps } from "../../../event/state";
+import type { Intent } from "../../../event/intent";
+import { NO_MODS } from "../../../event/event";
+import { HitRegions } from "../../../event/hit-regions";
 
 function makeDeps(): { deps: StateDeps; intents: Intent[] } {
   const intents: Intent[] = [];
@@ -644,9 +644,7 @@ describe("segment_strip / ghost_handle pointer-down — select / split / bend", 
   });
 
   // UX spec: default segment-body drag (no modifier) is a TRANSLATE of
-  // the sub-selection, NOT a bend. Mirrors the main editor's default
-  // cursor-tool behavior (`ve.onDragStart()` in
-  // `surface-vector-editor.tsx:339`). Bend is reserved for Meta-down
+  // the sub-selection, NOT a bend. Bend is reserved for Meta-down
   // (covered below).
   it("segment-body drag WITHOUT Meta promotes to translate_vector_selection + emits preview", () => {
     const state = new SurfaceState();
@@ -708,8 +706,7 @@ describe("segment_strip / ghost_handle pointer-down — select / split / bend", 
   });
 
   // UX spec: holding Meta during a segment-body drag switches the
-  // promotion to `bend_segment`. Mirrors the main editor's bend-tool
-  // keybind (`hotkeys.tsx:200-224`).
+  // promotion to `bend_segment`.
   it("segment-body drag WITH Meta promotes to bend_segment + emits preview", () => {
     const state = new SurfaceState();
     const { deps, intents } = makeDeps();
@@ -815,8 +812,7 @@ describe("segment_strip / ghost_handle pointer-down — select / split / bend", 
 // inserted. Matches Figma's pen/segment-add behaviour.
 describe("ghost split-and-drag (eager insert + translate)", () => {
   // Test fixture: a host that echoes setVectorSelection synchronously
-  // when it sees a split_segment intent. Mirrors svg-editor's actual
-  // `handle_split_segment` behaviour, which inserts the new vertex AND
+  // when it sees a split_segment intent — inserts the new vertex AND
   // pushes the selection mirror back to the HUD in the same call stack.
   function makeSplitEchoingDeps(state: SurfaceState): {
     deps: StateDeps;

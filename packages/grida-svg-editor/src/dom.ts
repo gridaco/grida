@@ -76,6 +76,10 @@ import { insertions, type DragModifiers } from "./core/insertions";
 import { paint } from "./core/paint";
 import { Gestures } from "./gestures/gestures";
 import { applyDefaultGestures } from "./gestures/defaults";
+import {
+  create_attention_tracker,
+  type AttentionTracker,
+} from "./util/attention";
 import { SvgTextSurface } from "./text-surface";
 import {
   PathModel,
@@ -275,6 +279,11 @@ class DomSurface implements Surface {
   private fit_on_attach: boolean;
   /** Container element (cached from options). */
   private readonly container: HTMLElement;
+  /** Pointer/focus-attention tracker — gates the doc/window-level keydown
+   *  listeners that call `preventDefault()` so the surface doesn't claim
+   *  page-level shortcuts (Space, arrows, Cmd+=, Shift+0, …) when nothing
+   *  signals interest in the surface. See `util/attention.ts`. */
+  private readonly attention: AttentionTracker;
   /** Surface-side handle on the memoized geometry provider — drives both
    *  `bounds_of` reads and the fat-hit picker's AABB pre-filter. Same
    *  instance the editor core sees via `_internal.set_geometry`. */
@@ -443,6 +452,8 @@ class DomSurface implements Surface {
     this.container = options.container;
     const container = this.container;
     this.fit_on_attach = options.fit === true;
+    this.attention = create_attention_tracker(container);
+    this.teardown.push(() => this.attention.dispose());
     // The container is exclusively owned by the surface — interactive
     // children break pointer routing (capture redirects pointerup off
     // them, so the browser never synthesizes a click). Surface the
@@ -681,6 +692,7 @@ class DomSurface implements Surface {
       // stub here that matches the SurfaceHandle shape — replaced by the
       // attach_dom_surface caller via setter below.
       handle: { detach: () => {} },
+      is_attended: () => this.attention.is_attended(),
     });
     if (options.gestures !== false) {
       applyDefaultGestures(this.gestures);
@@ -2276,15 +2288,36 @@ class DomSurface implements Surface {
   private on_keydown(e: KeyboardEvent) {
     if (this.text_edit) return;
 
+    // Attention gate — when the surface isn't attended (focus outside the
+    // container subtree AND pointer not over the container), do not claim
+    // any key. The doc-level keydown listener is broad by design (so a
+    // user holding focus in a host-rendered side panel can still hit
+    // editor shortcuts while the pointer is on the canvas), but a host
+    // that mounts the surface as one block in a larger scrollable
+    // document gets the embedded-reader state by default: body-focused,
+    // pointer in the page margin. In that state the editor must stay
+    // out of the way (page scroll, browser zoom, etc.). One exception:
+    // Escape always reaches the gesture-cancel path, because an in-flight
+    // gesture takes attention regardless of focus / pointer location.
+    // See util/attention.ts for the predicate.
+    if (e.code !== "Escape" && !this.attention.is_attended()) return;
+
     // Host-specific concern: Escape cancels any in-flight preview
     // regardless of whether the keymap consumes the event. Run before
     // dispatch so a "deselect when nothing is selected" no-op doesn't
     // swallow the preview cancel.
     if (e.code === "Escape") {
       const canceled = this.cancel_in_flight();
+      // Escape only routes into the keymap/preventDefault path AND
+      // exits the vector-edit session when the surface is attended —
+      // otherwise gesture-cancel ran above and we leave the platform
+      // default (and the editor's own mode) alone. An unattended Escape
+      // belongs to whatever host UI the user is interacting with (modal
+      // close, page-level dialog, etc.).
+      if (!this.attention.is_attended()) return;
       // If nothing in-flight got canceled AND we're in vector-edit mode,
       // Esc exits the vector-edit session entirely (matches text-edit's
-      // "Esc to leave the mode" UX, and main-editor's vector mode).
+      // "Esc to leave the mode" UX).
       if (!canceled && this.vector_edit) {
         this.exit_vector_edit();
       }

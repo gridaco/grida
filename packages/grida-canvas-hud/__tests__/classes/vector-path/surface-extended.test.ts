@@ -6,9 +6,9 @@
 // - Segment hit-strip emission (VIRTUAL — no render, only hit regions)
 
 import { describe, it, expect } from "vitest";
-import { buildVectorChrome } from "../surface/vector-chrome";
-import { DEFAULT_STYLE } from "../surface/style";
-import type { VectorOverlay } from "../surface/vector-chrome";
+import { buildVectorChrome } from "../../../classes/vector-path";
+import { DEFAULT_STYLE } from "../../../surface/style";
+import type { VectorOverlay } from "../../../classes/vector-path";
 
 // A single cubic segment from (0,0) → (10,0) with both tangents pointing
 // up by 5 px → produces an arc-shaped curve.
@@ -120,10 +120,10 @@ describe("buildVectorChrome — tangent emission", () => {
   });
 
   it("tangent knobs render as a diamond — smaller than vertex knobs", () => {
-    // UX rule (mirrors the main editor): tangent knobs render as a 45°-
-    // rotated square ("diamond") at ~0.75× the vertex knob size, so the user
-    // can tell tangents apart from vertices at a glance. Shape stays "rect"
-    // (the renderer rotates it); circle is reserved for vertices.
+    // UX rule: tangent knobs render as a 45°-rotated square ("diamond")
+    // at ~0.75× the vertex knob size, so the user can tell tangents apart
+    // from vertices at a glance. Shape stays "rect" (the renderer rotates
+    // it); circle is reserved for vertices.
     const { overlays } = buildVectorChrome({
       vector_selection: {
         node_id: "n1",

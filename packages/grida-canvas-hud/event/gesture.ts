@@ -1,4 +1,5 @@
 import cmath from "@grida/cmath";
+import type { AffineTransform } from "../primitives/transform-box";
 import type { ResizeDirection, RotationCorner } from "./cursor";
 // Type-only import — `SelectionShape` is defined in `./shape`, which itself
 // imports `NodeId` and `Rect` from this file. TS resolves cyclic type imports
@@ -291,6 +292,71 @@ export type SurfaceGesture =
        *  Pointer-up skips commit on click-only interactions because
        *  `value` is seeded from the inset-padded knob position at
        *  pointer-down. */
+      dragged: boolean;
+    }
+  | {
+      /**
+       * Drag of a `padding_handle` knob (padding named class). Opened
+       * eagerly from a `padding_handle` overlay action; emits
+       * `padding_handle` intents on every move + commit.
+       *
+       * `mirror` is NOT latched at gesture start — read live on each
+       * frame from `state.modifiers.alt`. Per the doctrine: "modifier
+       * change mid-gesture updates `mirror` on subsequent previews."
+       *
+       * The container `rect` and starting value are captured at
+       * pointer_down so subsequent value projection (`projectPaddingValue`)
+       * stays exact through camera moves — value math runs in doc-space
+       * against the rect snapshot, not the live geometry.
+       */
+      kind: "padding_handle";
+      node_id: NodeId;
+      side: cmath.RectangleSide;
+      /** Container rect snapshot at gesture start (doc-space). */
+      rect: Rect;
+      /** Initial padding value at gesture start (doc-space units). */
+      initial_value: number;
+      /** Most-recent doc-space pointer. */
+      last_doc: cmath.Vector2;
+      /** Most-recent computed value (doc-space units, clamped to [0, max]). */
+      value: number;
+      /** Flips to `true` the first time `pointer_move` advances the
+       *  gesture state. Pointer-up skips commit on click-only
+       *  interactions — `value === initial_value` on first frame. */
+      dragged: boolean;
+    }
+  | {
+      /**
+       * Drag of a transform-box handle (transform-box named class).
+       * Opened eagerly from a `transform_box_{body,side,corner}` overlay
+       * action; emits `transform_box` intents on every move + commit.
+       *
+       * `base_transform` is the transform at gesture start (frozen);
+       * each preview reduces from `base_transform` against the
+       * cumulative doc-space delta. `size` and `rotation` are the
+       * container parameters at gesture start (frozen — container
+       * doesn't change shape mid-gesture).
+       */
+      kind: "transform_box";
+      id: string;
+      op:
+        | { type: "translate" }
+        | { type: "scale_side"; side: cmath.RectangleSide }
+        | { type: "rotate"; corner: cmath.IntercardinalDirection };
+      /** Box size in doc-space units (frozen at gesture start). */
+      size: cmath.Vector2;
+      /** Container rotation (degrees) at gesture start. Used to de-rotate
+       *  doc-space cursor delta into box-local frame before reducing. */
+      rotation: number;
+      /** Transform at gesture start (frozen). */
+      base_transform: AffineTransform;
+      /** Pointer-down doc-space position. */
+      start_doc: cmath.Vector2;
+      /** Most-recent doc-space pointer. */
+      last_doc: cmath.Vector2;
+      /** Most-recent reduced transform (used for the commit emit). */
+      transform: AffineTransform;
+      /** Flips to `true` once `pointer_move` advances. Click-no-drag → no commit. */
       dragged: boolean;
     };
 

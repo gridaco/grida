@@ -14,6 +14,8 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import * as React from "react";
+import vn from "@grida/vn";
+import { PathModel } from "@grida/svg-editor";
 import type {
   HUDDraw,
   HUDPaint,
@@ -22,7 +24,13 @@ import type {
   SelectionGroup,
   SurfaceVisibilityPolicy,
 } from "@grida/hud";
-import { DEFAULT_RULER_DRAG_THRESHOLD, measurementToHUDDraw } from "@grida/hud";
+import {
+  DEFAULT_RULER_DRAG_THRESHOLD,
+  measurementToHUDDraw,
+  type PaddingOverlayInput,
+  type TransformBoxInput,
+  type AffineTransform,
+} from "@grida/hud";
 import { ParametricStar } from "./_star";
 import { SvgEditorCanvas, SvgEditorProvider } from "@grida/svg-editor/react";
 import { cursors as hud_cursors } from "@grida/hud/cursors";
@@ -44,13 +52,21 @@ import {
   CORNER_RADIUS_COMBO_RIGHT_RECT,
   emptyFixture,
   groupFixture,
+  lineFixture,
   measurementDemoFixture,
   pixelGridFixture,
   rotatedRectFixture,
   singleRectFixture,
   snapDemoFixture,
   unionShape,
-  vectorFixture,
+  VECTOR_FIXTURE_OPEN_D,
+  VECTOR_FIXTURE_CLOSED_D,
+  networkToVectorOverlay,
+  cloneNetwork,
+  paddingOverlayFixture,
+  PADDING_OVERLAY_CONTAINER_RECT,
+  transformBoxFixture,
+  TRANSFORM_BOX_FIXTURE_RECT,
   type Fixture,
 } from "./_fixtures";
 
@@ -449,7 +465,7 @@ export function PrimitivesSection() {
 
   return (
     <Section anchor="primitives">
-      <SectionHeader eyebrow="§0 Primitives" title="The atoms HUD ships">
+      <SectionHeader eyebrow="Primitives" title="The atoms HUD ships">
         Every chrome surface in this package — selection outlines, knobs,
         rulers, snap guides, measurement overlays — composes from six draw
         primitives. The stage walks them top to bottom: lines, rects, polylines,
@@ -602,10 +618,7 @@ export function PrimitivesSection() {
 export function ArchitectureSection() {
   return (
     <Section anchor="architecture">
-      <SectionHeader
-        eyebrow="§1 Architecture"
-        title="Three layers, one direction"
-      >
+      <SectionHeader eyebrow="Architecture" title="Three layers, one direction">
         Hud is a state machine plus a canvas renderer plus a thin wired surface.
         Dependencies flow{" "}
         <code className="rounded bg-zinc-100 px-1 text-[12px]">
@@ -651,7 +664,7 @@ export function SelectionScenariosSection() {
   return (
     <Section anchor="selection-scenarios">
       <SectionHeader
-        eyebrow="§2 Selection intent"
+        eyebrow="Selection intent"
         title="Pointer-down → Scenario, deterministically"
       >
         Every pointer-down classifies into one of a finite set of named
@@ -800,7 +813,7 @@ export function GroupSelectionSection() {
   return (
     <Section anchor="group-selection">
       <SectionHeader
-        eyebrow="§3 Group selection"
+        eyebrow="Group selection"
         title="One envelope, many members"
       >
         Hosts pass a pre-computed{" "}
@@ -882,7 +895,7 @@ export function LayoutSection() {
   return (
     <Section anchor="layout">
       <SectionHeader
-        eyebrow="§4 Selection chrome layout"
+        eyebrow="Selection chrome layout"
         title="9-slice — priority ladder, axis-independent negotiation"
       >
         Selection chrome is a 9-slice over the selection rect: body + 4 corners
@@ -991,7 +1004,7 @@ export function TransformedSection() {
   return (
     <Section anchor="transformed">
       <SectionHeader
-        eyebrow="§5 Transformed selections"
+        eyebrow="Transformed selections"
         title="Knobs follow the artwork, not its AABB"
       >
         When{" "}
@@ -1053,31 +1066,137 @@ export function TransformedSection() {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Line selection — endpoint chrome on a `kind: "line"` shape.
+//
+// When `shapeOf(id)` returns `{ kind: "line", p1, p2 }`, the surface skips
+// the 9-slice ladder entirely and emits a line-specific chrome: an outline
+// along the segment plus two endpoint knobs at p1/p2 carrying
+// `endpoint_handle` actions. The body translate zone uses the segment's
+// AABB inflated to `MIN_HIT_SIZE` on each axis so axis-aligned lines
+// (1-px-tall AABB) are still grabbable in the body.
+//
+// The demo runs three specimens — diagonal, horizontal, vertical — to
+// exercise both the diagonal case (real AABB) and the axis-aligned cases
+// (inflated AABB).
+// ───────────────────────────────────────────────────────────────────────────
+
+export function LineSection() {
+  const fixture = React.useMemo(() => lineFixture(), []);
+  const [state, setState] = React.useState<HUDPlaygroundState | null>(null);
+  return (
+    <Section anchor="line">
+      <SectionHeader
+        eyebrow="Line selection"
+        title="Endpoint knobs, not a 9-slice"
+      >
+        When{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">shapeOf</code>{" "}
+        returns{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">
+          {"{ kind: 'line', p1, p2 }"}
+        </code>
+        , the surface skips the 9-slice ladder and paints a line-specific chrome
+        — an outline along the segment plus two endpoint knobs that emit{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">
+          set_endpoint
+        </code>{" "}
+        intents. The body translate zone uses the segment&apos;s AABB inflated
+        to{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">
+          MIN_HIT_SIZE
+        </code>{" "}
+        on each axis so axis-aligned lines (a 1-px-tall AABB) stay grabbable.
+        Click any line to select it, drag an endpoint to move it, or drag the
+        body to translate.
+      </SectionHeader>
+      <SplitStage
+        stage={<HUDStage fixture={fixture} onState={setState} />}
+        inspector={<InspectorPanel state={state} title="Line" />}
+      />
+      <div className="mt-6">
+        <SpecTable
+          rows={[
+            {
+              name: "SelectionShape.line",
+              rule: (
+                <>
+                  <code>{"{ kind: 'line', p1, p2 }"}</code> — two doc-space
+                  endpoints. No rect, no transform; the surface treats the
+                  segment itself as the artwork.
+                </>
+              ),
+            },
+            {
+              name: "Endpoint knobs (p1, p2)",
+              rule: (
+                <>
+                  One paired overlay per endpoint, drawn as an{" "}
+                  <code>HUDScreenRect</code> at the doc-space point. Action
+                  kind: <code>endpoint_handle</code> → scenario{" "}
+                  <code>HandleEndpoint</code> → intent <code>set_endpoint</code>{" "}
+                  (preview / commit).
+                </>
+              ),
+            },
+            {
+              name: "Body AABB inflation",
+              rule: (
+                <>
+                  Body translate zone uses the segment&apos;s AABB inflated to{" "}
+                  <code>MIN_HIT_SIZE</code> on each axis. Without inflation, a
+                  horizontal or vertical line has a degenerate (zero-thickness)
+                  AABB and the body would be ungrabbable. Diagonal lines reach
+                  the threshold naturally and skip the inflation.
+                </>
+              ),
+            },
+            {
+              name: "Outline render",
+              rule: (
+                <>
+                  One <code>HUDLine</code> primitive along p1→p2 — the same
+                  primitive every other chrome uses for its outlines. No 9-slice
+                  corners or edges; the segment IS the outline.
+                </>
+              ),
+            },
+            {
+              name: "No rotation halo",
+              rule: "Endpoint drag IS the rotation affordance — moving an endpoint pivots the line around the other endpoint. No separate rotation knob.",
+            },
+            {
+              name: "set_endpoint contract",
+              rule: (
+                <>
+                  Absolute <code>pos</code>, not a delta. Hosts that bind the
+                  line to a node update the corresponding endpoint coordinate on{" "}
+                  <code>commit</code>; <code>preview</code> ghosts it without
+                  committing to history.
+                </>
+              ),
+            },
+          ]}
+        />
+      </div>
+    </Section>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // Vector chrome
 // ───────────────────────────────────────────────────────────────────────────
 
-// Ray-cast point-in-polygon, doc-space. Lasso polygons come in as
-// `[number, number][]` oldest-first; the surface treats them as closed
-// (last → first implicit), so the standard even-odd test applies.
-function pointInPolygon(
-  p: [number, number],
-  poly: readonly (readonly [number, number])[]
-): boolean {
-  if (poly.length < 3) return false;
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i];
-    const [xj, yj] = poly[j];
-    const intersect =
-      yi > p[1] !== yj > p[1] &&
-      p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
+// Stable per-loop segment indices for the merged demo. The closed circle
+// in the fixture is a single 4-segment closed loop (segments 0..3); we
+// hand it to the surface as a single region so region chrome composes
+// on the same shape that demos vertex / tangent / segment chrome.
+// Region geometry is host-derived (`vn.snapshot()` doesn't expose loops)
+// and the loop's topology is stable across vertex translations.
+const CLOSED_PATH_REGIONS: ReadonlyArray<{ segments: number[] }> = [
+  { segments: [0, 1, 2, 3] },
+];
 
 export function VectorChromeSection() {
-  const fixture = React.useMemo(() => vectorFixture(), []);
   const [state, setState] = React.useState<HUDPlaygroundState | null>(null);
   const [insertionMode, setInsertionMode] = React.useState<
     "midpoint" | "projected"
@@ -1086,39 +1205,102 @@ export function VectorChromeSection() {
     "marquee"
   );
   const [bendMode, setBendMode] = React.useState<"auto" | "always">("auto");
-  // Minimal vertex sub-selection state. The marquee/lasso intents from the
-  // surface come through `state.lastIntent` and we run our own vertex hit-
-  // test below to update this set — same shape svg-editor's path-edit
-  // session keeps.
+  // Region feature-flag toggle — proves the schema-level absence rule
+  // (no `regions` field → no region chrome rendered).
+  const [regionsEnabled, setRegionsEnabled] = React.useState(true);
+
+  // Live path geometry — held as `vn.VectorNetwork` for two reasons:
+  //   - It's vn's mutation primitives (`translateVertex`, `updateTangent`,
+  //     `splitSegment`, `bendSegment`) that turn HUD intents into geometry
+  //     changes, so holding the network avoids parse/serialize per tick.
+  //   - `@grida/svg-editor`'s `PathModel` is used ONCE at mount to parse
+  //     the canonical `d` string into a network; after that, svg-editor
+  //     stays out of the hot path. (Producer position recorded in spec
+  //     table below: `vn`-as-mutation + `PathModel`-as-serialization is
+  //     the intended composition seam.)
+  const [openNetwork, setOpenNetwork] = React.useState<vn.VectorNetwork>(() =>
+    cloneNetwork(PathModel.fromSvgPathD(VECTOR_FIXTURE_OPEN_D).snapshot())
+  );
+  const [closedNetwork, setClosedNetwork] = React.useState<vn.VectorNetwork>(
+    () =>
+      cloneNetwork(PathModel.fromSvgPathD(VECTOR_FIXTURE_CLOSED_D).snapshot())
+  );
+
+  // Sub-selection state — vertices, segments, tangents. Marquee / lasso
+  // and direct vertex/segment/tangent clicks update these; mutation
+  // intents read them (translate_vector_selection unions the selected
+  // sub-state with `additional_vertex_indices` before applying).
   const [selectedVertices, setSelectedVertices] = React.useState<number[]>([]);
+  const [selectedSegments, setSelectedSegments] = React.useState<number[]>([]);
+  const [selectedTangents, setSelectedTangents] = React.useState<
+    Array<[number, 0 | 1]>
+  >([]);
+  const [selectedRegions, setSelectedRegions] = React.useState<number[]>([]);
+
+  // Gesture-start snapshot. HUD emits intent deltas as "from gesture
+  // start to now," not incremental — so we freeze the network at
+  // preview-phase-1 and re-apply the full delta from that snapshot each
+  // tick. Cleared on commit (or on a new gesture taking over).
+  const gestureSnapshotRef = React.useRef<vn.VectorNetwork | null>(null);
+
   const vectorEdit = React.useMemo(
     () => ({
       id: "path-closed" as string,
-      selection: { vertices: selectedVertices },
+      selection: {
+        vertices: selectedVertices,
+        segments: selectedSegments,
+        tangents: selectedTangents,
+        regions: selectedRegions,
+      },
     }),
-    [selectedVertices]
+    [selectedVertices, selectedSegments, selectedTangents, selectedRegions]
   );
 
-  // Doc-space vertices of the path under edit. The hit-test predicates
-  // run against these. Closed path's origin defaults to (0,0) so the
-  // vertices already are doc-space; the +origin is here for safety.
-  const pathVertices = React.useMemo<[number, number][]>(() => {
-    const n = fixture.nodes.find((x) => x.id === "path-closed");
-    if (!n?.vector) return [];
-    const [ox, oy] = n.vector.origin ?? [0, 0];
-    return n.vector.vertices.map(
-      (v) => [v[0] + ox, v[1] + oy] as [number, number]
-    );
-  }, [fixture]);
+  // Derive the static fixture once from initial geometry, just to give
+  // HUDStage the node identities + selection bbox shape. The interactive
+  // overlay below replaces the vector overlay per render.
+  const fixture = React.useMemo<Fixture>(
+    () => ({
+      nodes: [
+        {
+          id: "path-open",
+          kind: "vector",
+          stroke: "#94A3B8",
+          vector: networkToVectorOverlay(openNetwork),
+        },
+        {
+          id: "path-closed",
+          kind: "vector",
+          stroke: "#94A3B8",
+          vector: networkToVectorOverlay(closedNetwork, {
+            neighbours: closedNetwork.vertices.map((_, i) => i),
+            regions: regionsEnabled
+              ? CLOSED_PATH_REGIONS.map((r) => ({ segments: r.segments }))
+              : undefined,
+          }),
+        },
+      ],
+      initialSelection: ["path-closed"],
+    }),
+    [openNetwork, closedNetwork, regionsEnabled]
+  );
 
-  // React to vector-select intents — runs once per real intent emission
-  // by deduping on the intent reference. Surface re-emits a fresh object
-  // every time, so reference identity is a clean edge trigger.
+  // Doc-space vertices of the closed path (for marquee/lasso hit-test).
+  const pathVertices = React.useMemo<[number, number][]>(
+    () => closedNetwork.vertices.map((v) => [v[0], v[1]] as [number, number]),
+    [closedNetwork]
+  );
+
+  // React to intents — selection + mutation. One effect, one ref-dedupe
+  // pattern. Mutation branches route by `intent.node_id` to the right
+  // network setter.
   const lastSeenIntentRef = React.useRef<Intent | null>(null);
   React.useEffect(() => {
     const intent = state?.lastIntent;
     if (!intent || intent === lastSeenIntentRef.current) return;
     lastSeenIntentRef.current = intent;
+
+    // ── Selection intents (read) ───────────────────────────────────────
     if (intent.kind === "marquee_select" && intent.phase === "commit") {
       const r = intent.rect;
       const hits: number[] = [];
@@ -1134,15 +1316,20 @@ export function VectorChromeSection() {
       setSelectedVertices((curr) =>
         intent.additive ? Array.from(new Set([...curr, ...hits])) : hits
       );
-    } else if (intent.kind === "lasso_select" && intent.phase === "commit") {
+      return;
+    }
+    if (intent.kind === "lasso_select" && intent.phase === "commit") {
       const hits: number[] = [];
       pathVertices.forEach((v, i) => {
-        if (pointInPolygon(v, intent.polygon)) hits.push(i);
+        if (cmath.polygon.pointInPolygon(v, intent.polygon as cmath.Vector2[]))
+          hits.push(i);
       });
       setSelectedVertices((curr) =>
         intent.additive ? Array.from(new Set([...curr, ...hits])) : hits
       );
-    } else if (intent.kind === "select_vertex") {
+      return;
+    }
+    if (intent.kind === "select_vertex") {
       setSelectedVertices((curr) => {
         if (intent.mode === "replace") return [intent.index];
         const s = new Set(curr);
@@ -1151,27 +1338,205 @@ export function VectorChromeSection() {
         else s.add(intent.index);
         return Array.from(s);
       });
-    } else if (intent.kind === "clear_vector_selection") {
-      setSelectedVertices([]);
+      return;
     }
-  }, [state?.lastIntent, pathVertices]);
+    if (intent.kind === "select_segment") {
+      setSelectedSegments((curr) => {
+        if (intent.mode === "replace") return [intent.segment];
+        const s = new Set(curr);
+        if (intent.mode === "add") s.add(intent.segment);
+        else if (s.has(intent.segment)) s.delete(intent.segment);
+        else s.add(intent.segment);
+        return Array.from(s);
+      });
+      return;
+    }
+    if (intent.kind === "select_region") {
+      // Mirrors the main editor's `selectLoop` policy: region selection
+      // also implies the loop's segments, so the segment chrome
+      // highlights alongside the region's stripe paint.
+      setSelectedRegions((curr) => {
+        if (intent.mode === "replace") return [intent.region];
+        const s = new Set(curr);
+        if (intent.mode === "add") s.add(intent.region);
+        else if (s.has(intent.region)) s.delete(intent.region);
+        else s.add(intent.region);
+        return Array.from(s);
+      });
+      const segs = CLOSED_PATH_REGIONS[intent.region]?.segments ?? [];
+      setSelectedSegments((curr) => {
+        if (intent.mode === "replace") return [...segs];
+        const s = new Set(curr);
+        if (intent.mode === "add") for (const x of segs) s.add(x);
+        else if (segs.every((x) => s.has(x))) for (const x of segs) s.delete(x);
+        else for (const x of segs) s.add(x);
+        return Array.from(s);
+      });
+      return;
+    }
+    if (intent.kind === "select_tangent") {
+      // HUD's intent.tangent is readonly `[number, 0|1]`; we hold a
+      // mutable copy in state because HUD's vectorEdit selection field
+      // is typed mutable.
+      const t0 = intent.tangent[0];
+      const t1 = intent.tangent[1];
+      const next: [number, 0 | 1] = [t0, t1];
+      setSelectedTangents((curr) => {
+        const same = (t: [number, 0 | 1]) => t[0] === t0 && t[1] === t1;
+        if (intent.mode === "replace") return [next];
+        if (intent.mode === "add" && !curr.some(same)) return [...curr, next];
+        if (intent.mode === "toggle") {
+          return curr.some(same)
+            ? curr.filter((t) => !same(t))
+            : [...curr, next];
+        }
+        return curr;
+      });
+      return;
+    }
+    if (intent.kind === "clear_vector_selection") {
+      setSelectedVertices([]);
+      setSelectedSegments([]);
+      setSelectedTangents([]);
+      setSelectedRegions([]);
+      return;
+    }
+
+    // ── Mutation intents — route by node_id ──────────────────────────────
+    const isMut =
+      intent.kind === "translate_vertices" ||
+      intent.kind === "translate_vector_selection" ||
+      intent.kind === "set_tangent" ||
+      intent.kind === "bend_segment" ||
+      intent.kind === "split_segment";
+    if (!isMut) return;
+
+    const targetId = intent.node_id;
+    if (targetId !== "path-closed" && targetId !== "path-open") return;
+    const liveNetwork =
+      targetId === "path-closed" ? closedNetwork : openNetwork;
+    const setNetwork =
+      targetId === "path-closed" ? setClosedNetwork : setOpenNetwork;
+
+    // ── Snapshot / phase plumbing ───────────────────────────────────────
+    // `split_segment` is atomic (no phase); everything else uses the
+    // freeze-at-preview-1, apply-from-frozen, clear-on-commit pattern.
+    if (intent.kind !== "split_segment") {
+      if (intent.phase === "preview" && !gestureSnapshotRef.current) {
+        gestureSnapshotRef.current = cloneNetwork(liveNetwork);
+      }
+    }
+    const base =
+      intent.kind === "split_segment"
+        ? liveNetwork
+        : (gestureSnapshotRef.current ?? liveNetwork);
+    const next = cloneNetwork(base);
+    const editor = new vn.VectorNetworkEditor(next);
+
+    if (intent.kind === "translate_vertices") {
+      for (const i of intent.indices) {
+        editor.translateVertex(i, [intent.dx, intent.dy]);
+      }
+    } else if (intent.kind === "translate_vector_selection") {
+      // Union: explicit additional indices + currently selected vertices
+      // + endpoints of selected segments. This mirrors the contract on
+      // the intent: HUD seeds `additional_vertex_indices`; the host
+      // unions with its own authoritative sub-selection.
+      const idxs = new Set<number>(intent.additional_vertex_indices);
+      for (const v of selectedVertices) idxs.add(v);
+      for (const segIdx of selectedSegments) {
+        const seg = base.segments[segIdx];
+        if (seg) {
+          idxs.add(seg.a);
+          idxs.add(seg.b);
+        }
+      }
+      for (const i of idxs) {
+        editor.translateVertex(i, [intent.dx, intent.dy]);
+      }
+    } else if (intent.kind === "set_tangent") {
+      const [vIdx, side] = intent.tangent;
+      // side === 0 means "ta of the segment whose a === vIdx";
+      // side === 1 means "tb of the segment whose b === vIdx".
+      const segIdx = base.segments.findIndex((s) =>
+        side === 0 ? s.a === vIdx : s.b === vIdx
+      );
+      if (segIdx >= 0) {
+        const v = base.vertices[vIdx];
+        const relative: [number, number] = [
+          intent.pos[0] - v[0],
+          intent.pos[1] - v[1],
+        ];
+        editor.updateTangent(
+          segIdx,
+          side === 0 ? "ta" : "tb",
+          relative,
+          intent.mirror
+        );
+      }
+    } else if (intent.kind === "bend_segment") {
+      const frozen = base.segments[intent.segment];
+      if (frozen) {
+        editor.bendSegment(intent.segment, intent.ca, intent.cb, {
+          a: [base.vertices[frozen.a][0], base.vertices[frozen.a][1]],
+          b: [base.vertices[frozen.b][0], base.vertices[frozen.b][1]],
+          ta: [frozen.ta[0], frozen.ta[1]],
+          tb: [frozen.tb[0], frozen.tb[1]],
+        });
+      }
+    } else if (intent.kind === "split_segment") {
+      editor.splitSegment({ segment: intent.segment, t: intent.t });
+    }
+
+    setNetwork(editor.value);
+
+    if (intent.kind !== "split_segment" && intent.phase === "commit") {
+      gestureSnapshotRef.current = null;
+    }
+  }, [
+    state?.lastIntent,
+    pathVertices,
+    closedNetwork,
+    openNetwork,
+    selectedVertices,
+    selectedSegments,
+  ]);
+  const resetGeometry = React.useCallback(() => {
+    setOpenNetwork(
+      cloneNetwork(PathModel.fromSvgPathD(VECTOR_FIXTURE_OPEN_D).snapshot())
+    );
+    setClosedNetwork(
+      cloneNetwork(PathModel.fromSvgPathD(VECTOR_FIXTURE_CLOSED_D).snapshot())
+    );
+    setSelectedVertices([]);
+    setSelectedSegments([]);
+    setSelectedTangents([]);
+    setSelectedRegions([]);
+    gestureSnapshotRef.current = null;
+  }, []);
+
   return (
     <Section anchor="vector">
       <SectionHeader
-        eyebrow="§6 Vector chrome"
-        title="Vertices, tangents, segments — all in the package"
+        eyebrow="Vector chrome"
+        title="Vertices, tangents, segments, regions — all in the package"
       >
         Pass{" "}
         <code className="rounded bg-zinc-100 px-1 text-[12px]">
           setVectorSelection({"{ node_id, vertices }"})
         </code>{" "}
         and the surface draws vertex circles, tangent diamonds, segment outlines
-        (with idle/hover/selected state), and a ghost insertion knob at the
-        cursor. Three modes — insertion (midpoint / projected), selection
-        (marquee / lasso), bend (auto / always) — match the editor's active
-        tool. Marquee or lasso the closed path's vertices and watch the chrome's
-        selected-vertex fill update — the host runs the hit-test, the hud
-        renders the result.
+        (with idle/hover/selected state), region body chrome for closed loops,
+        and a ghost insertion knob at the cursor. The path is fully editable —
+        drag a vertex, drag a tangent diamond, alt-drag a segment to bend, click
+        the ghost to insert, click inside a closed loop to select the region.
+        The host applies every mutation intent through{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">@grida/vn</code>{" "}
+        and re-emits geometry to HUD; the seam between the two SDKs is host
+        territory by design. The{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">regions</code>{" "}
+        field on the overlay is the schema-level feature flag — toggle it off
+        and region chrome disappears entirely, without any HUD-side branching.
       </SectionHeader>
       <SplitStage
         toolbar={
@@ -1194,6 +1559,19 @@ export function VectorChromeSection() {
               options={["auto", "always"]}
               onChange={(v) => setBendMode(v as "auto" | "always")}
             />
+            <ToggleChip
+              label="Regions"
+              checked={regionsEnabled}
+              onCheckedChange={setRegionsEnabled}
+            />
+            <button
+              type="button"
+              onClick={resetGeometry}
+              className="ml-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] text-zinc-700 hover:bg-zinc-50"
+              title="Reset both paths to their initial geometry"
+            >
+              Reset
+            </button>
           </>
         }
         stage={
@@ -1205,13 +1583,23 @@ export function VectorChromeSection() {
             vectorBendMode={bendMode}
             onState={setState}
           >
-            <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-zinc-200 bg-white/95 px-2 py-1 font-mono text-[11px] text-zinc-700 shadow backdrop-blur">
-              vertices selected:{" "}
-              <span className="text-zinc-900">
-                {selectedVertices.length === 0
-                  ? "—"
-                  : `[${selectedVertices.sort((a, b) => a - b).join(", ")}]`}
-              </span>
+            <div className="pointer-events-none absolute left-3 top-3 z-10 space-y-0.5 rounded-md border border-zinc-200 bg-white/95 px-2 py-1 font-mono text-[11px] text-zinc-700 shadow backdrop-blur">
+              <div>
+                vertices:{" "}
+                <span className="text-zinc-900">
+                  {selectedVertices.length === 0
+                    ? "—"
+                    : `[${selectedVertices.sort((a, b) => a - b).join(", ")}]`}
+                </span>
+              </div>
+              <div>
+                regions:{" "}
+                <span className="text-zinc-900">
+                  {selectedRegions.length === 0
+                    ? "—"
+                    : `[${selectedRegions.sort((a, b) => a - b).join(", ")}]`}
+                </span>
+              </div>
             </div>
           </HUDStage>
         }
@@ -1249,16 +1637,558 @@ export function VectorChromeSection() {
               rule: "Empty-space drag inside content-edit fires marquee_select or lasso_select (per vectorSelectionMode) with phase preview→commit. The host runs the predicate (rect contains vertex / point-in-polygon) and pushes the result back via setVectorSelection.",
             },
             {
+              name: "Vertex drag",
+              rule: "translate_vertices preview/commit — drag any vertex (selection or not) and the selected sub-set translates with it. The host freezes the network at preview-1 and applies the gesture-from-start delta against the frozen state each tick, so deltas never accumulate.",
+            },
+            {
+              name: "Tangent drag",
+              rule: "set_tangent preview/commit — the host maps HUD's (vertex, side) tangent reference to vn's (segmentIndex, ta|tb), subtracts the vertex position to convert HUD's absolute target to vn's relative tangent vector, then applies through vn's mirror policy (auto/none/angle/all).",
+            },
+            {
               name: "Segment drag (no Meta)",
-              rule: "translate_vector_selection preview/commit — the whole sub-selection moves with the cursor.",
+              rule: "translate_vector_selection preview/commit — the whole sub-selection moves with the cursor. The host unions HUD's additional_vertex_indices with the selected vertices + endpoints of selected segments before applying translateVertex.",
             },
             {
               name: "Segment drag with Meta",
-              rule: "bend_segment preview/commit — the pivot is the drag-start projection on the curve (not 0.5).",
+              rule: "bend_segment preview/commit — the pivot is the drag-start projection on the curve (not 0.5). The host passes the segment's frozen endpoints + tangents to vn.bendSegment so each preview tick re-solves the cubic from the same starting state.",
             },
             {
               name: "Ghost split-and-drag",
-              rule: "Pointer-down on ghost → split_segment fires immediately, then translate_vertices on the newly-inserted vertex. Press-no-drag commits insert with zero delta.",
+              rule: "Pointer-down on ghost → split_segment fires immediately (atomic, no phase), then translate_vertices preview/commit on the newly-inserted vertex. Press-no-drag commits insert with zero delta.",
+            },
+            {
+              name: "Region — feature flag (schema-level)",
+              rule: "Absence of `VectorOverlay.regions` = no region chrome rendered. No separate `enableRegions` boolean — the data is the flag. Backends that can't enumerate loops simply omit the field. Toggle the toolbar switch to prove it: region chrome disappears entirely without any HUD-side branching.",
+            },
+            {
+              name: "Region — geometry",
+              rule: "Each region carries `segments: number[]` — segment indices forming a closed loop. The HUD reconstructs the cubic path at chrome build time from `vertices` + the referenced segments. Regions carry no own geometry.",
+            },
+            {
+              name: "Region — hit-test & priority",
+              rule: "Screen-space AABB + `customHitTest` running `cmath.polygon.pointInPolygon` against the rasterised loop polygon. Priority REGION_PRIORITY (9) strictly above SEGMENT_STRIP_PRIORITY (8) — any vertex / tangent / ghost / segment-strip control within the loop wins. Wins over empty-space miss → clicking the interior selects the region instead of starting a marquee.",
+            },
+            {
+              name: "Region — paint",
+              rule: "Idle: no render (hit registered, body visually transparent). Hover: doc_polyline fill with `style.vectorRegionHoverPaint` (default HUDPaintStripes 45° / 8px / 1.5px, accent, 50%). Selected: `style.vectorRegionSelectedPaint` (default same stripes at 70%). Hover wins over selected.",
+            },
+            {
+              name: "Region — select intent",
+              rule: "select_region { node_id, region, mode } — eager at pointer-down. Shift → toggle, no-shift → replace. The host mirrors the loop's segments into the segment sub-selection (the main editor's `selectLoop` policy) so segment chrome highlights along with the region's stripe paint.",
+            },
+            {
+              name: "Region — drag",
+              rule: "Drag from a region body promotes to `translate_vector_selection` (no new translate intent kind). The HUD seeds `additional_vertex_indices` with the loop's endpoint vertices so the gesture works even before the host echoes the region select.",
+            },
+            {
+              name: "Mutation seam (producer position)",
+              rule: (
+                <>
+                  <code>@grida/vn</code> provides the vector-network mutation
+                  primitives; <code>@grida/svg-editor</code>&apos;s{" "}
+                  <code>PathModel</code> provides canonical{" "}
+                  <code>d ↔ vector-network</code> conversion. Hosts that want to
+                  mutate a path&apos;s geometry compose the two at the host
+                  layer. The seam is intentional; widening{" "}
+                  <code>PathModel</code>&apos;s public surface to carry
+                  mutation, or shipping a host-shaped reducer that names a
+                  specific intent vocabulary, is out of scope. This demo is the
+                  proof.
+                </>
+              ),
+            },
+          ]}
+        />
+      </div>
+    </Section>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Padding overlay (Layer B)
+// ───────────────────────────────────────────────────────────────────────────
+
+export function PaddingOverlaySection() {
+  const [state, setState] = React.useState<HUDPlaygroundState | null>(null);
+
+  // Host-owned padding values. The HUD reads them via `setPaddingOverlay`
+  // each render; intents flow back via `onPaddingHandle`. Active-side
+  // mirror is HUD-owned (derived from gesture state) — no host shadow.
+  const [padding, setPadding] = React.useState({
+    top: 24,
+    right: 16,
+    bottom: 32,
+    left: 16,
+  });
+  // Feature-flag toggle in the inspector — pop `paddingOverlay` to `null`
+  // and chrome disappears entirely (schema-level absence is the off state).
+  const [overlayEnabled, setOverlayEnabled] = React.useState(true);
+
+  // Rebuild the fixture each render so the inner "content" rect tracks
+  // the live padding values — the reader sees the content shrink/grow as
+  // the handles drag, which is what makes the affordance intuitive.
+  const fixture = React.useMemo(
+    () => paddingOverlayFixture(padding),
+    [padding]
+  );
+
+  const containerRect = PADDING_OVERLAY_CONTAINER_RECT;
+
+  const paddingOverlay = React.useMemo<PaddingOverlayInput | null>(() => {
+    if (!overlayEnabled) return null;
+    return {
+      node_id: "container",
+      rect: containerRect,
+      padding,
+    };
+  }, [overlayEnabled, containerRect, padding]);
+
+  // Forward `padding_handle` intents to the local reducer.
+  const handlePadding = React.useCallback((intent: Intent) => {
+    if (intent.kind !== "padding_handle") return;
+    setPadding((prev) => {
+      const next = { ...prev };
+      next[intent.side] = Math.round(intent.value);
+      if (intent.mirror) {
+        const opp =
+          intent.side === "top"
+            ? "bottom"
+            : intent.side === "bottom"
+              ? "top"
+              : intent.side === "left"
+                ? "right"
+                : "left";
+        next[opp] = Math.round(intent.value);
+      }
+      return next;
+    });
+  }, []);
+
+  return (
+    <Section anchor="padding-overlay">
+      <SectionHeader
+        eyebrow="Padding overlay"
+        title="Flex-parent padding chrome — a Layer B model"
+      >
+        Four hover-sensitive inset side rects with diagonal-stripe affordance
+        and a mid-edge drag handle each. Drag a handle and the inner blue{" "}
+        <em>content</em> rect resizes live — the host re-derives its layout from
+        the per-side padding values streamed back via{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">
+          padding_handle
+        </code>{" "}
+        intents. Toggle the switch above the canvas to prove the schema-level
+        feature flag — the chrome disappears entirely without any host-side
+        branching. Alt-drag mirrors the value to the opposite side; HUD reads
+        the modifier directly (no host-pushed shadow).
+      </SectionHeader>
+      <SplitStage
+        toolbar={
+          <div className="flex items-center gap-2 px-1 text-[12px]">
+            <Switch
+              id="padding-flag"
+              checked={overlayEnabled}
+              onCheckedChange={setOverlayEnabled}
+            />
+            <label
+              htmlFor="padding-flag"
+              className="cursor-pointer font-mono text-zinc-700"
+            >
+              setPaddingOverlay input pushed
+            </label>
+          </div>
+        }
+        stage={
+          <HUDStage
+            fixture={fixture}
+            paddingOverlay={paddingOverlay}
+            onPaddingHandle={handlePadding}
+            onState={setState}
+          >
+            <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md border border-zinc-200 bg-white/95 px-2 py-1 font-mono text-[11px] text-zinc-700 shadow backdrop-blur">
+              padding: t={padding.top} r={padding.right} b={padding.bottom} l=
+              {padding.left}
+            </div>
+          </HUDStage>
+        }
+        inspector={<InspectorPanel state={state} title="Padding overlay" />}
+      />
+      <div className="mt-6">
+        <SpecTable
+          rows={[
+            {
+              name: "Feature flag (schema-level)",
+              rule: "Absence of `surface.setPaddingOverlay(...)` input = no chrome rendered. No separate `enablePadding` boolean — the data is the flag. Hosts that don't track padding don't push input.",
+            },
+            {
+              name: "Geometry",
+              rule: "Per-side inset rect in doc-space. `top` = full width × top padding; `right` = right padding × full height; bottom/left symmetric. Absent / zero sides skipped — no overlay element, no hit region.",
+            },
+            {
+              name: "Hit-test",
+              rule: "Region: doc-space rect projected to a screen-space AABB on every frame, so the hit body scales with zoom. Handle: 16px screen-px square at the mid-edge, padded to MIN_HIT_SIZE.",
+            },
+            {
+              name: "Hit-priority",
+              rule: "PADDING_HANDLE_PRIORITY (12) wins over corner-radius (15), resize (≥30), translate body (40). PADDING_REGION_PRIORITY (35) wins over body, loses to resize — clicking inside the padding fires hover; clicking a corner still resizes.",
+            },
+            {
+              name: "Paint — idle",
+              rule: "No fill (render omitted). Hit still registered — the body becomes interactive on hover.",
+            },
+            {
+              name: "Paint — hover",
+              rule: "doc_polyline fill with `style.paddingHoverPaint` — default HUDPaintStripes 45° / 8px / 1.5px, accent color, 50% opacity. Alt-held: BOTH the hovered side AND its opposite paint. HUD reads `alt` directly.",
+            },
+            {
+              name: "Paint — selected (during drag)",
+              rule: "Stroked OUTLINE of the side rect (no stripe fill). `color = style.paddingSelectedStroke`, `strokeWidth = selectionOutlineWidth`. HUD-owned — derived from `state.gesture` when a `padding_handle` drag is in flight. The outline communicates the live padding value cleanly; stripes would read as hover preview. Mirrors to opposite side when `alt` is held.",
+            },
+            {
+              name: "Paint — hover on handle",
+              rule: "The hover stripe also lights up when the cursor is on the side's drag handle (not just the region body) — the handle is part of the side's affordance, so losing the stripe when the cursor crosses onto the knob would be jarring.",
+            },
+            {
+              name: "Value math (2× handle displacement)",
+              rule: "Handle sits at the CENTER of the padding strip (`y = padding.top / 2` for top). For the handle to track the cursor 1:1, padding changes at 2× the cursor displacement from the rect edge: `value = 2 × (cursor_y - rect.y)` for top, symmetric for others. Click-no-drag preserves the initial value.",
+            },
+            {
+              name: "Intent — drag",
+              rule: "`padding_handle { node_id, side, value, mirror, phase }`. Preview-stream on every move + one commit on release. `mirror` is read LIVE per frame — toggling alt mid-drag flips the flag on subsequent previews. Layer B dedicated kind; internally reducible to parametric-handle drag math.",
+            },
+          ]}
+        />
+      </div>
+    </Section>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Transform-box (Layer B) — TWO sections that share the same chrome but
+// commit to DIFFERENT host-side targets. The duality IS the demo seam's
+// dogfooding pass: per sdk-design, a public contract is shaped by ≥2
+// internal consumers. Until the main-editor image-paint editor lands,
+// the demo plays the role of consumer #2.
+// ───────────────────────────────────────────────────────────────────────────
+
+const IDENTITY_AFFINE: AffineTransform = [
+  [1, 0, 0],
+  [0, 1, 0],
+];
+
+/** Demo image — public asset, abstract placeholder. */
+const TRANSFORM_BOX_DEMO_IMAGE = "/images/abstract-placeholder.jpg";
+
+/** Decompose an affine transform into rotation°/scale/translation for
+ *  inspector display. Mirrors the math primitive's `decompose` without
+ *  pulling cmath transitively into the demo. */
+function decomposeAffineForDisplay(m: AffineTransform): {
+  rotation: number;
+  scale: [number, number];
+  translation: [number, number];
+} {
+  const a = m[0][0];
+  const b = m[1][0];
+  const c = m[0][1];
+  const d = m[1][1];
+  const sx = Math.hypot(a, b);
+  const sy = Math.hypot(c, d);
+  const rotation = (Math.atan2(b, a) * 180) / Math.PI;
+  return { rotation, scale: [sx, sy], translation: [m[0][2], m[1][2]] };
+}
+
+function TransformBoxLiveOverlay({
+  transform,
+  op,
+}: {
+  transform: AffineTransform;
+  op: string;
+}) {
+  const d = decomposeAffineForDisplay(transform);
+  return (
+    <div className="pointer-events-none absolute left-3 top-3 z-10 space-y-0.5 rounded-md border border-zinc-200 bg-white/95 px-2 py-1 font-mono text-[11px] text-zinc-700 shadow backdrop-blur">
+      <div>op: {op}</div>
+      <div>
+        a={transform[0][0].toFixed(3)} b={transform[1][0].toFixed(3)} c=
+        {transform[0][1].toFixed(3)} d={transform[1][1].toFixed(3)}
+      </div>
+      <div>
+        tx={transform[0][2].toFixed(3)} ty={transform[1][2].toFixed(3)}
+      </div>
+      <div>
+        rot={d.rotation.toFixed(1)}° scale=[{d.scale[0].toFixed(2)},
+        {d.scale[1].toFixed(2)}]
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Two-layer image overlay aligned to the transform-box's frame.
+ *
+ *   Layer 1 (ghost): full image at opacity 0.5, NOT clipped — extends
+ *                    past the parent rect so the user can see where the
+ *                    transform is going.
+ *   Layer 2 (clear): same image, clipped by `overflow: hidden` on the
+ *                    parent-rect wrapper — the "real" image as it would
+ *                    render inside the frame.
+ *
+ * Both layers apply the same affine `input.transform` to the image via
+ * CSS `matrix()`, with translation components denormalized by the
+ * frame's screen-px size (mirrors how the math primitive denormalizes
+ * to pixel-space). The frame wrapper itself rotates by `input.rotation`.
+ */
+function TransformBoxImageOverlay({
+  input,
+  state,
+  clipped,
+}: {
+  input: TransformBoxInput | null;
+  state: HUDPlaygroundState | null;
+  /** When false (free-transform case), the clear layer's wrapper does
+   *  NOT clip — the whole image renders. The ghost layer is also
+   *  suppressed (no frame → no overflow to ghost into). */
+  clipped: boolean;
+}) {
+  if (!input || !state) return null;
+  // Camera transform: doc → screen. Off-diagonals always 0 (no camera
+  // rotation in this demo); read scale + translate from the diagonal.
+  const camSx = state.transform[0][0];
+  const camSy = state.transform[1][1];
+  const camTx = state.transform[0][2];
+  const camTy = state.transform[1][2];
+
+  const originScreenX = input.origin[0] * camSx + camTx;
+  const originScreenY = input.origin[1] * camSy + camTy;
+  const frameW = input.size[0] * camSx;
+  const frameH = input.size[1] * camSy;
+
+  // CSS matrix(a, b, c, d, e, f) corresponds to:
+  //   [a c e]
+  //   [b d f]
+  // Our AffineTransform shape is [[m00, m01, m02], [m10, m11, m12]],
+  // and `m02 / m12` are normalized [0..1] against the box size — so
+  // denormalize by (frameW, frameH) for the screen-px CSS matrix.
+  const m = input.transform;
+  const cssMatrix = `matrix(${m[0][0]}, ${m[1][0]}, ${m[0][1]}, ${m[1][1]}, ${m[0][2] * frameW}, ${m[1][2] * frameH})`;
+
+  const imgStyle: React.CSSProperties = {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: frameW,
+    height: frameH,
+    transform: cssMatrix,
+    transformOrigin: "0 0",
+    objectFit: "fill",
+    userSelect: "none",
+    pointerEvents: "none",
+  };
+
+  const frameWrapper: React.CSSProperties = {
+    position: "absolute",
+    left: originScreenX,
+    top: originScreenY,
+    width: frameW,
+    height: frameH,
+    transform: `rotate(${input.rotation ?? 0}deg)`,
+    transformOrigin: "0 0",
+    pointerEvents: "none",
+  };
+
+  return (
+    <>
+      {clipped ? (
+        <>
+          {/* Ghost — extends past the frame, opacity 0.5. */}
+          <div style={{ ...frameWrapper, opacity: 0.5 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- dev showcase: image is being live-transformed; next/image fights interactive transforms */}
+            <img
+              src={TRANSFORM_BOX_DEMO_IMAGE}
+              alt=""
+              style={imgStyle}
+              draggable={false}
+            />
+          </div>
+          {/* Clear — clipped to the frame. Frame outline as a subtle
+              border so the user sees the clipping boundary. */}
+          <div
+            style={{
+              ...frameWrapper,
+              overflow: "hidden",
+              boxShadow: "inset 0 0 0 1px rgba(0, 0, 0, 0.1)",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- dev showcase: image is being live-transformed; next/image fights interactive transforms */}
+            <img
+              src={TRANSFORM_BOX_DEMO_IMAGE}
+              alt=""
+              style={imgStyle}
+              draggable={false}
+            />
+          </div>
+        </>
+      ) : (
+        // Free-transform: no clipping frame — the image is the object
+        // being transformed, not a paint inside a parent. One layer
+        // only, full opacity.
+        <div style={frameWrapper}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- dev showcase: image is being live-transformed; next/image fights interactive transforms */}
+          <img
+            src={TRANSFORM_BOX_DEMO_IMAGE}
+            alt=""
+            style={imgStyle}
+            draggable={false}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Consumer #1: image-fit transform binding. Simulates the future
+ * main-editor image-paint editor — the host binds the transform-box's
+ * `transform` to a `cg.ImagePaint.transform` value.
+ */
+export function TransformBoxImageFitSection() {
+  const [state, setState] = React.useState<HUDPlaygroundState | null>(null);
+  const [transform, setTransform] =
+    React.useState<AffineTransform>(IDENTITY_AFFINE);
+  const [containerRotation, setContainerRotation] = React.useState<0 | 30 | 90>(
+    0
+  );
+  const [enabled, setEnabled] = React.useState(true);
+  const [lastOp, setLastOp] = React.useState<string>("(idle)");
+
+  const fixture = React.useMemo(() => transformBoxFixture(), []);
+  const r = TRANSFORM_BOX_FIXTURE_RECT;
+
+  const transformBox = React.useMemo<TransformBoxInput | null>(() => {
+    if (!enabled) return null;
+    return {
+      id: "image-fit-fixture",
+      transform,
+      size: [r.width, r.height],
+      origin: [r.x, r.y],
+      rotation: containerRotation,
+    };
+  }, [enabled, transform, containerRotation, r.height, r.width, r.x, r.y]);
+
+  const handleTransformBox = React.useCallback((intent: Intent) => {
+    if (intent.kind !== "transform_box") return;
+    setTransform(intent.transform);
+    setLastOp(
+      intent.op.type === "translate"
+        ? "translate"
+        : intent.op.type === "scale_side"
+          ? `scale_side(${intent.op.side})`
+          : `rotate(${intent.op.corner})`
+    );
+  }, []);
+
+  return (
+    <Section anchor="transform-box">
+      <SectionHeader
+        eyebrow="Transform box"
+        title="Affine transform box — a Layer B model"
+      >
+        Quad outline + 4 corner rotate handles + 4 side scale handles + body
+        translate. The image is bound to the chrome&apos;s affine transform; the
+        parent rect clips the &quot;real&quot; rendering and a 50% ghost shows
+        the same image extending past the frame so you can see where the
+        transform is going. Drag a corner to rotate, a side to scale on that
+        axis, the body to translate. Toggle the container-rotation chip to
+        exercise the de-rotation path. The HUD intent (`transform_box`) is
+        target-agnostic — the same chrome would work against any 2×3 affine
+        target.
+      </SectionHeader>
+      <SplitStage
+        toolbar={
+          <div className="flex flex-wrap items-center gap-3 px-1 text-[12px]">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="tb-flag"
+                checked={enabled}
+                onCheckedChange={setEnabled}
+              />
+              <label
+                htmlFor="tb-flag"
+                className="cursor-pointer font-mono text-zinc-700"
+              >
+                setTransformBox input pushed
+              </label>
+            </div>
+            <ModeChip
+              label="Container rotation"
+              value={String(containerRotation)}
+              options={["0", "30", "90"]}
+              onChange={(v) => setContainerRotation(Number(v) as 0 | 30 | 90)}
+            />
+            <button
+              type="button"
+              className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs shadow-sm hover:bg-zinc-50"
+              onClick={() => setTransform(IDENTITY_AFFINE)}
+            >
+              reset transform
+            </button>
+          </div>
+        }
+        stage={
+          <HUDStage
+            fixture={fixture}
+            transformBox={transformBox}
+            onTransformBox={handleTransformBox}
+            onState={setState}
+          >
+            <TransformBoxImageOverlay
+              input={transformBox}
+              state={state}
+              clipped
+            />
+            <TransformBoxLiveOverlay transform={transform} op={lastOp} />
+          </HUDStage>
+        }
+        inspector={<InspectorPanel state={state} title="Transform box" />}
+      />
+      <div className="mt-6">
+        <SpecTable
+          rows={[
+            {
+              name: "Feature flag (schema-level)",
+              rule: "Absence of `surface.setTransformBox(...)` input = no chrome rendered. No `enableTransformBox` boolean — the data IS the flag. Same pattern as `setPaddingOverlay` / `setCornerRadius`.",
+            },
+            {
+              name: "Target-agnostic (Layer B doctrine)",
+              rule: "The model is NOT image-specific. The intent's `id` lets the host route the resolved `transform` to whatever it bound to — `cg.ImagePaint.transform`, a node's local transform, a future free-transform tool. The input is marked `@unstable` until the main-editor image-paint editor migrates onto it — the contract is locked in only after ≥2 internal consumers shape it.",
+            },
+            {
+              name: "Geometry",
+              rule: "Box-relative affine — translation components ([0][2], [1][2]) normalized [0..1] against `size`. Pipeline: box_local → transform → +rotation around origin → +origin → doc-space.",
+            },
+            {
+              name: "Hit-priority (corner > side > body)",
+              rule: "TRANSFORM_BOX_CORNER_PRIORITY=13 wins over corner-radius (15). TRANSFORM_BOX_SIDE_PRIORITY=14. TRANSFORM_BOX_BODY_PRIORITY=38 beats marquee/translate-body, loses to every resize.",
+            },
+            {
+              name: "Hit asymmetry (D3 — Layer B doctrine)",
+              rule: "Visible stroke: 1px (selectionOutlineWidth). Hit strip: 12px thick (Fitts'-reach). Corner hit AABB: 16×16 (≥ MIN_HIT_SIZE). Hit strictly contains the rendered bbox — the pinning test for the asymmetric-outputs discipline.",
+            },
+            {
+              name: "Cursors — rotation-aware",
+              rule: "Side hit → resize cursor tilted by the box's effective screen-space rotation (`container.rotation + decompose(transform).rotation`). Corner hit → rotate-arc cursor with the same baseAngle. Mirrors `resize_handle.baseAngle` / `rotate_handle.baseAngle` on selection chrome — the cursor stays aligned to the visual axis at any rotation.",
+            },
+            {
+              name: "Intent",
+              rule: "`transform_box { id, op: { type, side?/corner? }, transform, phase }`. HUD has already reduced — host commits `transform` directly. `op` carries TYPE and TARGET only (no pointer delta — D1: subscribe to outcomes, not events).",
+            },
+            {
+              name: "Container rotation",
+              rule: "When `input.rotation !== 0`, the gesture's doc-space cursor delta is de-rotated by `-rotation` before being fed to the Layer A reducer. The intent's `transform` stays in box-relative space — the host re-applies its container rotation on the next push.",
+            },
+            {
+              name: "Math primitive (Layer A)",
+              rule: "`reduceTransformBox(base, action, {size})` — pure, exported from `@grida/hud`. The same reducer is the engine behind this chrome and behind any host's own non-UI transform manipulation.",
             },
           ]}
         />
@@ -1291,10 +2221,7 @@ export function SizeMeterSection() {
   );
   return (
     <Section anchor="size-meter">
-      <SectionHeader
-        eyebrow="§7 Size meter"
-        title="W × H, on the lowest OBB edge"
-      >
+      <SectionHeader eyebrow="Size meter" title="W × H, on the lowest OBB edge">
         Host-fed pill that reads the selection's local width × height. For
         axis-aligned rects it sits below the bottom edge; for rotated /
         transformed selections it picks the visually-lowest edge of the OBB and
@@ -1347,7 +2274,7 @@ export function SnapSection() {
   );
   return (
     <Section anchor="snap">
-      <SectionHeader eyebrow="§8 Snap" title="Edge / center alignment guides">
+      <SectionHeader eyebrow="Snap" title="Edge / center alignment guides">
         Full-viewport rules drawn at every doc-space offset where a dragged
         shape's edge or center lines up with a neighbour's. The svg-editor emits
         these live during translate, resize, and insert gestures; the static
@@ -1434,7 +2361,7 @@ export function MeasurementSection() {
   return (
     <Section anchor="measurement">
       <SectionHeader
-        eyebrow="§9 Measurement"
+        eyebrow="Measurement"
         title="Distance between two rectangles"
       >
         The 4-side distance overlay: a guide line per non-zero side from the
@@ -1577,7 +2504,7 @@ export function VisibilitySection() {
   return (
     <Section anchor="visibility">
       <SectionHeader
-        eyebrow="§10 Visibility groups"
+        eyebrow="Visibility groups"
         title="Suppress chrome families per-gesture, without re-wiring draws"
       >
         Hosts assign string group names to chrome slots via{" "}
@@ -1674,7 +2601,7 @@ export function PixelGridSection() {
   return (
     <Section anchor="pixel-grid">
       <SectionHeader
-        eyebrow="§11 Pixel grid"
+        eyebrow="Pixel grid"
         title="Back-most chrome — visible past the zoom threshold"
       >
         Pixel grid is a named built-in chrome behind selection chrome. The host
@@ -1844,10 +2771,7 @@ export function CursorsSection() {
   const [rotationAware, setRotationAware] = React.useState(true);
   return (
     <Section anchor="cursors">
-      <SectionHeader
-        eyebrow="§12 Cursors"
-        title="Rotation-aware, tree-shake-safe"
-      >
+      <SectionHeader eyebrow="Cursors" title="Rotation-aware, tree-shake-safe">
         The surface owns cursor state via{" "}
         <code className="rounded bg-zinc-100 px-1 text-[12px]">
           surface.cursor()
@@ -1987,7 +2911,7 @@ export function ClickTrackerSection() {
   return (
     <Section anchor="click-tracker">
       <SectionHeader
-        eyebrow="§13 Click tracker"
+        eyebrow="Click tracker"
         title="Canvas-tuned 250ms / 4-px double-click window"
       >
         The surface ships its own click counter, tuned for canvas workflows
@@ -2045,44 +2969,33 @@ export function ClickTrackerSection() {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Migration sections — one per editor feature the main editor wires today
-// that the surface chrome doesn't build yet. Each section is a live host-
-// built prototype using existing primitives; the "not yet built" section
-// at the end lists what still needs new primitives or DOM escape hatches.
-//
-// These will land as named built-in chrome once the gesture + intent shape
-// has been dogfooded enough to lock the API.
+// StandardSection — thin wrapper around Section + SectionHeader + SplitStage
+// + SpecTable. Used by sections that don't need the full bespoke layout the
+// large interactive demos build by hand.
 // ───────────────────────────────────────────────────────────────────────────
 
-function MigrationSection({
+function StandardSection({
   anchor,
-  num,
+  eyebrow,
   title,
   prose,
   toolbar,
   stage,
   inspector,
   rows,
-  // Default category. Sections move off "Migration" once the affordance is
-  // shipped — "Stable" for items whose canonical home is resolved and the
-  // contract is no longer moving (e.g. §16 aspect-ratio guide: geometry
-  // available as `cmath.ui.diagonalForDirection`, render is a host-side
-  // composition over `HUDLine`).
-  kind = "Migration",
 }: {
   anchor: string;
-  num: string;
+  eyebrow: string;
   title: string;
   prose: React.ReactNode;
   toolbar?: React.ReactNode;
   stage: React.ReactNode;
   inspector: React.ReactNode;
   rows?: SpecRow[];
-  kind?: "Migration" | "Stable";
 }) {
   return (
     <Section anchor={anchor}>
-      <SectionHeader eyebrow={`${num} ${kind}`.trim()} title={title}>
+      <SectionHeader eyebrow={eyebrow} title={title}>
         {prose}
       </SectionHeader>
       <SplitStage toolbar={toolbar} stage={stage} inspector={inspector} />
@@ -2140,85 +3053,46 @@ function clampRadius(v: number): number {
 export function CornerRadiusSection() {
   return (
     <Section anchor="corner-radius">
-      <SectionHeader
-        eyebrow="Stable"
-        title="Parametric handles — corner radius + parametric star"
-      >
-        Hud&apos;s universal &quot;scalar-on-a-1D-manifold&quot; primitive in
-        two guises. <strong>Demo A</strong> wires{" "}
+      <SectionHeader eyebrow="Corner radius" title="Per-corner radius handles">
         <code className="rounded bg-zinc-100 px-1 text-[12px]">
           surface.setCornerRadius
         </code>{" "}
-        — the corner-radius affordance on two rects in one canvas (axis-aligned
-        + rotated). Each knob sits at its corner&apos;s ARC CENTER, offset by{" "}
+        — corner-radius chrome on two rects in one canvas (axis-aligned +
+        rotated). Each knob sits at its corner&apos;s ARC CENTER, offset by{" "}
         <code>r</code> in BOTH x and y from the corner toward the interior;
         position <em>is</em> the radius value, and the rotated rect&apos;s knobs
         ride the rotated diagonals via the input&apos;s{" "}
         <code className="rounded bg-zinc-100 px-1 text-[12px]">transform</code>.
-        Internally this API is an adapter over the universal primitive (a local{" "}
-        <code className="rounded bg-zinc-100 px-1 text-[12px]">
-          cornerRadiusHandles
-        </code>{" "}
-        composer +{" "}
-        <code className="rounded bg-zinc-100 px-1 text-[12px]">
-          surface.setParametricHandles
-        </code>
-        ); the 43-test corner-radius behavior pin proves the equivalence.{" "}
-        <strong>Demo B</strong> uses the universal primitive directly: a
-        parametric star, rendered on a custom <code>&lt;canvas&gt;</code>{" "}
-        underlay (no SVG fixture), with three handles — tip-radius (N segment
-        handles, one per outer tip), inner/outer ratio (segment from center to a
-        tip), and point-count (a stepped arc around the center, snapping to
-        integers 3..12). Hud doesn&apos;t know the shape is a star — the host
-        paints it, hud paints the knobs, intents flow.
+        Internally this API is a thin adapter over the universal parametric
+        handle primitive (see the next section); the 43-test corner-radius
+        behavior pin proves the equivalence.
       </SectionHeader>
 
       <CornerRadiusComboDemo />
-      <div className="h-4" />
-      <ParametricStarDemo />
 
       <div className="mt-6">
         <SpecTable
           rows={[
             {
-              name: "Primitive",
-              rule: (
-                <>
-                  The universal affordance:{" "}
-                  <code>
-                    surface.setParametricHandles(input | input[] | null)
-                  </code>{" "}
-                  — one or more handles, each a scalar <code>value</code>{" "}
-                  constrained to a 1D <code>curve</code>. Two curve kinds today:{" "}
-                  <code>segment</code> (corner-radius, ratio) and{" "}
-                  <code>arc</code> (count). Use-case composers (like the
-                  corner-radius one) live next to their callers and build the
-                  input from shape-specific schemas; the producer never knows
-                  what shape the host is editing.
-                </>
-              ),
-            },
-            {
               name: "Corner-radius wrapper",
               rule: (
                 <>
-                  <code>surface.setCornerRadius</code> remains as a thin adapter
-                  — its public types and the three <code>corner_radius*</code>{" "}
-                  intent kinds are unchanged from pre-migration. Internally,
-                  every input is composed by a local{" "}
-                  <code>cornerRadiusHandles</code> helper next to the primitive
-                  and routed through the universal parametric handle. The
-                  43-test corner-radius behavior pin (
+                  <code>surface.setCornerRadius</code> is a thin adapter — its
+                  public types and the three <code>corner_radius*</code> intent
+                  kinds are unchanged from pre-migration. Internally, every
+                  input is composed by a local <code>cornerRadiusHandles</code>{" "}
+                  helper next to the primitive and routed through the universal
+                  parametric handle. The 43-test corner-radius behavior pin (
                   <code>__tests__/corner-radius.test.ts</code>) is the
                   equivalence proof.
                 </>
               ),
             },
             {
-              name: "Arc-center position (corner-radius rect)",
+              name: "Arc-center position",
               rule: (
                 <>
-                  Each corner-radius knob sits at the rounded corner&apos;s{" "}
+                  Each knob sits at the rounded corner&apos;s{" "}
                   <em>arc center</em> — offset by radius <code>r</code> in BOTH
                   x and y from its corner, toward the rect interior. Translates
                   to a segment curve from corner → (corner + (max, max) · sign)
@@ -2236,8 +3110,8 @@ export function CornerRadiusSection() {
                   When ALL members are within ε of each other in doc-space, the
                   producer registers ONE hit region for the group; direction
                   resolution picks among the listed candidates only.
-                  Corner-radius declares its 4-corner group; star handles
-                  don&apos;t need to. Class-agnostic.
+                  Corner-radius declares its 4-corner group so a single knob
+                  drives all four when they&apos;re equal.
                 </>
               ),
             },
@@ -2247,24 +3121,80 @@ export function CornerRadiusSection() {
                 <>
                   Producer-side floor: at rest, the knob is floored to{" "}
                   <code>inset</code> in the track&apos;s own units. During a
-                  gesture the floor is lifted. Corner-radius&apos;s "16 px per
-                  axis" UX convention is the caller&apos;s concern — the
-                  corner-radius primitive computes{" "}
-                  <code>inset = 16 · √2 / zoom</code> per frame (the diagonal
-                  track at 45° turns a per-axis pixel into <code>√2</code> along
-                  the track) before populating the field.
+                  gesture the floor is lifted. The "16 px per axis" UX
+                  convention computes <code>inset = 16 · √2 / zoom</code> per
+                  frame (the diagonal track at 45° turns a per-axis pixel into{" "}
+                  <code>√2</code> along the track) before populating the field.
                 </>
               ),
             },
             {
-              name: "Stepped domains",
+              name: "Intents",
               rule: (
                 <>
-                  <code>domain.step</code> snaps the EMITTED value during
-                  projection. The star demo&apos;s point-count handle uses{" "}
-                  <code>{`{ min: 3, max: 12, step: 1 }`}</code> on an arc curve
-                  — the knob can hover continuously around the arc, but the
-                  intent payload always carries an integer.
+                  Three named kinds: <code>corner_radius</code> (all-or-named,
+                  default drag), <code>corner_radius_explicit</code>{" "}
+                  (alt-modifier, always named anchor),{" "}
+                  <code>corner_radius_uniform</code> (line geometry, always
+                  all). Preserved for backward compat — see{" "}
+                  <code>CHECKPOINT-setCornerRadius.md</code>.
+                </>
+              ),
+            },
+          ]}
+        />
+      </div>
+    </Section>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Parametric handles — the agnostic primitive underlying corner-radius.
+// The star demo proves the same primitive composes for an arbitrary shape
+// HUD knows nothing about.
+// ───────────────────────────────────────────────────────────────────────────
+
+export function ParametricHandlesSection() {
+  return (
+    <Section anchor="parametric-handles">
+      <SectionHeader
+        eyebrow="Parametric handles"
+        title="The agnostic primitive — scalar on a 1D manifold"
+      >
+        HUD&apos;s universal &quot;scalar-on-a-1D-manifold&quot; primitive,{" "}
+        <code className="rounded bg-zinc-100 px-1 text-[12px]">
+          surface.setParametricHandles
+        </code>
+        . One or more handles, each a scalar <code>value</code> constrained to a
+        1D <code>curve</code>. The corner-radius affordance above is a thin
+        wrapper over this; the demo below uses the primitive <em>directly</em>{" "}
+        on a shape HUD knows nothing about — a parametric star, rendered on a
+        custom <code>&lt;canvas&gt;</code> underlay (no SVG fixture), with three
+        handles: tip-radius (one segment handle per outer tip), inner / outer
+        ratio (segment from center to a tip), and point-count (a stepped arc
+        around the center, snapping to integers). The host paints the star, HUD
+        paints the knobs, intents flow.
+      </SectionHeader>
+
+      <ParametricStarDemo />
+
+      <div className="mt-6">
+        <SpecTable
+          rows={[
+            {
+              name: "Primitive",
+              rule: (
+                <>
+                  <code>
+                    surface.setParametricHandles(input | input[] | null)
+                  </code>{" "}
+                  — one or more handles, each a scalar <code>value</code>{" "}
+                  constrained to a 1D <code>curve</code>. Two curve kinds today:{" "}
+                  <code>segment</code> (corner-radius, ratio) and{" "}
+                  <code>arc</code> (count). Use-case composers (like the
+                  corner-radius one) live next to their callers and build the
+                  input from shape-specific schemas; the producer never knows
+                  what shape the host is editing.
                 </>
               ),
             },
@@ -2282,16 +3212,26 @@ export function CornerRadiusSection() {
               ),
             },
             {
-              name: "Intents",
+              name: "Stepped domains",
+              rule: (
+                <>
+                  <code>domain.step</code> snaps the EMITTED value during
+                  projection. The star demo&apos;s point-count handle uses{" "}
+                  <code>{`{ min: 3, max: 12, step: 1 }`}</code> on an arc curve
+                  — the knob can hover continuously around the arc, but the
+                  intent payload always carries an integer.
+                </>
+              ),
+            },
+            {
+              name: "Intent",
               rule: (
                 <>
                   Universal API: <code>parametric_handle</code> with{" "}
                   <code>{`{ node_id, handle_id, value, modifiers: { alt, shift }, phase }`}</code>
                   . Modifier policy lives in the host — the producer reports
                   flags, the host&apos;s reducer decides "all vs one,"
-                  "broadcast vs explicit," etc. The corner-radius wrapper
-                  preserves its three named kinds for backward compat (decided
-                  at Phase 3 — see <code>CHECKPOINT-setCornerRadius.md</code>).
+                  "broadcast vs explicit," etc.
                 </>
               ),
             },
@@ -2906,10 +3846,9 @@ export function AspectRatioSection() {
     [direction]
   );
   return (
-    <MigrationSection
+    <StandardSection
       anchor="aspect-ratio"
-      num=""
-      kind="Stable"
+      eyebrow="Aspect ratio"
       title="Aspect-ratio guide"
       prose={
         <>
@@ -3125,7 +4064,7 @@ export function RulerGuidesSection() {
   return (
     <Section anchor="ruler-guides">
       <SectionHeader
-        eyebrow="§14 Ruler & guides"
+        eyebrow="Ruler & guides"
         title="Built-in ruler chrome + host-owned guide state"
       >
         Ruler is named built-in chrome — same shape as pixel-grid, opposite slot
@@ -3607,7 +4546,7 @@ export function PerformanceSection() {
   return (
     <Section anchor="performance">
       <SectionHeader
-        eyebrow="§17 Performance"
+        eyebrow="Performance"
         title="N × N grid — chrome cost is selection-sized, not scene-sized"
       >
         Mounts the same{" "}
@@ -3699,7 +4638,7 @@ export function NotYetBuiltSection() {
   return (
     <Section anchor="not-yet-built">
       <SectionHeader
-        eyebrow="§18 Not yet built"
+        eyebrow="Not yet built"
         title="Open work — what hud needs next"
       >
         Items the main editor wires today but the demo cannot prototype with

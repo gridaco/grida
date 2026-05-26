@@ -146,8 +146,7 @@ describe("lasso gesture — host swaps selection mode to lasso", () => {
   });
 
   it("Shift propagates to additive on both preview and commit", () => {
-    // Why: matches the additive semantics of marquee + main editor
-    // (event-target.reducer.ts:455).
+    // Why: matches the additive semantics of marquee selection.
     const state = new SurfaceState();
     const { deps, intents } = makeDeps();
     state.setVectorSelectionMode("lasso");

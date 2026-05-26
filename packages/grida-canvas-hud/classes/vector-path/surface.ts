@@ -1,4 +1,4 @@
-// Vector chrome — overlays for path content-edit mode.
+// Vector-path — named-class chrome.
 //
 // Rendered when `SurfaceState.getVectorSelection()` is non-null AND the host
 // provided a `vectorOf` callback that resolves the active path's geometry.
@@ -13,7 +13,6 @@
 //                          region is N small samples along the curve.
 //                          Idle: gray, 1px. Hover: chrome color, 3px @
 //                          50% opacity. Selected: chrome color, 3px solid.
-//                          Mirrors the main editor's segment chrome.
 //   2. Vertex knobs      — PAIRED. Small circle render, padded square hit.
 //   3. Tangent handles   — PAIRED knob (small diamond render — a 45°-
 //                          rotated square so it reads as a different
@@ -22,82 +21,53 @@
 //                          to control point. Only emitted for vertices
 //                          in `neighbours`. Selected-tangent line
 //                          renders at a thicker width.
+//   4. Region bodies     — PAIRED. Closed-loop polygons rasterised from
+//                          the segment list; hit-tested via screen-space
+//                          point-in-polygon.
+//   5. Ghost insertion knob — VIRTUAL preview while hovering a segment;
+//                              click commits a `split_segment` intent.
 //
 // Disagreement-by-design: visible knobs are small (legibility), hit
 // regions are padded to MIN_HIT_SIZE (Fitts').
+//
+// Anti-goals (what this class is NOT):
+//
+// - **Not a path editor.** The host owns the path data — vertices,
+//   segments, regions, the model of "what a curve is." This class draws
+//   chrome over a host-supplied `VectorOverlay` POJO and emits intents
+//   describing what the user did to it. The host's commit logic decides
+//   what to do.
+// - **Not a sub-selection store.** Selected vertices / segments / regions
+//   are mirrored via `setVectorSelection`; the chrome reads it each frame.
+//   No internal selection authority.
+// - **Not a constraint solver.** Bend and tangent intents carry resolved
+//   geometry; the host's path-edit session decides whether to re-solve
+//   smooth joins, project to grids, snap to siblings, etc.
+// - **Not multi-path.** One `VectorOverlay` per setter call (the
+//   currently-edited path). Multi-path editing isn't a model this
+//   class supports.
+// - **Not undo-aware.** Intents stream `phase: "preview"`; host owns
+//   history.
 
-import type { OverlayElement, RenderShape } from "../event/overlay";
-import { MIN_HIT_SIZE } from "../event/overlay";
-import type { NodeId } from "../event/gesture";
-import type { VectorHover, VectorSubSelection } from "../event/state";
-import { docToScreen, IDENTITY, type Transform } from "../event/transform";
-import type { HUDStyle } from "./style";
-import type { HUDSemanticGroup } from "../primitives/types";
 import cmath from "@grida/cmath";
+import type { NodeId } from "../../event/gesture";
+import type { OverlayElement, RenderShape } from "../../event/overlay";
+import { MIN_HIT_SIZE } from "../../event/overlay";
+import { docToScreen, IDENTITY } from "../../event/transform";
+import type { HUDSemanticGroup } from "../../primitives/types";
+import type { HUDStyle } from "../../surface/style";
+import type { VectorChromeInput, VectorChromeOutput } from "./input";
+import {
+  DECORATIVE_PRIORITY,
+  GHOST_HANDLE_PRIORITY,
+  REGION_PRIORITY,
+  SEGMENT_STRIP_PRIORITY,
+  TANGENT_HANDLE_PRIORITY,
+  VERTEX_HANDLE_PRIORITY,
+} from "./priority";
 
-/**
- * Doc-space POJO returned by the host's `vectorOf` callback. The HUD never
- * imports `@grida/vn` — this minimal shape carries everything chrome needs.
- *
- * All coordinates are in doc-space (the HUD's container CSS-px frame). The
- * host is responsible for projecting from its local frame (e.g. SVG viewBox)
- * through the camera CTM before handing the data over.
- */
-export interface VectorOverlay {
-  /** Vertex positions in doc-space. Index === VertexId. */
-  vertices: ReadonlyArray<readonly [number, number]>;
-  /** Optional — present when the host wants segment chrome, tangent
-   *  handles, and segment hit-strips. Each segment carries the four
-   *  cubic control points in doc-space (already projected). */
-  segments?: ReadonlyArray<{
-    a: number;
-    b: number;
-    /** Absolute doc-space position of the first cubic control point
-     *  (= vertices[a] + ta_local, projected through the host's CTM). */
-    a_control: readonly [number, number];
-    /** Absolute doc-space position of the second cubic control point
-     *  (= vertices[b] + tb_local, projected). */
-    b_control: readonly [number, number];
-  }>;
-  /** Vertices whose tangent handles should render. The host computes
-   *  this — selected vertices ∪ their 1-hop neighbours (see
-   *  `PathModel.neighbouringVertices`). Empty list = no tangent handles
-   *  rendered. Spelled `neighbours` (not `neighbouring_vertices`) for
-   *  brevity and so it doesn't collide with the main canvas editor's
-   *  `selection_neighbouring_vertices` state field — if/when the main
-   *  editor adopts this overlay shape, no field-name friction. */
-  neighbours?: ReadonlyArray<number>;
-  /** Doc-space offset to add to local vertex coords before rendering.
-   *  For hosts that already project to doc-space (most), pass `[0, 0]`. */
-  origin?: readonly [number, number];
-}
-
-/**
- * Hit-priority ladder for vector chrome. Lower wins.
- *
- * - Tangents must outrank vertices (the tangent knob is usually OFFSET
- *   from the vertex, so they rarely overlap; when they do — broken handles
- *   collapsed onto the vertex — the user grabbed the more specific
- *   control).
- * - Vertices must outrank segments (clicking a vertex shouldn't
- *   accidentally split the connected segment).
- * - Segment strips are the lowest of the three (they cover the entire
- *   path body and should lose to any specific control).
- *
- * Set below `HUDHitPriority.ENDPOINT_HANDLE` (10) so vector chrome wins
- * during content-edit mode.
- */
-const TANGENT_HANDLE_PRIORITY = 4;
-const VERTEX_HANDLE_PRIORITY = 5;
-/** Ghost insertion knob — sits between vertex (real, wins) and segment
- *  (body, loses). The ghost is a transient control born of segment hover,
- *  so a real vertex collapsed onto it should win, but ANY segment-body
- *  click that lands on the knob should snap to the ghost's split action. */
-const GHOST_HANDLE_PRIORITY = 7;
-const SEGMENT_STRIP_PRIORITY = 8;
-/** Highest priority value = loses to everything — used for decorative
- *  segment outlines and tangent lines that should never absorb input. */
-const DECORATIVE_PRIORITY = 1000;
+// VectorOverlay / VectorChromeInput / VectorChromeOutput types live in
+// ./input.ts. Priority constants live in ./priority.ts.
 
 /** Per-segment sample count for the visual outline ONLY.
  *
@@ -106,6 +76,14 @@ const DECORATIVE_PRIORITY = 1000;
  * which projects the cursor onto the cubic exactly (mirrors the main
  * editor's `cmath.bezier.project`-based model). */
 const SEGMENT_SAMPLES = 24;
+
+/** Per-segment sample count for region polygon flattening. Used both
+ *  for the rasterised polygon the region uses to render its fill AND
+ *  for the screen-space polygon its `customHitTest` runs
+ *  `pointInPolygon` against. Higher than `SEGMENT_SAMPLES` because the
+ *  polygon is consumed by hit-test, not just rendered — a coarse
+ *  rasterisation would leak clicks near a curved boundary. */
+const REGION_SAMPLES = 32;
 
 /** Distance threshold (screen-px) for "the cursor is near this segment."
  *  Applied inside the segment's customHitTest after AABB containment.
@@ -117,41 +95,6 @@ const SEGMENT_HIT_THRESHOLD_PX = MIN_HIT_SIZE / 2;
  *  insertion point while the cursor hovers a segment. Smaller than a real
  *  vertex knob so the user can tell preview from committed. */
 const GHOST_VERTEX_SIZE = 6;
-
-export interface VectorChromeInput {
-  /** Sub-selection mirror pushed by the host via `setVectorSelection`.
-   *  Same type the surface stores internally — chrome reads it each draw. */
-  vector_selection: VectorSubSelection;
-  vector_overlay: VectorOverlay;
-  style: HUDStyle;
-  /** Current vector hover (from `SurfaceState.getVectorHover()`). Drives
-   *  hover affordance on segments, vertices, and tangent knobs. */
-  vector_hover?: VectorHover | null;
-  /** Current view transform. Used to compute screen-space cubic control
-   *  points for the per-segment projection-based hit-test (so the
-   *  threshold stays at the same screen-px regardless of zoom). Defaults
-   *  to identity (1:1 doc-screen) when omitted — convenient for tests
-   *  that don't exercise zoom-dependent behavior. */
-  transform?: Transform;
-  /**
-   * True when the user is mid-interaction (pending pointer-down OR
-   * non-idle gesture). When true, the chrome suppresses preview-only
-   * affordances — overlays that exist to suggest "what idle hover would
-   * do" and would compete with the user's actual intent. Currently
-   * gates the ghost insertion knob; reused for any future hover-derived
-   * preview overlay.
-   *
-   * Defaults to `false` so static chrome-render tests behave like idle.
-   * In production, the surface threads `SurfaceState.isInteracting()`
-   * here on every draw.
-   */
-  is_interacting?: boolean;
-  group?: HUDSemanticGroup;
-}
-
-export interface VectorChromeOutput {
-  overlays: OverlayElement[];
-}
 
 function offset_point(
   p: readonly [number, number],
@@ -179,10 +122,10 @@ function make_segment_action(
     segment,
     a_idx,
     b_idx,
-    a: [a[0], a[1]] as readonly [number, number],
-    b: [b[0], b[1]] as readonly [number, number],
-    a_control: [a_control[0], a_control[1]] as readonly [number, number],
-    b_control: [b_control[0], b_control[1]] as readonly [number, number],
+    a,
+    b,
+    a_control,
+    b_control,
   };
 }
 
@@ -240,8 +183,149 @@ export function buildVectorChrome(
       : null;
   const hovered_segment =
     vector_hover && vector_hover.kind === "segment" ? vector_hover.segment : -1;
+  const hovered_region =
+    vector_hover && vector_hover.kind === "region" ? vector_hover.region : -1;
 
   const segments = vector_overlay.segments;
+  const regions = vector_overlay.regions;
+  const selected_region_set = new Set(vector_selection.regions ?? []);
+
+  // ─── Regions (closed-loop body chrome) ─────────────────────────────────
+  //
+  // Schema-level feature flag: emitted iff `vector_overlay.regions` is
+  // present AND `vector_overlay.segments` is present (regions reference
+  // segment indices — without segment data there's nothing to flatten).
+  //
+  // For each region we emit ONE overlay:
+  //
+  //   - hit:    screen-space AABB + customHitTest running `pointInPolygon`
+  //             against the rasterised screen-space loop polygon.
+  //             Mirrors the segment-strip's AABB+refinement model.
+  //
+  //   - render: doc-space closed `doc_polyline` (the cubic samples for
+  //             each segment, concatenated, last point === first). Painted
+  //             with `fill: true` + `fillPaint = vectorRegionHoverPaint`
+  //             (hover state) or `vectorRegionSelectedPaint` (selected
+  //             state). Idle = no fill (render omitted entirely).
+  //
+  // Priority `REGION_PRIORITY` loses to every specific vector control,
+  // wins over the empty-space miss — the body of a closed loop becomes
+  // clickable without claiming pixels owned by vertices, tangents,
+  // ghost, or segment strips.
+  //
+  // Painted FIRST so vertex / tangent / segment / ghost chrome render
+  // visually on top of the region's hover fill.
+  if (regions && segments) {
+    for (let ri = 0; ri < regions.length; ri++) {
+      const region = regions[ri];
+      if (region.segments.length === 0) continue;
+
+      // Rasterise the cubic loop in DOC space (for render) and SCREEN
+      // space (for hit-test). Concatenate per-segment samples; the loop's
+      // closing edge is implicit (last sample === first by construction
+      // when the loop is well-formed; we still write `last = first`
+      // explicitly at the end so the polyline closes even on malformed
+      // input).
+      const loop_doc: [number, number][] = [];
+      const loop_screen: cmath.Vector2[] = [];
+      // Union of endpoint vertex indices — registered on the action so
+      // a drag promotion can seed `translate_vector_selection.additional_vertex_indices`.
+      const vertices_in_loop = new Set<number>();
+      for (let li = 0; li < region.segments.length; li++) {
+        const si = region.segments[li];
+        if (si < 0 || si >= segments.length) continue;
+        const seg = segments[si];
+        const a_doc = offset_point(vector_overlay.vertices[seg.a], origin);
+        const b_doc = offset_point(vector_overlay.vertices[seg.b], origin);
+        const ta_abs_doc = offset_point(seg.a_control, origin);
+        const tb_abs_doc = offset_point(seg.b_control, origin);
+        const ta_rel_doc: cmath.Vector2 = [
+          ta_abs_doc[0] - a_doc[0],
+          ta_abs_doc[1] - a_doc[1],
+        ];
+        const tb_rel_doc: cmath.Vector2 = [
+          tb_abs_doc[0] - b_doc[0],
+          tb_abs_doc[1] - b_doc[1],
+        ];
+        vertices_in_loop.add(seg.a);
+        vertices_in_loop.add(seg.b);
+        // Sample i = 0..N-1 (exclusive end). The next segment's i = 0
+        // duplicates this segment's i = N, so dropping the closing
+        // endpoint here avoids duplicate vertices in the polygon —
+        // matters for `pointInPolygon` consistency.
+        for (let i = 0; i < REGION_SAMPLES; i++) {
+          const t = i / REGION_SAMPLES;
+          const p = cmath.bezier.evaluate(
+            a_doc,
+            b_doc,
+            ta_rel_doc,
+            tb_rel_doc,
+            t
+          );
+          loop_doc.push([p[0], p[1]]);
+          const [sx, sy] = docToScreen(transform, p[0], p[1]);
+          loop_screen.push([sx, sy]);
+        }
+      }
+      if (loop_doc.length < 3) continue;
+      // Explicit closing point — last === first — so the doc_polyline
+      // renderer's `closePath()` produces a clean closed shape.
+      loop_doc.push([loop_doc[0][0], loop_doc[0][1]]);
+
+      // Screen-space AABB of the rasterised polygon. Padded by 1 px so
+      // an exact-boundary hit (the pointInPolygon "onEdge" branch)
+      // still passes the AABB containment check upstream.
+      const aabb_pad = 1;
+      const bbox = cmath.rect.fromPoints(loop_screen);
+      const hit_rect = {
+        x: bbox.x - aabb_pad,
+        y: bbox.y - aabb_pad,
+        width: bbox.width + 2 * aabb_pad,
+        height: bbox.height + 2 * aabb_pad,
+      };
+
+      const is_selected = selected_region_set.has(ri);
+      const is_hovered = hovered_region === ri;
+      // Hover wins over selected — matches every other vector overlay's
+      // precedence (vertex / segment / tangent / ghost knobs).
+      const fill_paint = is_hovered
+        ? style.vectorRegionHoverPaint
+        : is_selected
+          ? style.vectorRegionSelectedPaint
+          : undefined;
+
+      // Closure captures the screen-space polygon by reference. The
+      // chrome is rebuilt every frame so the polygon never goes stale
+      // beyond one frame's worth of pan/zoom.
+      const polygon_screen = loop_screen;
+
+      overlays.push({
+        label: `region:${ri}`,
+        group,
+        action: {
+          kind: "region",
+          node_id,
+          region: ri,
+          segments: region.segments,
+          vertices: Array.from(vertices_in_loop),
+        },
+        hit: { kind: "screen_aabb", rect: hit_rect },
+        customHitTest: (screen_point) =>
+          cmath.polygon.pointInPolygon(screen_point, polygon_screen),
+        render: fill_paint
+          ? ({
+              kind: "doc_polyline",
+              points: loop_doc,
+              stroke: false,
+              fill: true,
+              fillPaint: fill_paint,
+            } satisfies Extract<RenderShape, { kind: "doc_polyline" }>)
+          : undefined,
+        priority: REGION_PRIORITY,
+        cursor: "pointer",
+      });
+    }
+  }
 
   // ─── Segments ───────────────────────────────────────────────────────────
   //
@@ -259,9 +343,9 @@ export function buildVectorChrome(
   //        re-projects on demand to get the live `t` (for hover preview
   //        and for split/bend down-time).
   //
-  // This mirrors the main editor's `snapped_segment_p` model: one
-  // candidate insertion point per segment per cursor position, computed
-  // exactly via `cmath.bezier.project` — NOT pre-sampled.
+  // Single-candidate insertion model: one candidate insertion point per
+  // segment per cursor position, computed exactly via `cmath.bezier.project`
+  // — NOT pre-sampled.
   if (segments) {
     for (let si = 0; si < segments.length; si++) {
       const seg = segments[si];
@@ -563,7 +647,7 @@ export function buildVectorChrome(
   // ─── 4. Vertex knobs (PAIRED) ──────────────────────────────────────────
   //
   // Painted LAST so they appear on top of segment outlines and tangent
-  // lines — matches the main editor's z-order.
+  // lines.
   for (let i = 0; i < vector_overlay.vertices.length; i++) {
     const v = vector_overlay.vertices[i];
     const anchor_doc = offset_point(v, origin);
@@ -685,7 +769,7 @@ function emit_tangent_handle(args: {
   }
 
   // (a) DECORATIVE line from vertex to control point. No hit region.
-  //     Width 1 idle, width 2 selected — matches the main editor.
+  //     Width 1 idle, width 2 selected (per `style.tangentLine*Width`).
   overlays.push({
     label: `tangent_line:${vertex_idx}:${end}`,
     group,

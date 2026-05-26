@@ -1,4 +1,15 @@
 import cmath from "@grida/cmath";
+import type { PaddingHover } from "../classes/padding/input";
+import { projectPaddingValue } from "../classes/padding/surface";
+import type {
+  TransformBoxHover,
+  TransformBoxInput,
+} from "../classes/transform-box/input";
+import { docDeltaToBoxLocal } from "../classes/transform-box/surface";
+import {
+  decompose as decomposeTransformBox,
+  reduceTransformBox,
+} from "../primitives/transform-box";
 import {
   type SurfaceEvent,
   type SurfaceResponse,
@@ -90,6 +101,16 @@ export interface VectorSubSelection {
   /** `[vertex_idx, 0]` for ta on segment whose a === vertex_idx;
    *  `[vertex_idx, 1]` for tb where b === vertex_idx. */
   tangents: readonly (readonly [number, 0 | 1])[];
+  /**
+   * Selected region indices (= closed-loop ids in
+   * `VectorOverlay.regions`). Optional for backward compat — hosts that
+   * don't enumerate regions (or don't push a region mirror) leave it
+   * undefined; the chrome treats `undefined` and `[]` identically.
+   *
+   * Drives the region's `selected` visual state. The chrome reads it
+   * each frame.
+   */
+  regions?: readonly number[];
 }
 
 /**
@@ -117,7 +138,16 @@ export type VectorHover =
    * the ghost render in HOVER state and gates the split-on-click: only
    * this hover variant deferred-clicks to `split_segment`.
    */
-  | { kind: "ghost"; node_id: NodeId; segment: number; t: number };
+  | { kind: "ghost"; node_id: NodeId; segment: number; t: number }
+  /**
+   * Cursor is inside a closed-loop "region" (a body hit, not a control
+   * knob). Drives the region's hover paint (diagonal stripes). Loses
+   * priority to vertex / tangent / ghost / segment-strip controls
+   * within the same loop's bbox — those win on overlap so the user can
+   * always reach a specific control without the region claiming the
+   * pixel.
+   */
+  | { kind: "region"; node_id: NodeId; region: number };
 
 const DRAG_THRESHOLD_PX = 3;
 
@@ -175,26 +205,48 @@ export class SurfaceState {
    */
   private vector_hover: VectorHover | null = null;
   /**
+   * Which padding-overlay control is currently under the pointer (or
+   * null). Updated on every idle `pointer_move` from the hit_regions
+   * registry. The padding chrome reads this each frame to render hover
+   * affordances (per-side stripe paint, alt-held mirror paint on the
+   * opposite side). Owned by the HUD — mirrors the vector_hover pattern.
+   */
+  private padding_hover: PaddingHover | null = null;
+  /**
+   * Which transform-box control is currently under the pointer (or
+   * null). Updated on every idle `pointer_move` from the hit_regions
+   * registry. The chrome reads this each frame; cursor mapping reads
+   * it on idle. Owned by the HUD — mirrors padding_hover.
+   */
+  private transform_box_hover: TransformBoxHover | null = null;
+  /**
+   * Active transform-box input pushed via `setTransformBox`. The chrome
+   * builder reads this and re-emits overlays on every draw; the gesture
+   * intercept reads it for `size`, `rotation`, and `base_transform` at
+   * pointer-down. `null` = chrome off (schema-level feature flag).
+   */
+  private transform_box_input: TransformBoxInput | null = null;
+  /**
    * How `t` is computed for segment hovers/clicks. `"midpoint"` = always
    * 0.5 (the predictable default — ghost preview pinned to the segment's
    * midpoint regardless of cursor); `"projected"` = `cmath.bezier.project`
-   * of the cursor (mirrors the main editor — ghost tracks the cursor).
+   * of the cursor (ghost tracks the cursor along the segment).
    */
   private vector_insertion_mode: "midpoint" | "projected" = "midpoint";
   /**
    * Which gesture an empty-space drag promotes to. `"marquee"` (default)
    * draws a rectangle; `"lasso"` draws a freeform polygon. The HUD doesn't
-   * own the tool toggle — the host (svg-editor) pushes this whenever its
-   * own tool model flips (e.g. Q-key swap). The only branch that reads it
-   * is the pending → drag promotion in `pointer_move`.
+   * own the tool toggle — the host pushes this whenever its own tool model
+   * flips. The only branch that reads it is the pending → drag promotion
+   * in `pointer_move`.
    */
   private vector_selection_mode: "marquee" | "lasso" = "marquee";
   /**
    * Sticky-bend toggle for segment-body drag. `"auto"` (default) defers to
    * `modifiers.meta` (no Meta → translate, Meta → bend); `"always"` forces
-   * the bend branch as if Meta were held. The host (svg-editor) sets this
-   * when its bend tool is active. Same pattern as `vector_selection_mode`
-   * — the HUD doesn't own the tool toggle, just exposes the dispatch knob.
+   * the bend branch as if Meta were held. The host sets this when its bend
+   * tool is active. Same pattern as `vector_selection_mode` — the HUD
+   * doesn't own the tool toggle, just exposes the dispatch knob.
    */
   private vector_bend_mode: "auto" | "always" = "auto";
 
@@ -212,11 +264,11 @@ export class SurfaceState {
    * Push a new selection from the host. Accepts either:
    *
    * - **A flat `NodeId[]`** — each id becomes its own single-member group
-   *   with shape resolved via `shapeOf(id)` at chrome build time. Simple
-   *   hosts (e.g. svg-editor v1) use this overload.
+   *   with shape resolved via `shapeOf(id)` at chrome build time. Hosts
+   *   that don't pre-group by parent use this overload.
    * - **A `SelectionGroup[]`** — pre-computed groups (typically grouped by
    *   parent), each with its own pre-unioned shape. Hosts that already
-   *   compute groups (e.g. the main editor) use this overload.
+   *   compute groups use this overload.
    *
    * The flat-ids form is resolved lazily — `shapeOf` is called by the chrome
    * builder, not here. This keeps `setSelection` cheap and lets host shape
@@ -276,6 +328,35 @@ export class SurfaceState {
   /** Read-only access to the current vector hover (for chrome). */
   getVectorHover(): VectorHover | null {
     return this.vector_hover;
+  }
+
+  /** Read-only access to the current padding hover (for chrome). */
+  getPaddingHover(): PaddingHover | null {
+    return this.padding_hover;
+  }
+
+  /**
+   * Push a transform-box input from the host. Pass `null` to clear
+   * (schema-level feature flag). Surface reads this on every draw to
+   * emit chrome via `buildTransformBox`.
+   */
+  setTransformBox(input: TransformBoxInput | null): void {
+    this.transform_box_input = input;
+    // If the input is cleared mid-hover, the hover would point at a
+    // now-invisible region — clear it to avoid stale cursor state.
+    if (input === null && this.transform_box_hover !== null) {
+      this.transform_box_hover = null;
+    }
+  }
+
+  /** Read-only access to the current transform-box input (for chrome). */
+  getTransformBox(): TransformBoxInput | null {
+    return this.transform_box_input;
+  }
+
+  /** Read-only access to the current transform-box hover (for chrome). */
+  getTransformBoxHover(): TransformBoxHover | null {
+    return this.transform_box_hover;
   }
 
   /**
@@ -507,6 +588,23 @@ export class SurfaceState {
           point_doc,
           this.vector_insertion_mode
         );
+        // Padding hover — derived from the SAME ui_action under a
+        // separate identity space (vector_hover and padding_hover never
+        // co-exist; vector chrome only shows during content-edit, padding
+        // only on flex parents in non-content-edit). Reads `alt` to
+        // populate `mirror_side` when over a region body.
+        const next_ph = paddingHoverFromAction(ui_action, this.modifiers.alt);
+        if (!paddingHoversEqual(this.padding_hover, next_ph)) {
+          this.padding_hover = next_ph;
+          response.needsRedraw = true;
+        }
+        // Transform-box hover — same shape (separate identity space,
+        // separate cursor mapping). HUD-owned; redraw on change.
+        const next_th = transformBoxHoverFromAction(ui_action);
+        if (!transformBoxHoversEqual(this.transform_box_hover, next_th)) {
+          this.transform_box_hover = next_th;
+          response.needsRedraw = true;
+        }
         if (!vectorHoversEqual(this.vector_hover, next_vh)) {
           this.vector_hover = next_vh;
           response.needsRedraw = true;
@@ -897,6 +995,113 @@ export class SurfaceState {
         this.gesture = { kind: "pan", prev_screen: [sx, sy] };
         return response;
       }
+      case "padding_handle": {
+        const g = this.gesture;
+        const value = projectPaddingValue(g.rect, g.side, point_doc);
+        this.gesture = { ...g, last_doc: point_doc, value, dragged: true };
+        deps.emitIntent({
+          kind: "padding_handle",
+          node_id: g.node_id,
+          side: g.side,
+          value,
+          // Read alt LIVE — modifier change mid-gesture updates mirror
+          // on subsequent previews.
+          mirror: this.modifiers.alt,
+          phase: "preview",
+        });
+        response.needsRedraw = true;
+        return response;
+      }
+      case "transform_box": {
+        const g = this.gesture;
+        // Compute doc-space delta from gesture start, de-rotate by
+        // -rotation to get the un-rotated pixel-space delta the math
+        // reducer expects, then call `reduceTransformBox` to reduce
+        // from `base_transform` (NOT from the previous frame's
+        // `transform` — frame-accumulation would drift on a slow
+        // reducer).
+        const doc_delta: cmath.Vector2 = [
+          point_doc[0] - g.start_doc[0],
+          point_doc[1] - g.start_doc[1],
+        ];
+        // Synthesize a TransformBoxInput shape for `docDeltaToBoxLocal`.
+        // The de-rotation only needs `rotation`; we don't need the
+        // origin/size for the delta transform.
+        const box_delta = docDeltaToBoxLocal(
+          {
+            id: g.id,
+            transform: g.base_transform,
+            size: g.size,
+            origin: [0, 0],
+            rotation: g.rotation,
+          },
+          doc_delta
+        );
+        const action =
+          g.op.type === "translate"
+            ? { type: "translate" as const, delta: box_delta }
+            : g.op.type === "scale_side"
+              ? {
+                  type: "scale-side" as const,
+                  side: g.op.side,
+                  delta: box_delta,
+                }
+              : {
+                  type: "rotate" as const,
+                  corner: g.op.corner,
+                  delta: box_delta,
+                };
+        const next_transform = reduceTransformBox(g.base_transform, action, {
+          size: g.size,
+        });
+        this.gesture = {
+          ...g,
+          last_doc: point_doc,
+          transform: next_transform,
+          dragged: true,
+        };
+        deps.emitIntent({
+          kind: "transform_box",
+          id: g.id,
+          op: g.op,
+          transform: next_transform,
+          phase: "preview",
+        });
+        // Live cursor tracking — same pattern as the selection-box
+        // rotate gesture (`initial_cursor_angle + delta`): compose the
+        // container rotation with the inner transform's *live* rotation
+        // so the cursor stays aligned to the visible box throughout the
+        // drag, not just at gesture start. `cursorEquals` buckets the
+        // angle so this only re-emits on real motion.
+        const live_angle_rad =
+          ((decomposeTransformBox(next_transform).rotation + g.rotation) *
+            Math.PI) /
+          180;
+        if (g.op.type === "translate") {
+          this.setCursor("move", response);
+        } else if (g.op.type === "scale_side") {
+          this.setCursor(
+            {
+              kind: "resize",
+              direction:
+                g.op.side === "top" || g.op.side === "bottom" ? "n" : "w",
+              baseAngle: live_angle_rad,
+            },
+            response
+          );
+        } else {
+          this.setCursor(
+            {
+              kind: "rotate",
+              corner: g.op.corner,
+              baseAngle: live_angle_rad,
+            },
+            response
+          );
+        }
+        response.needsRedraw = true;
+        return response;
+      }
     }
     return response;
   }
@@ -1044,15 +1249,76 @@ export class SurfaceState {
       return response;
     }
 
+    // Padding handle intercept. Opens a `padding_handle` gesture
+    // eagerly at pointer_down; on drag the gesture emits
+    // `padding_handle` intents per move + commit. Click-no-drag is a
+    // no-op (no commit) — matches corner-radius's `dragged` guard
+    // pattern.
+    if (ui_action && ui_action.kind === "padding_handle") {
+      if (this.readonly) return response;
+      this.gesture = {
+        kind: "padding_handle",
+        node_id: ui_action.node_id,
+        side: ui_action.side,
+        rect: ui_action.rect,
+        initial_value: ui_action.initial_value,
+        last_doc: point_doc,
+        value: ui_action.initial_value,
+        dragged: false,
+      };
+      response.needsRedraw = true;
+      return response;
+    }
+
+    // Transform-box intercept. Opens a `transform_box` gesture eagerly
+    // at pointer_down for any of the 3 hit kinds (body, side, corner).
+    // Click-no-drag is a no-op — matches padding-handle / corner-
+    // radius. The gesture reads `transform_box_input` for `size`,
+    // `rotation`, and the base
+    // transform — frozen at gesture start, the chrome rebuild
+    // doesn't re-derive them.
+    if (
+      ui_action &&
+      (ui_action.kind === "transform_box_body" ||
+        ui_action.kind === "transform_box_side" ||
+        ui_action.kind === "transform_box_corner")
+    ) {
+      if (this.readonly) return response;
+      const input = this.transform_box_input;
+      // Defensive: if the host cleared the input between chrome build
+      // and pointer-down (race), don't open a gesture against stale
+      // hit data. Mirrors the corner-radius's input-presence check.
+      if (input === null || input.id !== ui_action.id) return response;
+      const op =
+        ui_action.kind === "transform_box_body"
+          ? ({ type: "translate" } as const)
+          : ui_action.kind === "transform_box_side"
+            ? ({ type: "scale_side", side: ui_action.side } as const)
+            : ({ type: "rotate", corner: ui_action.corner } as const);
+      this.gesture = {
+        kind: "transform_box",
+        id: input.id,
+        op,
+        size: input.size,
+        rotation: input.rotation ?? 0,
+        base_transform: input.transform,
+        start_doc: point_doc,
+        last_doc: point_doc,
+        transform: input.transform,
+        dragged: false,
+      };
+      response.needsRedraw = true;
+      return response;
+    }
+
     // For segment_strip hits, resolve `t` per `vector_insertion_mode` and
     // pass it to the decision module. Used by BOTH:
     //   - segment_strip → select_segment (no t needed for select)
     //   - ghost_handle  → split_segment.t (mode-dependent — "midpoint"
     //                     pins 0.5; "projected" projects the cursor)
     //   - either        → bend_segment.ca (ALWAYS projected at cursor,
-    //                     mode-INDEPENDENT — matches the main editor's
-    //                     `t0Ref = cmath.bezier.project(point)` in
-    //                     `surface-vector-editor.tsx:337`)
+    //                     mode-INDEPENDENT — bend pivot follows the cursor
+    //                     regardless of insertion mode)
     //
     // The two `t`s are computed separately. Conflating them was the
     // "bend pivot pinned to 0.5 in midpoint mode" bug — insertion mode
@@ -1088,6 +1354,7 @@ export class SurfaceState {
             vertices: this.vector_selection.vertices,
             segments: this.vector_selection.segments,
             tangents: this.vector_selection.tangents,
+            regions: this.vector_selection.regions ?? [],
           }
         : undefined,
       // Sticky-bend override. `"always"` is the host's bend tool talking
@@ -1225,9 +1492,8 @@ export class SurfaceState {
       case "start_split_and_translate": {
         // Press on the ghost insertion knob — eager split-and-drag.
         //
-        // 1. Emit `split_segment`. The host (svg-editor's
-        //    `handle_split_segment`) commits the split AND pushes the
-        //    new vertex into the selection mirror via
+        // 1. Emit `split_segment`. The host commits the split AND
+        //    pushes the new vertex into the selection mirror via
         //    `setVectorSelection({ vertices: [new_idx], … })`. That
         //    push can happen SYNCHRONOUSLY (within `emitIntent`) OR in
         //    a follow-up tick (microtask / RAF / React commit) —
@@ -1280,6 +1546,23 @@ export class SurfaceState {
         deps.emitIntent({
           kind: "select",
           ids: [...decision.select_ids],
+          mode: decision.mode,
+        });
+        response.needsRedraw = true;
+        this.pending = {
+          anchor_doc: point_doc,
+          anchor_screen: screen,
+          ids_at_down: decision.pending.ids_at_down,
+          deferred: decision.pending.deferred,
+          promote_to: decision.pending.promote_to,
+        };
+        return response;
+
+      case "immediate_select_region":
+        deps.emitIntent({
+          kind: "select_region",
+          node_id: decision.node_id,
+          region: decision.region,
           mode: decision.mode,
         });
         response.needsRedraw = true;
@@ -1650,6 +1933,50 @@ export class SurfaceState {
         response.needsRedraw = true;
         break;
       }
+      case "padding_handle": {
+        const g = this.gesture;
+        // Click-no-drag: no commit. `value === initial_value` so a
+        // commit would be a no-op for the host anyway, but emitting
+        // it would still drive a history entry. Skip to keep the
+        // history clean — matches corner-radius / parametric handle.
+        if (!g.dragged) {
+          this.gesture = IDLE;
+          response.needsRedraw = true;
+          break;
+        }
+        deps.emitIntent({
+          kind: "padding_handle",
+          node_id: g.node_id,
+          side: g.side,
+          value: g.value,
+          mirror: this.modifiers.alt,
+          phase: "commit",
+        });
+        this.gesture = IDLE;
+        response.needsRedraw = true;
+        break;
+      }
+      case "transform_box": {
+        const g = this.gesture;
+        // Click-no-drag: no commit. `transform === base_transform`
+        // so a commit would be identity for the host. Matches the
+        // padding-handle / corner-radius `dragged` guard pattern.
+        if (!g.dragged) {
+          this.gesture = IDLE;
+          response.needsRedraw = true;
+          break;
+        }
+        deps.emitIntent({
+          kind: "transform_box",
+          id: g.id,
+          op: g.op,
+          transform: g.transform,
+          phase: "commit",
+        });
+        this.gesture = IDLE;
+        response.needsRedraw = true;
+        break;
+      }
     }
     return response;
   }
@@ -1664,6 +1991,14 @@ export class SurfaceState {
     }
     if (this.vector_hover !== null) {
       this.vector_hover = null;
+      response.needsRedraw = true;
+    }
+    if (this.padding_hover !== null) {
+      this.padding_hover = null;
+      response.needsRedraw = true;
+    }
+    if (this.transform_box_hover !== null) {
+      this.transform_box_hover = null;
       response.needsRedraw = true;
     }
     return response;
@@ -1793,6 +2128,12 @@ function vectorHoverFromAction(
         // action's cubic geometry to stay zero-lag in projected mode.
         t: segmentTForMode(action, point_doc, mode),
       };
+    case "region":
+      return {
+        kind: "region",
+        node_id: action.node_id,
+        region: action.region,
+      };
     default:
       return null;
   }
@@ -1824,6 +2165,10 @@ function vectorHoversEqual(
     case "ghost":
       return (
         (b as Extract<VectorHover, { kind: "ghost" }>).segment === a.segment
+      );
+    case "region":
+      return (
+        (b as Extract<VectorHover, { kind: "region" }>).region === a.region
       );
   }
 }
@@ -2064,6 +2409,103 @@ function trackTangent01(
   if (track.radius === 0) return [1, 0];
   const dir = track.to >= track.from ? 1 : -1;
   return [-Math.sin(track.from) * dir, Math.cos(track.from) * dir];
+}
+
+// ─── Padding-overlay hover helpers ────────────────────────────────────────
+
+/**
+ * Derive a `PaddingHover` from the current `OverlayAction` (or null).
+ * Reads `alt_held` to populate `mirror_side` on region hovers — the
+ * renderer paints both the hovered side and its opposite when alt is
+ * down.
+ */
+function paddingHoverFromAction(
+  action: OverlayAction | null,
+  alt_held: boolean
+): PaddingHover | null {
+  if (!action) return null;
+  switch (action.kind) {
+    case "padding_region":
+      return {
+        kind: "padding_region",
+        node_id: action.node_id,
+        side: action.side,
+        mirror_side: alt_held
+          ? cmath.rect.getOppositeSide(action.side)
+          : undefined,
+      };
+    case "padding_handle":
+      return {
+        kind: "padding_handle",
+        node_id: action.node_id,
+        side: action.side,
+      };
+    default:
+      return null;
+  }
+}
+
+function paddingHoversEqual(
+  a: PaddingHover | null,
+  b: PaddingHover | null
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.kind !== b.kind) return false;
+  if (a.node_id !== b.node_id) return false;
+  if (a.side !== b.side) return false;
+  if (a.kind === "padding_region" && b.kind === "padding_region") {
+    return a.mirror_side === b.mirror_side;
+  }
+  return true;
+}
+
+// ─── Transform-box hover helpers ──────────────────────────────────────────
+
+/**
+ * Derive a `TransformBoxHover` from the current `OverlayAction` (or null).
+ * Transform-box hover has no modifier-sensitive variants (unlike
+ * padding's `mirror_side`); the 1:1 mapping below is the entire policy.
+ */
+function transformBoxHoverFromAction(
+  action: OverlayAction | null
+): TransformBoxHover | null {
+  if (!action) return null;
+  switch (action.kind) {
+    case "transform_box_body":
+      return { kind: "transform_box_body", id: action.id };
+    case "transform_box_side":
+      return {
+        kind: "transform_box_side",
+        id: action.id,
+        side: action.side,
+      };
+    case "transform_box_corner":
+      return {
+        kind: "transform_box_corner",
+        id: action.id,
+        corner: action.corner,
+      };
+    default:
+      return null;
+  }
+}
+
+function transformBoxHoversEqual(
+  a: TransformBoxHover | null,
+  b: TransformBoxHover | null
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.kind !== b.kind) return false;
+  if (a.id !== b.id) return false;
+  if (a.kind === "transform_box_side" && b.kind === "transform_box_side") {
+    return a.side === b.side;
+  }
+  if (a.kind === "transform_box_corner" && b.kind === "transform_box_corner") {
+    return a.corner === b.corner;
+  }
+  return true;
 }
 
 /** Re-exports for convenience. */

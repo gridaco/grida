@@ -671,8 +671,8 @@ describe("drawRuler", () => {
   // now reads as one continuous stroke crossing the strip boundary into
   // the canvas guide below, instead of being capped by a 1-px separator
   // painted on top. Every production editor (Figma, Sketch, XD,
-  // Illustrator, Affinity, our main editor's `@grida/ruler`) paints the
-  // separator under ticks; the hud now follows.
+  // Illustrator, Affinity) paints the separator under ticks; the hud
+  // now follows.
   //
   // Pin: the separator stroke (identified by its strokeStyle being set
   // to the borderColor and its moveTo landing at y = strip - 0.5) is

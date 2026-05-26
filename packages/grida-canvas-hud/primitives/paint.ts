@@ -38,32 +38,38 @@ export interface ResolvedPaint {
 }
 
 /**
- * Pure geometry for a stripes tile. Computes the period (tile size) and
- * the per-stripe parameters in device pixels. Separated from the
- * rasterizer so the math is testable in Node.
+ * Pure geometry for a stripes tile. Computes the cross-stripe period
+ * (tile height) and the per-stripe parameters in device pixels.
+ * Separated from the rasterizer so the math is testable in Node.
  *
- * The tile is a square whose side equals one stripe period along the
- * pattern's principal axis; when tiled with `repeat` and rotated by
- * `angle`, it produces an infinite stripe field.
+ * The tile is `1 × size`: one horizontal stripe period, axis-aligned.
+ * Rotation is applied at draw time via `CanvasPattern.setTransform`,
+ * NOT baked into the rasterized tile — baking rotation would force the
+ * tile's axis-aligned period to `spacing / sin(angle)`, irrational for
+ * the canonical 45° case, and produce visible breaks within each
+ * rendered stripe (the previous behavior).
  *
  * To keep stripes screen-aligned regardless of viewport zoom, the tile
- * is built in *device pixels* and the consumer applies a counter-CTM
- * via `CanvasPattern.setTransform` at draw time.
+ * is built in *device pixels* and the consumer composes a counter-CTM
+ * with the rotation in `setTransform`.
  */
 export function computeStripesTileGeometry(
   paint: HUDPaintStripes,
   dpr: number
 ): {
+  /**
+   * Tile height in device pixels — one cross-stripe period. The tile's
+   * width is fixed at 1 (the stripe is constant along the stripe
+   * direction; horizontal width doesn't carry information).
+   */
   size: number;
   spacingPx: number;
   thicknessPx: number;
   angleRad: number;
 } {
-  // Guard non-positive / non-finite inputs — `spacingPx` is used as
-  // the step of a `for (offset += spacingPx)` loop in `buildStripesTile`
-  // and would loop forever at zero or negative values. Fall back to
-  // the documented defaults rather than silently producing an empty
-  // pattern, so a misconfigured paint still renders something.
+  // Guard non-positive / non-finite inputs. Fall back to the documented
+  // defaults rather than silently producing an empty pattern, so a
+  // misconfigured paint still renders something.
   const spacingRaw = paint.spacing ?? DEFAULT_STRIPES_SPACING_PX;
   const thicknessRaw = paint.thickness ?? DEFAULT_STRIPES_THICKNESS_PX;
   const spacing =
@@ -81,12 +87,11 @@ export function computeStripesTileGeometry(
   const thicknessPx = thickness * safeDpr;
   const angleRad = (angleDeg * Math.PI) / 180;
 
-  // The tile is a square sized to one stripe period, expanded enough that
-  // rotation doesn't reveal seams. For a rotated stripe pattern the tile
-  // must be a multiple of the period along the perpendicular-to-stripes
-  // axis. A square of side = ceil(spacingPx) is sufficient for the
-  // standard 45° / 8px / 1.5px config; we use that as the period.
-  const size = Math.max(1, Math.ceil(spacingPx));
+  // Tile height = one cross-stripe period in device pixels, rounded to
+  // the nearest integer (OffscreenCanvas requires integer dimensions).
+  // For typical configs (integer spacing, dpr ∈ {1, 2, 3}) `spacingPx`
+  // is already integer.
+  const size = Math.max(1, Math.round(spacingPx));
 
   return { size, spacingPx, thicknessPx, angleRad };
 }
@@ -134,49 +139,50 @@ function getOrBuildStripesTile(
 }
 
 /**
- * Rasterize a single-period stripes tile (device pixels) with the
- * angle baked into the bitmap. Consumers tile it axis-aligned via
- * `ctx.createPattern(tile, "repeat")` — no draw-time rotation needed,
- * which leaves `CanvasPattern.setTransform` free for the counter-CTM
- * that keeps stripes screen-aligned.
+ * Rasterize an unrotated, axis-aligned stripes tile (device pixels).
+ * The tile is `1 × size` — one horizontal stripe band wrapping the
+ * `y=0` / `y=size` seam, so it tiles cleanly under `repeat`.
+ *
+ * Rotation is applied at draw time via the pattern transform in
+ * `resolvePaint`. Baking rotation here would force the axis-aligned
+ * tile dimensions to align with the rotated stripe lattice — irrational
+ * for the canonical 45° case — and produce visible breaks within each
+ * rendered stripe.
  */
 export function buildStripesTile(
   paint: HUDPaintStripes,
   dpr: number
 ): OffscreenCanvas {
-  const { size, spacingPx, thicknessPx, angleRad } = computeStripesTileGeometry(
-    paint,
-    dpr
-  );
-  const canvas = new OffscreenCanvas(size, size);
+  const { size, thicknessPx } = computeStripesTileGeometry(paint, dpr);
+  const canvas = new OffscreenCanvas(1, size);
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     throw new Error("OffscreenCanvas 2d context unavailable");
   }
-  ctx.clearRect(0, 0, size, size);
+  ctx.clearRect(0, 0, 1, size);
   ctx.fillStyle = paint.color;
 
-  // Draw stripes by walking perpendicular-to-stripe direction and
-  // emitting filled rectangles of width = thicknessPx along the stripe.
-  // For the canonical 45° / 8px / 1.5px case: one stripe per tile.
-  // The tile is rotated about its center.
-  ctx.save();
-  ctx.translate(size / 2, size / 2);
-  ctx.rotate(angleRad);
-  // After rotation, draw a horizontal stripe band centered on the origin.
-  // Draw across a length sufficient to cover the rotated square — its
-  // diagonal is `size * sqrt(2)`. Use `2 * size` for safety.
-  const drawLen = 2 * size;
-  const half = thicknessPx / 2;
-  // Center stripe
-  ctx.fillRect(-drawLen / 2, -half, drawLen, thicknessPx);
-  // Additional stripes at integer multiples of `spacingPx`, in case the
-  // tile is sized to fit more than one period.
-  for (let offset = spacingPx; offset < size; offset += spacingPx) {
-    ctx.fillRect(-drawLen / 2, offset - half, drawLen, thicknessPx);
-    ctx.fillRect(-drawLen / 2, -offset - half, drawLen, thicknessPx);
+  // One stripe band, centered on the y=0 / y=size seam. Split into a
+  // "top half" (above the seam, drawn at y=0) and a "bottom half"
+  // (drawn at y = size - half, just above the seam). After `repeat`
+  // tiling, the two halves merge into a single band straddling each
+  // tile boundary — no clip artifact, no doubling.
+  //
+  // Edge case: when `thicknessPx >= size`, the two halves would meet (or
+  // overlap) in the middle but the gap geometry above paints only the
+  // outer two strips, leaving the centre transparent. Fill the whole
+  // tile in that case so a full-thickness band renders as solid.
+  const half = Math.min(thicknessPx / 2, size / 2);
+  if (half > 0) {
+    if (thicknessPx >= size) {
+      ctx.fillRect(0, 0, 1, size);
+    } else {
+      ctx.fillRect(0, 0, 1, half);
+      if (size - half > half) {
+        ctx.fillRect(0, size - half, 1, half);
+      }
+    }
   }
-  ctx.restore();
 
   return canvas;
 }
@@ -204,17 +210,40 @@ export function resolvePaint(
     if (!pattern) {
       throw new Error("createPattern returned null");
     }
-    // Counter the current CTM so the tile maps 1:1 to device pixels.
-    // Without this the tile would scale with the viewport zoom.
+    // Pattern transform = rotate(-angle) · inverse(CTM).
     //
-    // Note: `createPattern` + `getTransform().inverse()` runs per call.
-    // For N striped primitives sharing one paint, that's N pattern
-    // objects + N inverses per draw. The tile itself is cached. When a
-    // consumer (vector-edit rehost) stripes-fills many primitives in
-    // one draw, add a per-draw `(tileKey, ctm) → CanvasPattern`
-    // scratchpad on `HUDCanvas`. Premature today — §0 demo emits 2.
-    const m = ctx.getTransform();
-    pattern.setTransform(m.inverse());
+    //   - inverse(CTM) maps canvas-space sample positions back to device
+    //     pixels, so the tile period stays in device pixels regardless of
+    //     viewport zoom (counter-CTM, screen-aligned chrome).
+    //   - rotate(-angle) then rotates the device-pixel sample point. The
+    //     tile itself is axis-aligned horizontal stripes; rotating the
+    //     sample point by -angle makes the displayed stripes appear at
+    //     +angle in canvas space.
+    //
+    // Composing both into one DOMMatrixInit avoids any dependency on
+    // browser-only `DOMMatrix.rotate` / `.multiply` (Node tests use a
+    // plain-object inverse).
+    //
+    // Note: `createPattern` + `getTransform()` runs per call. For N
+    // striped primitives sharing one paint, that's N pattern objects +
+    // N CTM reads per draw. The tile itself is cached. When a consumer
+    // stripes-fills many primitives in one draw, add a per-draw
+    // `(tileKey, ctm) → CanvasPattern` scratchpad on `HUDCanvas`.
+    // Premature today.
+    const inv = ctx.getTransform().inverse();
+    const angleRad =
+      ((paint.angle ?? DEFAULT_STRIPES_ANGLE_DEG) * Math.PI) / 180;
+    const c = Math.cos(angleRad);
+    const s = Math.sin(angleRad);
+    const t: DOMMatrixInit = {
+      a: c * inv.a + s * inv.b,
+      b: -s * inv.a + c * inv.b,
+      c: c * inv.c + s * inv.d,
+      d: -s * inv.c + c * inv.d,
+      e: c * inv.e + s * inv.f,
+      f: -s * inv.e + c * inv.f,
+    };
+    pattern.setTransform(t);
     return { style: pattern, opacity: paint.opacity ?? 1 };
   }
   // Closed-taxonomy enforcement: no silent passthrough for unknown kinds.

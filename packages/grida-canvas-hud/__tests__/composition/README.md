@@ -1,0 +1,76 @@
+# `__tests__/composition/` — co-target test matrix
+
+This folder hosts the tests that enforce the [composition contract](../../README.md#composition-contract) — the package's central guarantee that any combination of named classes co-targeting the same logical thing via a shared `id` resolves to a deterministic, coherent hover/hit/cursor/intent stream.
+
+`co-target.test.ts` exists today with the **first cell** of the matrix — `padding × transform-box`. Five assertions: documented priority ladder holds, both classes co-exist in one registry, transform-box-only hit returns the tb action (no padding phantom-hit), empty-space returns null, adding transform-box does not shift padding's hit results. Subsequent migrations grow the matrix: each new class adds one row + one column. The matrix is verbose but mechanical; the value is the coverage, not the elegance.
+
+This README documents the planned full matrix shape so each migration knows what cells to add.
+
+## Why a matrix
+
+Hover, hit-test, and cursor are _cross-class_ concerns. They cannot be unit-tested inside any single class — by construction, a class's tests only see its own overlays. The composition contract is the SDK's promise that _no combination_ of classes produces a phantom hit, a flickering hover, a stuck cursor, or a non-deterministic intent. The only way to enforce that promise is a matrix that exercises every pair (and later, every triple where co-targeting on one `id` is realistic).
+
+A class that ships without a matrix row for every existing class is shipping unverified composition behavior. The promotion contract makes this a gate: a migration PR doesn't merge until its matrix rows do.
+
+## Matrix shape
+
+Rows and columns are classes. Each off-diagonal cell describes what happens when both classes target the same `id` and both their hit regions overlap at the pointer.
+
+The matrix is symmetric in the sense that the _contract_ it enforces is symmetric (no phantom hits in either direction), but the _expected resolution_ may differ per direction (e.g. corner-radius wins inside the corner, padding wins outside it — the cell records the winner from the pointer's perspective).
+
+Diagonal cells (class × itself) capture multi-instance behavior — two instances of the same class with different `id`s, hit regions touching. Tests assert that hover identity is stable (no flicker between the two `id`s on a pixel-stable pointer position) and that intents stream from the resolved-winner's `id`.
+
+## Initial matrix (post-migration target)
+
+Once all the candidate migrations under [`classes/README.md`](../../classes/README.md#promotion-bar-dry-run) land, the matrix below is what `co-target.test.ts` covers. Cells marked **N/A** are class pairs that cannot share an `id` in practice (e.g. vector-path requires a path; padding requires a rect).
+
+**N/A cells require no test code, only an entry in the matrix above.** The promotion contract is satisfied by marking the cell N/A with a one-line justification — the matrix exists so reviewers can confirm the impossibility, not as a checkbox exercise. A class can promote with all of its row's cells being N/A as long as each is explicitly marked.
+
+|                       | padding                     | corner-radius                                                                   | transform-box                                                                                                      | parametric-handle                                                             | vector-path                                                                                                        | resize-box                                                                                                                                                                                                       | selection-outline                                          | marquee                                                                           | lasso                                          |
+| --------------------- | --------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **padding**           | flicker probe (2 instances) | corner wins inside corner; padding wins along sides; no flicker on the boundary | scale-side beats padding-handle on the same side (transform-box is the active edit; padding is the passive layout) | parametric-handle wins on its knob; padding wins on side regions              | N/A                                                                                                                | resize-handle wins on corner/side knobs; padding wins between knobs; no double-commit on shared region                                                                                                           | outline draws under both classes; no hit contribution      | starts only from empty space — N/A unless host puts padding overlay on empty area | same as marquee — N/A                          |
+| **corner-radius**     | (mirror of above)           | flicker probe                                                                   | corner-of-corner-radius vs corner-of-transform-box on the same corner — transform-box wins (priority 13 < 15)      | both are knob classes; pick deterministically by priority + declaration order | N/A                                                                                                                | resize-handle on the corner beats corner-radius (resize-handle is the immediate selection chrome)                                                                                                                | outline under both                                         | N/A                                                                               | N/A                                            |
+| **transform-box**     | (mirror)                    | (mirror)                                                                        | flicker probe (2 instances should not happen in practice but the test pins behavior)                               | transform-box corner/side wins over parametric on the rect's perimeter        | N/A — transform-box edits an inner affine on a rectangular region; vector-path edits a path. Cannot share an `id`. | **decision: same model question.** When both classes exist, audit folds may merge them. Until then: resize-handle priority dominates on the outer rect; transform-box on the inner affine. Two `id`s, never one. | outline under both                                         | N/A                                                                               | N/A                                            |
+| **parametric-handle** | (mirror)                    | (mirror)                                                                        | (mirror)                                                                                                           | flicker probe (multiple knobs on the same id — already the default usage)     | parametric knob inside a vector path region resolves to the knob (knob priority < region)                          | resize-handle beats parametric on the rect's corners; parametric wins elsewhere                                                                                                                                  | outline under both                                         | N/A                                                                               | N/A                                            |
+| **vector-path**       | N/A                         | N/A                                                                             | N/A                                                                                                                | (mirror)                                                                      | flicker probe (2 paths overlapping in screen-space)                                                                | N/A — vector-path is its own edit mode; resize-box does not apply during path edit                                                                                                                               | outline under both                                         | N/A                                                                               | N/A                                            |
+| **resize-box**        | (mirror)                    | (mirror)                                                                        | (mirror)                                                                                                           | (mirror)                                                                      | N/A                                                                                                                | flicker probe (2 selections; multi-select group is one resize-box)                                                                                                                                               | outline under both — resize-box knobs always above outline | starts from empty space — N/A                                                     | starts from empty space — N/A                  |
+| **selection-outline** | passive — never wins a hit  | passive                                                                         | passive                                                                                                            | passive                                                                       | passive                                                                                                            | passive                                                                                                                                                                                                          | flicker probe (2 outlines from a 2-id selection)           | passive under marquee                                                             | passive under lasso                            |
+| **marquee**           | (mirror)                    | (mirror)                                                                        | (mirror)                                                                                                           | (mirror)                                                                      | (mirror)                                                                                                           | (mirror)                                                                                                                                                                                                         | (mirror)                                                   | flicker probe (cannot have 2 active marquees)                                     | mutually exclusive — only one active at a time |
+| **lasso**             | (mirror)                    | (mirror)                                                                        | (mirror)                                                                                                           | (mirror)                                                                      | (mirror)                                                                                                           | (mirror)                                                                                                                                                                                                         | (mirror)                                                   | (mirror)                                                                          | flicker probe                                  |
+
+The cells are written from the perspective of "the pointer is somewhere both classes register a hit at the same `id`." The cell describes the resolved winner and (where relevant) the no-flicker constraint at the boundary between the two regions.
+
+## What each test asserts
+
+A matrix-row test for class pair (A, B) covers four properties:
+
+1. **Deterministic hover.** Move the pointer along a path that crosses A's region, then the (A ∩ B) overlap, then B's region. Hover identity reads cleanly: `A → A or B (specified by cell) → B`. No intermediate `null`, no oscillation.
+2. **Deterministic cursor.** Cursor at each pointer position derives from the hover; same path produces the same cursor stream.
+3. **Independent intents.** Drag-from-A emits only A's intent kind; drag-from-B emits only B's. Even when the drag traverses the overlap, the gesture commits to whichever class won at pointer-down — no mid-gesture handoff.
+4. **No phantom hits.** At pointer positions outside both A's and B's visible chrome, no overlay-tier hit resolves. Falls through to the host's `pick`.
+
+A matrix-row test for a **flicker probe** (diagonal cell, multi-instance of the same class) covers:
+
+- Two instances with different `id`s, hit regions adjacent. Pointer at the boundary picks one consistently (declaration order in the input array breaks ties). Pixel-stable pointer does not oscillate between the two `id`s on subsequent `pointer_move` events.
+
+## Test layout
+
+```text
+__tests__/composition/
+├── README.md           # this file
+├── co-target.test.ts   # the matrix — lands with the first per-class migration into classes/
+└── fixtures.ts         # shared helpers for building (class A input × class B input) over a shared id
+```
+
+The fixtures helper centralizes the "two-class scaffold" so each cell's test is short — typically ~10 lines per cell, mostly assertion. The matrix is verbose but mechanical; the value is the coverage, not the elegance.
+
+## Maintenance
+
+When a new named class is promoted into `classes/<name>/`, that PR:
+
+1. Adds a row and a column to the matrix above (this README).
+2. Adds one cell-test per existing class in `co-target.test.ts`.
+3. Adds one flicker-probe test in the diagonal cell.
+4. The matrix grows by one row and one column; new cells are filled by the PR; existing cells are not changed.
+
+When two classes fold (the doctrine's preferred outcome under rule #1), the matrix shrinks: their row/column merges; existing cell-tests for the absorbed class either delete (if redundant) or migrate to the absorbing class with renames. The PR that performs the fold owns the matrix update.

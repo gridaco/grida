@@ -171,9 +171,30 @@ const editor = createSvgEditor({
 });
 ```
 
-`createSvgEditor` is the only constructor. The returned `SvgEditor` is the only object consumers ever hold.
+`createSvgEditor` is the only **editor** constructor. The returned `SvgEditor` is the only editor instance consumers ever hold. A small set of Layer-A geometry primitives (see [Geometry primitives](#geometry-primitives) below) is also exported for callers that need canonical SVG geometry without mounting an editor — those are not editor instances and have no lifecycle.
 
 The editor core is **headless**. It parses the SVG, owns the document IR, accepts commands, and emits state — but it does not import, reference, or call into `window`, `document`, `HTMLElement`, or any DOM type. To render or take input, the host attaches a `Surface` (next section).
+
+### Geometry primitives
+
+A small set of Layer-A primitives is exported for callers that want canonical SVG geometry without mounting an editor. These are not part of the editor lifecycle, do not subscribe, and do not produce diffs against an `SvgDocument` — they are pure value classes over the bytes you hand them.
+
+#### `PathModel`
+
+Models a single SVG path's vector network for callers that want path geometry without an editor. Construct from a `d` string, observe vertex/segment shape, compute a bbox, serialize back to `d`. No editor, no document, no DOM.
+
+```ts
+import { PathModel } from "@grida/svg-editor";
+
+const m = PathModel.fromSvgPathD("M 10 10 L 100 10 L 100 100 Z");
+m.vertexCount(); // 3
+m.segmentCount(); // 3
+m.snapshot(); // { vertices, segments } — POJO
+m.bbox(); // { x, y, width, height }
+m.toSvgPathD(); // canonical d
+```
+
+`@experimental` — the externally-stable contract for v0 is construction (`fromSvgPathD`) plus `snapshot()` / `bbox()` / `vertexCount()` / `segmentCount()` / `toSvgPathD()`. Mutation methods on the class exist for the editor's internal use and are not part of the documented public surface.
 
 ### Surface
 
@@ -210,6 +231,8 @@ Geometry (world-space bboxes, screen ↔ local projection) is exposed via `edito
 `@grida/svg-editor/dom` exports `attach_dom_surface(editor, { container, ... })` as the default DOM implementation, plus the surface-scoped types (`Camera`, `Gestures`, `SnapOptions`, `MemoizedGeometryProvider`, `DomComputedResolver`) that callers writing alternative surfaces or advanced integrations may need. It mounts the SVG into the container, wires pointer / keyboard listeners scoped to that container, and uses native `getBBox` / `getScreenCTM` for geometry. It is the only place in this package that imports DOM types.
 
 The container is **exclusively owned** by the surface. Render toolbars, layer lists, inspectors, and any other interactive chrome as **siblings** of the container, not children. Children of the container interfere with pointer routing (capture redirects, hit-test ordering) and produce silent click breakage. The shipped `SvgEditorCanvas` React component enforces this by creating its own internal div; hosts using `domSurface` / `keynote.attach` directly are responsible for the same discipline. In development, the surface emits a `console.warn` at attach time when the container is non-empty.
+
+**Attention gate.** The DOM surface installs document- and window-level keydown listeners (so a user with focus on a side-panel button can still hit editor shortcuts while the pointer is on the canvas). Those listeners are gated by an internal attention predicate: a key is claimed (and `preventDefault()`-ed) only when **focus is inside the container's subtree OR the pointer is over the container**. Body-focus alone — the natural state when the surface is embedded as a block in a longer document — is not attended, so the editor stays out of the way of page-level shortcuts (Space / arrows to scroll, Cmd+= to zoom, etc.). Passive observation listeners (modifier mirrors, blur resets) are not gated — they don't call `preventDefault()` and need to stay live across focus boundaries.
 
 ### Lifecycle
 

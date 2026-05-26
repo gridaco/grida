@@ -96,7 +96,7 @@ function begin_drag_pan(
 /** space-drag-pan: hold Space + drag to pan (hand tool). */
 const SPACE_DRAG_PAN: GestureBinding = {
   id: "space-drag-pan",
-  install({ container, camera }) {
+  install({ container, camera, is_attended }) {
     let space_held = false;
     let prev_cursor: string | null = null;
     const set_cursor = (next: string | null) => {
@@ -108,6 +108,9 @@ const SPACE_DRAG_PAN: GestureBinding = {
     const on_keydown = (e: KeyboardEvent) => {
       if (e.code !== "Space" || e.repeat) return;
       if (is_text_input_focused()) return;
+      // Attention gate: don't steal Space from a host that's using us as
+      // an embedded block in a longer document. See util/attention.ts.
+      if (!is_attended()) return;
       space_held = true;
       set_cursor("grab");
       e.preventDefault();
@@ -168,15 +171,15 @@ const MIDDLE_MOUSE_PAN: GestureBinding = {
 /** keyboard-zoom: Shift+0 / Shift+1 / Shift+2 / Cmd+= / Cmd+- shortcuts. */
 const KEYBOARD_ZOOM: GestureBinding = {
   id: "keyboard-zoom",
-  install({ container, camera }) {
+  install({ container, camera, is_attended }) {
     const owner_doc = container.ownerDocument;
     const on_keydown = (e: KeyboardEvent) => {
-      // Doc-level listener gated to "this container's tree has focus" —
-      // surfaces in other windows / panels stay independent.
-      const active = owner_doc.activeElement;
-      if (active && active !== owner_doc.body && !container.contains(active)) {
-        return;
-      }
+      // Attention gate: focus inside the container subtree OR pointer over
+      // the container. Body-focus alone (embedded reading state) is NOT
+      // attended — this listener is doc-level and would otherwise steal
+      // Shift+0 / Cmd+= from a page hosting the editor as a block.
+      // See util/attention.ts.
+      if (!is_attended()) return;
       if (is_text_input_focused()) return;
       const mod = e.metaKey || e.ctrlKey;
       if (e.shiftKey && !mod && (e.code === "Digit0" || e.code === "Numpad0")) {
