@@ -1,4 +1,118 @@
 import type { SelectionShape, VectorOverlay } from "@grida/hud";
+import type vn from "@grida/vn";
+
+// ───────────────────────────────────────────────────────────────────────────
+// vn.VectorNetwork → HUD VectorOverlay adapter.
+//
+// `vn.VectorNetwork` (and `PathModel.snapshot()`, structurally identical)
+// carries segments with RELATIVE tangent vectors (`ta`, `tb`). HUD's
+// `VectorOverlay` wants ABSOLUTE control points (`a_control`, `b_control`)
+// — already projected into doc-space. The conversion is documented on
+// `VectorOverlay`'s JSDoc:
+//   a_control = vertices[a] + ta
+//   b_control = vertices[b] + tb
+//
+// This is the only place in the demo that does that conversion; once
+// HUD's vector chrome adopts vn-style tangent fields directly, this
+// helper goes away.
+//
+// Mutable vector demos hold state as a live `vn.VectorNetwork` and call
+// this directly — no parse/serialize round-trip per tick. For bootstrap,
+// the same call composes trivially:
+//
+//   networkToVectorOverlay(PathModel.fromSvgPathD(D).snapshot(), opts)
+//
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Structural shape both `vn.VectorNetwork` and `PathModel.snapshot()` satisfy. */
+type NetworkLike = {
+  vertices: ReadonlyArray<readonly [number, number]>;
+  segments: ReadonlyArray<{
+    a: number;
+    b: number;
+    ta: readonly [number, number];
+    tb: readonly [number, number];
+  }>;
+};
+
+export function networkToVectorOverlay(
+  net: NetworkLike,
+  opts: {
+    origin?: readonly [number, number];
+    neighbours?: ReadonlyArray<number>;
+    regions?: ReadonlyArray<{ segments: ReadonlyArray<number> }>;
+  } = {}
+): VectorOverlay {
+  return {
+    vertices: net.vertices,
+    segments: net.segments.map((s) => ({
+      a: s.a,
+      b: s.b,
+      a_control: [
+        net.vertices[s.a][0] + s.ta[0],
+        net.vertices[s.a][1] + s.ta[1],
+      ] as const,
+      b_control: [
+        net.vertices[s.b][0] + s.tb[0],
+        net.vertices[s.b][1] + s.tb[1],
+      ] as const,
+    })),
+    origin: opts.origin ?? [0, 0],
+    neighbours: opts.neighbours,
+    regions: opts.regions,
+  };
+}
+
+/**
+ * Deep-clone (and widen) a `vn.VectorNetwork`-shaped value into a mutable
+ * `vn.VectorNetwork`. Accepts the structural `NetworkLike` shape so it
+ * can also lift `PathModel.snapshot()` (which exposes readonly tuples)
+ * into the mutable form `vn.VectorNetworkEditor` requires.
+ *
+ * `vn.VectorNetworkEditor` stores references to the input arrays and
+ * mutates them in place — the mutable vector demos clone before passing
+ * through the editor so React's setState contract holds.
+ */
+export function cloneNetwork(net: NetworkLike): vn.VectorNetwork {
+  return {
+    vertices: net.vertices.map((v) => [v[0], v[1]] as [number, number]),
+    segments: net.segments.map((s) => ({
+      a: s.a,
+      b: s.b,
+      ta: [s.ta[0], s.ta[1]] as [number, number],
+      tb: [s.tb[0], s.tb[1]] as [number, number],
+    })),
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Canonical `d` strings the vector demos parse to bootstrap their
+// `vn.VectorNetwork` state. Exported so the section can do the parse
+// itself (it needs the live network, not just the static overlay shape).
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Open polyline — 4 vertices on a horizontal row, no tangents. */
+export const VECTOR_FIXTURE_OPEN_D = "M 80 100 L 200 100 L 320 100 L 440 100";
+
+/** Closed cubic-Bezier circle, centered (300, 300), radius 100.
+ *  k = (4/3)·(√2 − 1)·r ≈ 55.23 per side. */
+export const VECTOR_FIXTURE_CLOSED_D = (() => {
+  const k = (4 / 3) * (Math.SQRT2 - 1) * 100;
+  return [
+    "M 300 200",
+    `C ${300 + k} 200, 400 ${300 - k}, 400 300`,
+    `C 400 ${300 + k}, ${300 + k} 400, 300 400`,
+    `C ${300 - k} 400, 200 ${300 + k}, 200 300`,
+    `C 200 ${300 - k}, ${300 - k} 200, 300 200`,
+    "Z",
+  ].join(" ");
+})();
+
+/** Annulus: outer square 0..200 + inner hole 70..130, both straight-edged. */
+export const VECTOR_REGION_ANNULUS_D = [
+  "M 0 0 L 200 0 L 200 200 L 0 200 Z",
+  "M 70 70 L 130 70 L 130 130 L 70 130 Z",
+].join(" ");
 
 // ───────────────────────────────────────────────────────────────────────────
 // Toy scene model — the smallest thing that lets a hud demo prove itself.
@@ -142,104 +256,134 @@ export function selectionIntentFixture(): Fixture {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Vector scene — one open path and one closed path with cubic segments.
+// Line scene — three line specimens (diagonal, horizontal, vertical) so the
+// line-specific selection chrome and its axis-aligned MIN_HIT_SIZE inflation
+// are both visible in one stage.
+//
+// `kind: "line"` resolves to `{ kind: "line", p1, p2 }` via fixtureToShape;
+// the surface paints an outline along the segment and two endpoint knobs at
+// p1/p2. For axis-aligned lines the chrome inflates the body's AABB to
+// MIN_HIT_SIZE on the squeezed axis so a 1-px-tall line is still grabbable.
 // ───────────────────────────────────────────────────────────────────────────
 
-// Two specimens stacked vertically:
-//   - top band: open polyline (straight edges) — 4 vertices on a square
-//     grid, no tangents. Demonstrates vertex knobs without the noise of
-//     tangent diamonds.
-//   - bottom band: closed circle approximation — 4 vertices on the
-//     cardinal points of a 100-px-radius circle, with cubic tangents of
-//     the canonical length k = 4/3 × (√2 − 1) × r ≈ 55. Symmetric so the
-//     tangent diamonds land in predictable, comparable positions.
-export function vectorFixture(): Fixture {
-  // Open path — 4 vertices in a horizontal row at y=100, x stepping by 120
-  // (so [80, 200, 320, 440]). Even spacing makes the segment-strip hit
-  // regions easy to compare.
-  const openVertices: Array<[number, number]> = [
-    [80, 100],
-    [200, 100],
-    [320, 100],
-    [440, 100],
-  ];
-  const openSegments = [
-    { a: 0, b: 1 },
-    { a: 1, b: 2 },
-    { a: 2, b: 3 },
-  ].map((s) => ({
-    ...s,
-    a_control: openVertices[s.a],
-    b_control: openVertices[s.b],
-  }));
-
-  // Closed path — circle approximation centered at (300, 300), radius 100.
-  // Cardinal vertices + canonical Bézier tangent length for a circle.
-  const cx = 300;
-  const cy = 300;
-  const r = 100;
-  const k = (4 / 3) * (Math.SQRT2 - 1) * r; // ≈ 55.23
-  const closedVertices: Array<[number, number]> = [
-    [cx, cy - r], // 0: top
-    [cx + r, cy], // 1: right
-    [cx, cy + r], // 2: bottom
-    [cx - r, cy], // 3: left
-  ];
-  const closedSegments = [
-    {
-      a: 0,
-      b: 1,
-      a_control: [cx + k, cy - r] as [number, number],
-      b_control: [cx + r, cy - k] as [number, number],
-    },
-    {
-      a: 1,
-      b: 2,
-      a_control: [cx + r, cy + k] as [number, number],
-      b_control: [cx + k, cy + r] as [number, number],
-    },
-    {
-      a: 2,
-      b: 3,
-      a_control: [cx - k, cy + r] as [number, number],
-      b_control: [cx - r, cy + k] as [number, number],
-    },
-    {
-      a: 3,
-      b: 0,
-      a_control: [cx - r, cy - k] as [number, number],
-      b_control: [cx - k, cy - r] as [number, number],
-    },
-  ];
-
+export function lineFixture(): Fixture {
   return {
     nodes: [
       {
-        id: "path-open",
-        kind: "vector",
+        id: "diagonal",
+        kind: "line",
+        p1: [120, 100],
+        p2: [480, 320],
         stroke: STROKE,
-        vector: {
-          vertices: openVertices,
-          segments: openSegments,
-          origin: [0, 0],
-        },
       },
       {
-        id: "path-closed",
-        kind: "vector",
+        id: "horizontal",
+        kind: "line",
+        p1: [120, 380],
+        p2: [480, 380],
         stroke: STROKE,
-        vector: {
-          vertices: closedVertices,
-          segments: closedSegments,
-          // Every vertex in a closed path has two adjacent segments, so all
-          // get tangent diamonds when in content-edit.
-          neighbours: [0, 1, 2, 3],
-          origin: [0, 0],
-        },
+      },
+      {
+        id: "vertical",
+        kind: "line",
+        p1: [60, 100],
+        p2: [60, 380],
+        stroke: STROKE,
       },
     ],
-    initialSelection: ["path-closed"],
+    initialSelection: ["diagonal"],
   };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Vector scenes — the canonical `d` strings live above
+// (`VECTOR_FIXTURE_OPEN_D`, `VECTOR_FIXTURE_CLOSED_D`,
+// `VECTOR_REGION_ANNULUS_D`). The interactive vector demos in
+// `_showcase.tsx` bootstrap their `vn.VectorNetwork` state from those
+// constants directly — geometry is host state, not a fixture.
+//
+// No static `vectorFixture()` / `vectorRegionFixture()` wrappers ship
+// from here; if a future read-only caller needs them, it composes
+// `networkToVectorOverlay(PathModel.fromSvgPathD(D).snapshot())` inline.
+// ───────────────────────────────────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────────────────────────
+// Padding overlay scene — a flex-parent container plus a derived "content"
+// rect that visualises what the padding actually does. The content rect's
+// geometry = container inset by the current padding on each side, so the
+// padding-overlay section can re-derive the fixture per intent and the
+// reader sees the content shrink/grow as they drag the handles.
+// ───────────────────────────────────────────────────────────────────────────
+
+export const PADDING_OVERLAY_CONTAINER_RECT = {
+  x: 100,
+  y: 80,
+  width: 400,
+  height: 300,
+};
+
+export function paddingOverlayFixture(padding: {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}): Fixture {
+  const c = PADDING_OVERLAY_CONTAINER_RECT;
+  // Clamp content to non-negative dimensions — if the user piles padding
+  // past the container the content collapses to a sliver but the demo
+  // doesn't crash.
+  const contentRect = {
+    x: c.x + padding.left,
+    y: c.y + padding.top,
+    width: Math.max(0, c.width - padding.left - padding.right),
+    height: Math.max(0, c.height - padding.top - padding.bottom),
+  };
+  return {
+    nodes: [
+      // Content first → container is the LAST node, so hit-pick (which
+      // walks the array in reverse) picks the container first. The user
+      // can still see the content layer but can't accidentally select it.
+      {
+        id: "content",
+        kind: "rect",
+        rect: contentRect,
+        fill: "#dbeafe", // blue-100
+        stroke: "#60a5fa", // blue-400
+        label: "content",
+      },
+      {
+        id: "container",
+        kind: "rect",
+        rect: c,
+        fill: FILL,
+        stroke: STROKE,
+        label: "flex parent",
+      },
+    ],
+    initialSelection: ["container"],
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Transform-box fixture — single rect that hosts BOTH demo sections
+// (image-fit transform binding + free-transform binding). The fixture
+// is shape-only; binding state (id, transform, size, origin) is
+// constructed per-section in the showcase.
+// ───────────────────────────────────────────────────────────────────────────
+
+export const TRANSFORM_BOX_FIXTURE_RECT = {
+  x: 120,
+  y: 80,
+  width: 320,
+  height: 200,
+};
+
+export function transformBoxFixture(): Fixture {
+  // Empty fixture — the image overlay rendered in `_showcase.tsx` is
+  // the entire visual. No fixture rect (would compete with the image
+  // for the frame role) and no `initialSelection` (would draw a
+  // selection box around an invisible target).
+  return { nodes: [], initialSelection: [] };
 }
 
 // ───────────────────────────────────────────────────────────────────────────

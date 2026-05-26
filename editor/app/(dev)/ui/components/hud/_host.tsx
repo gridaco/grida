@@ -1,17 +1,27 @@
 "use client";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Minimal hud host adapter.
+// Dev showcase host — NOT a reference adapter.
 //
-// `HUDStage` is the thinnest possible consumer of `@grida/hud`:
+// `HUDStage` is the thinnest possible consumer of `@grida/hud` for the
+// `/packages/@grida/hud` spec page. It exists to render the section
+// fixtures, not to be copied verbatim into a production host. The intent
+// dispatcher, preview/commit state, and ref-mirrored selection live here
+// in hooks because this is a dev page; a production host should lift
+// that logic into a class against `Surface`'s imperative API so it can
+// be tested and benchmarked (see `code-react` skill: hooks barred from
+// load-bearing canvas logic).
+//
+// What the showcase does demonstrate honestly:
 //   - an SVG underlay paints the toy scene (fixture)
 //   - a canvas overlay drives the hud surface
 //   - container pointer / wheel / keyboard events forward to `surface.dispatch`
-//   - selection mirror + camera live in local state
+//   - selection mirror + camera live in host state
 //
 // The surface owns gesture, hover, cursor, hit-test. The host owns
-// document content, selection, camera. This separation is the contract
-// `@grida/hud` was built around — see README §"Layer responsibilities".
+// document content, selection, camera. That separation is the real
+// contract `@grida/hud` was built around — see the package README
+// §"Layer responsibilities".
 // ───────────────────────────────────────────────────────────────────────────
 
 import * as React from "react";
@@ -137,6 +147,41 @@ export interface HUDStageProps {
    * the section's reducer per `/sdk-design`.
    */
   onParametricHandle?: (intent: Intent) => void;
+  /**
+   * Enable hud's Layer B padding overlay — diagonal-stripe inset side
+   * rects + mid-edge drag handles on a flex-parent container. The
+   * host owns the padding values; the hud emits `padding_handle`
+   * intents on drag (preview-stream + commit). Forward via
+   * {@link onPaddingHandle}; on apply, push back the updated input.
+   *
+   * Pass `null` (or omit) to disable. Schema-level feature flag —
+   * absence is the off-state.
+   */
+  paddingOverlay?: import("@grida/hud").PaddingOverlayInput | null;
+  /**
+   * Receive `padding_handle` intents emitted by the hud. The HUDStage
+   * does not interpret — the section's reducer applies the value to
+   * its `padding` state (and to the opposite side when `mirror` is
+   * true), and pushes back the updated `paddingOverlay` input.
+   */
+  onPaddingHandle?: (intent: Intent) => void;
+  /**
+   * Transform-box (Layer B) — push the bound transform + size + origin
+   * + optional container rotation. Hud paints the quad outline,
+   * intercepts handles (corner = rotate, side = scale, body =
+   * translate), and emits `transform_box` intents on drag. Forward via
+   * {@link onTransformBox}; on apply, push back the updated input.
+   *
+   * Pass `null` (or omit) to disable. Schema-level feature flag —
+   * absence is the off-state.
+   */
+  transformBox?: import("@grida/hud").TransformBoxInput | null;
+  /**
+   * Receive `transform_box` intents from the hud. The HUDStage does not
+   * interpret — the section's reducer commits `intent.transform` to its
+   * bound state and pushes back the updated input.
+   */
+  onTransformBox?: (intent: Intent) => void;
   /** Block all mutating intents. */
   readonly?: boolean;
   /**
@@ -151,7 +196,15 @@ export interface HUDStageProps {
   /** Decoration layered on top of the hud surface chrome. */
   extra?: HUDExtraBuilder;
   /** Vector content-edit overlay — pass `null` to exit content-edit. */
-  vectorEdit?: { id: string; selection?: { vertices: number[] } } | null;
+  vectorEdit?: {
+    id: string;
+    selection?: {
+      vertices: number[];
+      segments?: number[];
+      tangents?: Array<[number, 0 | 1]>;
+      regions?: number[];
+    };
+  } | null;
   /** Surface vector insertion / selection / bend mode toggles. */
   vectorInsertionMode?: "midpoint" | "projected";
   vectorSelectionMode?: "marquee" | "lasso";
@@ -225,12 +278,17 @@ function hitPick(fixture: Fixture, point: [number, number]): NodeId | null {
 function FixtureSvg({
   fixture,
   offsets,
+  endpointPreviews,
   width,
   height,
   transform,
 }: {
   fixture: Fixture;
   offsets: Record<string, [number, number]>;
+  endpointPreviews: Record<
+    string,
+    { p1?: [number, number]; p2?: [number, number] }
+  >;
   width: number;
   height: number;
   transform: cmath.Transform;
@@ -246,7 +304,10 @@ function FixtureSvg({
     >
       <g transform={t}>
         {fixture.nodes.map((n) => (
-          <FixtureShape key={n.id} node={applyOffsetToNode(n, offsets)} />
+          <FixtureShape
+            key={n.id}
+            node={applyOffsetToNode(n, offsets, endpointPreviews)}
+          />
         ))}
       </g>
     </svg>
@@ -476,30 +537,50 @@ function eventButton(e: PointerEvent): "primary" | "secondary" | "middle" {
 
 function applyOffsetToNode(
   n: FixtureNode,
-  offs: Record<string, [number, number]>
+  offs: Record<string, [number, number]>,
+  endpoints?: Record<string, { p1?: [number, number]; p2?: [number, number] }>
 ): FixtureNode {
   const off = offs[n.id];
-  if (!off) return n;
-  const [dx, dy] = off;
-  if (n.rect)
-    return { ...n, rect: { ...n.rect, x: n.rect.x + dx, y: n.rect.y + dy } };
-  if (n.p1 && n.p2)
-    return {
-      ...n,
-      p1: [n.p1[0] + dx, n.p1[1] + dy],
-      p2: [n.p2[0] + dx, n.p2[1] + dy],
+  const ep = endpoints?.[n.id];
+  if (!off && !ep) return n;
+  let next: FixtureNode = n;
+  if (off) {
+    const [dx, dy] = off;
+    if (next.rect)
+      next = {
+        ...next,
+        rect: { ...next.rect, x: next.rect.x + dx, y: next.rect.y + dy },
+      };
+    if (next.p1 && next.p2)
+      next = {
+        ...next,
+        p1: [next.p1[0] + dx, next.p1[1] + dy],
+        p2: [next.p2[0] + dx, next.p2[1] + dy],
+      };
+  }
+  if (ep && next.p1 && next.p2) {
+    next = {
+      ...next,
+      p1: ep.p1 ?? next.p1,
+      p2: ep.p2 ?? next.p2,
     };
-  return n;
+  }
+  return next;
 }
 
 function commitOffsets(
   fixture: Fixture,
-  offs: Record<string, [number, number]>
+  offs: Record<string, [number, number]>,
+  endpoints?: Record<string, { p1?: [number, number]; p2?: [number, number] }>
 ): Fixture {
-  if (Object.keys(offs).length === 0) return fixture;
+  if (
+    Object.keys(offs).length === 0 &&
+    (!endpoints || Object.keys(endpoints).length === 0)
+  )
+    return fixture;
   return {
     ...fixture,
-    nodes: fixture.nodes.map((n) => applyOffsetToNode(n, offs)),
+    nodes: fixture.nodes.map((n) => applyOffsetToNode(n, offs, endpoints)),
   };
 }
 
@@ -520,6 +601,10 @@ export function HUDStage(props: HUDStageProps) {
     onCornerRadius,
     parametricHandles = null,
     onParametricHandle,
+    paddingOverlay = null,
+    onPaddingHandle,
+    transformBox = null,
+    onTransformBox,
     readonly = false,
     interactionLocked = false,
     extra,
@@ -569,6 +654,16 @@ export function HUDStage(props: HUDStageProps) {
   const previewOffsetsRef = React.useRef(previewOffsets);
   previewOffsetsRef.current = previewOffsets;
 
+  // Line-endpoint preview overrides, applied on top of liveFixture in shapeOf
+  // and the SVG underlay. Unlike translate offsets (deltas), endpoint moves
+  // are absolute positions — `set_endpoint` carries `pos`, not `dx/dy` —
+  // so they live in their own map keyed by node id, partial per endpoint.
+  const [endpointPreviews, setEndpointPreviews] = React.useState<
+    Record<string, { p1?: [number, number]; p2?: [number, number] }>
+  >({});
+  const endpointPreviewsRef = React.useRef(endpointPreviews);
+  endpointPreviewsRef.current = endpointPreviews;
+
   // Camera. `initialTransform` is read once at mount — runtime changes
   // would fight the user's wheel-zoom, so we don't track it as a dep.
   const [transform, setTransform] = React.useState<cmath.Transform>(
@@ -585,6 +680,10 @@ export function HUDStage(props: HUDStageProps) {
   const onCornerRadiusRef = React.useRef(onCornerRadius);
   const onParametricHandleRef = React.useRef(onParametricHandle);
   onParametricHandleRef.current = onParametricHandle;
+  const onPaddingHandleRef = React.useRef(onPaddingHandle);
+  onPaddingHandleRef.current = onPaddingHandle;
+  const onTransformBoxRef = React.useRef(onTransformBox);
+  onTransformBoxRef.current = onTransformBox;
   const interactionLockedRef = React.useRef(interactionLocked);
   interactionLockedRef.current = interactionLocked;
   const lastIntentRef = React.useRef<Intent | null>(null);
@@ -632,7 +731,8 @@ export function HUDStage(props: HUDStageProps) {
       (intent.kind === "select" ||
         intent.kind === "deselect_all" ||
         intent.kind === "marquee_select" ||
-        intent.kind === "translate")
+        intent.kind === "translate" ||
+        intent.kind === "set_endpoint")
     ) {
       return;
     }
@@ -683,6 +783,34 @@ export function HUDStage(props: HUDStageProps) {
           return next;
         });
       }
+    } else if (intent.kind === "set_endpoint") {
+      // Line endpoint drag — `pos` is absolute doc-space. Preview keeps it
+      // in `endpointPreviews` (consumed by hitPick / shapeOf / SVG); commit
+      // bakes it into liveFixture and clears the override. Mirrors the
+      // translate handler's preview/commit pairing for offsets.
+      const { id, endpoint, pos } = intent;
+      if (intent.phase === "preview") {
+        setEndpointPreviews((prev) => {
+          const cur = prev[id] ?? {};
+          const existing = cur[endpoint];
+          if (existing && existing[0] === pos[0] && existing[1] === pos[1])
+            return prev;
+          return {
+            ...prev,
+            [id]: { ...cur, [endpoint]: [pos[0], pos[1]] as [number, number] },
+          };
+        });
+      } else if (intent.phase === "commit") {
+        setLiveFixture((prev) =>
+          commitOffsets(prev, {}, { [id]: { [endpoint]: [pos[0], pos[1]] } })
+        );
+        setEndpointPreviews((prev) => {
+          if (!prev[id]) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
     } else if (
       intent.kind === "corner_radius" ||
       intent.kind === "corner_radius_explicit" ||
@@ -701,6 +829,18 @@ export function HUDStage(props: HUDStageProps) {
       // mutates its host-owned scalar values and pushes back updated
       // `parametricHandles` inputs on the next render.
       onParametricHandleRef.current?.(intent);
+    } else if (intent.kind === "padding_handle") {
+      // Layer B padding model — section owns the per-side values and
+      // the active-side mirror. Forwards `padding_handle` (preview /
+      // commit) and the `mirror` flag; HUDStage stays unopinionated.
+      onPaddingHandleRef.current?.(intent);
+    } else if (intent.kind === "transform_box") {
+      // Layer B transform-box model — section owns the bound
+      // transform. Forwards `transform_box` (preview / commit); the
+      // section's reducer commits `intent.transform` to whatever
+      // field it bound to (image-paint transform, node-local
+      // transform, …). HUDStage stays unopinionated.
+      onTransformBoxRef.current?.(intent);
     } else if (intent.kind === "marquee_select" && intent.phase === "commit") {
       // In vector content-edit, marquee targets vertices, not nodes — let
       // the host's section-level intent observer (subscribed to
@@ -736,7 +876,11 @@ export function HUDStage(props: HUDStageProps) {
     // Apply preview offsets so both hit-test and shape resolution follow
     // the in-flight drag.
     const ghosted = (): Fixture =>
-      commitOffsets(fixtureRef.current, previewOffsetsRef.current);
+      commitOffsets(
+        fixtureRef.current,
+        previewOffsetsRef.current,
+        endpointPreviewsRef.current
+      );
     const s = new Surface(canvasRef.current, {
       pick: (p) => hitPick(ghosted(), p),
       shapeOf: (id) => {
@@ -846,7 +990,14 @@ export function HUDStage(props: HUDStageProps) {
     if (selectionGroups) surface.setSelection(selectionGroups);
     else surface.setSelection(selectionRef.current);
     surface.draw(computeExtra());
-  }, [surface, liveFixture, previewOffsets, selectionGroups, computeExtra]);
+  }, [
+    surface,
+    liveFixture,
+    previewOffsets,
+    endpointPreviews,
+    selectionGroups,
+    computeExtra,
+  ]);
 
   React.useEffect(() => {
     if (!surface) return;
@@ -899,6 +1050,26 @@ export function HUDStage(props: HUDStageProps) {
     surface.draw(computeExtra());
   }, [surface, parametricHandles, computeExtra]);
 
+  // Padding overlay (Layer B) — host pushes the container rect + per-side
+  // values + optional `active_side` mirror; hud paints and emits
+  // `padding_handle` intents on drag. Loop closes when the host applies
+  // the value and pushes a new `paddingOverlay` input back.
+  React.useEffect(() => {
+    if (!surface) return;
+    surface.setPaddingOverlay(paddingOverlay);
+    surface.draw(computeExtra());
+  }, [surface, paddingOverlay, computeExtra]);
+
+  // Transform-box (Layer B) — host pushes the bound transform + size +
+  // origin + optional rotation. Hud paints the quad outline + handles
+  // and emits `transform_box` intents on drag. Loop closes when the
+  // host commits `intent.transform` and pushes back a new input.
+  React.useEffect(() => {
+    if (!surface) return;
+    surface.setTransformBox(transformBox);
+    surface.draw(computeExtra());
+  }, [surface, transformBox, computeExtra]);
+
   // Host-`extra`-only change → nudge a redraw. `extra` is read through
   // `extraRef.current` at draw time (so per-frame draws always see the
   // latest closure), but hud has no internal reason to redraw when only
@@ -918,8 +1089,9 @@ export function HUDStage(props: HUDStageProps) {
       surface.setVectorSelection({
         node_id: vectorEdit.id,
         vertices: vectorEdit.selection?.vertices ?? [],
-        segments: [],
-        tangents: [],
+        segments: vectorEdit.selection?.segments ?? [],
+        tangents: vectorEdit.selection?.tangents ?? [],
+        regions: vectorEdit.selection?.regions ?? [],
       });
     } else {
       surface.setVectorSelection(null);
@@ -1166,6 +1338,7 @@ export function HUDStage(props: HUDStageProps) {
       <FixtureSvg
         fixture={liveFixture}
         offsets={previewOffsets}
+        endpointPreviews={endpointPreviews}
         width={size.width}
         height={size.height}
         transform={transform}

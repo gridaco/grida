@@ -8,8 +8,12 @@ import {
   CursorsSection,
   GroupSelectionSection,
   LayoutSection,
+  LineSection,
   MeasurementSection,
   NotYetBuiltSection,
+  PaddingOverlaySection,
+  TransformBoxImageFitSection,
+  ParametricHandlesSection,
   PerformanceSection,
   PixelGridSection,
   PrimitivesSection,
@@ -47,25 +51,29 @@ const WG_SELECTION =
 // + _live-section.tsx.
 const SECTIONS: { id: string; label: string }[] = [
   { id: "live", label: "Live editor" },
-  { id: "primitives", label: "§0 Primitives" },
-  { id: "architecture", label: "§1 Architecture" },
-  { id: "selection-scenarios", label: "§2 Selection intent" },
-  { id: "group-selection", label: "§3 Group selection" },
-  { id: "layout", label: "§4 Layout / 9-slice" },
-  { id: "transformed", label: "§5 Transformed" },
-  { id: "vector", label: "§6 Vector chrome" },
-  { id: "size-meter", label: "§7 Size meter" },
-  { id: "snap", label: "§8 Snap" },
-  { id: "measurement", label: "§9 Measurement" },
-  { id: "visibility", label: "§10 Visibility groups" },
-  { id: "pixel-grid", label: "§11 Pixel grid" },
-  { id: "cursors", label: "§12 Cursors" },
-  { id: "click-tracker", label: "§13 Click tracker" },
-  { id: "ruler-guides", label: "§14 Ruler & guides" },
+  { id: "primitives", label: "Primitives" },
+  { id: "architecture", label: "Architecture" },
+  { id: "selection-scenarios", label: "Selection intent" },
+  { id: "group-selection", label: "Group selection" },
+  { id: "transformed", label: "Transformed" },
+  { id: "line", label: "Line selection" },
+  { id: "layout", label: "Layout / 9-slice" },
+  { id: "size-meter", label: "Size meter" },
   { id: "corner-radius", label: "Corner radius" },
+  { id: "padding-overlay", label: "Padding overlay" },
+  { id: "transform-box", label: "Transform box" },
   { id: "aspect-ratio", label: "Aspect ratio" },
-  { id: "performance", label: "§17 Performance" },
-  { id: "not-yet-built", label: "§18 Not yet built" },
+  { id: "parametric-handles", label: "Parametric handles" },
+  { id: "vector", label: "Vector chrome" },
+  { id: "snap", label: "Snap" },
+  { id: "measurement", label: "Measurement" },
+  { id: "ruler-guides", label: "Ruler & guides" },
+  { id: "pixel-grid", label: "Pixel grid" },
+  { id: "cursors", label: "Cursors" },
+  { id: "click-tracker", label: "Click tracker" },
+  { id: "visibility", label: "Visibility groups" },
+  { id: "performance", label: "Performance" },
+  { id: "not-yet-built", label: "Not yet built" },
 ];
 
 function SidebarToc({
@@ -135,8 +143,8 @@ export default function HudSpecPage() {
                   </p>
                 </div>
 
-                {/* Quick links + install */}
-                <div className="flex flex-wrap items-center gap-3">
+                {/* Quick links */}
+                <div className="flex flex-wrap items-center gap-2">
                   <Link
                     href={README_URL}
                     target="_blank"
@@ -185,9 +193,12 @@ export default function HudSpecPage() {
                       source
                     </Button>
                   </Link>
-                  <div className="ml-auto w-full max-w-xs">
-                    <CopyToClipboardInput value="pnpm add @grida/hud" />
-                  </div>
+                </div>
+
+                {/* Install — its own row so it doesn't compete with the
+                    button cluster on narrow viewports */}
+                <div className="w-full max-w-sm">
+                  <CopyToClipboardInput value="pnpm add @grida/hud" />
                 </div>
 
                 {/* Table of contents — inline on small screens; floats on xl+ */}
@@ -217,19 +228,23 @@ export default function HudSpecPage() {
           <ArchitectureSection />
           <SelectionScenariosSection />
           <GroupSelectionSection />
-          <LayoutSection />
           <TransformedSection />
-          <VectorChromeSection />
+          <LineSection />
+          <LayoutSection />
           <SizeMeterSection />
+          <CornerRadiusSection />
+          <PaddingOverlaySection />
+          <TransformBoxImageFitSection />
+          <AspectRatioSection />
+          <ParametricHandlesSection />
+          <VectorChromeSection />
           <SnapSection />
           <MeasurementSection />
-          <VisibilitySection />
+          <RulerGuidesSection />
           <PixelGridSection />
           <CursorsSection />
           <ClickTrackerSection />
-          <RulerGuidesSection />
-          <CornerRadiusSection />
-          <AspectRatioSection />
+          <VisibilitySection />
           <PerformanceSection />
           <NotYetBuiltSection />
         </div>
