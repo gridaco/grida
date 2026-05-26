@@ -183,7 +183,7 @@ describe("VectorEditSession — snapshot / restore for history wiring", () => {
 
 describe("external-mutation reconciliation contract — tag-aware", () => {
   // The host watcher in `dom.ts` reconciles vector-edit sessions when
-  // external writes hit the source-tag's native attr. v1 v1 watcher was
+  // external writes hit the source-tag's native attr. v1's watcher was
   // gated to <path>, which left <polyline>/<polygon> stale across undo,
   // redo, programmatic `set_attr`, or collab. These tests pin the
   // tag-aware reconciliation contract by exercising the same pipeline the
