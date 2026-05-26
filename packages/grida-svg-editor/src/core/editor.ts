@@ -1853,6 +1853,17 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
  * attach later via `editor.attach(surface)`.
  */
 export function createSvgEditor(opts: CreateSvgEditorOptions): SvgEditor {
+  if (opts == null || typeof opts.svg !== "string") {
+    const got =
+      opts == null
+        ? String(opts)
+        : opts.svg === null
+          ? "null"
+          : typeof opts.svg;
+    throw new TypeError(
+      `createSvgEditor({ svg }) requires { svg: string }, got svg=${got}`
+    );
+  }
   return _create_svg_editor_internal(opts);
 }
 
