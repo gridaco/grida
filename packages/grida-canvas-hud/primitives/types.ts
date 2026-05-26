@@ -8,6 +8,77 @@ export interface HUDSemantic {
 }
 
 // ---------------------------------------------------------------------------
+// Paint — the design-language vocabulary for fill and stroke.
+//
+// `HUDPaint` is the closed taxonomy of paint kinds HUD ships. New kinds
+// require a PR with ≥2 internal consumers shaped — hosts cannot register
+// kinds at runtime.
+//
+// Built-in kinds (currently `solid`, `stripes`) are HUD-owned: HUD chooses
+// rasterization quality and re-rasterizes on zoom so the chrome stays sharp.
+// Theming flows through the `color` field; geometry (angle, spacing,
+// thickness) is fixed by HUD's defaults and overridden only for the second
+// canonical look — not for re-skinning.
+//
+// `HUDPaint` is symmetric across fill and stroke (Canvas API has no
+// asymmetry here — both `fillStyle` and `strokeStyle` accept a
+// `CanvasPattern`). The same value can drive `fillPaint` or `strokePaint`
+// on a primitive.
+//
+// @unstable Public shape may change until the vector-edit overlay rehosts
+// onto `@grida/hud` and becomes the second consumer that locks the
+// contract.
+// ---------------------------------------------------------------------------
+
+/**
+ * Solid color paint — the existing flat-fill behavior, lifted into the
+ * `HUDPaint` discriminated union.
+ *
+ * @unstable
+ */
+export interface HUDPaintSolid {
+  kind: "solid";
+  /** CSS color string. */
+  color: string;
+  /** Paint opacity, 0–1 (default: 1). */
+  opacity?: number;
+}
+
+/**
+ * Diagonal-stripes paint — HUD's canonical "highlighted region, not
+ * committed selection" chrome. Defaults match the editor's vector-edit
+ * hover language (45° / 8px / 1.5px in device pixels).
+ *
+ * HUD rasterizes the tile per frame at the current DPR × zoom bucket and
+ * caches the result — hosts never own the bitmap.
+ *
+ * @unstable
+ */
+export interface HUDPaintStripes {
+  kind: "stripes";
+  /** CSS color string for the stripe. */
+  color: string;
+  /** Paint opacity, 0–1 (default: 1). */
+  opacity?: number;
+  /** Stripe angle in degrees (default: 45). */
+  angle?: number;
+  /** Distance between stripe centers in CSS (logical) px (default: 8).
+   *  The paint resolver scales by `devicePixelRatio` at runtime. */
+  spacing?: number;
+  /** Stripe thickness in CSS (logical) px (default: 1.5).
+   *  The paint resolver scales by `devicePixelRatio` at runtime. */
+  thickness?: number;
+}
+
+/**
+ * The closed taxonomy of paint kinds HUD ships. See module banner above
+ * for the promotion contract.
+ *
+ * @unstable
+ */
+export type HUDPaint = HUDPaintSolid | HUDPaintStripes;
+
+// ---------------------------------------------------------------------------
 // Draw primitives — the atoms every HUD feature composes from.
 //
 // All coordinates are in **document space** unless noted otherwise.
@@ -27,6 +98,14 @@ export interface HUDLine extends cmath.ui.Line, HUDSemantic {
    * back to the canvas's current color when absent.
    */
   color?: string;
+  /**
+   * Paint applied to the stroke. When set, takes precedence over `color`
+   * for the stroke; the label pill stays on `color` (labels are theming
+   * surface, not paintable design-language surface).
+   *
+   * @unstable
+   */
+  strokePaint?: HUDPaint;
   /**
    * Label rotation in radians (CCW) around the label pill's screen-space
    * center. Defaults to `0`. Used to make the size meter pill rotate with
@@ -53,6 +132,20 @@ export interface HUDRule extends HUDSemantic {
    * the canvas's current color when absent.
    */
   color?: string;
+  /**
+   * Paint applied to the stroke. When set, takes precedence over `color`.
+   *
+   * @unstable
+   */
+  strokePaint?: HUDPaint;
+  /**
+   * Stroke width in screen-space CSS px. Defaults to the canvas default
+   * (`DEFAULT_LINE_WIDTH`, 0.5). Hosts emitting per-rule visual state
+   * (hovered, selected) can vary this to match a corresponding
+   * `RulerMark.strokeWidth`, so the strip tick and the guide line read
+   * as one continuous stroke. Mirrors {@link HUDLine.strokeWidth}.
+   */
+  strokeWidth?: number;
 }
 
 /**
@@ -70,6 +163,13 @@ export interface HUDPoint extends HUDSemantic {
    * Falls back to the canvas's current color when absent.
    */
   color?: string;
+  /**
+   * Paint applied to the crosshair stroke. When set, takes precedence
+   * over `color`.
+   *
+   * @unstable
+   */
+  strokePaint?: HUDPaint;
 }
 
 /**
@@ -97,6 +197,21 @@ export interface HUDRect extends HUDSemantic {
    * to the canvas's current color when absent.
    */
   color?: string;
+  /**
+   * Paint applied to the fill. When set, takes precedence over `color` +
+   * `fillOpacity` for the fill (`fillOpacity` is folded into `HUDPaint.opacity`
+   * by the host when migrating).
+   *
+   * @unstable
+   */
+  fillPaint?: HUDPaint;
+  /**
+   * Paint applied to the stroke. When set, takes precedence over `color`
+   * for the stroke.
+   *
+   * @unstable
+   */
+  strokePaint?: HUDPaint;
 }
 
 /**
@@ -126,6 +241,20 @@ export interface HUDPolyline extends HUDSemantic {
    * back to the canvas's current color when absent.
    */
   color?: string;
+  /**
+   * Paint applied to the fill. When set, takes precedence over `color` +
+   * `fillOpacity` for the fill.
+   *
+   * @unstable
+   */
+  fillPaint?: HUDPaint;
+  /**
+   * Paint applied to the stroke. When set, takes precedence over `color`
+   * + `strokeOpacity` for the stroke.
+   *
+   * @unstable
+   */
+  strokePaint?: HUDPaint;
 }
 
 /**
@@ -153,6 +282,18 @@ export interface HUDScreenRect extends HUDSemantic {
   fillColor?: string;
   /** Override the canvas color for stroke. */
   strokeColor?: string;
+  /**
+   * Paint applied to the fill. When set, takes precedence over `fillColor`.
+   *
+   * @unstable
+   */
+  fillPaint?: HUDPaint;
+  /**
+   * Paint applied to the stroke. When set, takes precedence over `strokeColor`.
+   *
+   * @unstable
+   */
+  strokePaint?: HUDPaint;
   /**
    * Rotation in radians (CCW) around the rect's screen-space center.
    * Defaults to `0`. Used to make handle knobs / size badges rotate

@@ -143,6 +143,8 @@ surface.setSelection(ids);  // read-only mirror from host
 surface.setStyle(partial);
 surface.setReadonly(v);
 surface.setPixelGrid({ enabled, zoomThreshold, color?, steps? }); // or null to disable
+surface.setRuler({ enabled, axes?, color?, ranges?, marks?, ... }); // or null to disable
+surface.setRulerTransform(t);
 surface.dispose();
 
 // Input
@@ -360,7 +362,117 @@ Layer order within a frame (back-to-front):
 3. Marquee rect
 4. Resize/rotate handles
 5. Size meter pill
-6. Host-fed extras (always on top)
+6. Host-fed extras
+7. Ruler strips (when enabled — top + left L-shape, screen-space)
+
+### Substrate vs frame — why pixel grid and ruler sit at opposite ends
+
+The two named viewport chromes — pixel grid and ruler — share the
+inlining mechanism (a pure `draw*(ctx, params)` routine over the HUD's
+existing context), but they belong to **different paint-order
+families**:
+
+- **Substrate (back-most).** Pixel grid is content-space: it lives
+  with the document, the user reads it _under_ everything else, and
+  its only job is to give content something to align to. Selection
+  chrome, marquee, and host extras are what the user is _interacting
+  with_; the grid is decoration that informs the interaction. So it
+  paints first.
+- **Frame (top-most).** Ruler is viewport-space: it frames the editing
+  area, the way a window title bar frames a document. The ticks
+  reference world coordinates a selection might cross, but the strip
+  itself is "outside" the editing surface. A selection outline,
+  marquee, or handle that visually escapes into the strip reads as
+  broken in the same way a document scrolling under a title bar
+  reads as broken. So it paints last — after the pixel grid, after
+  surface chrome, and after host extras.
+
+  Every major editor (Figma, Sketch, XD, Illustrator, Affinity,
+  OmniGraffle) paints the ruler on top of content chrome. The HUD
+  follows that convention. The corner square (`strip × strip` at
+  origin) is deliberately left blank — hosts that want to fill it
+  draw it via the host-fed extras pass, which sits beneath the
+  ruler and is therefore correctly clipped by the strip on top.
+
+  Each strip also paints a **1-px inner-edge separator** early in
+  its own pass — right after the background fill, before any range
+  accent, mark, or step tick. The line where the strip meets the
+  editing area is the universal affordance every editor ships:
+  without it the strip visually bleeds into content. Painting it
+  beneath the data means a full-strip mark (`strokeHeight: strip`)
+  reads as one continuous stroke crossing the strip boundary into
+  the canvas guide below — instead of being capped by the separator
+  on top. The two roles answer different questions and earn
+  different paint slots: the separator is cosmetic chrome ("where
+  does the strip end?"), the ticks and marks are data ("what's the
+  position?"); chrome below, data above. The separator obeys the
+  `axes` filter — `axes: ["x"]` paints only the top-strip separator,
+  `axes: ["y"]` only the left-strip separator. The two separators
+  meet at right angles inside the corner square; nothing else is
+  painted there.
+
+  **Separator color is independent of tick color.** `RulerConfig`
+  exposes a separate `borderColor?` token that defaults to `color`
+  (the tick color) for backward compatibility, but the two are
+  deliberately decoupled. Every production editor (Figma, Sketch,
+  XD, Illustrator, Affinity, and our own main editor) paints the
+  separator distinctly LIGHTER than the ticks — the ticks must
+  read as numerals, the separator only marks the edge. A single
+  shared color cannot satisfy both responsibilities. Hosts that
+  want the main-editor look should pass a light neutral as
+  `borderColor` (e.g. an OKLCH or hex value matching their design
+  system's `border` token) while keeping `color` at the standard
+  mid-gray for the ticks.
+
+  **Marks (guide positions).** `RulerConfig.marks` accepts per-axis
+  arrays of `RulerMark`. A minimal `{ pos }` mark renders as a regular
+  step tick — short stroke, label color = the ruler's `color`. The
+  extra fields cover the standard guide-position affordance every
+  editor ships: a full-strip line with an accent stroke + label color:
+
+  ```ts
+  interface RulerMark {
+    pos: number;
+    /** Tick stroke + (default) label color. */
+    color?: string;
+    /** Label text. */
+    text?: string;
+    /** Override the stroke color independently of the label color. */
+    strokeColor?: string;
+    /** Stroke width in CSS pixels. Default 1. */
+    strokeWidth?: number;
+    /**
+     * Stroke height in CSS pixels. Default `tickHeight`. Pass `strip`
+     * (the strip width) for a full-strip mark — the standard
+     * guide-position affordance.
+     */
+    strokeHeight?: number;
+    /** Label color. Defaults to `color` if omitted. */
+    textColor?: string;
+    /** Label alignment. Default "center". */
+    textAlign?: CanvasTextAlign;
+    /** Label position offset from `pos`. Default 0. */
+    textAlignOffset?: number;
+  }
+  ```
+
+  To paint a guide position the way the rest of the editor renders
+  guides — full-strip accent line with a same-colored label — pass
+  `strokeHeight: strip` (matching `RulerConfig.strip`, default 20)
+  along with an accent `color` / `strokeColor`. Defaults are chosen
+  so omitting every field except `pos` keeps rendering identically
+  to a step tick — additive, no regressions for existing callers.
+
+  **Drag threshold.** Hosts implementing drag-from-strip to create
+  guides should use `DEFAULT_RULER_DRAG_THRESHOLD` (4 px) as the
+  minimum pointer-movement distance from pointer-down before
+  committing a new guide — without it, a stray click on the strip
+  spawns an unwanted guide. The constant is a published recommendation,
+  not a runtime gate; hud does not own the gesture.
+
+If a future chrome turns out to be neither a substrate nor a frame,
+the right move is to add a new paint slot deliberately — not to
+hard-code it next to one of the existing ones by analogy.
 
 ## Transformed selections
 
@@ -414,6 +526,8 @@ packages/grida-canvas-hud/
 ├── primitives/                # UI — dumb render shapes
 │   ├── canvas.ts              # HUDCanvas
 │   ├── types.ts               # HUDDraw, HUDLine, HUDRect, HUDPolyline, HUDRule, HUDScreenRect
+│   ├── pixel-grid.ts          # inlined pure draw routine (sibling: @grida/pixel-grid)
+│   ├── ruler.ts               # inlined pure draw routine (sibling: @grida/ruler)
 │   ├── snap-guide.ts          # HUDDraw builder
 │   ├── measurement-guide.ts   # HUDDraw builder
 │   ├── marquee.ts             # legacy HUDDraw builder (surface emits its own marquee)
@@ -569,24 +683,25 @@ Non-exhaustive index — open the test files for the full surface.
 
 ### Test file index
 
-| File                                   | Domain pinned by tests                                                                                       |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `transform.test.ts`                    | screen ↔ doc across translate, scale, DPR                                                                    |
-| `hit-regions.test.ts`                  | topmost wins, reverse iteration, clear/empty, AABB containment                                               |
-| `handles.test.ts`                      | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                   |
-| `click-tracker.test.ts`                | single vs double within window; position threshold; multi-button isolation                                   |
-| `gesture.test.ts`                      | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                 |
-| `state.test.ts`                        | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates, exit-edit |
-| `intent.test.ts`                       | intent stream + `phase` correctness across a full drag (preview·N → commit)                                  |
-| `decision.test.ts`                     | one test per named scenario in the selection-intent classifier, including ExitEdit gating                    |
-| `chrome.test.ts`                       | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                         |
-| `chrome-transformed.test.ts`           | `SelectionShape.transformed` end-to-end                                                                      |
-| `chrome-priority.test.ts`              | overlay priority ladder over scenarios                                                                       |
-| `cursors.test.ts`                      | `cursors.defaultRenderer` produces rotation-aware CSS values; tree-shake invariant                           |
-| `vector-chrome.test.ts`                | vector chrome baseline: vertex emission, neighbouring filter, hit-region pad                                 |
-| `vector-chrome-extended.test.ts`       | vector chrome UX: tangent diamond shape + size, selection highlight, priority ladder                         |
-| `vector-chrome-segment-render.test.ts` | segment outline state machine: idle / hover / selected styling                                               |
-| `vector-gesture.test.ts`               | vector-specific gesture state machine: tangent drag, segment-strip click→split, drag→bend                    |
+| File                                   | Domain pinned by tests                                                                                                                                                                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transform.test.ts`                    | screen ↔ doc across translate, scale, DPR                                                                                                                                                                                                      |
+| `hit-regions.test.ts`                  | topmost wins, reverse iteration, clear/empty, AABB containment                                                                                                                                                                                 |
+| `handles.test.ts`                      | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                                                                                                                                                     |
+| `click-tracker.test.ts`                | single vs double within window; position threshold; multi-button isolation                                                                                                                                                                     |
+| `gesture.test.ts`                      | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                                                                                                                                                   |
+| `state.test.ts`                        | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates, exit-edit                                                                                                                                   |
+| `intent.test.ts`                       | intent stream + `phase` correctness across a full drag (preview·N → commit)                                                                                                                                                                    |
+| `decision.test.ts`                     | one test per named scenario in the selection-intent classifier, including ExitEdit gating                                                                                                                                                      |
+| `chrome.test.ts`                       | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                                                                                                                                                           |
+| `chrome-transformed.test.ts`           | `SelectionShape.transformed` end-to-end                                                                                                                                                                                                        |
+| `chrome-priority.test.ts`              | overlay priority ladder over scenarios                                                                                                                                                                                                         |
+| `cursors.test.ts`                      | `cursors.defaultRenderer` produces rotation-aware CSS values; tree-shake invariant                                                                                                                                                             |
+| `vector-chrome.test.ts`                | vector chrome baseline: vertex emission, neighbouring filter, hit-region pad                                                                                                                                                                   |
+| `vector-chrome-extended.test.ts`       | vector chrome UX: tangent diamond shape + size, selection highlight, priority ladder                                                                                                                                                           |
+| `vector-chrome-segment-render.test.ts` | segment outline state machine: idle / hover / selected styling                                                                                                                                                                                 |
+| `vector-gesture.test.ts`               | vector-specific gesture state machine: tangent drag, segment-strip click→split, drag→bend                                                                                                                                                      |
+| `ruler.test.ts`                        | inlined ruler draw routine: layout helpers (step / subtick / range-merge), drawRuler call sequence, HUDCanvas wiring (setRuler/setRulerTransform, substrate-vs-frame paint-order: ruler top-most over chrome and extras, pixel-grid back-most) |
 
 Render output (visual canvas correctness — paint order, anti-aliasing, the
 actual pixel result) is verified in the browser, not unit-tested. Every UX
@@ -599,15 +714,30 @@ layer" API (see Anti-goals — "Not a host of plugins"). Three paths cover real
 needs, in this order of preference:
 
 1. **Named built-in chrome.** Things every Grida editor wants — pixel grid,
-   selection, snap guides, measurement — live inside this package as
-   first-class features with their own toggles (e.g. `setPixelGrid`,
-   `setStyle`, the chrome built from `SurfaceState`). New canonical chrome
-   lands here; open a PR against `@grida/hud`.
+   ruler, selection, snap guides, measurement — live inside this package
+   as first-class features with their own toggles (e.g. `setPixelGrid`,
+   `setRuler`, `setStyle`, the chrome built from `SurfaceState`). New
+   canonical chrome lands here; open a PR against `@grida/hud`.
+
+   Inlined chrome carries an explicit synchronisation contract: each
+   inlined primitive (`primitives/pixel-grid.ts`, `primitives/ruler.ts`,
+   …) documents its upstream sibling in a header comment. Bug fixes must
+   land on both sides. The bar for inlining a new chrome is that it
+   resolves into a single pure draw routine over an existing context —
+   anything that wants to own its own canvas, its own DPR, or its own
+   stateful renderer class belongs in a sibling package the host mounts,
+   not here. See "Not a renderer" under Anti-goals.
 
 2. **Host-fed `HUDDraw` extras.** Pass extra primitives into `surface.draw(extra)`
    per frame. Best for transient, gesture-coupled overlays the host already
-   computes (measurement lines, custom snap visualizers). Drawn on top of named
-   chrome — they're foreground, not background.
+   computes (measurement lines, custom snap visualizers). Drawn on top of the
+   substrate-band and content-band chrome (pixel grid, selection, marquee,
+   handles, size meter) but **beneath the frame-band chrome** (ruler). If a
+   host extra is meant to occupy the ruler strip (a corner-square fill, a
+   ruler-strip widget), draw it as an extra and let the ruler clip the
+   bleed — don't try to paint above the ruler. The HUD reserves the right
+   to add more frame-band chrome later; hosts should not build patterns
+   that depend on extras being the absolute top layer.
 
 3. **DOM-level escape hatch.** The host owns the container element; the surface
    only inserts the SVG and the HUD canvas. Hosts that need a non-canvas overlay
@@ -618,12 +748,16 @@ needs, in this order of preference:
 
 ## Anti-goals
 
-- **Not a renderer.** `primitives/HUDCanvas` is intentionally minimal Canvas2D. Skia / WebGL backends are not in scope.
+- **Not a renderer.** `primitives/HUDCanvas` is intentionally minimal Canvas2D. Skia / WebGL backends are not in scope. Inlined chrome (pixel grid, ruler) must reduce to a single pure draw routine over the existing ctx — no nested canvases, no stateful renderer classes, no internal DPR ownership. Anything heavier belongs in a sibling package the host mounts. Incremental affordances inside an existing inlined routine (e.g. the ruler's inner-edge separator) are fine when they share that routine's transform and state; they are not the same as introducing a new renderer.
 - **Not a scene graph.** Surface never reads node data — only via `pick` / `shapeOf`.
 - **Not a host of plugins.** No widget registry. Custom HUD elements go through host-fed `HUDDraw` extras.
+- **Not a kitchen of decorative-line helpers.** The `*GuideToHUDDraw` family (`snapGuideToHUDDraw`, `measurementToHUDDraw`) exists to translate _rich cmath domain structs_ — `SnapGuide`, `Measurement` — into multi-element draw lists where the layout rules are the work. They are not, and must not become, thin aliases for "produce one primitive of a named flavor." If an affordance is `{ one HUDLine | HUDRect | HUDPoint } + { color }` over geometry that already lives elsewhere, the host composes it directly. Worked example: the aspect-ratio guide (a single dashed `HUDLine` whose endpoints come from an 8-case `CardinalDirection` table) lives entirely outside this package — the geometry is `cmath.ui.diagonalForDirection`, the render is one host-side object literal. Refusing the alias keeps the public surface narrow and the promotion bar honest.
 - **Not undo-aware.** Intents carry `phase`; host owns undo.
 - **Not a selection store.** Host owns selection; surface mirrors.
 - **Not SVG-aware.** No `data-id`, no DOM IR, no `<style>` resolution.
+- **Paint kinds: closed taxonomy, not open registry.** `HUDPaint` is a discriminated union HUD ships (`solid`, `stripes` today). Adding a kind requires a HUD PR with ≥2 internal consumers shaped — same promotion contract as any new primitive. There is no runtime registration of paint kinds; a future `bitmap` (host-rasterized escape hatch) is the only deliberate widening on the table, and it lands only when a real second consumer asks. Built-in kinds are HUD-owned: HUD chooses rasterization quality and zoom behavior; hosts pass theming (`color`) and dimension knobs only. The chrome design language lives inside this package, not at runtime in the host.
+- **Not a paint compositor.** One paint per fill, one paint per stroke. No layered fills, no blend modes between paints on the same primitive — if a host wants stacking, they emit two primitives.
+- **No paint on labels.** `HUDLine`'s label pill + text intentionally stay on the legacy `color` path. Labels are theming surface, not paintable design-language surface; promoting them to accept `HUDPaint` would invite per-label patterned chrome that doesn't match anything the editor actually wants.
 
 ## Adoption
 

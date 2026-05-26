@@ -186,6 +186,112 @@ export type SurfaceGesture =
       ca: number;
       anchor_doc: cmath.Vector2;
       last_doc: cmath.Vector2;
+    }
+  | {
+      /**
+       * Dragging a corner-radius handle.
+       *
+       * For RECT geometry the gesture carries the rect AABB and the
+       * candidate-anchor set captured at pointer_down. When the user
+       * grabs a single-corner knob (sub-max radii), `candidates` has
+       * length 1 and `anchor` is set. When the user grabs a
+       * coincidence group (oblong-max pair, square-max quadruple),
+       * `candidates` has length 2+ and `anchor` is `null` until the
+       * drag crosses the threshold; the state machine resolves the
+       * anchor from drag direction AMONG `candidates` only.
+       *
+       * For LINE geometry the gesture carries `a` and `b`; the
+       * projection axis is `a → b`. `anchor` is always `null` and
+       * `candidates` is empty.
+       *
+       * The new radius is derived each frame by projecting the
+       * cursor onto the relevant axis (rect: corner →
+       * `corner + (sign_x, sign_y)`; line: `a → b`). `explicit`
+       * latches the alt modifier at gesture start — the intent kind
+       * is decided once.
+       */
+      kind: "corner_radius";
+      node_id: NodeId;
+      geometry: "rect" | "line";
+      /** RECT only — the rect AABB in LOCAL space. Used to derive
+       *  per-anchor corner positions for projection. Undefined for
+       *  line. */
+      rect?: { x: number; y: number; width: number; height: number };
+      /** RECT only — optional local → doc transform. Threaded
+       *  through from the input so the gesture projects the cursor
+       *  along the ROTATED axis on a rotated rect. */
+      transform?: cmath.Transform;
+      /** RECT only — the candidate anchors this gesture was opened
+       *  for. Length 1 means anchor is locked at start; length 2 or
+       *  4 means anchor is `null` until threshold + direction
+       *  resolution picks one. Empty for line. */
+      candidates: readonly ("nw" | "ne" | "se" | "sw")[];
+      /** Resolved corner anchor for rect (one of `candidates`).
+       *  `null` while pre-resolution on a multi-candidate group, OR
+       *  always for line geometry. */
+      anchor: "nw" | "ne" | "se" | "sw" | null;
+      /** LINE only — the line endpoints. Undefined for rect. */
+      a?: cmath.Vector2;
+      b?: cmath.Vector2;
+      /** Screen-space pointer-down anchor — used by the multi-
+       *  candidate threshold + direction resolution. */
+      anchor_screen: cmath.Vector2;
+      /** Doc-space pointer-down anchor — paired with `transform` to
+       *  resolve the right corner on a rotated rect. The threshold
+       *  check stays in screen-space (pixels), but the
+       *  direction-resolution dot-product compares the doc-space drag
+       *  delta (`point_doc - anchor_doc`) against the rect's
+       *  rotated-into-doc sign vectors (`T.linear · sign_local`). */
+      anchor_doc: cmath.Vector2;
+      /** Whether alt was held at pointer_down. Latches at gesture
+       *  start; intent kind is decided once. */
+      explicit: boolean;
+      /** Most-recent doc-space pointer. */
+      last_doc: cmath.Vector2;
+      /** Most-recent computed radius value (doc-space units). */
+      value: number;
+      /** Flips to `true` the first time `pointer_move` advances the
+       *  gesture state (resolves the anchor or updates `value`).
+       *  Pointer-up consults this to skip the commit on click-only
+       *  interactions — `value` is seeded from the inset-padded knob
+       *  position at pointer-down, so a pure click would otherwise
+       *  commit a non-zero radius the user never intended. */
+      dragged: boolean;
+    }
+  | {
+      /**
+       * Drag of a `parametric_handle` knob — opened from a
+       * `parametric_knob` overlay action and emits `parametric_handle`
+       * intents on every move + commit.
+       *
+       * When the action carries multiple `candidates` (a coincident
+       * group), `handle_id` is `null` until the drag crosses the
+       * threshold and direction-resolution picks one. `candidates`
+       * is the ordered list of (handle_id, curve, domain) tuples
+       * that hit-region stood in for.
+       *
+       * `modifiers` is the latched alt/shift state at pointer_down —
+       * intent payload reports it unchanged; host interprets.
+       */
+      kind: "parametric_handle";
+      node_id: NodeId;
+      candidates: readonly {
+        handle_id: string;
+        track_doc: cmath.ui.Curve | cmath.ui.PointSet;
+        domain: { min: number; max: number; step?: number };
+      }[];
+      handle_id: string | null;
+      anchor_screen: cmath.Vector2;
+      modifiers: { alt: boolean; shift: boolean };
+      last_doc: cmath.Vector2;
+      /** Last computed value in host units (post-step-quantization). */
+      value: number;
+      /** Flips to `true` the first time `pointer_move` advances the
+       *  gesture state (resolves the handle or updates `value`).
+       *  Pointer-up skips commit on click-only interactions because
+       *  `value` is seeded from the inset-padded knob position at
+       *  pointer-down. */
+      dragged: boolean;
     };
 
 export const IDLE: SurfaceGesture = { kind: "idle" };

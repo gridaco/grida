@@ -63,6 +63,22 @@ export const packages = [
     ],
   },
   {
+    name: "@grida/hud",
+    description:
+      "Canvas-based heads-up display for the Grida editor viewport. Selection chrome, handles, hover, marquee, gesture state, hit-testing — rendered to a single canvas from a pure-logic state machine. No DOM overlay, no data-id traversal, no per-element React reconciliation in the hot path.",
+    demoPath: "/packages/@grida/hud",
+    npm: true,
+    features: [
+      "Canvas-rendered (one draw per frame)",
+      "Pure-logic state machine, headless event core",
+      "Render and hit-testing as separate outputs",
+      "Rotation-aware selection chrome and cursors",
+      "Vector edit chrome (vertices, tangents, segments)",
+      "Host-fed extras via surface.draw(extra)",
+      "Tree-shakable rotation-aware cursors subpath",
+    ],
+  },
+  {
     name: "@grida/pixel-grid",
     description:
       "A React component for rendering pixel-perfect grids in infinite canvas applications. This package provides a flexible and performant way to display grid patterns with zoom and pan capabilities.",
