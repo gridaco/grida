@@ -33,6 +33,14 @@ export type GestureContext = {
   editor: SvgEditor;
   /** Handle for advanced bindings (e.g. wanting `camera.fit("<selection>")`). */
   handle: SurfaceHandle;
+  /**
+   * Predicate returning `true` iff the surface is currently "attended" —
+   * focus inside the container subtree OR pointer over the container.
+   * Gesture bindings whose keydown handlers call `preventDefault()` MUST
+   * consult this before claiming, so the surface doesn't steal page-level
+   * shortcuts when embedded in a larger document. See `util/attention.ts`.
+   */
+  is_attended: () => boolean;
 };
 
 export type GestureBinding = {

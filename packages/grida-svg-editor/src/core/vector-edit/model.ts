@@ -120,6 +120,26 @@ type ArcMeta = {
 
 // ─── PathModel class ───────────────────────────────────────────────────────
 
+/**
+ * Canonical vector-network model for a single SVG path's `d` string.
+ *
+ * `PathModel` is a self-contained geometry primitive — it parses an SVG
+ * path `d` into a vertex/segment graph (with verb hints preserved for
+ * round-trip honesty), exposes POJO observers, and serializes back to
+ * `d`. It does not hold or reference an `SvgDocument`, an editor
+ * instance, the DOM, or any host. It is safe to construct in any
+ * environment that can run the package.
+ *
+ * Public re-exported as a top-level Layer-A primitive from
+ * `@grida/svg-editor` for callers that want canonical path geometry
+ * without mounting an editor. The full mutation surface (translate /
+ * bend / set-tangent / split, etc.) is package-internal and may shift;
+ * the publicly-stable contract for external callers is the construction
+ * + serialization + observation methods documented at the entry point.
+ *
+ * @experimental Surface shape is v0; signatures may change before the
+ * package reaches semver stability.
+ */
 export class PathModel {
   private readonly _network: vn.VectorNetwork;
   private readonly _meta: ReadonlyArray<SegmentMeta>;
