@@ -236,6 +236,13 @@ export type SurfaceGesture =
       /** Screen-space pointer-down anchor — used by the multi-
        *  candidate threshold + direction resolution. */
       anchor_screen: cmath.Vector2;
+      /** Doc-space pointer-down anchor — paired with `transform` to
+       *  resolve the right corner on a rotated rect. The threshold
+       *  check stays in screen-space (pixels), but the
+       *  direction-resolution dot-product compares the doc-space drag
+       *  delta (`point_doc - anchor_doc`) against the rect's
+       *  rotated-into-doc sign vectors (`T.linear · sign_local`). */
+      anchor_doc: cmath.Vector2;
       /** Whether alt was held at pointer_down. Latches at gesture
        *  start; intent kind is decided once. */
       explicit: boolean;

@@ -419,6 +419,55 @@ describe("resolveCornerDragAnchor", () => {
     // wins by being listed first.
     expect(resolveCornerDragAnchor(-10, 0, ["nw", "sw"])).toBe("nw");
   });
+
+  // UX spec: on a rotated rect, the user's drag direction is in
+  // doc-space — pulling "up-left-on-screen" should resolve to
+  // whichever corner is up-and-left RELATIVE TO THE ROTATED RECT,
+  // not whichever corner is up-and-left in world axes. The host
+  // passes the rect's local→doc transform; the resolver rotates the
+  // local sign vectors through it.
+  it("rotates local sign vectors through transform for rotated rects", () => {
+    // 90° rotation: T = [[0, -1, 0], [1, 0, 0]]. Local sign vectors
+    // map through T.linear to doc-space:
+    //   nw (1,1)   → ( 0·1 + -1·1,  1·1 + 0·1 ) = (-1, 1)
+    //   ne (-1,1)  → ( 0·-1+ -1·1,  1·-1+ 0·1 ) = (-1,-1)
+    //   se (-1,-1) → ( 0·-1+ -1·-1, 1·-1+ 0·-1) = ( 1,-1)
+    //   sw (1,-1)  → ( 0·1 + -1·-1, 1·1 + 0·-1) = ( 1, 1)
+    //
+    // For drag delta (-10, 10) in doc-space, the resolver picks the
+    // candidate maximizing `sign_doc · -delta = sign_doc · (10, -10)`:
+    //   nw: -1·10 +  1·-10 = -20
+    //   ne: -1·10 + -1·-10 =   0
+    //   se:  1·10 + -1·-10 =  20   ← max
+    //   sw:  1·10 +  1·-10 =   0
+    // → se wins on the rotated rect.
+    const transform90: cmath.Transform = [
+      [0, -1, 0],
+      [1, 0, 0],
+    ];
+    expect(
+      resolveCornerDragAnchor(-10, 10, ["nw", "ne", "se", "sw"], transform90)
+    ).toBe("se");
+    // Sanity: same drag with no transform resolves to sw (the
+    // axis-aligned answer — local sign (1,-1) dotted with (10,-10)
+    // is 20, the max).
+    expect(resolveCornerDragAnchor(-10, 10, ["nw", "ne", "se", "sw"])).toBe(
+      "sw"
+    );
+  });
+
+  it("is a no-op when transform is the identity (matches no-transform path)", () => {
+    const identity: cmath.Transform = [
+      [1, 0, 0],
+      [0, 1, 0],
+    ];
+    expect(
+      resolveCornerDragAnchor(-10, -10, ["nw", "ne", "se", "sw"], identity)
+    ).toBe("nw");
+    expect(
+      resolveCornerDragAnchor(10, 10, ["nw", "ne", "se", "sw"], identity)
+    ).toBe("se");
+  });
 });
 
 // ─── drawCornerRadius — the pure painter ──────────────────────────────────

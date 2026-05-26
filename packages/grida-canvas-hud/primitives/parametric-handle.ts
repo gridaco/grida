@@ -49,6 +49,13 @@ export type ParametricHandleGroup = cmath.parametric.ParametricHandleGroup;
  * `primitives/corner-radius.ts`); other producers that want the same
  * convention compute `inset = screen_px / zoom · k` for whatever
  * geometric factor `k` their track demands.
+ *
+ * `groups`, if provided, MUST be disjoint — each handle id may appear
+ * in at most one group. Overlapping declarations would register the
+ * same handle in multiple hit regions and make routing ambiguous.
+ * The layout-grouper enforces this at runtime by first-declared-wins:
+ * later groups that mention an already-claimed id are dropped (with a
+ * dev-mode warning).
  */
 export interface ParametricHandleInput {
   node_id: NodeId;
@@ -307,7 +314,36 @@ export function parametricHandleLayoutGroups(
   const claimed = new Set<string>();
   const groups: ParametricHandleLayout[][] = [];
 
+  // Disjoint-group invariant: an id may appear in at most one declared
+  // group. Overlapping groups would register the same handle in
+  // multiple hit regions and make routing ambiguous. We process groups
+  // in declaration order, skipping any whose members were already
+  // claimed by an earlier group (first-declared wins). In dev, surface
+  // the violation so producers fix their input.
+  const seen_ids = new Set<string>();
+
   for (const decl of declared) {
+    let overlap = false;
+    for (const id of decl.ids) {
+      if (seen_ids.has(id)) {
+        overlap = true;
+        break;
+      }
+    }
+    if (overlap) {
+      if (
+        typeof process !== "undefined" &&
+        process.env?.NODE_ENV !== "production"
+      ) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[parametricHandleLayoutGroups] overlapping declared groups on node ${input.node_id}: ids ${decl.ids.join(",")} overlap a previously declared group. Skipping (first-declared wins).`
+        );
+      }
+      continue;
+    }
+    for (const id of decl.ids) seen_ids.add(id);
+
     const members = decl.ids
       .map((id) => by_id.get(id))
       .filter((l): l is ParametricHandleLayout => !!l);

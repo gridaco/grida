@@ -792,9 +792,15 @@ export class SurfaceState {
           g.anchor === null &&
           g.candidates.length > 1
         ) {
-          const dx = sx - g.anchor_screen[0];
-          const dy = sy - g.anchor_screen[1];
-          if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+          // Threshold gate stays in SCREEN pixels — the user's
+          // physical pointer movement governs "did the drag begin",
+          // not how far the artwork has moved in world units.
+          const dx_screen = sx - g.anchor_screen[0];
+          const dy_screen = sy - g.anchor_screen[1];
+          if (
+            dx_screen * dx_screen + dy_screen * dy_screen <
+            DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX
+          ) {
             // Pre-threshold: don't emit; the handle stays painted
             // at its coincidence position (the dedup-paint slot in
             // `drawCornerRadius`).
@@ -802,7 +808,20 @@ export class SurfaceState {
             response.needsRedraw = true;
             return response;
           }
-          const resolved = resolveCornerDragAnchor(dx, dy, g.candidates);
+          // Direction resolution runs in DOC space so it stays
+          // correct under camera rotation AND node rotation. The
+          // candidate sign vectors are local-axis (nw/ne/se/sw); the
+          // resolver rotates them through `g.transform.linear` to
+          // doc-space before comparing against the doc-space drag
+          // delta.
+          const dx_doc = point_doc[0] - g.anchor_doc[0];
+          const dy_doc = point_doc[1] - g.anchor_doc[1];
+          const resolved = resolveCornerDragAnchor(
+            dx_doc,
+            dy_doc,
+            g.candidates,
+            g.transform
+          );
           g = { ...g, anchor: resolved };
           this.gesture = g;
         }
@@ -937,6 +956,7 @@ export class SurfaceState {
           candidates,
           anchor: initial_anchor,
           anchor_screen: [sx, sy],
+          anchor_doc: [point_doc[0], point_doc[1]],
           explicit,
           last_doc: point_doc,
           // Radius at pointer_down — if the anchor is already
@@ -971,6 +991,7 @@ export class SurfaceState {
           a: [a[0], a[1]],
           b: [b[0], b[1]],
           anchor_screen: [sx, sy],
+          anchor_doc: [point_doc[0], point_doc[1]],
           explicit,
           last_doc: point_doc,
           value: Math.max(0, projectRadiusOnAxis(ui_action.pos, a, b)),
@@ -1844,23 +1865,45 @@ function projectRadiusOnAxis(
  * for both the 2-candidate oblong-max case and the 4-candidate
  * square-max case; `candidates` constrains the choice so we never
  * resolve to a corner that isn't part of the group the user grabbed.
+ *
+ * Coordinate frames:
+ *
+ * - The intercardinal sign vectors `nw=(1,1)` etc. live in the rect's
+ *   LOCAL frame.
+ * - `dx, dy` is the drag delta in DOC space.
+ * - For a rotated rect, the host's `transform` (local → doc) rotates
+ *   the sign vectors into doc space via `T.linear · sign_local` so
+ *   the dot-product picks the corner the user actually dragged
+ *   toward, not the corner that lines up with the world axes.
+ *
+ * When `transform` is undefined (axis-aligned rect) the local frame
+ * coincides with the doc frame and the rotation is a no-op.
  */
 function resolveCornerDragAnchor(
   dx: number,
   dy: number,
-  candidates: readonly ("nw" | "ne" | "se" | "sw")[]
+  candidates: readonly ("nw" | "ne" | "se" | "sw")[],
+  transform?: cmath.Transform
 ): "nw" | "ne" | "se" | "sw" {
-  const dirs: Record<"nw" | "ne" | "se" | "sw", [number, number]> = {
+  const local_dirs: Record<"nw" | "ne" | "se" | "sw", [number, number]> = {
     nw: [1, 1],
     ne: [-1, 1],
     se: [-1, -1],
     sw: [1, -1],
   };
+  // Pre-rotate the local sign vectors into doc-space once.
+  // `T.linear` is the 2x2 linear part — translation drops out for
+  // direction vectors.
+  const [a, b, c, d] = transform
+    ? [transform[0][0], transform[0][1], transform[1][0], transform[1][1]]
+    : [1, 0, 0, 1];
   let best: "nw" | "ne" | "se" | "sw" = candidates[0];
   let best_dot = -Infinity;
   for (const anchor of candidates) {
-    const [vx, vy] = dirs[anchor];
-    const dot = vx * -dx + vy * -dy;
+    const [vx, vy] = local_dirs[anchor];
+    const dx_doc = a * vx + b * vy;
+    const dy_doc = c * vx + d * vy;
+    const dot = dx_doc * -dx + dy_doc * -dy;
     if (dot > best_dot) {
       best_dot = dot;
       best = anchor;

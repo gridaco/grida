@@ -540,17 +540,34 @@ export function cornerRadiusLayoutGroups(
  *
  * Equivalent (and what the code does): maximize the dot product
  * with the NEGATED delta.
+ *
+ * For a rotated rect, callers pass the rect's local→doc `transform`
+ * along with a DOC-space drag delta; the function rotates the local
+ * sign vectors through `T.linear` before comparing so the resolved
+ * corner is the one the user actually dragged toward — not the one
+ * that happens to line up with world axes. With `transform`
+ * omitted, the local frame coincides with the doc frame and the
+ * rotation is a no-op (back-compatible with axis-aligned callers).
  */
 export function resolveCornerDragAnchor(
   dx: number,
   dy: number,
-  candidates: readonly CornerRadiusAnchor[]
+  candidates: readonly CornerRadiusAnchor[],
+  transform?: cmath.Transform
 ): CornerRadiusAnchor {
+  // Pre-rotate the local sign vectors into doc-space once.
+  // `T.linear` is the 2x2 linear part — translation drops out for
+  // direction vectors.
+  const [a, b, c, d] = transform
+    ? [transform[0][0], transform[0][1], transform[1][0], transform[1][1]]
+    : [1, 0, 0, 1];
   let best: CornerRadiusAnchor = candidates[0];
   let best_dot = -Infinity;
   for (const anchor of candidates) {
     const [sx, sy] = cornerRadiusAnchorSign(anchor);
-    const dot = sx * -dx + sy * -dy;
+    const dx_doc = a * sx + b * sy;
+    const dy_doc = c * sx + d * sy;
+    const dot = dx_doc * -dx + dy_doc * -dy;
     if (dot > best_dot) {
       best_dot = dot;
       best = anchor;
