@@ -509,7 +509,7 @@ describe("keymap registry / tool.set", () => {
     expect(editor.state.mode).toBe("edit-content");
   });
 
-  it("tool.set 'lasso' refuses in select mode (path-edit-only)", () => {
+  it("tool.set 'lasso' refuses in select mode (vector-edit-only)", () => {
     const editor = createSvgEditor({ svg: EMPTY });
     const consumed = editor.commands.invoke("tool.set", { type: "lasso" });
     expect(consumed).toBe(false);
@@ -524,7 +524,7 @@ describe("keymap registry / tool.set", () => {
     expect(editor.state.tool).toEqual({ type: "lasso" });
   });
 
-  it("tool.set 'bend' refuses in select mode (path-edit-only)", () => {
+  it("tool.set 'bend' refuses in select mode (vector-edit-only)", () => {
     const editor = createSvgEditor({ svg: EMPTY });
     const consumed = editor.commands.invoke("tool.set", { type: "bend" });
     expect(consumed).toBe(false);

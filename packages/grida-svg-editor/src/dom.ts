@@ -77,7 +77,15 @@ import { paint } from "./core/paint";
 import { Gestures } from "./gestures/gestures";
 import { applyDefaultGestures } from "./gestures/defaults";
 import { SvgTextSurface } from "./text-surface";
-import { PathModel, PathEditSession, marquee } from "./core/path-edit";
+import {
+  PathModel,
+  VectorEditSession,
+  marquee,
+  sub_selection_equal,
+  source_to_session_d,
+  apply_session_d,
+  type SubSelectionSnapshot,
+} from "./core/vector-edit";
 import type {
   InsertableTag,
   InsertPreviewSession,
@@ -151,6 +159,12 @@ const IS_MODIFIER_KEY: Record<string, true> = {
  *  surface skips render() during the in-flight mount and doesn't yank the
  *  live `<text>` element out from under the about-to-mount text surface. */
 const TEXT_EDIT_PENDING = { __pending: true } as const;
+
+/** Per-frame `neighbours: []` for the `vector_of` HUD projection. Polyline
+ *  and polygon sources never render tangent handles in v1 (curve edits would
+ *  promote to `<path>`); using a frozen module-level array avoids allocating
+ *  a fresh empty array per redraw frame. */
+const EMPTY_NEIGHBOURS: readonly number[] = Object.freeze([]);
 
 export type DomSurfaceOptions = {
   /** Mount the SVG inside this container. */
@@ -284,7 +298,7 @@ class DomSurface implements Surface {
   private rotate_orchestrator!: RotateOrchestrator;
   // Active history.preview session for the in-flight gesture. Translate
   // and resize gestures live inside their respective orchestrators; this
-  // field tracks endpoint gestures only (and the path-edit equivalent below).
+  // field tracks endpoint gestures only (and the vector-edit equivalent below).
   private active_preview:
     | {
         kind: "endpoint";
@@ -295,11 +309,19 @@ class DomSurface implements Surface {
         session: Preview;
       }
     | {
-        kind: "path_vertex_translate";
+        kind: "vector_vertex_translate";
         node_id: NodeId;
         indices: readonly number[];
         /** Snapshot of `d` at gesture start; used by `revert`. */
         initial_d: string;
+        /** Parsed PathModel for `initial_d`. Frozen for the gesture, so the
+         *  parse runs once at open instead of once per preview frame. */
+        baseline_model: PathModel;
+        /** Sub-selection at gesture start. Closed over by the committed
+         *  delta's `revert` so undo restores the selection the user had
+         *  before the drag, not whatever the reconciler would otherwise
+         *  clear. */
+        before_selection: SubSelectionSnapshot;
         /** In-flight PathModel — reflects the current preview position.
          *  Served from `vector_of()` during the gesture so HUD chrome
          *  (vertex knobs) tracks the drag in real time, not just on commit. */
@@ -307,15 +329,17 @@ class DomSurface implements Surface {
         session: Preview;
       }
     | {
-        kind: "path_set_tangent";
+        kind: "vector_set_tangent";
         node_id: NodeId;
         tangent: readonly [number, 0 | 1];
         initial_d: string;
+        baseline_model: PathModel;
+        before_selection: SubSelectionSnapshot;
         preview_model: PathModel;
         session: Preview;
       }
     | {
-        kind: "path_bend_segment";
+        kind: "vector_bend_segment";
         node_id: NodeId;
         segment: number;
         ca: number;
@@ -329,6 +353,8 @@ class DomSurface implements Surface {
           tb: readonly [number, number];
         };
         initial_d: string;
+        baseline_model: PathModel;
+        before_selection: SubSelectionSnapshot;
         preview_model: PathModel;
         session: Preview;
       }
@@ -345,11 +371,12 @@ class DomSurface implements Surface {
          * Mirror policy fixed to `"none"` during multi-translate — mirror
          * behavior is reserved for the singleton-tangent curve gesture.
          */
-        kind: "path_translate_vector_selection";
+        kind: "vector_translate_selection";
         node_id: NodeId;
         indices: readonly number[];
         tangent_refs: readonly (readonly [number, 0 | 1])[];
         initial_d: string;
+        before_selection: SubSelectionSnapshot;
         preview_model: PathModel;
         // Cached at open/re-open: baseline_d is frozen for the gesture, so
         // the parsed PathModel and per-tangent absolute positions are stable
@@ -366,12 +393,12 @@ class DomSurface implements Surface {
   private text_edit_target: NodeId | null = null;
   private text_edit_original: string = "";
 
-  /** Active path-edit session (null when not in vector content-edit mode).
+  /** Active vector-edit session (null when not in vector content-edit mode).
    *  Mutually exclusive with `text_edit` — content-edit mode owns exactly
    *  one session at a time. */
-  private path_edit: PathEditSession | null = null;
+  private vector_edit: VectorEditSession | null = null;
 
-  /** Snapshot of the path-edit sub-selection at the START of an in-flight
+  /** Snapshot of the vector-edit sub-selection at the START of an in-flight
    *  region-selection gesture (marquee OR lasso). Captured on the first
    *  preview, used as the merge baseline for every subsequent preview
    *  (and the commit) so that:
@@ -381,9 +408,9 @@ class DomSurface implements Surface {
    *    - Tangent visibility (which depends on which vertices were already
    *      selected) is computed against the gesture-start selection, so
    *      candidates don't shift mid-drag.
-   *  Cleared on the commit frame and on every other path-edit lifecycle
+   *  Cleared on the commit frame and on every other vector-edit lifecycle
    *  transition (enter/exit content-edit). */
-  private path_edit_region_baseline: {
+  private vector_edit_region_baseline: {
     vertices: readonly number[];
     segments: readonly number[];
     tangents: readonly (readonly [number, 0 | 1])[];
@@ -707,7 +734,7 @@ class DomSurface implements Surface {
           this.pending_insert = null;
         }
       }
-      // ─── Path-edit: reconcile against external `d` mutations.
+      // ─── Vector-edit: reconcile against external `d` mutations.
       //
       // The session keeps `last_seen_d` = the `d` produced by our most
       // recent gesture commit. If the live `d` now disagrees AND no
@@ -718,19 +745,28 @@ class DomSurface implements Surface {
       // selection indices reference vertices/segments by position, and
       // an external mutation may have shifted or removed them. The safe,
       // honest behaviour is to drop sub-selection; the user can re-pick.
-      if (this.path_edit && !this.active_preview) {
-        const cur_d = this.read_session_d();
-        if (cur_d !== null && cur_d !== this.path_edit.last_seen_d) {
-          const had_selection =
-            this.path_edit.selected_vertices.length > 0 ||
-            this.path_edit.selected_segments.length > 0 ||
-            this.path_edit.selected_tangents.length > 0;
-          // Atomic: advances last_seen_d AND clears sub-selection. The two
-          // halves used to live inline here — pulling them into one
-          // function keeps the invariant honest at the session-layer
-          // boundary (see session.ts).
-          this.path_edit.reconcile_after_external_mutation(cur_d);
-          if (had_selection) this.sync_selection_mirror();
+      if (this.vector_edit && !this.active_preview) {
+        // External-mutation detection only runs for <path> sources in
+        // v1. For <polyline>/<polygon> the document holds native attrs
+        // (points=), so this `d` watcher would need a tag-aware read.
+        // Rare in practice; the session stays stale until the next user
+        // interaction.
+        if (this.vector_edit.source.kind === "path") {
+          const cur_d =
+            this.editor_internal().doc.get_attr(
+              this.vector_edit.node_id,
+              "d"
+            ) ?? null;
+          if (cur_d !== null && cur_d !== this.vector_edit.last_seen_d) {
+            const had_selection =
+              this.vector_edit.selected_vertices.length > 0 ||
+              this.vector_edit.selected_segments.length > 0 ||
+              this.vector_edit.selected_tangents.length > 0;
+            // Atomic: advances last_seen_d AND clears sub-selection.
+            // See `vector-edit/session.ts:reconcile_after_external_mutation`.
+            this.vector_edit.reconcile_after_external_mutation(cur_d);
+            if (had_selection) this.sync_selection_mirror();
+          }
         }
       }
       // Host extras re-feed: HUD reuses last-passed extras on its own redraws.
@@ -878,11 +914,11 @@ class DomSurface implements Surface {
   // via `this` from the HUD's `pick` callback (see constructor).
 
   private hit_test(x: number, y: number): NodeId | null {
-    // In path-edit mode, suppress scene-content picks so node-level
+    // In vector-edit mode, suppress scene-content picks so node-level
     // selection doesn't compete with vertex chrome. Vertex knobs are
     // tier-1 UI hits and resolve before `pick` is consulted, so this
     // only filters the fallback (clicks on empty space / the path body).
-    if (this.path_edit) return null;
+    if (this.vector_edit) return null;
     return this.pick_at(x, y, false);
   }
 
@@ -1017,11 +1053,11 @@ class DomSurface implements Surface {
       this.text_edit = null;
       this.text_edit_target = null;
     }
-    if (this.path_edit) {
+    if (this.vector_edit) {
       // Discard any open preview; the dom-level field clear happens
       // below as part of the generic active_preview reset.
-      this.path_edit = null;
-      this.path_edit_region_baseline = null;
+      this.vector_edit = null;
+      this.vector_edit_region_baseline = null;
       this.hud.setVectorSelection(null);
     }
     this.gestures._dispose();
@@ -2236,11 +2272,11 @@ class DomSurface implements Surface {
     // swallow the preview cancel.
     if (e.code === "Escape") {
       const canceled = this.cancel_in_flight();
-      // If nothing in-flight got canceled AND we're in path-edit mode,
-      // Esc exits the path-edit session entirely (matches text-edit's
+      // If nothing in-flight got canceled AND we're in vector-edit mode,
+      // Esc exits the vector-edit session entirely (matches text-edit's
       // "Esc to leave the mode" UX, and main-editor's vector mode).
-      if (!canceled && this.path_edit) {
-        this.exit_path_edit();
+      if (!canceled && this.vector_edit) {
+        this.exit_vector_edit();
       }
     }
 
@@ -2283,21 +2319,23 @@ class DomSurface implements Surface {
         // Always clears the host's node-level selection. While in
         // content-edit, the HUD's decision module emits
         // `clear_vector_selection` instead, so this branch never collides
-        // with a path-edit sub-selection clear.
+        // with a vector-edit sub-selection clear.
         this.editor.commands.deselect();
         return;
       }
       case "clear_vector_selection": {
         // Empty-space single click while in content-edit. Clears vertex /
         // segment / tangent selection without touching the node selection
-        // or exiting content-edit. No-op when no path-edit session is
+        // or exiting content-edit. No-op when no vector-edit session is
         // active.
-        if (!this.path_edit) return;
-        this.path_edit.clear_selection();
+        if (!this.vector_edit) return;
+        const before = this.vector_edit.snapshot_selection();
+        this.vector_edit.clear_selection();
         // Push the now-empty selection through the same channel as every
         // other selection-changing handler — see `sync_selection_mirror`.
         this.sync_selection_mirror();
         this.redraw();
+        this.record_vector_selection_change(before, "clear vector selection");
         return;
       }
       case "translate": {
@@ -2331,10 +2369,10 @@ class DomSurface implements Surface {
       }
       case "exit_content_edit": {
         // HUD signal: user dblclicked away from the active edit. Discard
-        // any in-flight preview, clear the path-edit session, and return
-        // to select mode. `exit_path_edit` calls `setVectorSelection(null)`
+        // any in-flight preview, clear the vector-edit session, and return
+        // to select mode. `exit_vector_edit` calls `setVectorSelection(null)`
         // which closes the loop with the HUD.
-        this.exit_path_edit();
+        this.exit_vector_edit();
         return;
       }
       case "select_vertex": {
@@ -2616,39 +2654,39 @@ class DomSurface implements Surface {
   }
 
   /**
-   * Capture the path-edit sub-selection on the first region-gesture
+   * Capture the vector-edit sub-selection on the first region-gesture
    * preview, and reuse it for every subsequent preview + the commit.
    * Anchors additive merging and tangent-candidate eligibility to the
    * gesture-start state so they don't shift mid-drag. Shared by marquee
    * and lasso — both gestures emit a preview-per-move, both consume the
-   * same baseline. See `path_edit_region_baseline` doc-comment for the
-   * full rationale. Caller must have a non-null `this.path_edit`.
+   * same baseline. See `vector_edit_region_baseline` doc-comment for the
+   * full rationale. Caller must have a non-null `this.vector_edit`.
    */
   private ensure_region_baseline(): {
     vertices: readonly number[];
     segments: readonly number[];
     tangents: readonly (readonly [number, 0 | 1])[];
   } {
-    if (!this.path_edit_region_baseline) {
-      this.path_edit_region_baseline = {
-        vertices: this.path_edit!.selected_vertices.slice(),
-        segments: this.path_edit!.selected_segments.slice(),
-        tangents: this.path_edit!.selected_tangents.map(
+    if (!this.vector_edit_region_baseline) {
+      this.vector_edit_region_baseline = {
+        vertices: this.vector_edit!.selected_vertices.slice(),
+        segments: this.vector_edit!.selected_segments.slice(),
+        tangents: this.vector_edit!.selected_tangents.map(
           (t) => [t[0], t[1]] as const
         ),
       };
     }
-    return this.path_edit_region_baseline;
+    return this.vector_edit_region_baseline;
   }
 
   private handle_marquee(intent: Intent & { kind: "marquee_select" }): void {
-    // Path-edit branch: marquee selects sub-path elements (vertices,
+    // Vector-edit branch: marquee selects sub-path elements (vertices,
     // tangents, segments) using the vertex-priority precedence rule.
     // Vector hit-testing is cheap — geometry is already resolved in the
-    // path-edit model — so we consume BOTH preview and commit phases here,
+    // vector-edit model — so we consume BOTH preview and commit phases here,
     // republishing the sub-selection live as the user drags. The
     // commit phase is the final, stable selection.
-    if (this.path_edit) {
+    if (this.vector_edit) {
       this.handle_marquee_vectors(intent);
       return;
     }
@@ -2696,8 +2734,8 @@ class DomSurface implements Surface {
   private handle_marquee_vectors(
     intent: Intent & { kind: "marquee_select" }
   ): void {
-    if (!this.path_edit) return;
-    const node_id = this.path_edit.node_id;
+    if (!this.vector_edit) return;
+    const node_id = this.vector_edit.node_id;
     const el = this.element_index.get(node_id);
     if (!(el instanceof SVGGraphicsElement)) return;
     if (typeof el.getScreenCTM !== "function") return;
@@ -2743,8 +2781,9 @@ class DomSurface implements Surface {
     const vertex_hit_set = new Set(vertex_hits);
     const segment_hits: number[] = [];
     if (rect_local) {
+      const segs = model.snapshot().segments;
       for (const sid of candidates.segments) {
-        const s = model.snapshot().segments[sid];
+        const s = segs[sid];
         // Vertex-priority: if a segment's endpoint already won the
         // marquee as a vertex, drop the segment to avoid double-credit.
         if (vertex_hit_set.has(s.a) || vertex_hit_set.has(s.b)) continue;
@@ -2764,12 +2803,21 @@ class DomSurface implements Surface {
       },
       intent.additive
     );
-    this.path_edit.set_selection(merged);
+    this.vector_edit.set_selection(merged);
     this.sync_selection_mirror();
     // Commit drops the baseline so the next marquee snapshots fresh.
     // Preview frames keep it alive across the drag.
     if (intent.phase === "commit") {
-      this.path_edit_region_baseline = null;
+      // Record one undo entry per marquee, from the pre-gesture baseline
+      // to the merged result. Intermediate preview frames are NOT
+      // recorded — they would flood the stack with N entries per drag.
+      const baseline_snapshot: SubSelectionSnapshot = Object.freeze({
+        vertices: baseline.vertices,
+        segments: baseline.segments,
+        tangents: baseline.tangents,
+      });
+      this.vector_edit_region_baseline = null;
+      this.record_vector_selection_change(baseline_snapshot, "marquee select");
     }
     this.redraw();
   }
@@ -2784,12 +2832,12 @@ class DomSurface implements Surface {
    *
    * Lifecycle / baseline behaviour matches marquee: snapshot on first
    * preview, reuse for additive merge and tangent-eligibility, clear on
-   * commit and on path-edit exit. Scene (non-path-edit) lasso is a
+   * commit and on vector-edit exit. Scene (non-vector-edit) lasso is a
    * follow-up.
    */
   private handle_lasso_select(intent: Intent & { kind: "lasso_select" }): void {
-    if (!this.path_edit) return;
-    const node_id = this.path_edit.node_id;
+    if (!this.vector_edit) return;
+    const node_id = this.vector_edit.node_id;
     const el = this.element_index.get(node_id);
     if (!(el instanceof SVGGraphicsElement)) return;
     if (typeof el.getScreenCTM !== "function") return;
@@ -2845,10 +2893,16 @@ class DomSurface implements Surface {
       },
       intent.additive
     );
-    this.path_edit.set_selection(merged);
+    this.vector_edit.set_selection(merged);
     this.sync_selection_mirror();
     if (intent.phase === "commit") {
-      this.path_edit_region_baseline = null;
+      const baseline_snapshot: SubSelectionSnapshot = Object.freeze({
+        vertices: baseline.vertices,
+        segments: baseline.segments,
+        tangents: baseline.tangents,
+      });
+      this.vector_edit_region_baseline = null;
+      this.record_vector_selection_change(baseline_snapshot, "lasso select");
     }
     this.redraw();
   }
@@ -2861,13 +2915,24 @@ class DomSurface implements Surface {
    * routes on the actual tag.
    */
   private enter_content_edit(id: NodeId): boolean {
-    if (this.text_edit || this.path_edit) return false;
+    if (this.text_edit || this.vector_edit) return false;
     const tag = this.tag_of(id);
     if (tag === "text" || tag === "tspan") {
       return this.enter_text_edit(id);
     }
-    if (tag === "path") {
-      return this.enter_path_edit(id);
+    // Vector-edit: path / polyline / polygon. Eligibility is checked
+    // inside `enter_vector_edit` via `is_vector_edit_target`; the tag pre-
+    // filter here just avoids the extra predicate lookup on unrelated
+    // tags. `<line>` is intentionally NOT routed in v1: a line has no
+    // useful vertex-edit gestures that stay within the source tag
+    // (insert-vertex would promote to <polyline>, tangent would promote
+    // to <path>), and promotions are out of scope for v1. Updating this
+    // list without widening the doc-side predicate would silently route
+    // ineligible tags to a rejecting path; updating the predicate
+    // without widening this list would make those tags silently fall
+    // through to "no content edit".
+    if (tag === "path" || tag === "polyline" || tag === "polygon") {
+      return this.enter_vector_edit(id);
     }
     return false;
   }
@@ -2962,23 +3027,105 @@ class DomSurface implements Surface {
    * the original `d`, flip the editor mode, push a vector-selection mirror
    * to the HUD, and start serving `vectorOf` from the live session.
    *
-   * Exit happens via `exit_path_edit` (Esc / `set_mode("select")` /
+   * Exit happens via `exit_vector_edit` (Esc / `set_mode("select")` /
    * dblclick away). On exit, any in-flight preview is discarded; committed
    * intermediate states stay (each gesture's commit was its own history
    * entry, per the gesture-bracketed history doctrine).
+   *
+   * The enter is itself a history step (tagged `vector-mode-enter`) so
+   * undo from inside vector-edit reverts the entry — symmetric to the
+   * `vector-mode-exit` push in {@link exit_vector_edit}. Both deltas
+   * delegate to the unchecked {@link _do_enter_vector_edit} /
+   * {@link _do_exit_vector_edit} helpers; the public wrappers below own
+   * the history side, the unchecked helpers own the state mutation.
    */
-  private enter_path_edit(id: NodeId): boolean {
-    if (this.path_edit) return false;
+  private enter_vector_edit(id: NodeId): boolean {
+    if (this.vector_edit) return false;
+    if (!this._do_enter_vector_edit(id)) return false;
+    // Apply succeeded — push a delta so undo can reverse it. Use
+    // preview+set+commit (the surface seam exposes `preview()` only).
+    // Apply (= redo) re-runs the unchecked enter; revert undoes it.
+    const internal = this.editor_internal();
+    const node_id = id;
+    const preview = internal.history.preview("enter vector edit");
+    preview.set({
+      providerId: "svg-editor",
+      descriptor: { kind: "vector-mode-enter" },
+      apply: () => {
+        this._do_enter_vector_edit(node_id);
+      },
+      revert: () => {
+        this._do_exit_vector_edit();
+      },
+    });
+    preview.commit();
+    return true;
+  }
+
+  /**
+   * Discard any in-flight preview, clear the vector-edit session, and return
+   * the editor to select mode. Safe to call when no vector-edit is active
+   * (no-op). Idempotent.
+   *
+   * Pushes a `vector-mode-exit` history step that closes over the
+   * session's `node_id` and its final sub-selection, so undo re-enters
+   * the same path and restores the selection the user was about to
+   * leave. Pairs with {@link enter_vector_edit}.
+   */
+  private exit_vector_edit(): void {
+    if (!this.vector_edit) return;
+    const node_id = this.vector_edit.node_id;
+    const final_selection = this.vector_edit.snapshot_selection();
+    this._do_exit_vector_edit();
+    const internal = this.editor_internal();
+    const preview = internal.history.preview("exit vector edit");
+    preview.set({
+      providerId: "svg-editor",
+      descriptor: { kind: "vector-mode-exit" },
+      apply: () => {
+        this._do_exit_vector_edit();
+      },
+      revert: () => {
+        if (this._do_enter_vector_edit(node_id)) {
+          // Restore the sub-selection the user had when they left.
+          // Indices may have drifted under collab/AI mutations; the
+          // HUD's vectorOf provider tolerates stale indices (chrome
+          // simply doesn't render for missing vertices), and the next
+          // user click will rebuild a valid selection.
+          this.vector_edit?.restore_selection(final_selection);
+          this.sync_selection_mirror();
+          this.redraw();
+        }
+      },
+    });
+    preview.commit();
+  }
+
+  /**
+   * Unchecked enter — performs the mode flip + HUD wiring without
+   * pushing to history. Called by {@link enter_vector_edit} (user-facing,
+   * which pushes the delta) and by the exit-delta's revert (history-
+   * driven re-entry on undo). Returns `false` if the node has no usable
+   * `d` attribute, leaving editor state untouched.
+   */
+  private _do_enter_vector_edit(id: NodeId): boolean {
+    if (this.vector_edit) return false;
     const internal = this.editor_internal();
     const doc = internal.doc;
-    const d = doc.get_attr(id, "d");
-    if (d === null || d.trim().length === 0) return false;
+    // Eligibility + source snapshot in one call. Covers <path>, <line>,
+    // <polyline>, <polygon>; returns null for any other tag, for empty
+    // <path d>, and for degenerate <polyline>/<polygon> with < 2 points.
+    const source = doc.is_vector_edit_target(id);
+    if (source === null) return false;
 
-    this.path_edit = new PathEditSession(id, d);
+    // The session-d — the in-memory path-form geometry lingua franca.
+    // For <path> this is the verbatim authored d; for the vertex-chain
+    // tags it's the path-form derived from the native attrs.
+    // Non-mutating — the document keeps its native attrs until the
+    // first gesture commit calls apply_session_d to project back.
+    const session_d = source_to_session_d(source);
+    this.vector_edit = new VectorEditSession(id, source, session_d);
     this.editor.commands.set_mode("edit-content");
-    // Push initial vector selection mirror — empty sub-selection on entry.
-    // The HUD's vectorOf provider is now live; chrome renders vertex knobs
-    // for this node on the next draw.
     this.sync_selection_mirror();
     this.sync_surface_selection();
     this.sync_cursor();
@@ -2987,30 +3134,24 @@ class DomSurface implements Surface {
   }
 
   /**
-   * Discard any in-flight preview, clear the path-edit session, and return
-   * the editor to select mode. Safe to call when no path-edit is active
-   * (no-op). Idempotent.
+   * Unchecked exit — counterpart to {@link _do_enter_vector_edit}. No
+   * history push. Safe to call when no session is active.
    */
-  private exit_path_edit(): void {
-    if (!this.path_edit) return;
-    // Discard any active preview so the document reverts to its last
-    // committed state.
+  private _do_exit_vector_edit(): void {
+    if (!this.vector_edit) return;
     if (
       this.active_preview &&
-      (this.active_preview.kind === "path_vertex_translate" ||
-        this.active_preview.kind === "path_set_tangent" ||
-        this.active_preview.kind === "path_bend_segment" ||
-        this.active_preview.kind === "path_translate_vector_selection")
+      (this.active_preview.kind === "vector_vertex_translate" ||
+        this.active_preview.kind === "vector_set_tangent" ||
+        this.active_preview.kind === "vector_bend_segment" ||
+        this.active_preview.kind === "vector_translate_selection")
     ) {
       this.active_preview.session.discard();
       this.active_preview = null;
     }
-    this.path_edit = null;
-    this.path_edit_region_baseline = null;
+    this.vector_edit = null;
+    this.vector_edit_region_baseline = null;
     this.hud.setVectorSelection(null);
-    // Lasso / bend are only valid during path content-edit; revert to
-    // cursor on exit so the tool stays honest (the HUD's selection-mode
-    // and bend-mode pushes follow on the next subscribe tick).
     if (
       this.current_tool.type === "lasso" ||
       this.current_tool.type === "bend"
@@ -3025,7 +3166,7 @@ class DomSurface implements Surface {
 
   /**
    * `vectorOf` provider for the HUD. Returns the live PathSnapshot for the
-   * named node when a path-edit session is active for it; otherwise null.
+   * named node when a vector-edit session is active for it; otherwise null.
    * HUD calls this each frame; cheap enough to recompute (snapshot just
    * copies the underlying network's arrays via the model's getter).
    */
@@ -3040,11 +3181,11 @@ class DomSurface implements Surface {
     neighbours?: ReadonlyArray<number>;
     origin?: readonly [number, number];
   } | null {
-    if (!this.path_edit || this.path_edit.node_id !== id) return null;
+    if (!this.vector_edit || this.vector_edit.node_id !== id) return null;
     // Prefer the in-flight preview model during any gesture (vertex /
     // tangent / segment) so chrome tracks the drag in real time. Falls
     // back to deriving from the live `d` between gestures — there is no
-    // cached model on the session by design (see path-edit/session.ts).
+    // cached model on the session by design (see vector-edit/session.ts).
     // This is what makes undo/redo "just work" for chrome: a doc-state
     // change rewrites `d`, the next HUD draw re-derives the model.
     const model = this.active_preview_model_for(id) ?? this.session_model();
@@ -3099,12 +3240,20 @@ class DomSurface implements Surface {
       };
     });
     // Neighbouring vertices — those whose tangent handles should render.
-    // Derived from the live sub-selection.
-    const neighbours = model.neighbouringVertices({
-      vertices: this.path_edit.selected_vertices,
-      segments: this.path_edit.selected_segments,
-      tangents: this.path_edit.selected_tangents,
-    });
+    //
+    // v1 carves out the vertex-chain sources (`<polyline>` / `<polygon>`):
+    // a tangent edit would force promotion to `<path>`, and promotions
+    // are out of scope. Hiding the affordance IS the contract — the
+    // gesture handlers (`handle_set_tangent_intent`,
+    // `handle_bend_segment`) also refuse at the door for these sources.
+    const neighbours: readonly number[] =
+      this.vector_edit.source.kind === "path"
+        ? model.neighbouringVertices({
+            vertices: this.vector_edit.selected_vertices,
+            segments: this.vector_edit.selected_segments,
+            tangents: this.vector_edit.selected_tangents,
+          })
+        : EMPTY_NEIGHBOURS;
 
     return {
       vertices,
@@ -3115,22 +3264,22 @@ class DomSurface implements Surface {
   }
 
   /**
-   * Read the live `d` for the path under edit. `d` is the authoritative
-   * geometry store while a session is open — every gesture commit, undo,
-   * and redo writes here. Returns `null` if the node has no `d` (paths
-   * always do; this guards the rare deleted-mid-gesture case).
+   * The session's in-memory PathModel-form `d`. For `<path>` sources
+   * this stays in lock-step with `doc.get_attr(id, "d")`; for
+   * `<line>` / `<polyline>` / `<polygon>` sources the document holds
+   * native attrs and the session-d is the lingua-franca view that
+   * gesture handlers parse from and write back to via
+   * {@link apply_session_d}. Returns `null` if no session is active.
    */
   private read_session_d(): string | null {
-    if (!this.path_edit) return null;
-    return (
-      this.editor_internal().doc.get_attr(this.path_edit.node_id, "d") ?? null
-    );
+    if (!this.vector_edit) return null;
+    return this.vector_edit.current_d;
   }
 
   /**
    * Derive a fresh `PathModel` from the current `d` for the path under
    * edit. Computed on read — there is no cached copy held on the session.
-   * See `path-edit/session.ts` for the doctrine ("d is the live store").
+   * See `vector-edit/session.ts` for the doctrine ("d is the live store").
    */
   private session_model(): PathModel | null {
     const d = this.read_session_d();
@@ -3139,20 +3288,72 @@ class DomSurface implements Surface {
   }
 
   /**
-   * Republish the path-edit sub-selection to the HUD. No-op when no
+   * Republish the vector-edit sub-selection to the HUD. No-op when no
    * session is open. Every selection-changing handler ends with this so
-   * the surface mirror stays in lock-step with `this.path_edit` — the
+   * the surface mirror stays in lock-step with `this.vector_edit` — the
    * inline `setVectorSelection({ node_id, vertices, segments, tangents })`
    * block was repeated at 6+ sites before this collapse.
    */
   private sync_selection_mirror(): void {
-    if (!this.path_edit) return;
+    if (!this.vector_edit) return;
     this.hud.setVectorSelection({
-      node_id: this.path_edit.node_id,
-      vertices: this.path_edit.selected_vertices,
-      segments: this.path_edit.selected_segments,
-      tangents: this.path_edit.selected_tangents,
+      node_id: this.vector_edit.node_id,
+      vertices: this.vector_edit.selected_vertices,
+      segments: this.vector_edit.selected_segments,
+      tangents: this.vector_edit.selected_tangents,
     });
+  }
+
+  /**
+   * Push a standalone vector sub-selection change as one history entry.
+   *
+   * Called by selection-only handlers (vertex / segment / tangent click,
+   * marquee / lasso commit, clear-vector-selection) AFTER the
+   * `VectorEditSession` has been mutated to the new state. `before` is the
+   * snapshot captured before the mutation; the current session state is
+   * captured here as `after`.
+   *
+   * Tagged with `descriptor: { kind: "vector-selection" }` so hosts that
+   * want Figma-style "skip selection on undo" can filter on the
+   * descriptor without inspecting closure internals. Default behavior:
+   * standalone vector-selection IS undoable.
+   *
+   * No-op when the snapshot is unchanged — avoids spamming the stack
+   * with entries from clicks that resolve to the same state (e.g.
+   * clicking an already-selected vertex in `replace` mode).
+   */
+  private record_vector_selection_change(
+    before: SubSelectionSnapshot,
+    label: string
+  ): void {
+    if (!this.vector_edit) return;
+    const after = this.vector_edit.snapshot_selection();
+    if (sub_selection_equal(before, after)) return;
+    const session = this.vector_edit;
+    const sync = () => this.sync_selection_mirror();
+    const redraw = () => this.redraw();
+    // The surface↔editor seam exposes `preview()` only — not `atomic()`.
+    // Compose a single committed delta via preview+set+commit (the same
+    // shape `handle_split_segment` uses for its one-shot edit). The
+    // initial `set(...)` call invokes `apply()` once to install the new
+    // selection; `commit()` then seals it onto the undo stack.
+    const internal = this.editor_internal();
+    const preview = internal.history.preview(label);
+    preview.set({
+      providerId: "svg-editor",
+      descriptor: { kind: "vector-selection" },
+      apply: () => {
+        session.restore_selection(after);
+        sync();
+        redraw();
+      },
+      revert: () => {
+        session.restore_selection(before);
+        sync();
+        redraw();
+      },
+    });
+    preview.commit();
   }
 
   /** Resolve the in-flight `PathModel` for the named node id when a
@@ -3161,13 +3362,13 @@ class DomSurface implements Surface {
     const ap = this.active_preview;
     if (!ap) return null;
     switch (ap.kind) {
-      case "path_vertex_translate":
+      case "vector_vertex_translate":
         return ap.node_id === id ? ap.preview_model : null;
-      case "path_set_tangent":
+      case "vector_set_tangent":
         return ap.node_id === id ? ap.preview_model : null;
-      case "path_bend_segment":
+      case "vector_bend_segment":
         return ap.node_id === id ? ap.preview_model : null;
-      case "path_translate_vector_selection":
+      case "vector_translate_selection":
         return ap.node_id === id ? ap.preview_model : null;
       default:
         return null;
@@ -3175,16 +3376,19 @@ class DomSurface implements Surface {
   }
 
   /**
-   * Apply a `select_vertex` intent. Updates the path-edit session's sub-
+   * Apply a `select_vertex` intent. Updates the vector-edit session's sub-
    * selection and pushes a fresh mirror to the HUD.
    */
   private handle_select_vertex(
     intent: Intent & { kind: "select_vertex" }
   ): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
-    this.path_edit.select_vertex(intent.index, intent.mode);
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
+    const before = this.vector_edit.snapshot_selection();
+    this.vector_edit.select_vertex(intent.index, intent.mode);
     this.sync_selection_mirror();
     this.redraw();
+    this.record_vector_selection_change(before, "select vertex");
   }
 
   /**
@@ -3195,10 +3399,13 @@ class DomSurface implements Surface {
   private handle_select_segment(
     intent: Intent & { kind: "select_segment" }
   ): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
-    this.path_edit.select_segment(intent.segment, intent.mode);
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
+    const before = this.vector_edit.snapshot_selection();
+    this.vector_edit.select_segment(intent.segment, intent.mode);
     this.sync_selection_mirror();
     this.redraw();
+    this.record_vector_selection_change(before, "select segment");
   }
 
   /**
@@ -3210,23 +3417,28 @@ class DomSurface implements Surface {
    * - The commit frame finalizes the preview; the session keeps its updated
    *   model for the next gesture.
    *
-   * The path-edit session's `model` is updated to reflect the committed
+   * The vector-edit session's `model` is updated to reflect the committed
    * state (preview model is computed on the fly each frame from the
    * baseline; only commit writes back into session.model).
    */
   private handle_translate_vertices(
     intent: Intent & { kind: "translate_vertices" }
   ): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
     const internal = this.editor_internal();
     const doc = internal.doc;
     const emit = internal.emit;
     const node_id = intent.node_id;
+    // Capture source for the apply/revert closures — they fire later
+    // (undo, redo) when `this.vector_edit` may have been cleared.
+    const source = this.vector_edit.source;
+    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     // Open / refresh the preview session.
     if (
       !this.active_preview ||
-      this.active_preview.kind !== "path_vertex_translate" ||
+      this.active_preview.kind !== "vector_vertex_translate" ||
       this.active_preview.node_id !== node_id ||
       !array_shallow_equal(this.active_preview.indices, intent.indices)
     ) {
@@ -3239,15 +3451,18 @@ class DomSurface implements Surface {
       }
       const initial_d = this.read_session_d();
       if (initial_d === null) return;
+      const baseline_model = PathModel.fromSvgPathD(initial_d);
       this.active_preview = {
-        kind: "path_vertex_translate",
+        kind: "vector_vertex_translate",
         node_id,
         indices: [...intent.indices],
         initial_d,
+        baseline_model,
+        before_selection: this.vector_edit.snapshot_selection(),
         // Seed preview_model at the baseline; the next block re-derives it
         // from `dx, dy` (which is `0, 0` on the first preview frame).
-        preview_model: PathModel.fromSvgPathD(initial_d),
-        session: internal.history.preview("path/translate-vertex"),
+        preview_model: baseline_model,
+        session: internal.history.preview("vector/translate-vertex"),
       };
     }
 
@@ -3282,39 +3497,57 @@ class DomSurface implements Surface {
     // total delta from gesture start; replaying from baseline each frame
     // (instead of accumulating from the previous frame) keeps the chrome
     // and the document byte-identical with no per-frame drift.
-    const baseline_model = PathModel.fromSvgPathD(baseline_d);
-    const preview_model = baseline_model.translateVertices(indices, [
-      local_dx,
-      local_dy,
-    ]);
+    const preview_model = this.active_preview.baseline_model.translateVertices(
+      indices,
+      [local_dx, local_dy]
+    );
     const target_d = preview_model.toSvgPathD();
     // Update the active preview's model BEFORE calling apply so that any
     // subscriber-triggered HUD redraw inside apply() (via emit) reads the
     // fresh vertex positions through `vector_of`.
     this.active_preview.preview_model = preview_model;
 
-    const apply = () => {
-      doc.set_attr(node_id, "d", target_d);
-      emit();
-    };
-    const revert = () => {
-      doc.set_attr(node_id, "d", baseline_d);
-      emit();
-    };
-
-    this.active_preview.session.set({
-      providerId: "svg-editor",
-      apply,
-      revert,
-    });
-
     if (intent.phase === "commit") {
+      // Build the committed delta with sub-selection capture so undo /
+      // redo restores selection alongside `d`. See the vector-edit
+      // selection-history note in `handle_set_tangent_intent` — the
+      // pattern is intentionally repeated rather than abstracted, to
+      // keep each gesture handler readable in isolation.
+      const before_selection = this.active_preview.before_selection;
+      const after_selection = this.vector_edit.snapshot_selection();
+      const session = this.vector_edit;
+      const sync = () => this.sync_selection_mirror();
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          session.mark_seen(target_d);
+          session.restore_selection(after_selection);
+          sync();
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          session.mark_seen(baseline_d);
+          session.restore_selection(before_selection);
+          sync();
+          emit();
+        },
+      });
       this.active_preview.session.commit();
       this.active_preview = null;
-      // Mark the new `d` as ours so the external-mutation watcher in
-      // `editor.subscribe` doesn't treat this commit as an external write
-      // and clear sub-selection.
-      this.path_edit.mark_seen(target_d);
+    } else {
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          emit();
+        },
+      });
     }
   }
 
@@ -3342,23 +3575,26 @@ class DomSurface implements Surface {
    * twice). Mirror policy pinned to `"none"` during multi-translate; mirror
    * behavior is reserved for the singleton-tangent curve gesture.
    *
-   * Opens a dedicated `path_translate_vector_selection` preview so the
+   * Opens a dedicated `vector_translate_selection` preview so the
    * vertex translate AND tangent delta apply atomically per frame.
    */
   private handle_translate_vector_selection(
     intent: Intent & { kind: "translate_vector_selection" }
   ): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
     const internal = this.editor_internal();
     const doc = internal.doc;
     const emit = internal.emit;
     const node_id = intent.node_id;
+    const source = this.vector_edit.source;
+    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     // Resolve the set of vertices and tangents to act on — reads the host's
     // authoritative sub-selection. Session doesn't cache the model
     // (gesture-bracketed history re-parses on demand); read current `d`
     // and parse for vertex_count + segment snapshot.
-    const ses = this.path_edit;
+    const ses = this.vector_edit;
     const current_d = this.read_session_d();
     if (current_d === null) return;
     const resolved_model = PathModel.fromSvgPathD(current_d);
@@ -3396,7 +3632,7 @@ class DomSurface implements Surface {
     // Open / refresh the preview session. Re-open when targets change.
     if (
       !this.active_preview ||
-      this.active_preview.kind !== "path_translate_vector_selection" ||
+      this.active_preview.kind !== "vector_translate_selection" ||
       this.active_preview.node_id !== node_id ||
       !array_shallow_equal(this.active_preview.indices, indices) ||
       !sameTangentRefs(this.active_preview.tangent_refs, tangent_refs)
@@ -3413,15 +3649,16 @@ class DomSurface implements Surface {
         baseline_model.tangentAbsolute(ref, [0, 0])
       );
       this.active_preview = {
-        kind: "path_translate_vector_selection",
+        kind: "vector_translate_selection",
         node_id,
         indices: [...indices],
         tangent_refs: [...tangent_refs],
         initial_d,
+        before_selection: this.vector_edit.snapshot_selection(),
         preview_model: baseline_model,
         baseline_model,
         baseline_tangent_abs,
-        session: internal.history.preview("path/translate-vector-selection"),
+        session: internal.history.preview("vector/translate-selection"),
       };
     }
 
@@ -3477,25 +3714,42 @@ class DomSurface implements Surface {
     const target_d = preview_model.toSvgPathD();
     this.active_preview.preview_model = preview_model;
 
-    const apply = () => {
-      doc.set_attr(node_id, "d", target_d);
-      emit();
-    };
-    const revert = () => {
-      doc.set_attr(node_id, "d", baseline_d);
-      emit();
-    };
-
-    this.active_preview.session.set({
-      providerId: "svg-editor",
-      apply,
-      revert,
-    });
-
     if (intent.phase === "commit") {
+      const before_selection = this.active_preview.before_selection;
+      const after_selection = this.vector_edit.snapshot_selection();
+      const session = this.vector_edit;
+      const sync = () => this.sync_selection_mirror();
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          session.mark_seen(target_d);
+          session.restore_selection(after_selection);
+          sync();
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          session.mark_seen(baseline_d);
+          session.restore_selection(before_selection);
+          sync();
+          emit();
+        },
+      });
       this.active_preview.session.commit();
       this.active_preview = null;
-      this.path_edit.mark_seen(target_d);
+    } else {
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          emit();
+        },
+      });
     }
   }
 
@@ -3503,10 +3757,13 @@ class DomSurface implements Surface {
   private handle_select_tangent(
     intent: Intent & { kind: "select_tangent" }
   ): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
-    this.path_edit.select_tangent(intent.tangent, intent.mode);
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
+    const before = this.vector_edit.snapshot_selection();
+    this.vector_edit.select_tangent(intent.tangent, intent.mode);
     this.sync_selection_mirror();
     this.redraw();
+    this.record_vector_selection_change(before, "select tangent");
   }
 
   /**
@@ -3524,16 +3781,28 @@ class DomSurface implements Surface {
   private handle_set_tangent_intent(
     intent: Intent & { kind: "set_tangent" }
   ): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
+    // v1: tangent edits force a curve, which only `<path>` can carry as
+    // native attrs. For polyline/polygon sources `apply_session_d` would
+    // refuse silently (returns `false`) while `mark_seen` still advanced
+    // `last_seen_d`, leaving the external-mutation watcher permanently
+    // out of sync. Refuse the intent at the door instead — the HUD
+    // already hides tangent handles for these sources (`vector_of`), so
+    // a reachable invocation here can only come from a programmatic
+    // intent.
+    if (this.vector_edit.source.kind !== "path") return;
     const internal = this.editor_internal();
     const doc = internal.doc;
     const emit = internal.emit;
     const node_id = intent.node_id;
+    const source = this.vector_edit.source;
+    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     // Open / refresh the preview session.
     if (
       !this.active_preview ||
-      this.active_preview.kind !== "path_set_tangent" ||
+      this.active_preview.kind !== "vector_set_tangent" ||
       this.active_preview.node_id !== node_id ||
       this.active_preview.tangent[0] !== intent.tangent[0] ||
       this.active_preview.tangent[1] !== intent.tangent[1]
@@ -3543,13 +3812,16 @@ class DomSurface implements Surface {
       }
       const initial_d = this.read_session_d();
       if (initial_d === null) return;
+      const baseline_model = PathModel.fromSvgPathD(initial_d);
       this.active_preview = {
-        kind: "path_set_tangent",
+        kind: "vector_set_tangent",
         node_id,
         tangent: [intent.tangent[0], intent.tangent[1]],
         initial_d,
-        preview_model: PathModel.fromSvgPathD(initial_d),
-        session: internal.history.preview("path/set-tangent"),
+        baseline_model,
+        before_selection: this.vector_edit.snapshot_selection(),
+        preview_model: baseline_model,
+        session: internal.history.preview("vector/set-tangent"),
       };
     }
 
@@ -3558,8 +3830,7 @@ class DomSurface implements Surface {
     const local_pos = this.project_doc_point_to_local(node_id, intent.pos);
     if (!local_pos) return;
 
-    const baseline_model = PathModel.fromSvgPathD(baseline_d);
-    const preview_model = baseline_model.setTangent(
+    const preview_model = this.active_preview.baseline_model.setTangent(
       intent.tangent,
       local_pos,
       intent.mirror
@@ -3567,25 +3838,49 @@ class DomSurface implements Surface {
     const target_d = preview_model.toSvgPathD();
     this.active_preview.preview_model = preview_model;
 
-    const apply = () => {
-      doc.set_attr(node_id, "d", target_d);
-      emit();
-    };
-    const revert = () => {
-      doc.set_attr(node_id, "d", baseline_d);
-      emit();
-    };
-
-    this.active_preview.session.set({
-      providerId: "svg-editor",
-      apply,
-      revert,
-    });
-
     if (intent.phase === "commit") {
+      // Per-handler note: vector-edit gestures commit one delta whose
+      // closures restore BOTH `d` and the sub-selection that was live
+      // before the gesture, so undo lands on the user's prior
+      // selection. The reconciler at `editor.subscribe` (see
+      // session.ts) would otherwise observe `d` change and clear sub-
+      // selection; we suppress that with `mark_seen` inside the
+      // closure, then write the captured selection back.
+      const before_selection = this.active_preview.before_selection;
+      const after_selection = this.vector_edit.snapshot_selection();
+      const session = this.vector_edit;
+      const sync = () => this.sync_selection_mirror();
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          session.mark_seen(target_d);
+          session.restore_selection(after_selection);
+          sync();
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          session.mark_seen(baseline_d);
+          session.restore_selection(before_selection);
+          sync();
+          emit();
+        },
+      });
       this.active_preview.session.commit();
       this.active_preview = null;
-      this.path_edit.mark_seen(target_d);
+    } else {
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          emit();
+        },
+      });
     }
   }
 
@@ -3598,8 +3893,11 @@ class DomSurface implements Surface {
   private handle_split_segment(
     intent: Intent & { kind: "split_segment" }
   ): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
     const node_id = intent.node_id;
+    const source = this.vector_edit.source;
+    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
     const baseline_d = this.read_session_d();
     if (baseline_d === null) return;
     const baseline_model = PathModel.fromSvgPathD(baseline_d);
@@ -3616,26 +3914,39 @@ class DomSurface implements Surface {
     // simplest way to compose this with the existing preview/commit
     // sessions used by other vector edits is `preview() + set() +
     // commit()` in immediate succession.
-    const split_session = internal.history.preview("path/split-segment");
+    //
+    // Selection note: split auto-selects the newly inserted vertex
+    // (matching Figma). We close over BOTH the pre-split selection and
+    // the post-split selection in the delta, so undo restores what the
+    // user had selected before the click AND redo re-installs the new
+    // vertex selection.
+    const session = this.vector_edit;
+    const before_selection = session.snapshot_selection();
+    const after_selection: SubSelectionSnapshot = Object.freeze({
+      vertices: Object.freeze([new_vertex]),
+      segments: Object.freeze([] as number[]),
+      tangents: Object.freeze([] as ReadonlyArray<readonly [number, 0 | 1]>),
+    });
+    const sync = () => this.sync_selection_mirror();
+    const split_session = internal.history.preview("vector/split-segment");
     split_session.set({
       providerId: "svg-editor",
       apply: () => {
-        doc.set_attr(node_id, "d", target_d);
+        commit(target_d);
+        session.mark_seen(target_d);
+        session.restore_selection(after_selection);
+        sync();
         emit();
       },
       revert: () => {
-        doc.set_attr(node_id, "d", baseline_d);
+        commit(baseline_d);
+        session.mark_seen(baseline_d);
+        session.restore_selection(before_selection);
+        sync();
         emit();
       },
     });
     split_session.commit();
-    this.path_edit.mark_seen(target_d);
-    this.path_edit.set_selection({
-      vertices: [new_vertex],
-      segments: [],
-      tangents: [],
-    });
-    this.sync_selection_mirror();
     this.redraw();
   }
 
@@ -3649,15 +3960,22 @@ class DomSurface implements Surface {
    * the cumulative drag delta is correct without per-frame drift.
    */
   private handle_bend_segment(intent: Intent & { kind: "bend_segment" }): void {
-    if (!this.path_edit || this.path_edit.node_id !== intent.node_id) return;
+    if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
+      return;
+    // v1: bending a straight segment introduces tangents — only `<path>`
+    // can carry them as native attrs. See the same carve-out on
+    // `handle_set_tangent_intent` for the full rationale.
+    if (this.vector_edit.source.kind !== "path") return;
     const internal = this.editor_internal();
     const doc = internal.doc;
     const emit = internal.emit;
     const node_id = intent.node_id;
+    const source = this.vector_edit.source;
+    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     if (
       !this.active_preview ||
-      this.active_preview.kind !== "path_bend_segment" ||
+      this.active_preview.kind !== "vector_bend_segment" ||
       this.active_preview.node_id !== node_id ||
       this.active_preview.segment !== intent.segment ||
       this.active_preview.ca !== intent.ca
@@ -3674,7 +3992,7 @@ class DomSurface implements Surface {
       const va = snap.vertices[s.a];
       const vb = snap.vertices[s.b];
       this.active_preview = {
-        kind: "path_bend_segment",
+        kind: "vector_bend_segment",
         node_id,
         segment: intent.segment,
         ca: intent.ca,
@@ -3685,8 +4003,10 @@ class DomSurface implements Surface {
           tb: [s.tb[0], s.tb[1]],
         },
         initial_d,
+        baseline_model,
+        before_selection: this.vector_edit.snapshot_selection(),
         preview_model: baseline_model,
-        session: internal.history.preview("path/bend-segment"),
+        session: internal.history.preview("vector/bend-segment"),
       };
     }
 
@@ -3695,8 +4015,7 @@ class DomSurface implements Surface {
     const local_cb = this.project_doc_point_to_local(node_id, intent.cb);
     if (!local_cb) return;
 
-    const baseline_model = PathModel.fromSvgPathD(baseline_d);
-    const preview_model = baseline_model.bendSegment(
+    const preview_model = this.active_preview.baseline_model.bendSegment(
       intent.segment,
       intent.ca,
       local_cb,
@@ -3705,25 +4024,42 @@ class DomSurface implements Surface {
     const target_d = preview_model.toSvgPathD();
     this.active_preview.preview_model = preview_model;
 
-    const apply = () => {
-      doc.set_attr(node_id, "d", target_d);
-      emit();
-    };
-    const revert = () => {
-      doc.set_attr(node_id, "d", baseline_d);
-      emit();
-    };
-
-    this.active_preview.session.set({
-      providerId: "svg-editor",
-      apply,
-      revert,
-    });
-
     if (intent.phase === "commit") {
+      const before_selection = this.active_preview.before_selection;
+      const after_selection = this.vector_edit.snapshot_selection();
+      const session = this.vector_edit;
+      const sync = () => this.sync_selection_mirror();
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          session.mark_seen(target_d);
+          session.restore_selection(after_selection);
+          sync();
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          session.mark_seen(baseline_d);
+          session.restore_selection(before_selection);
+          sync();
+          emit();
+        },
+      });
       this.active_preview.session.commit();
       this.active_preview = null;
-      this.path_edit.mark_seen(target_d);
+    } else {
+      this.active_preview.session.set({
+        providerId: "svg-editor",
+        apply: () => {
+          commit(target_d);
+          emit();
+        },
+        revert: () => {
+          commit(baseline_d);
+          emit();
+        },
+      });
     }
   }
 
@@ -3850,8 +4186,13 @@ export function project_point_through_ctm(
   ctm: { a: number; b: number; c: number; d: number; e: number; f: number },
   container_offset: readonly [number, number]
 ): [number, number] {
-  const sx = ctm.a * px + ctm.c * py + ctm.e;
-  const sy = ctm.b * px + ctm.d * py + ctm.f;
+  const [sx, sy] = cmath.vector2.transform(
+    [px, py],
+    [
+      [ctm.a, ctm.c, ctm.e],
+      [ctm.b, ctm.d, ctm.f],
+    ]
+  );
   return [sx + container_offset[0], sy + container_offset[1]];
 }
 
@@ -3871,7 +4212,11 @@ export function project_delta_inverse_ctm(
   const det = ctm.a * ctm.d - ctm.c * ctm.b;
   if (det === 0)
     throw new Error("project_delta_inverse_ctm: singular CTM linear part");
-  return [(ctm.d * dx - ctm.c * dy) / det, (-ctm.b * dx + ctm.a * dy) / det];
+  const inv = cmath.transform.invert([
+    [ctm.a, ctm.c, 0],
+    [ctm.b, ctm.d, 0],
+  ]);
+  return cmath.vector2.transform([dx, dy], inv);
 }
 
 /**
@@ -3896,17 +4241,14 @@ export function inverse_project_rect(
   },
   offset: readonly [number, number]
 ): cmath.Rectangle | null {
-  const det = ctm.a * ctm.d - ctm.c * ctm.b;
-  if (det === 0) return null;
-  const to_local = (px: number, py: number): [number, number] => {
-    const lx = px - offset[0];
-    const ly = py - offset[1];
-    return [
-      (ctm.d * (lx - ctm.e) - ctm.c * (ly - ctm.f)) / det,
-      (-ctm.b * (lx - ctm.e) + ctm.a * (ly - ctm.f)) / det,
-    ];
-  };
-  const corners: [number, number][] = [
+  if (ctm.a * ctm.d - ctm.c * ctm.b === 0) return null;
+  const inv = cmath.transform.invert([
+    [ctm.a, ctm.c, ctm.e],
+    [ctm.b, ctm.d, ctm.f],
+  ]);
+  const to_local = (px: number, py: number): cmath.Vector2 =>
+    cmath.vector2.transform([px - offset[0], py - offset[1]], inv);
+  const corners: cmath.Vector2[] = [
     to_local(rect.x, rect.y),
     to_local(rect.x + rect.width, rect.y),
     to_local(rect.x, rect.y + rect.height),

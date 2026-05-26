@@ -68,14 +68,7 @@ export namespace marquee {
   ): K[] {
     const hits: K[] = [];
     for (const c of candidates) {
-      const x = c.pos[0];
-      const y = c.pos[1];
-      if (
-        x >= rect.x &&
-        x <= rect.x + rect.width &&
-        y >= rect.y &&
-        y <= rect.y + rect.height
-      ) {
+      if (cmath.rect.containsPoint(rect, c.pos as cmath.Vector2)) {
         hits.push(c.key);
       }
     }
