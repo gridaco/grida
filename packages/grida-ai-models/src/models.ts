@@ -137,6 +137,16 @@ export namespace models {
         outputLimit: 128_000,
         cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
       },
+      // Google's cache model is read + hourly storage (no one-time write
+      // premium that matches `cacheWrite` semantics), so the field is omitted.
+      "google/gemini-3.5-flash": {
+        id: "google/gemini-3.5-flash",
+        label: "Gemini 3.5 Flash",
+        multimodal: true,
+        contextWindow: 1_048_576,
+        outputLimit: 65_536,
+        cost: { input: 1.5, output: 9, cacheRead: 0.15 },
+      },
     } as const satisfies Record<string, ModelSpec>;
 
     /** Catalogued text-model id. The literal key set of {@link catalog}. */
