@@ -349,6 +349,9 @@ importers:
       '@grida/agent-tools':
         specifier: workspace:*
         version: link:../packages/grida-agent-tools
+      '@grida/ai-models':
+        specifier: workspace:*
+        version: link:../packages/grida-ai-models
       '@grida/bitmap':
         specifier: workspace:*
         version: link:../packages/grida-canvas-bitmap
@@ -1022,6 +1025,18 @@ importers:
       zod:
         specifier: ^4
         version: 4.3.6
+    devDependencies:
+      tsdown:
+        specifier: ^0.21.9
+        version: 0.21.9(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+
+  packages/grida-ai-models:
     devDependencies:
       tsdown:
         specifier: ^0.21.9

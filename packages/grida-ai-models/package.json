@@ -1,0 +1,36 @@
+{
+  "name": "@grida/ai-models",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed AI model catalogue: tier vocabulary, text-model specs, and media-generation catalogues (image, audio, image-tools). Catalogue data only — not a provider registry, not a billing package.",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "prepack": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsdown": "^0.21.9",
+    "typescript": "^6",
+    "vitest": "^4"
+  }
+}

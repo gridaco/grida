@@ -60,6 +60,7 @@ Per 1M tokens.
 | Claude Opus 4.7 (`anthropic/claude-opus-4.7`)     | $5.00  | $6.25       | $0.50      | $25.00  |
 | GPT-5.5 (`openai/gpt-5.5`)                        | $5.00  | —           | $0.50      | $30.00  |
 | GPT-5.5 Pro (`openai/gpt-5.5-pro`)                | $30.00 | —           | —          | $180.00 |
+| Gemini 3.5 Flash (`google/gemini-3.5-flash`)      | $1.50  | —           | $0.15      | $9.00   |
 
 ## Image Generation Models
 

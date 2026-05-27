@@ -22,13 +22,15 @@ description: >
 
 ## Key Files
 
-| File                                       | Role                                                                   |
-| ------------------------------------------ | ---------------------------------------------------------------------- |
-| `editor/lib/ai/models.ts`                  | Text model tiers (nano/mini/pro/max), gateway config, `ModelSpec` type |
-| `editor/lib/ai/ai.ts`                      | Image model registry, image tool models, pricing types, `toMills()`    |
-| `editor/app/(api)/private/ai/ratelimit.ts` | Budget enforcement (Upstash sliding window, mills)                     |
-| `editor/app/(www)/(ai)/ai/models/page.tsx` | Public models catalog page                                             |
-| `docs/models/index.md`                     | User-facing models & pricing documentation                             |
+| File                                       | Role                                                                                                                                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/grida-ai-models/src/models.ts`   | Central catalogue. Sole export is the `models` namespace: `models.text` (`ModelSpec`, `catalog`, `byTier`, `modelSpecById`), `models.image`, `models.audio`, `models.image_tools` |
+| `packages/grida-ai-models/src/tiers.ts`    | `ModelTier` set + `TIER_MODEL_IDS` (type-uses `models.text.CatalogId` from `models.ts`)                                                                                           |
+| `editor/lib/ai/models.ts`                  | AI Gateway + BYOK provider seam (catalogue is re-exported from `@grida/ai-models`)                                                                                                |
+| `editor/lib/ai/ai.ts`                      | `toMills()` + Replicate call shapes; re-aggregates catalogue under `models.*`                                                                                                     |
+| `editor/app/(api)/private/ai/ratelimit.ts` | Budget enforcement (Upstash sliding window, mills)                                                                                                                                |
+| `editor/app/(www)/(ai)/ai/models/page.tsx` | Public models catalog page                                                                                                                                                        |
+| `docs/models/index.md`                     | User-facing models & pricing documentation                                                                                                                                        |
 
 ## Tools
 
@@ -62,7 +64,7 @@ Note: `models.dev` has per-token costs but not per-image tier breakdowns. For pe
 
 ## Text Models
 
-Live in `editor/lib/ai/models.ts` as `Record<ModelTier, ModelSpec>`.
+Live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. The tier set and tier→model id table sit in `packages/grida-ai-models/src/tiers.ts` and type-use `models.text.CatalogId` from `models.ts` — so every tier id must resolve to a real catalogued spec.
 
 Fields to update per tier:
 
@@ -73,7 +75,7 @@ Fields to update per tier:
 
 ## Image Models
 
-Live in `editor/lib/ai/ai.ts` under `ai.image.models`.
+Live in `packages/grida-ai-models/src/models.ts` under `models.image.models`. Editor consumers reach the same data via `import { ai } from "@/lib/ai/ai"` (a thin re-aggregator that adds `ai.toMills` and `ai.server.methods.*`).
 
 ### Pricing types
 
@@ -107,7 +109,7 @@ All image generation routes through the Vercel AI Gateway (`gateway.image(id)`).
 
 ## Image Tool Models
 
-Live in `ai.image_tools.models` in `editor/lib/ai/ai.ts`. Flat `cost_usd` pricing via Replicate.
+Live in `models.image_tools.models` in `packages/grida-ai-models/src/models.ts`. Flat `cost_usd` pricing via Replicate.
 
 ## Budget System
 
@@ -115,7 +117,7 @@ Upstash sliding-window rate limiting. Unit: **mills** (1 mill = $0.001 USD).
 
 - Budget: `1000` mills = $1.00 per 30-day window
 - Configured in `editor/app/(api)/private/ai/ratelimit.ts`
-- `ai.toMills(cost_usd)` converts, `ai.millsToUSD(mills)` formats
+- `ai.toMills(cost_usd)` converts USD to mills
 
 Currently deducts `avg_cost_usd` before generation. TODO: switch to real cost tracking post-generation.
 
