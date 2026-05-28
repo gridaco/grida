@@ -39,7 +39,7 @@ export const TIER_MODEL_IDS = {
   nano: "openai/gpt-5.4-nano",
   mini: "openai/gpt-5.4-mini",
   pro: "anthropic/claude-sonnet-4.6",
-  max: "anthropic/claude-opus-4.7",
+  max: "anthropic/claude-opus-4.8",
 } as const satisfies Record<ModelTier, models.text.CatalogId>;
 
 /** Literal union of tier-mapped model ids (values of {@link TIER_MODEL_IDS}). */

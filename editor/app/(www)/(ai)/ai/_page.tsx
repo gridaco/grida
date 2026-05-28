@@ -36,6 +36,7 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
+import models, { type ModelTier } from "@grida/ai-models";
 import { cn } from "@/components/lib/utils";
 import { resolveAiError } from "@/lib/ai/error";
 import { AiCredits, useAiCredits } from "@/lib/ai/credits";
@@ -53,12 +54,16 @@ type Props = {
 };
 
 // ---------------------------------------------------------------------------
-// Model picker — only the four tiered models (nano / mini / pro / max).
+// Model picker — only the four tiered models (nano / mini / pro / max),
+// derived from the `@grida/ai-models` catalogue (`models.text.byTier`) so
+// ids, labels, and pricing stay in lockstep with the source of truth.
 // Non-tiered catalog entries (e.g. gpt-5.5, gpt-5.5-pro) are intentionally
 // hidden — they're either too expensive for blanket exposure or reserved
-// for specific call sites. Tier → model mapping lives in lib/ai/models.ts.
+// for specific call sites.
+//
+// `@grida/ai-models` is a pure data package; `@/lib/ai/models` is NOT
+// imported here because it carries the server-only gateway/BYOK seam.
 // ---------------------------------------------------------------------------
-type ModelTier = "nano" | "mini" | "pro" | "max";
 type ModelOption = {
   id: string;
   label: string;
@@ -66,37 +71,23 @@ type ModelOption = {
   inputUsd: number;
   outputUsd: number;
 };
-const MODEL_OPTIONS: readonly ModelOption[] = [
-  {
-    id: "openai/gpt-5.4-nano",
-    label: "GPT-5.4 Nano",
-    tier: "nano",
-    inputUsd: 0.2,
-    outputUsd: 1.25,
-  },
-  {
-    id: "openai/gpt-5.4-mini",
-    label: "GPT-5.4 Mini",
-    tier: "mini",
-    inputUsd: 0.75,
-    outputUsd: 4.5,
-  },
-  {
-    id: "anthropic/claude-sonnet-4.6",
-    label: "Claude Sonnet 4.6",
-    tier: "pro",
-    inputUsd: 3,
-    outputUsd: 15,
-  },
-  {
-    id: "anthropic/claude-opus-4.7",
-    label: "Claude Opus 4.7",
-    tier: "max",
-    inputUsd: 5,
-    outputUsd: 25,
-  },
-] as const;
-const DEFAULT_MODEL_ID = "openai/gpt-5.4-mini";
+const TIER_ORDER = [
+  "nano",
+  "mini",
+  "pro",
+  "max",
+] as const satisfies readonly ModelTier[];
+const MODEL_OPTIONS: readonly ModelOption[] = TIER_ORDER.map((tier) => {
+  const spec = models.text.byTier[tier];
+  return {
+    id: spec.id,
+    label: spec.label,
+    tier,
+    inputUsd: spec.cost.input,
+    outputUsd: spec.cost.output,
+  };
+});
+const DEFAULT_MODEL_ID = models.text.byTier.mini.id;
 
 // ---------------------------------------------------------------------------
 // Debug flag — keyboard shortcut (Cmd/Ctrl+Shift+D) + `?debug=1` URL param.

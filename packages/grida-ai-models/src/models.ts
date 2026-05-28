@@ -86,6 +86,11 @@ export namespace models {
       outputLimit: number;
       /** Cost per 1M tokens in USD. */
       cost: ModelCostPerMillion;
+      /**
+       * Legacy/superseded marker. The model is still callable, but a newer
+       * sibling has taken its tier slot; UIs may hide or mark it.
+       */
+      deprecated?: boolean;
     }
 
     const catalogSpecs = {
@@ -129,6 +134,14 @@ export namespace models {
         outputLimit: 128_000,
         cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
       },
+      "anthropic/claude-opus-4.8": {
+        id: "anthropic/claude-opus-4.8",
+        label: "Claude Opus 4.8",
+        multimodal: true,
+        contextWindow: 1_000_000,
+        outputLimit: 128_000,
+        cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+      },
       "anthropic/claude-opus-4.7": {
         id: "anthropic/claude-opus-4.7",
         label: "Claude Opus 4.7",
@@ -136,6 +149,7 @@ export namespace models {
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+        deprecated: true,
       },
       // Google's cache model is read + hourly storage (no one-time write
       // premium that matches `cacheWrite` semantics), so the field is omitted.
