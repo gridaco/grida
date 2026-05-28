@@ -3,9 +3,12 @@
 A tiny live store + AI-SDK tool for the agent's plan. Mirrors Claude
 Code's `TodoWrite`.
 
-This is a **fundamental tool** in the sense `docs/wg/feat-ai/tools.md`
-uses the term: always available, applicable to any agent (chat,
-canvas, server-side), zero-cost, no sandbox required.
+This is a **fundamental tool** in the sense
+[`docs/wg/ai/grida/tools-fundamentals.md`](../../../../docs/wg/ai/grida/tools-fundamentals.md)
+uses the term (binding the locked-tool RFC at
+[`docs/wg/ai/agent/tools.md`](../../../../docs/wg/ai/agent/tools.md)):
+always available, applicable to any agent (chat, canvas, server-side),
+zero-cost, no sandbox required.
 
 ## Why it exists
 
