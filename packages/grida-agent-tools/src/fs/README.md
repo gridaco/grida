@@ -6,9 +6,11 @@ files — either against live state (editors, doc models) or pure storage
 persistence backend. No React, no LLM coupling, fully testable in Node.
 
 This is a **fundamental tool** in the sense
-[`docs/wg/feat-ai/tools.md`](../../../docs/wg/feat-ai/tools.md) uses the
-term: always available, applicable to any agent (chat, canvas,
-server-side), zero-cost, no sandbox required.
+[`docs/wg/ai/grida/tools-fundamentals.md`](../../../../docs/wg/ai/grida/tools-fundamentals.md)
+uses the term (binding the locked-tool RFC at
+[`docs/wg/ai/agent/tools.md`](../../../../docs/wg/ai/agent/tools.md)):
+always available, applicable to any agent (chat, canvas, server-side),
+zero-cost, no sandbox required.
 
 The tool **signatures are storage-agnostic** — `read_file("/x.md")`
 makes the same sense whether the backing store is `MemoryBackend`,
