@@ -102,7 +102,7 @@ synchronizes to a server.
 
 The agent runs in an ephemeral container or micro-VM provisioned by a
 cloud host. The container is created for the job, lives long enough to
-serve it, and is destroyed (or snapshotted) afterwards.
+serve it, and is destroyed (or snapshotted) afterward.
 
 **Capabilities offered.**
 

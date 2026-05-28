@@ -381,7 +381,7 @@ Per part type:
 
 ### The lowering chain
 
-```
+```text
 compositor part   ──┐
                     │
   (persistence)     ├─►  chat_parts row (typed, JSON in data_json)

@@ -39,7 +39,7 @@ tool](#adding-a-new-fundamental-tool)).
 | `write`       | `write_file`               | Same shape; Grida adds an optional `version` for stale-check.              |
 | `edit`        | `edit_file`                | Same shape; Grida adds a strict ambiguity rule on multi-match.             |
 | `glob`        | `list_files`               | Today a flat enumerate; promote to glob-shape when needed.                 |
-| `grep`        | `grep_files`               | Same shape; literal + regex content search.                                |
+| `grep`        | `grep_files`               | Same shape; literal substring search (regex is not shipped).               |
 | `bash`        | `run_command`              | Honest name — Grida's host does not always launch a shell.                 |
 | `todo`        | `todo_write`               | Same shape; replace-all semantics.                                         |
 | `task`        | _not yet shipped_          | Subagent spawn surfaced behind editor flows; expose as `task` once stable. |
@@ -179,8 +179,7 @@ The contract stays honest about what is actually executed:
 Security expectation: command execution must run under a real
 sandbox boundary. Grida's desktop binding wraps the daemon process
 under the reference sandbox (`srt`); see
-[`../agent/srt.md`](../agent/srt.md) and the desktop binding at
-[`../../desktop/sandbox-runtime.md`](../../desktop/sandbox-runtime.md).
+[`../agent/srt.md`](../agent/srt.md).
 
 ### `tool_search` (proposed)
 

@@ -24,9 +24,6 @@ Two sibling layers live here:
   how Grida's host wires the locked-tool set. These docs describe
   what Grida ships; they reference the RFC for the shapes.
 
-For the Grida desktop / daemon implementation (the host that runs
-the RFC against a real workspace), see [`../desktop/`](../desktop/index.md).
-
 ## Reading order
 
 If you're trying to understand the system end-to-end:
@@ -48,7 +45,5 @@ If you're trying to understand the system end-to-end:
 
 This WG focuses on the agent protocol and Grida's bindings.
 Provider auth and credentials are out of scope (host territory).
-The desktop product implementation lives in
-[`../desktop/`](../desktop/index.md). The hosted billing /
-model-seam architecture lives in
+The hosted billing / model-seam architecture lives in
 [`../platform/`](../platform/index.md).

@@ -212,7 +212,7 @@ One new synthetic assistant message + one new part — no special
 "compaction marker" beyond a reserved part type. Nothing else changes
 except `hidden_at` on the summarized rows.
 
-```
+```text
 chat_messages:
   + INSERT one new row   → role="assistant", synthetic
   ~ UPDATE summarized    → hidden_at = now()

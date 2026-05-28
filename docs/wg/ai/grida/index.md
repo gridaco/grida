@@ -31,5 +31,3 @@ fundamentals as Grida ships them.
 ## See also
 
 - [Agent RFC](../agent/index.md) — the protocol these bindings ride on.
-- [Desktop WG](../../desktop/index.md) — the host that runs the agent
-  loop locally (Electron + workstation daemon).
