@@ -38,6 +38,16 @@
       "types": "./dist/cursors/index.d.ts",
       "import": "./dist/cursors/index.mjs",
       "require": "./dist/cursors/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.mjs",
+      "require": "./dist/core/index.js"
+    },
+    "./primitives": {
+      "types": "./dist/primitives/bedrock.d.ts",
+      "import": "./dist/primitives/bedrock.mjs",
+      "require": "./dist/primitives/bedrock.js"
     }
   },
   "publishConfig": {

@@ -10,6 +10,45 @@ The HUD is the non-content visual chrome drawn on top of the viewport: selection
 
 In industry terms: Blender calls this "Overlays", Unity calls it "Gizmos", game engines call it "HUD". We use HUD.
 
+## Bedrock layers (`core/` + `primitives/`)
+
+> **Stability — `v0.x`, no compatibility guarantees.** The bedrock is an
+> **additive foundational layer**. It ships its own value types and mechanism
+> modules, fully unit-tested, but is **not yet load-bearing in production**:
+> the package's `Surface` and its consumers still run on the legacy `event/`
+> stack. The bedrock is reached only through the `@grida/hud/core` and
+> `@grida/hud/primitives` subpaths — never the package root, which keeps the
+> legacy names (`HitShape`, `RenderShape`, `CursorIcon`, …). The two coexist
+> without collision until the legacy stack is grounded on the bedrock in a
+> follow-up. Types here may change without a semver bump in this window.
+
+Two layers below the named-class surface, designed once and intended to
+outlive every higher-layer redesign. They import only `@grida/cmath` and each
+other — no DOM, no framework, no class knowledge.
+
+- **`core/`** (`@grida/hud/core`) — engine substrate. Independently-testable
+  mechanism modules: the synthesized input vocabulary (`HUDEvent`), a
+  multi-click classifier (`ClickTracker`), screen↔world helpers
+  (`Transform`), a generic name-keyed `NamedRegistry<K, T>`, and the generic
+  `HitRegistry<I>` + pure `shapeContains` (lower priority wins on overlap).
+  No master class. See [`core/README.md`](./core/README.md).
+
+- **`primitives/`** (`@grida/hud/primitives`) — agnostic value types: the
+  canonical `HUDObject<I>` (a discriminated union enforcing the
+  `(render ∨ hit)` invariant at the type level), the `HitShape` / `RenderShape`
+  unions, the 4-method `Painter` seam, and cursor value types. The pre-existing
+  drawing primitives ship alongside; the opinionated drawers (`ruler.ts`,
+  `corner-radius.ts`, …) still co-locate here, flagged for relocation to
+  `classes/<name>/` in a follow-up. See [`primitives/README.md`](./primitives/README.md).
+
+Bedrock anti-goals (the defensive perimeter — a request that crosses one is
+"the wrong tool"): **not a plugin host** (no `register*` extension API), **not
+a renderer** (`Painter` is the seam to a host renderer; bedrock paints HUD
+chrome, never document content), **not a hit-test acceleration structure**
+(`HitRegistry` is O(n) per query; no spatial index ships in `core/`), **not a
+state mirror** (no per-class state), **not a DOM library** (no `HTMLElement`
+in `core/`).
+
 ## What this package is — two tiers
 
 The package ships **two tiers** of API with different audiences. They are not a hierarchy — they are two products shipped from one package.
