@@ -2217,7 +2217,12 @@ export function SizeMeterSection() {
   const [state, setState] = React.useState<HUDPlaygroundState | null>(null);
   const extra = React.useCallback<HUDExtraBuilder>(
     (ctx) =>
-      buildSizeMeterExtra(ctx.fixture, ctx.selection, ctx.resizes) ?? undefined,
+      buildSizeMeterExtra(
+        ctx.fixture,
+        ctx.selection,
+        ctx.offsets,
+        ctx.resizes
+      ) ?? undefined,
     []
   );
   return (
@@ -2500,7 +2505,12 @@ export function VisibilitySection() {
   // rect — that's the moment when the meter is actually on-screen.
   const extra = React.useCallback<HUDExtraBuilder>(
     (ctx) =>
-      buildSizeMeterExtra(ctx.fixture, ctx.selection, ctx.resizes) ?? undefined,
+      buildSizeMeterExtra(
+        ctx.fixture,
+        ctx.selection,
+        ctx.offsets,
+        ctx.resizes
+      ) ?? undefined,
     []
   );
   const visibility = React.useCallback<SurfaceVisibilityPolicy>(
@@ -4829,6 +4839,7 @@ function selectedRect(
 function buildSizeMeterExtra(
   fixture: Fixture,
   selection: string[],
+  offsets?: Record<string, [number, number]>,
   resizes?: Record<
     string,
     { x: number; y: number; width: number; height: number }
@@ -4838,10 +4849,16 @@ function buildSizeMeterExtra(
   const id = selection[0];
   const node = fixture.nodes.find((n) => n.id === id);
   if (!node?.rect) return null;
-  // Live W × H during a resize gesture — read the in-flight rect so the
-  // pill tracks the dragging handle rather than the pre-drag size.
+  // Live rect across both gestures — resize wins (gestures are mutually
+  // exclusive at the surface, so this is the documented case), translate
+  // adds dx/dy when no resize is in flight. Without folding offsets in,
+  // the pill lags the dragged rect during translate.
   const live = resizes?.[id];
-  const { x, y, width, height } = live ?? node.rect;
+  const off = live ? undefined : offsets?.[id];
+  const base = live ?? node.rect;
+  const x = base.x + (off?.[0] ?? 0);
+  const y = base.y + (off?.[1] ?? 0);
+  const { width, height } = base;
   const angle =
     node.kind === "rect-rotated" && node.angle !== undefined ? node.angle : 0;
   const label = `${Math.round(width)} × ${Math.round(height)}`;
