@@ -837,15 +837,19 @@ export function HUDStage(props: HUDStageProps) {
         });
       }
     } else if (intent.kind === "resize") {
-      // Demo applies resize to a single rect node only (the visibility +
-      // size-meter sections both use single-rect fixtures). For multi-id
-      // selections we'd need to distribute the new group AABB across
-      // members — out of scope for the dev showcase.
+      // Demo applies resize to a single axis-aligned rect node only (the
+      // visibility section's fixture). Multi-id groups would need the
+      // new AABB distributed across members; rotated nodes carry their
+      // true dims as `intent.shape.local` + a matrix, not the doc-space
+      // AABB in `intent.rect` — writing the AABB into a `rect-rotated`'s
+      // local rect would corrupt its geometry while preserving the angle.
+      // Both cases are out of scope for the showcase; bail explicitly.
       const ids = intent.ids as readonly string[];
       if (ids.length !== 1) return;
       const id = ids[0];
       const node = fixtureRef.current.nodes.find((n) => n.id === id);
       if (!node?.rect) return;
+      if (node.kind === "rect-rotated") return;
       const next = {
         x: intent.rect.x,
         y: intent.rect.y,
