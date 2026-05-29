@@ -17,6 +17,7 @@ import {
   ComposerProvider,
   ComposerTriggerMenu,
   useComposer,
+  type ComposerAttachment,
   type ComposerMessage,
 } from "@/kits/composer";
 import {
@@ -53,12 +54,21 @@ function ComposerDemo() {
 
   const selectedItem = sidebarItems.find((item) => item.id === selectedItemId);
 
+  const revokeTrackedObjectUrl = (url: string | undefined) => {
+    if (!url || !objectUrls.current.includes(url)) return;
+    URL.revokeObjectURL(url);
+    objectUrls.current = objectUrls.current.filter((item) => item !== url);
+  };
+
+  const revokeTrackedObjectUrls = () => {
+    for (const url of objectUrls.current) {
+      URL.revokeObjectURL(url);
+    }
+    objectUrls.current = [];
+  };
+
   useEffect(() => {
-    return () => {
-      for (const url of objectUrls.current) {
-        URL.revokeObjectURL(url);
-      }
-    };
+    return revokeTrackedObjectUrls;
   }, []);
 
   const submit = (readyMessage?: ComposerMessage | null) => {
@@ -70,6 +80,7 @@ function ComposerDemo() {
       prev.concat({ ...message, demo_id: `message-${prev.length + 1}` })
     );
     composer.clear();
+    revokeTrackedObjectUrls();
   };
 
   const addLocalFiles = (fileList: FileList | File[]) => {
@@ -121,6 +132,9 @@ function ComposerDemo() {
               addLocalFiles={addLocalFiles}
               fileInputRef={fileInputRef}
               isDraggingOverComposer={isDraggingOverComposer}
+              onRemoveAttachment={(attachment) =>
+                revokeTrackedObjectUrl(attachment.url)
+              }
               onDrop={onComposerDrop}
               onSubmit={submit}
               setIsDraggingOverComposer={setIsDraggingOverComposer}
@@ -144,6 +158,7 @@ function DemoComposerInput({
   addLocalFiles,
   fileInputRef,
   isDraggingOverComposer,
+  onRemoveAttachment,
   onDrop,
   onSubmit,
   setIsDraggingOverComposer,
@@ -151,6 +166,7 @@ function DemoComposerInput({
   addLocalFiles: (files: FileList | File[]) => void;
   fileInputRef: RefObject<HTMLInputElement | null>;
   isDraggingOverComposer: boolean;
+  onRemoveAttachment: (attachment: ComposerAttachment) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onSubmit: (message?: ComposerMessage | null) => void;
   setIsDraggingOverComposer: (value: boolean) => void;
@@ -180,7 +196,10 @@ function DemoComposerInput({
         onDropCapture={onDrop}
       >
         <ComposerTriggerMenu />
-        <ComposerAttachmentCards className="px-2 pt-2" />
+        <ComposerAttachmentCards
+          className="px-2 pt-2"
+          onRemoveAttachment={onRemoveAttachment}
+        />
         <ComposerContent
           autofocus
           onSubmitRequest={() => onSubmit()}

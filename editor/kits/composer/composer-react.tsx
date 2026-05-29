@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -33,6 +34,7 @@ type ComposerContextValue = {
   editor: Editor | null;
   setEditor: (editor: Editor | null) => void;
   snapshot: ComposerSnapshot;
+  triggerMenuId: string;
 };
 
 export type ComposerController = {
@@ -68,6 +70,11 @@ export function ComposerProvider({
     core.current = new ComposerCore(catalog);
   }
   const coreValue = core.current;
+  const reactId = useId();
+  const triggerMenuId = useMemo(
+    () => `composer-trigger-menu-${reactId.replace(/:/g, "")}`,
+    [reactId]
+  );
   const [editor, setEditor] = useState<Editor | null>(null);
 
   useEffect(() => {
@@ -86,8 +93,9 @@ export function ComposerProvider({
       editor,
       setEditor,
       snapshot,
+      triggerMenuId,
     }),
-    [coreValue, editor, snapshot]
+    [coreValue, editor, setEditor, snapshot, triggerMenuId]
   );
 
   return (
@@ -151,7 +159,7 @@ export function ComposerContent({
   className,
   editorClassName,
   placeholder = "Compose...",
-  triggerMenuId = "composer-trigger-menu",
+  triggerMenuId,
   autofocus,
   onSubmitRequest,
   ...props
@@ -162,7 +170,13 @@ export function ComposerContent({
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
 }) {
-  const { core, setEditor, snapshot } = useComposerInternals();
+  const {
+    core,
+    setEditor,
+    snapshot,
+    triggerMenuId: defaultTriggerMenuId,
+  } = useComposerInternals();
+  const resolvedTriggerMenuId = triggerMenuId ?? defaultTriggerMenuId;
   const editorRef = useRef<Editor | null>(null);
   const extensions = useMemo(
     () => ComposerTiptap.extensions({ placeholder }),
@@ -175,7 +189,7 @@ export function ComposerContent({
       attributes: {
         "data-composer-editor": "",
         "aria-autocomplete": "list",
-        "aria-controls": triggerMenuId,
+        "aria-controls": resolvedTriggerMenuId,
         "aria-expanded": "false",
         class: cn("outline-none", editorClassName),
       },
@@ -216,17 +230,17 @@ export function ComposerContent({
     if (!editor) return;
     const dom = editor.view.dom;
     const selectedItem = snapshot.trigger?.items[snapshot.triggerIndex];
-    dom.setAttribute("aria-controls", triggerMenuId);
+    dom.setAttribute("aria-controls", resolvedTriggerMenuId);
     dom.setAttribute("aria-expanded", snapshot.trigger ? "true" : "false");
     if (snapshot.trigger && selectedItem) {
       dom.setAttribute(
         "aria-activedescendant",
-        `${triggerMenuId}-${snapshot.trigger.kind}-${selectedItem.id}`
+        `${resolvedTriggerMenuId}-${snapshot.trigger.kind}-${selectedItem.id}`
       );
     } else {
       dom.removeAttribute("aria-activedescendant");
     }
-  }, [editor, snapshot.trigger, snapshot.triggerIndex, triggerMenuId]);
+  }, [editor, resolvedTriggerMenuId, snapshot.trigger, snapshot.triggerIndex]);
 
   return (
     <div

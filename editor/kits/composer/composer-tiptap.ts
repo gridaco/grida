@@ -188,6 +188,10 @@ export namespace ComposerTiptap {
     moveTriggerIndex: (delta: number) => void;
     submit: () => void;
   }): boolean {
+    if (isComposing(input.event)) {
+      return false;
+    }
+
     const trigger = input.core.getSnapshot().trigger;
     const triggerItemsCount = trigger?.items.length ?? 0;
 
@@ -219,6 +223,10 @@ export namespace ComposerTiptap {
     }
 
     return false;
+  }
+
+  function isComposing(event: KeyboardEvent): boolean {
+    return event.isComposing || event.keyCode === 229;
   }
 
   export function selectTriggerItem(

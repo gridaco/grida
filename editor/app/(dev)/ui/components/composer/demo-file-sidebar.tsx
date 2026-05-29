@@ -170,6 +170,7 @@ function DropModeButton({
 }) {
   return (
     <button
+      aria-pressed={active}
       className={`rounded px-2 py-1.5 text-xs ${
         active
           ? "bg-primary text-primary-foreground"

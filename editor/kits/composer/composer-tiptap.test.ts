@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ComposerCore } from "./composer-core";
 import { ComposerTiptap } from "./composer-tiptap";
 
 describe("ComposerTiptap", () => {
@@ -100,5 +101,36 @@ describe("ComposerTiptap", () => {
         { type: "code-block", text: "const x = 1;" },
       ],
     });
+  });
+
+  it("does not submit or select trigger items during IME composition", () => {
+    const core = new ComposerCore({
+      commands: [{ id: "review", title: "Review" }],
+    });
+    core.inspectCursor("/", 1);
+    let prevented = false;
+    let submitted = false;
+
+    const handled = ComposerTiptap.handleKeyDown({
+      core,
+      editor: null,
+      event: {
+        isComposing: true,
+        key: "Enter",
+        preventDefault() {
+          prevented = true;
+        },
+        shiftKey: false,
+      } as KeyboardEvent,
+      triggerIndex: 0,
+      moveTriggerIndex() {},
+      submit() {
+        submitted = true;
+      },
+    });
+
+    expect(handled).toBe(false);
+    expect(prevented).toBe(false);
+    expect(submitted).toBe(false);
   });
 });

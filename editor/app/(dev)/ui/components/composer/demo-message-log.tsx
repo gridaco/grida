@@ -64,6 +64,7 @@ function MessageViewToggle({
     <div className="flex rounded-md bg-muted p-0.5 text-xs">
       {(["ui", "raw"] as const).map((value) => (
         <button
+          aria-pressed={mode === value}
           className={`rounded px-2 py-1 ${
             mode === value
               ? "bg-background text-foreground shadow-xs"

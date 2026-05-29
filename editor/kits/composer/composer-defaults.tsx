@@ -11,6 +11,7 @@ import { ImageIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { type ReactNode, useEffect, useRef } from "react";
 import {
+  useComposerInternals,
   useComposer,
   type ComposerAttachment,
   type ComposerCommand,
@@ -37,12 +38,14 @@ function getAttachmentTypeLabel(attachment: ComposerAttachment): string {
 
 export function ComposerTriggerMenu({
   className,
-  id = "composer-trigger-menu",
+  id,
 }: {
   className?: string;
   id?: string;
 }) {
   const composer = useComposer();
+  const { triggerMenuId } = useComposerInternals();
+  const resolvedId = id ?? triggerMenuId;
   const selectedRef = useRef<HTMLDivElement | null>(null);
   const trigger = composer.trigger;
 
@@ -65,6 +68,7 @@ export function ComposerTriggerMenu({
         className
       )}
       data-composer-trigger-menu
+      id={resolvedId}
     >
       <Command
         className="bg-transparent"
@@ -78,7 +82,6 @@ export function ComposerTriggerMenu({
         <CommandList
           aria-label={trigger.kind === "command" ? "Commands" : "Mentions"}
           className="max-h-64 scroll-py-1 p-1"
-          id={id}
         >
           <CommandGroup className="p-0">
             {trigger.items.map((item, index) => {
@@ -89,9 +92,15 @@ export function ComposerTriggerMenu({
               return (
                 <CommandItem
                   className="scroll-my-1 items-center py-1"
-                  id={`${id}-${trigger.kind}-${item.id}`}
                   key={itemValues[index]}
-                  ref={index === composer.triggerIndex ? selectedRef : null}
+                  ref={(node) => {
+                    if (node) {
+                      node.id = `${resolvedId}-${trigger.kind}-${item.id}`;
+                    }
+                    if (index === composer.triggerIndex) {
+                      selectedRef.current = node;
+                    }
+                  }}
                   value={itemValues[index]}
                   onMouseDown={(event) => {
                     event.preventDefault();
@@ -128,9 +137,11 @@ export function ComposerTriggerMenu({
 
 export function ComposerAttachmentCards({
   className,
+  onRemoveAttachment,
   renderAttachment,
 }: {
   className?: string;
+  onRemoveAttachment?: (attachment: ComposerAttachment) => void;
   renderAttachment?: (
     attachment: ComposerAttachment,
     controls: { remove: () => void }
@@ -143,7 +154,12 @@ export function ComposerAttachmentCards({
   return (
     <div className={cn("flex flex-wrap items-end gap-2", className)}>
       {snapshot.attachments.map((attachment) => {
-        const controls = { remove: () => removeAttachment(attachment.id) };
+        const controls = {
+          remove() {
+            onRemoveAttachment?.(attachment);
+            removeAttachment(attachment.id);
+          },
+        };
         return (
           <div data-composer-attachment={attachment.id} key={attachment.id}>
             {renderAttachment ? (
@@ -181,7 +197,7 @@ function ComposerAttachmentCard({
         />
         <button
           aria-label={`Remove ${attachment.name}`}
-          className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover:opacity-100"
+          className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover:opacity-100 group-focus-within:opacity-100"
           onClick={onRemove}
           type="button"
         >

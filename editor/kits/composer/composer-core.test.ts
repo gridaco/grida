@@ -44,6 +44,24 @@ describe("ComposerCore", () => {
     });
   });
 
+  it("clones editor contexts before storing them", () => {
+    const core = new ComposerCore();
+    const contexts = [
+      {
+        kind: "selection",
+        payload: { nested: { path: "src/a.ts" } },
+        emitted_at: 1,
+      },
+    ];
+
+    core.setContexts(contexts);
+    contexts[0].payload.nested = { path: "src/b.ts" };
+
+    expect(core.getSnapshot().contexts[0]).toMatchObject({
+      payload: { nested: { path: "src/a.ts" } },
+    });
+  });
+
   it("detects slash command triggers", () => {
     const core = new ComposerCore({
       commands: [{ id: "review", title: "Review" }],

@@ -111,6 +111,8 @@ Use CSS variables for the default editor skin:
 
 For custom UI, keep `ComposerProvider` and `ComposerContent`, then replace `ComposerTriggerMenu` and `ComposerAttachmentCards` with call-site components built on `useComposer()`.
 
+When using the default attachment cards with host-owned resources such as object URLs, pass `onRemoveAttachment` to release those resources when a card is removed.
+
 ## Boundaries
 
 This kit does not upload files, fetch mention results, own chat rendering, or bind to workbench/editor global state. Callers provide catalogs, attachments, editor contexts, and submission handling.

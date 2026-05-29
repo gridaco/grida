@@ -343,8 +343,9 @@ export class ComposerCore {
   }
 
   setContexts(contexts: ComposerEditorContext[]): void {
-    if (this.snapshot.contexts === contexts) return;
-    this.snapshot = { ...this.snapshot, contexts };
+    const next = contexts.map((context) => this.cloneEditorContext(context));
+    if (this.contextsEqual(this.snapshot.contexts, next)) return;
+    this.snapshot = { ...this.snapshot, contexts: next };
     this.publish();
   }
 
@@ -490,6 +491,50 @@ export class ComposerCore {
     b: ComposerDocument.Root
   ): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  private contextsEqual(
+    a: ComposerEditorContext[],
+    b: ComposerEditorContext[]
+  ): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  private cloneEditorContext(
+    context: ComposerEditorContext
+  ): ComposerEditorContext {
+    return {
+      ...context,
+      payload: this.clonePayload(context.payload),
+    };
+  }
+
+  private clonePayload(
+    payload: Record<string, unknown>
+  ): Record<string, unknown> {
+    if (typeof globalThis.structuredClone === "function") {
+      try {
+        return globalThis.structuredClone(payload) as Record<string, unknown>;
+      } catch {
+        // Fall back to cloning plain JSON-like payloads below.
+      }
+    }
+    return this.clonePlainValue(payload) as Record<string, unknown>;
+  }
+
+  private clonePlainValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.clonePlainValue(item));
+    }
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+          key,
+          this.clonePlainValue(item),
+        ])
+      );
+    }
+    return value;
   }
 
   private walkDocument(document: ComposerDocument.Root, state: LoweringState) {
