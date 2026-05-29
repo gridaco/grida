@@ -2,12 +2,17 @@
 // universal `surface.setParametricHandles` primitive against a shape
 // hud doesn't know about — the host paints the star on a custom
 // `<canvas>` underlay (no SVG fixture), and feeds hud three handles
-// (tip-radius, inner/outer ratio, point-count).
+// (corner-radius, inner/outer ratio, point-count).
 //
-// Out-of-scope: rounded-corner star path rendering. The handles
-// visualize their host-owned values; the polygon stays sharp. If a
-// real rounded-tip render is needed later it's a separate PR against
-// this file.
+// Corner-radius rounding (paint side): when `style.cornerRadius > 0`
+// the painter rounds every polygon corner uniformly via `arcTo`. The
+// per-corner cap is `(min_incident_edge / 2) · tan(θ/2)` where θ is
+// the unsigned angle between the corner's edge vectors — the tightest
+// constraint that prevents adjacent fillets from overlapping or
+// `arcTo` from overshooting. Star tips have very acute θ, so this
+// cap dominates the half-edge constraint. The polygon geometry itself
+// stays sharp (hit-test, AABB, etc. don't change); rounding lives only
+// in the paint path.
 
 export interface ParametricStarParams {
   /** Star center, doc-space. */
@@ -24,6 +29,13 @@ export interface ParametricStarParams {
 }
 
 export class ParametricStar {
+  // Instance caches — safe because `ParametricStar` is constructed
+  // fresh whenever its params change (the demo's useMemo on
+  // [innerR, pointCount]). Same params → reused instance → cached
+  // polygon and max-radius, no per-frame recomputation.
+  private _polygon: Array<[number, number]> | null = null;
+  private _maxR: number | null = null;
+
   constructor(public readonly params: ParametricStarParams) {}
 
   /**
@@ -32,6 +44,7 @@ export class ParametricStar {
    * one at angle `-π/2 + rotation`) and walks counter-clockwise.
    */
   polygon(): Array<[number, number]> {
+    if (this._polygon) return this._polygon;
     const { cx, cy, outerR, innerR, points, rotation = 0 } = this.params;
     const N = Math.max(3, Math.floor(points));
     const verts: Array<[number, number]> = [];
@@ -41,6 +54,7 @@ export class ParametricStar {
       const a = -Math.PI / 2 + rotation + i * step;
       verts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
     }
+    this._polygon = verts;
     return verts;
   }
 
@@ -96,19 +110,80 @@ export class ParametricStar {
   }
 
   /**
+   * Maximum corner radius the polygon admits without `arcTo` fillets
+   * overshooting or overlapping. The limit per-corner is
+   * `(min_incident_edge / 2) · tan(θ/2)` where θ is the unsigned angle
+   * at that corner; the polygon-wide max is the min across all corners.
+   * Star tips have very acute θ, so this cap is much tighter than half
+   * the edge length and dominates the limit.
+   */
+  maxCornerRadius(): number {
+    if (this._maxR !== null) return this._maxR;
+    const verts = this.polygon();
+    if (verts.length < 3) return (this._maxR = 0);
+    const n = verts.length;
+    let max = Infinity;
+    for (let i = 0; i < n; i++) {
+      const prev = verts[(i - 1 + n) % n];
+      const cur = verts[i];
+      const next = verts[(i + 1) % n];
+      const ux = prev[0] - cur[0];
+      const uy = prev[1] - cur[1];
+      const vx = next[0] - cur[0];
+      const vy = next[1] - cur[1];
+      const lenU = Math.hypot(ux, uy);
+      const lenV = Math.hypot(vx, vy);
+      // Fail-closed on any degenerate corner: a zero-length edge means
+      // adjacent verts coincide, and `arcTo` over coincident points is
+      // implementation-defined. Better to disable rounding entirely
+      // than skip the corner and let paint() emit undefined output.
+      if (lenU === 0 || lenV === 0) return (this._maxR = 0);
+      const cosT = Math.max(
+        -1,
+        Math.min(1, (ux * vx + uy * vy) / (lenU * lenV))
+      );
+      const theta = Math.acos(cosT);
+      const halfEdge = Math.min(lenU, lenV) / 2;
+      const cornerMax = halfEdge * Math.tan(theta / 2);
+      if (cornerMax < max) max = cornerMax;
+    }
+    return (this._maxR = Number.isFinite(max) ? Math.max(0, max) : 0);
+  }
+
+  /**
    * Paint the star into a Canvas 2D context, in DOC SPACE — caller
    * must have already applied the camera transform via `ctx.setTransform`.
    *
-   * Sharp-cornered polygon; rounded corners are deliberately not
-   * rendered (out-of-scope for the demo, see file header).
+   * When `style.cornerRadius > 0` every polygon corner is rounded
+   * uniformly via `arcTo`. The radius is clamped to {@link maxCornerRadius}
+   * so adjacent fillets can never overlap and `arcTo` never overshoots
+   * the corner.
    */
   paint(ctx: CanvasRenderingContext2D, style: ParametricStarStyle): void {
     const verts = this.polygon();
     if (verts.length < 3) return;
+    const r = Math.max(0, style.cornerRadius ?? 0);
     ctx.beginPath();
-    ctx.moveTo(verts[0][0], verts[0][1]);
-    for (let i = 1; i < verts.length; i++) {
-      ctx.lineTo(verts[i][0], verts[i][1]);
+    if (r <= 0) {
+      ctx.moveTo(verts[0][0], verts[0][1]);
+      for (let i = 1; i < verts.length; i++) {
+        ctx.lineTo(verts[i][0], verts[i][1]);
+      }
+    } else {
+      const n = verts.length;
+      const clamped = Math.min(r, this.maxCornerRadius());
+      // Start at the midpoint of the first edge so the first `arcTo`
+      // has a defined "current point" for its incoming tangent.
+      const start: [number, number] = [
+        (verts[0][0] + verts[1][0]) / 2,
+        (verts[0][1] + verts[1][1]) / 2,
+      ];
+      ctx.moveTo(start[0], start[1]);
+      for (let i = 1; i <= n; i++) {
+        const corner = verts[i % n];
+        const next = verts[(i + 1) % n];
+        ctx.arcTo(corner[0], corner[1], next[0], next[1], clamped);
+      }
     }
     ctx.closePath();
     if (style.fill) {
@@ -127,4 +202,6 @@ export interface ParametricStarStyle {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  /** Per-corner fillet radius, doc-space. 0 (or omitted) = sharp polygon. */
+  cornerRadius?: number;
 }

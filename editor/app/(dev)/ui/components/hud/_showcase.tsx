@@ -2216,7 +2216,8 @@ export function SizeMeterSection() {
   const fixture = React.useMemo(() => rotatedRectFixture(angle), [angle]);
   const [state, setState] = React.useState<HUDPlaygroundState | null>(null);
   const extra = React.useCallback<HUDExtraBuilder>(
-    (ctx) => buildSizeMeterExtra(ctx.fixture, ctx.selection) ?? undefined,
+    (ctx) =>
+      buildSizeMeterExtra(ctx.fixture, ctx.selection, ctx.resizes) ?? undefined,
     []
   );
   return (
@@ -2410,12 +2411,14 @@ export function MeasurementSection() {
 // ───────────────────────────────────────────────────────────────────────────
 
 // Per-gesture hidden set. Mirrors the policy in `VisibilitySection.visibility`
-// — keep the two in sync. `hidesOn` is empty for groups the policy never
-// touches (hover / marquee / lasso); those stay visible whenever they have
-// reason to render.
-const VISIBILITY_GROUPS: { name: string; hidesOn: ReadonlyArray<string> }[] = [
-  { name: "selection", hidesOn: ["translate"] },
-  { name: "selectionControls", hidesOn: ["translate"] },
+// — keep the two in sync. `hidesOn` is the set of gesture kinds where the
+// group is suppressed; empty means the group is always allowed to paint.
+const VISIBILITY_GROUPS: {
+  name: string;
+  hidesOn: ReadonlyArray<string>;
+}[] = [
+  { name: "selection", hidesOn: ["translate", "resize"] },
+  { name: "selectionControls", hidesOn: ["translate", "resize"] },
   { name: "sizeMeter", hidesOn: ["translate"] },
   { name: "hover", hidesOn: [] },
   { name: "marquee", hidesOn: [] },
@@ -2468,7 +2471,16 @@ export function VisibilitySection() {
   // sizeMeter visible during RESIZE — that's where its W × H readout
   // matters most. The fixture is just a single rect; the demo is about
   // which chrome stays when, not the geometry.
-  const fixture = React.useMemo(() => singleRectFixture(220, 140), []);
+  // Strip the underlay stroke — the demo is about which CHROME family
+  // paints when, and a fixture stroke reads as a misleading "border"
+  // that competes with the selection rectangle.
+  const fixture = React.useMemo(() => {
+    const base = singleRectFixture(220, 140);
+    return {
+      ...base,
+      nodes: base.nodes.map((n) => ({ ...n, stroke: undefined })),
+    };
+  }, []);
   const [state, setState] = React.useState<HUDPlaygroundState | null>(null);
   const [policyOn, setPolicyOn] = React.useState(true);
   const groups = React.useMemo(
@@ -2484,19 +2496,29 @@ export function VisibilitySection() {
   // Mount the size-meter as host extra so the demo has a third chrome
   // family to filter. The line carries `group: "sizeMeter"` (see
   // `buildSizeMeterExtra`); the policy below filters by that tag.
+  // Pass `ctx.resizes` so the W × H label tracks the in-flight resize
+  // rect — that's the moment when the meter is actually on-screen.
   const extra = React.useCallback<HUDExtraBuilder>(
-    (ctx) => buildSizeMeterExtra(ctx.fixture, ctx.selection) ?? undefined,
+    (ctx) =>
+      buildSizeMeterExtra(ctx.fixture, ctx.selection, ctx.resizes) ?? undefined,
     []
   );
   const visibility = React.useCallback<SurfaceVisibilityPolicy>(
     (ctx) => {
       if (!policyOn) return undefined;
-      // Translate is the only gesture this policy filters on. During
-      // resize, idle, rotate, marquee, etc. nothing is hidden — the
-      // size meter shows its live W × H while resizing, which is the
-      // whole point of having a separate group for it.
-      if (ctx.gesture.kind !== "translate") return undefined;
-      return { hidden: ["selection", "selectionControls", "sizeMeter"] };
+      // Three states:
+      //   • idle / hover — show selection + selectionControls + sizeMeter
+      //   • translate    — hide all three (clean moving silhouette)
+      //   • resize       — show ONLY sizeMeter (drop the static chrome
+      //                    so the live W × H pill stands alone with the
+      //                    in-flight rect)
+      if (ctx.gesture.kind === "translate") {
+        return { hidden: ["selection", "selectionControls", "sizeMeter"] };
+      }
+      if (ctx.gesture.kind === "resize") {
+        return { hidden: ["selection", "selectionControls"] };
+      }
+      return undefined;
     },
     [policyOn]
   );
@@ -2520,13 +2542,14 @@ export function VisibilitySection() {
           SurfaceOptions.visibility
         </code>{" "}
         per-gesture. The hud package never owns the vocabulary; hosts name their
-        own. The svg-editor uses this for an asymmetric rule: during{" "}
-        <strong>translate</strong> the silhouette goes clean ({" "}
-        <code>selection</code>, <code>selectionControls</code>, and{" "}
-        <code>sizeMeter</code> all vanish ), but during <strong>resize</strong>{" "}
-        the size meter stays — that&apos;s when its W × H readout matters.
-        Select the rect, then drag the body (translate) vs. a handle (resize)
-        and watch the legend.
+        own. The demo runs three states off one policy: at <strong>idle</strong>{" "}
+        all three chrome families (<code>selection</code>,{" "}
+        <code>selectionControls</code>, <code>sizeMeter</code>) paint; during{" "}
+        <strong>translate</strong> all three vanish so the moving silhouette is
+        clean; during <strong>resize</strong> the static chrome drops out and
+        only <code>sizeMeter</code> remains, label tracking the in-flight rect
+        live. Select the rect, then drag the body (translate) vs. a corner /
+        edge handle (resize) and watch the legend.
       </SectionHeader>
       <SplitStage
         toolbar={
@@ -2561,12 +2584,16 @@ export function VisibilitySection() {
               rule: "On each draw, the surface walks every primitive in built-in chrome + extras and drops the ones whose group is in `hidden`. Unrelated extras pass through untouched. Returns undefined when every primitive is hidden.",
             },
             {
+              name: "idle rule",
+              rule: "No filter — selection + selectionControls + sizeMeter all paint. The size meter is mounted as a host extra (one HUDLine tagged group: 'sizeMeter'); the policy lets it through.",
+            },
+            {
               name: "translate-hide rule",
               rule: "When gesture.kind === 'translate', hide selection + selectionControls + sizeMeter. The moving silhouette renders alone.",
             },
             {
-              name: "resize-keep rule (the asymmetry)",
-              rule: "Every other gesture — resize, rotate, idle, marquee — pass through unfiltered. The size meter is mounted as a host extra (one HUDLine tagged group: 'sizeMeter') and benefits directly: hidden during translate, on-screen during resize, where its live W × H reading is what the user is watching.",
+              name: "resize-isolate rule (the asymmetry)",
+              rule: "When gesture.kind === 'resize', hide selection + selectionControls but KEEP sizeMeter. The static chrome drops out so the live W × H pill stands alone with the in-flight rect — the host threads the dragging rect into the extra builder so the label tracks the handle live, not the pre-drag size.",
             },
             {
               name: "Pass-through",
@@ -3468,6 +3495,19 @@ function ParametricStarDemo() {
     [innerR, pointCount]
   );
 
+  // Polygon-wide corner-radius limit — only depends on the star
+  // geometry (innerR, pointCount), so it's memoized on `star` and
+  // reused by both the handle's domain ceiling and the paint clamp.
+  // Stable across cornerRadius drags, which is the hot path.
+  const cornerRadiusMax = React.useMemo(() => star.maxCornerRadius(), [star]);
+
+  // Clamp at read sites instead of writing the clamp back to state —
+  // the React state holds the user's last drag intent (preserved
+  // across geometry shrink/grow); display and paint always reflect
+  // what the polygon admits *now*. Eliminates the one-frame stale
+  // chip lie that an after-render effect would leave.
+  const clampedCornerRadius = Math.min(cornerRadius, cornerRadiusMax);
+
   // Three parametric inputs declared as a single multi-handle input
   // on one logical node ("star"). Each handle has its own id; the
   // host's reducer routes by id.
@@ -3491,21 +3531,20 @@ function ParametricStarDemo() {
       STAR_CX + STAR_OUTER * Math.cos(innerValleyAngle),
       STAR_CY + STAR_OUTER * Math.sin(innerValleyAngle),
     ];
-    // Corner-radius handle — segment from outerTip(0) inward along
-    // the tip's radius (bisector). Travels TOWARD the star center,
-    // NOT along the tip→valley edge. Cap at `outerR - innerR` so the
-    // rounded corner can't grow past the inner ring (a clean
-    // geometric ceiling even though the true tangent-circle cap is
-    // sharper — the demo doesn't care about exact star geometry).
-    const cornerRadiusMax = Math.max(0, STAR_OUTER - innerR);
+    // Corner-radius handle — segment from outerTip(0) toward the star
+    // center, exactly as long as the geometric cap so knob travel
+    // matches value travel one-to-one (no dead zone past the cap).
+    // At innerR=0 the cap collapses to 0 and the track degenerates
+    // to a point — honest signal that the handle is geometrically
+    // dead, not a silently-frozen knob.
     const cornerRadiusHandle = {
       id: "corner-radius",
       track: {
         kind: "segment" as const,
         a: tip0,
-        b: [STAR_CX, STAR_CY - innerR] as cmath.Vector2,
+        b: [STAR_CX, STAR_CY - STAR_OUTER + cornerRadiusMax] as cmath.Vector2,
       },
-      value: cornerRadius,
+      value: clampedCornerRadius,
       domain: { min: 0, max: cornerRadiusMax },
       inset: 16,
     };
@@ -3545,7 +3584,7 @@ function ParametricStarDemo() {
       node_id: "star",
       handles: [cornerRadiusHandle, ratioHandle, countHandle],
     };
-  }, [cornerRadius, innerR, pointCount]);
+  }, [clampedCornerRadius, cornerRadiusMax, innerR, pointCount]);
 
   const onParametricHandle = React.useCallback((intent: Intent) => {
     if (intent.kind !== "parametric_handle") return;
@@ -3584,7 +3623,7 @@ function ParametricStarDemo() {
             Reset
           </button>
           <code className="font-mono text-[11px] tabular-nums text-zinc-600">
-            r={cornerRadius.toFixed(1)} · ratio=
+            r={clampedCornerRadius.toFixed(1)} · ratio=
             {(innerR / STAR_OUTER).toFixed(2)} · count={pointCount}
           </code>
         </>
@@ -3596,7 +3635,13 @@ function ParametricStarDemo() {
           onParametricHandle={onParametricHandle}
           onState={setState}
           interactionLocked
-          underlay={<StarCanvas star={star} state={state} />}
+          underlay={
+            <StarCanvas
+              star={star}
+              state={state}
+              cornerRadius={clampedCornerRadius}
+            />
+          }
         />
       }
       inspector={<InspectorPanel state={state} title="Star" />}
@@ -3613,9 +3658,11 @@ function ParametricStarDemo() {
 function StarCanvas({
   star,
   state,
+  cornerRadius,
 }: {
   star: ParametricStar;
   state: HUDPlaygroundState | null;
+  cornerRadius: number;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -3660,8 +3707,9 @@ function StarCanvas({
       fill: "rgba(99, 102, 241, 0.12)",
       stroke: "#6366f1",
       strokeWidth: 1.5 / Math.max(Math.abs(sx), 1e-6),
+      cornerRadius,
     });
-  }, [size.width, size.height, star, state?.transform]);
+  }, [size.width, size.height, star, state?.transform, cornerRadius]);
 
   return (
     <div
@@ -4780,13 +4828,20 @@ function selectedRect(
 
 function buildSizeMeterExtra(
   fixture: Fixture,
-  selection: string[]
+  selection: string[],
+  resizes?: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >
 ): HUDDraw | null {
   if (selection.length === 0) return null;
   const id = selection[0];
   const node = fixture.nodes.find((n) => n.id === id);
   if (!node?.rect) return null;
-  const { x, y, width, height } = node.rect;
+  // Live W × H during a resize gesture — read the in-flight rect so the
+  // pill tracks the dragging handle rather than the pre-drag size.
+  const live = resizes?.[id];
+  const { x, y, width, height } = live ?? node.rect;
   const angle =
     node.kind === "rect-rotated" && node.angle !== undefined ? node.angle : 0;
   const label = `${Math.round(width)} × ${Math.round(height)}`;
