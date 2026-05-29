@@ -39,31 +39,40 @@ describe("createAsyncTreeSource: abort semantics", () => {
     expect(handle.getLoadState("<root>")).toBe("loaded");
   });
 
-  it("abort then load before microtask flush is safe", async () => {
-    // Rapid abort+load sequence: the rejection handler from the first
-    // call lands after the second load has started. The source must
-    // not stomp the second load's "loading" state on the first's
-    // signal-aware reset.
+  it("abort then immediate load — the second load is not stomped by the first's late rejection", async () => {
+    // The race: load1 → abort → load2 all in one synchronous tick.
+    // The first call's rejection lands as a microtask AFTER load2
+    // has started. The source must:
+    //   1. let load2 actually fire (loadState reset synchronously by
+    //      abort, so load2's "if loading return" guard doesn't trip),
+    //   2. NOT stomp load2's "loading" state when the first's
+    //      rejection later sees signal.aborted.
     const fp = createFakeFsProvider({
       tree: [
         {
           id: "<root>",
           hasChildren: true,
-          children: [],
+          children: ["a"],
           meta: { label: "root" },
         },
+        { id: "a", hasChildren: false, children: [], meta: { label: "a" } },
       ],
     });
     const handle = createAsyncTreeSource(fp.provider, { autoLoadRoot: false });
     handle.load("<root>");
     handle.abort("<root>");
-    // Pending count: 1 (first call still queued). The store cleared
-    // its inflight entry before the rejection lands.
+    handle.load("<root>");
+    expect(handle.getLoadState("<root>")).toBe("loading");
+
     await Promise.resolve();
     await Promise.resolve();
-    // After abort settles, state is unloaded; pending fake queue still
-    // has the resolver but it's been rejected so it's no-op for the test.
-    expect(handle.getLoadState("<root>")).toBe("unloaded");
+    // The first rejection has now landed; it must NOT have stomped
+    // the second load's "loading" state.
+    expect(handle.getLoadState("<root>")).toBe("loading");
+
+    await fp.resolve("<root>");
+    expect(handle.getLoadState("<root>")).toBe("loaded");
+    expect(handle.source.getNode("<root>").children).toEqual(["a"]);
   });
 
   it("dispose aborts every in-flight listChildren", async () => {

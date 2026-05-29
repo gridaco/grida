@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAsyncTreeSource } from "../../src/async";
+import { createAsyncTreeSource, type AsyncTreeProvider } from "../../src/async";
 import { createFakeFsProvider } from "./_helpers";
 
 describe("createAsyncTreeSource: change events", () => {
@@ -216,92 +216,114 @@ describe("createAsyncTreeSource: change events", () => {
   });
 
   it("commitListing re-listing the same id under a new parent detaches from old parent", async () => {
-    // Cross-parent re-list — adapter must remove the child from the
-    // previous parent's children list, not leave it dual-membered.
-    const fp = createFakeFsProvider({
-      tree: [
-        {
-          id: "<root>",
-          hasChildren: true,
-          children: ["a", "b"],
-          meta: { label: "root" },
-        },
-        { id: "a", hasChildren: true, children: ["x"], meta: { label: "a" } },
-        { id: "x", hasChildren: false, children: [], meta: { label: "x" } },
-        { id: "b", hasChildren: true, children: [], meta: { label: "b" } },
-      ],
-    });
-    const handle = createAsyncTreeSource(fp.provider);
-    await fp.resolve("<root>");
+    // Cross-parent re-list via the actual commitListing path (not a
+    // watcher event). Mutate the underlying tree between
+    // listChildren calls so 'x' appears under 'b' on b's re-list.
+    type FsTree = {
+      [id: string]: {
+        children: string[];
+        hasChildren: boolean;
+        meta: { label: string };
+      };
+    };
+    const tree: FsTree = {
+      "<root>": {
+        children: ["a", "b"],
+        hasChildren: true,
+        meta: { label: "root" },
+      },
+      a: { children: ["x"], hasChildren: true, meta: { label: "a" } },
+      x: { children: [], hasChildren: false, meta: { label: "x" } },
+      b: { children: [], hasChildren: true, meta: { label: "b" } },
+    };
+    const provider: AsyncTreeProvider<{ label: string }> = {
+      rootId: "<root>",
+      hasChildren: (id) => tree[id]?.hasChildren ?? false,
+      listChildren: async (id) =>
+        (tree[id]?.children ?? []).map((cid) => ({
+          id: cid,
+          hasChildren: tree[cid].hasChildren,
+          meta: tree[cid].meta,
+        })),
+      getRootMeta: () => tree["<root>"].meta,
+    };
+    const handle = createAsyncTreeSource(provider);
+    // Microtask flush so the auto-load of root settles.
+    await new Promise((r) => setTimeout(r, 0));
     handle.load("a");
-    await fp.resolve("a");
+    await new Promise((r) => setTimeout(r, 0));
     expect(handle.source.getNode("a").children).toEqual(["x"]);
     expect(handle.source.getNode("x").parent).toBe("a");
 
-    // Provider's view changes: 'x' moves to 'b'. Re-list 'b'.
+    // Mutate the producer's view of the world: x moves from a to b.
+    tree.a.children = [];
+    tree.b.children = ["x"];
+
+    // Re-list b through listChildren. commitListing must detach x
+    // from a's children list and rebind under b.
+    handle.invalidate("b");
     handle.load("b");
-    // Mutate the fake's underlying tree by emitting deleted-then-created
-    // is one path; here we exercise commitListing's cross-parent path
-    // by resolving 'b' with an entry whose id already lives under 'a'.
-    const queue = (fp as unknown as { provider: typeof fp.provider }).provider;
-    void queue;
-    // Resolve 'b' with x as a member; the adapter must reparent x.
-    // Use a manual resolution path: just resolve b normally with its
-    // current children (none), then emit a `created` event for x
-    // under b — same effect, using existing test surface.
-    await fp.resolve("b");
-    fp.emit([
-      {
-        type: "created",
-        parent: "b",
-        entry: { id: "x", hasChildren: false, meta: { label: "x" } },
-      },
-    ]);
+    await new Promise((r) => setTimeout(r, 0));
     expect(handle.source.getNode("x").parent).toBe("b");
     expect(handle.source.getNode("a").children).toEqual([]);
     expect(handle.source.getNode("b").children).toEqual(["x"]);
   });
 
   it("commitListing pruning: container → leaf transition discards cached descendants", async () => {
-    // Regression for Codex P2: when a re-list returns an existing
-    // child with hasChildren=false after it was previously cached
-    // as a container, the cached children + descendant records must
-    // be pruned (not just the hint flipped).
-    const fp = createFakeFsProvider({
-      tree: [
-        {
-          id: "<root>",
-          hasChildren: true,
-          children: ["a"],
-          meta: { label: "root" },
-        },
-        {
-          id: "a",
-          hasChildren: true,
-          children: ["a/x", "a/y"],
-          meta: { label: "a" },
-        },
-        { id: "a/x", hasChildren: false, children: [], meta: { label: "x" } },
-        { id: "a/y", hasChildren: false, children: [], meta: { label: "y" } },
-      ],
-    });
-    const handle = createAsyncTreeSource(fp.provider);
-    await fp.resolve("<root>");
+    // Regression: when a re-list returns an existing child with
+    // hasChildren=false after it was previously cached as a
+    // container, the cached children + descendant records must be
+    // pruned via the real commitListing path (not via a watcher
+    // event).
+    type FsTree = {
+      [id: string]: {
+        children: string[];
+        hasChildren: boolean;
+        meta: { label: string };
+      };
+    };
+    const tree: FsTree = {
+      "<root>": {
+        children: ["a"],
+        hasChildren: true,
+        meta: { label: "root" },
+      },
+      a: {
+        children: ["a/x", "a/y"],
+        hasChildren: true,
+        meta: { label: "a" },
+      },
+      "a/x": { children: [], hasChildren: false, meta: { label: "x" } },
+      "a/y": { children: [], hasChildren: false, meta: { label: "y" } },
+    };
+    const provider: AsyncTreeProvider<{ label: string }> = {
+      rootId: "<root>",
+      hasChildren: (id) => tree[id]?.hasChildren ?? false,
+      listChildren: async (id) =>
+        (tree[id]?.children ?? []).map((cid) => ({
+          id: cid,
+          hasChildren: tree[cid].hasChildren,
+          meta: tree[cid].meta,
+        })),
+      getRootMeta: () => tree["<root>"].meta,
+    };
+    const handle = createAsyncTreeSource(provider);
+    await new Promise((r) => setTimeout(r, 0));
     handle.load("a");
-    await fp.resolve("a");
+    await new Promise((r) => setTimeout(r, 0));
     expect(handle.source.getNode("a").children).toEqual(["a/x", "a/y"]);
     expect(handle.hasNode("a/x")).toBe(true);
     expect(handle.hasNode("a/y")).toBe(true);
 
-    // Re-list root: 'a' is now a leaf in the producer's view.
-    fp.emit([
-      {
-        type: "created",
-        parent: "<root>",
-        entry: { id: "a", hasChildren: false, meta: { label: "a" } },
-      },
-    ]);
+    // Mutate: 'a' is now a leaf in the producer's view.
+    tree.a.hasChildren = false;
+    tree.a.children = [];
 
+    // Re-list root through listChildren — commitListing must prune
+    // a's cached descendants because the new entry says hasChildren=false.
+    handle.invalidate("<root>");
+    handle.load("<root>");
+    await new Promise((r) => setTimeout(r, 0));
     expect(handle.source.getNode("a").children).toEqual([]);
     expect(handle.source.isContainer!("a")).toBe(false);
     expect(handle.hasNode("a/x")).toBe(false);

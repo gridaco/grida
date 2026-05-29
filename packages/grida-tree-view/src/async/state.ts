@@ -127,7 +127,6 @@ export class AsyncStore<TMeta> {
           try {
             l();
           } catch (err) {
-            // eslint-disable-next-line no-console
             console.error(
               "[grida/tree-view] async store subscriber threw",
               err

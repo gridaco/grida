@@ -240,9 +240,15 @@ export function createFakeFsProvider(init?: {
       ]);
     },
     emitDeleted(parent, child) {
+      const prune = (id: NodeId) => {
+        const node = nodes.get(id);
+        if (!node) return;
+        for (const cid of node.children) prune(cid);
+        nodes.delete(id);
+      };
       const p = nodes.get(parent);
       if (p) p.children = p.children.filter((c) => c !== child);
-      nodes.delete(child);
+      prune(child);
       changeHandler?.([{ type: "deleted", parent, child }]);
     },
     emitInvalidated(id) {

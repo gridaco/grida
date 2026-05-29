@@ -73,24 +73,11 @@ export function createAsyncTreeSource<TMeta>(
 
     provider.listChildren(id, ac.signal).then(
       (entries) => {
-        if (ac.signal.aborted) {
-          // Provider resolved after abort. Defensive: a well-behaved
-          // producer rejects on signal-abort (the rejection branch
-          // handles cleanup), but custom IPC/REST wrappers may swallow
-          // the signal and resolve anyway. Apply the same cleanup the
-          // rejection branch would — drop the inflight controller and
-          // reset to "unloaded" so a re-expand re-issues the load.
-          store.inflight.delete(id);
-          const live = store.records.get(id);
-          if (live && live.loadState === "loading") {
-            store.mutate(() => {
-              live.loadState = "unloaded";
-              live.error = null;
-              store.markDirty();
-            });
-          }
-          return;
-        }
+        // signal.aborted ⇒ abort() already cleared inflight + reset
+        // loadState synchronously. A second load may have started in
+        // the same tick with its own AbortController; do NOT touch
+        // shared state here or we'd stomp on it.
+        if (ac.signal.aborted) return;
         // Defensive: the record may have been pruned mid-flight (e.g.
         // a deleted parent up the chain). Bail in that case.
         const live = store.records.get(id);
@@ -110,20 +97,11 @@ export function createAsyncTreeSource<TMeta>(
         });
       },
       (err) => {
-        if (ac.signal.aborted) {
-          // The consumer aborted — reset to unloaded so a re-expand
-          // re-issues the load. Do NOT surface the error.
-          const live = store.records.get(id);
-          if (live) {
-            store.mutate(() => {
-              live.loadState = "unloaded";
-              live.error = null;
-              store.markDirty();
-            });
-          }
-          store.inflight.delete(id);
-          return;
-        }
+        // Same as the success branch: if we were aborted, abort()
+        // already cleaned up. The producer's rejection (typically an
+        // AbortError) is the expected echo — do not surface it as an
+        // error and do not stomp on a fresh second load's state.
+        if (ac.signal.aborted) return;
         store.inflight.delete(id);
         const live = store.records.get(id);
         if (!live) return;
@@ -140,9 +118,22 @@ export function createAsyncTreeSource<TMeta>(
   function abort(id: NodeId): void {
     const ac = store.inflight.get(id);
     if (!ac) return;
+    // Cleanup must be synchronous: an immediate `load(id)` after
+    // `abort(id)` would otherwise short-circuit because loadState is
+    // still "loading" — the producer's rejection runs on a microtask.
+    // Drop the inflight pointer and reset loadState now; the late
+    // settlement sees `signal.aborted` and bails without touching
+    // state.
+    store.inflight.delete(id);
+    const rec = store.records.get(id);
+    if (rec && rec.loadState === "loading") {
+      store.mutate(() => {
+        rec.loadState = "unloaded";
+        rec.error = null;
+        store.markDirty();
+      });
+    }
     ac.abort();
-    // The Promise's rejection handler resets loadState; nothing more
-    // to do here.
   }
 
   function invalidate(id: NodeId): void {
@@ -193,7 +184,12 @@ export function createAsyncTreeSource<TMeta>(
       if (!rec) {
         throw new Error(`[grida/tree-view] async: unknown node: ${id}`);
       }
-      return rec.hasChildren;
+      // `hasChildren` is the producer's last-known hint; it can lag
+      // behind change events that grow / shrink the actual children
+      // list. Treat either signal as authoritative — VS Code's mental
+      // model: a node is a container if it has any children OR the
+      // producer claims it can have some.
+      return rec.hasChildren || rec.children.length > 0;
     },
   };
 
