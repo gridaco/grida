@@ -75,7 +75,7 @@ A file belongs in `core/` iff it satisfies **all** of:
 | [`click-tracker.ts`](./click-tracker.ts) | 83  | `class ClickTracker` — counts consecutive clicks within a 250 ms / 5 px window. Canvas-tuned (the OS-default 500 ms makes every single-click hesitate).                          | **Yes** — `last_time`, `last_x/y`, `count`.              |
 | [`transform.ts`](./transform.ts)         | 47  | `Transform` alias for `cmath.Transform`, plus `screenToDoc`, `docToScreen`, `zoomOf`. Axis-aligned (scale + translate only) — no rotation at the camera level.                   | No — pure functions.                                     |
 | [`registry.ts`](./registry.ts)           | 91  | `class NamedRegistry<K, T>` — name-keyed store with insertion order + `detach()` lifecycle on unregister/clear. `RegistrationError` for duplicate names.                         | **Yes** — `byName` Map + `order` array.                  |
-| [`hit-registry.ts`](./hit-registry.ts)   | 208 | `class HitRegistry<I>` storing `HUDObject<I>`, plus pure `shapeContains(shape, point, transform)`. Lower priority wins; paint-only objects (no `hit`) are filtered from queries. | **Yes** — `items` array. `shapeContains` itself is pure. |
+| [`hit-registry.ts`](./hit-registry.ts)   | 224 | `class HitRegistry<I>` storing `HUDObject<I>`, plus pure `shapeContains(shape, point, transform)`. Lower priority wins; paint-only objects (no `hit`) are filtered from queries. | **Yes** — `items` array. `shapeContains` itself is pure. |
 | [`index.ts`](./index.ts)                 | 42  | Re-exports the bedrock surface. Documents the deferred mechanisms (`gesture-fsm.ts`, `decision.ts`).                                                                             | n/a                                                      |
 
 ## Patterns
@@ -157,7 +157,7 @@ top-level [`README.md`](../README.md).
 
 - `pnpm turbo test --filter=@grida/hud` runs:
   - `__tests__/api/bedrock-invariants.test.ts` — `HitRegistry` priority + paint-only filter + `shapeContains` variant coverage.
-  - `__tests__/api/import-graph.test.ts` — every `core/*.ts` file's imports walked.
+  - `__tests__/api/import-graph.test.ts` — walks the transitive closure of the `@grida/hud/core` entry (`core/index.ts`) for cross-layer imports.
 
 ## Anti-goals
 

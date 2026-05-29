@@ -86,35 +86,3 @@ export { snapGuideToHUDDraw } from "./snap-guide";
 export { measurementToHUDDraw } from "./measurement-guide";
 export { marqueeToHUDDraw } from "./marquee";
 export { lassoToHUDDraw } from "./lasso";
-
-// ─── Bedrock value types (v0.x — no compatibility guarantees) ──────────────
-// The agnostic foundational layer: the canonical `HUDObject`, its hit/render
-// shape unions, the `Painter` seam, and cursor value types. These share
-// names (`HitShape`, `RenderShape`, `CursorIcon`, `MIN_HIT_SIZE`, …) with the
-// legacy `event/` types still exported from the package root, so they are
-// surfaced ONLY here, under the `@grida/hud/primitives` subpath, never at the
-// root — the two layers coexist without collision until the legacy stack is
-// retired. See `primitives/README.md` and the top-level stability banner.
-
-export {
-  type HUDObject,
-  type HUDObjectPaintOnly,
-  type HUDObjectInteractive,
-  type HitShape,
-  type RenderShape,
-  MIN_HIT_SIZE,
-  MIN_CHROME_VISIBLE_SIZE,
-} from "./overlay";
-
-export { type Painter, type PainterViewport } from "./painter";
-
-export {
-  type CursorIcon,
-  type ResizeDirection,
-  type RotationCorner,
-  type CursorRenderer,
-  CURSOR_ANGLE_BUCKET_RAD,
-  angleBucket,
-  cursorToCss,
-  cursorEquals,
-} from "./cursor";

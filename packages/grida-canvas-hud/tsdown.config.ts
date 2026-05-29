@@ -6,7 +6,7 @@ export default defineConfig({
     "react.tsx",
     "cursors/index.ts",
     "core/index.ts",
-    "primitives/index.ts",
+    "primitives/bedrock.ts",
   ],
   format: ["cjs", "esm"],
   platform: "neutral",

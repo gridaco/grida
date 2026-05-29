@@ -1,25 +1,20 @@
 // Import-graph invariant — bedrock layering enforcement.
 //
-// **Rule:** every file the bedrock introduces — all of `core/`, and the
-// bedrock value-type files under `primitives/` — imports ONLY from
-// `@grida/cmath` (or its submodule paths) and from sibling bedrock files,
-// under the layer-direction rule:
+// **Rule:** the two published bedrock subpath entry points —
+// `@grida/hud/core` (`core/index.ts`) and `@grida/hud/primitives`
+// (`primitives/bedrock.ts`) — and their ENTIRE transitive closure of
+// relative imports/re-exports must reference only `@grida/cmath` (or its
+// submodules) and sibling bedrock files. Nothing in the closure may import
+// from `classes/`, `surface/`, or the legacy `event/` directory.
 //
-//   primitives/ → @grida/cmath (+ sibling primitives/)
-//   core/       → @grida/cmath + primitives/ (+ sibling core/)
-//
-// No imports from `classes/`, `surface/`, `event/`, or any other
-// higher-layer / legacy directory.
-//
-// **Scope note.** This PR ships the bedrock as an additive layer; it does
-// NOT yet relocate the opinionated drawers that still live in `primitives/`
-// (`ruler.ts`, `corner-radius.ts`, `parametric-handle.ts`, `pixel-grid.ts`,
-// plus `canvas.ts` / `projection.ts`). Those are legacy and import across
-// layers by design until the relocation lands. So the primitives side of
-// this test checks an explicit allowlist of the files the bedrock adds,
-// not the whole directory. `core/` is new in its entirety, so it is scanned
-// wholesale. When the relocation happens, this test widens to the full
-// `primitives/` directory scan.
+// This walks the real module graph from each entry, following `import`,
+// `export … from`, bare `import "…"`, and dynamic `import("…")` specifiers.
+// Because it follows re-exports, it cannot be fooled by a barrel that
+// re-exports a cross-layer module (the failure the previous allowlist-based
+// version could not see): the `@grida/hud/primitives` subpath must NOT pull
+// in the legacy drawers (`ruler.ts`, `corner-radius.ts`, …) that import from
+// `event/`, which is precisely why `primitives/bedrock.ts` is a curated
+// barrel distinct from `primitives/index.ts`.
 
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -27,104 +22,123 @@ import path from "node:path";
 
 const PKG_ROOT = path.resolve(__dirname, "..", "..");
 
-/**
- * The bedrock value-type files this PR adds under `primitives/`. Every
- * other file in `primitives/` is legacy (pre-existing, cross-layer by
- * design) and out of scope until the relocation. Adding a new bedrock
- * primitive means adding it here — the guard test below fails otherwise.
- */
-const BEDROCK_PRIMITIVES = ["overlay.ts", "painter.ts", "cursor.ts"];
+/** The published bedrock subpath entry points (see package.json `exports`). */
+const ENTRIES = ["core/index.ts", "primitives/bedrock.ts"];
 
-/** Disallowed import-path fragments — any of these in an import is a fail. */
+/** Disallowed relative-import fragments — any of these is a layering break. */
 const DISALLOWED_FRAGMENTS = [
-  "../classes/",
-  "../surface/",
-  "../event/",
   "/classes/",
   "/surface/",
   "/event/",
+  "../classes",
+  "../surface",
+  "../event",
 ];
-
-function listTsFiles(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.endsWith(".ts"))
-    .map((e) => path.join(dir, e.name));
-}
-
-function extractImports(file: string): string[] {
-  const text = fs.readFileSync(file, "utf8");
-  const out: string[] = [];
-  const importRe = /\bimport\s+(?:type\s+)?[^"';]*?\s+from\s+["']([^"']+)["']/g;
-  const bareRe = /\bimport\s+["']([^"']+)["']/g;
-  // dynamic `import("...")` type references (e.g. types.ts label field)
-  const dynRe = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
-  let m;
-  while ((m = importRe.exec(text))) out.push(m[1]);
-  while ((m = bareRe.exec(text))) out.push(m[1]);
-  while ((m = dynRe.exec(text))) out.push(m[1]);
-  return out;
-}
 
 function isAllowedExternal(spec: string): boolean {
   return spec === "@grida/cmath" || spec.startsWith("@grida/cmath/");
 }
 
-function checkSpec(
-  spec: string,
-  fromDir: "core" | "primitives"
-): string | null {
-  if (!spec.startsWith(".")) {
-    return isAllowedExternal(spec)
-      ? null
-      : `external import "${spec}" is not allowed in bedrock`;
+/** Extract every module specifier referenced by a source file. */
+function extractSpecifiers(text: string): string[] {
+  const out: string[] = [];
+  const patterns = [
+    // import … from "x" / import type … from "x"
+    /\bimport\s+(?:type\s+)?[^"';]*?\s+from\s+["']([^"']+)["']/g,
+    // export … from "x" / export * from "x" / export type { … } from "x"
+    /\bexport\s+(?:type\s+)?(?:\*|\{[^}]*\}|[^"';]*?)\s+from\s+["']([^"']+)["']/g,
+    // bare import "x"
+    /\bimport\s+["']([^"']+)["']/g,
+    // dynamic import("x")
+    /\bimport\(\s*["']([^"']+)["']\s*\)/g,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(text))) out.push(m[1]);
   }
-  for (const frag of DISALLOWED_FRAGMENTS) {
-    if (spec.includes(frag)) {
-      return `forbidden cross-layer import "${spec}"`;
-    }
-  }
-  if (fromDir === "primitives" && spec.includes("../core/")) {
-    return `primitives → core import "${spec}" reverses the layer direction`;
+  return out;
+}
+
+/** Resolve a relative specifier from `fromFile` to an on-disk `.ts` file. */
+function resolveRelative(fromFile: string, spec: string): string | null {
+  const base = path.resolve(path.dirname(fromFile), spec);
+  const candidates = [base, `${base}.ts`, path.join(base, "index.ts")];
+  for (const c of candidates) {
+    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
   }
   return null;
 }
 
-function scanLayer(dir: "core" | "primitives", files: string[]): string[] {
+/** BFS the relative-import closure from `entry`, collecting violations. */
+function walk(entry: string): string[] {
   const violations: string[] = [];
-  for (const file of files) {
-    for (const imp of extractImports(file)) {
-      const err = checkSpec(imp, dir);
-      if (err) violations.push(`${path.basename(file)}: ${err}`);
+  const seen = new Set<string>();
+  const queue = [path.join(PKG_ROOT, entry)];
+  while (queue.length) {
+    const file = queue.pop()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const rel = path.relative(PKG_ROOT, file);
+    for (const spec of extractSpecifiers(fs.readFileSync(file, "utf8"))) {
+      if (!spec.startsWith(".")) {
+        if (!isAllowedExternal(spec)) {
+          violations.push(`${rel}: forbidden external import "${spec}"`);
+        }
+        continue;
+      }
+      if (DISALLOWED_FRAGMENTS.some((frag) => spec.includes(frag))) {
+        violations.push(`${rel}: forbidden cross-layer import "${spec}"`);
+        continue;
+      }
+      const target = resolveRelative(file, spec);
+      if (target) queue.push(target);
     }
   }
   return violations;
 }
 
 describe("Bedrock import graph", () => {
-  const coreFiles = listTsFiles(path.join(PKG_ROOT, "core"));
-  const bedrockPrimFiles = BEDROCK_PRIMITIVES.map((f) =>
-    path.join(PKG_ROOT, "primitives", f)
-  );
-
-  it("core/ imports only from @grida/cmath and primitives/ (no classes/, surface/, or event/)", () => {
-    expect(coreFiles.length).toBeGreaterThan(0);
-    expect(scanLayer("core", coreFiles)).toEqual([]);
-  });
-
-  it("bedrock primitives import only from @grida/cmath and sibling primitives/ (no core/, classes/, surface/, event/)", () => {
-    const missing = bedrockPrimFiles.filter((f) => !fs.existsSync(f));
+  it("every published bedrock entry exists", () => {
+    const missing = ENTRIES.filter(
+      (e) => !fs.existsSync(path.join(PKG_ROOT, e))
+    );
     expect(missing).toEqual([]);
-    expect(scanLayer("primitives", bedrockPrimFiles)).toEqual([]);
   });
 
-  it("the bedrock-primitives allowlist is exhaustively enumerated (adding one forces a test edit)", () => {
-    // Pin the list so a new bedrock primitive can't land unchecked.
-    expect([...BEDROCK_PRIMITIVES].sort()).toEqual([
-      "cursor.ts",
-      "overlay.ts",
-      "painter.ts",
-    ]);
+  for (const entry of ENTRIES) {
+    it(`${entry} closure imports only @grida/cmath and sibling bedrock files (no classes/, surface/, event/)`, () => {
+      expect(walk(entry)).toEqual([]);
+    });
+  }
+
+  it("the @grida/hud/primitives closure excludes the legacy cross-layer drawers", () => {
+    // Guard the specific regression the curated barrel exists to prevent:
+    // primitives/bedrock.ts must NOT transitively reach ruler/corner-radius/
+    // parametric-handle/pixel-grid/canvas/projection (all of which import
+    // from event/ or classes/).
+    const seen = new Set<string>();
+    const queue = [path.join(PKG_ROOT, "primitives/bedrock.ts")];
+    while (queue.length) {
+      const file = queue.pop()!;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      for (const spec of extractSpecifiers(fs.readFileSync(file, "utf8"))) {
+        if (spec.startsWith(".")) {
+          const target = resolveRelative(file, spec);
+          if (target) queue.push(target);
+        }
+      }
+    }
+    const reached = [...seen].map((f) => path.basename(f));
+    for (const legacy of [
+      "ruler.ts",
+      "corner-radius.ts",
+      "parametric-handle.ts",
+      "pixel-grid.ts",
+      "canvas.ts",
+      "projection.ts",
+    ]) {
+      expect(reached).not.toContain(legacy);
+    }
   });
 });

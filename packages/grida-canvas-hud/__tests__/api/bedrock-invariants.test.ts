@@ -175,6 +175,29 @@ describe("HitRegistry: later-added object wins on EQUAL priority", () => {
     });
     expect(reg.queryPoint([50, 50], IDENTITY)?.label).toBe("second");
   });
+
+  it("queryAll[0] equals queryPoint on a priority tie (the two query paths never disagree on the winner)", () => {
+    const reg = new HitRegistry();
+    reg.add({
+      priority: 5,
+      hit: {
+        kind: "screen_aabb",
+        rect: { x: 0, y: 0, width: 100, height: 100 },
+      },
+      label: "first",
+    });
+    reg.add({
+      priority: 5,
+      hit: {
+        kind: "screen_aabb",
+        rect: { x: 0, y: 0, width: 100, height: 100 },
+      },
+      label: "second",
+    });
+    const all = reg.queryAll([50, 50], IDENTITY);
+    expect(all.map((o) => o.label)).toEqual(["second", "first"]);
+    expect(all[0].label).toBe(reg.queryPoint([50, 50], IDENTITY)?.label);
+  });
 });
 
 describe("HitRegistry: `refine` narrows a shape that already matched", () => {

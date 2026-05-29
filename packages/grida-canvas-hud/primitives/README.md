@@ -59,9 +59,13 @@ A file belongs in `primitives/` iff it satisfies **all** of:
   `setPixelGrid`, …). Removed from the bedrock `Painter` interface;
   legacy `surface/painter.ts` still carries them for `Surface`'s
   benefit but is not part of the bedrock surface.
-- **`customHitTest: (p) => boolean`** or any other escape hatch that
-  smuggles host code into hit-testing. Non-AABB shapes are named
-  `HitShape` variants (`screen_circle_at_doc`, `screen_polygon`).
+- **A general `customHitTest` escape hatch** that lets host code drive or
+  _widen_ hit-testing. Non-AABB shapes are first-class `HitShape` variants
+  (`screen_circle_at_doc`, `screen_polygon`) instead. The single sanctioned
+  exception is `HUDObjectInteractive.refine` — a narrow predicate that may
+  only _reject_ a point the shape already matched (it cannot widen a hit). It
+  exists for curve-near refinement (a bezier's bbox matched — but is the
+  point actually near the curve?) and is documented as such in `overlay.ts`.
 - **HTMLElement references.** No `HTMLCanvasElement`, no
   `HTMLDivElement`, no DOM in any file under `primitives/`.
 
@@ -154,8 +158,7 @@ Walk the deciding table (see [`.claude/skills/sdk-design/SKILL.md`](../../../.cl
 
 - `pnpm turbo test --filter=@grida/hud` runs the bedrock invariant tests:
   - `__tests__/api/bedrock-invariants.test.ts` pins `HUDObject` variants, `HitShape` coverage, `Painter` interface shape, `HitRegistry` priority behavior.
-  - `__tests__/api/import-graph.test.ts` scans all of `core/` plus the new bedrock primitives (`overlay.ts`, `painter.ts`, `cursor.ts`) and asserts they import only `@grida/cmath` and sibling bedrock files — no `classes/`, `surface/`, or `event/`.
-- The bedrock-primitives allowlist in that test is pinned by a third assertion — adding a new bedrock primitive forces the test edit and a reviewer's attention. (The whole-`primitives/` scan widens in here once the legacy drawers relocate to `classes/<name>/`.)
+  - `__tests__/api/import-graph.test.ts` walks the full transitive closure of the two published bedrock entry points (`core/index.ts` → `@grida/hud/core`, `primitives/bedrock.ts` → `@grida/hud/primitives`), following `import` and `export … from` re-exports, and asserts every reachable file imports only `@grida/cmath` and sibling bedrock files — no `classes/`, `surface/`, or `event/`. Because it follows re-exports, a barrel that re-exports a legacy cross-layer drawer is caught (which is why `primitives/bedrock.ts` is curated separately from `primitives/index.ts`).
 
 ## Anti-goals
 

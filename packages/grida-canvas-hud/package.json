@@ -45,9 +45,9 @@
       "require": "./dist/core/index.js"
     },
     "./primitives": {
-      "types": "./dist/primitives/index.d.ts",
-      "import": "./dist/primitives/index.mjs",
-      "require": "./dist/primitives/index.js"
+      "types": "./dist/primitives/bedrock.d.ts",
+      "import": "./dist/primitives/bedrock.mjs",
+      "require": "./dist/primitives/bedrock.js"
     }
   },
   "publishConfig": {

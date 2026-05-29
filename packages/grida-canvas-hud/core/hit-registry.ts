@@ -83,22 +83,29 @@ export class HitRegistry<I = unknown> {
   }
 
   /**
-   * Return all hit-testable objects whose hit shape contains the
-   * point, sorted by priority ascending (winner first).
+   * Return all hit-testable objects whose hit shape contains the point,
+   * winner first. Ordering is identical to `queryPoint`'s arbitration:
+   * priority ascending (lower wins), and on EQUAL priority the
+   * later-added object comes first ("later push wins on tie"). This makes
+   * `queryAll(p)[0]` always equal `queryPoint(p)` — the two query paths
+   * never disagree on the winner.
    */
   queryAll(point_screen: cmath.Vector2, transform: Transform): HUDObject<I>[] {
-    const matches: HUDObject<I>[] = [];
-    for (const obj of this.items) {
+    const matches: { obj: HUDObject<I>; i: number }[] = [];
+    for (let i = 0; i < this.items.length; i++) {
+      const obj = this.items[i];
       if (!obj.hit) continue;
       if (!shapeContains(obj.hit, point_screen, transform)) continue;
       // Honour `refine` symmetrically with `queryPoint` — otherwise the
       // two query paths disagree on curve-refined shapes (bbox match vs
       // on-curve match).
       if (obj.refine && !obj.refine(point_screen)) continue;
-      matches.push(obj);
+      matches.push({ obj, i });
     }
-    matches.sort((a, b) => a.priority - b.priority);
-    return matches;
+    // Priority ascending; tie broken by DESCENDING insertion index so the
+    // later-added object wins a tie — matching `queryPoint`.
+    matches.sort((a, b) => a.obj.priority - b.obj.priority || b.i - a.i);
+    return matches.map((m) => m.obj);
   }
 }
 
