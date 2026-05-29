@@ -8,6 +8,7 @@ export const uiNavGroups: NavGroup[] = [
       { name: "Degree Control", href: "/ui/components/degree" },
       { name: "Spinner", href: "/ui/components/spinner" },
       { name: "Progress", href: "/ui/components/progress" },
+      { name: "Composer", href: "/ui/components/composer" },
       { name: "Rich Text Editor", href: "/ui/components/rich-text-editor" },
       { name: "Timeline", href: "/ui/components/timeline" },
       { name: "Property Controls", href: "/ui/components/property" },
