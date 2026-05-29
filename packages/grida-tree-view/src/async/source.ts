@@ -73,7 +73,24 @@ export function createAsyncTreeSource<TMeta>(
 
     provider.listChildren(id, ac.signal).then(
       (entries) => {
-        if (ac.signal.aborted) return;
+        if (ac.signal.aborted) {
+          // Provider resolved after abort. Defensive: a well-behaved
+          // producer rejects on signal-abort (the rejection branch
+          // handles cleanup), but custom IPC/REST wrappers may swallow
+          // the signal and resolve anyway. Apply the same cleanup the
+          // rejection branch would — drop the inflight controller and
+          // reset to "unloaded" so a re-expand re-issues the load.
+          store.inflight.delete(id);
+          const live = store.records.get(id);
+          if (live && live.loadState === "loading") {
+            store.mutate(() => {
+              live.loadState = "unloaded";
+              live.error = null;
+              store.markDirty();
+            });
+          }
+          return;
+        }
         // Defensive: the record may have been pruned mid-flight (e.g.
         // a deleted parent up the chain). Bail in that case.
         const live = store.records.get(id);

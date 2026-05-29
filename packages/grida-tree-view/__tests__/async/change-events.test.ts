@@ -262,6 +262,52 @@ describe("createAsyncTreeSource: change events", () => {
     expect(handle.source.getNode("b").children).toEqual(["x"]);
   });
 
+  it("commitListing pruning: container → leaf transition discards cached descendants", async () => {
+    // Regression for Codex P2: when a re-list returns an existing
+    // child with hasChildren=false after it was previously cached
+    // as a container, the cached children + descendant records must
+    // be pruned (not just the hint flipped).
+    const fp = createFakeFsProvider({
+      tree: [
+        {
+          id: "<root>",
+          hasChildren: true,
+          children: ["a"],
+          meta: { label: "root" },
+        },
+        {
+          id: "a",
+          hasChildren: true,
+          children: ["a/x", "a/y"],
+          meta: { label: "a" },
+        },
+        { id: "a/x", hasChildren: false, children: [], meta: { label: "x" } },
+        { id: "a/y", hasChildren: false, children: [], meta: { label: "y" } },
+      ],
+    });
+    const handle = createAsyncTreeSource(fp.provider);
+    await fp.resolve("<root>");
+    handle.load("a");
+    await fp.resolve("a");
+    expect(handle.source.getNode("a").children).toEqual(["a/x", "a/y"]);
+    expect(handle.hasNode("a/x")).toBe(true);
+    expect(handle.hasNode("a/y")).toBe(true);
+
+    // Re-list root: 'a' is now a leaf in the producer's view.
+    fp.emit([
+      {
+        type: "created",
+        parent: "<root>",
+        entry: { id: "a", hasChildren: false, meta: { label: "a" } },
+      },
+    ]);
+
+    expect(handle.source.getNode("a").children).toEqual([]);
+    expect(handle.source.isContainer!("a")).toBe(false);
+    expect(handle.hasNode("a/x")).toBe(false);
+    expect(handle.hasNode("a/y")).toBe(false);
+  });
+
   it("re-listing prunes children no longer present", async () => {
     const fp = createFakeFsProvider({
       tree: [

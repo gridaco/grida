@@ -59,6 +59,36 @@ function applyInvalidated<TMeta>(store: AsyncStore<TMeta>, id: NodeId): void {
   }
 }
 
+/**
+ * Apply a `hasChildren` transition on an existing record. The
+ * container → leaf direction is destructive: the cached children
+ * list and every descendant record are pruned, because they no
+ * longer exist in the producer's view. `syncAdapted(rec)` should
+ * still be called by the caller after — this helper only mutates
+ * the record's fields + descendant cache.
+ */
+function applyHasChildrenTransition<TMeta>(
+  store: AsyncStore<TMeta>,
+  rec: NodeRecord<TMeta>,
+  hasChildren: boolean
+): void {
+  if (rec.hasChildren === hasChildren) return;
+  if (rec.hasChildren && !hasChildren && rec.children.length > 0) {
+    // Container → leaf: prune the entire cached subtree. Producers
+    // documented `listChildren` as the canonical replace; a re-list
+    // (or re-create) that flips the hint to leaf implies the
+    // descendants are gone.
+    for (const childId of rec.children) store.pruneSubtree(childId);
+    rec.children = [];
+    // A leaf is implicitly "loaded" — no listing to fire. If the
+    // node was previously "unloaded" (rare), keep that state honest.
+    if (rec.loadState === "loaded" || rec.loadState === "error") {
+      rec.error = null;
+    }
+  }
+  rec.hasChildren = hasChildren;
+}
+
 function applyCreated<TMeta>(
   store: AsyncStore<TMeta>,
   parentId: NodeId,
@@ -77,7 +107,8 @@ function applyCreated<TMeta>(
         store.markDirty();
       }
       if (existing.hasChildren !== entry.hasChildren) {
-        existing.hasChildren = entry.hasChildren;
+        applyHasChildrenTransition(store, existing, entry.hasChildren);
+        syncAdapted(existing);
         store.markDirty();
       }
       if (!parent.children.includes(entry.id)) {
@@ -102,7 +133,7 @@ function applyCreated<TMeta>(
     existing.parent = parentId;
     if (existing.meta !== entry.meta) existing.meta = entry.meta;
     if (existing.hasChildren !== entry.hasChildren) {
-      existing.hasChildren = entry.hasChildren;
+      applyHasChildrenTransition(store, existing, entry.hasChildren);
     }
     syncAdapted(existing);
     if (!parent.children.includes(entry.id)) {
@@ -195,7 +226,7 @@ export function commitListing<TMeta>(
           changed = true;
         }
         if (existing.hasChildren !== entry.hasChildren) {
-          existing.hasChildren = entry.hasChildren;
+          applyHasChildrenTransition(store, existing, entry.hasChildren);
           changed = true;
         }
         if (changed) syncAdapted(existing);

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createAsyncTreeSource } from "../../src/async";
+import {
+  createAsyncTreeSource,
+  type AsyncTreeEntry,
+  type AsyncTreeProvider,
+} from "../../src/async";
 import { createFakeFsProvider } from "./_helpers";
 
 describe("createAsyncTreeSource: abort semantics", () => {
@@ -84,6 +88,38 @@ describe("createAsyncTreeSource: abort semantics", () => {
     handle.dispose();
     expect(fp.wasAborted("a")).toBe(true);
     expect(fp.wasAborted("b")).toBe(true);
+  });
+
+  it("provider that resolves after abort still cleans up — load(id) can retry", async () => {
+    // Regression for Codex P2: if a custom IPC/REST wrapper ignores
+    // the AbortSignal and resolves anyway, the source must still
+    // reset loadState/inflight so a subsequent load() fires.
+    let captured: {
+      resolve: (entries: readonly AsyncTreeEntry<{ label: string }>[]) => void;
+    } | null = null;
+    const ignoresAbort: AsyncTreeProvider<{ label: string }> = {
+      rootId: "<root>",
+      hasChildren: () => true,
+      listChildren: (_id, _signal) =>
+        new Promise((resolve) => {
+          captured = { resolve };
+          // Deliberately ignore _signal — simulate a misbehaved producer.
+        }),
+    };
+    const handle = createAsyncTreeSource(ignoresAbort, { autoLoadRoot: false });
+    handle.load("<root>");
+    expect(handle.getLoadState("<root>")).toBe("loading");
+    handle.abort("<root>");
+    // No reject ever fires from the provider — instead it resolves
+    // late as if the abort never happened.
+    captured!.resolve([{ id: "a", hasChildren: false, meta: { label: "a" } }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(handle.getLoadState("<root>")).toBe("unloaded");
+    expect(handle.hasNode("a")).toBe(false);
+    // A subsequent load must fire — would no-op if loadState was stuck.
+    handle.load("<root>");
+    expect(handle.getLoadState("<root>")).toBe("loading");
   });
 
   it("abort on a non-loading id is a no-op", () => {
