@@ -47,6 +47,23 @@ import { fixtureToShape, type Fixture, type FixtureNode } from "./_fixtures";
 
 type NodeId = string;
 
+// Intent kinds that represent "free gestures" — the reader poking the
+// canvas via selection chrome, marquee, or direct node manipulation.
+// `interactionLocked` drops exactly these. Host-routed handle intents
+// (corner-radius, parametric, padding, transform-box, …) and mode
+// transitions pass through, so a new handle family doesn't need to
+// remember to update a per-family allowlist here.
+const FREE_GESTURE_INTENTS: ReadonlySet<Intent["kind"]> = new Set([
+  "select",
+  "deselect_all",
+  "translate",
+  "resize",
+  "rotate",
+  "marquee_select",
+  "lasso_select",
+  "set_endpoint",
+]);
+
 // ───────────────────────────────────────────────────────────────────────────
 // Public state shape — what the inspector subscribes to.
 // ───────────────────────────────────────────────────────────────────────────
@@ -78,6 +95,15 @@ export type HUDExtraBuilder = (ctx: {
   gesture: SurfaceGesture;
   /** dx/dy per dragged id while a translate gesture is in flight. */
   offsets: Record<string, [number, number]>;
+  /**
+   * Live target rect per resized id while a resize gesture is in flight.
+   * Empty when no resize is active. Symmetric to {@link offsets}; lets
+   * size-meter / measurement extras read W × H without double-baking.
+   */
+  resizes: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >;
 }) => HUDDraw | undefined;
 
 export interface HUDStageProps {
@@ -185,12 +211,15 @@ export interface HUDStageProps {
   /** Block all mutating intents. */
   readonly?: boolean;
   /**
-   * Lock the host so the only honored intents are corner-radius drags.
-   * `select` / `deselect_all` / `marquee_select` / `translate` are all
-   * dropped — selection chrome stays pinned, nodes don't move, and the
-   * scene becomes a fixed stage for one affordance. Used by §15 so the
-   * reader can focus on the radius handles without accidentally moving
-   * or reselecting the demo rects.
+   * Lock the host so only host-routed handle intents are honored —
+   * every intent kind in {@link FREE_GESTURE_INTENTS} (`select` /
+   * `deselect_all` / `translate` / `resize` / `rotate` /
+   * `marquee_select` / `lasso_select` / `set_endpoint`) is dropped.
+   * Selection chrome stays pinned and the scene becomes a fixed stage
+   * for whichever affordance the section wired up (corner-radius,
+   * parametric handles, etc.). Used by §15 and the parametric-star
+   * demo so the reader can focus on the active handle without
+   * accidentally moving or reselecting demo nodes.
    */
   interactionLocked?: boolean;
   /** Decoration layered on top of the hud surface chrome. */
@@ -279,6 +308,7 @@ function FixtureSvg({
   fixture,
   offsets,
   endpointPreviews,
+  resizes,
   width,
   height,
   transform,
@@ -288,6 +318,10 @@ function FixtureSvg({
   endpointPreviews: Record<
     string,
     { p1?: [number, number]; p2?: [number, number] }
+  >;
+  resizes: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
   >;
   width: number;
   height: number;
@@ -306,7 +340,7 @@ function FixtureSvg({
         {fixture.nodes.map((n) => (
           <FixtureShape
             key={n.id}
-            node={applyOffsetToNode(n, offsets, endpointPreviews)}
+            node={applyOffsetToNode(n, offsets, endpointPreviews, resizes)}
           />
         ))}
       </g>
@@ -538,11 +572,16 @@ function eventButton(e: PointerEvent): "primary" | "secondary" | "middle" {
 function applyOffsetToNode(
   n: FixtureNode,
   offs: Record<string, [number, number]>,
-  endpoints?: Record<string, { p1?: [number, number]; p2?: [number, number] }>
+  endpoints?: Record<string, { p1?: [number, number]; p2?: [number, number] }>,
+  resizes?: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >
 ): FixtureNode {
   const off = offs[n.id];
   const ep = endpoints?.[n.id];
-  if (!off && !ep) return n;
+  const rz = resizes?.[n.id];
+  if (!off && !ep && !rz) return n;
   let next: FixtureNode = n;
   if (off) {
     const [dx, dy] = off;
@@ -565,22 +604,32 @@ function applyOffsetToNode(
       p2: ep.p2 ?? next.p2,
     };
   }
+  if (rz && next.rect) {
+    next = { ...next, rect: { ...next.rect, ...rz } };
+  }
   return next;
 }
 
 function commitOffsets(
   fixture: Fixture,
   offs: Record<string, [number, number]>,
-  endpoints?: Record<string, { p1?: [number, number]; p2?: [number, number] }>
+  endpoints?: Record<string, { p1?: [number, number]; p2?: [number, number] }>,
+  resizes?: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >
 ): Fixture {
   if (
     Object.keys(offs).length === 0 &&
-    (!endpoints || Object.keys(endpoints).length === 0)
+    (!endpoints || Object.keys(endpoints).length === 0) &&
+    (!resizes || Object.keys(resizes).length === 0)
   )
     return fixture;
   return {
     ...fixture,
-    nodes: fixture.nodes.map((n) => applyOffsetToNode(n, offs, endpoints)),
+    nodes: fixture.nodes.map((n) =>
+      applyOffsetToNode(n, offs, endpoints, resizes)
+    ),
   };
 }
 
@@ -664,6 +713,16 @@ export function HUDStage(props: HUDStageProps) {
   const endpointPreviewsRef = React.useRef(endpointPreviews);
   endpointPreviewsRef.current = endpointPreviews;
 
+  // Resize preview rects, applied on top of liveFixture in shapeOf / SVG /
+  // extra ctx. Resize intent's `rect` is the group AABB; for the demo's
+  // single-rect fixtures we apply it directly to the one resized id. Multi-
+  // id groups are out of scope (svg-editor solves that with shape, not rect).
+  const [resizePreviews, setResizePreviews] = React.useState<
+    Record<string, { x: number; y: number; width: number; height: number }>
+  >({});
+  const resizePreviewsRef = React.useRef(resizePreviews);
+  resizePreviewsRef.current = resizePreviews;
+
   // Camera. `initialTransform` is read once at mount — runtime changes
   // would fight the user's wheel-zoom, so we don't track it as a dep.
   const [transform, setTransform] = React.useState<cmath.Transform>(
@@ -714,6 +773,7 @@ export function HUDStage(props: HUDStageProps) {
       fixture: fixtureRef.current,
       gesture: surfaceRef.current?.gesture() ?? { kind: "idle" },
       offsets: previewOffsetsRef.current,
+      resizes: resizePreviewsRef.current,
     });
   }, []);
 
@@ -722,18 +782,12 @@ export function HUDStage(props: HUDStageProps) {
   const handleIntentRef = React.useRef<((intent: Intent) => void) | null>(null);
   handleIntentRef.current = (intent) => {
     lastIntentRef.current = intent;
-    // When the host has locked interaction to corner-radius only, drop
-    // every intent kind that isn't a corner-radius mutation. The hud
-    // still emits everything (it doesn't know about the lock); the host
-    // is the gate. Allowlist on purpose — a future intent kind defaults
-    // to "blocked while locked," which is the safer default for a
-    // "corner-radius only" stage.
-    if (
-      interactionLockedRef.current &&
-      intent.kind !== "corner_radius" &&
-      intent.kind !== "corner_radius_explicit" &&
-      intent.kind !== "corner_radius_uniform"
-    ) {
+    // When the host has locked interaction, drop free-gesture intents
+    // (selection / marquee / direct node manipulation). The hud still
+    // emits everything; the host is the gate. Denylist on purpose —
+    // host-routed handle intents (any handle family the section wired
+    // up) pass through automatically without having to be enumerated.
+    if (interactionLockedRef.current && FREE_GESTURE_INTENTS.has(intent.kind)) {
       return;
     }
     if (intent.kind === "select") {
@@ -781,6 +835,50 @@ export function HUDStage(props: HUDStageProps) {
           const next = { ...prev };
           for (const id of ids) delete next[id];
           return next;
+        });
+      }
+    } else if (intent.kind === "resize") {
+      // Demo applies resize to a single axis-aligned rect node only (the
+      // visibility section's fixture). Multi-id groups would need the
+      // new AABB distributed across members; rotated nodes carry their
+      // true dims as `intent.shape.local` + a matrix, not the doc-space
+      // AABB in `intent.rect` — writing the AABB into a `rect-rotated`'s
+      // local rect would corrupt its geometry while preserving the angle.
+      // Both cases are out of scope for the showcase; bail explicitly.
+      const ids = intent.ids as readonly string[];
+      if (ids.length !== 1) return;
+      const id = ids[0];
+      const node = fixtureRef.current.nodes.find((n) => n.id === id);
+      if (!node?.rect) return;
+      if (node.kind === "rect-rotated") return;
+      const next = {
+        x: intent.rect.x,
+        y: intent.rect.y,
+        width: intent.rect.width,
+        height: intent.rect.height,
+      };
+      if (intent.phase === "preview") {
+        setResizePreviews((prev) => {
+          const cur = prev[id];
+          if (
+            cur &&
+            cur.x === next.x &&
+            cur.y === next.y &&
+            cur.width === next.width &&
+            cur.height === next.height
+          )
+            return prev;
+          return { ...prev, [id]: next };
+        });
+      } else if (intent.phase === "commit") {
+        setLiveFixture((prev) =>
+          commitOffsets(prev, {}, undefined, { [id]: next })
+        );
+        setResizePreviews((prev) => {
+          if (!prev[id]) return prev;
+          const out = { ...prev };
+          delete out[id];
+          return out;
         });
       }
     } else if (intent.kind === "set_endpoint") {
@@ -879,7 +977,8 @@ export function HUDStage(props: HUDStageProps) {
       commitOffsets(
         fixtureRef.current,
         previewOffsetsRef.current,
-        endpointPreviewsRef.current
+        endpointPreviewsRef.current,
+        resizePreviewsRef.current
       );
     const s = new Surface(canvasRef.current, {
       pick: (p) => hitPick(ghosted(), p),
@@ -995,6 +1094,7 @@ export function HUDStage(props: HUDStageProps) {
     liveFixture,
     previewOffsets,
     endpointPreviews,
+    resizePreviews,
     selectionGroups,
     computeExtra,
   ]);
@@ -1339,6 +1439,7 @@ export function HUDStage(props: HUDStageProps) {
         fixture={liveFixture}
         offsets={previewOffsets}
         endpointPreviews={endpointPreviews}
+        resizes={resizePreviews}
         width={size.width}
         height={size.height}
         transform={transform}
