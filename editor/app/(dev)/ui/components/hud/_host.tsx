@@ -212,13 +212,14 @@ export interface HUDStageProps {
   readonly?: boolean;
   /**
    * Lock the host so only host-routed handle intents are honored —
-   * everything that mutates selection or moves nodes (`select` /
-   * `deselect_all` / `marquee_select` / `translate` / `set_endpoint`)
-   * is dropped. Selection chrome stays pinned and the scene becomes a
-   * fixed stage for whichever affordance the section wired up
-   * (corner-radius, parametric handles, etc.). Used by §15 and the
-   * parametric-star demo so the reader can focus on the active
-   * handle without accidentally moving or reselecting demo nodes.
+   * every intent kind in {@link FREE_GESTURE_INTENTS} (`select` /
+   * `deselect_all` / `translate` / `resize` / `rotate` /
+   * `marquee_select` / `lasso_select` / `set_endpoint`) is dropped.
+   * Selection chrome stays pinned and the scene becomes a fixed stage
+   * for whichever affordance the section wired up (corner-radius,
+   * parametric handles, etc.). Used by §15 and the parametric-star
+   * demo so the reader can focus on the active handle without
+   * accidentally moving or reselecting demo nodes.
    */
   interactionLocked?: boolean;
   /** Decoration layered on top of the hud surface chrome. */
