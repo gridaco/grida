@@ -4,12 +4,14 @@
   "private": false,
   "description": "Headless, agnostic tree-view controller for the Grida editor.",
   "keywords": [
+    "async",
     "dnd",
     "drag-and-drop",
     "file-explorer",
     "headless",
     "keyboard-navigation",
     "layers-panel",
+    "lazy-loading",
     "outliner",
     "react",
     "selection",
@@ -41,6 +43,11 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.mjs",
       "require": "./dist/react.js"
+    },
+    "./async": {
+      "types": "./dist/async.d.ts",
+      "import": "./dist/async.mjs",
+      "require": "./dist/async.js"
     }
   },
   "publishConfig": {
