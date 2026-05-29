@@ -1,0 +1,93 @@
+@reference "../../app/ui.css";
+
+.composer-content {
+  --composer-content-min-height: 4rem;
+  --composer-content-padding-block: 0.5rem;
+  --composer-content-padding-inline: 0.625rem;
+  --composer-editor-min-height: 2rem;
+  --composer-editor-font-size: 0.875rem;
+  --composer-paragraph-margin-block: 0.125rem;
+  --composer-code-padding: 0.5rem;
+  --composer-chip-margin-inline: 0.125rem;
+  --composer-chip-padding-block: 0.125rem;
+  --composer-chip-padding-inline: 0.25rem;
+  --composer-chip-radius: 0.25rem;
+  --composer-chip-color: var(--color-blue-600);
+  --composer-chip-background: var(--color-blue-50);
+
+  min-height: var(--composer-content-min-height);
+  padding-block: var(--composer-content-padding-block);
+  padding-inline: var(--composer-content-padding-inline);
+  font-size: var(--composer-editor-font-size);
+  font-weight: 400;
+}
+
+.composer-content [data-composer-editor] {
+  min-height: var(--composer-editor-min-height);
+  outline: none;
+}
+
+.composer-content [data-composer-editor] .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
+.composer-content [data-composer-editor] .composer-text-node {
+  margin-block: var(--composer-paragraph-margin-block);
+}
+
+.composer-content [data-composer-editor] .composer-code-block {
+  max-height: 7rem;
+  margin-block: 0.375rem;
+  overflow: auto;
+  border-radius: 0.375rem;
+  background: var(--muted);
+  padding: var(--composer-code-padding);
+}
+
+.composer-content [data-composer-editor] .composer-inline-code {
+  border-radius: 0.25rem;
+  background: var(--muted);
+  padding-inline: 0.25rem;
+}
+
+.composer-content [data-composer-editor] .composer-list-node {
+  margin-block: var(--composer-paragraph-margin-block);
+  padding-left: 1.25rem;
+}
+
+.composer-content [data-composer-editor] .composer-list-node-bullet {
+  list-style: disc;
+}
+
+.composer-content [data-composer-editor] .composer-list-node-ordered {
+  list-style: decimal;
+}
+
+.composer-content [data-composer-chip] {
+  display: inline-flex;
+  align-items: center;
+  margin-inline: var(--composer-chip-margin-inline);
+  border-radius: var(--composer-chip-radius);
+  padding-block: var(--composer-chip-padding-block);
+  padding-inline: var(--composer-chip-padding-inline);
+  color: var(--composer-chip-color);
+  font-family: var(--font-mono);
+}
+
+.composer-content [data-composer-chip]:hover,
+.composer-content [data-composer-chip].ProseMirror-selectednode {
+  background: var(--composer-chip-background);
+}
+
+.dark .composer-content {
+  --composer-chip-color: var(--color-blue-400);
+  --composer-chip-background: color-mix(
+    in oklab,
+    var(--color-blue-950) 60%,
+    transparent
+  );
+}

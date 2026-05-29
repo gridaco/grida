@@ -55,6 +55,7 @@ General conventions:
 
 | kit                        | description                                      | entry                             |
 | -------------------------- | ------------------------------------------------ | --------------------------------- |
+| `composer`                 | Prompt composer kit (Tiptap-based).              | `@/kits/composer`                 |
 | `minimal-tiptap`           | Opinionated rich-text editor kit (Tiptap-based). | `@/kits/minimal-tiptap`           |
 | `email-template-authoring` | Email-client-style template authoring UI.        | `@/kits/email-template-authoring` |
 
