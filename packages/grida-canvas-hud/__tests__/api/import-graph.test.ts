@@ -25,18 +25,26 @@ const PKG_ROOT = path.resolve(__dirname, "..", "..");
 /** The published bedrock subpath entry points (see package.json `exports`). */
 const ENTRIES = ["core/index.ts", "primitives/bedrock.ts"];
 
-/** Disallowed relative-import fragments — any of these is a layering break. */
-const DISALLOWED_FRAGMENTS = [
-  "/classes/",
-  "/surface/",
-  "/event/",
-  "../classes",
-  "../surface",
-  "../event",
-];
+/**
+ * Top-level package directories the bedrock must never reach. Checked
+ * against the RESOLVED file path (not the raw specifier text), so a
+ * non-canonical spelling that still resolves into one of these is caught.
+ */
+const FORBIDDEN_DIRS = ["classes", "surface", "event"];
+
+/** Extensions a relative specifier may resolve to (superset of what the
+ *  bundler accepts), plus index files — so a `.tsx`/`.mts` re-export edge
+ *  is followed, never silently dropped. */
+const RESOLVE_EXTS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs"];
 
 function isAllowedExternal(spec: string): boolean {
   return spec === "@grida/cmath" || spec.startsWith("@grida/cmath/");
+}
+
+/** Is the resolved file inside a forbidden top-level package directory? */
+function isForbidden(file: string): boolean {
+  const top = path.relative(PKG_ROOT, file).split(path.sep)[0];
+  return FORBIDDEN_DIRS.includes(top);
 }
 
 /** Extract every module specifier referenced by a source file. */
@@ -59,17 +67,27 @@ function extractSpecifiers(text: string): string[] {
   return out;
 }
 
-/** Resolve a relative specifier from `fromFile` to an on-disk `.ts` file. */
+/** Resolve a relative specifier from `fromFile` to an on-disk source file,
+ *  trying every accepted extension and an index file. Returns null only when
+ *  nothing on disk matches. */
 function resolveRelative(fromFile: string, spec: string): string | null {
   const base = path.resolve(path.dirname(fromFile), spec);
-  const candidates = [base, `${base}.ts`, path.join(base, "index.ts")];
-  for (const c of candidates) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+  const isFile = (c: string) => fs.existsSync(c) && fs.statSync(c).isFile();
+  if (isFile(base)) return base; // spec already had an extension
+  for (const ext of RESOLVE_EXTS) {
+    if (isFile(base + ext)) return base + ext;
+    if (isFile(path.join(base, `index${ext}`))) {
+      return path.join(base, `index${ext}`);
+    }
   }
   return null;
 }
 
-/** BFS the relative-import closure from `entry`, collecting violations. */
+/** BFS the relative-import closure from `entry`, collecting violations.
+ *  A relative specifier is a violation if it (a) resolves into a forbidden
+ *  package directory, or (b) cannot be resolved at all — an unresolved edge
+ *  is treated as a leak rather than silently skipped, so the guard can't be
+ *  bypassed by an extension the resolver doesn't recognise. */
 function walk(entry: string): string[] {
   const violations: string[] = [];
   const seen = new Set<string>();
@@ -86,12 +104,17 @@ function walk(entry: string): string[] {
         }
         continue;
       }
-      if (DISALLOWED_FRAGMENTS.some((frag) => spec.includes(frag))) {
-        violations.push(`${rel}: forbidden cross-layer import "${spec}"`);
+      const target = resolveRelative(file, spec);
+      if (!target) {
+        violations.push(`${rel}: unresolved relative import "${spec}"`);
         continue;
       }
-      const target = resolveRelative(file, spec);
-      if (target) queue.push(target);
+      if (isForbidden(target)) {
+        const dst = path.relative(PKG_ROOT, target);
+        violations.push(`${rel}: cross-layer import "${spec}" → ${dst}`);
+        continue;
+      }
+      queue.push(target);
     }
   }
   return violations;

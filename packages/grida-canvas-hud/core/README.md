@@ -157,7 +157,7 @@ top-level [`README.md`](../README.md).
 
 - `pnpm turbo test --filter=@grida/hud` runs:
   - `__tests__/api/bedrock-invariants.test.ts` — `HitRegistry` priority + paint-only filter + `shapeContains` variant coverage.
-  - `__tests__/api/import-graph.test.ts` — walks the transitive closure of the `@grida/hud/core` entry (`core/index.ts`) for cross-layer imports.
+  - `__tests__/api/import-graph.test.ts` — walks the transitive closure of BOTH published bedrock entries (`core/index.ts` → `@grida/hud/core`, `primitives/bedrock.ts` → `@grida/hud/primitives`), following re-exports, and fails on any cross-layer or unresolved import.
 
 ## Anti-goals
 

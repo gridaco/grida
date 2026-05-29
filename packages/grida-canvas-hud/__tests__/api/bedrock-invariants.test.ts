@@ -114,6 +114,24 @@ describe("Painter interface is exactly 4 methods", () => {
     p.endFrame();
     expect(p.calls).toEqual(["beginFrame", "setTransform", "draw", "endFrame"]);
   });
+
+  it("the interface has no methods beyond the four (type-level cardinality guard)", () => {
+    // The runtime stub above only proves a 4-method object CONFORMS; it would
+    // still pass if a 5th method were added to `Painter`. This pins the
+    // cardinality at the type level: `_Extra` is non-`never` if a method is
+    // added or renamed; `_Missing` is non-`never` if one is removed. Either
+    // makes the `true` assignment fail to compile — so the "exactly 4" claim
+    // in this block's name is enforced, not just asserted in prose.
+    type _Expected = "beginFrame" | "setTransform" | "draw" | "endFrame";
+    type _Extra = Exclude<keyof Painter, _Expected>;
+    type _Missing = Exclude<_Expected, keyof Painter>;
+    const _exact: [_Extra] extends [never]
+      ? [_Missing] extends [never]
+        ? true
+        : false
+      : false = true;
+    expect(_exact).toBe(true);
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────

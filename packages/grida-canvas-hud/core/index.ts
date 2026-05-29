@@ -1,8 +1,9 @@
 // `core/` — bedrock engine mechanisms.
 //
 // Independently-testable modules. No master class, no extension API,
-// no class-specific knowledge. Each module is a separate export with
-// a unit test in `__tests__/core/`.
+// no class-specific knowledge. Each module is a separate export, pinned by
+// the bedrock specs in `__tests__/api/` (`bedrock-invariants.test.ts`,
+// `import-graph.test.ts`).
 //
 // Deferred (out of bedrock scope until orchestrator follow-up):
 //
