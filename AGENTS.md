@@ -16,19 +16,18 @@ Currently, we have below features / modules.
 
 > **When entering an unfamiliar directory**, always check for `README.md` and `AGENTS.md` first. These files contain domain-specific context, conventions, and constraints that override general assumptions. The table below lists the known ones, but sub-directories and individual packages may have their own as well.
 
-| directory              | README                                       | AGENTS                                       | notes                                         |
-| ---------------------- | -------------------------------------------- | -------------------------------------------- | --------------------------------------------- |
-| [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                            |
-| [format](./format)     | [`format/README.md`](./format/README.md)     | [`format/AGENTS.md`](./format/AGENTS.md)     | grida file formats & schemas                  |
-| [editor](./editor)     | -                                            | [`editor/AGENTS.md`](./editor/AGENTS.md)     | the editor directory                          |
-| [crates](./crates)     | -                                            | -                                            | the rust crates directory                     |
-| [packages](./packages) | -                                            | -                                            | shared packages                               |
-| [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app                      |
-| [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                          |
-| [apps](./apps)         | -                                            | -                                            | micro sites for Grida                         |
-| [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                                   |
-| [test](./test)         | [`test/README.md`](./test/README.md)         | [`test/AGENTS.md`](./test/AGENTS.md)         | manual test cases & UX behavior specs         |
-| [.legacy](./.legacy)   | -                                            | -                                            | will be removed (fully ignore this directory) |
+| directory              | README                                       | AGENTS                                       | notes                                 |
+| ---------------------- | -------------------------------------------- | -------------------------------------------- | ------------------------------------- |
+| [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                    |
+| [format](./format)     | [`format/README.md`](./format/README.md)     | [`format/AGENTS.md`](./format/AGENTS.md)     | grida file formats & schemas          |
+| [editor](./editor)     | -                                            | [`editor/AGENTS.md`](./editor/AGENTS.md)     | the editor directory                  |
+| [crates](./crates)     | -                                            | -                                            | the rust crates directory             |
+| [packages](./packages) | -                                            | -                                            | shared packages                       |
+| [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app              |
+| [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                  |
+| [apps](./apps)         | -                                            | -                                            | micro sites for Grida                 |
+| [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                           |
+| [test](./test)         | [`test/README.md`](./test/README.md)         | [`test/AGENTS.md`](./test/AGENTS.md)         | manual test cases & UX behavior specs |
 
 ## Languages, Frameworks, Tools, Infrastructures
 

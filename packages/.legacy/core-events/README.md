@@ -1,1 +1,0 @@
-# Bridged Event handling

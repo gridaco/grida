@@ -8,7 +8,6 @@
   },
   "ignorePatterns": [
     "third_party/externals/",
-    ".legacy/",
     ".ref/",
     ".json5",
     "data/",
