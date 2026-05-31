@@ -10,6 +10,11 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import { modeFromEvent, TreeController, type NodeId } from "@grida/tree-view";
+import {
+  bindAsyncTreeController,
+  createAsyncTreeSource,
+  type AsyncTreeSourceHandle,
+} from "@grida/tree-view/async";
 import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
 import {
   SvgEditorCanvas,
@@ -26,10 +31,15 @@ import {
 import { Resources } from "@/resources";
 import Image from "next/image";
 import {
+  AlertCircleIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CommandIcon,
   FileCode2Icon,
+  FileIcon,
+  FolderIcon,
+  Loader2Icon,
+  RefreshCwIcon,
   SearchIcon,
   SettingsIcon,
   TerminalIcon,
@@ -41,6 +51,7 @@ import {
   buildVSCodeFixture,
   type DemoMeta,
 } from "./_fixtures";
+import { createFakeFsProvider, type FakeFsControls } from "./_async-fixture";
 import { DemoPanel, type RenderRowArgs } from "./_panel";
 import {
   applyIntent,
@@ -865,6 +876,344 @@ export function FinderShowcase() {
             />
           </MacOSDesktop>
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// VS Code (async) — the SAME explorer chrome, but the children of each
+// folder are listed asynchronously through `@grida/tree-view/async`.
+// Proof-of-recipe for the README; mirrors what an Electron file explorer
+// or a REST resource panel would wire up.
+// ───────────────────────────────────────────────────────────────────────────
+
+interface AsyncRowProps {
+  args: RenderRowArgs;
+  handle: AsyncTreeSourceHandle<DemoMeta>;
+}
+
+function AsyncVSCodeRow({ args, handle }: AsyncRowProps) {
+  const { row } = args;
+  const ctrl = useTree<DemoMeta>();
+  // Subscribe to source version so load-state transitions repaint. The
+  // load-state itself lives off-meta; the version is the change signal.
+  useTreeSnapshot<DemoMeta, number>((c) => c.source.getVersion());
+  const meta = (() => {
+    try {
+      return ctrl.source.getNode(row.id).meta;
+    } catch {
+      return undefined;
+    }
+  })();
+  const selected = useTreeSnapshot<DemoMeta, boolean>((c) =>
+    c.getSelection().includes(row.id)
+  );
+  // Guard: a watcher event can prune a row id between the rows
+  // snapshot and this render. Use hasNode to avoid throwing.
+  const known = handle.hasNode(row.id);
+  const loadState = known ? handle.getLoadState(row.id) : "loaded";
+  const error = known ? handle.getError(row.id) : null;
+  const isFolder = meta?.kind === "folder";
+  const label = meta?.label ?? row.id;
+  return (
+    <div
+      data-tree-row-id={row.id}
+      data-row-depth={row.depth}
+      data-state={
+        selected ? "selected" : loadState === "error" ? "error" : "idle"
+      }
+      role="treeitem"
+      aria-selected={selected}
+      aria-busy={loadState === "loading" || undefined}
+      tabIndex={-1}
+      onClick={(e) => {
+        ctrl.focus(row.id);
+        ctrl.select([row.id], modeFromEvent(e));
+        if (isFolder) ctrl.toggle(row.id);
+      }}
+      className="relative flex h-[22px] items-center gap-1.5 px-2 text-[13px] leading-none select-none cursor-pointer font-normal text-[#CCCCCC] data-[state=selected]:bg-[#04395E] data-[state=selected]:text-white data-[state=error]:text-[#F48771] data-[state=idle]:hover:bg-[#2A2D2E]"
+      style={{ paddingLeft: 8 + row.depth * 14 }}
+    >
+      {/* indent guides */}
+      {Array.from({ length: row.depth }).map((_, i) => (
+        <span
+          key={i}
+          className="absolute top-0 bottom-0 w-px bg-[#404040]"
+          style={{ left: 8 + i * 14 + 6 }}
+        />
+      ))}
+      <span className="inline-flex size-3 items-center justify-center text-[#CCCCCC]">
+        {isFolder ? (
+          row.isExpanded ? (
+            <ChevronDownIcon className="size-3" />
+          ) : (
+            <ChevronRightIcon className="size-3" />
+          )
+        ) : null}
+      </span>
+      {isFolder ? (
+        <FolderIcon className="size-3.5 text-[#DCB67A]" />
+      ) : (
+        <FileIcon className="size-3.5 text-[#75BEFF]" />
+      )}
+      <span className="truncate flex-1" title={String(row.id)}>
+        {label}
+      </span>
+      {loadState === "loading" && (
+        <Loader2Icon
+          className="size-3 animate-spin text-[#9DA5B4]"
+          aria-label="Loading"
+        />
+      )}
+      {loadState === "error" && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handle.invalidate(row.id);
+            handle.load(row.id);
+          }}
+          title={error instanceof Error ? error.message : "Error"}
+          className="inline-flex size-4 items-center justify-center text-[#F48771] hover:text-white"
+          aria-label="Retry"
+        >
+          <AlertCircleIcon className="size-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AsyncControls({
+  controls,
+  handle,
+  controller,
+}: {
+  controls: FakeFsControls;
+  handle: AsyncTreeSourceHandle<DemoMeta>;
+  controller: TreeController<DemoMeta>;
+}) {
+  const [latency, setLatencyState] = React.useState(600);
+  const [createCounter, setCreateCounter] = React.useState(1);
+  const setLatency = (v: number) => {
+    setLatencyState(v);
+    controls.setLatency(v);
+  };
+  return (
+    <div
+      className={`flex ${STAGE_H} flex-col gap-4 overflow-auto rounded-lg border border-[#3C3C3C] bg-[#1E1E1E] p-4 text-[12px] text-[#CCCCCC]`}
+    >
+      <div>
+        <div className="mb-1 text-[11px] uppercase tracking-wider text-[#9DA5B4]">
+          What this is
+        </div>
+        <p className="text-[#CCCCCC]/85 leading-relaxed">
+          Same <code>TreeController</code> as the static VS Code section above.
+          Children are listed async via
+          <code className="mx-1 rounded bg-[#252526] px-1 py-0.5">
+            @grida/tree-view/async
+          </code>
+          . Expand a folder → spinner; collapse mid-load → abort; toggle{" "}
+          <em>Fail next</em> → error row with retry; press{" "}
+          <em>Emit watcher event</em> → tree mutates without re-listing.
+        </p>
+      </div>
+
+      <div>
+        <div className="mb-2 text-[11px] uppercase tracking-wider text-[#9DA5B4]">
+          Latency · {latency} ms
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={2000}
+          step={50}
+          value={latency}
+          onChange={(e) => setLatency(Number(e.target.value))}
+          className="w-full accent-[#007ACC]"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => controls.setFailNext(true)}
+          className="rounded border border-[#3C3C3C] bg-[#252526] px-2.5 py-1 text-[11px] text-[#CCCCCC] hover:bg-[#2A2D2E]"
+        >
+          Fail next listing
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const focused = controller.getFocused();
+            const target = focused ?? "/";
+            handle.invalidate(target);
+            // Re-load only if currently expanded; otherwise wait for the
+            // next expansion.
+            if (controller.isExpanded(target) || target === "/") {
+              handle.load(target);
+            }
+          }}
+          className="rounded border border-[#3C3C3C] bg-[#252526] px-2.5 py-1 text-[11px] text-[#CCCCCC] hover:bg-[#2A2D2E]"
+        >
+          <RefreshCwIcon className="mr-1 inline size-3" />
+          Refresh focused
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const id = `/src/lib/note-${createCounter}.md`;
+            setCreateCounter((c) => c + 1);
+            controls.emitCreated("/src/lib", {
+              id,
+              parent: "/src/lib",
+              children: [],
+              meta: {
+                kind: "file",
+                label: `note-${createCounter}.md`,
+                ext: "md",
+              },
+            });
+          }}
+          className="rounded border border-[#3C3C3C] bg-[#252526] px-2.5 py-1 text-[11px] text-[#CCCCCC] hover:bg-[#2A2D2E]"
+        >
+          Emit watcher event (create)
+        </button>
+        <button
+          type="button"
+          onClick={() => controls.emitInvalidated("/src/app")}
+          className="rounded border border-[#3C3C3C] bg-[#252526] px-2.5 py-1 text-[11px] text-[#CCCCCC] hover:bg-[#2A2D2E]"
+        >
+          Emit invalidate (/src/app)
+        </button>
+      </div>
+
+      <div className="rounded border border-[#3C3C3C] bg-[#252526] p-3 leading-relaxed">
+        <div className="mb-1 font-mono text-[11px] text-[#9DA5B4]">
+          handle.getLoadState(focused)
+        </div>
+        <FocusedLoadState handle={handle} />
+      </div>
+
+      <div className="mt-auto text-[11px] text-[#9DA5B4]">
+        Producer interface: <code>hasChildren</code> +{" "}
+        <code>listChildren(id, signal)</code> + <code>subscribeChanges?</code>.
+        The same shape works for <code>fs.promises.readdir</code>, an HTTP
+        endpoint, or OPFS.
+      </div>
+    </div>
+  );
+}
+
+function FocusedLoadState({
+  handle,
+}: {
+  handle: AsyncTreeSourceHandle<DemoMeta>;
+}) {
+  const focused = useTreeSnapshot<DemoMeta, NodeId | null>((c) =>
+    c.getFocused()
+  );
+  // Re-render on source-version bumps so load-state stays fresh.
+  useTreeSnapshot<DemoMeta, number>((c) => c.source.getVersion());
+  if (!focused) {
+    return <span className="text-[#CCCCCC]/60">(focus a row)</span>;
+  }
+  // Guard: focused may briefly reference an id pruned by a watcher
+  // event before the controller's focus catches up.
+  if (!handle.hasNode(focused)) {
+    return (
+      <span className="text-[#CCCCCC]/60 font-mono text-[11px]">
+        (unknown · {String(focused)})
+      </span>
+    );
+  }
+  const state = handle.getLoadState(focused);
+  const err = handle.getError(focused);
+  const color =
+    state === "loading"
+      ? "text-[#75BEFF]"
+      : state === "error"
+        ? "text-[#F48771]"
+        : state === "loaded"
+          ? "text-[#89D185]"
+          : "text-[#CCCCCC]";
+  return (
+    <div className="font-mono text-[11px]">
+      <span className={color}>{state}</span>
+      <span className="text-[#CCCCCC]/60"> · {String(focused)}</span>
+      {err instanceof Error && (
+        <div className="mt-1 text-[#F48771]/80">{err.message}</div>
+      )}
+    </div>
+  );
+}
+
+export function VSCodeAsyncShowcase() {
+  // Source + controller + binding are constructed once per mount. The
+  // useMemo dependency list is empty because all state lives inside
+  // the handle / controller.
+  const { controller, handle, controls } = React.useMemo(() => {
+    const { provider, controls } = createFakeFsProvider({ latencyMs: 600 });
+    const handle = createAsyncTreeSource(provider);
+    const controller = new TreeController<DemoMeta>({
+      source: handle.source,
+    });
+    return { controller, handle, controls };
+  }, []);
+  React.useEffect(() => {
+    const unbind = bindAsyncTreeController(controller, handle);
+    return () => {
+      unbind();
+      handle.dispose();
+      controller.dispose();
+    };
+  }, [controller, handle]);
+  return (
+    <section className="border-t border-zinc-200 py-16">
+      <div className="mx-auto max-w-6xl px-4">
+        <SectionHeader
+          eyebrow="VS Code (async)"
+          icon={Resources.assets.macos.icons.vscode}
+          iconAlt="VS Code"
+        >
+          Same controller, lazy children. Expand a folder to fire{" "}
+          <code>listChildren</code>; collapse mid-load aborts via the{" "}
+          <code>AbortSignal</code> the provider receives. Errors land on a
+          side-channel <code>getLoadState</code> — your <code>meta</code> stays
+          clean.
+        </SectionHeader>
+        <TreeProvider controller={controller}>
+          <SplitStage
+            frame="bg-[#141416] ring-1 ring-white/5"
+            tree={
+              <div
+                className={`flex ${STAGE_H} flex-col overflow-hidden rounded-lg border border-[#3C3C3C] bg-[#252526] font-mono shadow-lg`}
+              >
+                <div className="flex items-center gap-2 border-b border-[#3C3C3C] bg-[#333333] px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-[#CCCCCC]">
+                  <TerminalIcon className="size-3" />
+                  <span>Explorer · async</span>
+                </div>
+                <DemoPanel
+                  controller={controller}
+                  indentBase={8}
+                  indentStep={14}
+                  className="min-h-0 flex-1 !border-0 !bg-[#252526]"
+                  renderRow={(args) => (
+                    <AsyncVSCodeRow args={args} handle={handle} />
+                  )}
+                />
+              </div>
+            }
+            editor={
+              <AsyncControls
+                controls={controls}
+                handle={handle}
+                controller={controller}
+              />
+            }
+          />
+        </TreeProvider>
       </div>
     </section>
   );

@@ -168,7 +168,7 @@ That's the entire surface a basic layer panel needs. Drag, keymap,
 constraints, virtualization, and grouping highlights are opt-in
 additions documented below.
 
-## Two entry points
+## Three entry points
 
 ```ts
 // Core: state, math, intents — pure TypeScript, no React, no DOM.
@@ -181,12 +181,24 @@ import {
 
 // React bindings: <TreeProvider> + useTree + useTreeSnapshot.
 import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
+
+// Async children: turn an async listing (fs, REST, OPFS, …) into a
+// synchronous TreeSource the existing controller consumes.
+import {
+  createAsyncTreeSource,
+  bindAsyncTreeController,
+  type AsyncTreeProvider,
+} from "@grida/tree-view/async";
 ```
 
 `react` is an optional peer (`>=18`). The `/react` subpath is the **only**
 React surface — there are no per-row hooks shipped. The intended pattern
 is `useEditorState`-style: one provider, one subscription hook,
 consumers select whatever slice they want.
+
+`/async` is the adapter for lazy / remote / filesystem-shaped sources.
+See [Wrapping an async store](#wrapping-an-async-store-fs-rest-opfs)
+for the recipe.
 
 ### Typed React context (recommended for typed apps)
 
@@ -397,6 +409,95 @@ version bumps, key the cache on the underlying node — the adapter object
 stays stable as long as the source does. The WeakMap also collects
 entries automatically as the host drops its nodes, so there's no
 explicit invalidation step on the consumer side.
+
+### Wrapping an async store (FS, REST, OPFS)
+
+Sometimes the children of a container aren't in memory yet — a folder
+on disk, a paginated REST collection, an OPFS directory, an S3 prefix.
+The package's optional `/async` subpath ships a tiny adapter that
+turns an async listing into a synchronous `TreeSource` the existing
+`TreeController` consumes unchanged. Load state stays on a side
+channel so your `meta` type doesn't grow a `loadState` field.
+
+```ts
+import {
+  createAsyncTreeSource,
+  bindAsyncTreeController,
+  type AsyncTreeProvider,
+} from "@grida/tree-view/async";
+
+interface FsMeta {
+  name: string;
+}
+
+const provider: AsyncTreeProvider<FsMeta> = {
+  rootId: "/",
+  // Sync chevron hint. Return `true` for "probably a container, I'll
+  // confirm on the first listing" — never return a third state.
+  hasChildren: (id) => isLikelyDir(id),
+
+  // The sole async point. Throw / reject to enter `error`.
+  async listChildren(id, signal) {
+    const entries = await window.fs.readdir(id, { signal });
+    return entries.map((e) => ({
+      id: e.path,
+      hasChildren: e.isDirectory,
+      meta: { name: e.name },
+    }));
+  },
+
+  // Optional. Wire your watcher (chokidar, FileSystemObserver, SSE…).
+  subscribeChanges(handler) {
+    return window.fs.watch("/", (events) => handler(events));
+  },
+
+  getRootMeta: () => ({ name: "/" }),
+};
+
+const handle = createAsyncTreeSource(provider);
+const controller = new TreeController({ source: handle.source });
+// Wire expand → load, collapse → abort.
+const unbind = bindAsyncTreeController(controller, handle);
+
+// In your row renderer, paint a spinner / error per row:
+//   const state = handle.getLoadState(row.id);
+//   const err = handle.getError(row.id);
+//   <span aria-busy={state === "loading"}>{meta.name}</span>
+```
+
+**Load state lives on the handle, not in `meta`.** The handle exposes
+`getLoadState(id)` returning `"unloaded" | "loading" | "loaded" | "error"`
+and `getError(id)` for the rejection reason. Load-state transitions
+bump `source.getVersion()`, so any `useTreeSnapshot` selector re-runs
+naturally; in the selector, read the handle.
+
+**Change events.** If your watcher emits granular events (created /
+changed / deleted), pass them through. If it can only tell you
+"something under X changed", emit `{ type: "invalidated", id: X }`
+and the adapter drops the cache so the next expand re-lists.
+Currently-visible children stay until the re-listing commits a
+replacement (VS Code semantics).
+
+**Abort semantics.** Collapsing a node with an in-flight `listChildren`
+aborts via the `AbortSignal` you receive in the producer. The node
+returns to `unloaded`; a subsequent expand re-issues the listing. The
+adapter dedupes in-flight calls — calling `load(id)` twice while one
+is in flight is a no-op.
+
+**What `/async` deliberately does NOT do:**
+
+- No URI / path parsing. `NodeId` stays opaque.
+- No `stat`-equivalent or `readFile`. The producer is yours.
+- No retry / backoff. After `error`, call `handle.load(id)` to retry.
+- No synthetic placeholder rows. The row renderer paints inline
+  spinners using `handle.getLoadState(row.id)`. Keyboard focus on
+  unfilled rows + `aria-busy` are one-liners on the consumer side.
+- No pagination cursor model. A future extension if a real consumer
+  needs it.
+- No `FsMeta<T>` wrapper. Your `meta` stays clean.
+
+The live demo for this recipe is the "VS Code (async)" panel at
+[`grida.co/packages/@grida/tree-view`](https://grida.co/packages/@grida/tree-view).
 
 ### External selection adapter
 

@@ -5,6 +5,7 @@ import {
   FinderShowcase,
   GridaShowcase,
   NotionShowcase,
+  VSCodeAsyncShowcase,
   VSCodeShowcase,
 } from "@/app/(dev)/ui/components/tree-view/_showcase";
 import { CustomSourcePanel } from "@/app/(dev)/ui/components/tree-view/_custom-source";
@@ -94,6 +95,7 @@ export default function TreeViewLandingPage() {
       <GridaShowcase />
       <FigmaShowcase />
       <VSCodeShowcase />
+      <VSCodeAsyncShowcase />
       <NotionShowcase />
       <FinderShowcase />
 
