@@ -1,8 +1,0 @@
-{
-  "name": "@app/scene-view",
-  "version": "0.0.0",
-  "private": false,
-  "description": "Scene view related components & logics",
-  "dependencies": {},
-  "authors": "author"
-}

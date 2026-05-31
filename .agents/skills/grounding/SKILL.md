@@ -4,7 +4,7 @@ description: >
   Establish what is actually true and current for the surface you are
   about to change — not just search. Grounding = locate the
   authoritative source and reconcile sources that disagree (code vs doc,
-  migration vs schema, memory vs current code, live vs `.legacy`), not
+  migration vs schema, memory vs current code, live vs archived), not
   take the first hit. Use before any grep/find/explore of the codebase
   or docs, when deciding which of several definitions is the real one,
   or when a doc or memory conflicts with the code. Covers the
@@ -45,22 +45,23 @@ then trust:
 Disagreement → decide which wins _and why_ (`git log -1` recency, what
 the running entrypoint imports, what tests assert); don't average;
 surface a material conflict to the user. **Never authoritative even when
-they match:** `.legacy/`, `packages/.legacy/`, `docs/_history/`,
+they match:** `docs/_history/`,
 `docs/@designto-code/` (synced — truth is upstream), `docs/cli/`
 (deprecated), `.ref/`, vendored `third_party/`.
 
-## The `.legacy/` trap
+## Dead-tree traps
 
-`.legacy/` (~700 files) and `packages/.legacy/` (~230) are git-tracked
-but dead — a bare `rg` from repo root returns obsolete hits that look
-like confirmation. `rg` already skips gitignored build dirs
+Some directories are git-tracked but dead — a bare `rg` from repo root
+returns obsolete hits that look like confirmation: `docs/_history/`,
+`.ref/`, vendored `third_party/`. (The legacy editor trees `.legacy/`
+and `packages/.legacy/` were retired May 2026; recover via the
+`archive/legacy-2026-05` tag.) `rg` already skips gitignored build dirs
 (`node_modules/`, `target/`, `.next/`, …); don't waste flags there.
 Scope positively, or exclude the dead trees:
 
 ```sh
 rg PATTERN editor/grida-canvas crates/grida/src packages
-rg PATTERN -g '!**/.legacy/**' -g '!**/packages/.legacy/**' \
-   -g '!**/third_party/**' -g '!**/docs/_history/**'
+rg PATTERN -g '!**/third_party/**' -g '!**/docs/_history/**'
 ```
 
 ## Grounding the docs

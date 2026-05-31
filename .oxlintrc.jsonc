@@ -52,7 +52,6 @@
   },
   "ignorePatterns": [
     "third_party/externals/",
-    ".legacy/",
     ".ref/",
     "data/",
     "bin/",

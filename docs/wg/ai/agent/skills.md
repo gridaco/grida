@@ -66,8 +66,8 @@ position defined by [`session / system prompt assembly`](./session.md#system-pro
 ### Why eager
 
 Project instructions are **unconditional knowledge** — "this repo
-uses pnpm, not npm"; "never write to `.legacy/`"; "the test command
-is `just test`." Making the model re-discover this on every relevant
+uses pnpm, not npm"; "the test command is `just test`." Making the
+model re-discover this on every relevant
 turn is a tax on every turn. Bake it in once.
 
 Skills, by contrast, are _conditional_ — "load this when authoring

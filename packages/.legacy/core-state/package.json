@@ -1,9 +1,0 @@
-{
-  "name": "@core/state",
-  "version": "0.0.0",
-  "dependencies": {
-    "@boring.so/action": "workspace:*",
-    "@boring.so/loader": "workspace:*",
-    "immer": "^9.0.3"
-  }
-}
