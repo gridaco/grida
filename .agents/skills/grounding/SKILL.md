@@ -55,7 +55,7 @@ Some directories are git-tracked but dead — a bare `rg` from repo root
 returns obsolete hits that look like confirmation: `docs/_history/`,
 `.ref/`, vendored `third_party/`. (The legacy editor trees `.legacy/`
 and `packages/.legacy/` were retired May 2026; recover via the
-`archive/legacy-2026-05` tag.) `rg` already skips gitignored build dirs
+`archive/do-not-delete-legacy-retired-pr759` tag.) `rg` already skips gitignored build dirs
 (`node_modules/`, `target/`, `.next/`, …); don't waste flags there.
 Scope positively, or exclude the dead trees:
 
