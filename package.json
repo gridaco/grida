@@ -24,7 +24,7 @@
     "lefthook": "^2.1.5",
     "oxfmt": "^0.44.0",
     "oxlint": "^1.60.0",
-    "tsdown": "^0.21.9",
+    "tsdown": "^0.22.1",
     "tsx": "^4",
     "turbo": "^2.9.5",
     "typescript": "^6",
