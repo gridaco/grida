@@ -14,4 +14,5 @@ export default defineConfig({
   format: ["cjs", "esm"],
   platform: "neutral",
   dts: true,
+  checks: { emptyImportMeta: false },
 });

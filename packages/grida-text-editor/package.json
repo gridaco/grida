@@ -36,7 +36,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "tsdown": "^0.21.9",
+    "tsdown": "^0.22.1",
     "typescript": "^6",
     "vitest": "^4"
   }
