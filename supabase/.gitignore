@@ -7,5 +7,6 @@
 .env.local
 .env.*.local
 
-# jwt signing keys
+# legacy jwt signing keys — no longer used by config, kept ignored so a
+# pre-existing local signing_keys.json (private JWK) is never committed
 signing_keys.json

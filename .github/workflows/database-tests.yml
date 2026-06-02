@@ -20,6 +20,5 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.72.7
-      - run: printf '[]' > supabase/signing_keys.json && supabase gen signing-key --append --yes
       - run: supabase db start
       - run: supabase test db
