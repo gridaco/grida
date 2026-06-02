@@ -81,22 +81,10 @@ impl From<CGTransform2D> for AffineTransform {
     }
 }
 
-impl From<&CGTransform2D> for AffineTransform {
-    fn from(transform: &CGTransform2D) -> Self {
-        (*transform).into()
-    }
-}
-
 impl From<AffineTransform> for CGTransform2D {
     fn from(transform: AffineTransform) -> Self {
         let [[m00, m01, m02], [m10, m11, m12]] = transform.matrix;
         CGTransform2D::new(m00, m01, m02, m10, m11, m12)
-    }
-}
-
-impl From<&AffineTransform> for CGTransform2D {
-    fn from(transform: &AffineTransform) -> Self {
-        (*transform).into()
     }
 }
 
