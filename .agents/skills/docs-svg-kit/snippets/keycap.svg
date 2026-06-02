@@ -1,6 +1,6 @@
-<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<!-- @generated-by: docs-svg-kit v1 -->
 <!--
-  canvas-docs-svg-kit  ·  keycap
+  docs-svg-kit  ·  keycap
 
   Modifier-key pill (kbd-style). Use in interaction figures to show which
   key the user holds during a gesture (Alt-hover, Shift-resize, etc.).
@@ -20,7 +20,7 @@
      width="960"
      height="360"
      font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <metadata>docs-svg-kit/v1</metadata>
   <defs>
     <style>
       .canvas-bg   { fill: #ECECEC; }

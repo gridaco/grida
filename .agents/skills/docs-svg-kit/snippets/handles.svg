@@ -1,6 +1,6 @@
-<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<!-- @generated-by: docs-svg-kit v1 -->
 <!--
-  canvas-docs-svg-kit  ·  handles
+  docs-svg-kit  ·  handles
 
   The kit's three "point" primitives:
     .handle             → square corner handle (selection chrome)
@@ -19,7 +19,7 @@
      width="960"
      height="480"
      font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <metadata>docs-svg-kit/v1</metadata>
   <defs>
     <style>
       .canvas-bg     { fill: #ECECEC; }

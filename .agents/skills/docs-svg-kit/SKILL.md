@@ -1,21 +1,28 @@
 ---
-name: canvas-docs-svg-kit
+name: docs-svg-kit
 description: >
-  Author SVG figures for canvas user docs at docs/editor/. Provides reusable
+  Author SVG figures for Grida docs — diff-able, version-controlled vector
+  diagrams embedded in doc pages instead of screenshots. Provides reusable
   primitives (selection chrome, size badges, anchor pins, resize cursors,
   click ripples), color/typography tokens, a starter template, and finished
-  examples to crib from. Use when drawing diagrams that explain canvas UI
-  behaviour — gestures, alignment, before/after states — that a screenshot
-  alone can't capture. Trigger phrases: "svg diagram", "draw a figure",
-  "visual for docs", "explain this gesture visually", "before/after diagram".
+  examples to crib from. Canvas user docs (docs/editor/) are the first
+  consumer; the kit is meant to generalize to any product's docs. Use when
+  drawing diagrams that explain UI behaviour — gestures, alignment,
+  before/after states — that a screenshot alone can't capture. Trigger
+  phrases: "svg diagram", "draw a figure", "visual for docs", "explain this
+  gesture visually", "before/after diagram".
 ---
 
-# Canvas Docs SVG Kit
+# Docs SVG Kit
 
-A snippet library for drawing SVG figures used in canvas user docs.
+A snippet library for drawing SVG figures embedded in Grida docs. Canvas
+user docs are the kit's first consumer; the same primitives and
+conventions are meant to carry over to any product's docs as they adopt
+SVG figures.
 
-**Companion to:** [`canvas-user-docs`](../canvas-user-docs/SKILL.md).
-Use that skill for prose, this one for the visuals embedded inside it.
+**First consumer / companion:**
+[`docs-canvas`](../docs-canvas/SKILL.md). Use that skill for the prose,
+this one for the visuals embedded inside it.
 
 ## Why SVG, not a screenshot
 
@@ -55,13 +62,13 @@ So we can enumerate, audit, and migrate kit assets later without reading each fi
 1. A top-level XML comment immediately before the root `<svg>` (grep-friendly):
 
    ```xml
-   <!-- @generated-by: canvas-docs-svg-kit v1 -->
+   <!-- @generated-by: docs-svg-kit v1 -->
    ```
 
 2. A `<metadata>` element as the first child of `<svg>` (SVG-spec-native, survives minification and SVGO passes that strip comments):
 
    ```xml
-   <metadata>canvas-docs-svg-kit/v1</metadata>
+   <metadata>docs-svg-kit/v1</metadata>
    ```
 
 Both markers are present in `snippets/template.svg`, so they propagate automatically when you copy from the template. If you start a figure from scratch, paste both before composing anything else.
@@ -71,7 +78,7 @@ Both markers are present in `snippets/template.svg`, so they propagate automatic
 **Enumerate kit assets:**
 
 ```sh
-grep -rl "canvas-docs-svg-kit" docs/editor/
+grep -rl "docs-svg-kit" docs/editor/
 ```
 
 When the kit changes, walk the grep output and update each file.
@@ -241,8 +248,8 @@ We don't have this validator yet — add it the first time you find yourself fix
 
 **Pre-publish checklist:**
 
-- [ ] Watermark comment present (`@generated-by: canvas-docs-svg-kit v1`)
-- [ ] `<metadata>canvas-docs-svg-kit/v1</metadata>` is the first child of `<svg>`
+- [ ] Watermark comment present (`@generated-by: docs-svg-kit v1`)
+- [ ] `<metadata>docs-svg-kit/v1</metadata>` is the first child of `<svg>`
 - [ ] Inline `<style>` only — no external stylesheet references
 - [ ] No `<use href="other.svg#…">` — all referenced ids exist in this file
 - [ ] Viewport is `960 × 960`
