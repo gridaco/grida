@@ -100,7 +100,7 @@ pub enum ParagraphIdentifier {
 ///
 /// This struct contains the geometric information needed to draw baseline paths
 /// for text overlay features like hit testing and stroke visualization.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct BaselineInfo {
     /// Left edge of the line in text coordinates
     pub left: f32,
@@ -114,7 +114,7 @@ pub struct BaselineInfo {
 ///
 /// This struct contains all available measurement results from the Skia Paragraph API,
 /// providing complete geometric information for layout calculations and rendering.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct LayoutMeasurements {
     // Basic dimensions
     /// Total height of the paragraph
@@ -160,7 +160,7 @@ pub struct ParagraphCacheEntry {
 
 /// Accumulated statistics from `measure()` calls — for benchmarking only.
 /// All fields are simple integer counters (zero-cost increments).
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct ParagraphMeasureStats {
     pub calls: u64,
     pub cache_hits: u64,
@@ -282,13 +282,13 @@ impl ParagraphCache {
                     // Fast path: return cached measurements if width matches
                     if let Some((cached_w, ref measurements)) = entry.cached_measurements {
                         if cached_w == width {
-                            return measurements.clone();
+                            return *measurements;
                         }
                     }
                     // Width changed: re-layout and cache
                     let paragraph_rc = entry.paragraph.clone();
                     let m = Self::compute_measurements(paragraph_rc, width);
-                    entry.cached_measurements = Some((width, m.clone()));
+                    entry.cached_measurements = Some((width, m));
                     return m;
                 }
             }
@@ -299,12 +299,12 @@ impl ParagraphCache {
                     self.stats.cache_hits += 1;
                     if let Some((cached_w, ref measurements)) = entry.cached_measurements {
                         if cached_w == width {
-                            return measurements.clone();
+                            return *measurements;
                         }
                     }
                     let paragraph_rc = entry.paragraph.clone();
                     let m = Self::compute_measurements(paragraph_rc, width);
-                    entry.cached_measurements = Some((width, m.clone()));
+                    entry.cached_measurements = Some((width, m));
                     return m;
                 }
             }
@@ -322,7 +322,7 @@ impl ParagraphCache {
             hash: shape_key.unwrap_or(0),
             font_generation: fonts_gen,
             paragraph: paragraph_rc,
-            cached_measurements: Some((width, measurements.clone())),
+            cached_measurements: Some((width, measurements)),
         };
 
         // Store in the appropriate cache

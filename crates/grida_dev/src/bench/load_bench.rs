@@ -123,7 +123,7 @@ fn measure_load_scene(
         );
     }
     let layout_us = t1.elapsed().as_micros() as u64;
-    let para_stats = paragraph_cache.stats.clone();
+    let para_stats = paragraph_cache.stats;
 
     // Stage 2: Geometry
     let t2 = Instant::now();

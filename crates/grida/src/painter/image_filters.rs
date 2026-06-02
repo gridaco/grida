@@ -294,7 +294,7 @@ pub fn create_tint_filter(green_multiplier: f32) -> sk::ColorFilter {
 }
 
 /// Parameters for the shadows/highlights filter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ShadowsHighlightsParams {
     /// Shadow adjustment [-1.0, +1.0] (>0 lift shadows, <0 crush)
     pub shadows: f32,
