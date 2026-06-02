@@ -273,7 +273,7 @@ impl<'a> NodePainter<'a> {
     pub fn draw_polygon_node(&self, node: &PolygonNodeRec) {
         self.painter.with_transform(&node.transform.matrix, || {
             let path = node.to_path();
-            let shape = PainterShape::from_path(path.clone());
+            let shape = PainterShape::from_path(path);
             // In debug rendering, transform is already applied, so bounds should be in local space (identity transform)
             let identity_transform = math2::transform::AffineTransform::identity().matrix;
             self.painter

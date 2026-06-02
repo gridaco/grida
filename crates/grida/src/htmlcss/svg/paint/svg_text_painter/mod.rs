@@ -3244,11 +3244,11 @@ fn read_local_font(node: &DemoNode, prop: &str) -> Option<String> {
     let parts = parse_font_shorthand(&raw)?;
     if parsed_in_shorthand {
         let from_shorthand = match prop {
-            "font-style" => parts.style.clone(),
-            "font-weight" => parts.weight.clone(),
-            "font-stretch" => parts.stretch.clone(),
-            "font-size" => parts.size.clone(),
-            "font-family" => parts.family.clone(),
+            "font-style" => parts.style,
+            "font-weight" => parts.weight,
+            "font-stretch" => parts.stretch,
+            "font-size" => parts.size,
+            "font-family" => parts.family,
             _ => None,
         };
         if from_shorthand.is_some() {

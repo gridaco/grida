@@ -926,7 +926,7 @@ fn detect_select_widget(node_data: &DemoNode, dom: &DemoDom, el: &mut StyledElem
         }
     }
 
-    let display_text = selected_text.clone().or(first_option_text);
+    let display_text = selected_text.or(first_option_text);
     if let Some(ref text) = display_text {
         inject_synthetic_text(el, text, el.color);
     }
