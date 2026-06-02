@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@grida/canvas-sync": "workspace:*",
-    "hono": "^4.9.8"
+    "hono": "^4.12.23"
   },
   "devDependencies": {
     "typescript": "^6",
