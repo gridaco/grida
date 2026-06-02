@@ -1,6 +1,6 @@
-<!-- @generated-by: canvas-docs-svg-kit v1 -->
+<!-- @generated-by: docs-svg-kit v1 -->
 <!--
-  canvas-docs-svg-kit  ·  primitives catalog
+  docs-svg-kit  ·  primitives catalog
 
   Visual reference of every primitive in the kit. Open this file to see
   what's available before composing a new figure. The CSS classes shown
@@ -11,7 +11,7 @@
      width="960"
      height="1400"
      font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <metadata>canvas-docs-svg-kit/v1</metadata>
+  <metadata>docs-svg-kit/v1</metadata>
   <defs>
     <style>
       .canvas-bg     { fill: #ECECEC; }

@@ -1,5 +1,5 @@
 ---
-name: canvas-user-docs
+name: docs-canvas
 description: >
   Author and manage user-facing documentation for the Grida Canvas editor.
   Covers writing style, tone, product screenshots, demo state preparation,
@@ -111,7 +111,7 @@ For workflows, before/after, or relationships a screenshot can't show.
 - Annotations: red (#FF3B30) circles/arrows, 2px stroke, 1-3 callouts max
 
 For SVG figures specifically — gestures, alignment, before/after diagrams that
-recreate canvas UI — use the **`canvas-docs-svg-kit`** skill. It provides a
+recreate canvas UI — use the **`docs-svg-kit`** skill. It provides a
 starter template, a primitives catalog (selection chrome, size badges, anchor
 pins, resize cursors, ripples), and finished examples to crib from. Saves you
 from re-deriving stroke widths, colors, and the half-pixel alignment tricks.
