@@ -184,7 +184,7 @@ fn svg_linear_gradient_to_paint(
 ) -> Paint {
     let xy1 = Alignment::from_uv(Uv(linear.x1, linear.y1));
     let xy2 = Alignment::from_uv(Uv(linear.x2, linear.y2));
-    let mut transform = AffineTransform::from(&linear.transform);
+    let mut transform = AffineTransform::from(linear.transform);
     normalize_gradient_transform(&mut transform, bounds);
 
     Paint::LinearGradient(LinearGradientPaint {
@@ -209,7 +209,7 @@ fn svg_radial_gradient_to_paint(
         return unsupported_svg_gradient("radial focal point (fx/fy)");
     }
 
-    let mut gradient_transform = AffineTransform::from(&radial.transform);
+    let mut gradient_transform = AffineTransform::from(radial.transform);
     normalize_gradient_transform(&mut gradient_transform, bounds);
     let alignment = radial_gradient_alignment_transform((radial.cx, radial.cy), radial.r);
 

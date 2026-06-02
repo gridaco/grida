@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// # Constraints
 ///
 /// - `width` and `height` must be non-negative (can be zero, but not negative)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CGRect {
     /// The x-coordinate of the rectangle's origin (left edge).
     pub x: f32,
