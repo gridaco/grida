@@ -85,63 +85,48 @@ As `grida_ciam` evolves, keep this section up to date, and add new sections belo
    - If valid and not expired, create a `grida_ciam.customer_session`.
    - Mark `public.customer.is_email_verified = true` and sync email on success.
 
-3. **Mint JWT**
-   - Backend mints a JWT containing a session identifier (`sid`).
-   - Client uses Supabase client `accessToken: async () => jwt`.
+3. **Create portal session token**
+   - Backend issues an opaque URL-safe token via `create_customer_portal_session`
+     and stores only its `sha256` hash; the raw token is returned once.
+   - The token is redeemed server-side via `redeem_customer_portal_session`.
 
-4. **RLS**
-   - DB helpers read `request.jwt.claims` and resolve:
-     - `customer_uid()`
-     - `project_id()`
-   - Policies can reference these helpers to enforce row access.
+4. **Identity resolution**
+   - _Current_: resolved **server-side using `service_role`**, filtering by
+     `customer_uid` / `project_id` (DB requests do not carry customer-session claims).
+   - _Future_: DB helpers (`customer_uid()` / `project_id()`) read `request.jwt.claims`
+     so RLS policies can enforce row access directly.
+
+See [Session model & cryptography](#session-model--cryptography) below for details.
 
 ---
 
-### Cryptography & JWT signing keys
+### Session model & cryptography
 
-#### Why ES256 (signing keys) over HS256 (legacy secret)?
+#### Current: opaque portal-session tokens
 
-- ES256 enables safe rotation and fast verification via public key discovery (JWKS).
-- HS256 shared secrets are discouraged for production and complicate rotation.
+The customer portal flow (email OTP → customer session → portal session) is **opaque
+URL-token based**, not JWT based:
 
-See Supabase docs:
-
-- [`JWT Signing Keys`](https://supabase.com/docs/guides/auth/signing-keys)
-- [`JWTs` / verification + `accessToken`](https://supabase.com/docs/guides/auth/jwts#verifying-a-jwt-from-supabase)
-- [`Third-party auth` overview (limitations)](https://supabase.com/docs/guides/auth/third-party/overview#limitations)
-
-#### First-party custom auth (not a third-party provider)
+- `grida_ciam_public.create_customer_portal_session` mints a URL-safe random token
+  (`grida_ciam.make_url_token`) and stores only its `sha256` hash
+  (`customer_portal_session.token_hash`); the raw token is returned **once**.
+- The token is redeemed server-side via `grida_ciam_public.redeem_customer_portal_session`.
+- Identity is resolved **server-side using `service_role`**, filtering by `customer_uid` /
+  `project_id`. Customer-session claims are **not** attached to DB requests today, so
+  customer-facing reads do not yet rely on customer-scoped RLS (see the `TODO(ciam)` in
+  `app/(tenant)/~/[tenant]/(p)/p/session/[token]/page.tsx`).
 
 This system intentionally behaves as **first-party custom auth** for the customer portal:
+customers are **not** created / managed as Supabase Auth users (`auth.users`).
 
-- We **do not** create / manage customers as Supabase Auth users (`auth.users`).
-- We **do** mint JWTs that Supabase/PostgREST can verify so RLS can enforce access.
+#### Future direction: customer-session-oriented RLS
 
-There is an alternative design: treat `grida_ciam` as a **third-party auth provider** and have Supabase verify JWTs via an OIDC issuer discovery + JWKS setup.
-
-While doable, it would likely require:
-
-- OIDC issuer discovery endpoints and JWKS hosting, and
-- a per-tenant (per `project_id`) issuer configuration to preserve strict tenant scoping,
-
-which is operationally heavier and offers no clear benefits for our current goals.
-
-As a result, we require `grida_ciam` to sign JWTs using a signing key that Supabase trusts (ES256 signing keys system), while still keeping the customer identity model separate from Supabase Auth.
-
-#### Hosted Supabase constraint (important)
-
-Hosted Supabase **does not allow extracting** the platform-managed private signing key.
-
-Therefore, `grida_ciam` requires you to **bring/import your own private key**:
-
-- Import your ES256 private key into Supabase Auth as a signing key.
-- Store the same private key in your backend secret manager.
-- Configure the backend to use `SUPABASE_SIGNING_KEY_JSON` (private JWK; must include `d`).
-
-This allows:
-
-- Backend to **sign** JWTs.
-- Supabase/PostgREST to **verify** JWTs using JWKS (public-only).
+A later iteration may attach a per-customer authorization context to DB requests so RLS
+can enforce access directly (rather than going through `service_role`). One candidate is to
+mint JWTs that Supabase/PostgREST verifies via JWKS (ES256 signing keys), keeping the
+customer identity model separate from Supabase Auth. This is **not implemented** — it would
+require a signing-key setup (e.g. bring-your-own key on hosted Supabase, since
+platform-managed private keys are not extractable) and is tracked as future work.
 
 ---
 
@@ -176,8 +161,6 @@ We keep the public surface RPC-based so internal tables aren’t directly expose
 
 ### Operational notes / pitfalls
 
-- **JWKS is public-only**: `.../auth/v1/.well-known/jwks.json` does not include `d` and cannot be used to sign.
-- **Local Supabase Auth key file**: the local Auth container expects a compatible signing key setup; keep `signing_keys.json` consistent with your local stack.
 - **OTP attempt counting**: PL/pgSQL exceptions roll back changes in the same transaction; track attempts accordingly if you need strict accounting.
 
 ---
