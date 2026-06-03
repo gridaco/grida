@@ -15,6 +15,7 @@ import { WorkspaceRegistry } from "../../workspaces";
 import { openSessionsDb } from "../../session/db";
 import { SessionsStore } from "../../session/store";
 import { AGENT_SESSION_AGENT } from "../../protocol/run";
+import type { SessionStatus } from "../../protocol/session-status";
 import { AgentRuntime } from "../../runtime";
 import { StreamRegistry } from "../../runtime/stream-registry";
 import { registerSessionsRoutes } from "./sessions";
@@ -23,6 +24,7 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
   let baseDir: string;
   let store: SessionsStore;
   let streams: StreamRegistry;
+  let runtime: AgentRuntime;
   let app: Hono;
 
   beforeEach(async () => {
@@ -33,7 +35,7 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
     store = new SessionsStore(openSessionsDb({ user_data_path: baseDir }));
     streams = new StreamRegistry();
     app = new Hono();
-    const runtime = new AgentRuntime({
+    runtime = new AgentRuntime({
       secrets,
       workspace_registry: new WorkspaceRegistry(baseDir),
       sessions_store: store,
@@ -44,7 +46,7 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
   });
 
   afterEach(async () => {
-    streams.clear();
+    runtime.dispose(); // clears the registry + the scheduler's drain timers
     store.close();
     await fs.rm(baseDir, { recursive: true, force: true });
   });
@@ -197,5 +199,142 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
       body: JSON.stringify({ from_message_id: "msg_x" }),
     });
     expect(res.status).toBe(404);
+  });
+
+  describe("queue routes (RFC `queue`)", () => {
+    it("POST enqueues even while a run is in flight (no 409), held out of the model view", async () => {
+      const { id } = await seed(1);
+      streams.create(id); // mark a run in flight
+      const res = await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ text: "queued while busy" }),
+      });
+      // Enqueue MUST NOT 409 — queuing behind a running turn is the point.
+      expect(res.status).toBe(200);
+      const row = (await res.json()) as {
+        id: string;
+        metadata: { queued_at?: number };
+      };
+      expect(row.metadata.queued_at).toEqual(expect.any(Number));
+      // ...and it is not part of the model view.
+      expect(
+        (await store.listVisibleMessages(id)).map((m) => m.id)
+      ).not.toContain(row.id);
+    });
+
+    it("GET returns the queue FIFO", async () => {
+      const { id } = await seed(1);
+      await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ id: "qa", text: "first" }),
+      });
+      await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ id: "qb", text: "second" }),
+      });
+      const res = await app.request(`/sessions/${id}/queue`, { method: "GET" });
+      expect(res.status).toBe(200);
+      const items = (await res.json()) as Array<{ id: string }>;
+      expect(items.map((m) => m.id)).toEqual(["qa", "qb"]);
+    });
+
+    it("DELETE cancels a queued item, and is scoped to the path session", async () => {
+      const { id } = await seed(1);
+      const other = await store.create({ agent: AGENT_SESSION_AGENT });
+      await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ id: "qx", text: "pending" }),
+      });
+      // A DELETE under the WRONG session must NOT remove it.
+      const wrong = await app.request(`/sessions/${other.id}/queue/qx`, {
+        method: "DELETE",
+      });
+      expect(wrong.status).toBe(200);
+      expect(await store.getMessage("qx")).not.toBeNull();
+      // Under the right session, it is removed.
+      const ok = await app.request(`/sessions/${id}/queue/qx`, {
+        method: "DELETE",
+      });
+      expect(ok.status).toBe(200);
+      expect(await store.getMessage("qx")).toBeNull();
+    });
+  });
+
+  describe("status channel (RFC `session` §Session status)", () => {
+    // Read SSE `data:` frames into parsed SessionStatus objects.
+    function parseStatuses(buf: string): SessionStatus[] {
+      const out: SessionStatus[] = [];
+      for (const frame of buf.split("\n\n")) {
+        const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
+        if (!dataLine) continue;
+        try {
+          out.push(JSON.parse(dataLine.slice("data:".length).trim()));
+        } catch {
+          /* skip */
+        }
+      }
+      return out;
+    }
+
+    async function readStatuses(
+      res: Response,
+      count: number
+    ): Promise<SessionStatus[]> {
+      const reader = res.body!.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (parseStatuses(buf).length < count) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+      }
+      reader.cancel().catch(() => undefined);
+      return parseStatuses(buf);
+    }
+
+    it("streams the current status then every idle⇄busy transition", async () => {
+      const { id } = await seed(1);
+      const ac = new AbortController();
+      const res = await app.request(`/sessions/${id}/status`, {
+        signal: ac.signal,
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+
+      // Drive a turn lifecycle through the registry — the observer projects it
+      // onto the scheduler, which broadcasts to this subscription.
+      streams.create(id);
+      streams.finish(id, "finish");
+
+      const statuses = await readStatuses(res, 3);
+      ac.abort();
+      expect(statuses.map((s) => s.state)).toEqual(["idle", "busy", "idle"]);
+    });
+
+    it("projects a hard error as state=error", async () => {
+      const { id } = await seed(1);
+      const ac = new AbortController();
+      const res = await app.request(`/sessions/${id}/status`, {
+        signal: ac.signal,
+      });
+      streams.create(id);
+      streams.finish(id, "error");
+      const statuses = await readStatuses(res, 3);
+      ac.abort();
+      expect(statuses.map((s) => s.state)).toEqual(["idle", "busy", "error"]);
+    });
+
+    it("a late subscriber's first frame is the CURRENT status", async () => {
+      const { id } = await seed(1);
+      streams.create(id); // session is already busy when the client joins
+      const ac = new AbortController();
+      const res = await app.request(`/sessions/${id}/status`, {
+        signal: ac.signal,
+      });
+      const [first] = await readStatuses(res, 1);
+      ac.abort();
+      expect(first.state).toBe("busy");
+      streams.finish(id, "finish"); // settle for teardown
+    });
   });
 });

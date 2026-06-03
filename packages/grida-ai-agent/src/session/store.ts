@@ -127,6 +127,21 @@ export class SessionsStore {
     return rows[0] ? rowToSession(rows[0]) : null;
   }
 
+  /**
+   * The session's internal workspace root — the filesystem the agent is bound
+   * to, or `null` for an unbound (standalone) session. Not on the public
+   * {@link ChatSessionRow} (it's host-internal); read directly for a core
+   * queue drain, which has no client request to carry it.
+   */
+  async getWorkspaceRoot(id: string): Promise<string | null> {
+    const rows = await this.db
+      .select({ workspace_root: chatSessions.workspace_root })
+      .from(chatSessions)
+      .where(eq(chatSessions.id, id))
+      .limit(1);
+    return rows[0]?.workspace_root ?? null;
+  }
+
   async list(filter: SessionListFilter = {}): Promise<SessionListPage> {
     const limit = clampLimit(filter.limit);
     const conditions = [] as Array<ReturnType<typeof eq>>;
@@ -390,10 +405,19 @@ export class SessionsStore {
       if (bucket) bucket.push(row);
       else partsByMessage.set(row.message_id, [row]);
     }
-    return messages.map((m) => ({
-      ...rowToMessage(m),
-      parts: partsByMessage.get(m.id) ?? [],
-    }));
+    return (
+      messages
+        .map((m) => ({
+          ...rowToMessage(m),
+          parts: partsByMessage.get(m.id) ?? [],
+        }))
+        // Queued sends (RFC `queue`): rows carrying `metadata.queued_at` are
+        // pending — not part of the transcript until they fire. Excluded here
+        // and from `listVisibleMessages` (the model view); surfaced only via
+        // `listQueuedMessages`. `listMessageIds` deliberately does NOT filter
+        // (the persist-tail dedup must still see queued ids).
+        .filter((m) => !isQueued(m.metadata))
+    );
   }
 
   /**
@@ -429,10 +453,143 @@ export class SessionsStore {
       if (bucket) bucket.push(row);
       else partsByMessage.set(row.message_id, [row]);
     }
-    return messages.map((m) => ({
-      ...rowToMessage(m),
-      parts: partsByMessage.get(m.id) ?? [],
-    }));
+    return (
+      messages
+        .map((m) => ({
+          ...rowToMessage(m),
+          parts: partsByMessage.get(m.id) ?? [],
+        }))
+        // Queued sends (RFC `queue`): a pending `metadata.queued_at` row must
+        // not reach the model — it is excluded until it fires (its `queued_at`
+        // is cleared by {@link dequeueMessage}). See {@link listMessages}.
+        .filter((m) => !isQueued(m.metadata))
+    );
+  }
+
+  // ──────────────────────────── queue ────────────────────────────
+  // Queued sends (RFC `queue`): a queued message is a normal `user` row
+  // carrying `metadata.queued_at`. It is held out of the model view and the
+  // transcript until it fires; `listQueuedMessages` surfaces it for the host's
+  // queued region. Firing clears `queued_at` ({@link dequeueMessage}); the X
+  // affordance hard-deletes it ({@link deleteMessage}).
+
+  /**
+   * Persist a queued user message: a `user` row stamped with
+   * `metadata.queued_at` plus its single text part (written in the same
+   * AI-SDK part shape a fired turn consumes, so the row can later be fired
+   * directly). Uses {@link appendMessage} (not the idempotent variant) — a
+   * queued id collision is a real bug, not a resend race.
+   */
+  async appendQueuedMessage(
+    sessionId: string,
+    input: { id?: string; text: string; queued_at?: number }
+  ): Promise<ChatMessageRow & { parts: ChatPartRow[] }> {
+    const queuedAt = input.queued_at ?? Date.now();
+    const msg = await this.appendMessage(sessionId, {
+      id: input.id,
+      role: "user",
+      metadata: { queued_at: queuedAt },
+    });
+    const part = await this.upsertPart(msg.id, {
+      index: 0,
+      type: "text",
+      data: { type: "text", text: input.text },
+      session_id: sessionId,
+    });
+    return { ...msg, parts: [part] };
+  }
+
+  /**
+   * The queue: pending `metadata.queued_at` rows with parts, FIFO by
+   * `queued_at` with a deterministic `id` tiebreak (RFC `queue / order`).
+   */
+  async listQueuedMessages(
+    sessionId: string
+  ): Promise<Array<ChatMessageRow & { parts: ChatPartRow[] }>> {
+    const messages = await this.db
+      .select()
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.session_id, sessionId),
+          isNull(chatMessages.hidden_at)
+        )
+      );
+    const parts = await this.db
+      .select()
+      .from(chatParts)
+      .where(eq(chatParts.session_id, sessionId))
+      .orderBy(asc(chatParts.message_id), asc(chatParts.index));
+    const partsByMessage = new Map<string, ChatPartRow[]>();
+    for (const p of parts) {
+      const row = rowToPart(p);
+      const bucket = partsByMessage.get(row.message_id);
+      if (bucket) bucket.push(row);
+      else partsByMessage.set(row.message_id, [row]);
+    }
+    return messages
+      .map((m) => ({
+        ...rowToMessage(m),
+        parts: partsByMessage.get(m.id) ?? [],
+      }))
+      .filter((m) => isQueued(m.metadata))
+      .sort((a, b) => {
+        const qa = a.metadata.queued_at as number;
+        const qb = b.metadata.queued_at as number;
+        return qa - qb || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      });
+  }
+
+  /**
+   * Fire a queued message: clear `metadata.queued_at` so it becomes a normal
+   * visible user message (RFC `queue / the run-state machine`). No-op if the
+   * row is gone or was not queued. Merges metadata so sibling keys survive
+   * (mirrors {@link setMessageUsage}).
+   */
+  async dequeueMessage(messageId: string): Promise<void> {
+    const existing = await this.getMessage(messageId);
+    if (!existing || !isQueued(existing.metadata)) return;
+    const metadata = { ...existing.metadata };
+    delete metadata.queued_at;
+    const now = Date.now();
+    await this.db
+      .update(chatMessages)
+      .set({
+        metadata_json: JSON.stringify(metadata),
+        // Re-stamp `created_at` to fire time. A queued message's original
+        // `created_at` is its ENQUEUE time, which can predate the in-flight
+        // assistant message (created lazily on its first chunk). Since the
+        // model view orders by `created_at`, leaving it would sort the fired
+        // user message BEFORE that assistant turn — the conversation would end
+        // on an assistant message and the provider rejects it ("must end with
+        // a user message"). Firing IS the message entering the conversation as
+        // the next turn, so its position is the end.
+        created_at: now,
+        updated_at: now,
+      })
+      .where(eq(chatMessages.id, messageId));
+  }
+
+  /**
+   * Cancel a queued message: hard-delete the row and its parts (RFC
+   * `queue / operating on queued messages`). Doubly guarded — the row must
+   * (a) belong to `sessionId` (the DELETE route is session-scoped; a
+   * messageId must not reach across sessions) and (b) STILL carry
+   * `metadata.queued_at`, so it can never remove a fired/recorded turn
+   * (defends a cancel/fire race). No-op otherwise. This is the store's only
+   * hard delete; every other removal is a soft `hidden_at` rewind.
+   */
+  async deleteMessage(sessionId: string, messageId: string): Promise<void> {
+    const existing = await this.getMessage(messageId);
+    if (
+      !existing ||
+      existing.session_id !== sessionId ||
+      !isQueued(existing.metadata)
+    ) {
+      return;
+    }
+    await this.db.delete(chatParts).where(eq(chatParts.message_id, messageId));
+    await this.db.delete(chatMessages).where(eq(chatMessages.id, messageId));
   }
 
   /**
@@ -491,15 +648,27 @@ export class SessionsStore {
     sessionId: string,
     fromMessageId: string
   ): Promise<RewindResult> {
-    const rows = await this.db
+    const allRows = await this.db
       .select({
         id: chatMessages.id,
         created_at: chatMessages.created_at,
         hidden_at: chatMessages.hidden_at,
+        metadata_json: chatMessages.metadata_json,
       })
       .from(chatMessages)
       .where(eq(chatMessages.session_id, sessionId))
       .orderBy(asc(chatMessages.created_at), asc(chatMessages.id));
+    // Queued sends (RFC `queue`) are PENDING, not history — a rewind must not
+    // touch them. A queued row's `created_at` is its (recent) enqueue time, so
+    // it sorts after the rewind target and the old code stamped `hidden_at` on
+    // it, which dropped it from `listQueuedMessages` forever (it requires
+    // `hidden_at IS NULL`) while its `queued_at` lingered → an unreclaimable
+    // lost message. Excluding them here keeps the pending queue invariant
+    // across a rewind.
+    const rows = allRows.filter(
+      (r) =>
+        !isQueued(parseJsonOr(r.metadata_json, {}) as Record<string, unknown>)
+    );
     const targetIdx = rows.findIndex((r) => r.id === fromMessageId);
     if (targetIdx < 0) throw new MessageNotFoundError(fromMessageId);
 
@@ -1013,6 +1182,18 @@ function parseJsonOr<T>(raw: string | null, fallback: T): unknown | T {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * A message is QUEUED — pending, held out of the transcript AND the model
+ * view until it fires — iff its metadata carries a numeric `queued_at`
+ * (RFC `queue`). This is the single source of the queue-visibility rule:
+ * every list filter and the dequeue/cancel guards route through it so they
+ * can never disagree about what counts as queued (e.g. on the `queued_at: 0`
+ * boundary).
+ */
+function isQueued(metadata: Record<string, unknown> | undefined): boolean {
+  return typeof metadata?.queued_at === "number";
 }
 
 function clampLimit(raw: number | undefined): number {

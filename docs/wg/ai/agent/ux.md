@@ -30,7 +30,16 @@ The user submits another message while the assistant is still
 streaming. The behavior MUST be **queue and process on idle**: the
 new message appears immediately, **visually distinguished from settled
 history** (it has not been answered yet), and fires on its own when
-the running turn ends.
+the session next goes idle.
+
+A submit queues whenever the session is **busy**, and "busy" spans
+more than a streaming turn: a maintenance operation that holds the
+turn slot — e.g. an in-flight [compaction](./session.md#compaction) —
+also makes the next submit queue, so it fires **after** that operation
+finishes rather than racing a fresh turn against a session that is
+mid-change. The surface decides what counts as busy from the run
+state; the [run-state machine](./queue.md#the-run-state-machine) is
+the authority on when the next turn may fire.
 
 Affordances a conforming surface SHOULD provide:
 
@@ -49,6 +58,14 @@ next batch — stop does **not** clear the queue. To stop everything the
 user cancels the queued messages first (a surface MAY combine the two
 into one "stop and clear" control). See
 [`queue / stopping with a queue`](./queue.md#stopping-with-a-queue).
+
+**When a turn fails.** A clean abort drains the next item (above), but
+a turn that **hard-fails** — a provider or network error, not a user
+stop — **pauses** the drain: the queued messages keep their place and
+wait. The drain resumes on the next fired turn (the user's retry or
+edit-and-resend), which clears the error. This is the run-state
+machine's rule, not a surface choice; see
+[`queue / the run-state machine`](./queue.md#the-run-state-machine).
 
 Parallel turns on the same session are a footgun — the second turn
 would race with the first on context, on tools, on the session's run

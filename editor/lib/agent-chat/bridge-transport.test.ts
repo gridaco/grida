@@ -127,4 +127,46 @@ describe("desktopAgentTransport", () => {
       expect.any(Function)
     );
   });
+
+  // Regression: a core-initiated turn (a queue drain) is rendered by
+  // `resumeStream()`, which the AI SDK calls as `reconnectToStream({ chatId })`
+  // with the AI-SDK chat id. For a FRESH chat that id is client-generated and
+  // never matches the SERVER session id the stream registry is keyed by — so a
+  // reconnect on `chatId` 404s and the drained turn's response silently never
+  // renders. The transport MUST reconnect to the server id learned on send.
+  it("reconnectToStream resumes the SERVER session id (from send), not the client chatId", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_server", // the server-resolved id, != the chatId below
+      done: Promise.resolve(),
+    }));
+    vi.mocked(ai.reconnectAgentRun).mockResolvedValue(null); // no live run → null
+
+    const transport = desktopAgentTransport.create();
+
+    // First send: the fresh chat adopts its server id (via the bridge handle).
+    const stream = await transport.sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-client-generated",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "1" }] },
+      ],
+      abortSignal: undefined,
+    });
+    // Drain the stream so `start()` runs and the session id is tracked.
+    const reader = stream.getReader();
+    while (!(await reader.read()).done) {
+      /* drain */
+    }
+
+    // A later reconnect (the core drained the next queued turn) MUST target the
+    // server id — NOT the client `chatId`, which would 404.
+    await transport.reconnectToStream!({ chatId: "chat-client-generated" });
+    expect(ai.reconnectAgentRun).toHaveBeenLastCalledWith(
+      "ses_server",
+      0,
+      expect.any(Function)
+    );
+  });
 });

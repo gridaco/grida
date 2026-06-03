@@ -40,7 +40,13 @@ import { discoverSkills } from "../skills/discovery";
 import { discoverProjectInstructions } from "../skills/project-instructions";
 import type { SkillBodyCache, SkillIndex } from "../skills/types";
 import type { WorkspaceRegistry } from "../workspaces";
-import { RunInFlightError, StreamRegistry } from "./stream-registry";
+import {
+  RunInFlightError,
+  StreamRegistry,
+  type StreamEntry,
+} from "./stream-registry";
+import { SessionScheduler } from "./session-scheduler";
+import { AGENT_DEFAULT_TIER } from "../tiers";
 import {
   extractFirstUserText,
   parseRunBody,
@@ -50,6 +56,7 @@ import {
 import { runAgent, type AgentStepUsage } from "./run-agent";
 import { buildModelMessages } from "./message-view";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
+import { buildStatusConsumerResponse } from "./status-sse";
 
 /** Session-static agent context (RFC `skills`: discovered once per session). */
 type SessionContext = {
@@ -151,11 +158,41 @@ export type AgentRuntimeDeps = ResolveDeps & {
     /** Stop the upward project + instruction walk here (inclusive). */
     stop_at?: string;
   };
+  /**
+   * Inter-turn settle delay before a drained queued turn fires (RFC `queue`).
+   * Defaults to {@link DEFAULT_DRAIN_COOLDOWN_MS}. Tests shrink it.
+   */
+  drain_cooldown_ms?: number;
+};
+
+/** A provider resolved by {@link resolveProvider} (model factory + ids). */
+type ResolvedProvider = Awaited<ReturnType<typeof resolveProvider>>;
+
+/**
+ * Everything {@link AgentRuntime.startTurn} needs to fire ONE turn, decoupled
+ * from any HTTP request. The HTTP `run()` path and the core queue drain both
+ * build this.
+ */
+type StartTurnOptions = {
+  provider: ResolvedProvider;
+  run_id: string;
+  tier: RunRequest["tier"];
+  model_id?: RunRequest["model_id"];
+  feature?: RunRequest["feature"];
+  workspace_root?: string;
+  skills?: RunRequest["skills"];
 };
 
 export class AgentRuntime {
   /** In-flight run registry. Owned here; `AgentHost.streams` aliases it. */
   readonly streams: StreamRegistry;
+  /**
+   * The per-session run-state machine (RFC `queue`): authoritative
+   * `SessionStatus` + the serial queue drain. Observes the registry lifecycle
+   * and fires queued turns through {@link startTurn}. The status SSE route
+   * reads it ({@link SessionScheduler.subscribe}).
+   */
+  readonly scheduler: SessionScheduler;
   private readonly run_agent_fn: typeof runAgent;
   /** Session-static agent context, discovered once per session id. */
   private readonly session_contexts = new Map<string, SessionContext>();
@@ -170,6 +207,60 @@ export class AgentRuntime {
     this.compaction_config =
       deps.compaction?.config ?? DEFAULT_COMPACTION_CONFIG;
     this.compaction_summarize = deps.compaction?.summarize;
+
+    // Run-state machine: owns SessionStatus + the serial drain. Its drain is a
+    // one-way dependency back into this runtime (fires a turn via startTurn);
+    // it reads/clears the queue through the store. Wire it to the registry's
+    // busy/idle edges (works for an injected registry too).
+    this.scheduler = new SessionScheduler({
+      list_queued: (sessionId) =>
+        this.deps.sessions_store.listQueuedMessages(sessionId),
+      dequeue: (messageId) =>
+        this.deps.sessions_store.dequeueMessage(messageId),
+      drain: (sessionId) => this.drainTurn(sessionId),
+      drain_cooldown_ms: deps.drain_cooldown_ms,
+    });
+    this.streams.observe({
+      on_create: (sessionId) => this.scheduler.onCreate(sessionId),
+      on_finish: (sessionId, reason) =>
+        this.scheduler.onFinish(sessionId, reason),
+    });
+  }
+
+  /**
+   * Fire the next queued turn for a session — the scheduler's injected drain
+   * (RFC `queue / the run-state machine`). The scheduler already dequeued the
+   * fired row (cleared its `queued_at`) just before calling this, so it is
+   * already in the model view; this just rebuilds the turn context from the
+   * PERSISTED session — provider/model from `session.model`, workspace root
+   * from the row — and starts the turn. No client request, no per-send skills
+   * (a renderer concern with no analogue here). Throws {@link RunInFlightError}
+   * if a run is already in flight (the scheduler swallows it and retries on the
+   * next idle edge).
+   */
+  private async drainTurn(sessionId: string): Promise<void> {
+    const session = await this.deps.sessions_store.get(sessionId);
+    if (!session) return;
+    // Resolve the provider from the persisted model. A provider-down here
+    // throws to the scheduler (swallowed); the committed row waits for a
+    // user retry. The win path owns status.
+    const provider = await resolveProvider(this.deps, {
+      explicit: session.model?.provider_id,
+    });
+    const workspaceRoot =
+      (await this.deps.sessions_store.getWorkspaceRoot(sessionId)) ?? undefined;
+    const runId = crypto.randomUUID();
+    console.log(
+      `[agent-host-agent] drain firing sessionId=${sessionId} runId=${runId} providerId=${provider.provider_id}`
+    );
+    this.startTurn(sessionId, {
+      provider,
+      run_id: runId,
+      tier: session.model?.tier ?? AGENT_DEFAULT_TIER,
+      model_id: session.model?.model_id,
+      workspace_root: workspaceRoot,
+      skills: undefined,
+    });
   }
 
   /**
@@ -334,11 +425,18 @@ export class AgentRuntime {
         });
     }
 
-    // Reserve the registry entry; its `modelAbort.signal` (not the
-    // request signal) drives the model call so a disconnect can resume.
-    let entry;
+    // Reserve + pump for this turn (single-flight owned by startTurn). A 409
+    // surfaces as RunInFlightError; everything else streams.
     try {
-      entry = this.streams.create(sessionId);
+      this.startTurn(sessionId, {
+        provider,
+        run_id: runId,
+        tier,
+        model_id: modelId,
+        feature,
+        workspace_root: workspaceRoot,
+        skills,
+      });
     } catch (err) {
       if (err instanceof RunInFlightError) {
         return Response.json(
@@ -348,6 +446,37 @@ export class AgentRuntime {
       }
       throw err;
     }
+
+    return buildConsumerResponse(this.streams, sessionId, requestSignal);
+  }
+
+  /**
+   * Reserve the single-flight registry entry, attach the recorder, and launch
+   * the (fire-and-forget) model pump for ONE turn. Both the HTTP `run()` path
+   * and the core queue drain go through here, so the reserve, recorder attach,
+   * model view, and finish are owned in one place. Throws
+   * {@link RunInFlightError} if a run is already in flight — the caller maps
+   * it (HTTP → 409; a core drain swallows it and retries on the next idle
+   * edge). The model view is built from the server-authoritative
+   * `listVisibleMessages`; a drained row is already made visible by the
+   * scheduler (it clears `queued_at` right before firing), so this needs no
+   * client message array and no dequeue of its own.
+   */
+  private startTurn(sessionId: string, opts: StartTurnOptions): StreamEntry {
+    const {
+      provider,
+      run_id: runId,
+      tier,
+      model_id: modelId,
+      feature,
+      workspace_root: workspaceRoot,
+      skills,
+    } = opts;
+
+    // Reserve the registry entry; its `modelAbort.signal` (not the request
+    // signal) drives the model call so a disconnect can resume. Throws
+    // RunInFlightError to the caller if a run is already in flight.
+    const entry = this.streams.create(sessionId);
 
     // Recorder consumer — attached BEFORE the pump so no frame is missed.
     this.streams.attach(
@@ -366,8 +495,8 @@ export class AgentRuntime {
       sessions_store: sessionsStore,
     } = this.deps;
     // Pump: open the upstream model call, forward each SSE frame into the
-    // registry. Doesn't block the HTTP response; the client attaches as
-    // another consumer below.
+    // registry. Doesn't block the caller; a client attaches as another
+    // consumer (HTTP) or reconnects later (a core drain has no live consumer).
     void (async () => {
       try {
         // Auto-compaction (RFC `session / compaction`): if the session is
@@ -440,7 +569,7 @@ export class AgentRuntime {
       }
     })();
 
-    return buildConsumerResponse(this.streams, sessionId, requestSignal);
+    return entry;
   }
 
   /**
@@ -463,6 +592,24 @@ export class AgentRuntime {
       );
     }
     return buildConsumerResponse(this.streams, sessionId, requestSignal);
+  }
+
+  /**
+   * `GET /sessions/:id/status` — subscribe to the session's `SessionStatus`
+   * (RFC `session.md` §Session status). Long-lived SSE: the current status is
+   * the first frame, then every idle⇄busy⇄error transition. Always available —
+   * an unknown/idle session reads as `{ state: "idle" }`. This is the
+   * authoritative fact the dumb UI renders Stop/Send from.
+   */
+  statusStream(sessionId: string, requestSignal: AbortSignal): Response {
+    if (!sessionId) {
+      return Response.json({ error: "sessionId required" }, { status: 400 });
+    }
+    return buildStatusConsumerResponse(
+      this.scheduler,
+      sessionId,
+      requestSignal
+    );
   }
 
   /**
@@ -595,6 +742,62 @@ export class AgentRuntime {
     return Response.json(result);
   }
 
+  /**
+   * `POST /sessions/:id/queue` — enqueue a user message (RFC `queue`). Persists
+   * a pending `user` row with `metadata.queued_at`; it is held out of the model
+   * view and the transcript until it fires. Does NOT call {@link guardIdle} —
+   * enqueueing while a run is in flight is the entire point.
+   */
+  async enqueue(sessionId: string, body: unknown): Promise<Response> {
+    const { id, text } = (body ?? {}) as { id?: unknown; text?: unknown };
+    if (typeof text !== "string" || text.trim().length === 0) {
+      return Response.json({ error: "text is required" }, { status: 400 });
+    }
+    const session = await this.deps.sessions_store.get(sessionId);
+    if (!session) {
+      return Response.json({ error: "session not found" }, { status: 404 });
+    }
+    const row = await this.deps.sessions_store.appendQueuedMessage(sessionId, {
+      id: typeof id === "string" && id.length > 0 ? id : undefined,
+      text,
+    });
+    // Close the stale-busy race: a client enqueues while it believes the
+    // session is busy, but the turn may have just ended (the idle status frame
+    // still in flight). If the session is already idle with no drain pending,
+    // nothing else would ever fire this row — kick a drain now. A no-op while
+    // busy (the turn-end edge drains) or while a drain is already scheduled.
+    this.scheduler.notifyEnqueued(sessionId);
+    return Response.json(row);
+  }
+
+  /**
+   * `GET /sessions/:id/queue` — the pending queue, FIFO by `queued_at`
+   * (RFC `queue / order`).
+   */
+  async listQueued(sessionId: string): Promise<Response> {
+    const session = await this.deps.sessions_store.get(sessionId);
+    if (!session) {
+      return Response.json({ error: "session not found" }, { status: 404 });
+    }
+    const items = await this.deps.sessions_store.listQueuedMessages(sessionId);
+    return Response.json(items);
+  }
+
+  /**
+   * `DELETE /sessions/:id/queue/:messageId` — cancel (remove) a queued message
+   * before it fires (RFC `queue / operating on queued messages`). Scoped to
+   * the path's session: the store only deletes a row that belongs to
+   * `sessionId` AND still carries `queued_at`, so a messageId can neither
+   * reach across sessions nor remove a fired turn; idempotent.
+   */
+  async cancelQueued(sessionId: string, messageId: string): Promise<Response> {
+    if (!messageId) {
+      return Response.json({ error: "messageId required" }, { status: 400 });
+    }
+    await this.deps.sessions_store.deleteMessage(sessionId, messageId);
+    return Response.json({ ok: true });
+  }
+
   /** 409 if a run is actively in flight on this session; null when idle.
    *  Mirrors {@link StreamRegistry.create}: an *ended* entry lingering in
    *  its replay grace window is NOT in flight. */
@@ -615,12 +818,14 @@ export class AgentRuntime {
   /** Drain in-flight runs (abort upstream) + clear the registry. */
   dispose(): void {
     this.streams.clear();
+    this.scheduler.dispose();
     this.session_contexts.clear();
   }
 
   /** Drop a session's cached static context (call when a session is deleted). */
   forgetSession(sessionId: string): void {
     this.session_contexts.delete(sessionId);
+    this.scheduler.forget(sessionId);
   }
 }
 

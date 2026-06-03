@@ -102,7 +102,10 @@ function AgentComposerInner({
   }, [commandActions]);
 
   const submit = () => {
-    if (isStreaming) return;
+    // No `isStreaming` early-return: submitting WHILE a turn streams is how a
+    // message gets queued (RFC `queue`). The host's `onSubmit` decides
+    // send-vs-enqueue; the round button stays Stop (abort) while streaming, so
+    // Enter is the queue affordance.
     const message = composer.submit({ submitted_at: Date.now() });
     if (!message) return;
     // Intercept action commands (`/compact`, …) — run them instead of

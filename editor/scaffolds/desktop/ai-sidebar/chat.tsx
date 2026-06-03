@@ -37,12 +37,17 @@ import {
 } from "@/lib/desktop/bridge";
 import {
   desktopAgentTransport,
+  isSessionBusy,
   useChatSession,
+  useCoreTurnSync,
   useRefreshOnStreamEnd,
   useSessionFork,
+  useSessionStatus,
+  useTurnQueueController,
   type ChatMessage,
 } from "@/lib/agent-chat";
 import { useAgentFsBinding } from "./agent-fs-binding";
+import { QueuedMessages } from "../shared/queued-messages";
 import {
   ChatMessageView,
   CompactingIndicator,
@@ -148,11 +153,43 @@ export function AISidebarChat({ className }: { className?: string }) {
     stop,
     clearError,
     setMessages,
+    resumeStream,
   } = useChat({
     chat,
     resume: true,
   });
+  // `isStreaming` = a turn is actively streaming THROUGH THIS CLIENT. Used
+  // where that is the honest concept: the typing indicator, the Stop/Send
+  // button, and "did I start this turn?" (vs. the core). It is the AI-SDK
+  // client's optimistic per-request status — NOT the authoritative session
+  // state.
   const isStreaming = status === "submitted" || status === "streaming";
+
+  // Manual compaction (RFC `session / compaction`) runs as a separate op that
+  // does NOT move `useChat` status. Declared here so the single `busy` signal
+  // below can fold it in; the `/compact` command is wired further down.
+  const [compacting, setCompacting] = useState(false);
+
+  // Authoritative core run-state (RFC `session / session status`): the fact the
+  // UI projects, not the AI-SDK client's optimism. `coreBusy` covers a turn
+  // running on the session even one this client hasn't attached to yet (a queue
+  // drain the core just started).
+  const coreStatus = useSessionStatus(chatSession.current_id);
+  const coreBusy =
+    coreStatus?.state === "busy" || coreStatus?.state === "retrying";
+
+  // The session-busy signal — the SINGLE source for "is this session occupied
+  // and may not start another op." Combines the client-local view (streaming or
+  // an in-flight compaction) with the authoritative core state, so every
+  // session-op gate (queue submit, rewind, fork, compact, per-message actions)
+  // agrees on "busy" and a core-started turn also gates submits to enqueue.
+  const busy = isSessionBusy(status, compacting) || coreBusy;
+  // Block the reconcile while a turn is live — streaming locally OR a core turn
+  // this client is (about to be) attached to. NOT compacting: a compaction is
+  // idle to both signals and its rehydrate MUST reconcile. Read via a ref so
+  // the effect runs only on an `initial_messages` change.
+  const reconcileBlockedRef = useRef(false);
+  reconcileBlockedRef.current = isStreaming || coreBusy;
 
   // Reconcile the live chat to the persisted transcript whenever a rewind or
   // compaction replaces it. The `chat` memo above rebuilds on
@@ -161,9 +198,18 @@ export function AISidebarChat({ className }: { className?: string }) {
   // flips from client-generated to the server id), so the just-written
   // compaction divider can fail to render until a manual reload. Pushing the
   // hydrated messages in deterministically reconciles the render to DB truth.
-  // No-op during streaming/adoption — `initialMessages` is unchanged there, so
-  // a live turn is never clobbered.
+  //
+  // The `isStreaming` guard is the safety net: `initial_messages` is meant to
+  // change only while idle (rewind/compaction run while `busy`; compaction
+  // awaits `rehydrate_async` before clearing its busy flag — see onCompact),
+  // but if a hydration ever lands as a drained turn starts to stream, this
+  // would blindly overwrite the live turn. Skipping while streaming makes that
+  // fail safe (a stale reconcile is dropped, not applied over a live turn).
+  // Read via a ref so the effect still runs ONLY on an `initial_messages`
+  // change — adding `isStreaming` as a dep would re-run it on stream-end and
+  // re-apply a stale snapshot.
   useEffect(() => {
+    if (reconcileBlockedRef.current) return;
     setMessages(chatSession.initial_messages);
   }, [chatSession.initial_messages, setMessages]);
 
@@ -180,25 +226,47 @@ export function AISidebarChat({ className }: { className?: string }) {
   // "New Chat" until the renderer is reloaded.
   useRefreshOnStreamEnd(status, chatSession.refresh);
 
-  const onSubmit = useCallback(
-    async (text: string) => {
-      const t = text.trim();
-      if (!t || isStreaming) return;
-      // Thread the session id live (not via the transport's creation-time
-      // default) so a fresh chat that adopted its id mid-first-turn still
-      // sends it on the next turn without the `Chat` being rebuilt.
-      await sendMessage(
-        { text: t },
+  // Turn queue (RFC `queue`): a submit while the session is busy enqueues; the
+  // CORE fires queued items serially on a clean idle edge (the drain is core
+  // state — not this client). `useTurnQueueController` owns the submit gate +
+  // the optimistic mirror, shared with `workbench/agent-pane.tsx`. The session
+  // id is threaded live so a fresh chat that adopted its id mid-first-turn
+  // keeps continuity.
+  const {
+    queued,
+    cancel: cancelQueued,
+    drop: dropQueued,
+    submit: onSubmit,
+    refetch: refetchQueue,
+  } = useTurnQueueController({
+    sessionId: chatSession.current_id,
+    busy,
+    send: (text) =>
+      sendMessage(
+        { text },
         {
           body: {
             session_id: chatSession.current_id ?? undefined,
             model_id: modelId,
           },
         }
-      );
-    },
-    [isStreaming, sendMessage, modelId, chatSession.current_id]
-  );
+      ),
+  });
+
+  // React to the CORE drain (RFC `queue`): when the core fires a queued turn (a
+  // busy edge THIS client did not start), `useCoreTurnSync` promotes the fired
+  // message from the tray into the transcript and attaches to its stream. The
+  // core dequeues the row at FIRE time (not during the cooldown), so it stays
+  // in the tray as pending until then — "submitting" in step with its response.
+  useCoreTurnSync({
+    coreState: coreStatus?.state ?? null,
+    isStreaming,
+    queued,
+    setMessages,
+    dropQueued,
+    resumeStream,
+    refetchQueue,
+  });
 
   // Rewind (RFC `session / rewinding`): soft-truncate the session to the
   // chosen user message, then re-hydrate so the transcript drops the now-
@@ -206,7 +274,7 @@ export function AISidebarChat({ className }: { className?: string }) {
   const onRewind = useCallback(
     async (messageId: string) => {
       const sid = chatSession.current_id;
-      if (!sid || isStreaming) return;
+      if (!sid || busy) return;
       try {
         await bridgeSessions.rewind(sid, messageId);
         chatSession.rehydrate();
@@ -215,35 +283,37 @@ export function AISidebarChat({ className }: { className?: string }) {
         console.warn("[ai-sidebar] rewind failed", err);
       }
     },
-    [chatSession, isStreaming, clearError]
+    [chatSession, busy, clearError]
   );
 
   // Fork (RFC `session / fork`): the action + its "just forked" notice live
   // in one hook so every entry point (the per-message button and the `/fork`
-  // command below) shares the same behavior and feedback.
-  const { fork, just_forked: justForked } = useSessionFork(
-    chatSession,
-    isStreaming
-  );
+  // command below) shares the same behavior and feedback. Blocked while busy
+  // (a fork mid-compaction would copy a half-written summary).
+  const { fork, just_forked: justForked } = useSessionFork(chatSession, busy);
 
-  // Manual compaction (RFC `session / compaction`). `compacting` drives the
-  // in-flight divider+shimmer; the settled `data-compaction` summary renders
-  // itself once `rehydrate()` re-fetches the session.
-  const [compacting, setCompacting] = useState(false);
+  // Manual compaction (RFC `session / compaction`). `compacting` (declared
+  // above, where the queue controller reads it) drives the in-flight
+  // divider+shimmer. Await `rehydrate_async` BEFORE clearing the busy flag so
+  // the compacted transcript reconciles before the queue drains — otherwise a
+  // queued message would fire against the stale view and the late hydration
+  // would clobber the in-flight turn (RFC `queue`).
   const onCompact = useCallback(async () => {
     const sid = chatSession.current_id;
-    if (!sid || isStreaming || compacting) return;
+    // `busy` already folds in `compacting`, so this also blocks re-entrant
+    // compaction.
+    if (!sid || busy) return;
     setCompacting(true);
     try {
       await bridgeSessions.compact(sid);
-      chatSession.rehydrate();
+      await chatSession.rehydrate_async();
       clearError();
     } catch (err) {
       console.warn("[ai-sidebar] compact failed", err);
     } finally {
       setCompacting(false);
     }
-  }, [chatSession, isStreaming, compacting, clearError]);
+  }, [chatSession, busy, clearError]);
 
   // `/fork` command: the no-target sibling of the per-message fork. With no
   // chosen message it forks at the tail — the whole conversation.
@@ -253,12 +323,12 @@ export function AISidebarChat({ className }: { className?: string }) {
     return fork(fromMessageId);
   }, [fork, messages]);
 
-  // Stable per-turn affordances. `disabled` flips with streaming, so the
-  // object identity changes only on stream start/stop — settled rows skip
-  // re-render otherwise (reference-equal props).
+  // Stable per-turn affordances. `disabled` flips with `busy` (rewind/fork are
+  // session ops — disabled during a turn AND a compaction), so the object
+  // identity changes only on that edge; settled rows skip re-render otherwise.
   const messageActions = useMemo<ChatMessageActions>(
-    () => ({ onRewind, onFork: fork, disabled: isStreaming }),
-    [onRewind, fork, isStreaming]
+    () => ({ onRewind, onFork: fork, disabled: busy }),
+    [onRewind, fork, busy]
   );
 
   const commandActions = useMemo<ComposerCommandAction[]>(
@@ -337,6 +407,8 @@ export function AISidebarChat({ className }: { className?: string }) {
           </button>
         </div>
       )}
+
+      <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
       <div className="shrink-0 border-t p-3">
         <AgentComposerInput

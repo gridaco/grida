@@ -197,6 +197,19 @@ coalescing trades granularity for cost and for letting the agent
 react to everything at once. The discipline is fixed per
 implementation; this guide does not mandate one.
 
+**Drain cadence is a host policy.** The drain rule fires the next batch
+"when the session goes idle" — but an implementation MAY insert a brief
+**settle delay** between the idle edge and the next fire. The session is
+genuinely `idle` for that window (no turn running) and the next batch stays
+**queued** for its duration — its `queued_at` is cleared only when it fires.
+This gives every client time to observe the idle transition, and lets a
+surface keep showing the still-pending batch as queued so it appears to
+"submit" in step with its response rather than flushing early. Useful where a
+surface projects run-state to a control (a stop/send toggle) that would
+otherwise never paint the idle state on a back-to-back drain. The delay
+changes only cadence, never an [invariant](#invariants); its duration is the
+host's, like the [throttle and dedup numbers](#drop-rules--what-does-not-queue).
+
 Messages that arrive **after** a drain has begun belong to the
 **next** batch, never the one already firing — a batch is whatever was
 queued at the instant the session reached `idle`. This is what keeps a

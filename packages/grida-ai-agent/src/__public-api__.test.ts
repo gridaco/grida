@@ -26,6 +26,7 @@ import {
   BYOK_PROVIDER_IDS,
   createAgent,
   createToolset,
+  GRIDA_STATUS_SSE_EVENT,
   type AgentModelId,
   type AgentRunMessage,
   type AgentRunMessagePart,
@@ -47,6 +48,8 @@ import {
   type RecentEntry,
   type SessionListFilter,
   type SessionListPage,
+  type SessionRunState,
+  type SessionStatus,
   type SkillId,
   type Workspace,
   type WorkspaceFsEntry,
@@ -83,6 +86,12 @@ describe("@grida/agent public API", () => {
       expect(AGENT_SERVER_PROTOCOL).toBe(1);
       expect(handshake.capabilities.sessions).toBe(true);
       expect(run.feature).toBe("grida");
+
+      // Session status back-channel (RFC `session` / `queue`).
+      expect(GRIDA_STATUS_SSE_EVENT).toBe("grida-status");
+      const idle: SessionStatus = { state: "idle" };
+      const state: SessionRunState = idle.state;
+      expect(state).toBe("idle");
     });
 
     it("exposes the runtime-agnostic agent factory and toolset factory", () => {

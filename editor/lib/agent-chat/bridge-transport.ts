@@ -38,20 +38,37 @@ export namespace desktopAgentTransport {
   export function create(
     defaults: DesktopAgentTransportOptions = {}
   ): ChatTransport<UIMessage> {
+    // The in-flight stream registry is keyed by the SERVER session id. A fresh
+    // chat's AI-SDK `chatId` is a client-generated value that NEVER matches it
+    // (the `Chat` is created with `id: currentId ?? undefined` and deliberately
+    // not rebuilt when the session adopts its server id). So `reconnectToStream`
+    // — which the AI SDK calls with `chatId` — MUST instead use the server id we
+    // learn on send: otherwise a core-initiated turn (a queue drain) resumes a
+    // 404 and silently renders nothing.
+    let liveSessionId: string | null = defaults.session_id ?? null;
+    const trackSessionId = (id: string) => {
+      if (id) liveSessionId = id;
+      defaults.onSessionId?.(id);
+    };
     return {
       async sendMessages(options) {
+        const body = readBodyOptions(options.body);
+        if (body.session_id) liveSessionId = body.session_id;
         return streamFromBridge({
           ...defaults,
-          ...readBodyOptions(options.body),
+          ...body,
+          onSessionId: trackSessionId,
           messages: options.messages,
           abortSignal: options.abortSignal,
         });
       },
 
       async reconnectToStream(options) {
-        const chatId = options?.chatId;
-        if (!chatId) return null;
-        return await reconnectFromBridge(chatId, defaults.onResumeStart);
+        // Live server id first; fall back to `chatId` only before the first
+        // send (no in-flight run to reconnect to anyway).
+        const sessionId = liveSessionId ?? options?.chatId;
+        if (!sessionId) return null;
+        return await reconnectFromBridge(sessionId, defaults.onResumeStart);
       },
     };
   }

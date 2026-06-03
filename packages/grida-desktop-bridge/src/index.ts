@@ -22,6 +22,7 @@ import type {
   RewindResult,
   SessionListFilter,
   SessionListPage,
+  SessionStatus,
   Workspace,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
@@ -229,5 +230,28 @@ export type DesktopBridge = {
       reason?: string;
       summary_message_id?: string;
     }>;
+    /** Queued sends: enqueue a pending user message (held out of the model
+     *  view + transcript until it fires). The caller mints the id. */
+    enqueue: (
+      id: string,
+      message: { id?: string; text: string }
+    ) => Promise<ChatMessageWithParts>;
+    /** The pending queue, FIFO by `queued_at`. */
+    list_queued: (id: string) => Promise<ChatMessageWithParts[]>;
+    /** Cancel a queued message before it fires. */
+    cancel_queued: (id: string, messageId: string) => Promise<void>;
+    /**
+     * Subscribe to the session's run-state (RFC `session` §Session status):
+     * the current status arrives first, then every idle⇄busy⇄error
+     * transition. Returns a `subscription_id` to later
+     * {@link unsubscribe_status}, and a `done` that settles when the
+     * subscription ends.
+     */
+    subscribe_status: (
+      id: string,
+      onStatus: (status: SessionStatus) => void
+    ) => Promise<{ subscription_id: string; done: Promise<void> }>;
+    /** Stop a status subscription started by {@link subscribe_status}. */
+    unsubscribe_status: (subscriptionId: string) => Promise<void>;
   };
 };

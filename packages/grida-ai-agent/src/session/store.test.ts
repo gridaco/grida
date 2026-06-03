@@ -710,6 +710,153 @@ describe("SessionsStore fork", () => {
   });
 });
 
+describe("SessionsStore queue", () => {
+  it("appendQueuedMessage persists a user row with queued_at + text part", async () => {
+    const s = await store.create({ agent: "grida" });
+    const row = await store.appendQueuedMessage(s.id, {
+      id: "q1",
+      text: "hello",
+    });
+    expect(row.id).toBe("q1");
+    expect(row.role).toBe("user");
+    expect(row.metadata.queued_at).toEqual(expect.any(Number));
+    expect(row.parts).toHaveLength(1);
+    expect(row.parts[0].type).toBe("text");
+    expect(row.parts[0].data).toEqual({ type: "text", text: "hello" });
+  });
+
+  it("holds a queued row out of the model view AND the transcript", async () => {
+    const s = await store.create({ agent: "grida" });
+    await store.appendMessage(s.id, { role: "user" }); // a fired message
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
+    expect(
+      (await store.listVisibleMessages(s.id)).map((m) => m.id)
+    ).not.toContain("q1");
+    expect((await store.listMessages(s.id)).map((m) => m.id)).not.toContain(
+      "q1"
+    );
+    // ...but the dedup id-list (persistIncomingTail) MUST still see it.
+    expect(await store.listMessageIds(s.id)).toContain("q1");
+  });
+
+  it("listQueuedMessages returns the queue FIFO by queued_at then id", async () => {
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, {
+      id: "b",
+      text: "second",
+      queued_at: 100,
+    });
+    await store.appendQueuedMessage(s.id, {
+      id: "a",
+      text: "first",
+      queued_at: 100,
+    });
+    await store.appendQueuedMessage(s.id, {
+      id: "c",
+      text: "third",
+      queued_at: 50,
+    });
+    const q = await store.listQueuedMessages(s.id);
+    // 50 first; the 100-tie breaks by id ascending (a before b).
+    expect(q.map((m) => m.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("dequeueMessage clears queued_at — the row becomes visible", async () => {
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
+    await store.dequeueMessage("q1");
+    expect(
+      (await store.listQueuedMessages(s.id)).map((m) => m.id)
+    ).not.toContain("q1");
+    expect((await store.listVisibleMessages(s.id)).map((m) => m.id)).toContain(
+      "q1"
+    );
+    expect((await store.listMessages(s.id)).map((m) => m.id)).toContain("q1");
+    const row = await store.getMessage("q1");
+    expect(row?.metadata.queued_at).toBeUndefined();
+  });
+
+  it("dequeueMessage re-stamps created_at so a fired message ends the conversation", async () => {
+    // Repro for the "must end with a user message" provider error: the
+    // assistant message is created lazily (first chunk), so a message queued
+    // during the model's thinking gap has an EARLIER created_at than the
+    // in-flight assistant. Firing must move it to the end.
+    //
+    // The assistant id ("zzz") is chosen to sort AFTER the queued id ("aaa")
+    // so that an `asc(id)` tiebreak would put the assistant LAST (wrong) — the
+    // test only passes if ordering is genuinely by the re-stamped created_at,
+    // not by the id tiebreak.
+    const s = await store.create({ agent: "grida" });
+    await store.appendMessage(s.id, { id: "u1", role: "user" });
+    await store.appendQueuedMessage(s.id, { id: "aaa", text: "queued early" });
+    await delay(2);
+    await store.appendMessage(s.id, { id: "zzz", role: "assistant" }); // later
+    await delay(2);
+    await store.dequeueMessage("aaa");
+    const visible = await store.listVisibleMessages(s.id);
+    // Fired message sorts last — the conversation ends on a user message.
+    expect(visible.at(-1)?.id).toBe("aaa");
+    expect(visible.at(-1)?.role).toBe("user");
+  });
+
+  it("rewind does NOT hide queued rows (the pending queue survives a rewind)", async () => {
+    // Regression: a queued row's created_at sorts after the rewind target, so
+    // the old rewind stamped hidden_at on it and it dropped out of
+    // listQueuedMessages forever (which requires hidden_at IS NULL) while its
+    // queued_at lingered — an unreclaimable lost message.
+    const s = await store.create({ agent: "grida" });
+    const u1 = await store.appendMessage(s.id, { role: "user" });
+    await delay(2);
+    await store.appendMessage(s.id, { role: "assistant" });
+    await delay(2);
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "still pending" });
+
+    const res = await store.rewind(s.id, u1.id);
+    // Only the real assistant turn is hidden — the queued row is untouched.
+    expect(res.hidden_count).toBe(1);
+    const q = await store.listQueuedMessages(s.id);
+    expect(q.map((m) => m.id)).toEqual(["q1"]);
+    expect((await store.getMessage("q1"))?.hidden_at).toBeNull();
+    // ...and it is still held out of the (rewound) transcript + model view.
+    expect((await store.listVisibleMessages(s.id)).map((m) => m.id)).toEqual([
+      u1.id,
+    ]);
+  });
+
+  it("deleteMessage hard-deletes a queued row and its parts", async () => {
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
+    await store.deleteMessage(s.id, "q1");
+    expect(await store.getMessage("q1")).toBeNull();
+    expect(await store.listMessageIds(s.id)).not.toContain("q1");
+    const parts = opened.sqlite
+      .prepare("SELECT COUNT(*) AS n FROM chat_parts WHERE message_id = ?")
+      .get("q1") as { n: number };
+    expect(parts.n).toBe(0);
+  });
+
+  it("deleteMessage refuses a non-queued (fired) message — guarded", async () => {
+    const s = await store.create({ agent: "grida" });
+    const m = await store.appendMessage(s.id, { role: "user" });
+    await store.deleteMessage(s.id, m.id);
+    // Guard: only rows still carrying `queued_at` can be hard-deleted, so a
+    // fired/recorded message is never removed by cancel.
+    expect(await store.getMessage(m.id)).not.toBeNull();
+  });
+
+  it("deleteMessage refuses a messageId from another session (scoped)", async () => {
+    const a = await store.create({ agent: "grida" });
+    const b = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(b.id, { id: "q-b", text: "b's queued" });
+    // Cancel scoped to session A must NOT delete B's queued row.
+    await store.deleteMessage(a.id, "q-b");
+    expect(await store.getMessage("q-b")).not.toBeNull();
+    // Scoped to its own session, it deletes.
+    await store.deleteMessage(b.id, "q-b");
+    expect(await store.getMessage("q-b")).toBeNull();
+  });
+});
+
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }

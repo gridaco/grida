@@ -63,6 +63,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
   let baseDir: string;
   let sessionsStore: SessionsStore;
   let streamRegistry: StreamRegistry;
+  let runtime: AgentRuntime;
   let app: Hono;
 
   beforeEach(async () => {
@@ -76,18 +77,21 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     // Inject the registry so tests can pre-populate in-flight runs.
     streamRegistry = new StreamRegistry();
     app = new Hono();
-    const runtime = new AgentRuntime({
+    runtime = new AgentRuntime({
       secrets,
       workspace_registry: workspaceRegistry,
       sessions_store: sessionsStore,
       streams: streamRegistry,
       run_agent: fakeRunAgent,
+      // Shrink the inter-drain cooldown so the core-drain test runs fast.
+      drain_cooldown_ms: 20,
     });
     registerAgentRoutes(app, runtime);
   });
 
   afterEach(async () => {
-    streamRegistry.clear();
+    // dispose() clears the injected registry + the scheduler's drain timers.
+    runtime.dispose();
     sessionsStore.close();
     await fs.rm(baseDir, { recursive: true, force: true });
   });
@@ -238,6 +242,56 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     const body = (await res.json()) as { code?: string };
     expect(body.code).toBe("run_in_flight");
   });
+
+  it("the CORE drains a queue on a clean idle edge — serial, FIFO, no client re-send (RFC `queue`)", async () => {
+    // Two pending messages, with NO client re-send: the scheduler fires them.
+    const created = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    await sessionsStore.appendQueuedMessage(created.id, {
+      id: "qa",
+      text: "first",
+      queued_at: 1,
+    });
+    await sessionsStore.appendQueuedMessage(created.id, {
+      id: "qb",
+      text: "second",
+      queued_at: 2,
+    });
+
+    // Drive a clean idle edge through the registry — the scheduler observes it
+    // (busy → idle) and drains the queue itself. No `/agent/run` from a client.
+    runtime.streams.create(created.id);
+    runtime.streams.finish(created.id, "finish");
+
+    // Both fire serially (cooldown between each), in FIFO order, each as its
+    // own turn with its own assistant reply — and the queue empties.
+    await vi.waitFor(
+      async () => {
+        expect(await sessionsStore.listQueuedMessages(created.id)).toHaveLength(
+          0
+        );
+        const visible = await sessionsStore.listVisibleMessages(created.id);
+        const users = visible.filter((m) => m.role === "user").map((m) => m.id);
+        expect(users).toEqual(["qa", "qb"]); // FIFO, both fired
+        expect(
+          visible.filter((m) => m.role === "assistant").length
+        ).toBeGreaterThanOrEqual(2); // one reply per drained turn
+        expect((await sessionsStore.getMessage("qa"))?.metadata.queued_at).toBe(
+          undefined
+        );
+        expect((await sessionsStore.getMessage("qb"))?.metadata.queued_at).toBe(
+          undefined
+        );
+      },
+      { timeout: 2000 }
+    );
+  });
+
+  // NOTE: the v1 "client re-sends each queued row by id to drain" test was
+  // removed here. That client-driven serial drain is exactly what this
+  // redesign moves into the core (the renderer no longer re-sends queued rows
+  // — see Phase 5). The core serial drain is covered by the test above; the
+  // single-message HTTP dequeue-by-id path stays covered by "drains a queued
+  // message" further up.
 
   it("GET /agent/stream/:id replays full chunk log from index 0, then live-tails", async () => {
     const sid = "ses_replay";

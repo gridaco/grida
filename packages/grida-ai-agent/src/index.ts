@@ -22,6 +22,11 @@ export {
   type AgentRunOptions,
 } from "./protocol/run";
 export { AGENT_SKILL_IDS, type SkillId } from "./protocol/skills";
+export {
+  GRIDA_STATUS_SSE_EVENT,
+  type SessionRunState,
+  type SessionStatus,
+} from "./protocol/session-status";
 export type { AgentUIMessageChunk } from "./protocol/wire";
 export type {
   FileRegisterResult,

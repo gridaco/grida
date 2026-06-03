@@ -27,14 +27,19 @@ export type UseSessionFork = {
 
 export function useSessionFork(
   session: UseChatSessionResult,
-  isStreaming: boolean
+  /** Block forking while the session is busy — a streaming turn OR a
+   *  maintenance op (compaction). A fork copies the visible transcript, so
+   *  forking mid-compaction would copy a half-written summary. This is the
+   *  session-busy concept, not "is a turn streaming" — see
+   *  `isSessionBusy` in `turn-queue.ts`. */
+  busy: boolean
 ): UseSessionFork {
   const [justForked, setJustForked] = useState(false);
 
   const fork = useCallback(
     async (fromMessageId: string) => {
       const sid = session.current_id;
-      if (!sid || isStreaming) return;
+      if (!sid || busy) return;
       try {
         const created = await bridgeSessions.fork(sid, fromMessageId);
         session.apply_resolved_session_id(created.id);
@@ -43,7 +48,7 @@ export function useSessionFork(
         console.warn("[agent-chat] fork failed", err);
       }
     },
-    [session, isStreaming]
+    [session, busy]
   );
 
   useEffect(() => {

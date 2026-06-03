@@ -77,6 +77,10 @@ const agentClient = new AgentTransport.Client({ fetcher: agentServerFetch });
 // index. Fresh runs hold a UUID placeholder until the server's in-band
 // `grida-session` frame yields the real id; the entry is then re-keyed.
 const agentRuns = new Map<string, AbortController>();
+// Long-lived session-status subscriptions, keyed by a per-subscription id so
+// two subscribers to the same session never collide (cf. `agentRuns`, keyed by
+// session). Each owns an AbortController that `unsubscribe_status` trips.
+const statusSubs = new Map<string, AbortController>();
 
 async function handshake(): Promise<HandshakeResponse> {
   return await agentClient.handshake();
@@ -413,6 +417,34 @@ const bridge: DesktopBridge = {
       metadata?: Record<string, unknown>
     ) => agentClient.sessions.fork(id, fromMessageId, metadata),
     compact: (id: string) => agentClient.sessions.compact(id),
+    enqueue: (id: string, message: { id?: string; text: string }) =>
+      agentClient.sessions.enqueue(id, message),
+    list_queued: (id: string) => agentClient.sessions.list_queued(id),
+    cancel_queued: (id: string, messageId: string) =>
+      agentClient.sessions.cancel_queued(id, messageId),
+    subscribe_status: async (id, onStatus) => {
+      const subscriptionId = crypto.randomUUID();
+      const controller = new AbortController();
+      statusSubs.set(subscriptionId, controller);
+      const { done } = await agentClient.sessions.subscribe_status(
+        id,
+        onStatus,
+        { signal: controller.signal }
+      );
+      return {
+        subscription_id: subscriptionId,
+        done: done.finally(() => {
+          statusSubs.delete(subscriptionId);
+        }),
+      };
+    },
+    unsubscribe_status: async (subscriptionId) => {
+      const controller = statusSubs.get(subscriptionId);
+      if (controller) {
+        statusSubs.delete(subscriptionId);
+        controller.abort();
+      }
+    },
   },
 };
 

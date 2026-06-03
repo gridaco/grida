@@ -117,6 +117,29 @@ export function registerSessionsRoutes(
     app.post("/sessions/:id/compact", async (c) =>
       runtime.compact(c.req.param("id"))
     );
+
+    // Queued sends (RFC `queue`). enqueue persists a pending user message;
+    // list returns the queue FIFO; cancel hard-deletes a pending item. The
+    // drain itself is CORE-owned (the SessionScheduler fires queued turns on a
+    // clean idle edge) — clients enqueue/cancel and watch status; they do not
+    // drive the drain.
+    app.post("/sessions/:id/queue", async (c) =>
+      runtime.enqueue(c.req.param("id"), await c.req.json().catch(() => ({})))
+    );
+    app.get("/sessions/:id/queue", async (c) =>
+      runtime.listQueued(c.req.param("id"))
+    );
+    app.delete("/sessions/:id/queue/:messageId", async (c) =>
+      runtime.cancelQueued(c.req.param("id"), c.req.param("messageId") ?? "")
+    );
+
+    // Session status back-channel (RFC `session.md` §Session status): a
+    // long-lived SSE the dumb UI subscribes to for idle/busy/error — the
+    // authoritative source it renders Stop/Send from (not the AI-SDK client's
+    // optimistic per-request status).
+    app.get("/sessions/:id/status", async (c) =>
+      runtime.statusStream(c.req.param("id"), c.req.raw.signal)
+    );
   }
 }
 

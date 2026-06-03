@@ -8,6 +8,10 @@
  */
 
 import { GRIDA_SESSION_SSE_EVENT, type AgentRunOptions } from "./protocol/run";
+import {
+  GRIDA_STATUS_SSE_EVENT,
+  type SessionStatus,
+} from "./protocol/session-status";
 import type { AgentServerHandshakeResponse } from "./protocol/handshake";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type {
@@ -425,6 +429,60 @@ export namespace AgentTransport {
         await this.postJson<CompactSessionResult>(
           `/sessions/${encodeURIComponent(id)}/compact`
         ),
+      /** Queued sends (RFC `queue`): enqueue a pending user message. The
+       *  caller mints the message id for its optimistic mirror; the CORE fires
+       *  the row on a clean idle edge (the scheduler clears `queued_at`). */
+      enqueue: async (
+        id: string,
+        message: { id?: string; text: string }
+      ): Promise<ChatMessageWithParts> =>
+        await this.postJson<ChatMessageWithParts>(
+          `/sessions/${encodeURIComponent(id)}/queue`,
+          { id: message.id, text: message.text }
+        ),
+      /** The pending queue, FIFO by `queued_at` (RFC `queue / order`). */
+      list_queued: async (id: string): Promise<ChatMessageWithParts[]> =>
+        await this.getJson<ChatMessageWithParts[]>(
+          `/sessions/${encodeURIComponent(id)}/queue`
+        ),
+      /** Cancel a queued message before it fires (RFC `queue`). */
+      cancel_queued: async (id: string, messageId: string): Promise<void> => {
+        await this.deleteJson<{ ok: true }>(
+          `/sessions/${encodeURIComponent(id)}/queue/${encodeURIComponent(messageId)}`
+        );
+      },
+      /**
+       * Subscribe to the session's `SessionStatus` back-channel (RFC
+       * `session` §Session status). A long-lived SSE: the CURRENT status
+       * arrives first, then every idle⇄busy⇄error transition. The returned
+       * `done` settles when the subscription ends (the caller aborts via
+       * `init.signal`, or the socket drops). Unknown/idle sessions read
+       * `{ state: "idle" }`.
+       */
+      subscribe_status: async (
+        id: string,
+        onStatus: (status: SessionStatus) => void,
+        init: { signal?: AbortSignal } = {}
+      ): Promise<{ done: Promise<void> }> => {
+        const route = `/sessions/${encodeURIComponent(id)}/status`;
+        const res = await this.fetch(route, {
+          method: "GET",
+          headers: { accept: "text/event-stream" },
+          signal: init.signal,
+        });
+        if (!res.ok || !res.body) {
+          throw await httpErrorFromResponse(res, route);
+        }
+        const done = readFrames(res.body, (event, data) => {
+          if (event !== GRIDA_STATUS_SSE_EVENT) return;
+          try {
+            onStatus(JSON.parse(data) as SessionStatus);
+          } catch {
+            /* malformed status frame — ignore */
+          }
+        });
+        return { done };
+      },
     } as const;
 
     readonly agent = {

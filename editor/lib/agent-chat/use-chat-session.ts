@@ -87,6 +87,16 @@ export type UseChatSessionResult = {
    * fresh (truncated) message set.
    */
   rehydrate: () => void;
+  /**
+   * Awaitable {@link rehydrate}: fetch + apply the active session's messages
+   * and resolve once `initialMessages` has been set. Compaction awaits this
+   * before clearing its busy flag so the compacted transcript reconciles
+   * BEFORE the turn queue drains — otherwise a queued message would fire
+   * against the pre-compaction view and the late hydration would clobber the
+   * in-flight turn (RFC `queue`; see `agent-pane.tsx` / `ai-sidebar/chat.tsx`
+   * onCompact).
+   */
+  rehydrate_async: () => Promise<void>;
   /** Inline rename helper that updates list state optimistically. */
   rename: (id: string, title: string) => Promise<void>;
   /** Archive + drop from list. */
@@ -287,6 +297,29 @@ export function useChatSession(
 
   const rehydrate = useCallback(() => setHydrateNonce((n) => n + 1), []);
 
+  // Awaitable hydration: fetch the active session's messages and apply them,
+  // resolving once `setInitialMessages` has been called. Shares
+  // `hydrateGenRef` with the hydrate effect so the latest request wins
+  // regardless of which path issued it. Reads `currentId` from a ref so the
+  // callback stays identity-stable (no spurious effect re-runs downstream).
+  const currentIdRef = useRef(currentId);
+  currentIdRef.current = currentId;
+  const rehydrateAsync = useCallback(async () => {
+    const cur = currentIdRef.current;
+    if (cur === null) {
+      setInitialMessages([]);
+      return;
+    }
+    const gen = ++hydrateGenRef.current;
+    try {
+      const rows = await bridgeSessions.listMessages(cur);
+      if (gen !== hydrateGenRef.current) return;
+      setInitialMessages(toUIMessages(rows));
+    } catch {
+      // Keep the last-known transcript on a transient failure.
+    }
+  }, []);
+
   const select = useCallback((id: string | null) => {
     setCurrentId(id);
   }, []);
@@ -345,6 +378,7 @@ export function useChatSession(
     start_new: startNew,
     refresh,
     rehydrate,
+    rehydrate_async: rehydrateAsync,
     rename,
     archive,
     remove,

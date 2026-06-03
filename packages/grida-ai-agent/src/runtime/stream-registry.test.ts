@@ -248,3 +248,62 @@ describe("StreamRegistry / GC", () => {
     vi.useRealTimers();
   });
 });
+
+describe("StreamRegistry / lifecycle observer", () => {
+  it("notifies on_create (busy edge) and on_finish (idle edge) at the chokepoints", () => {
+    const r = new StreamRegistry();
+    const created: string[] = [];
+    const finished: Array<[string, string]> = [];
+    r.observe({
+      on_create: (sid) => created.push(sid),
+      on_finish: (sid, reason) => finished.push([sid, reason]),
+    });
+
+    r.create("ses_a");
+    expect(created).toEqual(["ses_a"]);
+    expect(finished).toEqual([]);
+
+    r.finish("ses_a", "finish");
+    expect(finished).toEqual([["ses_a", "finish"]]);
+
+    // The abort path funnels through finish — observer sees a single
+    // on_finish("abort"), the same chokepoint.
+    r.create("ses_b");
+    r.abort("ses_b");
+    expect(created).toEqual(["ses_a", "ses_b"]);
+    expect(finished).toEqual([
+      ["ses_a", "finish"],
+      ["ses_b", "abort"],
+    ]);
+  });
+
+  it("does not notify on_create when create throws RunInFlightError", () => {
+    const r = new StreamRegistry();
+    const created: string[] = [];
+    r.observe({ on_create: (sid) => created.push(sid) });
+    r.create("ses_a");
+    expect(() => r.create("ses_a")).toThrow(RunInFlightError);
+    expect(created).toEqual(["ses_a"]); // the rejected second create did NOT notify
+  });
+
+  it("a throwing observer never breaks the registry's core duty", async () => {
+    const r = new StreamRegistry();
+    r.observe({
+      on_create: () => {
+        throw new Error("boom");
+      },
+      on_finish: () => {
+        throw new Error("boom");
+      },
+    });
+    // create + finish still work; a consumer still gets its frames + end.
+    expect(() => r.create("ses_a")).not.toThrow();
+    const c = makeConsumer();
+    r.attach("ses_a", c);
+    r.push("ses_a", "f1");
+    expect(() => r.finish("ses_a", "finish")).not.toThrow();
+    await Promise.resolve();
+    expect(c.frames).toEqual(["f1"]);
+    expect(c.ended).toEqual(["finish"]);
+  });
+});

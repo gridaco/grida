@@ -29,6 +29,7 @@ import {
   type RewindResult,
   type SessionListFilter,
   type SessionListPage,
+  type SessionStatus,
 } from "@grida/agent";
 import type {
   DesktopBridge,
@@ -65,6 +66,7 @@ export {
   type PatchSessionOptions,
   type SessionListFilter,
   type SessionListPage,
+  type SessionStatus,
 } from "@grida/agent";
 
 export type {
@@ -510,6 +512,55 @@ export namespace sessions {
     summaryMessageId?: string;
   }> {
     return await bridgeOrThrow().sessions.compact(id);
+  }
+
+  /** Queued sends (RFC `queue`): enqueue a pending user message while a turn
+   *  is in flight. The caller mints the id for its optimistic mirror; the CORE
+   *  fires the row on a clean idle edge (the scheduler drains it). */
+  export async function enqueue(
+    id: string,
+    message: { id?: string; text: string }
+  ): Promise<ChatMessageWithParts> {
+    return await bridgeOrThrow().sessions.enqueue(id, message);
+  }
+
+  /** The pending queue for a session, FIFO by `queued_at`. */
+  export async function listQueued(
+    id: string
+  ): Promise<ChatMessageWithParts[]> {
+    return await bridgeOrThrow().sessions.list_queued(id);
+  }
+
+  /** Cancel (remove) a queued message before it fires. */
+  export async function cancelQueued(
+    id: string,
+    messageId: string
+  ): Promise<void> {
+    await bridgeOrThrow().sessions.cancel_queued(id, messageId);
+  }
+
+  /**
+   * Subscribe to a session's run-state (RFC `session` §Session status). The
+   * current status arrives first, then every idle⇄busy⇄error transition.
+   * Returns a `subscriptionId` to pass to {@link unsubscribeStatus} on
+   * cleanup, plus a `done` that settles when the subscription ends. This is
+   * the authoritative busy/idle the UI renders from — not the AI-SDK client's
+   * optimistic per-request status.
+   */
+  export async function subscribeStatus(
+    id: string,
+    onStatus: (status: SessionStatus) => void
+  ): Promise<{ subscriptionId: string; done: Promise<void> }> {
+    const { subscription_id, done } =
+      await bridgeOrThrow().sessions.subscribe_status(id, onStatus);
+    return { subscriptionId: subscription_id, done };
+  }
+
+  /** Stop a status subscription started by {@link subscribeStatus}. */
+  export async function unsubscribeStatus(
+    subscriptionId: string
+  ): Promise<void> {
+    await bridgeOrThrow().sessions.unsubscribe_status(subscriptionId);
   }
 }
 

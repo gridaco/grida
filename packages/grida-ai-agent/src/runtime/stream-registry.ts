@@ -37,13 +37,51 @@ export type StreamRegistryOptions = {
   finish_grace_ms?: number;
 };
 
+/**
+ * Lifecycle observer — the two clean edges a run-state machine
+ * ({@link SessionScheduler}) needs: a turn started (`create`) and a turn
+ * ended (`finish`, including the abort path which funnels through `finish`).
+ * Settable post-construction so it works for an injected registry too.
+ */
+export type StreamLifecycleObserver = {
+  on_create?: (sessionId: string) => void;
+  on_finish?: (sessionId: string, reason: StreamEndReason) => void;
+};
+
 export class StreamRegistry {
   private readonly entries = new Map<string, StreamEntry>();
   private readonly grace_ms: number;
   private consumer_seq = 0;
+  private observer: StreamLifecycleObserver | null = null;
 
   constructor(opts: StreamRegistryOptions = {}) {
     this.grace_ms = opts.finish_grace_ms ?? 60_000;
+  }
+
+  /**
+   * Attach the lifecycle observer (the run-state machine). Settable here so it
+   * works whether the registry was constructed here or injected. Observer
+   * callbacks are invoked guarded — a throwing observer never breaks the
+   * registry's core duty of decoupling model lifetime from consumers.
+   */
+  observe(observer: StreamLifecycleObserver): void {
+    this.observer = observer;
+  }
+
+  private notifyObserver(fn: () => void): void {
+    try {
+      fn();
+    } catch (err) {
+      try {
+        console.warn(
+          `[stream-registry] observer error: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      } catch {
+        /* never let logging break the registry */
+      }
+    }
   }
 
   /** Reserve a new entry. Throws `RunInFlightError` if one is running.
@@ -60,6 +98,8 @@ export class StreamRegistry {
       consumers: new Map(),
     };
     this.entries.set(sessionId, entry);
+    // Busy edge — AFTER the entry is in the map (throws above never notify).
+    this.notifyObserver(() => this.observer?.on_create?.(sessionId));
     return entry;
   }
 
@@ -92,6 +132,10 @@ export class StreamRegistry {
       );
     }
     entry.gc_timer = setTimeout(() => this.drop(sessionId), this.grace_ms);
+    // Idle/error edge — AFTER the entry is marked ended + consumers notified,
+    // so an observer that triggers a drain sees a consistent ended entry. The
+    // drain it schedules runs on a fresh task, never re-entrantly here.
+    this.notifyObserver(() => this.observer?.on_finish?.(sessionId, reason));
   }
 
   /** Explicit cancel: abort the upstream signal then `finish("abort")`. */
