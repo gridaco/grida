@@ -12,6 +12,9 @@ import { notFound, redirect } from "next/navigation";
 import { DeleteOrganizationConfirm } from "./delete";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
+import { PublicUrls } from "@/services/public-urls";
+import { updateOrganizationProfile } from "./actions";
+import { OrganizationAvatarField } from "./avatar-field";
 import Link from "next/link";
 
 type Params = { organization_name: string };
@@ -44,6 +47,10 @@ export default async function OrganizationsSettingsProfilePage({
 
   const iamowner = data.owner_id === auth.user.id;
 
+  const avatar_url = data.avatar_path
+    ? PublicUrls.organization_avatar_url(client)(data.avatar_path)
+    : null;
+
   return (
     <main className="container mx-auto max-w-screen-md py-10 grid gap-10">
       <Card>
@@ -53,12 +60,17 @@ export default async function OrganizationsSettingsProfilePage({
         <CardContent>
           <form
             id="profile"
-            action={`/private/accounts/organizations/${organization_name}/profile`}
-            encType="multipart/form-data"
-            method="POST"
+            action={updateOrganizationProfile.bind(null, organization_name)}
             className="py-4"
           >
             <FieldGroup className="gap-10">
+              <Field>
+                <FieldLabel>Organization avatar</FieldLabel>
+                <OrganizationAvatarField
+                  current_avatar_url={avatar_url}
+                  display_name={data.display_name}
+                />
+              </Field>
               <Field>
                 <FieldLabel>Name</FieldLabel>
                 <Input disabled readOnly value={data.name} />
