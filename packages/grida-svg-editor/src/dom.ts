@@ -473,6 +473,12 @@ class DomSurface implements Surface {
     if (getComputedStyle(container).position === "static") {
       container.style.position = "relative";
     }
+    // Clip the surface to its viewport: `svg_root` is absolutely positioned
+    // and camera-transformed (apply_svg_layout / apply_camera_transform), so
+    // panned/zoomed content spills past the container box. Without this, that
+    // overflow paints over adjacent host chrome — a tab strip sitting in-flow
+    // above this positioned canvas subtree loses paint order and gets covered.
+    container.style.overflow = "hidden";
     // Suppress native text selection / drag-ghost on SVG content. The HUD
     // surface owns all gesture state — letting the browser highlight text
     // mid-drag is just visual noise.
