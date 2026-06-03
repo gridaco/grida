@@ -90,3 +90,4 @@ typings/
 
 # Electron-Forge
 out/
+.electron/

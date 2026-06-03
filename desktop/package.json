@@ -13,18 +13,32 @@
   "repository": "https://github.com/gridaco/grida",
   "main": ".vite/build/main.js",
   "scripts": {
-    "dev": "electron-forge start",
-    "make": "electron-forge make",
-    "package": "electron-forge package",
-    "publish:prerelease": "electron-forge publish",
+    "dev": "node scripts/prepare-dev-electron-branding.mjs && electron-forge start",
+    "dev:insiders": "node scripts/prepare-dev-electron-branding.mjs --insiders && electron-forge start -- --insiders",
+    "make": "node scripts/prepare-dev-electron-branding.mjs && electron-forge make",
+    "package": "node scripts/prepare-dev-electron-branding.mjs && electron-forge package",
+    "publish:prerelease": "node scripts/prepare-dev-electron-branding.mjs && electron-forge publish",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "3.0.66",
+    "@ai-sdk/openai-compatible": "2.0.47",
+    "@anthropic-ai/sandbox-runtime": "^0.0.52",
+    "@grida/agent": "link:../packages/grida-ai-agent",
+    "@grida/ai-models": "link:../packages/grida-ai-models",
+    "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge",
+    "@grida/home": "link:../packages/grida-home",
+    "@hono/node-server": "^1.13.7",
+    "ai": "6.0.116",
     "clsx": "^2.1.1",
     "electron-squirrel-startup": "^1.0.1",
+    "hono": "^4.6.14",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "tailwind-merge": "^3.5.0",
+    "undici": "^7.24.4",
     "update-electron-app": "^3.2.0"
   },
   "devDependencies": {
@@ -50,7 +64,16 @@
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.0.0",
     "typescript": "^6",
-    "vite": "^8.0.13"
+    "vite": "^8.0.13",
+    "vitest": "^4"
   },
-  "packageManager": "pnpm@10.24.0"
+  "packageManager": "pnpm@10.24.0",
+  "pnpm": {
+    "overrides": {
+      "@grida/agent": "link:../packages/grida-ai-agent",
+      "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge",
+      "@grida/ai-models": "link:../packages/grida-ai-models",
+      "@grida/home": "link:../packages/grida-home"
+    }
+  }
 }

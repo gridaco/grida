@@ -4,69 +4,152 @@ import {
   BrowserWindow,
   MenuItemConstructorOptions,
   Menu,
+  dialog,
+  type BaseWindow,
 } from "electron";
-import create_main_window, { create_canvas_playground_window } from "./window";
+import {
+  open_welcome_window,
+  open_settings_window,
+  open_workspace_window,
+} from "./window";
 import { EDITOR_BASE_URL } from "./env";
+import { getAgentSidecarInfo } from "./main/agent-sidecar-supervisor";
+import { agentSidecarClient } from "./main/agent-sidecar-client";
+import { focusWindowByUrl } from "./main/window-focus";
+import { IPC_CHANNELS } from "./bridge/contract";
 
 /**
- * Recursively merges two menu templates.
- * For items with the same label, properties from the later template override those in the earlier one.
- * If both items have submenus (arrays), they are merged recursively.
- *
- * This helper merges two arrays.
+ * "Preferences…" menu click handler. Macros and a separate window
+ * mirror native conventions (macOS Cmd+, opens app prefs in a window
+ * distinct from any open doc). Dedup: if a `/desktop/settings` window
+ * already exists, focus it instead of spawning a second one.
  */
-function merge_two_templates(
-  a: MenuItemConstructorOptions[],
-  b: MenuItemConstructorOptions[]
-): MenuItemConstructorOptions[] {
-  const merged = [...a];
-  b.forEach((customItem) => {
-    // Try to find a matching default item by label.
-    const idx = merged.findIndex(
-      (defaultItem) => defaultItem.label === customItem.label
-    );
-    if (idx !== -1) {
-      // Found an item with the same label, merge properties.
-      const defaultItem = merged[idx];
-      const mergedItem: MenuItemConstructorOptions = {
-        ...defaultItem,
-        ...customItem,
-      };
-
-      // If both have submenus, merge them recursively.
-      if (
-        Array.isArray(defaultItem.submenu) &&
-        Array.isArray(customItem.submenu)
-      ) {
-        mergedItem.submenu = merge_templates(
-          defaultItem.submenu as MenuItemConstructorOptions[],
-          customItem.submenu as MenuItemConstructorOptions[]
-        );
-      }
-      merged[idx] = mergedItem;
-    } else {
-      // Not found in default, so add the custom item.
-      merged.push(customItem);
-    }
-  });
-  return merged;
+function open_or_focus_settings(app: App) {
+  if (focusWindowByUrl("/desktop/settings")) return;
+  const agentSidecar = getAgentSidecarInfo();
+  if (!agentSidecar) return; // pre-ready / between restarts
+  open_settings_window({ app, base_url: EDITOR_BASE_URL });
 }
 
 /**
- * Recursively merges multiple menu templates.
+ * "Open Folder…" menu handler. Drives the native directory picker
+ * from main, registers the chosen path with the agent server, then opens
+ * (or focuses) a workspace window for it.
  *
- * @param templates - A rest parameter of menu template arrays.
- * @returns The merged menu template.
+ * Each workspace gets at most one Electron BrowserWindow — opening
+ * an already-open workspace refocuses the existing window rather
+ * than spawning a duplicate. Dedup is by the URL's `?id=` query
+ * since the renderer side encodes it there.
+ */
+async function open_folder_picker_and_register(app: App): Promise<void> {
+  const agentSidecar = getAgentSidecarInfo();
+  if (!agentSidecar) return; // pre-ready / between restarts
+  const focused = BrowserWindow.getFocusedWindow() ?? undefined;
+  const result = focused
+    ? await dialog.showOpenDialog(focused, { properties: ["openDirectory"] })
+    : await dialog.showOpenDialog({ properties: ["openDirectory"] });
+  if (result.canceled || result.filePaths.length === 0) return;
+  let workspaceId: string;
+  try {
+    const workspace = await agentSidecarClient.openWorkspace(
+      result.filePaths[0]
+    );
+    workspaceId = workspace.id;
+  } catch (err) {
+    console.error("[grida] open workspace failed:", err);
+    dialog.showErrorBox(
+      "Couldn't open folder",
+      err instanceof Error ? err.message : String(err)
+    );
+    return;
+  }
+  focus_or_open_workspace_window({
+    app,
+    agentSidecar,
+    workspace_id: workspaceId,
+  });
+}
+
+/**
+ * Focus a workspace window for `workspaceId` if one exists, else
+ * spawn a new one. Used by both the menu and the IPC bridge so
+ * "open folder" UX is uniform regardless of entry point.
+ *
+ * Match is by `?id=<workspaceId>` in the window URL — the workspace
+ * page encodes it that way and never rewrites it client-side.
+ */
+function focus_or_open_workspace_window({
+  app,
+  agentSidecar,
+  workspace_id: workspaceId,
+}: {
+  app: App;
+  agentSidecar: ReturnType<typeof getAgentSidecarInfo>;
+  workspace_id: string;
+}) {
+  if (!agentSidecar) return;
+  const needle = `/desktop/workspace?id=${encodeURIComponent(workspaceId)}`;
+  if (focusWindowByUrl(needle)) return;
+  open_workspace_window({
+    app,
+    base_url: EDITOR_BASE_URL,
+    workspace_id: workspaceId,
+  });
+}
+
+export { focus_or_open_workspace_window };
+
+function is_workspace_window(window: BrowserWindow): boolean {
+  try {
+    const url = new URL(window.webContents.getURL());
+    return url.pathname === "/desktop/workspace";
+  } catch {
+    return false;
+  }
+}
+
+function close_tab_or_window(baseWindow?: BaseWindow): void {
+  const focusedWindow =
+    baseWindow instanceof BrowserWindow
+      ? baseWindow
+      : BrowserWindow.getFocusedWindow();
+  if (!focusedWindow) return;
+  if (is_workspace_window(focusedWindow)) {
+    focusedWindow.webContents.send(
+      IPC_CHANNELS.WORKSPACE_COMMAND,
+      "workspace.tabs.close-active"
+    );
+    return;
+  }
+  focusedWindow.close();
+}
+
+/**
+ * Recursively merge `extras` into `base`. Items are matched by `label`;
+ * properties on `extras` override `base`. If both sides of a match carry
+ * a `submenu` array, the submenus are merged recursively. Items in
+ * `extras` with no label match are appended.
  */
 export function merge_templates(
-  ...templates: MenuItemConstructorOptions[][]
+  base: MenuItemConstructorOptions[],
+  extras: MenuItemConstructorOptions[]
 ): MenuItemConstructorOptions[] {
-  if (templates.length === 0) return [];
-  // Start with the first template.
-  let merged = templates[0];
-  // Merge each subsequent template into the merged result.
-  for (let i = 1; i < templates.length; i++) {
-    merged = merge_two_templates(merged, templates[i]);
+  const merged = [...base];
+  for (const item of extras) {
+    const idx = merged.findIndex((m) => m.label === item.label);
+    if (idx === -1) {
+      merged.push(item);
+      continue;
+    }
+    const base_item = merged[idx];
+    const next: MenuItemConstructorOptions = { ...base_item, ...item };
+    if (Array.isArray(base_item.submenu) && Array.isArray(item.submenu)) {
+      next.submenu = merge_templates(
+        base_item.submenu as MenuItemConstructorOptions[],
+        item.submenu as MenuItemConstructorOptions[]
+      );
+    }
+    merged[idx] = next;
   }
   return merged;
 }
@@ -120,7 +203,11 @@ export function create_default_menu(
       role: "window",
       submenu: [
         { role: "minimize", accelerator: "CmdOrCtrl+M" },
-        { role: "close", accelerator: "CmdOrCtrl+W" },
+        {
+          label: "Close",
+          accelerator: "CmdOrCtrl+W",
+          click: (_menuItem, baseWindow) => close_tab_or_window(baseWindow),
+        },
         { type: "separator" },
         { accelerator: "CmdOrCtrl+Alt+I", role: "toggleDevTools" },
       ],
@@ -154,6 +241,12 @@ export function create_default_menu(
       label: appName,
       submenu: [
         { role: "about", label: "About " + appName },
+        { type: "separator" },
+        {
+          label: "Settings…",
+          accelerator: "Command+,",
+          click: () => open_or_focus_settings(app),
+        },
         { type: "separator" },
         { role: "services", label: "Services", submenu: [] },
         { type: "separator" },
@@ -193,69 +286,51 @@ export function create_default_menu(
 
 export default function create_menu(app: App, shell: Shell) {
   const default_menu = create_default_menu(app, shell);
-  const doctype_canvas_menus: MenuItemConstructorOptions[] = [
+  // Minimal File menu. An extension-keyed registry (one entry per
+  // openable file type) is the next iteration when modules other than
+  // `.svg` / `.grida` land.
+  const desktop_menus: MenuItemConstructorOptions[] = [
     {
       label: "File",
       submenu: [
-        //     // TODO:
-        // {
-        //   label: "New File",
-        //   accelerator: "CmdOrCtrl+N",
-        //   click: () => {
-        //     console.log("New File clicked");
-        //   },
-        // },
         {
           label: "New Window",
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => {
-            create_main_window({ baseUrl: EDITOR_BASE_URL });
+            const agentSidecar = getAgentSidecarInfo();
+            // Pre-ready or between supervisor restarts → no-op rather
+            // than open a window that can't reach the agent sidecar.
+            if (!agentSidecar) return;
+            open_welcome_window({
+              app,
+              base_url: EDITOR_BASE_URL,
+            });
           },
         },
         {
-          label: "New Canvas Playground",
+          label: "Open Folder…",
+          accelerator: "CmdOrCtrl+Shift+O",
           click: () => {
-            create_canvas_playground_window({ baseUrl: EDITOR_BASE_URL });
+            void open_folder_picker_and_register(app);
           },
         },
-        { type: "separator" },
-        // {
-        //   label: "Open...",
-        //   accelerator: "CmdOrCtrl+O",
-        //   click: () => {
-        //     // TODO:
-        //     dialog.showOpenDialog({
-        //       properties: ["openFile"],
-        //       filters: [{ name: "Grida Files", extensions: ["grida"] }],
-        //     });
-        //   },
-        // },
-        // {
-        //   label: "Save",
-        //   accelerator: "CmdOrCtrl+S",
-        //   click: () => {
-        //     // TODO:
-        //     const focusedWindow = BrowserWindow.getFocusedWindow();
-        //     if (focusedWindow) {
-        //       focusedWindow.webContents.send("app:save");
-        //     }
-        //   },
-        // },
-        // {
-        //   label: "Save As...",
-        //   accelerator: "CmdOrCtrl+Shift+S",
-        //   click: () => {
-        //     // TODO:
-        //     dialog.showSaveDialog({
-        //       filters: [{ name: "Grida Files", extensions: ["grida"] }],
-        //     });
-        //   },
-        // },
+        // Cross-platform shortcut to Settings. macOS gets the same
+        // entry under the app menu (above) per platform convention,
+        // but Cmd/Ctrl+, is the universal expectation — keep it here
+        // too so Win/Linux users discover it without leaving File.
+        ...(process.platform === "darwin"
+          ? []
+          : [
+              { type: "separator" as const },
+              {
+                label: "Settings…",
+                accelerator: "Ctrl+,",
+                click: () => open_or_focus_settings(app),
+              },
+            ]),
       ],
     },
   ];
 
-  return Menu.buildFromTemplate(
-    merge_templates(default_menu, doctype_canvas_menus)
-  );
+  return Menu.buildFromTemplate(merge_templates(default_menu, desktop_menus));
 }
